@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тренажёр: деление дробей</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font-ui:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Sora','Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,-apple-system,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#EEF1F7;
+  --blob-1:rgba(120,150,255,.16);
+  --blob-2:rgba(190,150,230,.14);
+  --card:rgba(255,255,255,.8);
+  --glass:rgba(255,255,255,.55);
+  --glass-strong:rgba(255,255,255,.72);
+  --glass-border:rgba(255,255,255,.85);
+  --glass-inset:rgba(255,255,255,.55);
+  --hl:var(--hl-14);
+  --muted-1:#8E8E93;
+  --muted-2:#6E6E73;
+  --muted-3:#48484A;
+  --muted-4:#3A3A3C;
+  --muted-5:#1D1D1F;
+  --muted-6:#8E8E93;
+  --muted-7:#C7C7CC;
+  --muted-8:#8E8E93;
+  --paper:#FDFCF7;
+  --grid:#DCE4F0;
+  --margin-red:#FF9F0A;
+  --ink:#004C99;
+  --ink-active:#003A75;
+  --pencil:#1D1D1F;
+  --teacher:#FF3B30;
+  --ok:#248A3D;
+  --ok-tint:rgba(36,138,61,.1);
+  --ok-shadow:rgba(36,138,61,.3);
+  --moved:#5AC8FA;
+  --shadow:0 10px 34px rgba(20,30,60,.08);
+  --cell:38px;
+  --hl-14:var(--hl);
+  --hl-18:rgba(0,76,153,.18);
+  --hl-28:rgba(0,76,153,.28);
+  --hl-35:rgba(0,76,153,.35);
+}
+
+html[data-theme="dark"]{
+  --bg:#0B0E1A;
+  --blob-1:rgba(90,110,255,.22);
+  --blob-2:rgba(150,90,220,.18);
+  --paper:#151A2C;
+  --card:rgba(30,37,64,.82);
+  --glass:rgba(40,46,74,.5);
+  --glass-strong:rgba(46,53,84,.65);
+  --glass-border:rgba(255,255,255,.12);
+  --glass-inset:rgba(255,255,255,.07);
+  --hl:rgba(40,110,214,.26);
+  --grid:#232A44;
+  --margin-red:#FF9F0A;
+  --ink:#2E7DE0;
+  --ink-active:#4A93F0;
+  --pencil:#F2F3F5;
+  --teacher:#FF6961;
+  --ok:#3E8E5B;
+  --ok-tint:rgba(62,142,91,.14);
+  --ok-shadow:rgba(62,142,91,.35);
+  --moved:#64D2FF;
+  --shadow:0 10px 40px rgba(0,0,0,.55);
+  --hl-14:var(--hl);
+  --hl-18:rgba(46,125,224,.29);
+  --hl-28:rgba(46,125,224,.45);
+  --hl-35:rgba(46,125,224,.5);
+  --muted-1:#9A9AA2;
+  --muted-2:#9A9AA2;
+  --muted-3:#AEAEB4;
+  --muted-4:#C7C7CC;
+  --muted-5:#F2F3F5;
+  --muted-6:#9A9AA2;
+  --muted-7:#3A3F55;
+  --muted-8:#9A9AA2;
+  --hover-1:rgba(127,160,255,.08);
+  --hover-2:rgba(127,160,255,.14);
+}
+html[data-theme="dark"] input{background:var(--card)}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--bg);
+  background-size:auto,auto,24px 24px,24px 24px,auto;
+  font-family:var(--font-ui);
+  color:var(--pencil);
+  min-height:100vh;
+  padding:18px 12px 60px;
+}
+.wrap{max-width:1040px;margin:0 auto}
+h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(26px,5vw,38px);color:var(--pencil);text-align:center;}
+.sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 18px;}
+.levels{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px}
+.lvl{font-family:var(--font-ui);font-weight:600;font-size:14px;border:1px solid var(--glass-border);background:var(--glass);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border-radius:999px;padding:8px 16px;cursor:pointer;color:var(--muted-3);transition:all .15s;}
+.lvl:hover{border-color:var(--ink)}
+.lvl.active{background:var(--ink);border-color:var(--ink);color:#fff;box-shadow:0 6px 16px var(--hl-35);}
+.lvl .done-mark{color:#FFB800;margin-left:4px;}
+.sheet{
+  position:relative;
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--paper);
+  background-size:var(--cell) var(--cell);
+  border:1px solid var(--glass-border);
+  border-radius:20px;
+  box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);
+  padding:calc(var(--cell)*2) calc(var(--cell)*.7) calc(var(--cell)*2.6) calc(var(--cell)*1.4);
+  overflow-x:auto;
+  min-height:calc(var(--cell)*8);
+}
+.sheet::before{
+  content:'';
+  position:absolute;
+  top:0;bottom:0;
+  left:calc(var(--cell)*1);
+  width:2px;
+  background:var(--margin-red);
+  opacity:.55;
+}
+.corner{font-family:var(--font-ui);font-weight:500;position:absolute;top:6px;right:12px;color:var(--muted-1);font-size:13px;display:flex;align-items:center;gap:8px;}
+.refresh-btn{width:28px;height:28px;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}
+.refresh-btn:hover{border-color:var(--ink);transform:rotate(80deg)}
+.refresh-btn:active{transform:scale(.9)}
+.corner-left{
+  position:absolute;
+  top:6px;left:12px;
+  z-index:2;
+}
+.undo-btn{
+  width:26px;height:26px;
+  border:1.5px solid var(--grid);
+  border-radius:7px;
+  background:var(--card);
+  color:var(--ink);
+  font-size:16px;
+  line-height:1;
+  cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:transform .12s, border-color .12s, opacity .15s;
+}
+.undo-btn:hover{border-color:var(--ink)}
+.undo-btn:active{transform:scale(.9)}
+.undo-btn:disabled{opacity:.3;cursor:default}
+.undo-btn:disabled:hover{border-color:var(--grid)}
+.frow{
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  gap:0;
+  row-gap:calc(var(--cell)*.3);
+  flex-wrap:wrap;
+  padding:0 4px;
+  font-family:var(--font-mono);
+}
+.whole-part{
+  color:var(--ink);
+  display:flex;align-items:center;justify-content:center;
+  width:var(--cell);
+  height:calc(var(--cell)*2 + 3px);
+  font-size:calc(var(--cell)*.58);
+}
+.frac{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  position:relative;
+}
+.frac.flip-target{
+  cursor:pointer;
+  outline:2px dashed var(--teacher);
+  outline-offset:6px;
+  border-radius:10px;
+  animation:pulse 1s infinite;
+}
+.frac.flipping{perspective:400px}
+.frac.flipping .fnum, .frac.flipping .fden{position:relative;z-index:2}
+@keyframes flipDown{
+  0%   { transform:translateY(0) rotateX(0deg); }
+  50%  { transform:translateY(calc(var(--swap-dist) / 2)) rotateX(180deg) scale(.8); opacity:.35; }
+  100% { transform:translateY(var(--swap-dist)) rotateX(360deg); }
+}
+@keyframes flipUp{
+  0%   { transform:translateY(0) rotateX(0deg); }
+  50%  { transform:translateY(calc(var(--swap-dist) * -0.5)) rotateX(180deg) scale(.8); opacity:.35; }
+  100% { transform:translateY(calc(var(--swap-dist) * -1)) rotateX(360deg); }
+}
+.flip-anim-down{animation:flipDown .55s cubic-bezier(.45,0,.4,1) forwards}
+.flip-anim-up{animation:flipUp .55s cubic-bezier(.45,0,.4,1) forwards}
+@keyframes signFlip{
+  0%   { transform:scaleX(1); }
+  48%  { transform:scaleX(0); }
+  52%  { transform:scaleX(0); }
+  100% { transform:scaleX(1); }
+}
+.op-sign.flipping-sign{display:inline-block;animation:signFlip .55s ease-in-out;color:var(--teacher);font-weight:700}
+.frac.flip-target:hover{background:rgba(201,58,43,.06);border-radius:10px}
+.frac .fnum, .frac .fden{
+  position:relative;
+  color:var(--ink);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:var(--cell);
+}
+.fdigit{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:var(--cell);
+  height:var(--cell);
+  font-size:calc(var(--cell)*.6);
+}
+.frac .fbar{
+  width:100%;
+  height:3px;
+  background:var(--ink);
+  border-radius:1.5px;
+}
+.op-sign, .eq-sign{
+  color:var(--pencil);
+  font-size:calc(var(--cell)*.5);
+  display:flex;align-items:center;justify-content:center;
+  width:var(--cell);
+  height:calc(var(--cell)*2 + 3px);
+}
+.fnum.tappable, .fden.tappable{
+  outline:2px dashed var(--teacher);
+  outline-offset:-3px;
+  border-radius:8px;
+  cursor:pointer;
+}
+.fnum.tappable:not(.struck):hover, .fden.tappable:not(.struck):hover{background:rgba(201,58,43,.08)}
+.fnum.struck .newval:hover, .fden.struck .newval:hover{background:rgba(201,58,43,.14);border-radius:6px;padding:2px 6px}
+.fnum.hl, .fden.hl{
+  background:var(--hl-14);
+  border-radius:8px;
+  animation:pulse 1s infinite;
+}
+@keyframes pulse{50%{background:var(--hl-28)}}
+.fnum.selected, .fden.selected{
+  background:rgba(201,58,43,.16);
+  border-radius:8px;
+  color:var(--teacher-active,var(--teacher));
+  font-weight:700;
+}
+.fnum.struck, .fden.struck{color:var(--muted-7);position:relative}
+.fnum.struck::after, .fden.struck::after{
+  content:'';
+  position:absolute;
+  left:-4px;right:-4px;top:50%;
+  height:2.5px;
+  background:var(--teacher);
+  transform:rotate(-16deg);
+  border-radius:2px;
+}
+.newval{
+  position:absolute;
+  top:-22px; left:50%;
+  transform:translateX(-50%);
+  font-size:calc(var(--cell)*.38);
+  color:var(--teacher);
+  font-family:var(--font-ui);
+  font-weight:700;
+  line-height:1;
+  white-space:nowrap;
+}
+.newval.stale{
+  color:var(--muted-7);
+  position:absolute;
+}
+.newval.stale::after{
+  content:'';
+  position:absolute;
+  left:-4px;right:-4px;top:50%;
+  height:2px;
+  background:var(--teacher);
+  transform:rotate(-16deg);
+  border-radius:2px;
+}
+.newval.mark-hl{
+  background:var(--hl-18);
+  border-radius:6px;
+  padding:2px 6px;
+  animation:pulse 1s infinite;
+}
+.newval.below{
+  top:auto;
+  bottom:-22px;
+}
+.inline-input{
+  position:absolute;
+  top:-30px; left:50%;
+  transform:translateX(-50%);
+  width:42px;
+  font-family:var(--font-mono);
+  font-size:calc(var(--cell)*.38);
+  text-align:center;
+  border:2px solid var(--teacher);
+  border-radius:7px;
+  padding:2px 0;
+  color:var(--teacher);
+  background:var(--card);
+}
+.inline-input.below{
+  top:auto;
+  bottom:-30px;
+}
+.inline-input:focus{outline:none;border-color:var(--ink);color:var(--ink)}
+.inline-input.shake{animation:shake .35s}
+.inline-arrow{
+  position:absolute;
+  top:-30px; left:50%;
+  transform:translateX(-50%);
+  font-size:calc(var(--cell)*.4);
+  color:var(--teacher);
+  line-height:1;
+}
+.frac.answer .fnum, .frac.answer .fden{color:var(--ok)}
+.frac.answer .fbar{background:var(--ok)}
+.divider-note{
+  width:100%;
+  text-align:center;
+  font-family:var(--font-ui);
+  font-size:16px;
+  color:var(--muted-1);
+  margin-top:4px;
+}
+.panel{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:20px;margin-top:16px;}
+.prompt{font-family:var(--font-ui);font-weight:500;font-size:clamp(17px,3.2vw,20px);color:var(--muted-5);margin-bottom:12px;line-height:1.4;}
+.prompt b{color:var(--ink)}
+.inrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+input.num{
+  font-family:var(--font-mono);
+  font-size:24px;
+  padding:9px 12px;
+  border:1px solid var(--glass-border);
+  background:var(--card);
+  border-radius:14px 0 0 14px;
+  border-right:none;
+  color:var(--ink);
+  width:100px;
+}
+input.num:focus{outline:none;border-color:var(--ink)}
+input.num.shake{animation:shake .35s}
+@keyframes shake{
+  20%{transform:translateX(-7px)}40%{transform:translateX(7px)}
+  60%{transform:translateX(-5px)}80%{transform:translateX(5px)}
+}
+.num-wrap{display:inline-flex;align-items:stretch;vertical-align:middle}
+.spin{display:flex;flex-direction:column;border:1px solid var(--glass-border);background:var(--card);border-radius:0 14px 14px 0;overflow:hidden;}
+.spin-btn{flex:1;width:32px;border:none;background:transparent;color:var(--ink);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;touch-action:manipulation;}
+.spin-btn:first-child{border-bottom:1px solid var(--glass-border);}
+.spin-btn:active{background:var(--hl);}
+button.go{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ink);color:#fff;border:none;border-radius:14px;padding:11px 26px;cursor:pointer;box-shadow:0 6px 18px var(--hl-35);}
+button.go:active{transform:scale(.96)}
+button.go.no{background:var(--teacher)}
+button.go.secondary{background:var(--ok)}
+.hint{font-family:var(--font-ui);font-weight:500;color:var(--teacher);font-size:15px;margin-top:12px;min-height:20px;line-height:1.4;}
+.hint.good{color:var(--ok)}
+.next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:8px;box-shadow:0 6px 18px var(--ok-shadow);}
+.stats{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.stat{flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:12px 14px;text-align:center;}
+.stat .v{font-family:var(--font-ui);font-weight:700;font-size:22px;color:var(--ink);}
+.stat .l{font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-6);}
+.stars{color:#FFB800;font-size:20px;letter-spacing:2px;}
+.theory{display:flex;gap:14px;margin-top:16px;flex-wrap:wrap;align-items:stretch}
+.tcard{flex:1;min-width:290px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:18px 20px;}
+.tt{font-family:var(--font-ui);font-weight:700;font-size:17px;color:var(--pencil);margin-bottom:10px;}
+.talg{font-family:var(--font-ui);font-weight:400;font-size:14px;color:var(--muted-4);padding-left:20px;line-height:1.6;}
+.talg li{margin:5px 0;}
+.ttrap{font-family:var(--font-ui);font-weight:500;font-size:13px;color:var(--teacher);margin-top:8px;line-height:1.45;}
+.keypad{display:grid;grid-template-columns:repeat(3, 44px);gap:6px;}
+.keypad button{width:44px;height:40px;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-mono);font-size:18px;cursor:pointer;touch-action:manipulation;}
+.keypad button:active{background:var(--hl);}
+.keypad button.kp-minus{color:var(--teacher);font-weight:700;}
+.keypad button.kp-back{font-size:15px;color:var(--muted-6);}
+.keypad button.kp-enter{grid-column:span 3;width:auto;height:38px;font-family:var(--font-ui);font-weight:600;font-size:14px;background:var(--ink);color:#fff;border-color:var(--ink);}
+.keypad button.kp-enter:active{background:var(--ink-active);}
+.keypad-float{position:fixed;top:220px;right:20px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:50;}
+.keypad-close{position:absolute;top:-11px;right:-11px;width:26px;height:26px;border-radius:50%;background:var(--teacher);color:#fff;border:2px solid #fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.keypad-toggle{position:fixed;top:220px;right:20px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50;}
+@media(max-width:720px){.keypad-float,.keypad-toggle{top:auto;bottom:16px;right:16px}}
+
+.theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
+.theme-toggle:hover{border-color:var(--ink)}
+.theme-toggle:active{transform:scale(.92)}
+.home-btn{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
+.home-btn:hover{border-color:var(--ink)}
+.home-btn:active{transform:scale(.92)}
+</style>
+</head>
+<body>
+<a class="home-btn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
+<button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<script>(function(){
+  var btn=document.getElementById('themeToggle');
+  function apply(t, persist){
+    document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = t === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    if (persist) { try{ localStorage.setItem('theme', t); }catch(e){} }
+  }
+  apply(document.documentElement.getAttribute('data-theme') || 'light', false);
+  btn.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur, true);
+  });
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onSystemChange = function(e){
+      var explicit = false;
+      try{ explicit = !!localStorage.getItem('theme'); }catch(err){}
+      if (explicit) return;
+      apply(e.matches ? 'dark' : 'light', false);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
+    else if (mq.addListener) mq.addListener(onSystemChange);
+  }
+})();</script>
+<div class="wrap">
+  <h1>Деление дробей</h1>
+  <div class="sub">переворачиваем дробь, на которую делим, а дальше — как обычное умножение</div>
+
+  <div class="levels" id="levels"></div>
+
+  <div class="sheet">
+    <div class="corner-left">
+      <button class="undo-btn" id="undoBtn" title="Отменить последний шаг" disabled>←</button>
+    </div>
+    <div class="corner">
+      <button class="refresh-btn" id="refreshBtn" title="Обновить пример">⟳</button>
+      <span id="taskNum">пример №1</span>
+    </div>
+    <div class="frow" id="board"></div>
+  </div>
+
+  <div class="panel">
+    <div class="prompt" id="prompt"></div>
+    <div class="inrow" id="inputArea"></div>
+    <button class="next-btn" id="nextBtn" style="display:none">Следующий пример →</button>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="v" id="stSolved">0</div><div class="l">решено</div></div>
+    <div class="stat"><div class="v" id="stStreak">0</div><div class="l">серия без ошибок</div></div>
+    <div class="stat"><div class="v stars" id="stStars">—</div><div class="l">этот пример</div></div>
+  </div>
+
+  <div class="theory">
+    <div class="tcard">
+      <div class="tt">Алгоритм</div>
+      <ol class="talg">
+        <li>Если стоит знак ÷ — переворачиваем дробь, на которую делим (числитель и знаменатель меняются местами).</li>
+        <li>После переворота знак меняется на ×, и дальше всё как при обычном умножении.</li>
+        <li>Ищем любые два числа — числитель и знаменатель — у которых есть общий делитель, и сокращаем.</li>
+        <li>Умножаем все числители между собой, все знаменатели между собой.</li>
+        <li>Если результат ещё сократим — сокращаем и его. Если неправильная дробь — выделяем целую часть.</li>
+      </ol>
+    </div>
+    <div class="tcard">
+      <div class="tt">Ловушки</div>
+      <div class="ttrap">⚠ Переворачивается только та дробь, НА которую делят — не первая.</div>
+      <div class="ttrap">⚠ Сокращать можно только ПОСЛЕ переворота — до этого числа стоят не в тех местах.</div>
+      <div class="ttrap">⚠ Если дробей несколько и знаков ÷ тоже несколько — переворачивай каждую из них, у которой перед ней стоит ÷.</div>
+    </div>
+  </div>
+</div>
+
+<button class="keypad-toggle" id="kpToggle" title="Показать клавиатуру" style="display:none">⌨</button>
+<div class="keypad-float" id="keypadFloat" style="display:none">
+  <button class="keypad-close" id="kpClose" title="Скрыть клавиатуру">✕</button>
+  <div class="keypad" id="keypadButtons"></div>
+</div>
+
+<script>
+const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const pick = a=>a[ri(0,a.length-1)];
+function gcd(a,b){ while(b){ [a,b]=[b,a%b]; } return a; }
+
+/* ───────── алгоритм: жадное сокращение в любом порядке (проверено на 30000 наборов) ───────── */
+function greedyFullyReduce(fractions){
+  const nums = fractions.map(f=>f.n);
+  const dens = fractions.map(f=>f.d);
+  const events = [];
+  let changed = true;
+  while(changed){
+    changed = false;
+    for(let i=0;i<nums.length && !changed;i++){
+      for(let j=0;j<dens.length && !changed;j++){
+        const g = gcd(nums[i], dens[j]);
+        if(g>1){ nums[i]/=g; dens[j]/=g; events.push({numIdx:i, denIdx:j, g}); changed = true; }
+      }
+    }
+  }
+  const resultNum = nums.reduce((a,b)=>a*b,1);
+  const resultDen = dens.reduce((a,b)=>a*b,1);
+  return {nums, dens, resultNum, resultDen, events};
+}
+
+/* ───────── генерация ───────── */
+function genOps(count, mode){
+  // ops[0] не используется — перед первой дробью знака нет
+  const ops = new Array(count).fill(null);
+  if(mode==='alwaysDivide'){
+    for(let i=1;i<count;i++) ops[i]='÷';
+    return ops;
+  }
+  // mixed — случайная смесь ×/÷, но хотя бы одно ÷ гарантировано
+  let guard=0;
+  while(true){
+    guard++;
+    for(let i=1;i<count;i++) ops[i] = ri(0,1)===0 ? '×' : '÷';
+    if(ops.slice(1).includes('÷') || guard>50) return ops;
+  }
+}
+
+function genProblem(opts={}){
+  let guard=0;
+  const count = opts.count || 2;
+  const smallRange = opts.smallRange || [1,9];
+  const twoDigitRange = opts.twoDigitRange || [10,16];
+  const opsMode = opts.opsMode || 'alwaysDivide';
+  while(true){
+    guard++; if(guard>20000) throw 'genProblem: не удалось сгенерировать';
+    const totalSlots = count*2; // числитель+знаменатель для каждой дроби
+    let twoDigitCount = 0;
+    if(opts.twoDigitCountRange){
+      twoDigitCount = Math.min(ri(opts.twoDigitCountRange[0], opts.twoDigitCountRange[1]), totalSlots);
+    }
+    const slots = [...Array(totalSlots).keys()];
+    for(let i=slots.length-1;i>0;i--){ const j=ri(0,i); [slots[i],slots[j]]=[slots[j],slots[i]]; }
+    const twoDigitSlots = new Set(slots.slice(0, twoDigitCount));
+
+    const fractions = [];
+    for(let k=0;k<count;k++){
+      const nSlot = k*2, dSlot = k*2+1;
+      const n = twoDigitSlots.has(nSlot) ? ri(twoDigitRange[0], twoDigitRange[1]) : ri(smallRange[0], smallRange[1]);
+      const d = twoDigitSlots.has(dSlot) ? ri(twoDigitRange[0], twoDigitRange[1]) : ri(Math.max(2,smallRange[0]), smallRange[1]);
+      fractions.push({n,d});
+    }
+    const ops = genOps(count, opsMode);
+    // эффективные дроби — с учётом переворота там, где стоит ÷ (нужны только для проверки свойств примера)
+    const eff = fractions.map((f,idx)=> (idx>0 && ops[idx]==='÷') ? {n:f.d, d:f.n} : f);
+    const sim = greedyFullyReduce(eff);
+    const cancelCount = sim.events.length;
+    if(opts.forbidCancel && cancelCount>0) continue;
+    if(opts.minCancel!==undefined && cancelCount<opts.minCancel) continue;
+    if(opts.maxCancel!==undefined && cancelCount>opts.maxCancel) continue;
+    const isImproper = sim.resultNum >= sim.resultDen;
+    if(opts.requireImproper && !isImproper) continue;
+    if(opts.forbidImproper && isImproper) continue;
+    return {fractions, ops, sim, isImproper};
+  }
+}
+
+const LEVELS = [
+  {id:0, name:'Уровень 1', desc:'Разминка — 1–2 двузначных числа', gen:()=>genProblem({count:2, opsMode:'alwaysDivide', twoDigitCountRange:[1,2], forbidCancel:true, forbidImproper:true})},
+  {id:1, name:'Уровень 2', desc:'Числа побольше — 1–3 двузначных', gen:()=>genProblem({count:2, opsMode:'alwaysDivide', twoDigitCountRange:[1,3]})},
+  {id:2, name:'Уровень 3', desc:'Цепочка из трёх дробей', gen:()=>genProblem({count:3, opsMode:'mixed', twoDigitCountRange:[1,3], minCancel:2})},
+  {id:3, name:'Уровень 4', desc:'Большие числа, 3–4 дроби', gen:()=>genProblem({count:ri(0,1)?4:3, opsMode:'mixed', twoDigitCountRange:[2,6], twoDigitRange:[10,90]})},
+  {id:4, name:'Экзамен',   desc:'вперемешку'},
+];
+let curLevel = 0;
+const solvedByLevel = [0,0,0,0,0];
+let totalSolved = 0, streak = 0, taskCounter = 0;
+
+function gen(level){
+  if(level===4) level = ri(0,3);
+  return LEVELS[level].gen();
+}
+
+let P=null, S=null;
+
+function fieldRole(field){ return field[0]; } // 'n' | 'd'
+function fieldIdx(field){ return Number(field.slice(1)); }
+function needsFlip(idx){ return idx>0 && P.ops[idx]==='÷'; }
+function isFlipped(idx){ return needsFlip(idx) && !!S.flipped[idx]; }
+function effectiveOriginal(idx, role){
+  const effRole = isFlipped(idx) ? (role==='n'?'d':'n') : role;
+  return P.fractions[idx][effRole];
+}
+function curVal(field){
+  const role = fieldRole(field), idx = fieldIdx(field);
+  const store = role==='n' ? S.struckN : S.struckD;
+  const hist = store[idx];
+  return (hist && hist.length) ? hist[hist.length-1] : effectiveOriginal(idx, role);
+}
+function pendingFlipIndices(){
+  return P.fractions.map((_,i)=>i).filter(i=>needsFlip(i) && !S.flipped[i]);
+}
+
+function anyReduciblePairExists(){
+  const n = P.fractions.length;
+  for(let i=0;i<n;i++) for(let j=0;j<n;j++){
+    if(gcd(curVal('n'+i), curVal('d'+j))>1) return true;
+  }
+  return false;
+}
+
+function newProblem(){
+  P = gen(curLevel);
+  taskCounter++;
+  S = {
+    phase:'preview',
+    struckN: {}, struckD: {},
+    flipped: {},
+    animatingFlip: false,
+    subPhase: 'flip',
+    selectedFirst: null, selectedSecond: null,
+    pairNumField: null, pairDenField: null,
+    divisor: null,
+    numChain: null, denChain: null,
+    productNum: null, productDen: null,
+    resultNum: null, resultDen: null,
+    whole: null,
+    errTotal: 0,
+    exam: curLevel===4,
+    history: [],
+  };
+  document.getElementById('taskNum').textContent = 'пример №'+taskCounter;
+  document.getElementById('nextBtn').style.display='none';
+  document.getElementById('stStars').textContent='—';
+  setHint('');
+  renderAll(); setPrompt(); renderInputs(); syncUndoButton();
+}
+document.getElementById('refreshBtn').onclick = newProblem;
+
+/* ───────── отмена последнего шага ───────── */
+function pushHistory(){
+  const snapshot = JSON.parse(JSON.stringify({
+    struckN:S.struckN, struckD:S.struckD, flipped:S.flipped, subPhase:S.subPhase,
+    selectedFirst:S.selectedFirst, selectedSecond:S.selectedSecond,
+    pairNumField:S.pairNumField, pairDenField:S.pairDenField, divisor:S.divisor,
+    numChain:S.numChain, denChain:S.denChain,
+    productNum:S.productNum, productDen:S.productDen,
+    resultNum:S.resultNum, resultDen:S.resultDen, whole:S.whole,
+    errTotal:S.errTotal,
+  }));
+  S.history.push(snapshot);
+  syncUndoButton();
+}
+function undoStep(){
+  if(!S.history || S.history.length===0 || S.phase!=='solve') return;
+  const prev = S.history.pop();
+  Object.assign(S, prev);
+  setHint('');
+  renderAll(); setPrompt(); renderInputs(); syncUndoButton();
+}
+function syncUndoButton(){
+  const btn = document.getElementById('undoBtn');
+  if(!btn) return;
+  btn.disabled = !S || S.phase!=='solve' || !S.history || S.history.length===0;
+}
+document.getElementById('undoBtn').onclick = undoStep;
+
+function startSolving(){
+  S.phase = 'solve';
+  enterFlipOrCancelPhase();
+}
+
+function enterFlipOrCancelPhase(){
+  S.subPhase = pendingFlipIndices().length>0 ? 'flip' : 'selectFirst';
+  renderAll(); setPrompt(); renderInputs();
+}
+
+function onFlipTap(idx){
+  if(S.subPhase!=='flip') return;
+  if(!needsFlip(idx) || S.flipped[idx]) return;
+  if(S.animatingFlip) return; // не даём тапнуть повторно, пока идёт анимация
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+
+  const numEl = document.querySelector(`[data-field="n${idx}"]`);
+  const denEl = document.querySelector(`[data-field="d${idx}"]`);
+  const fracEl = document.querySelector(`[data-flip-idx="${idx}"]`);
+  const signEl = document.querySelector(`[data-op-idx="${idx}"]`);
+  const canAnimate = numEl && denEl && typeof numEl.getBoundingClientRect==='function' && typeof denEl.getBoundingClientRect==='function';
+
+  if(canAnimate){
+    const numRect = numEl.getBoundingClientRect();
+    const denRect = denEl.getBoundingClientRect();
+    const dist = denRect.top - numRect.top;
+    if(dist>0){
+      S.animatingFlip = true;
+      if(fracEl && fracEl.classList) fracEl.classList.add('flipping');
+      numEl.style.setProperty('--swap-dist', dist+'px');
+      denEl.style.setProperty('--swap-dist', dist+'px');
+      numEl.classList.add('flip-anim-down');
+      denEl.classList.add('flip-anim-up');
+      if(signEl && signEl.classList){
+        signEl.classList.add('flipping-sign');
+        setTimeout(()=>{ signEl.textContent = '×'; }, 270); // ровно в момент, когда знак "невидим" на scaleX=0
+      }
+      setTimeout(()=>{ S.animatingFlip = false; finishFlip(idx); }, 560);
+      return;
+    }
+  }
+  finishFlip(idx);
+}
+
+function finishFlip(idx){
+  pushHistory();
+  S.flipped[idx] = true;
+  enterFlipOrCancelPhase();
+}
+
+function enterMultiplyPhase(){
+  S.numChain = P.fractions.map((_,i)=>curVal('n'+i));
+  S.denChain = P.fractions.map((_,i)=>curVal('d'+i));
+  S.subPhase = 'multiplyNum';
+  renderAll(); setPrompt(); renderInputs();
+}
+
+function checkFinalSimplify(){
+  const g = gcd(S.productNum, S.productDen);
+  if(g>1){
+    S.subPhase = 'finalDivisor';
+    renderAll(); setPrompt(); renderInputs();
+  } else {
+    afterFinalSimplify(S.productNum, S.productDen);
+  }
+}
+
+function afterFinalSimplify(num, den){
+  S.productNum = num; S.productDen = den;
+  if(gcd(num,den)>1){
+    // сократили не до конца (например, поделили только на 2 из общего делителя 4) — идём на ещё один круг
+    checkFinalSimplify();
+    return;
+  }
+  if(num>=den){
+    S.resultNum = num; S.resultDen = den;
+    S.subPhase = 'mixedWhole';
+    renderAll(); setPrompt(); renderInputs();
+  } else {
+    S.resultNum = num; S.resultDen = den; S.whole = 0;
+    finish();
+  }
+}
+
+/* ───────── отрисовка ───────── */
+function digitsHTML(val){
+  return String(val).split('').map(ch=>`<span class="fdigit">${ch}</span>`).join('');
+}
+
+function stackMarksHTML(history, liveInputId, direction, highlightCurrent){
+  // history: массив значений после каждого шага сокращения (последнее — текущее, живое)
+  // liveInputId: если задан, поверх стека рисуем ещё и активное поле ввода для нового уровня
+  const items = [];
+  const n = history ? history.length : 0;
+  for(let i=0;i<n;i++){
+    const isCurrent = (i===n-1) && !liveInputId;
+    const off = 24 + 30*i;
+    const style = direction==='up' ? `top:-${off}px;bottom:auto` : `bottom:-${off}px;top:auto`;
+    let cls = isCurrent ? 'newval' : 'newval stale';
+    if(isCurrent && highlightCurrent) cls += ' mark-hl';
+    items.push(`<span class="${cls}" style="${style}">${history[i]}</span>`);
+  }
+  if(liveInputId){
+    const off = 34 + 30*n;
+    const style = direction==='up' ? `top:-${off}px;bottom:auto` : `bottom:-${off}px;top:auto`;
+    const inputCl = direction==='up' ? 'inline-input' : 'inline-input below';
+    items.push(`<input class="${inputCl}" id="${liveInputId}" type="text" inputmode="none" autocomplete="off" placeholder="?" style="${style}">`);
+  }
+  return items.join('');
+}
+
+function fracHTML(idx, numVal, denVal, opts={}){
+  const numCl = ['fnum'];
+  const denCl = ['fden'];
+  if(opts.numTappable) numCl.push('tappable');
+  if(opts.denTappable) denCl.push('tappable');
+  const numHasHistory = !!(opts.numHistory && opts.numHistory.length);
+  const denHasHistory = !!(opts.denHistory && opts.denHistory.length);
+  // если у числа уже есть история сокращений, подсветку несёт только актуальная метка — не вся ячейка
+  // (иначе подсвечивается заодно и старая зачёркнутая цифра, что путает)
+  if(opts.numHl && !numHasHistory) numCl.push('hl');
+  if(opts.denHl && !denHasHistory) denCl.push('hl');
+  if(opts.numSel && !numHasHistory) numCl.push('selected');
+  if(opts.denSel && !denHasHistory) denCl.push('selected');
+  let numMark='', denMark='';
+  const numHighlighted = !!(opts.numHl || opts.numSel);
+  const denHighlighted = !!(opts.denHl || opts.denSel);
+  if(opts.numInput || numHasHistory){
+    numCl.push('struck');
+    numMark = stackMarksHTML(opts.numHistory, opts.numInput ? 'inlineNumInput' : null, 'up', numHighlighted);
+  }
+  if(opts.denInput || denHasHistory){
+    denCl.push('struck');
+    denMark = stackMarksHTML(opts.denHistory, opts.denInput ? 'inlineDenInput' : null, 'down', denHighlighted);
+  }
+  const fracCl = ['frac'];
+  if(opts.answer) fracCl.push('answer');
+  if(opts.flipTarget) fracCl.push('flip-target');
+  const flipAttr = opts.flipTarget ? ` data-flip-idx="${idx}"` : '';
+  return `<div class="${fracCl.join(' ')}"${flipAttr}>
+    <div class="${numCl.join(' ')}" data-field="n${idx}">${digitsHTML(numVal)}${numMark}</div>
+    <div class="fbar"></div>
+    <div class="${denCl.join(' ')}" data-field="d${idx}">${digitsHTML(denVal)}${denMark}</div>
+  </div>`;
+}
+
+function plainFracHTML(numVal, denVal, opts={}){
+  const fracCl = ['frac'];
+  if(opts.answer) fracCl.push('answer');
+  const numCl = ['fnum']; const denCl = ['fden'];
+  let numMark='', denMark='';
+  if(opts.numInput){ numCl.push('struck'); numMark = stackMarksHTML([], 'inlineNumInput', 'up'); }
+  if(opts.denInput){ denCl.push('struck'); denMark = stackMarksHTML([], 'inlineDenInput', 'down'); }
+  return `<div class="${fracCl.join(' ')}">
+    <div class="${numCl.join(' ')}">${digitsHTML(numVal)}${numMark}</div>
+    <div class="fbar"></div>
+    <div class="${denCl.join(' ')}">${digitsHTML(denVal)}${denMark}</div>
+  </div>`;
+}
+
+function opSignHTML(idx){
+  const op = needsFlip(idx) && !isFlipped(idx) ? '÷' : '×';
+  return `<span class="op-sign" data-op-idx="${idx}">${op}</span>`;
+}
+
+function renderAll(){
+  const board = document.getElementById('board');
+
+  if(S.phase==='preview'){
+    const parts = P.fractions.map((f,idx)=>(idx>0?`<span class="op-sign">${P.ops[idx]}</span>`:'')+plainFracHTML(f.n,f.d));
+    board.innerHTML = parts.join('') + `<span class="eq-sign">=</span><span class="op-sign">?</span>`;
+    return;
+  }
+
+  const isCancelPhase = ['selectFirst','selectSecond','divisor','fillResults'].includes(S.subPhase);
+  const isMultiplyPhase = ['multiplyNum','multiplyDen'].includes(S.subPhase);
+  const isFlipPhase = S.subPhase==='flip';
+
+  const fracParts = P.fractions.map((f,idx)=>{
+    const opt = {};
+    if(S.struckN[idx]!==undefined) opt.numHistory = S.struckN[idx];
+    if(S.struckD[idx]!==undefined) opt.denHistory = S.struckD[idx];
+    const dispN = effectiveOriginal(idx,'n'), dispD = effectiveOriginal(idx,'d');
+
+    if(isFlipPhase && needsFlip(idx) && !S.flipped[idx]){
+      opt.flipTarget = true;
+    }
+    if(isCancelPhase){
+      opt.numTappable = true; opt.denTappable = true;
+      if(S.selectedFirst==='n'+idx || S.selectedSecond==='n'+idx) opt.numSel = true;
+      if(S.selectedFirst==='d'+idx || S.selectedSecond==='d'+idx) opt.denSel = true;
+      if((S.subPhase==='divisor'||S.subPhase==='fillResults')){
+        if(S.pairNumField==='n'+idx) opt.numHl = true;
+        if(S.pairDenField==='d'+idx) opt.denHl = true;
+      }
+      if(S.subPhase==='fillResults'){
+        if(S.pairNumField==='n'+idx) opt.numInput = true;
+        if(S.pairDenField==='d'+idx) opt.denInput = true;
+      }
+    }
+    if(isMultiplyPhase){
+      if(S.subPhase==='multiplyNum') opt.numHl = true;
+      if(S.subPhase==='multiplyDen') opt.denHl = true;
+    }
+    return (idx>0?opSignHTML(idx):'') + fracHTML(idx, dispN, dispD, opt);
+  });
+
+  let resultBlock = '';
+  if(isMultiplyPhase || S.subPhase==='finalDivisor' || S.subPhase==='finalFill' || S.subPhase==='mixedWhole' || S.subPhase==='mixedRemainder'){
+    let showNum = '?', showDen = '?';
+    if(S.subPhase==='multiplyDen') showNum = S.productNum;
+    else if(S.subPhase!=='multiplyNum') { showNum = S.productNum; showDen = S.productDen; }
+    const resOpt = {answer:true};
+    if(S.subPhase==='finalFill'){ resOpt.numInput = true; resOpt.denInput = true; }
+    resultBlock = `<span class="eq-sign">=</span>` + plainFracHTML(showNum, showDen, resOpt);
+  } else if(S.phase==='done'){
+    if(S.whole>0){
+      resultBlock = `<span class="eq-sign">=</span><span class="whole-part">${S.whole}</span>` + (S.resultNum>0 ? plainFracHTML(S.resultNum, S.resultDen, {answer:true}) : '');
+    } else {
+      resultBlock = `<span class="eq-sign">=</span>` + plainFracHTML(S.resultNum, S.resultDen, {answer:true});
+    }
+  }
+
+  board.innerHTML = fracParts.join('') + resultBlock;
+
+  board.querySelectorAll('[data-field]').forEach(el=>{
+    el.onclick = ()=>onTapCell(el.dataset.field);
+  });
+  board.querySelectorAll('[data-flip-idx]').forEach(el=>{
+    el.onclick = ()=>onFlipTap(Number(el.dataset.flipIdx));
+  });
+}
+
+function setPrompt(){
+  const p = document.getElementById('prompt');
+  if(S.phase==='preview'){
+    p.innerHTML = 'Посмотри на пример спокойно — спешить некуда.<br>Когда будешь готов, жми «Начать».';
+    return;
+  }
+  if(S.phase==='done'){
+    p.innerHTML = 'Пример решён! 🎉';
+    return;
+  }
+  if(S.subPhase==='flip'){
+    const n = pendingFlipIndices().length;
+    p.innerHTML = `Тут стоит знак ÷ — <b>переверни дробь, на которую делим</b> (коснись её). Знак сам сменится на ×.${n>1?` Осталось перевернуть: ${n}.`:''}`;
+    return;
+  }
+  if(S.subPhase==='selectFirst'){
+    p.innerHTML = `Есть что сократить? Коснись любого числа — числителя или знаменателя. Или сразу жми «Умножаем» — если что-то останется несокращённым, досократим уже после умножения.`;
+  } else if(S.subPhase==='selectSecond'){
+    p.innerHTML = `Теперь коснись <b>второго</b> числа — числитель нужно соединить со знаменателем.`;
+  } else if(S.subPhase==='divisor'){
+    p.innerHTML = `${curVal(S.pairNumField)} и ${curVal(S.pairDenField)} — <b>на что сокращаем?</b> (их общий делитель)`;
+  } else if(S.subPhase==='fillResults'){
+    p.innerHTML = `Делим оба числа на ${S.divisor}. <b>Что получится у каждого?</b>`;
+  } else if(S.subPhase==='multiplyNum'){
+    p.innerHTML = `Сокращения позади — умножаем числители. <b>${S.numChain.join(' × ')} = ?</b>`;
+  } else if(S.subPhase==='multiplyDen'){
+    p.innerHTML = `Теперь знаменатели. <b>${S.denChain.join(' × ')} = ?</b>`;
+  } else if(S.subPhase==='finalDivisor'){
+    p.innerHTML = `Получилась дробь ${S.productNum}/${S.productDen} — она ещё сократима! <b>На что сокращаем?</b>`;
+  } else if(S.subPhase==='finalFill'){
+    p.innerHTML = `Делим оба числа на ${S.divisor}. <b>Что получится?</b>`;
+  } else if(S.subPhase==='mixedWhole'){
+    p.innerHTML = `Дробь ${S.resultNum}/${S.resultDen} — неправильная. <b>Сколько целых здесь поместится?</b>`;
+  } else if(S.subPhase==='mixedRemainder'){
+    p.innerHTML = `Целых ${S.whole}. <b>А что останется в числителе дробной части?</b>`;
+  }
+}
+
+function numInputHTML(id, extraStyle){
+  return `<div class="num-wrap">
+    <input class="num" id="${id}" type="text" inputmode="none" autocomplete="off" placeholder="?"${extraStyle?` style="${extraStyle}"`:''}>
+    <div class="spin">
+      <button type="button" class="spin-btn" data-target="${id}" data-dir="1">▲</button>
+      <button type="button" class="spin-btn" data-target="${id}" data-dir="-1">▼</button>
+    </div>
+  </div>`;
+}
+
+function attachSpinners(area){
+  area.querySelectorAll('.spin-btn').forEach(btn=>{
+    btn.onclick = ()=>{
+      const inp = document.getElementById(btn.dataset.target);
+      if(!inp) return;
+      let v = Number(inp.value);
+      if(!Number.isFinite(v)) v = 0;
+      v += Number(btn.dataset.dir);
+      if(v<0) v=0;
+      if(v>999) v=999;
+      inp.value = String(v);
+      inp.focus();
+    };
+  });
+}
+
+function renderInputs(){
+  const area = document.getElementById('inputArea');
+  syncKeypadVisibility();
+  syncUndoButton();
+  if(S.phase==='preview'){
+    area.innerHTML = `<button class="go" id="goBtn">Начать →</button>`;
+    document.getElementById('goBtn').onclick = startSolving;
+    return;
+  }
+  if(S.phase==='done'){ area.innerHTML=''; return; }
+
+  if(S.subPhase==='flip'){
+    area.innerHTML = `<span class="lbl" style="font-family:var(--font-ui);font-size:19px;color:var(--muted-6)">Коснись дроби на доске выше ↑</span>`;
+    return;
+  }
+
+  if(S.subPhase==='selectFirst'){
+    area.innerHTML = `<span class="lbl" style="font-family:var(--font-ui);font-size:19px;color:var(--muted-6)">Коснись числа на доске выше ↑</span>
+      <button class="go secondary" id="doneBtn">Умножаем →</button>`;
+    document.getElementById('doneBtn').onclick = onDoneCancel;
+    return;
+  }
+  if(S.subPhase==='selectSecond'){
+    area.innerHTML = `<span class="lbl" style="font-family:var(--font-ui);font-size:19px;color:var(--muted-6)">Коснись второго числа на доске выше ↑</span>`;
+    return;
+  }
+  if(S.subPhase==='fillResults' || S.subPhase==='finalFill'){
+    area.innerHTML = `
+      <span class="lbl" style="font-family:var(--font-ui);font-size:19px;color:var(--muted-6)">Впиши оба числа прямо на доске выше ↑</span>
+      <button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>`;
+    document.getElementById('goBtn').onclick = submitAnswer;
+    const numEl = document.getElementById('inlineNumInput');
+    const denEl = document.getElementById('inlineDenInput');
+    activeInputId = 'inlineNumInput';
+    if(numEl){
+      numEl.addEventListener('focus', ()=>{ activeInputId='inlineNumInput'; });
+      numEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ if(denEl) denEl.focus(); else submitAnswer(); } });
+    }
+    if(denEl){
+      denEl.addEventListener('focus', ()=>{ activeInputId='inlineDenInput'; });
+      denEl.addEventListener('keydown', e=>{ if(e.key==='Enter') submitAnswer(); });
+    }
+    setTimeout(()=>{ if(numEl) numEl.focus(); }, 30);
+    return;
+  }
+
+  // divisor / multiplyNum / multiplyDen / finalDivisor / mixedWhole / mixedRemainder — одиночный ввод
+  area.innerHTML = `
+    ${numInputHTML('ans')}
+    <button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>`;
+  document.getElementById('goBtn').onclick = submitAnswer;
+  attachSpinners(area);
+  activeInputId = 'ans';
+  document.getElementById('ans').addEventListener('keydown', e=>{ if(e.key==='Enter') submitAnswer(); });
+  setTimeout(()=>{ const el=document.getElementById('ans'); if(el) el.focus(); }, 30);
+}
+
+function setHint(t, good=false){
+  const h = document.getElementById('hint');
+  h.innerHTML = t;
+  h.className = 'hint'+(good?' good':'');
+}
+
+/* ───────── логика решения ───────── */
+function onTapCell(field){
+  if(S.subPhase==='selectFirst'){
+    pushHistory();
+    S.selectedFirst = field;
+    S.subPhase = 'selectSecond';
+    renderAll(); setPrompt(); renderInputs();
+    return;
+  }
+  if(S.subPhase==='selectSecond'){
+    if(field===S.selectedFirst){
+      setHint('Нужно выбрать два РАЗНЫХ числа.');
+      return;
+    }
+    const firstIsNum = fieldRole(S.selectedFirst)==='n';
+    const secondIsNum = fieldRole(field)==='n';
+    if(firstIsNum === secondIsNum){
+      S.errTotal++;
+      setHint(S.exam ? 'Нужны числитель и знаменатель.' : 'Сокращать можно только числитель со знаменателем — не два числителя и не два знаменателя.');
+      S.selectedFirst = null;
+      S.subPhase = 'selectFirst';
+      renderAll(); setPrompt(); renderInputs();
+      return;
+    }
+    const numField = firstIsNum ? S.selectedFirst : field;
+    const denField = firstIsNum ? field : S.selectedFirst;
+    const g = gcd(curVal(numField), curVal(denField));
+    if(g<=1){
+      S.errTotal++;
+      setHint(S.exam ? 'У этих чисел нет общего делителя.' : `У ${curVal(numField)} и ${curVal(denField)} нет общего делителя больше 1 — попробуй другую пару.`);
+      S.selectedFirst = null;
+      S.subPhase = 'selectFirst';
+      renderAll(); setPrompt(); renderInputs();
+      return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    pushHistory();
+    S.selectedSecond = field;
+    S.pairNumField = numField;
+    S.pairDenField = denField;
+    S.subPhase = 'divisor';
+    renderAll(); setPrompt(); renderInputs();
+  }
+}
+
+function onDoneCancel(){
+  setHint('');
+  pushHistory();
+  enterMultiplyPhase();
+}
+
+function submitAnswer(){
+  if(S.subPhase==='divisor'){
+    const inp = document.getElementById('ans');
+    if(!inp || inp.value==='') return;
+    const v = Number(inp.value);
+    const numV = curVal(S.pairNumField), denV = curVal(S.pairDenField);
+    const isValidDivisor = v>1 && numV%v===0 && denV%v===0;
+    if(!isValidDivisor){
+      S.errTotal++;
+      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+      setHint(S.exam ? 'Нужно число больше 1, на которое делятся оба нацело.' : `${numV} и ${denV} должны делиться на это число без остатка — попробуй другое.`);
+      inp.value=''; return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    inp.value='';
+    pushHistory();
+    S.divisor = v;
+    S.subPhase = 'fillResults';
+    renderAll(); setPrompt(); renderInputs();
+    return;
+  }
+
+  if(S.subPhase==='fillResults'){
+    const inpA = document.getElementById('inlineNumInput');
+    const inpB = document.getElementById('inlineDenInput');
+    if(!inpA || !inpB || inpA.value===''|| inpB.value==='') return;
+    const vA = Number(inpA.value), vB = Number(inpB.value);
+    const expA = curVal(S.pairNumField)/S.divisor, expB = curVal(S.pairDenField)/S.divisor;
+    if(vA!==expA || vB!==expB){
+      S.errTotal++;
+      [inpA,inpB].forEach(el=>{ el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); });
+      setHint(S.exam ? 'Раздели оба числа на найденный делитель.' : `${curVal(S.pairNumField)} ÷ ${S.divisor} и ${curVal(S.pairDenField)} ÷ ${S.divisor}.`);
+      inpA.value=''; inpB.value=''; return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    inpA.value=''; inpB.value='';
+    pushHistory();
+    const nIdx = fieldIdx(S.pairNumField), dIdx = fieldIdx(S.pairDenField);
+    if(!S.struckN[nIdx]) S.struckN[nIdx] = [];
+    if(!S.struckD[dIdx]) S.struckD[dIdx] = [];
+    S.struckN[nIdx].push(expA);
+    S.struckD[dIdx].push(expB);
+    S.selectedFirst = null; S.selectedSecond = null;
+    S.pairNumField = null; S.pairDenField = null; S.divisor = null;
+    S.subPhase = 'selectFirst';
+    renderAll(); setPrompt(); renderInputs();
+    return;
+  }
+
+  if(S.subPhase==='multiplyNum'){
+    const inp = document.getElementById('ans');
+    if(!inp || inp.value==='') return;
+    const v = Number(inp.value);
+    const expected = S.numChain.reduce((a,b)=>a*b,1);
+    if(v!==expected){
+      S.errTotal++;
+      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+      setHint(S.exam ? 'Проверь умножение.' : `Перемножь все числители: ${S.numChain.join(' × ')}.`);
+      inp.value=''; return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    inp.value='';
+    pushHistory();
+    S.productNum = expected;
+    S.subPhase = 'multiplyDen';
+    renderAll(); setPrompt(); renderInputs();
+    return;
+  }
+
+  if(S.subPhase==='multiplyDen'){
+    const inp = document.getElementById('ans');
+    if(!inp || inp.value==='') return;
+    const v = Number(inp.value);
+    const expected = S.denChain.reduce((a,b)=>a*b,1);
+    if(v!==expected){
+      S.errTotal++;
+      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+      setHint(S.exam ? 'Проверь умножение.' : `Перемножь все знаменатели: ${S.denChain.join(' × ')}.`);
+      inp.value=''; return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    inp.value='';
+    pushHistory();
+    S.productDen = expected;
+    checkFinalSimplify();
+    return;
+  }
+
+  if(S.subPhase==='finalDivisor'){
+    const inp = document.getElementById('ans');
+    if(!inp || inp.value==='') return;
+    const v = Number(inp.value);
+    const isValidDivisor = v>1 && S.productNum%v===0 && S.productDen%v===0;
+    if(!isValidDivisor){
+      S.errTotal++;
+      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+      setHint(S.exam ? 'Нужно число больше 1, на которое делятся оба нацело.' : `${S.productNum} и ${S.productDen} должны делиться на это число без остатка — попробуй другое.`);
+      inp.value=''; return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    inp.value='';
+    pushHistory();
+    S.divisor = v;
+    S.subPhase = 'finalFill';
+    renderAll(); setPrompt(); renderInputs();
+    return;
+  }
+
+  if(S.subPhase==='finalFill'){
+    const inpA = document.getElementById('inlineNumInput');
+    const inpB = document.getElementById('inlineDenInput');
+    if(!inpA || !inpB || inpA.value===''|| inpB.value==='') return;
+    const vA = Number(inpA.value), vB = Number(inpB.value);
+    const expA = S.productNum/S.divisor, expB = S.productDen/S.divisor;
+    if(vA!==expA || vB!==expB){
+      S.errTotal++;
+      [inpA,inpB].forEach(el=>{ el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); });
+      setHint(S.exam ? 'Раздели оба числа на найденный делитель.' : `${S.productNum} ÷ ${S.divisor} и ${S.productDen} ÷ ${S.divisor}.`);
+      inpA.value=''; inpB.value=''; return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    inpA.value=''; inpB.value='';
+    pushHistory();
+    afterFinalSimplify(expA, expB);
+    return;
+  }
+
+  if(S.subPhase==='mixedWhole'){
+    const inp = document.getElementById('ans');
+    if(!inp || inp.value==='') return;
+    const v = Number(inp.value);
+    const expected = Math.floor(S.resultNum/S.resultDen);
+    if(v!==expected){
+      S.errTotal++;
+      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+      setHint(S.exam ? 'Раздели числитель на знаменатель нацело.' : `Сколько раз ${S.resultDen} помещается в ${S.resultNum} целиком?`);
+      inp.value=''; return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    inp.value='';
+    pushHistory();
+    S.whole = expected;
+    S.subPhase = 'mixedRemainder';
+    renderAll(); setPrompt(); renderInputs();
+    return;
+  }
+
+  if(S.subPhase==='mixedRemainder'){
+    const inp = document.getElementById('ans');
+    if(!inp || inp.value==='') return;
+    const v = Number(inp.value);
+    const fullNum = S.resultNum, fullDen = S.resultDen;
+    const expected = fullNum - S.whole*fullDen;
+    if(v!==expected){
+      S.errTotal++;
+      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+      setHint(S.exam ? 'Посчитай остаток.' : `${fullNum} − ${S.whole}×${fullDen} = ?`);
+      inp.value=''; return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    inp.value='';
+    pushHistory();
+    S.resultNum = expected;
+    finish();
+    return;
+  }
+}
+
+function finish(){
+  S.phase='done';
+  renderAll(); setPrompt(); renderInputs();
+  let stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
+  document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
+  totalSolved++; solvedByLevel[curLevel]++;
+  streak = (S.errTotal===0) ? streak+1 : 0;
+  document.getElementById('stSolved').textContent = totalSolved;
+  document.getElementById('stStreak').textContent = streak;
+  setHint(S.errTotal===0 ? 'Без единой ошибки — блестяще!' : `Решено! Ошибок по пути: ${S.errTotal}.`, S.errTotal===0);
+  document.getElementById('nextBtn').style.display='block';
+  renderLevels();
+}
+
+/* ───────── интерфейс уровней ───────── */
+function renderLevels(){
+  const el = document.getElementById('levels');
+  el.innerHTML = LEVELS.map(L=>
+    `<button class="lvl ${L.id===curLevel?'active':''}" data-id="${L.id}" title="${L.desc}">
+      ${L.name}${solvedByLevel[L.id]>=5?'<span class="done-mark">★</span>':''}
+    </button>`
+  ).join('');
+  el.querySelectorAll('.lvl').forEach(b=>b.onclick=()=>{
+    curLevel = Number(b.dataset.id);
+    renderLevels(); newProblem();
+  });
+}
+document.getElementById('nextBtn').onclick = newProblem;
+
+/* ───────── плавающая клавиатура ───────── */
+let activeInputId = 'ans';
+let keypadOpen = true;
+function setupFloatingKeypad(){
+  const keys = ['7','8','9','4','5','6','1','2','3','−','0','⌫'];
+  document.getElementById('keypadButtons').innerHTML = keys.map(k=>{
+    const cls = k==='−' ? 'kp-minus' : (k==='⌫' ? 'kp-back' : '');
+    const val = k==='⌫' ? 'back' : (k==='−' ? '-' : k);
+    return `<button type="button" class="${cls}" data-key="${val}">${k}</button>`;
+  }).join('') + `<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>`;
+  document.querySelectorAll('#keypadButtons button').forEach(btn=>{
+    btn.onclick = ()=>keypadPress(btn.dataset.key);
+  });
+  document.getElementById('kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(); };
+  document.getElementById('kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(); };
+}
+function keypadPress(ch){
+  if(ch==='enter'){ document.getElementById('goBtn')?.click(); return; }
+  const inp = document.getElementById(activeInputId);
+  if(!inp) return;
+  if(ch==='back') inp.value = inp.value.slice(0,-1);
+  else inp.value = (inp.value||'') + ch;
+  inp.focus();
+}
+function syncKeypadVisibility(){
+  const needsInput = S && S.phase==='solve' && ['divisor','fillResults','multiplyNum','multiplyDen','finalDivisor','finalFill','mixedWhole','mixedRemainder'].includes(S.subPhase);
+  document.getElementById('keypadFloat').style.display = (needsInput && keypadOpen) ? 'block' : 'none';
+  document.getElementById('kpToggle').style.display = (needsInput && !keypadOpen) ? 'flex' : 'none';
+}
+
+setupFloatingKeypad();
+renderLevels();
+newProblem();
+</script>
+</body>
+</html>

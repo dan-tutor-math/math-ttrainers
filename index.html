@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тренажёры — Школа репетиторов</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font-ui:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Sora','Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,-apple-system,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#EEF1F7;
+  --blob-1:rgba(120,150,255,.16);
+  --blob-2:rgba(190,150,230,.14);
+  --card:rgba(255,255,255,.8);
+  --glass:rgba(255,255,255,.55);
+  --glass-strong:rgba(255,255,255,.72);
+  --glass-border:rgba(255,255,255,.85);
+  --glass-inset:rgba(255,255,255,.55);
+  --hl:var(--hl-14);
+  --hover-1:var(--hl-06);
+  --hover-2:var(--hl-10);
+  --muted-1:#8E8E93;
+  --muted-2:#6E6E73;
+  --muted-3:#48484A;
+  --muted-4:#3A3A3C;
+  --muted-5:#1D1D1F;
+  --muted-6:#8E8E93;
+  --muted-7:#C7C7CC;
+  --muted-8:#8E8E93;
+  --paper:#FDFCF7;
+  --grid:#DCE4F0;
+  --margin-red:#FF9F0A;
+  --ink:#004C99;
+  --ink-active:#003A75;
+  --pencil:#1D1D1F;
+  --teacher:#FF3B30;
+  --ok:#248A3D;
+  --moved:#5AC8FA;
+  --shadow:0 10px 34px rgba(20,30,60,.08);
+  --hl-06:rgba(0,76,153,.06);
+  --hl-10:rgba(0,76,153,.10);
+  --hl-14:var(--hl);
+}
+
+html[data-theme="dark"]{
+  --bg:#0B0E1A;
+  --blob-1:rgba(90,110,255,.22);
+  --blob-2:rgba(150,90,220,.18);
+  --paper:#151A2C;
+  --card:rgba(30,37,64,.82);
+  --glass:rgba(40,46,74,.5);
+  --glass-strong:rgba(46,53,84,.65);
+  --glass-border:rgba(255,255,255,.12);
+  --glass-inset:rgba(255,255,255,.07);
+  --hl:rgba(40,110,214,.26);
+  --grid:#232A44;
+  --margin-red:#FF9F0A;
+  --ink:#2E7DE0;
+  --ink-active:#4A93F0;
+  --pencil:#F2F3F5;
+  --teacher:#FF6961;
+  --ok:#3E8E5B;
+  --moved:#64D2FF;
+  --shadow:0 10px 40px rgba(0,0,0,.55);
+  --hl-06:rgba(46,125,224,.1);
+  --hl-10:rgba(46,125,224,.16);
+  --hl-14:var(--hl);
+  --muted-1:#9A9AA2;
+  --muted-2:#9A9AA2;
+  --muted-3:#AEAEB4;
+  --muted-4:#C7C7CC;
+  --muted-5:#F2F3F5;
+  --muted-6:#9A9AA2;
+  --muted-7:#3A3F55;
+  --muted-8:#9A9AA2;
+  --hover-1:rgba(127,160,255,.08);
+  --hover-2:rgba(127,160,255,.14);
+}
+html[data-theme="dark"] input{background:var(--card)}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--bg);
+  background-size:auto,auto,24px 24px,24px 24px,auto;
+  font-family:var(--font-ui);
+  color:var(--pencil);
+  min-height:100vh;
+  padding:32px 16px 60px;
+}
+.wrap{max-width:760px;margin:0 auto}
+h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(26px,5vw,38px);color:var(--pencil);text-align:center;}
+.sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 18px;}
+.topics{display:flex;flex-direction:column;gap:12px}
+.topic{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);overflow:hidden;}
+.topic-header{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 22px;background:none;border:none;cursor:pointer;text-align:left;font-family:var(--font-ui);font-weight:700;font-size:18px;color:var(--pencil);}
+.topic-header:hover{background:var(--hover-1);}
+.topic-header .count{font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-1);margin-left:8px;}
+.chevron{flex:0 0 auto;width:22px;height:22px;color:var(--ink);transition:transform .25s ease;}
+.topic.open .chevron{transform:rotate(180deg)}
+.topic-body{
+  max-height:0;
+  overflow:hidden;
+  transition:max-height .3s ease;
+}
+.topic.open .topic-body{max-height:600px}
+.topic-list{
+  padding:2px 10px 14px;
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.topic-item{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px 12px;
+  border-radius:10px;
+  text-decoration:none;
+  color:var(--pencil);
+  transition:background .12s;
+}
+.topic-item:hover{background:var(--hover-2)}
+.item-num{font-family:var(--font-mono);font-size:13px;color:var(--muted-1);min-width:22px;}
+.item-name{font-size:17px}
+.item-eq{margin-left:auto;font-family:var(--font-mono);font-size:14px;color:var(--muted-1);white-space:nowrap;}
+.item-arrow{
+  color:var(--grid);
+  font-size:18px;
+  flex:0 0 auto;
+}
+.topic-item:hover .item-arrow{color:var(--ink)}
+.topic-item.soon{opacity:.5;cursor:default;pointer-events:none;}
+.item-soon{margin-left:auto;font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-1);white-space:nowrap;}
+.group{margin:2px 4px 6px;border-radius:14px;background:var(--hover-1);overflow:hidden;}
+.group-header{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:none;border:none;cursor:pointer;text-align:left;font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--pencil);}
+.group-header:hover{background:var(--hover-2)}
+.group-header .count{font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-1);margin-left:8px;}
+.group .chevron{width:18px;height:18px}
+.group.open .chevron{transform:rotate(180deg)}
+.group-body{max-height:0;overflow:hidden;transition:max-height .3s ease;}
+.group.open .group-body{max-height:400px}
+.group-list{padding:0 8px 10px;display:flex;flex-direction:column;gap:2px;}
+.group-list .topic-item{padding:10px 12px}
+.feedback{margin-top:18px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;padding:12px 16px;text-align:center;display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;}
+.feedback-title{font-family:var(--font-ui);font-weight:500;font-size:13px;color:var(--muted-8);}
+.feedback-btn{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-ui);font-weight:600;font-size:13px;background:none;color:var(--ink);text-decoration:underline;text-underline-offset:2px;padding:2px 4px;border-radius:6px;transition:color .12s;}
+.feedback-btn:hover{color:var(--ink-active)}
+footer{text-align:center;font-family:var(--font-ui);font-weight:500;color:var(--muted-1);font-size:13px;margin-top:28px;}
+
+.theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
+.theme-toggle:hover{border-color:var(--ink)}
+.theme-toggle:active{transform:scale(.92)}
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<script>(function(){
+  var btn=document.getElementById('themeToggle');
+  function apply(t, persist){
+    document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = t === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    if (persist) { try{ localStorage.setItem('theme', t); }catch(e){} }
+  }
+  apply(document.documentElement.getAttribute('data-theme') || 'light', false);
+  btn.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur, true);
+  });
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onSystemChange = function(e){
+      var explicit = false;
+      try{ explicit = !!localStorage.getItem('theme'); }catch(err){}
+      if (explicit) return;
+      apply(e.matches ? 'dark' : 'light', false);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
+    else if (mq.addListener) mq.addListener(onSystemChange);
+  }
+})();</script>
+<div class="wrap">
+  <h1>Тренажёры</h1>
+  <div class="sub">выбери тему — внутри откроется список тренажёров</div>
+
+  <div class="topics" id="topics"></div>
+
+  <div class="feedback">
+    <span class="feedback-title">Нашли ошибку или есть идея?</span>
+    <a class="feedback-btn" href="https://t.me/tutor_mathh" target="_blank" rel="noopener">Написать в телеграм →</a>
+  </div>
+
+  <footer>Ещё темы появятся здесь по мере готовности</footer>
+</div>
+
+<script>
+/* ───────── темы и тренажёры внутри них ─────────
+   чтобы добавить новую тему — просто добавь новый объект в этот массив;
+   чтобы добавить тренажёр в существующую тему — добавь элемент в её items */
+const TOPICS = [
+  {
+    title: 'Действия с числами',
+    items: [
+      { name: 'Сложение в столбик',    href: 'addition.html',       eq: '999 + 1 = ?' },
+      { name: 'Вычитание в столбик',   href: 'subtraction.html',    eq: '700 − 458 = ?' },
+      { name: 'Умножение в столбик',   href: 'multiplication.html', eq: '347 × 26 = ?' },
+      { name: 'Деление в столбик',     href: 'division.html',       eq: '4826 : 7 = ?' },
+    ]
+  },
+  {
+    title: 'Уравнения',
+    items: [
+      { name: 'Линейные уравнения',    href: 'linear.html',    eq: '3(2x−5)+x = 2x−7' },
+      { name: 'Квадратные уравнения',  href: 'quadratic.html', eq: '2x² − 7x + 3 = 0' },
+    ]
+  },
+  {
+    title: 'Действия с дробями',
+    items: [
+      { name: 'Умножение дробей',      href: 'fraction_multiply.html', eq: '4⁄9 × 3⁄8 = ?' },
+      { name: 'Деление дробей',        href: 'fraction_divide.html',   eq: '2⁄3 ÷ 4⁄5 = ?' },
+    ]
+  },
+  {
+    title: 'ОГЭ',
+    items: [
+      { name: '№7. Сравнение и оценка чисел', href: 'oge7.html', eq: '5 < √27 < 6' },
+      { name: '№10. Теория вероятности', href: 'oge10.html', eq: 'P(A) = 5⁄20 = 0,25' },
+      { name: '№13. Неравенства', href: 'oge13.html', eq: 'x² − 9 ≤ 0 ⟺ [−3; 3]' },
+    ],
+    groups: [
+      {
+        title: '№9 · Уравнения',
+        items: [
+          { name: 'Линейные уравнения',    href: 'linear.html',    eq: '3(2x−5)+x = 2x−7' },
+          { name: 'Квадратные уравнения',  href: 'quadratic.html', eq: '2x² − 7x + 3 = 0' },
+          { name: 'Системы уравнений',     href: null,             eq: null },
+        ]
+      }
+    ]
+  },
+];
+
+function itemHTML(it, ii){
+  if(!it.href){
+    return `
+      <div class="topic-item soon">
+        <span class="item-num">${String(ii+1).padStart(2,'0')}</span>
+        <span class="item-name">${it.name}</span>
+        <span class="item-soon">скоро</span>
+      </div>
+    `;
+  }
+  return `
+    <a class="topic-item" href="${it.href}">
+      <span class="item-num">${String(ii+1).padStart(2,'0')}</span>
+      <span class="item-name">${it.name}</span>
+      <span class="item-eq">${it.eq}</span>
+      <span class="item-arrow">→</span>
+    </a>
+  `;
+}
+
+function topicCount(t){
+  const own = t.items.filter(it=>it.href).length;
+  const grouped = (t.groups||[]).reduce((sum,g)=>sum+g.items.filter(it=>it.href).length, 0);
+  return own + grouped;
+}
+
+function renderTopics(){
+  const el = document.getElementById('topics');
+  el.innerHTML = TOPICS.map((t, ti) => {
+    const n = topicCount(t);
+    return `
+    <div class="topic" id="topic-${ti}">
+      <button class="topic-header" data-idx="${ti}">
+        <span>${t.title}<span class="count">— ${n} тренажёр${pluralSuffix(n)}</span></span>
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+      </button>
+      <div class="topic-body">
+        <div class="topic-list">
+          ${t.items.map((it, ii) => itemHTML(it, ii)).join('')}
+          ${(t.groups||[]).map((g, gi) => {
+            const gn = g.items.filter(it=>it.href).length;
+            return `
+            <div class="group" id="topic-${ti}-group-${gi}">
+              <button class="group-header" data-tidx="${ti}" data-gidx="${gi}">
+                <span>${g.title}<span class="count">— ${gn} тренажёр${pluralSuffix(gn)}</span></span>
+                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
+              </button>
+              <div class="group-body">
+                <div class="group-list">
+                  ${g.items.map((it, ii) => itemHTML(it, ii)).join('')}
+                </div>
+              </div>
+            </div>
+          `;}).join('')}
+        </div>
+      </div>
+    </div>
+  `;}).join('');
+
+  el.querySelectorAll('.topic-header').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const topic = document.getElementById('topic-'+btn.dataset.idx);
+      topic.classList.toggle('open');
+    });
+  });
+
+  el.querySelectorAll('.group-header').forEach(btn=>{
+    btn.addEventListener('click', (e)=>{
+      e.stopPropagation();
+      const group = document.getElementById('topic-'+btn.dataset.tidx+'-group-'+btn.dataset.gidx);
+      group.classList.toggle('open');
+    });
+  });
+}
+
+function pluralSuffix(n){
+  const mod10 = n%10, mod100 = n%100;
+  if(mod100>=11 && mod100<=14) return 'ов';
+  if(mod10===1) return '';
+  if(mod10>=2 && mod10<=4) return 'а';
+  return 'ов';
+}
+
+renderTopics();
+</script>
+</body>
+</html>

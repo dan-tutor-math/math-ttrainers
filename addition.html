@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тренажёр: сложение в столбик</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font-ui:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Sora','Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,-apple-system,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#EEF1F7;
+  --blob-1:rgba(120,150,255,.16);
+  --blob-2:rgba(190,150,230,.14);
+  --card:rgba(255,255,255,.8);
+  --glass:rgba(255,255,255,.55);
+  --glass-strong:rgba(255,255,255,.72);
+  --glass-border:rgba(255,255,255,.85);
+  --glass-inset:rgba(255,255,255,.55);
+  --hl:rgba(0,76,153,.14);
+  --muted-1:#8E8E93;
+  --muted-2:#6E6E73;
+  --muted-3:#48484A;
+  --muted-4:#3A3A3C;
+  --muted-5:#1D1D1F;
+  --muted-6:#8E8E93;
+  --muted-7:#C7C7CC;
+  --muted-8:#8E8E93;
+  --paper:#FDFCF7;
+  --grid:#DCE4F0;
+  --margin-red:#FF9F0A;
+  --ink:#004C99;
+  --ink-active:#003A75;
+  --pencil:#1D1D1F;
+  --teacher:#FF3B30;
+  --ok:#248A3D;
+  --ok-tint:rgba(36,138,61,.1);
+  --ok-shadow:rgba(36,138,61,.3);
+  --moved:#5AC8FA;
+  --shadow:0 10px 34px rgba(20,30,60,.08);
+  --cell:38px;
+}
+
+html[data-theme="dark"]{
+  --bg:#0B0E1A;
+  --blob-1:rgba(90,110,255,.22);
+  --blob-2:rgba(150,90,220,.18);
+  --paper:#151A2C;
+  --card:rgba(30,37,64,.82);
+  --glass:rgba(40,46,74,.5);
+  --glass-strong:rgba(46,53,84,.65);
+  --glass-border:rgba(255,255,255,.12);
+  --glass-inset:rgba(255,255,255,.07);
+  --hl:rgba(40,110,214,.26);
+  --grid:#232A44;
+  --margin-red:#FF9F0A;
+  --ink:#2E7DE0;
+  --ink-active:#4A93F0;
+  --pencil:#F2F3F5;
+  --teacher:#FF6961;
+  --ok:#3E8E5B;
+  --ok-tint:rgba(62,142,91,.14);
+  --ok-shadow:rgba(62,142,91,.35);
+  --moved:#64D2FF;
+  --shadow:0 10px 40px rgba(0,0,0,.55);
+  --muted-1:#9A9AA2;
+  --muted-2:#9A9AA2;
+  --muted-3:#AEAEB4;
+  --muted-4:#C7C7CC;
+  --muted-5:#F2F3F5;
+  --muted-6:#9A9AA2;
+  --muted-7:#3A3F55;
+  --muted-8:#9A9AA2;
+  --hover-1:rgba(127,160,255,.08);
+  --hover-2:rgba(127,160,255,.14);
+}
+html[data-theme="dark"] input{background:var(--card)}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--bg);
+  background-size:auto,auto,24px 24px,24px 24px,auto;
+  font-family:var(--font-ui);
+  color:var(--pencil);
+  min-height:100vh;
+  padding:18px 12px 60px;
+}
+.wrap{max-width:1040px;margin:0 auto}
+h1{
+  font-family:var(--font-ui);
+  font-weight:700;
+  letter-spacing:-.02em;
+  font-size:clamp(26px,5vw,38px);
+  color:var(--pencil);
+  text-align:center;
+}
+.sub{
+  font-family:var(--font-ui);
+  font-weight:500;
+  text-align:center;
+  color:var(--muted-2);
+  font-size:15px;
+  margin:4px 0 18px;
+}
+.levels{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px}
+.lvl{
+  font-family:var(--font-ui);
+  font-weight:600;
+  font-size:14px;
+  border:1px solid var(--glass-border);
+  background:var(--glass);
+  backdrop-filter:blur(16px) saturate(160%);
+  -webkit-backdrop-filter:blur(16px) saturate(160%);
+  border-radius:999px;
+  padding:8px 16px;
+  cursor:pointer;
+  color:var(--muted-3);
+  transition:all .15s;
+}
+.lvl:hover{border-color:var(--ink)}
+.lvl.active{background:var(--ink);border-color:var(--ink);color:#fff;box-shadow:0 6px 16px rgba(0,76,153,.35)}
+.lvl .done-mark{color:#FFB800;margin-left:4px}
+.sheet{
+  position:relative;
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--paper);
+  background-size:var(--cell) var(--cell);
+  border:1px solid var(--glass-border);
+  border-radius:20px;
+  box-shadow:var(--shadow);
+  padding:calc(var(--cell)*2) calc(var(--cell)*.7) calc(var(--cell)) calc(var(--cell)*2);
+  overflow-x:auto;
+  min-height:calc(var(--cell)*9);
+}
+.sheet::before{
+  content:'';
+  position:absolute;
+  top:0;bottom:0;
+  left:calc(var(--cell)*1.4);
+  width:2px;
+  background:var(--margin-red);
+  opacity:.55;
+}
+.corner{
+  font-family:var(--font-ui);
+  font-weight:500;
+  position:absolute;
+  top:6px;right:12px;
+  color:var(--muted-1);
+  font-size:13px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+.refresh-btn{
+  width:28px;height:28px;
+  border:1px solid var(--glass-border);
+  border-radius:50%;
+  background:var(--glass-strong);
+  backdrop-filter:blur(14px) saturate(160%);
+  -webkit-backdrop-filter:blur(14px) saturate(160%);
+  color:var(--ink);
+  font-size:15px;
+  line-height:1;
+  cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:transform .18s, border-color .12s;
+}
+.refresh-btn:hover{border-color:var(--ink);transform:rotate(80deg)}
+.refresh-btn:active{transform:scale(.9)}
+#board{display:inline-block}
+.mrow{display:flex;height:var(--cell);position:relative}
+.mc{
+  width:var(--cell);
+  height:var(--cell);
+  flex:0 0 var(--cell);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:var(--font-mono);
+  font-size:calc(var(--cell)*.6);
+  color:var(--ink);
+  position:relative;
+}
+.mc.dim{color:var(--muted-7)}
+.mc.moved{color:var(--moved)}
+.mc.hl{
+  background:var(--hl);
+  border-radius:8px;
+  color:var(--ink-active);
+  font-weight:700;
+  transition:background .2s;
+}
+.mc.target{
+  outline:2px dashed var(--teacher);
+  outline-offset:-4px;
+  border-radius:8px;
+  animation:pulse 1s infinite;
+}
+@keyframes pulse{50%{outline-color:transparent}}
+.mc.sign{color:var(--pencil);font-size:calc(var(--cell)*.55)}
+.mc .carry{
+  position:absolute;
+  top:-24px; left:50%;
+  transform:translateX(-50%);
+  font-size:calc(var(--cell)*.42);
+  color:var(--teacher);
+  font-family:var(--font-ui);
+  font-weight:700;
+  line-height:1;
+}
+.mline{
+  border-top:2.5px solid var(--ink);
+  margin:2px 0 4px;
+}
+.mresult{
+  font-family:var(--font-ui);
+  font-weight:600;
+  font-size:18px;
+  color:var(--ok);
+  margin-top:10px;
+  padding-left:4px;
+}
+.panel{
+  background:var(--glass);
+  backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  border:1px solid var(--glass-border);
+  border-radius:22px;
+  box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);
+  padding:20px;
+  margin-top:16px;
+}
+.prompt{
+  font-family:var(--font-ui);
+  font-weight:500;
+  font-size:clamp(17px,3.2vw,20px);
+  color:var(--muted-5);
+  margin-bottom:12px;
+  line-height:1.4;
+}
+.prompt b{color:var(--ink)}
+.inrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+input.num{
+  font-family:var(--font-mono);
+  font-size:22px;
+  padding:10px 14px;
+  border:1px solid var(--glass-border);
+  background:var(--card);
+  border-radius:14px 0 0 14px;
+  border-right:none;
+  color:var(--ink);
+  width:120px;
+}
+input.num:focus{outline:none;border-color:var(--ink)}
+input.num.shake{animation:shake .35s}
+@keyframes shake{
+  20%{transform:translateX(-7px)}40%{transform:translateX(7px)}
+  60%{transform:translateX(-5px)}80%{transform:translateX(5px)}
+}
+.num-wrap{display:inline-flex;align-items:stretch;vertical-align:middle}
+.spin{display:flex;flex-direction:column;border:1px solid var(--glass-border);background:var(--card);border-radius:0 14px 14px 0;overflow:hidden}
+.spin-btn{flex:1;width:32px;border:none;background:transparent;color:var(--ink);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;touch-action:manipulation}
+.spin-btn:first-child{border-bottom:1px solid var(--glass-border)}
+.spin-btn:active{background:var(--hl)}
+button.go{
+  font-family:var(--font-ui);
+  font-weight:600;
+  font-size:16px;
+  background:var(--ink);
+  color:#fff;
+  border:none;
+  border-radius:14px;
+  padding:11px 26px;
+  cursor:pointer;
+  box-shadow:0 6px 18px rgba(0,76,153,.35);
+}
+button.go:active{transform:scale(.96)}
+.hint{
+  font-family:var(--font-ui);
+  font-weight:500;
+  color:var(--teacher);
+  font-size:15px;
+  margin-top:12px;
+  min-height:20px;
+  line-height:1.4;
+}
+.hint.good{color:var(--ok)}
+.next-btn{
+  font-family:var(--font-ui);
+  font-weight:600;
+  font-size:16px;
+  background:var(--ok);
+  color:#fff;
+  border:none;
+  border-radius:14px;
+  padding:13px 26px;
+  cursor:pointer;
+  width:100%;
+  margin-top:8px;
+  box-shadow:0 6px 18px var(--ok-shadow);
+}
+.stats{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.stat{flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:12px 14px;text-align:center}
+.stat .v{font-family:var(--font-ui);font-weight:700;font-size:22px;color:var(--ink)}
+.stat .l{font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-6)}
+.stars{color:#FFB800;font-size:20px;letter-spacing:2px}
+.theory{display:flex;gap:14px;margin-top:16px;flex-wrap:wrap;align-items:stretch}
+.tcard{flex:1;min-width:290px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:18px 20px}
+.tt{font-family:var(--font-ui);font-weight:700;font-size:17px;color:var(--pencil);margin-bottom:10px}
+.talg{font-family:var(--font-ui);font-weight:400;font-size:14px;color:var(--muted-4);padding-left:20px;line-height:1.6}
+.talg li{margin:5px 0}
+.ttrap{font-family:var(--font-ui);font-weight:500;font-size:13px;color:var(--teacher);margin-top:8px;line-height:1.45}
+.keypad{display:grid;grid-template-columns:repeat(3, 44px);gap:6px}
+.keypad button{width:44px;height:40px;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-mono);font-size:18px;cursor:pointer;touch-action:manipulation}
+.keypad button:active{background:var(--hl)}
+.keypad button.kp-minus{color:var(--teacher);font-weight:700}
+.keypad button.kp-back{font-size:15px;color:var(--muted-6)}
+.keypad button.kp-enter{grid-column:span 3;width:auto;height:38px;font-family:var(--font-ui);font-weight:600;font-size:14px;background:var(--ink);color:#fff;border-color:var(--ink);}
+.keypad button.kp-enter:active{background:var(--ink-active);}
+.keypad-float{position:fixed;top:220px;right:20px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:50}
+.keypad-close{position:absolute;top:-11px;right:-11px;width:26px;height:26px;border-radius:50%;background:var(--teacher);color:#fff;border:2px solid #fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.keypad-toggle{position:fixed;top:220px;right:20px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50}
+@media(max-width:720px){.keypad-float,.keypad-toggle{top:auto;bottom:16px;right:16px}}
+@media(max-width:480px){
+  :root{--cell:32px}
+  .sheet{padding-left:calc(var(--cell)*2)}
+}
+
+.theme-toggle{
+  position:fixed;
+  top:16px;right:16px;
+  width:40px;height:40px;
+  border-radius:14px;
+  border:1px solid var(--glass-border);
+  background:var(--glass-strong);
+  backdrop-filter:blur(20px) saturate(180%);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
+  color:var(--ink);
+  font-size:17px;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);
+  z-index:200;
+  transition:transform .15s, border-color .12s;
+}
+.theme-toggle:hover{border-color:var(--ink)}
+.theme-toggle:active{transform:scale(.92)}
+.home-btn{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
+.home-btn:hover{border-color:var(--ink)}
+.home-btn:active{transform:scale(.92)}
+</style>
+</head>
+<body>
+<a class="home-btn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
+<button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<script>(function(){
+  var btn=document.getElementById('themeToggle');
+  function apply(t, persist){
+    document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = t === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    if (persist) { try{ localStorage.setItem('theme', t); }catch(e){} }
+  }
+  apply(document.documentElement.getAttribute('data-theme') || 'light', false);
+  btn.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur, true);
+  });
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onSystemChange = function(e){
+      var explicit = false;
+      try{ explicit = !!localStorage.getItem('theme'); }catch(err){}
+      if (explicit) return;
+      apply(e.matches ? 'dark' : 'light', false);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
+    else if (mq.addListener) mq.addListener(onSystemChange);
+  }
+})();</script>
+<div class="wrap">
+  <h1>Сложение в столбик</h1>
+  <div class="sub">разряд за разрядом, с переносом — сам считаешь и решаешь, что пишем, а что переносим</div>
+
+  <div class="levels" id="levels"></div>
+
+  <div class="sheet">
+    <div class="corner">
+      <button class="refresh-btn" id="refreshBtn" title="Обновить пример">⟳</button>
+      <span id="taskNum">пример №1</span>
+    </div>
+    <div id="board"></div>
+    <div class="mresult" id="result"></div>
+  </div>
+
+  <div class="panel">
+    <div class="prompt" id="prompt"></div>
+    <div class="inrow" id="inputArea"></div>
+    <button class="next-btn" id="nextBtn" style="display:none">Следующий пример →</button>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="v" id="stSolved">0</div><div class="l">решено</div></div>
+    <div class="stat"><div class="v" id="stStreak">0</div><div class="l">серия без ошибок</div></div>
+    <div class="stat"><div class="v stars" id="stStars">—</div><div class="l">этот пример</div></div>
+  </div>
+
+  <div class="theory">
+    <div class="tcard">
+      <div class="tt">Алгоритм</div>
+      <ol class="talg">
+        <li>Складываем разряд за разрядом, справа налево.</li>
+        <li>Если есть перенос с прошлого шага — прибавляем и его тоже.</li>
+        <li>Если сумма меньше 10 — просто записываем её.</li>
+        <li>Если сумма 10 или больше — записываем только последнюю цифру, а единицу переносим в следующий разряд.</li>
+        <li>Если перенос остался уже после самого последнего разряда — он становится новым, самым старшим разрядом ответа.</li>
+      </ol>
+    </div>
+    <div class="tcard">
+      <div class="tt">Ловушки</div>
+      <div class="ttrap">⚠ Перенос — всегда ровно 1, сколько бы ни было цифр в сумме (максимум 9+9+1=19).</div>
+      <div class="ttrap">⚠ Если несколько девяток подряд — перенос проходит через них все, разряд за разрядом.</div>
+      <div class="ttrap">⚠ Не забудь перенос с предыдущего шага — частая ошибка не прибавить его.</div>
+    </div>
+  </div>
+</div>
+
+<button class="keypad-toggle" id="kpToggle" title="Показать клавиатуру" style="display:none">⌨</button>
+<div class="keypad-float" id="keypadFloat" style="display:none">
+  <button class="keypad-close" id="kpClose" title="Скрыть клавиатуру">✕</button>
+  <div class="keypad" id="keypadButtons"></div>
+</div>
+
+<script>
+const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const pick = a=>a[ri(0,a.length-1)];
+
+/* ───────── алгоритм сложения (проверено отдельно на 50000 примеров) ───────── */
+function simulateAddition(T_in, B_in){
+  const n = Math.max(T_in.length, B_in.length);
+  const pad = a => new Array(n-a.length).fill(0).concat(a);
+  const T = pad(T_in), B = pad(B_in);
+  const resultDigits = [];
+  let carry = 0;
+  const carryEvents = [];
+  for(let i=n-1;i>=0;i--){
+    const sum = T[i]+B[i]+carry;
+    resultDigits.unshift(sum%10);
+    if(sum>=10){ carryEvents.push(i); carry=1; } else { carry=0; }
+  }
+  if(carry>0) resultDigits.unshift(carry);
+  return {resultDigits, carryEvents, finalCarry:carry};
+}
+
+/* ───────── генерация ───────── */
+function genAdd(topLen, bottomLen, opts={}){
+  let guard=0;
+  while(true){
+    guard++; if(guard>8000) throw 'genAdd: не удалось сгенерировать';
+    const topVal = ri(Math.pow(10,topLen-1), Math.pow(10,topLen)-1);
+    const bottomVal = ri(Math.pow(10,bottomLen-1), Math.pow(10,bottomLen)-1);
+    const topDigitsRaw = String(topVal).split('').map(Number);
+    const bottomDigitsRaw = String(bottomVal).split('').map(Number);
+    const n = Math.max(topDigitsRaw.length, bottomDigitsRaw.length);
+    const pad = a => new Array(n-a.length).fill(0).concat(a);
+    const topDigits = pad(topDigitsRaw), bottomDigits = pad(bottomDigitsRaw);
+    const sim = simulateAddition(topDigits, bottomDigits);
+    const hasCarry = sim.carryEvents.length>0;
+    const hasCascade = sim.carryEvents.length>=2;
+    if(opts.requireCarry && !hasCarry) continue;
+    if(opts.requireCascade && !hasCascade) continue;
+    if(opts.forbidCarry && hasCarry) continue;
+    return {topVal, bottomVal, topDigits, bottomDigits, sim};
+  }
+}
+
+const LEVELS = [
+  {id:0, name:'Уровень 1', desc:'2-значное + 1-значное, простой перенос', gen:()=>genAdd(2,1,{requireCarry:true})},
+  {id:1, name:'Уровень 2', desc:'3-значное + 1-значное', gen:()=>genAdd(3,1,{requireCarry:true})},
+  {id:2, name:'Уровень 3', desc:'2-значное + 2-значное', gen:()=>genAdd(2,2,{})},
+  {id:3, name:'Уровень 4', desc:'3-значное + 2-значное', gen:()=>genAdd(3,2,{})},
+  {id:4, name:'Уровень 5', desc:'через девятку — цепочка переносов', gen:()=>genAdd(3,3,{requireCascade:true})},
+  {id:5, name:'Уровень 6', desc:'4-значное + 4-значное', gen:()=>genAdd(4,4,{})},
+  {id:6, name:'Экзамен',   desc:'вперемешку'},
+];
+let curLevel = 0;
+const solvedByLevel = [0,0,0,0,0,0,0];
+let totalSolved = 0, streak = 0, taskCounter = 0;
+
+function gen(level){
+  if(level===6) level = ri(0,5);
+  return LEVELS[level].gen();
+}
+
+let P=null, S=null;
+
+function newProblem(){
+  P = gen(curLevel);
+  taskCounter++;
+  S = {
+    phase:'preview',
+    pos: 0,
+    subPhase: 'add',
+    carryIn: 0,
+    sum: null,
+    resultDigits: [],
+    errTotal: 0,
+    exam: curLevel===6,
+  };
+  document.getElementById('taskNum').textContent = 'пример №'+taskCounter;
+  document.getElementById('nextBtn').style.display='none';
+  document.getElementById('stStars').textContent='—';
+  document.getElementById('result').textContent='';
+  setHint('');
+  renderAll(); setPrompt(); renderInputs();
+}
+document.getElementById('refreshBtn').onclick = newProblem;
+
+function startSolving(){
+  S.phase = 'solve';
+  enterDigit();
+}
+
+function n_(){ return P.topDigits.length; }
+function realIdxFromPos(pos){ return n_()-1-pos; }
+
+function enterDigit(){
+  const realIdx = realIdxFromPos(S.pos);
+  if(realIdx < 0){
+    // по новой логике сюда попадать не должны (последний разряд завершается сразу),
+    // но на всякий случай корректно закрываем пример
+    finish();
+    return;
+  }
+  S.subPhase = 'add';
+  renderAll(); setPrompt(); renderInputs();
+}
+
+/* ───────── ширина доски ───────── */
+function boardWidth(){
+  return n_() + 1;
+}
+
+/* ───────── отрисовка ───────── */
+function renderAll(){
+  const board = document.getElementById('board');
+  const n = n_();
+  const rows = [];
+
+  if(S.phase==='preview'){
+    const previewChars = `${P.topVal} + ${P.bottomVal} = ?`.split('');
+    board.innerHTML = `<div class="mrow">${previewChars.map(ch=>`<div class="mc${ch===' '?' dim':''}">${ch===' '?'':ch}</div>`).join('')}</div>`;
+    return;
+  }
+
+  const W = boardWidth();
+  const leftPad = W - n;
+  const realIdxNow = realIdxFromPos(S.pos);
+
+  // строка первого слагаемого, с меткой переноса над той позицией, куда он должен прийти
+  const topCells = [];
+  for(let i=0;i<n;i++){
+    let cl='mc';
+    const isBeingProcessed = (i === realIdxNow);
+    if(S.subPhase==='add' && isBeingProcessed) cl+=' hl';
+    let mark = '';
+    // перенос, полученный ИЗ предыдущего (более правого) разряда, показываем над позицией i,
+    // если именно на неё сейчас распространяется carryIn
+    if(isBeingProcessed && S.carryIn>0 && (S.subPhase==='add' || S.subPhase==='split')){
+      mark = `<span class="carry">${S.carryIn}</span>`;
+    }
+    topCells.push(`<div class="${cl}">${P.topDigits[i]}${mark}</div>`);
+  }
+  rows.push(`<div class="mrow">${'<div class="mc"></div>'.repeat(leftPad)}${topCells.join('')}</div>`);
+
+  // строка второго слагаемого со знаком +
+  const botCells = [];
+  for(let i=0;i<n;i++){
+    let cl='mc';
+    if(S.subPhase==='add' && realIdxNow===i) cl+=' hl';
+    botCells.push(`<div class="${cl}">${P.bottomDigits[i]}</div>`);
+  }
+  const signPos = leftPad-1;
+  const botRow = [];
+  for(let i=0;i<leftPad;i++) botRow.push(i===signPos && signPos>=0 ? '<div class="mc sign">+</div>' : '<div class="mc"></div>');
+  rows.push(`<div class="mrow">${botRow.join('')}${botCells.join('')}</div>`);
+
+  rows.push(`<div class="mline"></div>`);
+
+  // строка результата — то, что уже посчитано, справа налево; учитываем возможную лишнюю (переполняющую) цифру слева
+  const resCells = new Array(n+1).fill(null);
+  for(let i=0;i<S.resultDigits.length;i++){
+    resCells[n-i] = S.resultDigits[i];
+  }
+  const resRow = [];
+  for(let i=0;i<leftPad-1;i++) resRow.push('<div class="mc"></div>');
+  for(let i=0;i<=n;i++){
+    let cl='mc';
+    if(S.subPhase==='split' && realIdxNow===(i-1)) cl+=' target';
+    resRow.push(`<div class="${cl}">${resCells[i]===null?'':resCells[i]}</div>`);
+  }
+  rows.push(`<div class="mrow">${resRow.join('')}</div>`);
+
+  board.innerHTML = rows.join('');
+}
+
+function setPrompt(){
+  const p = document.getElementById('prompt');
+  if(S.phase==='preview'){
+    p.innerHTML = 'Посмотри на пример спокойно — спешить некуда.<br>Когда будешь готов, жми «Начать».';
+    return;
+  }
+  if(S.phase==='done'){
+    p.innerHTML = 'Пример решён! 🎉';
+    return;
+  }
+  const realIdx = realIdxFromPos(S.pos);
+
+  if(S.subPhase==='overflow'){
+    p.innerHTML = `Перенос остался уже после последнего разряда — он и станет новым, самым старшим. <b>Сколько там пишем?</b>`;
+    return;
+  }
+
+  const topDigit = P.topDigits[realIdx];
+  const botDigit = P.bottomDigits[realIdx];
+
+  if(S.subPhase==='add'){
+    if(S.carryIn>0){
+      p.innerHTML = `${topDigit} + ${botDigit}, и ещё перенос ${S.carryIn} с прошлого шага. <b>Сколько получится всего?</b>`;
+    } else {
+      p.innerHTML = `${topDigit} + ${botDigit} = ?`;
+    }
+  } else if(S.subPhase==='split'){
+    p.innerHTML = `Получили ${S.sum} — это больше 9. <b>Что пишем в этот разряд, а что переносим дальше?</b>`;
+  }
+}
+
+function numInputHTML(id, extraStyle){
+  return `<div class="num-wrap">
+    <input class="num" id="${id}" type="text" inputmode="none" autocomplete="off" placeholder="?"${extraStyle?` style="${extraStyle}"`:''}>
+    <div class="spin">
+      <button type="button" class="spin-btn" data-target="${id}" data-dir="1">▲</button>
+      <button type="button" class="spin-btn" data-target="${id}" data-dir="-1">▼</button>
+    </div>
+  </div>`;
+}
+
+function attachSpinners(area){
+  area.querySelectorAll('.spin-btn').forEach(btn=>{
+    btn.onclick = ()=>{
+      const inp = document.getElementById(btn.dataset.target);
+      if(!inp) return;
+      let v = Number(inp.value);
+      if(!Number.isFinite(v)) v = 0;
+      v += Number(btn.dataset.dir);
+      if(v<0) v=0;
+      if(v>999) v=999;
+      inp.value = String(v);
+      inp.focus();
+    };
+  });
+}
+
+function renderInputs(){
+  const area = document.getElementById('inputArea');
+  syncKeypadVisibility();
+  if(S.phase==='preview'){
+    area.innerHTML = `<button class="go" id="goBtn">Начать →</button>`;
+    document.getElementById('goBtn').onclick = startSolving;
+    return;
+  }
+  if(S.phase==='done'){ area.innerHTML=''; return; }
+
+  if(S.subPhase==='split'){
+    area.innerHTML = `
+      <span class="lbl" style="font-family:var(--font-ui);font-weight:500;font-size:15px">пишем</span>
+      ${numInputHTML('ansWrite','width:70px')}
+      <span class="lbl" style="font-family:var(--font-ui);font-weight:500;font-size:15px">переносим</span>
+      ${numInputHTML('ansCarry','width:70px')}
+      <button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>`;
+    document.getElementById('goBtn').onclick = submitAnswer;
+    attachSpinners(area);
+    activeInputId = 'ansWrite';
+    document.getElementById('ansWrite').addEventListener('focus', ()=>{ activeInputId='ansWrite'; });
+    document.getElementById('ansCarry').addEventListener('focus', ()=>{ activeInputId='ansCarry'; });
+    document.getElementById('ansWrite').addEventListener('keydown', e=>{ if(e.key==='Enter') submitAnswer(); });
+    document.getElementById('ansCarry').addEventListener('keydown', e=>{ if(e.key==='Enter') submitAnswer(); });
+    setTimeout(()=>{ const el=document.getElementById('ansWrite'); if(el) el.focus(); }, 30);
+    return;
+  }
+
+  area.innerHTML = `
+    ${numInputHTML('ans')}
+    <button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>`;
+  document.getElementById('goBtn').onclick = submitAnswer;
+  attachSpinners(area);
+  activeInputId = 'ans';
+  document.getElementById('ans').addEventListener('keydown', e=>{ if(e.key==='Enter') submitAnswer(); });
+  setTimeout(()=>{ const el=document.getElementById('ans'); if(el) el.focus(); }, 30);
+}
+
+function setHint(t, good=false){
+  const h = document.getElementById('hint');
+  h.innerHTML = t;
+  h.className = 'hint'+(good?' good':'');
+}
+
+/* ───────── логика решения ───────── */
+function submitAnswer(){
+  const realIdx = realIdxFromPos(S.pos);
+
+  if(S.subPhase==='overflow'){
+    const inp = document.getElementById('ans');
+    if(!inp || inp.value==='') return;
+    const v = Number(inp.value);
+    const expected = S.carryIn;
+    if(v!==expected){
+      S.errTotal++;
+      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+      setHint(S.exam ? 'Проверь перенос.' : `Перенос с прошлого шага — вот он и есть новый разряд.`);
+      inp.value=''; return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    inp.value='';
+    S.resultDigits.push(expected);
+    finish();
+    return;
+  }
+
+  if(S.subPhase==='add'){
+    const inp = document.getElementById('ans');
+    if(!inp || inp.value==='') return;
+    const v = Number(inp.value);
+    const topDigit = P.topDigits[realIdx];
+    const botDigit = P.bottomDigits[realIdx];
+    const expected = topDigit + botDigit + S.carryIn;
+    if(v!==expected){
+      S.errTotal++;
+      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+      if(S.exam){
+        setHint('Проверь сложение.');
+      } else if(S.carryIn>0){
+        setHint(`Не забудь перенос: ${topDigit} + ${botDigit} + ${S.carryIn}.`);
+      } else {
+        setHint(`Посчитай: ${topDigit} + ${botDigit}.`);
+      }
+      inp.value=''; return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    inp.value='';
+    S.sum = expected;
+    if(realIdx===0){
+      // последний разряд — складывать больше нечего, весь результат пишем сразу целиком
+      S.resultDigits.push(expected % 10);
+      if(expected>=10) S.resultDigits.push(Math.floor(expected/10));
+      finish();
+    } else if(expected>=10){
+      S.subPhase = 'split';
+      renderAll(); setPrompt(); renderInputs();
+    } else {
+      S.resultDigits.push(expected);
+      S.carryIn = 0;
+      S.pos++;
+      enterDigit();
+    }
+    return;
+  }
+
+  if(S.subPhase==='split'){
+    const inpW = document.getElementById('ansWrite');
+    const inpC = document.getElementById('ansCarry');
+    if(!inpW || !inpC || inpW.value===''|| inpC.value==='') return;
+    const vW = Number(inpW.value), vC = Number(inpC.value);
+    const expW = S.sum % 10, expC = Math.floor(S.sum/10);
+    if(vW!==expW || vC!==expC){
+      S.errTotal++;
+      [inpW,inpC].forEach(el=>{ el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); });
+      setHint(S.exam ? 'Проверь разбивку суммы.' : `Сумма ${S.sum}: последняя цифра — то, что пишем, остальное — то, что переносим.`);
+      inpW.value=''; inpC.value=''; return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    inpW.value=''; inpC.value='';
+    S.resultDigits.push(expW);
+    S.carryIn = expC;
+    S.pos++;
+    enterDigit();
+    return;
+  }
+}
+
+function finish(){
+  S.phase='done';
+  renderAll(); setPrompt(); renderInputs();
+  document.getElementById('result').textContent = `${P.topVal} + ${P.bottomVal} = ${P.topVal+P.bottomVal}`;
+  let stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
+  document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
+  totalSolved++; solvedByLevel[curLevel]++;
+  streak = (S.errTotal===0) ? streak+1 : 0;
+  document.getElementById('stSolved').textContent = totalSolved;
+  document.getElementById('stStreak').textContent = streak;
+  setHint(S.errTotal===0 ? 'Без единой ошибки — блестяще!' : `Решено! Ошибок по пути: ${S.errTotal}.`, S.errTotal===0);
+  document.getElementById('nextBtn').style.display='block';
+  renderLevels();
+}
+
+/* ───────── интерфейс уровней ───────── */
+function renderLevels(){
+  const el = document.getElementById('levels');
+  el.innerHTML = LEVELS.map(L=>
+    `<button class="lvl ${L.id===curLevel?'active':''}" data-id="${L.id}" title="${L.desc}">
+      ${L.name}${solvedByLevel[L.id]>=5?'<span class="done-mark">★</span>':''}
+    </button>`
+  ).join('');
+  el.querySelectorAll('.lvl').forEach(b=>b.onclick=()=>{
+    curLevel = Number(b.dataset.id);
+    renderLevels(); newProblem();
+  });
+}
+document.getElementById('nextBtn').onclick = newProblem;
+
+/* ───────── плавающая клавиатура ───────── */
+let activeInputId = 'ans';
+let keypadOpen = true;
+function setupFloatingKeypad(){
+  const keys = ['7','8','9','4','5','6','1','2','3','−','0','⌫'];
+  document.getElementById('keypadButtons').innerHTML = keys.map(k=>{
+    const cls = k==='−' ? 'kp-minus' : (k==='⌫' ? 'kp-back' : '');
+    const val = k==='⌫' ? 'back' : (k==='−' ? '-' : k);
+    return `<button type="button" class="${cls}" data-key="${val}">${k}</button>`;
+  }).join('') + `<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>`;
+  document.querySelectorAll('#keypadButtons button').forEach(btn=>{
+    btn.onclick = ()=>keypadPress(btn.dataset.key);
+  });
+  document.getElementById('kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(); };
+  document.getElementById('kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(); };
+}
+function keypadPress(ch){
+  if(ch==='enter'){ document.getElementById('goBtn')?.click(); return; }
+  const inp = document.getElementById(activeInputId);
+  if(!inp) return;
+  if(ch==='back') inp.value = inp.value.slice(0,-1);
+  else inp.value = (inp.value||'') + ch;
+  inp.focus();
+}
+function syncKeypadVisibility(){
+  const needsInput = S && S.phase==='solve' && (S.subPhase==='add' || S.subPhase==='split' || S.subPhase==='overflow');
+  document.getElementById('keypadFloat').style.display = (needsInput && keypadOpen) ? 'block' : 'none';
+  document.getElementById('kpToggle').style.display = (needsInput && !keypadOpen) ? 'flex' : 'none';
+}
+
+setupFloatingKeypad();
+renderLevels();
+newProblem();
+</script>
+</body>
+</html>

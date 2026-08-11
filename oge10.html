@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ОГЭ №10 — теория вероятности</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font-ui:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Sora','Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,-apple-system,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#EEF1F7;
+  --blob-1:rgba(120,150,255,.16);
+  --blob-2:rgba(190,150,230,.14);
+  --card:rgba(255,255,255,.8);
+  --glass:rgba(255,255,255,.55);
+  --glass-strong:rgba(255,255,255,.72);
+  --glass-border:rgba(255,255,255,.85);
+  --glass-inset:rgba(255,255,255,.55);
+  --hl:var(--hl-14);
+  --muted-1:#8E8E93;
+  --muted-2:#6E6E73;
+  --muted-3:#48484A;
+  --muted-4:#3A3A3C;
+  --muted-5:#1D1D1F;
+  --muted-6:#8E8E93;
+  --muted-7:#C7C7CC;
+  --muted-8:#8E8E93;
+  --paper:#FDFCF7;
+  --grid:#DCE4F0;
+  --margin-red:#FF9F0A;
+  --ink:#004C99;
+  --ink-active:#003A75;
+  --pencil:#1D1D1F;
+  --teacher:#FF3B30;
+  --ok:#248A3D;
+  --ok-tint:rgba(36,138,61,.1);
+  --ok-shadow:rgba(36,138,61,.3);
+  --moved:#5AC8FA;
+  --shadow:0 10px 34px rgba(20,30,60,.08);
+  --cell:34px;
+  --hl-10:rgba(0,76,153,.10);
+  --hl-14:var(--hl);
+  --hl-35:rgba(0,76,153,.35);
+}
+
+html[data-theme="dark"]{
+  --bg:#0B0E1A;
+  --blob-1:rgba(90,110,255,.22);
+  --blob-2:rgba(150,90,220,.18);
+  --paper:#151A2C;
+  --card:rgba(30,37,64,.82);
+  --glass:rgba(40,46,74,.5);
+  --glass-strong:rgba(46,53,84,.65);
+  --glass-border:rgba(255,255,255,.12);
+  --glass-inset:rgba(255,255,255,.07);
+  --hl:rgba(40,110,214,.26);
+  --grid:#232A44;
+  --margin-red:#FF9F0A;
+  --ink:#2E7DE0;
+  --ink-active:#4A93F0;
+  --pencil:#F2F3F5;
+  --teacher:#FF6961;
+  --ok:#3E8E5B;
+  --ok-tint:rgba(62,142,91,.14);
+  --ok-shadow:rgba(62,142,91,.35);
+  --moved:#64D2FF;
+  --shadow:0 10px 40px rgba(0,0,0,.55);
+  --hl-10:rgba(46,125,224,.16);
+  --hl-14:var(--hl);
+  --hl-35:rgba(46,125,224,.5);
+  --muted-1:#9A9AA2;
+  --muted-2:#9A9AA2;
+  --muted-3:#AEAEB4;
+  --muted-4:#C7C7CC;
+  --muted-5:#F2F3F5;
+  --muted-6:#9A9AA2;
+  --muted-7:#3A3F55;
+  --muted-8:#9A9AA2;
+  --hover-1:rgba(127,160,255,.08);
+  --hover-2:rgba(127,160,255,.14);
+}
+html[data-theme="dark"] input{background:var(--card)}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--bg);
+  background-size:auto,auto,24px 24px,24px 24px,auto;
+  font-family:var(--font-ui);
+  color:var(--pencil);
+  min-height:100vh;
+  padding:18px 12px 60px;
+}
+.wrap{max-width:820px;margin:0 auto}
+h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,5vw,34px);color:var(--pencil);text-align:center;}
+.sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 22px;}
+
+/* ─── выбор типа ─── */
+.modes{display:flex;flex-direction:column;gap:8px;margin-bottom:16px}
+.mode-card{
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px 16px;
+  text-align:left;
+  background:var(--glass);
+  backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
+  border:1px solid var(--glass-border);
+  border-radius:14px;
+  box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);
+  padding:11px 18px;
+  cursor:pointer;
+  transition:transform .12s, border-color .12s;
+  font-family:var(--font-ui);
+}
+.mode-card:hover{border-color:var(--ink); transform:translateX(3px)}
+.mode-card .mnum{font-family:var(--font-mono);font-size:12px;color:var(--muted-1);flex:0 0 auto;min-width:22px;white-space:nowrap;}
+.mode-card .mtitle{font-weight:600;font-size:15px;color:var(--pencil);line-height:1.3;flex:1 1 260px;margin:0;}
+.mode-card .mex{font-family:var(--font-mono);font-size:13px;color:var(--ink);flex:0 0 auto;}
+.mode-card.random{background:linear-gradient(135deg, var(--hl-10), transparent);border-color:var(--ink);}
+
+/* ─── шапка задачи ─── */
+.task-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.back-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 14px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);}
+.back-btn:hover{border-color:var(--ink)}
+.task-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3)}
+.corner{font-family:var(--font-ui);font-weight:500;display:flex;align-items:center;gap:10px;}
+/* ─── плавающая клавиатура ─── */
+.keypad{display:grid;grid-template-columns:repeat(3, 44px);gap:6px;}
+.keypad button{width:44px;height:40px;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-mono);font-size:18px;cursor:pointer;touch-action:manipulation;}
+.keypad button:active{background:var(--hl);}
+.keypad button.kp-minus{color:var(--teacher);font-weight:700;}
+.keypad button.kp-back{font-size:15px;color:var(--muted-6);}
+.keypad button.kp-comma{font-weight:700;color:var(--ink);}
+.keypad button.kp-enter{grid-column:span 2;width:auto;height:38px;font-family:var(--font-ui);font-weight:600;font-size:14px;background:var(--ink);color:#fff;border-color:var(--ink);}
+.keypad button.kp-enter:active{background:var(--ink-active);}
+.keypad-float{position:fixed;top:220px;right:20px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:50;}
+.keypad-close{position:absolute;top:-11px;right:-11px;width:26px;height:26px;border-radius:50%;background:var(--teacher);color:#fff;border:2px solid #fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.keypad-toggle{position:fixed;top:220px;right:20px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50;}
+@media(max-width:720px){.keypad-float,.keypad-toggle{top:auto;bottom:16px;right:16px}}
+.refresh-btn{width:28px;height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}
+.refresh-btn:hover{border-color:var(--ink);transform:rotate(80deg)}
+.refresh-btn:active{transform:scale(.9)}
+
+/* ─── тетрадный лист (для деления в столбик) ─── */
+.sheet{
+  position:relative;
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--paper);
+  background-size:var(--cell) var(--cell);
+  border:1px solid var(--glass-border);
+  border-radius:20px;
+  box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);
+  padding:calc(var(--cell)) calc(var(--cell)*.8) calc(var(--cell)*1.2) calc(var(--cell)*2);
+  overflow-x:auto;
+  min-height:calc(var(--cell)*7);
+  margin-bottom:14px;
+}
+.sheet::before{
+  content:'';
+  position:absolute;
+  top:0;bottom:0;
+  left:calc(var(--cell)*1.5);
+  width:2px;
+  background:var(--margin-red);
+  opacity:.55;
+}
+#board{display:inline-block;min-width:100%;position:relative;}
+.bring-down-ghost{
+  position:absolute;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:var(--font-mono);
+  font-size:calc(var(--cell)*.62);
+  color:var(--ink);
+  pointer-events:none;
+  transition:transform .42s cubic-bezier(.3,.85,.3,1);
+  will-change:transform;
+  z-index:5;
+}
+.row{display:flex;height:var(--cell)}
+.c{
+  width:var(--cell);
+  height:var(--cell);
+  flex:0 0 var(--cell);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:var(--font-mono);
+  font-size:calc(var(--cell)*.62);
+  color:var(--ink);
+  position:relative;
+}
+.c.dim{color:var(--muted-7)}
+.c.hl{color:var(--ink-active);background:var(--hl-10);border-radius:6px}
+.c.uline{border-bottom:2.5px solid var(--ink)}
+.c.vline{border-left:2.5px solid var(--ink)}
+.c.target{outline:2px dashed var(--teacher);outline-offset:-4px;border-radius:8px;animation:pulse 1s infinite;}
+@keyframes pulse{50%{outline-color:transparent}}
+.c.quo{color:var(--teacher);font-weight:700}
+.c.minus{color:var(--ink)}
+
+/* ─── панель ─── */
+.panel{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:20px;margin-bottom:14px;}
+.panel.fade-out{opacity:0;transform:translateY(-6px);transition:opacity .2s ease, transform .2s ease;}
+@keyframes revealUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+#mainPanel.reveal{animation:revealUp .38s cubic-bezier(.22,.9,.35,1) both;}
+.prompt{font-family:var(--font-ui);font-weight:500;font-size:clamp(17px,3.2vw,20px);color:var(--muted-5);margin-bottom:14px;line-height:1.4;}
+.prompt b{color:var(--ink)}
+.inrow{display:flex;gap:10px}
+#stepInput, #finalInput{
+  flex:1;
+  font-family:var(--font-mono);
+  font-size:22px;
+  padding:10px 14px;
+  border:1px solid var(--glass-border);
+  background:var(--card);
+  border-radius:14px;
+  color:var(--ink);
+  width:100%;
+  min-width:0;
+}
+#stepInput:focus, #finalInput:focus{outline:none;border-color:var(--ink)}
+#stepInput.shake, #finalInput.shake{animation:shake .35s}
+#stepInput:disabled, #finalInput:disabled{opacity:.5;cursor:not-allowed}
+@keyframes shake{20%{transform:translateX(-7px)}40%{transform:translateX(7px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+button.go{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ink);color:#fff;border:none;border-radius:14px;padding:11px 24px;cursor:pointer;box-shadow:0 6px 18px var(--hl-35);}
+button.go:active{transform:scale(.96)}
+button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+.hint{font-family:var(--font-ui);font-weight:500;color:var(--teacher);font-size:15px;margin-top:12px;min-height:20px;line-height:1.4;}
+.hint.good{color:var(--ok)}
+
+/* ─── виджет дроби (пустые поля) ─── */
+.mixed-fill{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;font-family:var(--font-mono);font-size:22px;color:var(--ink);padding:10px 0 4px;}
+.mixed-source{color:var(--pencil);white-space:nowrap;}
+.mixed-box{
+  width:52px;
+  font-family:var(--font-mono);
+  font-size:19px;
+  text-align:center;
+  padding:9px 4px;
+  border:1.5px solid var(--glass-border);
+  background:var(--card);
+  border-radius:10px;
+  color:var(--ink);
+}
+.mixed-box:focus{outline:none;border-color:var(--ink)}
+.mixed-box:disabled{opacity:.85}
+.mixed-box.ok{border-color:var(--ok);background:var(--ok-tint);color:var(--ok);}
+.mixed-box.bad{border-color:var(--teacher);background:rgba(255,59,48,.12);color:var(--teacher);}
+.mixed-vfrac{display:inline-flex;flex-direction:column;align-items:center;gap:5px;}
+.mixed-bar{width:52px;height:2px;background:currentColor;}
+
+/* ─── план решения ─── */
+.plan{font-family:var(--font-ui);font-weight:500;font-size:14px;color:var(--muted-4);background:var(--hl-10);border-radius:14px;padding:12px 15px;margin:2px 0 14px;line-height:1.5;}
+.plan b{color:var(--ink)}
+.step-why{font-family:var(--font-ui);font-weight:500;font-size:14px;color:var(--muted-2);margin-bottom:6px;line-height:1.4;}
+
+.explain{font-family:var(--font-ui);font-size:15px;color:var(--muted-4);line-height:1.55;}
+.explain b{color:var(--ink)}
+.next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:14px;box-shadow:0 6px 18px var(--ok-shadow);}
+
+/* ─── статистика ─── */
+.stats{display:flex;gap:10px;flex-wrap:wrap;}
+.stat{flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:12px 14px;text-align:center;}
+.stat .v{font-family:var(--font-ui);font-weight:700;font-size:22px;color:var(--ink);}
+.stat .l{font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-6);}
+
+.theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
+.theme-toggle:hover{border-color:var(--ink)}
+.theme-toggle:active{transform:scale(.92)}
+.home-btn{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
+.home-btn:hover{border-color:var(--ink)}
+.home-btn:active{transform:scale(.92)}
+@media(max-width:480px){:root{--cell:28px}.sheet{padding-left:calc(var(--cell)*2)}}
+</style>
+</head>
+<body>
+<a class="home-btn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
+<button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<script>(function(){
+  var btn=document.getElementById('themeToggle');
+  function apply(t, persist){
+    document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    if (persist) { try{ localStorage.setItem('theme', t); }catch(e){} }
+  }
+  apply(document.documentElement.getAttribute('data-theme') || 'light', false);
+  btn.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur, true);
+  });
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onSystemChange = function(e){
+      var explicit = false;
+      try{ explicit = !!localStorage.getItem('theme'); }catch(err){}
+      if (explicit) return;
+      apply(e.matches ? 'dark' : 'light', false);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
+    else if (mq.addListener) mq.addListener(onSystemChange);
+  }
+})();</script>
+
+<div class="wrap">
+  <h1>ОГЭ №10. Теория вероятности</h1>
+  <div class="sub">выбери тип задания — реши шаги, потом впиши ответ</div>
+
+  <div id="pickerArea">
+    <div class="modes" id="modesGrid"></div>
+  </div>
+
+  <div id="taskArea" style="display:none">
+    <div class="task-head">
+      <button class="back-btn" id="backBtn">← все типы</button>
+      <div class="corner">
+        <div class="task-title" id="taskTitle"></div>
+        <button class="refresh-btn" id="refreshBtn" title="Обновить задание">⟳</button>
+      </div>
+    </div>
+
+    <div class="panel" id="questionPanel" style="display:none">
+      <div class="prompt" id="questionPromptText"></div>
+    </div>
+
+    <div class="panel" id="planPanel" style="display:none">
+      <div class="plan" id="planText"></div>
+    </div>
+
+    <div class="panel" id="fracPanel" style="display:none">
+      <div class="prompt" id="fracPrompt"></div>
+      <div class="mixed-fill" id="fracFill"></div>
+      <div class="hint" id="fracHint"></div>
+    </div>
+
+    <div class="sheet" id="sheetArea" style="display:none">
+      <div id="board"></div>
+    </div>
+
+    <div class="panel" id="qaPanel" style="display:none">
+      <div class="prompt" id="qaPrompt"></div>
+      <div class="inrow" id="qaInrow">
+        <input id="stepInput" type="text" inputmode="text" placeholder="ответ" autocomplete="off">
+        <button class="go" id="stepGo">ОК</button>
+      </div>
+      <div class="mixed-fill" id="mixedFill" style="display:none"></div>
+      <div class="hint" id="stepHint"></div>
+    </div>
+
+    <div class="panel" id="finalPanel" style="display:none">
+      <div class="prompt" id="finalPrompt">Запиши итоговую вероятность десятичной дробью:</div>
+      <div class="inrow">
+        <input id="finalInput" type="text" inputmode="decimal" placeholder="например, 0,25" autocomplete="off">
+        <button class="go" id="finalGo">ОК</button>
+      </div>
+      <div class="hint" id="finalHint"></div>
+    </div>
+
+    <div class="panel" id="mainPanel" style="display:none">
+      <div class="explain" id="explainBox" style="display:none"></div>
+      <button class="next-btn" id="nextBtn" style="display:none">Следующий пример →</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="v" id="stSolved">0</div><div class="l">решено</div></div>
+      <div class="stat"><div class="v" id="stErrors">0</div><div class="l">ошибок</div></div>
+      <div class="stat"><div class="v" id="stStreak">0</div><div class="l">серия без ошибок</div></div>
+    </div>
+  </div>
+</div>
+
+<button class="keypad-toggle" id="kpToggle" title="Показать клавиатуру" style="display:none">⌨</button>
+<div class="keypad-float" id="keypadFloat" style="display:none">
+  <button class="keypad-close" id="kpClose" title="Скрыть клавиатуру">✕</button>
+  <div class="keypad" id="keypadButtons"></div>
+</div>
+
+<script>
+/* ═══════════════ утилиты ═══════════════ */
+const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const pick = arr=>arr[ri(0,arr.length-1)];
+function shuffleArr(arr){
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){ const j=ri(0,i); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+function fracStr(a,b){ return `<span class="vfrac"><span class="vnum">${a}</span><span class="vden">${b}</span></span>`; }
+function fmtRu(x){ return String(x).replace('.', ','); }
+// случайная композиция total на `parts` положительных слагаемых
+function splitN(total, parts){
+  const cuts = new Set();
+  while(cuts.size < parts-1) cuts.add(ri(1,total-1));
+  const sorted = [...cuts].sort((a,b)=>a-b);
+  const bounds = [0, ...sorted, total];
+  const res = [];
+  for(let i=0;i<parts;i++) res.push(bounds[i+1]-bounds[i]);
+  return res;
+}
+
+/* ═══════════════ виджет: деление в столбик ═══════════════ */
+function createDivWidget(sheetEl, qaPanelEls, spec, onDone){
+  // spec: {dividend:string, divisor:number, decimal:bool, maxDecimalDigits:number, question:string}
+  qaPanelEls.inrow.style.display='flex';
+  qaPanelEls.mixedFill.style.display='none';
+  const P = { dividend: spec.dividend, divisor: spec.divisor, decimal: !!spec.decimal };
+  let S = { phase:'group', pos:0, w:0, qStr:'', log:[], ext:'', commaDone:false, errStep:0 };
+  let pendingBringDownAnim = null;  // мета для анимации «сноса» цифры вниз
+
+  function firstGroupLen(){
+    let g=1;
+    while(g < P.dividend.length && Number(P.dividend.slice(0,g)) < P.divisor) g++;
+    return g;
+  }
+  function decDigitsSoFar(){
+    if(!S.commaDone) return 0;
+    return S.qStr.length - S.qStr.indexOf(',') - 1;
+  }
+  function expected(){
+    switch(S.phase){
+      case 'group': return firstGroupLen();
+      case 'q':     return Math.floor(S.w / P.divisor);
+      case 'prod':  return S.qd * P.divisor;
+      case 'rem':   return S.w - S.qd * P.divisor;
+    }
+  }
+
+  function render(){
+    const n = P.dividend.length;
+    const D = n + 1 + (P.decimal ? (spec.maxDecimalDigits||2) : 0);
+    const divisorStr = String(P.divisor);
+    const qMax = Math.max(S.qStr.length + 1, divisorStr.length);
+    const maxEnd = Math.max(S.pos, ...S.log.map(e=>e.endCol), 0);
+    const cols = Math.max(D + 1 + Math.max(divisorStr.length, qMax) + 1, maxEnd + 2);
+    const rows = [];
+    const blank = ()=>Array.from({length:cols},()=>({ch:'',cls:''}));
+
+    const r0 = blank();
+    const g = (S.phase==='group') ? 0 : firstGroupLen();
+    for(let i=0;i<n;i++){
+      r0[i+1].ch = P.dividend[i];
+      if(S.phase!=='group' && i<g && S.log.length===0) r0[i+1].cls='hl';
+      if(S.phase!=='group' && i>=S.pos) r0[i+1].cls += ' dim';
+    }
+    for(let i=0;i<S.ext.length;i++){ r0[n+1+i].ch = S.ext[i]; }
+    r0[D].cls='vline';
+    for(let i=0;i<divisorStr.length;i++){ r0[D+1+i].ch = divisorStr[i]; r0[D+1+i].cls='uline'; }
+    for(let i=divisorStr.length;i<qMax;i++) r0[D+1+i].cls='uline';
+    rows.push(r0);
+
+    const logRows = [];
+    for(const e of S.log){
+      const rr = blank();
+      const t = e.text;
+      const start = e.endCol - t.length + 1;
+      for(let i=0;i<t.length;i++){ rr[start+i].ch = t[i]; if(e.type==='sub') rr[start+i].cls='uline'; }
+      if(e.type==='sub'){ rr[start-1].ch='−'; rr[start-1].cls='minus uline'; }
+      logRows.push(rr);
+    }
+    while(logRows.length<1) logRows.push(blank());
+
+    const r1 = logRows[0];
+    if(!r1[D].ch) r1[D].cls += ' vline';
+    for(let i=0;i<S.qStr.length;i++){ r1[D+1+i].ch = S.qStr[i]; r1[D+1+i].cls='quo'; }
+    if(S.phase==='q') r1[D+1+S.qStr.length].cls='target quo';
+    if(S.phase==='prod' || S.phase==='rem'){
+      const rowIdx = S.log.length;
+      while(logRows.length <= rowIdx) logRows.push(blank());
+      logRows[rowIdx][S.pos].cls += ' target';
+    }
+    rows.push(...logRows);
+
+    sheetEl.querySelector('#board').innerHTML = rows.map(rr=>
+      '<div class="row">'+rr.map(c=>`<div class="c ${c.cls}">${c.ch}</div>`).join('')+'</div>'
+    ).join('');
+  }
+
+  function setPrompt(){
+    const p = qaPanelEls.prompt;
+    const v = P.divisor;
+    switch(S.phase){
+      case 'group': p.innerHTML = `${spec.question ? `<div class="step-why">${spec.question}</div>` : ''}Делим <b>${P.dividend}</b> на <b>${v}</b>. Сколько первых цифр делимого возьмём для первого шага?`; break;
+      case 'q':     p.innerHTML = `Делим <b>${S.w}</b> на <b>${v}</b>. Какую цифру пишем в частное?`; break;
+      case 'prod':  p.innerHTML = `Умножаем: <b>${S.qd} × ${v}</b> = ?`; break;
+      case 'rem':   p.innerHTML = `Вычитаем: <b>${S.w} − ${S.qd*v}</b> = ?`; break;
+    }
+  }
+  function setHint(t, good){ qaPanelEls.hint.textContent=t; qaPanelEls.hint.className='hint'+(good?' good':''); }
+
+  function bringDown(){
+    const n = P.dividend.length;
+    const d = S.pos < n ? P.dividend[S.pos] : '0';
+    const fromCol = S.pos + 1;
+    const last = S.log[S.log.length-1];
+    if(last && last.type==='val'){
+      const rowIdx = S.log.length - 1;
+      last.text += d; last.endCol = S.pos+1; S.w = S.w*10+Number(d);
+      pendingBringDownAnim = { fromCol, toRow: rowIdx+1, toCol: S.pos+1, digit: d };
+    }
+    else if(S.log.length===0){ S.ext += d; S.w = S.w*10+Number(d); } // спускать пока некуда — некуда падать
+    else {
+      const rowIdx = S.log.length;
+      S.log.push({type:'val', text:String(S.w)+d, endCol:S.pos+1}); S.w = S.w*10+Number(d);
+      pendingBringDownAnim = { fromCol, toRow: rowIdx+1, toCol: S.pos+1, digit: d };
+    }
+    S.pos++; S.errStep=0;
+  }
+
+  function playBringDownAnimation(meta){
+    const board = sheetEl.querySelector('#board');
+    const rows = board.querySelectorAll('.row');
+    const srcRow = rows[0], dstRow = rows[meta.toRow];
+    if(!srcRow || !dstRow) return;
+    const srcCell = srcRow.children[meta.fromCol];
+    const dstCell = dstRow.children[meta.toCol];
+    if(!srcCell || !dstCell) return;
+
+    const boardRect = board.getBoundingClientRect();
+    const srcRect = srcCell.getBoundingClientRect();
+    const dstRect = dstCell.getBoundingClientRect();
+
+    dstCell.style.opacity = '0';
+
+    const ghost = document.createElement('div');
+    ghost.className = 'bring-down-ghost';
+    ghost.textContent = meta.digit;
+    ghost.style.left = (srcRect.left - boardRect.left) + 'px';
+    ghost.style.top = (srcRect.top - boardRect.top) + 'px';
+    ghost.style.width = srcRect.width + 'px';
+    ghost.style.height = srcRect.height + 'px';
+    board.appendChild(ghost);
+
+    const cleanup = ()=>{
+      if(ghost.parentNode) ghost.remove();
+      dstCell.style.opacity = '';
+    };
+    requestAnimationFrame(()=>{
+      requestAnimationFrame(()=>{
+        const dx = dstRect.left - srcRect.left;
+        const dy = dstRect.top - srcRect.top;
+        ghost.style.transform = `translate(${dx}px, ${dy}px)`;
+      });
+    });
+    ghost.addEventListener('transitionend', cleanup, {once:true});
+    setTimeout(cleanup, 550);
+  }
+  function startDecimal(){
+    if(!S.commaDone){ S.qStr += ','; S.commaDone = true; setHint('Цифры закончились, а остаток не ноль. Ставим запятую и сносим ноль!', true); }
+    bringDown(); S.phase='q';
+  }
+  function finish(rem){
+    S.phase='done'; render();
+    onDone({ quotientStr: S.qStr, remainder: rem, dividend: Number(P.dividend), divisor: P.divisor });
+  }
+
+  function applyAnswer(exp){
+    const v = P.divisor, n = P.dividend.length;
+    switch(S.phase){
+      case 'group': { S.pos = exp; S.w = Number(P.dividend.slice(0,exp)); S.phase='q'; break; }
+      case 'q': {
+        S.qStr += String(exp);
+        if(exp===0){
+          if(S.pos < n){ bringDown(); S.phase='q'; }
+          else if(P.decimal && S.w>0 && decDigitsSoFar() < (spec.maxDecimalDigits||2)){ startDecimal(); }
+          else { finish(S.w); return; }
+        } else { S.qd = exp; S.phase='prod'; }
+        break;
+      }
+      case 'prod': { S.log.push({type:'sub', text:String(exp), endCol:S.pos}); S.phase='rem'; break; }
+      case 'rem': {
+        const rem = exp;
+        const capReached = P.decimal && decDigitsSoFar() >= (spec.maxDecimalDigits||2);
+        if(capReached){ S.log.push({type:'val', text:String(rem), endCol:S.pos}); finish(rem); return; }
+        if(S.pos < n){ S.log.push({type:'val', text:String(rem), endCol:S.pos}); S.w = rem; bringDown(); S.phase='q'; }
+        else if(P.decimal && rem>0){ S.log.push({type:'val', text:String(rem), endCol:S.pos}); S.w = rem; startDecimal(); }
+        else { S.log.push({type:'val', text:String(rem), endCol:S.pos}); finish(rem); return; }
+        break;
+      }
+    }
+    S.errStep=0; render(); setPrompt();
+    if(pendingBringDownAnim){ playBringDownAnimation(pendingBringDownAnim); pendingBringDownAnim = null; }
+  }
+
+  function submit(){
+    const input = qaPanelEls.input;
+    if(input.value==='') return;
+    const ans = Number(input.value);
+    const exp = expected();
+    if(ans !== exp){
+      S.errStep++;
+      input.classList.remove('shake'); void input.offsetWidth; input.classList.add('shake');
+      if(S.errStep>=3){
+        setHint(`Правильный ответ: ${exp}.`);
+        applyAnswer(exp);
+      } else {
+        setHint('Попробуй ещё раз.');
+      }
+      input.value=''; input.focus({preventScroll:true});
+      return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!','Так держать!']), true);
+    applyAnswer(exp);
+    input.value=''; input.focus({preventScroll:true});
+  }
+
+  qaPanelEls.goBtn.onclick = submit;
+  qaPanelEls.input.onkeydown = e=>{ if(e.key==='Enter') submit(); };
+  render(); setPrompt(); setHint(''); setTimeout(()=>qaPanelEls.input.focus({preventScroll:true}),30);
+}
+
+/* ═══════════════ общая логика для виджетов «впиши в клеточки» ═══════════════ */
+function attachFillBoxes(hostEls, boxes, onDone){
+  // boxes: [{el, answer}, ...] — общая проверка + подсветка ok/bad для любого набора полей
+  let done = false;
+  function checkAll(){
+    if(done) return;
+    const allCorrect = boxes.every(b => b.el.value.trim()!=='' && Number(b.el.value.trim())===Number(b.answer));
+    if(allCorrect){
+      done = true;
+      boxes.forEach(b=>{ b.el.disabled = true; });
+      hostEls.hint.textContent = pick(['Верно!','Точно!','Отлично!']);
+      hostEls.hint.className = 'hint good';
+      setTimeout(onDone, 500);
+    }
+  }
+  boxes.forEach((b,i)=>{
+    b.el.addEventListener('input', ()=>{
+      const raw = b.el.value.trim();
+      b.el.classList.remove('ok','bad');
+      if(raw!==''){
+        if(Number(raw)===Number(b.answer)) b.el.classList.add('ok');
+        else b.el.classList.add('bad');
+      }
+      checkAll();
+    });
+    b.el.addEventListener('keydown', e=>{
+      if(e.key==='Enter' && i<boxes.length-1) boxes[i+1].el.focus({preventScroll:true});
+    });
+  });
+  setTimeout(()=>boxes[0].el.focus({preventScroll:true}), 30);
+}
+
+/* ═══════════════ виджет: дробь вероятности (числитель/знаменатель пустые) ═══════════════ */
+function createProbFracWidget(fracEls, spec, onDone){
+  // spec: {question, num, den} — благоприятные/все, оба поля ученик заполняет сам.
+  // Проверка выполняется не на каждое нажатие клавиши, а только по кнопке «ОК»
+  // (или по Enter на знаменателе), после того как обе клетки заполнены.
+  fracEls.prompt.innerHTML = spec.question || '';
+  fracEls.hint.textContent = '';
+  fracEls.hint.className = 'hint';
+  fracEls.container.innerHTML = `
+    <span class="mixed-source">P(A) =</span>
+    <span class="mixed-vfrac">
+      <input class="mixed-box" id="pfNum" type="text" inputmode="numeric" autocomplete="off" maxlength="4">
+      <span class="mixed-bar"></span>
+      <input class="mixed-box" id="pfDen" type="text" inputmode="numeric" autocomplete="off" maxlength="4">
+    </span>
+    <button type="button" class="go" id="pfGo">ОК</button>
+  `;
+  const numBox = fracEls.container.querySelector('#pfNum');
+  const denBox = fracEls.container.querySelector('#pfDen');
+  const goBtn = fracEls.container.querySelector('#pfGo');
+  let done = false;
+
+  function submit(){
+    if(done) return;
+    const numRaw = numBox.value.trim(), denRaw = denBox.value.trim();
+    if(numRaw==='' || denRaw===''){
+      fracEls.hint.textContent = 'Заполни оба поля дроби.';
+      fracEls.hint.className = 'hint';
+      return;
+    }
+    const numOk = Number(numRaw)===Number(spec.num);
+    const denOk = Number(denRaw)===Number(spec.den);
+    numBox.classList.toggle('ok', numOk);
+    numBox.classList.toggle('bad', !numOk);
+    denBox.classList.toggle('ok', denOk);
+    denBox.classList.toggle('bad', !denOk);
+    if(numOk && denOk){
+      done = true;
+      numBox.disabled = true; denBox.disabled = true; goBtn.disabled = true;
+      fracEls.hint.textContent = pick(['Верно!','Точно!','Отлично!']);
+      fracEls.hint.className = 'hint good';
+      setTimeout(onDone, 500);
+    } else {
+      fracEls.hint.textContent = 'Проверь оба числа и попробуй ещё раз.';
+      fracEls.hint.className = 'hint';
+    }
+  }
+
+  [numBox, denBox].forEach(b=>{
+    b.addEventListener('input', ()=>{ b.classList.remove('ok','bad'); });
+  });
+  numBox.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); denBox.focus({preventScroll:true}); } });
+  denBox.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); submit(); } });
+  goBtn.onclick = submit;
+
+  setTimeout(()=>numBox.focus({preventScroll:true}), 30);
+}
+
+/* ═══════════════ генераторы типов (классическая вероятность) ═══════════════ */
+
+function gen_type1(){
+  // пирожки на тарелке
+  const total = pick([8,10,16,20]);
+  const counts = splitN(total,3);
+  const fillings = ['мясом','капустой','вишнёй'];
+  const idx = ri(0,2);
+  const favorable = counts[idx];
+  const partsText = fillings.map((f,i)=>`${counts[i]} с ${f}`).join(', ').replace(/, ([^,]*)$/, ' и $1');
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `На тарелке ${total} пирожков: ${partsText}. Наташа наугад выбирает один пирожок. Найдите вероятность того, что он окажется с ${fillings[idx]}.`,
+    favorable, total, answer,
+    explain: `Благоприятных исходов (пирожков с ${fillings[idx]}) — ${favorable}. Всего пирожков — ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`
+  };
+}
+
+const COLOR_POOL = [
+  {gen:'чёрных', nomN:'чёрное'},
+  {gen:'жёлтых', nomN:'жёлтое'},
+  {gen:'зелёных', nomN:'зелёное'},
+  {gen:'белых',  nomN:'белое'},
+  {gen:'красных', nomN:'красное'},
+  {gen:'синих',  nomN:'синее'},
+];
+function gen_type2(){
+  // машины такси
+  const total = pick([8,10,16,20,25,40,50]);
+  const k = ri(3,5);
+  const colors = shuffleArr(COLOR_POOL).slice(0,k);
+  const counts = splitN(total,k);
+  const idx = ri(0,k-1);
+  const favorable = counts[idx];
+  const partsText = colors.map((c,i)=>`${counts[i]} ${c.gen}`).join(', ').replace(/, ([^,]*)$/, ' и $1');
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `В фирме такси в данный момент свободно ${total} машин: ${partsText}. По вызову выехала одна из машин, случайно оказавшаяся ближе всего к заказчику. Найдите вероятность того, что к нему приедет ${colors[idx].nomN} такси.`,
+    favorable, total, answer,
+    explain: `Благоприятных исходов — ${favorable} (${colors[idx].gen} машин). Всего машин — ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`
+  };
+}
+
+const PEOPLE_TICKETS = [
+  {name:'Сергей', verb:'не выучил',  dat:'ему'},
+  {name:'Андрей', verb:'не выучил',  dat:'ему'},
+  {name:'Максим', verb:'не выучил',  dat:'ему'},
+  {name:'Марина', verb:'не выучила', dat:'ей'},
+  {name:'Оля',    verb:'не выучила', dat:'ей'},
+  {name:'Настя',  verb:'не выучила', dat:'ей'},
+];
+function gen_type3(){
+  // билеты на экзамене
+  const total = pick([8,10,16,20,25,40,50]);
+  const notLearned = ri(1, Math.max(1,Math.floor(total/2)));
+  const favorable = total - notLearned;
+  const p = pick(PEOPLE_TICKETS);
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `На экзамене ${total} билетов, ${p.name} ${p.verb} ${notLearned} из них. Найдите вероятность того, что ${p.dat} попадётся выученный билет.`,
+    favorable, total, answer,
+    explain: `Выучено билетов — ${total} − ${notLearned} = ${favorable}. Всего билетов — ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`
+  };
+}
+
+const ORDINAL_FEM = {8:'восьмой', 10:'десятой', 16:'шестнадцатой', 20:'двадцатой'};
+const PRIZE_PEOPLE = ['Варя','Настя','Игорь','Максим','Соня','Данил'];
+function gen_type4(){
+  // приз в каждой N-ой банке
+  const total = pick([8,10,16,20]);
+  const favorable = total - 1;
+  const name = pick(PRIZE_PEOPLE);
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `В каждой ${ORDINAL_FEM[total]} банке кофе согласно условиям акции есть приз. Призы распределены по банкам случайно. ${name} покупает банку кофе в надежде выиграть приз. Найдите вероятность того, что ${name} не найдёт приз в своей банке.`,
+    favorable, total, answer,
+    explain: `Банок без приза — ${total} − 1 = ${favorable}. Всего банок в серии — ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`
+  };
+}
+
+const TV_PEOPLE = [
+  {nom:'Маша', gen:'Маши'},
+  {nom:'Петя', gen:'Пети'},
+  {nom:'Костя', gen:'Кости'},
+  {nom:'Лена', gen:'Лены'},
+];
+function gen_type5(){
+  // сломанный телевизор, случайный канал
+  const total = pick([8,10,16,20,25,40,50]);
+  const comedy = ri(1, Math.max(1,Math.floor(total/2)));
+  const favorable = total - comedy;
+  const p = pick(TV_PEOPLE);
+  const channelsPhrase = comedy===1 ? 'одному каналу' : `${comedy} каналам`;
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `Телевизор у ${p.gen} сломался и показывает только один случайный канал. ${p.nom} включает телевизор. В это время по ${channelsPhrase} из ${total} показывают кинокомедии. Найдите вероятность того, что ${p.nom} попадёт на канал, где комедия не идёт.`,
+    favorable, total, answer,
+    explain: `Каналов без комедии — ${total} − ${comedy} = ${favorable}. Всего каналов — ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`
+  };
+}
+
+/* ═══════════════ игральные кости ═══════════════
+   Один кубик даёт знаменатель 6 = 2·3, два кубика — 36 = 2²·3². Чтобы
+   вероятность сокращалась до конечной десятичной дроби, тройка в
+   знаменателе должна полностью сократиться числителем. Поэтому события на
+   одном кубике годятся только те, где ровно 3 благоприятных исхода из 6
+   (тогда 3/6 = 1/2), а на «оба раза одно и то же» — 3·3=9 из 36 (9/36=1/4). */
+const DIE_EVENTS = [
+  { favSet:[2,4,6], text:'выпадет чётное число очков', textOnce:'выпало чётное число очков', textBoth:'оба раза выпало чётное число очков' },
+  { favSet:[1,3,5], text:'выпадет нечётное число очков', textOnce:'выпало нечётное число очков', textBoth:'оба раза выпало нечётное число очков' },
+  { favSet:[4,5,6], text:'выпадет число, большее 3', textOnce:'выпало число, большее 3', textBoth:'оба раза выпало число, большее 3' },
+  { favSet:[1,2,3], text:'выпадет число, не большее 3', textOnce:'выпало число, не большее 3', textBoth:'оба раза выпало число, не большее 3' },
+  { favSet:[2,3,5], text:'выпадет простое число очков', textOnce:'выпало простое число очков', textBoth:'оба раза выпало простое число очков' },
+];
+
+function gen_type6(){
+  // один кубик, один бросок, простое событие
+  const ev = pick(DIE_EVENTS);
+  const total = 6;
+  const favorable = ev.favSet.length;
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `Игральную кость (кубик) бросают один раз. Найдите вероятность того, что ${ev.text}.`,
+    favorable, total, answer,
+    explain: `Благоприятных исходов — ${favorable} (выпадает ${ev.favSet.join(', ')}). Всего исходов при одном броске кубика — ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`
+  };
+}
+
+const SUM_COUNT = {2:1,3:2,4:3,5:4,6:5,7:6,8:5,9:4,10:3,11:2,12:1};
+const SUM_PAIRS = [[4,7],[5,8],[6,9],[7,10]]; // только пары, где количество исходов в сумме даёт 9 (9/36=0,25)
+function sumCombosText(s){
+  const combos=[];
+  for(let a=1;a<=6;a++){ const b=s-a; if(b>=1 && b<=6) combos.push(`${a}+${b}`); }
+  return combos.join(', ');
+}
+function gen_type7(){
+  // два броска, сумма равна одному из двух чисел
+  const [s1,s2] = pick(SUM_PAIRS);
+  const c1 = SUM_COUNT[s1], c2 = SUM_COUNT[s2];
+  const favorable = c1 + c2;
+  const total = 36;
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `Игральную кость бросают дважды. Найдите вероятность того, что сумма двух выпавших чисел равна ${s1} или ${s2}.`,
+    favorable, total, answer,
+    explain: `Сумма ${s1} получается ${c1} способами (${sumCombosText(s1)}), сумма ${s2} — ${c2} способами (${sumCombosText(s2)}). Благоприятных исходов — ${c1}+${c2} = ${favorable}. Всего исходов при двух бросках — 6·6 = ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`
+  };
+}
+
+function gen_type8(){
+  // два броска, одно и то же событие оба раза
+  const ev = pick(DIE_EVENTS);
+  const k = ev.favSet.length;
+  const favorable = k*k;
+  const total = 36;
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `Игральную кость бросают дважды. Найдите вероятность того, что ${ev.textBoth}.`,
+    favorable, total, answer,
+    explain: `На каждом броске подходит ${k} исходов из 6, поэтому для двух бросков благоприятных исходов ${k}·${k} = ${favorable}. Всего исходов при двух бросках — 6·6 = ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`
+  };
+}
+
+function gen_type9(){
+  // два броска, чётность суммы
+  const even = Math.random() < 0.5;
+  const parity = even ? 'чётна' : 'нечётна';
+  const favorable = 18, total = 36;
+  const answer = Math.round((favorable/total)*10000)/10000;
+  const explain = even
+    ? `Сумма чётна, если оба числа нечётные (3·3 = 9 исходов) или оба чётные (3·3 = 9 исходов). Благоприятных исходов — 9+9 = ${favorable}. Всего исходов — 6·6 = ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`
+    : `Сумма нечётна, если первое число нечётное, а второе чётное (3·3 = 9 исходов), или наоборот (3·3 = 9 исходов). Благоприятных исходов — 9+9 = ${favorable}. Всего исходов — 6·6 = ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`;
+  return {
+    prompt: `Игральный кубик бросают дважды. Найдите вероятность того, что сумма двух выпавших чисел ${parity}.`,
+    favorable, total, answer, explain
+  };
+}
+
+function gen_type10(){
+  // два броска, хотя бы раз произошло событие (через противоположное)
+  const ev = pick(DIE_EVENTS);
+  const k = ev.favSet.length; // всегда 3
+  const total = 36;
+  const missCount = 6 - k;
+  const favorable = total - missCount*missCount;
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `Игральную кость бросают дважды. Найдите вероятность того, что хотя бы раз ${ev.textOnce}.`,
+    favorable, total, answer,
+    explain: `Проще посчитать вероятность противоположного события — что нужное не выпало ни разу. Не подходящих граней — ${missCount} из 6, значит ни разу не выпасть за два броска можно ${missCount}·${missCount} = ${missCount*missCount} способами из ${total}. Тогда «хотя бы раз» — это ${total} − ${missCount*missCount} = ${favorable} благоприятных исходов. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`
+  };
+}
+
+function gen_type11(){
+  // наибольшее/наименьшее из двух выпавших чисел равно N (единственные
+  // значения N, при которых дробь ещё сокращается до конечной десятичной)
+  const useMax = Math.random() < 0.5;
+  const N = useMax ? 5 : 2;
+  const favorable = 9, total = 36;
+  const answer = Math.round((favorable/total)*10000)/10000;
+  const word = useMax ? 'наибольшее' : 'наименьшее';
+  const edge = useMax ? 6 : 1;
+  const explain = `Число ${N} будет ${word==='наибольшее'?'наибольшим':'наименьшим'} из выпавших, если хотя бы один раз выпадет ${N} и ни разу не выпадет ${edge}. Чтобы не посчитать дважды случай «${N} и ${N}», получаем ${favorable} благоприятных исходов из ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`;
+  return {
+    prompt: `Игральную кость бросают дважды. Найдите вероятность того, что ${word} из двух выпавших чисел равно ${N}.`,
+    favorable, total, answer, explain
+  };
+}
+
+/* ═══════════════ реестр типов ═══════════════ */
+const MODES = [
+  { id:'type1', title:'Тип 1', gen:gen_type1 },
+  { id:'type2', title:'Тип 2', gen:gen_type2 },
+  { id:'type3', title:'Тип 3', gen:gen_type3 },
+  { id:'type4', title:'Тип 4', gen:gen_type4 },
+  { id:'type5', title:'Тип 5', gen:gen_type5 },
+  { id:'type6', title:'Тип 6', gen:gen_type6 },
+  { id:'type7', title:'Тип 7', gen:gen_type7 },
+  { id:'type8', title:'Тип 8', gen:gen_type8 },
+  { id:'type9', title:'Тип 9', gen:gen_type9 },
+  { id:'type10', title:'Тип 10', gen:gen_type10 },
+  { id:'type11', title:'Тип 11', gen:gen_type11 },
+];
+
+const SHARED_PLAN = `Вероятность равна отношению количества благоприятных исходов к общему числу исходов: P = благоприятные ⁄ все. Сначала сам определи оба числа и запиши дробь, а затем раздели её в столбик, чтобы получить десятичный ответ.`;
+
+/* ═══════════════ управление ═══════════════ */
+let totalSolved=0, streak=0, totalErrors=0;
+let curMode=null, curTask=null, stepIdx=0;
+let taskAnswered=false, stepsDone=false, finalErrStep=0;
+
+const els = {
+  picker: document.getElementById('pickerArea'),
+  taskArea: document.getElementById('taskArea'),
+  modesGrid: document.getElementById('modesGrid'),
+  backBtn: document.getElementById('backBtn'),
+  taskTitle: document.getElementById('taskTitle'),
+  refreshBtn: document.getElementById('refreshBtn'),
+  questionPanel: document.getElementById('questionPanel'),
+  questionPromptText: document.getElementById('questionPromptText'),
+  planPanel: document.getElementById('planPanel'),
+  planText: document.getElementById('planText'),
+  fracPanel: document.getElementById('fracPanel'),
+  fracPrompt: document.getElementById('fracPrompt'),
+  fracFill: document.getElementById('fracFill'),
+  fracHint: document.getElementById('fracHint'),
+  sheetArea: document.getElementById('sheetArea'),
+  qaPanel: document.getElementById('qaPanel'),
+  qaPrompt: document.getElementById('qaPrompt'),
+  qaInrow: document.getElementById('qaInrow'),
+  mixedFill: document.getElementById('mixedFill'),
+  stepInput: document.getElementById('stepInput'),
+  stepGo: document.getElementById('stepGo'),
+  stepHint: document.getElementById('stepHint'),
+  finalPanel: document.getElementById('finalPanel'),
+  finalInput: document.getElementById('finalInput'),
+  finalGo: document.getElementById('finalGo'),
+  finalHint: document.getElementById('finalHint'),
+  mainPanel: document.getElementById('mainPanel'),
+  explainBox: document.getElementById('explainBox'),
+  nextBtn: document.getElementById('nextBtn'),
+  stSolved: document.getElementById('stSolved'),
+  stErrors: document.getElementById('stErrors'),
+  stStreak: document.getElementById('stStreak'),
+};
+
+function qaPanelEls(){
+  return { prompt: els.qaPrompt, input: els.stepInput, goBtn: els.stepGo, hint: els.stepHint, inrow: els.qaInrow, mixedFill: els.mixedFill };
+}
+function fracPanelEls(){
+  return { prompt: els.fracPrompt, hint: els.fracHint, container: els.fracFill };
+}
+
+function renderPicker(){
+  els.modesGrid.innerHTML = `
+    <div class="mode-card random" data-id="random">
+      <div class="mnum">🎲 случайно</div>
+      <div class="mtitle">Все вперемешку</div>
+      <div class="mex">как на настоящем экзамене</div>
+    </div>
+  ` + MODES.map(m=>`
+    <div class="mode-card" data-id="${m.id}">
+      <div class="mtitle">${m.title}</div>
+    </div>
+  `).join('');
+  els.modesGrid.querySelectorAll('.mode-card').forEach(card=>{
+    card.onclick = ()=> startMode(card.dataset.id);
+  });
+}
+
+function startMode(id){
+  curMode = id;
+  els.picker.style.display='none';
+  els.taskArea.style.display='block';
+  const m = id==='random' ? null : MODES.find(x=>x.id===id);
+  els.taskTitle.textContent = m ? m.title : 'Все типы вперемешку';
+  newTask();
+}
+els.backBtn.onclick = ()=>{
+  els.taskArea.style.display='none';
+  els.picker.style.display='block';
+  window.scrollTo(0,0);
+  syncKeypadVisibility();
+};
+els.refreshBtn.onclick = newTask;
+
+function newTask(){
+  const m = curMode==='random' ? pick(MODES) : MODES.find(x=>x.id===curMode);
+  curTask = m.gen();
+  stepIdx = 0;
+  taskAnswered = false;
+  stepsDone = false;
+  finalErrStep = 0;
+
+  curTask.steps = [
+    { type:'fracfill2',
+      question:`Вероятность равна отношению количества благоприятных исходов к общему числу исходов. Впиши дробь сам:`,
+      num: curTask.favorable, den: curTask.total },
+    { type:'div', dividend:String(curTask.favorable), divisor:curTask.total, decimal:true,
+      maxDecimalDigits: decimalDigitsOf(curTask.answer),
+      question:`Разделим дробь в столбик, чтобы получить десятичную вероятность.` },
+  ];
+
+  // страница всегда открывается на тексте задания, а не на месте прошлого скролла
+  window.scrollTo(0,0);
+
+  els.questionPanel.style.display='block';
+  els.questionPromptText.innerHTML = curTask.prompt;
+
+  els.planPanel.style.display='block';
+  els.planText.innerHTML = `<b>План решения.</b> ${SHARED_PLAN}`;
+
+  els.fracPanel.style.display='none';
+  els.sheetArea.style.display='none';
+  els.qaPanel.style.display='none';
+  els.finalPanel.style.display='none';
+  els.finalInput.disabled=false;
+  els.finalGo.disabled=false;
+
+  els.mainPanel.style.display='none';
+  els.nextBtn.style.display='none';
+  els.explainBox.style.display='none';
+
+  runStep();
+}
+
+function runStep(){
+  if(taskAnswered) return;
+  const steps = curTask.steps;
+  if(stepIdx >= steps.length){
+    showFinalPanel();
+    return;
+  }
+  const step = steps[stepIdx];
+  if(step.type==='fracfill2'){
+    els.fracPanel.style.display='block';
+    createProbFracWidget(fracPanelEls(), step, ()=>{
+      stepIdx++; setTimeout(runStep, 400);
+    });
+  } else if(step.type==='div'){
+    // fracPanel НЕ трогаем — заполненная дробь остаётся на экране, пока
+    // рядом появляется деление в столбик
+    els.sheetArea.style.display='block';
+    els.qaPanel.style.display='block';
+    createDivWidget(document.getElementById('sheetArea'), qaPanelEls(), step, ()=>{
+      stepIdx++; setTimeout(runStep, 500);
+    });
+  }
+  syncKeypadVisibility();
+}
+
+function showFinalPanel(){
+  stepsDone = true;
+  els.finalPanel.style.display='block';
+  els.finalInput.value='';
+  els.finalHint.textContent = '';
+  els.finalHint.className='hint';
+  setTimeout(()=>els.finalInput.focus({preventScroll:true}), 30);
+  syncKeypadVisibility();
+}
+
+function normDec(x){ return Math.round(Number(String(x).replace(',','.'))*10000)/10000; }
+function decimalDigitsOf(x){
+  const s = String(x);
+  const i = s.indexOf('.');
+  return i===-1 ? 1 : Math.max(1, s.length - i - 1);
+}
+
+function submitFinal(){
+  if(taskAnswered) return;
+  const raw = els.finalInput.value.trim();
+  if(raw==='') return;
+  const ok = normDec(raw) === normDec(curTask.answer);
+  if(!ok){
+    finalErrStep++;
+    totalErrors++; els.stErrors.textContent = totalErrors;
+    streak = 0; els.stStreak.textContent = streak;
+    els.finalInput.classList.remove('shake'); void els.finalInput.offsetWidth; els.finalInput.classList.add('shake');
+    if(finalErrStep>=3){
+      els.finalHint.textContent = `Правильный ответ: ${fmtRu(curTask.answer)}.`;
+      els.finalHint.className='hint';
+      finishRound();
+    } else {
+      els.finalHint.textContent='Попробуй ещё раз.';
+      els.finalHint.className='hint';
+    }
+    els.finalInput.value=''; els.finalInput.focus({preventScroll:true});
+    return;
+  }
+  els.finalHint.textContent = pick(['Верно!','Точно!','Отлично!']);
+  els.finalHint.className='hint good';
+  streak++; els.stStreak.textContent = streak;
+  finishRound();
+}
+els.finalGo.onclick = submitFinal;
+els.finalInput.onkeydown = e=>{ if(e.key==='Enter') submitFinal(); };
+
+function finishRound(){
+  taskAnswered = true;
+  totalSolved++;
+  els.stSolved.textContent = totalSolved;
+  els.finalInput.disabled = true;
+  els.finalGo.disabled = true;
+  finishTask();
+}
+
+function finishTask(){
+  const fading = [els.sheetArea, els.qaPanel, els.planPanel, els.fracPanel, els.finalPanel].filter(el=>el.style.display!=='none');
+  fading.forEach(el=>el.classList.add('fade-out'));
+  setTimeout(()=>{
+    [els.sheetArea, els.qaPanel, els.planPanel, els.fracPanel, els.finalPanel].forEach(el=>{ el.style.display='none'; });
+    fading.forEach(el=>el.classList.remove('fade-out'));
+    syncKeypadVisibility();
+
+    els.mainPanel.style.display='block';
+    els.explainBox.style.display='block';
+    els.explainBox.innerHTML = `<b>Решение:</b> ${curTask.explain}`;
+    els.nextBtn.style.display='block';
+
+    els.mainPanel.classList.remove('reveal');
+    void els.mainPanel.offsetWidth; // перезапуск анимации
+    els.mainPanel.classList.add('reveal');
+  }, fading.length ? 190 : 0);
+}
+
+els.nextBtn.onclick = newTask;
+
+/* ───────── плавающая клавиатура ───────── */
+let keypadOpen = true;
+function setupFloatingKeypad(){
+  const keys = ['7','8','9','4','5','6','1','2','3','−','0','⌫'];
+  document.getElementById('keypadButtons').innerHTML = keys.map(k=>{
+    const cls = k==='−' ? 'kp-minus' : (k==='⌫' ? 'kp-back' : '');
+    const val = k==='⌫' ? 'back' : (k==='−' ? '-' : k);
+    return `<button type="button" class="${cls}" data-key="${val}">${k}</button>`;
+  }).join('')
+    + `<button type="button" class="kp-comma" data-key=",">,</button>`
+    + `<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>`;
+  document.querySelectorAll('#keypadButtons button').forEach(btn=>{
+    btn.onclick = ()=>keypadPress(btn.dataset.key);
+  });
+  document.getElementById('kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(); };
+  document.getElementById('kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(); };
+}
+let activeStepInput = null;
+document.addEventListener('focusin', e=>{
+  const t = e.target;
+  if(t && t.tagName==='INPUT' && (els.qaPanel.contains(t) || els.fracFill.contains(t) || els.finalPanel.contains(t))) activeStepInput = t;
+});
+function keypadPress(ch){
+  let inp = activeStepInput;
+  const stillValid = inp && (els.qaPanel.contains(inp) || els.fracFill.contains(inp) || els.finalPanel.contains(inp));
+  if(!inp || inp.disabled || !stillValid) inp = els.stepInput;
+  if(!inp || inp.disabled) return;
+  if(ch==='enter'){
+    if(inp.classList.contains('mixed-box')){
+      const boxes = [...els.fracFill.querySelectorAll('.mixed-box')];
+      const idx = boxes.indexOf(inp);
+      if(idx>=0 && idx<boxes.length-1){ boxes[idx+1].focus({preventScroll:true}); return; }
+      const pfGo = els.fracFill.querySelector('#pfGo');
+      if(pfGo && !pfGo.disabled){ pfGo.click(); return; }
+      return;
+    }
+    if(els.finalPanel.contains(inp)){ els.finalGo.click(); return; }
+    els.stepGo.click(); return;
+  }
+  if(ch==='back') inp.value = inp.value.slice(0,-1);
+  else inp.value = (inp.value||'') + ch;
+  inp.dispatchEvent(new Event('input', {bubbles:true}));
+  inp.focus({preventScroll:true});
+}
+function syncKeypadVisibility(){
+  const active = els.taskArea.style.display!=='none' &&
+    (els.qaPanel.style.display!=='none' || els.fracPanel.style.display!=='none' || els.finalPanel.style.display!=='none');
+  document.getElementById('keypadFloat').style.display = (active && keypadOpen) ? 'block' : 'none';
+  document.getElementById('kpToggle').style.display = (active && !keypadOpen) ? 'flex' : 'none';
+}
+
+renderPicker();
+setupFloatingKeypad();
+</script>
+</body>
+</html>

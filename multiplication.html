@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тренажёр: умножение в столбик</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font-ui:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Sora','Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,-apple-system,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#EEF1F7;
+  --blob-1:rgba(120,150,255,.16);
+  --blob-2:rgba(190,150,230,.14);
+  --card:rgba(255,255,255,.8);
+  --glass:rgba(255,255,255,.55);
+  --glass-strong:rgba(255,255,255,.72);
+  --glass-border:rgba(255,255,255,.85);
+  --glass-inset:rgba(255,255,255,.55);
+  --hl:var(--hl-14);
+  --muted-1:#8E8E93;
+  --muted-2:#6E6E73;
+  --muted-3:#48484A;
+  --muted-4:#3A3A3C;
+  --muted-5:#1D1D1F;
+  --muted-6:#8E8E93;
+  --muted-7:#C7C7CC;
+  --muted-8:#8E8E93;
+  --paper:#FDFCF7;
+  --grid:#DCE4F0;
+  --margin-red:#FF9F0A;
+  --ink:#004C99;
+  --ink-active:#003A75;
+  --pencil:#1D1D1F;
+  --teacher:#FF3B30;
+  --ok:#248A3D;
+  --ok-tint:rgba(36,138,61,.1);
+  --ok-shadow:rgba(36,138,61,.3);
+  --moved:#5AC8FA;
+  --shadow:0 10px 34px rgba(20,30,60,.08);
+  --cell:38px;
+  --hl-14:var(--hl);
+  --hl-35:rgba(0,76,153,.35);
+}
+
+html[data-theme="dark"]{
+  --bg:#0B0E1A;
+  --blob-1:rgba(90,110,255,.22);
+  --blob-2:rgba(150,90,220,.18);
+  --paper:#151A2C;
+  --card:rgba(30,37,64,.82);
+  --glass:rgba(40,46,74,.5);
+  --glass-strong:rgba(46,53,84,.65);
+  --glass-border:rgba(255,255,255,.12);
+  --glass-inset:rgba(255,255,255,.07);
+  --hl:rgba(40,110,214,.26);
+  --grid:#232A44;
+  --margin-red:#FF9F0A;
+  --ink:#2E7DE0;
+  --ink-active:#4A93F0;
+  --pencil:#F2F3F5;
+  --teacher:#FF6961;
+  --ok:#3E8E5B;
+  --ok-tint:rgba(62,142,91,.14);
+  --ok-shadow:rgba(62,142,91,.35);
+  --moved:#64D2FF;
+  --shadow:0 10px 40px rgba(0,0,0,.55);
+  --hl-14:var(--hl);
+  --hl-35:rgba(46,125,224,.5);
+  --muted-1:#9A9AA2;
+  --muted-2:#9A9AA2;
+  --muted-3:#AEAEB4;
+  --muted-4:#C7C7CC;
+  --muted-5:#F2F3F5;
+  --muted-6:#9A9AA2;
+  --muted-7:#3A3F55;
+  --muted-8:#9A9AA2;
+  --hover-1:rgba(127,160,255,.08);
+  --hover-2:rgba(127,160,255,.14);
+}
+html[data-theme="dark"] input{background:var(--card)}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--bg);
+  background-size:auto,auto,24px 24px,24px 24px,auto;
+  font-family:var(--font-ui);
+  color:var(--pencil);
+  min-height:100vh;
+  padding:18px 12px 60px;
+}
+.wrap{max-width:1040px;margin:0 auto}
+h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(26px,5vw,38px);color:var(--pencil);text-align:center;}
+.sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 18px;}
+.levels{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px}
+.lvl{font-family:var(--font-ui);font-weight:600;font-size:14px;border:1px solid var(--glass-border);background:var(--glass);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border-radius:999px;padding:8px 16px;cursor:pointer;color:var(--muted-3);transition:all .15s;}
+.lvl:hover{border-color:var(--ink)}
+.lvl.active{background:var(--ink);border-color:var(--ink);color:#fff;box-shadow:0 6px 16px var(--hl-35);}
+.lvl .done-mark{color:#FFB800;margin-left:4px;}
+/* ─── тетрадный лист ─── */
+.sheet{
+  position:relative;
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--paper);
+  background-size:var(--cell) var(--cell);
+  border:1px solid var(--glass-border);
+  border-radius:20px;
+  box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);
+  padding:calc(var(--cell)*2) calc(var(--cell)*.7) calc(var(--cell)) calc(var(--cell)*2);
+  min-height:calc(var(--cell)*9);
+  overflow-x:auto;
+}
+.sheet::before{
+  content:'';
+  position:absolute;
+  top:0;bottom:0;
+  left:calc(var(--cell)*1.4);
+  width:2px;
+  background:var(--margin-red);
+  opacity:.55;
+}
+.corner{font-family:var(--font-ui);font-weight:500;position:absolute;top:6px;right:12px;color:var(--muted-1);font-size:13px;display:flex;align-items:center;gap:8px;}
+.refresh-btn{width:28px;height:28px;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}
+.refresh-btn:hover{border-color:var(--ink);transform:rotate(80deg)}
+.refresh-btn:active{transform:scale(.9)}
+#board{display:inline-block}
+.mrow{display:flex;height:var(--cell);position:relative}
+.mc{
+  width:var(--cell);
+  height:var(--cell);
+  flex:0 0 var(--cell);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-family:var(--font-mono);
+  font-size:calc(var(--cell)*.6);
+  color:var(--ink);
+  position:relative;
+}
+.mc.dim{color:var(--muted-7)}
+.mc.moved{color:var(--moved)}
+.mc.hl{
+  background:var(--hl-14);
+  border-radius:8px;
+  color:var(--ink-active);
+  font-weight:700;
+  transition:background .2s;
+}
+.mc.target{
+  outline:2px dashed var(--teacher);
+  outline-offset:-4px;
+  border-radius:8px;
+  animation:pulse 1s infinite;
+}
+@keyframes pulse{50%{outline-color:transparent}}
+.mc.sign{color:var(--pencil);font-size:calc(var(--cell)*.55)}
+.mc .carry{
+  position:absolute;
+  top:-24px; left:50%;
+  transform:translateX(-50%);
+  font-size:calc(var(--cell)*.45);
+  color:var(--teacher);
+  font-family:var(--font-ui);
+  font-weight:700;
+  line-height:1;
+}
+.mline{
+  border-top:2.5px solid var(--ink);
+  margin:2px 0 4px;
+}
+.mresult{
+  font-family:var(--font-ui);
+  font-size:20px;
+  color:var(--ok);
+  margin-top:10px;
+  padding-left:4px;
+}
+/* ─── панель ─── */
+.panel{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:20px;margin-top:16px;}
+.prompt{font-family:var(--font-ui);font-weight:500;font-size:clamp(17px,3.2vw,20px);color:var(--muted-5);margin-bottom:12px;line-height:1.4;}
+.prompt b{color:var(--ink)}
+.inrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+input.num{
+  font-family:var(--font-mono);
+  font-size:24px;
+  padding:9px 12px;
+  border:1px solid var(--glass-border);
+  background:var(--card);
+  border-radius:14px 0 0 14px;
+  border-right:none;
+  color:var(--ink);
+  width:120px;
+}
+input.num:focus{outline:none;border-color:var(--ink)}
+input.num.shake{animation:shake .35s}
+@keyframes shake{
+  20%{transform:translateX(-7px)}40%{transform:translateX(7px)}
+  60%{transform:translateX(-5px)}80%{transform:translateX(5px)}
+}
+.num-wrap{display:inline-flex;align-items:stretch;vertical-align:middle}
+.spin{display:flex;flex-direction:column;border:1px solid var(--glass-border);background:var(--card);border-radius:0 14px 14px 0;overflow:hidden;}
+.spin-btn{flex:1;width:32px;border:none;background:transparent;color:var(--ink);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;touch-action:manipulation;}
+.spin-btn:first-child{border-bottom:1px solid var(--glass-border);}
+.spin-btn:active{background:var(--hl);}
+.keypad{display:grid;grid-template-columns:repeat(3, 44px);gap:6px;}
+.keypad button{width:44px;height:40px;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-mono);font-size:18px;cursor:pointer;touch-action:manipulation;}
+.keypad button:active{background:var(--hl);}
+.keypad button.kp-minus{color:var(--teacher);font-weight:700;}
+.keypad-float{position:fixed;top:220px;right:20px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:50;}
+.keypad-close{
+  position:absolute;
+  top:-11px; right:-11px;
+  width:26px;height:26px;
+  border-radius:50%;
+  background:var(--teacher);
+  color:#fff;
+  border:2px solid #fff;
+  font-size:14px;
+  line-height:1;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+}
+.keypad-toggle{position:fixed;top:220px;right:20px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50;}
+@media(max-width:720px){
+  .keypad-float, .keypad-toggle{ top:auto; bottom:16px; right:16px; }
+}
+.keypad button.kp-back{font-size:15px;color:var(--muted-6);}
+.keypad button.kp-enter{grid-column:span 3;width:auto;height:38px;font-family:var(--font-ui);font-weight:600;font-size:14px;background:var(--ink);color:#fff;border-color:var(--ink);}
+.keypad button.kp-enter:active{background:var(--ink-active);}
+button.go{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ink);color:#fff;border:none;border-radius:14px;padding:11px 26px;cursor:pointer;box-shadow:0 6px 18px var(--hl-35);}
+button.go:active{transform:scale(.96)}
+.hint{font-family:var(--font-ui);font-weight:500;color:var(--teacher);font-size:15px;margin-top:12px;min-height:20px;line-height:1.4;}
+.hint.good{color:var(--ok)}
+.next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:8px;box-shadow:0 6px 18px var(--ok-shadow);}
+/* ─── статистика и теория ─── */
+.stats{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.stat{flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:12px 14px;text-align:center;}
+.stat .v{font-family:var(--font-ui);font-weight:700;font-size:22px;color:var(--ink);}
+.stat .l{font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-6);}
+.stars{color:#FFB800;font-size:20px;letter-spacing:2px;}
+.theory{display:flex;gap:14px;margin-top:16px;flex-wrap:wrap;align-items:stretch}
+.tcard{flex:1;min-width:290px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:18px 20px;}
+.tt{font-family:var(--font-ui);font-weight:700;font-size:17px;color:var(--pencil);margin-bottom:10px;}
+.talg{font-family:var(--font-ui);font-weight:400;font-size:14px;color:var(--muted-4);padding-left:20px;line-height:1.6;}
+.talg li{margin:5px 0;}
+.ttrap{font-family:var(--font-ui);font-weight:500;font-size:13px;color:var(--teacher);margin-top:8px;line-height:1.45;}
+@media(max-width:480px){
+  :root{--cell:32px}
+  .sheet{padding-left:calc(var(--cell)*2)}
+}
+
+.theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
+.theme-toggle:hover{border-color:var(--ink)}
+.theme-toggle:active{transform:scale(.92)}
+.home-btn{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
+.home-btn:hover{border-color:var(--ink)}
+.home-btn:active{transform:scale(.92)}
+</style>
+</head>
+<body>
+<a class="home-btn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
+<button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<script>(function(){
+  var btn=document.getElementById('themeToggle');
+  function apply(t, persist){
+    document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = t === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    if (persist) { try{ localStorage.setItem('theme', t); }catch(e){} }
+  }
+  apply(document.documentElement.getAttribute('data-theme') || 'light', false);
+  btn.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur, true);
+  });
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onSystemChange = function(e){
+      var explicit = false;
+      try{ explicit = !!localStorage.getItem('theme'); }catch(err){}
+      if (explicit) return;
+      apply(e.matches ? 'dark' : 'light', false);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
+    else if (mq.addListener) mq.addListener(onSystemChange);
+  }
+})();</script>
+<div class="wrap">
+  <h1>Умножение в столбик</h1>
+  <div class="sub">от простого 2×1 до серьёзного 4×4 — по разряду, с переносом</div>
+
+  <div class="levels" id="levels"></div>
+
+  <div class="sheet">
+    <div class="corner">
+      <button class="refresh-btn" id="refreshBtn" title="Обновить пример">⟳</button>
+      <span id="taskNum">пример №1</span>
+    </div>
+    <div id="board"></div>
+    <div class="mresult" id="result"></div>
+  </div>
+
+  <div class="panel">
+    <div class="prompt" id="prompt"></div>
+    <div class="inrow" id="inputArea"></div>
+    <button class="next-btn" id="nextBtn" style="display:none">Следующий пример →</button>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="v" id="stSolved">0</div><div class="l">решено</div></div>
+    <div class="stat"><div class="v" id="stStreak">0</div><div class="l">серия без ошибок</div></div>
+    <div class="stat"><div class="v stars" id="stStars">—</div><div class="l">этот пример</div></div>
+  </div>
+
+  <div class="theory">
+    <div class="tcard">
+      <div class="tt">Алгоритм</div>
+      <ol class="talg">
+        <li>Умножаем каждую цифру верхнего числа на цифру нижнего — справа налево.</li>
+        <li>Если произведение больше 9 — пишем последнюю цифру, а десятки переносим влево, к следующему разряду.</li>
+        <li>Дошли до последней (левой) цифры — пишем результат целиком, вместе с переносом.</li>
+        <li>Если множитель не однозначный — для каждой его цифры получаем отдельную строку, сдвинутую на разряд влево.</li>
+        <li>Все строки складываем — это и есть ответ.</li>
+      </ol>
+    </div>
+    <div class="tcard">
+      <div class="tt">Ловушки</div>
+      <div class="ttrap">⚠ Перенос — самое частое место ошибки. Не забывай прибавлять его к следующему произведению.</div>
+      <div class="ttrap">⚠ Каждая новая строка (для второй, третьей цифры множителя) сдвигается на один разряд влево.</div>
+      <div class="ttrap">⚠ На последней цифре верхнего числа перенос не отбрасывается — он становится частью ответа.</div>
+    </div>
+  </div>
+</div>
+
+<button class="keypad-toggle" id="kpToggle" title="Показать клавиатуру" style="display:none">⌨</button>
+<div class="keypad-float" id="keypadFloat" style="display:none">
+  <button class="keypad-close" id="kpClose" title="Скрыть клавиатуру">✕</button>
+  <div class="keypad" id="keypadButtons"></div>
+</div>
+
+<script>
+/* ───────── утилиты ───────── */
+const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const pick = a=>a[ri(0,a.length-1)];
+
+function randDigits(len){
+  const d=[];
+  for(let i=0;i<len;i++) d.push(ri(2,9));
+  return d;
+}
+function digitsToNum(d){ return Number(d.join('')); }
+
+/* ───────── генерация ───────── */
+function genMult(lenTop, lenBottom){
+  const top = randDigits(lenTop);
+  const bottom = randDigits(lenBottom);
+  return {top, bottom, topVal:digitsToNum(top), bottomVal:digitsToNum(bottom)};
+}
+
+const LEVELS = [
+  {id:0, name:'Уровень 1', desc:'2-значное × 1-значное', gen:()=>genMult(2,1)},
+  {id:1, name:'Уровень 2', desc:'3-значное × 1-значное', gen:()=>genMult(3,1)},
+  {id:2, name:'Уровень 3', desc:'2-значное × 2-значное', gen:()=>genMult(2,2)},
+  {id:3, name:'Уровень 4', desc:'3-значное × 2-значное', gen:()=>genMult(3,2)},
+  {id:4, name:'Уровень 5', desc:'3-значное × 3-значное', gen:()=>genMult(3,3)},
+  {id:5, name:'Уровень 6', desc:'4-значное × 4-значное', gen:()=>genMult(4,4)},
+  {id:6, name:'Экзамен',   desc:'вперемешку'},
+];
+let curLevel = 0;
+const solvedByLevel = [0,0,0,0,0,0,0];
+let totalSolved = 0, streak = 0, taskCounter = 0;
+
+function gen(level){
+  if(level===6) level = ri(0,5);
+  return LEVELS[level].gen();
+}
+
+/* ───────── состояние ───────── */
+let P=null, S=null;
+
+function newProblem(){
+  P = gen(curLevel);
+  taskCounter++;
+  S = {
+    phase:'preview',
+    passIndex:0,      // индекс цифры множителя (0 = крайняя правая)
+    digitIndex:0,     // сколько цифр верхнего числа уже пройдено в этом проходе
+    carryIn:0,        // перенос, уже установленный с прошлой цифры (известное значение)
+    subPhase:'multiply', // 'multiply' | 'add' | 'split'
+    product:null,      // чистое произведение цифр (без переноса)
+    total:null,        // произведение + перенос
+    currentDigits:[], // цифры текущей строки, справа налево
+    partials:[],       // завершённые строки [{digits(слева направо), shift}]
+    finalStep:false,   // true, когда остался только шаг суммирования
+    errTotal:0,
+    exam: curLevel===6,
+  };
+  document.getElementById('taskNum').textContent = 'пример №'+taskCounter;
+  document.getElementById('nextBtn').style.display='none';
+  document.getElementById('stStars').textContent='—';
+  document.getElementById('result').textContent='';
+  setHint('');
+  renderAll(); setPrompt(); renderInputs();
+}
+document.getElementById('refreshBtn').onclick = newProblem;
+
+function startSolving(){
+  S.phase = 'solve';
+  renderAll(); setPrompt(); renderInputs();
+}
+
+/* ───────── вычисление ширины доски ───────── */
+function boardWidth(){
+  const n = P.top.length, m = P.bottom.length;
+  const trueTotal = String(P.topVal * P.bottomVal).length;
+  return Math.max(n, trueTotal) + 1; // запас в одну колонку
+}
+
+function buildCells(digits, shiftFromRight, width){
+  const cells = new Array(width).fill(null);
+  const rightMost = width - 1 - shiftFromRight;
+  for(let i=0;i<digits.length;i++){
+    const pos = rightMost - (digits.length-1-i);
+    if(pos>=0 && pos<width) cells[pos]=digits[i];
+  }
+  return cells;
+}
+
+/* ───────── отрисовка ───────── */
+function renderAll(){
+  const board = document.getElementById('board');
+  const W = boardWidth();
+  const rows = [];
+
+  if(S.phase==='preview'){
+    const topStr = P.top.join('');
+    const botStr = P.bottom.join('');
+    const previewChars = `${topStr} x ${botStr} = ?`.split('');
+    board.innerHTML = `<div class="mrow">${previewChars.map(ch=>`<div class="mc${ch===' '?' dim':''}">${ch==='x'?'×':(ch===' '?'':ch)}</div>`).join('')}</div>`;
+    return;
+  }
+
+  // строка верхнего числа
+  const topCells = buildCells(P.top, 0, W);
+  let topHl = null, botHl = null, topCarryMap = null;
+  if(S.phase==='solve' && !S.finalStep && S.partials.length < P.bottom.length){
+    const n = P.top.length;
+    const ti = n-1-S.digitIndex;
+    const topCol = columnOf(P.top.length, 0, W, ti);
+    topHl = new Set([topCol]);
+    botHl = new Set([columnOf(P.bottom.length, 0, W, P.bottom.length-1-S.passIndex)]);
+    if(S.carryIn>0){
+      topCarryMap = {}; topCarryMap[topCol] = S.carryIn;
+    }
+  }
+  rows.push(rowHTML(topCells, {}, null, null, topHl, topCarryMap));
+
+  // строка множителя со знаком ×
+  const botCells = buildCells(P.bottom, 0, W);
+  const signPos = W - P.bottom.length - 1;
+  rows.push(rowHTML(botCells, {}, signPos>=0?signPos:null, null, botHl));
+
+  rows.push(`<div class="mline"></div>`);
+
+  // уже завершённые строки частичных произведений
+  S.partials.forEach(p=>{
+    const cells = buildCells(p.digits, p.shift, W);
+    rows.push(rowHTML(cells, {moved:true}));
+  });
+
+  // текущая строка в процессе решения
+  if(S.phase==='solve' && !S.finalStep && S.partials.length < P.bottom.length){
+    const n = P.top.length;
+    const doneDigitsLeftToRight = [...S.currentDigits].reverse(); // то, что уже написано, слева направо от текущей позиции
+    const cells = buildCells(doneDigitsLeftToRight.length ? doneDigitsLeftToRight : [], S.passIndex, W);
+    // считаем целевую колонку — следующая цифра справа от уже написанных
+    const rightMost = W - 1 - S.passIndex;
+    const targetPos = rightMost - S.digitIndex;
+    const targetSet = new Set([targetPos]);
+    rows.push(rowHTML(cells, {moved:true}, null, targetSet));
+  }
+
+  // сумма (если множитель многозначный и все строки готовы)
+  if((S.finalStep || S.phase==='done') && P.bottom.length>1){
+    rows.push(`<div class="mline"></div>`);
+    if(S.phase==='done'){
+      const sumCells = buildCells(String(P.topVal*P.bottomVal).split('').map(Number), 0, W);
+      rows.push(rowHTML(sumCells, {moved:true}));
+    } else {
+      rows.push(`<div class="mrow"><div class="mc" style="width:auto;padding:0 8px">= ?</div></div>`);
+    }
+  }
+
+  board.innerHTML = rows.join('');
+}
+
+function columnOf(digitsLen, shiftFromRight, width, digitArrIndex){
+  const rightMost = width - 1 - shiftFromRight;
+  return rightMost - (digitsLen-1-digitArrIndex);
+}
+
+function rowHTML(cells, cls, signPos, targetSet, hlSet, carryMap){
+  const parts = cells.map((c,i)=>{
+    let cl = 'mc';
+    if(cls.moved) cl += ' moved';
+    if(targetSet && targetSet.has(i)) cl += ' target';
+    if(hlSet && hlSet.has(i)) cl += ' hl';
+    const carrySpan = (carryMap && carryMap[i]!==undefined) ? `<span class="carry">${carryMap[i]}</span>` : '';
+    if(c===null && !(targetSet&&targetSet.has(i))) return `<div class="${cl}">${carrySpan}</div>`;
+    return `<div class="${cl}">${c===null?'':c}${carrySpan}</div>`;
+  });
+  if(signPos!==null && signPos!==undefined && signPos>=0){
+    parts[signPos] = `<div class="mc sign">×</div>` + (cells[signPos]!==null?`<div class="mc">${cells[signPos]}</div>`:'');
+  }
+  return `<div class="mrow">${parts.join('')}</div>`;
+}
+
+function setPrompt(){
+  const p = document.getElementById('prompt');
+  if(S.phase==='preview'){
+    p.innerHTML = 'Посмотри на пример спокойно — спешить некуда.<br>Когда будешь готов, жми «Начать».';
+    return;
+  }
+  if(S.phase==='done'){
+    p.innerHTML = 'Пример решён! 🎉';
+    return;
+  }
+  if(S.finalStep){
+    p.innerHTML = 'Все частичные произведения готовы. Сложи их — это и есть ответ.';
+    return;
+  }
+  const n = P.top.length;
+  const ti = n-1-S.digitIndex; // индекс цифры верхнего числа (0 = старший разряд)
+  const topDigit = P.top[ti];
+  const multDigit = P.bottom[P.bottom.length-1-S.passIndex];
+  const isLast = S.digitIndex===n-1;
+  const passInfo = P.bottom.length>1 ? `<br><small>Строка ${S.passIndex+1} из ${P.bottom.length} — умножаем на ${multDigit}${S.passIndex>0?' (не забудь про сдвиг влево)':''}.</small>` : '';
+
+  if(S.subPhase==='multiply'){
+    p.innerHTML = `${topDigit} × ${multDigit} = ?${passInfo}`;
+  } else if(S.subPhase==='add'){
+    p.innerHTML = `${topDigit} × ${multDigit} = <b>${S.product}</b>. С учётом переноса с прошлого шага (он написан над столбцом) — сколько получится, если прибавить?${passInfo}`;
+  } else if(S.subPhase==='split'){
+    p.innerHTML = `Получили ${S.total}. Что пишем в строку, а что оставляем в уме (переносим)?${passInfo}`;
+  }
+}
+
+function numInputHTML(id, extraStyle){
+  return `<div class="num-wrap">
+    <input class="num" id="${id}" type="text" inputmode="none" autocomplete="off" placeholder="?"${extraStyle?` style="${extraStyle}"`:''}>
+    <div class="spin">
+      <button type="button" class="spin-btn" data-target="${id}" data-dir="1">▲</button>
+      <button type="button" class="spin-btn" data-target="${id}" data-dir="-1">▼</button>
+    </div>
+  </div>`;
+}
+
+function attachSpinners(area){
+  area.querySelectorAll('.spin-btn').forEach(btn=>{
+    btn.onclick = ()=>{
+      const inp = document.getElementById(btn.dataset.target);
+      if(!inp) return;
+      let v = Number(inp.value);
+      if(!Number.isFinite(v)) v = 0;
+      v += Number(btn.dataset.dir);
+      if(v<0) v=0;
+      if(v>999) v=999;
+      inp.value = String(v);
+      inp.focus();
+    };
+  });
+}
+
+let activeInputId = 'ans';
+let keypadOpen = true;
+function wireInput(id){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.addEventListener('keydown', e=>{ if(e.key==='Enter') submitAnswer(); });
+  el.addEventListener('focus', ()=>{ activeInputId = id; });
+}
+
+function keypadPress(ch){
+  if(ch==='enter'){ document.getElementById('goBtn')?.click(); return; }
+  const inp = document.getElementById(activeInputId);
+  if(!inp) return;
+  if(ch==='back') inp.value = inp.value.slice(0,-1);
+  else inp.value = (inp.value||'') + ch;
+  inp.focus();
+}
+
+function setupFloatingKeypad(){
+  const keys = ['7','8','9','4','5','6','1','2','3','−','0','⌫'];
+  document.getElementById('keypadButtons').innerHTML = keys.map(k=>{
+    const cls = k==='−' ? 'kp-minus' : (k==='⌫' ? 'kp-back' : '');
+    const val = k==='⌫' ? 'back' : (k==='−' ? '-' : k);
+    return `<button type="button" class="${cls}" data-key="${val}">${k}</button>`;
+  }).join('') + `<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>`;
+  document.querySelectorAll('#keypadButtons button').forEach(btn=>{
+    btn.onclick = ()=>keypadPress(btn.dataset.key);
+  });
+  document.getElementById('kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(); };
+  document.getElementById('kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(); };
+}
+
+function syncKeypadVisibility(){
+  const active = S && S.phase==='solve';
+  document.getElementById('keypadFloat').style.display = (active && keypadOpen) ? 'block' : 'none';
+  document.getElementById('kpToggle').style.display = (active && !keypadOpen) ? 'flex' : 'none';
+}
+
+function renderInputs(){
+  const area = document.getElementById('inputArea');
+  syncKeypadVisibility();
+  if(S.phase==='preview'){
+    area.innerHTML = `<button class="go" id="goBtn">Начать →</button>`;
+    document.getElementById('goBtn').onclick = startSolving;
+    return;
+  }
+  if(S.phase==='done'){ area.innerHTML=''; return; }
+  if(S.subPhase==='split'){
+    area.innerHTML = `
+      <span class="lbl" style="font-family:var(--font-ui);font-size:20px">пишем</span>
+      ${numInputHTML('ansWrite','width:60px')}
+      <span class="lbl" style="font-family:var(--font-ui);font-size:20px">в уме</span>
+      ${numInputHTML('ansCarry','width:60px')}
+      <button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>`;
+    document.getElementById('goBtn').onclick = submitAnswer;
+    attachSpinners(area);
+    wireInput('ansWrite'); wireInput('ansCarry');
+    activeInputId = 'ansWrite';
+    setTimeout(()=>{ const el=document.getElementById('ansWrite'); if(el) el.focus(); }, 30);
+    return;
+  }
+  area.innerHTML = `
+    ${numInputHTML('ans')}
+    <button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>`;
+  document.getElementById('goBtn').onclick = submitAnswer;
+  attachSpinners(area);
+  wireInput('ans');
+  activeInputId = 'ans';
+  setTimeout(()=>{ const el=document.getElementById('ans'); if(el) el.focus(); }, 30);
+}
+
+function setHint(t, good=false){
+  const h = document.getElementById('hint');
+  h.innerHTML = t;
+  h.className = 'hint'+(good?' good':'');
+}
+
+/* ───────── логика решения ───────── */
+function finalizeDigit(total){
+  String(total).split('').reverse().forEach(ch=>S.currentDigits.push(Number(ch)));
+  const digitsLeftToRight = [...S.currentDigits].reverse();
+  S.partials.push({digits:digitsLeftToRight, shift:S.passIndex});
+  S.currentDigits=[]; S.carryIn=0; S.digitIndex=0; S.subPhase='multiply'; S.product=null; S.total=null;
+  S.passIndex++;
+  if(S.passIndex>=P.bottom.length){
+    if(P.bottom.length>1){ S.finalStep=true; }
+    else { finish(); return; }
+  }
+  renderAll(); setPrompt(); renderInputs();
+}
+
+// после того как узнали total (умножили, может быть сложили с переносом) —
+// решаем, что дальше: если это последняя цифра — записываем целиком;
+// если переносить нечего (total<10) — пишем цифру и сразу идём дальше без лишнего вопроса;
+// если перенос есть — спрашиваем «что пишем, что в уме».
+function advanceAfterTotal(total, isLast){
+  if(isLast){
+    finalizeDigit(total);
+    return;
+  }
+  if(total<10){
+    S.currentDigits.push(total);
+    S.carryIn = 0;
+    S.digitIndex++;
+    S.subPhase='multiply'; S.product=null; S.total=null;
+    renderAll(); setPrompt(); renderInputs();
+    return;
+  }
+  S.subPhase='split';
+  S.total = total;
+  renderAll(); setPrompt(); renderInputs();
+}
+
+function submitAnswer(){
+  if(S.finalStep){
+    const inp = document.getElementById('ans');
+    if(!inp || inp.value==='') return;
+    const v = Number(inp.value);
+    const trueTotal = P.topVal*P.bottomVal;
+    if(!Number.isFinite(v) || v!==trueTotal){
+      S.errTotal++;
+      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+      setHint(S.exam ? 'Сложи строки ещё раз, столбиком.' : 'Сложи все частичные произведения столбиком, с учётом их сдвига. Проверь, не потерялся ли перенос при сложении.');
+      inp.value='';
+      return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    finish();
+    return;
+  }
+
+  const n = P.top.length;
+  const ti = n-1-S.digitIndex;
+  const multDigit = P.bottom[P.bottom.length-1-S.passIndex];
+  const isLast = S.digitIndex===n-1;
+
+  if(S.subPhase==='split'){
+    const iW = document.getElementById('ansWrite'), iC = document.getElementById('ansCarry');
+    if(!iW || !iC || iW.value==='' || iC.value==='') return;
+    const vW = Number(iW.value), vC = Number(iC.value);
+    const expW = S.total%10, expC = Math.floor(S.total/10);
+    if(!Number.isFinite(vW) || !Number.isFinite(vC) || vW!==expW || vC!==expC){
+      S.errTotal++;
+      if(vW!==expW){ iW.classList.remove('shake'); void iW.offsetWidth; iW.classList.add('shake'); }
+      if(vC!==expC){ iC.classList.remove('shake'); void iC.offsetWidth; iC.classList.add('shake'); }
+      setHint(S.exam ? 'Последняя цифра суммы — в строку, остальное — в уме.' : `Из числа ${S.total} в строку пишем только последнюю цифру, а всё, что осталось слева от неё, переносим в уме к следующему разряду.`);
+      iW.value=''; iC.value='';
+      return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    S.currentDigits.push(vW);
+    S.carryIn = vC;
+    S.digitIndex++;
+    S.subPhase='multiply'; S.product=null; S.total=null;
+    renderAll(); setPrompt(); renderInputs();
+    return;
+  }
+
+  const inp = document.getElementById('ans');
+  if(!inp || inp.value==='') return;
+  const v = Number(inp.value);
+  if(!Number.isFinite(v)){
+    inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+    setHint('Введи число.');
+    inp.value='';
+    return;
+  }
+
+  if(S.subPhase==='multiply'){
+    const expected = P.top[ti]*multDigit;
+    if(v!==expected){
+      S.errTotal++;
+      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+      setHint(S.exam ? 'Проверь умножение.' : `Перемножь ${P.top[ti]} и ${multDigit} — пока без переноса, это следующим шагом.`);
+      inp.value='';
+      return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    inp.value='';
+    S.product = expected;
+    if(S.carryIn>0){
+      S.subPhase='add';
+      renderAll(); setPrompt(); renderInputs();
+      return;
+    }
+    advanceAfterTotal(S.product, isLast);
+    return;
+  }
+
+  if(S.subPhase==='add'){
+    const expected = S.product + S.carryIn;
+    if(v!==expected){
+      S.errTotal++;
+      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+      setHint(S.exam ? 'Сложи произведение и перенос.' : `Сложи ${S.product} и перенос, написанный над столбцом.`);
+      inp.value='';
+      return;
+    }
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    inp.value='';
+    S.total = expected;
+    advanceAfterTotal(S.total, isLast);
+    return;
+  }
+}
+
+function finish(){
+  S.phase='done';
+  renderAll(); setPrompt(); renderInputs();
+  document.getElementById('result').textContent = `${P.topVal} × ${P.bottomVal} = ${P.topVal*P.bottomVal}`;
+  let stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
+  document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
+  totalSolved++; solvedByLevel[curLevel]++;
+  streak = (S.errTotal===0) ? streak+1 : 0;
+  document.getElementById('stSolved').textContent = totalSolved;
+  document.getElementById('stStreak').textContent = streak;
+  setHint(S.errTotal===0 ? 'Без единой ошибки — блестяще!' : `Решено! Ошибок по пути: ${S.errTotal}.`, S.errTotal===0);
+  document.getElementById('nextBtn').style.display='block';
+  renderLevels();
+}
+
+/* ───────── интерфейс уровней ───────── */
+function renderLevels(){
+  const el = document.getElementById('levels');
+  el.innerHTML = LEVELS.map(L=>
+    `<button class="lvl ${L.id===curLevel?'active':''}" data-id="${L.id}" title="${L.desc}">
+      ${L.name}${solvedByLevel[L.id]>=5?'<span class="done-mark">★</span>':''}
+    </button>`
+  ).join('');
+  el.querySelectorAll('.lvl').forEach(b=>b.onclick=()=>{
+    curLevel = Number(b.dataset.id);
+    renderLevels(); newProblem();
+  });
+}
+document.getElementById('nextBtn').onclick = newProblem;
+
+
+setupFloatingKeypad();
+renderLevels();
+newProblem();
+</script>
+</body>
+</html>

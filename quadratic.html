@@ -1,0 +1,1657 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тренажёр: квадратные уравнения</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font-ui:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Sora','Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,-apple-system,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#EEF1F7;
+  --blob-1:rgba(120,150,255,.16);
+  --blob-2:rgba(190,150,230,.14);
+  --card:rgba(255,255,255,.8);
+  --glass:rgba(255,255,255,.55);
+  --glass-strong:rgba(255,255,255,.72);
+  --glass-border:rgba(255,255,255,.85);
+  --glass-inset:rgba(255,255,255,.55);
+  --hl:var(--hl-14);
+  --muted-1:#8E8E93;
+  --muted-2:#6E6E73;
+  --muted-3:#48484A;
+  --muted-4:#3A3A3C;
+  --muted-5:#1D1D1F;
+  --muted-6:#8E8E93;
+  --muted-7:#C7C7CC;
+  --muted-8:#8E8E93;
+  --paper:#FDFCF7;
+  --grid:#DCE4F0;
+  --margin-red:#FF9F0A;
+  --ink:#004C99;
+  --ink-active:#003A75;
+  --pencil:#1D1D1F;
+  --teacher:#FF3B30;
+  --ok:#248A3D;
+  --ok-tint:rgba(36,138,61,.1);
+  --ok-shadow:rgba(36,138,61,.3);
+  --moved:#5AC8FA;
+  --shadow:0 10px 34px rgba(20,30,60,.08);
+  --hl-04:rgba(0,76,153,.04);
+  --hl-05:rgba(0,76,153,.05);
+  --hl-06:rgba(0,76,153,.06);
+  --hl-14:var(--hl);
+  --hl-35:rgba(0,76,153,.35);
+}
+
+html[data-theme="dark"]{
+  --bg:#0B0E1A;
+  --blob-1:rgba(90,110,255,.22);
+  --blob-2:rgba(150,90,220,.18);
+  --paper:#151A2C;
+  --card:rgba(30,37,64,.82);
+  --glass:rgba(40,46,74,.5);
+  --glass-strong:rgba(46,53,84,.65);
+  --glass-border:rgba(255,255,255,.12);
+  --glass-inset:rgba(255,255,255,.07);
+  --hl:rgba(40,110,214,.26);
+  --grid:#232A44;
+  --margin-red:#FF9F0A;
+  --ink:#2E7DE0;
+  --ink-active:#4A93F0;
+  --pencil:#F2F3F5;
+  --teacher:#FF6961;
+  --ok:#3E8E5B;
+  --ok-tint:rgba(62,142,91,.14);
+  --ok-shadow:rgba(62,142,91,.35);
+  --moved:#64D2FF;
+  --shadow:0 10px 40px rgba(0,0,0,.55);
+  --hl-04:rgba(46,125,224,.06);
+  --hl-05:rgba(46,125,224,.08);
+  --hl-06:rgba(46,125,224,.1);
+  --hl-14:var(--hl);
+  --hl-35:rgba(46,125,224,.5);
+  --muted-1:#9A9AA2;
+  --muted-2:#9A9AA2;
+  --muted-3:#AEAEB4;
+  --muted-4:#C7C7CC;
+  --muted-5:#F2F3F5;
+  --muted-6:#9A9AA2;
+  --muted-7:#3A3F55;
+  --muted-8:#9A9AA2;
+  --hover-1:rgba(127,160,255,.08);
+  --hover-2:rgba(127,160,255,.14);
+}
+html[data-theme="dark"] input{background:var(--card)}
+html[data-theme="dark"] .abc-legend .t-a{background:rgba(127,160,255,.16)}
+html[data-theme="dark"] .abc-legend .t-b{background:rgba(255,107,91,.16)}
+html[data-theme="dark"] .abc-legend .t-c{background:rgba(78,209,140,.16)}
+html[data-theme="dark"] .flyer{background:rgba(255,211,77,.18)}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--bg);
+  background-size:auto,auto,24px 24px,24px 24px,auto;
+  font-family:var(--font-ui);
+  color:var(--pencil);
+  min-height:100vh;
+  padding:18px 12px 60px;
+}
+.wrap{max-width:1040px;margin:0 auto}
+h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(26px,5vw,38px);color:var(--pencil);text-align:center;}
+.sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 18px;}
+.levels{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px}
+.lvl{font-family:var(--font-ui);font-weight:600;font-size:14px;border:1px solid var(--glass-border);background:var(--glass);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border-radius:999px;padding:8px 16px;cursor:pointer;color:var(--muted-3);transition:all .15s;}
+.lvl:hover{border-color:var(--ink)}
+.lvl.active{background:var(--ink);border-color:var(--ink);color:#fff;box-shadow:0 6px 16px var(--hl-35);}
+.lvl .done-mark{color:#FFB800;margin-left:4px;}
+/* ─── тетрадный лист ─── */
+.sheet{
+  position:relative;
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--paper);
+  background-size:34px 34px;
+  border:1px solid var(--glass-border);
+  border-radius:20px;
+  box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);
+  padding:34px 24px 34px 68px;
+  min-height:280px;
+}
+.sheet::before{
+  content:'';
+  position:absolute;
+  top:0;bottom:0;
+  left:51px;
+  width:2px;
+  background:var(--margin-red);
+  opacity:.55;
+}
+.corner{font-family:var(--font-ui);font-weight:500;position:absolute;top:6px;right:12px;color:var(--muted-1);font-size:13px;display:flex;align-items:center;gap:8px;}
+.refresh-btn{width:28px;height:28px;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}
+.refresh-btn:hover{border-color:var(--ink);transform:rotate(80deg)}
+.refresh-btn:active{transform:scale(.9)}
+.eqline{
+  font-size:26px;
+  color:var(--ink);
+  line-height:34px;
+  margin-bottom:0;
+}
+.stepline{
+  font-family:var(--font-mono);
+  font-size:21px;
+  color:var(--moved);
+  background:rgba(91,135,232,.10);
+  display:flex;
+  align-items:center;
+  width:fit-content;
+  line-height:1.15;
+  height:34px;
+  padding:0 12px;
+  border-radius:9px;
+  margin:0;
+}
+.stepline.stepline-frac{height:102px}
+.stepline.ok{
+  color:var(--ok);
+  background:rgba(46,125,83,.08);
+  font-family:var(--font-ui);
+  font-size:22px;
+  display:block;
+  line-height:34px;
+  margin-top:0;
+  padding:0 4px;
+}
+.steps-wrap{margin-top:0;display:flex;flex-direction:column}
+/* ─── панель вопроса ─── */
+.panel{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:20px;margin-top:16px;}
+.prompt{font-family:var(--font-ui);font-weight:500;font-size:clamp(17px,3.2vw,20px);color:var(--muted-5);margin-bottom:12px;line-height:1.4;}
+.prompt b{color:var(--ink)}
+.inrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+input.num{
+  font-family:var(--font-mono);
+  font-size:24px;
+  padding:9px 12px;
+  border:1px solid var(--glass-border);
+  background:var(--card);
+  border-radius:14px 0 0 14px;
+  border-right:none;
+  color:var(--ink);
+  width:110px;
+}
+input.num.small{width:92px}
+input.num:focus{outline:none;border-color:var(--ink)}
+.num-wrap{display:inline-flex;align-items:stretch;vertical-align:middle}
+.spin{display:flex;flex-direction:column;border:1px solid var(--glass-border);background:var(--card);border-radius:0 14px 14px 0;overflow:hidden;}
+.spin-btn{flex:1;width:32px;border:none;background:transparent;color:var(--ink);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;touch-action:manipulation;}
+.spin-btn:first-child{border-bottom:1px solid var(--glass-border);}
+.spin-btn:active{background:var(--hl);}
+.keypad{display:grid;grid-template-columns:repeat(3, 44px);gap:6px;}
+.keypad button{width:44px;height:40px;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-mono);font-size:18px;cursor:pointer;touch-action:manipulation;}
+.keypad button:active{background:var(--hl);}
+.keypad button.kp-minus{color:var(--teacher);font-weight:700;}
+.keypad button.kp-x{color:var(--moved);font-weight:700;font-style:italic}
+.keypad button.kp-back{font-size:15px;color:var(--muted-6);}
+.keypad button.kp-enter{grid-column:span 2;width:auto;height:40px;font-family:var(--font-ui);font-weight:600;font-size:14px;background:var(--ink);color:#fff;border-color:var(--ink);}
+.keypad button.kp-enter:active{background:var(--ink-active);}
+.keypad-float{position:fixed;top:220px;right:20px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:50;}
+.keypad-close{position:absolute;top:-11px;right:-11px;width:26px;height:26px;border-radius:50%;background:var(--teacher);color:#fff;border:2px solid #fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.keypad-toggle{position:fixed;top:220px;right:20px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50;}
+@media(max-width:720px){.keypad-float,.keypad-toggle{top:auto;bottom:16px;right:16px}}
+input.num.shake{animation:shake .35s}
+@keyframes shake{
+  20%{transform:translateX(-7px)}40%{transform:translateX(7px)}
+  60%{transform:translateX(-5px)}80%{transform:translateX(5px)}
+}
+button.go{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ink);color:#fff;border:none;border-radius:14px;padding:11px 26px;cursor:pointer;box-shadow:0 6px 18px var(--hl-35);}
+button.go:active{transform:scale(.96)}
+.choices{display:flex;flex-wrap:wrap;gap:10px}
+.eqline2{display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:26px;color:var(--ink);min-height:50px}
+.eq-sign{padding:0 4px;color:var(--pencil)}
+.term{display:inline-flex;align-items:center;padding:5px 12px;border-radius:10px;background:var(--hl-06);border:2px solid transparent;white-space:nowrap;line-height:1}
+.term.moved{color:var(--moved);background:rgba(91,135,232,.14)}
+.term.tap{cursor:pointer;border-color:var(--hl-35);border-style:dashed;transition:transform .12s,border-color .12s}
+.term.tap:hover{transform:translateY(-2px);border-color:var(--ink)}
+.term.shake{animation:shake .35s}
+.term.pop{animation:pop .45s}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.35)}100%{transform:scale(1)}}
+.flyer{position:fixed;z-index:50;display:inline-flex;align-items:center;padding:5px 12px;border-radius:10px;background:#FFF8E8;box-shadow:0 6px 18px rgba(0,0,0,.18);font-family:var(--font-mono);font-size:26px;color:var(--ink);pointer-events:none;transition:left .65s cubic-bezier(.4,.1,.3,1), top .65s cubic-bezier(.4,.1,.3,1);white-space:nowrap}
+.flyer.flip{color:var(--moved);animation:pop .45s}
+.divbar{display:inline-block;width:0;border-left:2.5px solid var(--ink);height:40px;margin:0 10px 0 14px;vertical-align:middle;animation:grow .5s ease}
+@keyframes grow{from{transform:scaleY(0)}}
+.divcolon{font-size:24px;color:var(--ink);animation:fadein .4s .3s backwards}
+@keyframes fadein{from{opacity:0}}
+.strikeable{position:relative;display:inline-block;padding:0 2px}
+.strikeable::after{content:'';position:absolute;left:-4%;top:52%;width:108%;height:3px;background:var(--teacher);border-radius:2px;transform:rotate(-16deg) scaleX(0);transform-origin:left center;transition:transform .5s ease}
+.strikeable.struck::after{transform:rotate(-16deg) scaleX(1)}
+.strikeable.struck{color:var(--muted-7);transition:color .5s .3s}
+.frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.15;margin:0 2px}
+.frac-input{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;margin:0 6px}
+.frac-cell{
+  width:64px;
+  text-align:center;
+  font-family:var(--font-mono);
+  font-size:20px;
+  padding:5px 6px;
+  border:1px solid var(--glass-border);
+  background:var(--card);
+  border-radius:8px;
+  color:var(--ink);
+}
+.frac-cell:focus{outline:none;border-color:var(--ink)}
+.frac-line{width:64px;height:2.5px;background:var(--ink);margin:5px 0}
+.frac .den{border-top:3px solid var(--ink);padding:5px 8px 0}
+.frac .num{padding:0 8px 5px}
+.factor-row{display:flex;align-items:flex-end;gap:5px;flex-wrap:wrap}
+.fbox{display:flex;flex-direction:column;align-items:center;gap:4px}
+.paren-box{
+  height:44px;
+  display:flex;
+  align-items:center;
+  font-size:26px;
+  color:var(--pencil);
+  padding:0 2px;
+}
+.fcap{font-family:var(--font-ui);font-size:12px;color:var(--muted-8);white-space:nowrap;line-height:1.1}
+.signtoggle{display:flex;gap:4px}
+.sbtn{
+  width:34px;height:38px;
+  border:2px solid var(--grid);
+  border-radius:8px;
+  background:var(--card);
+  color:var(--ink);
+  font-size:20px;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-mono);
+}
+.sbtn.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.sbtn.shake{animation:shake .35s;border-color:var(--teacher)}
+.split-row{display:flex;gap:14px;flex-wrap:wrap;width:100%}
+.split-half{
+  flex:1;min-width:170px;
+  background:var(--hl-04);
+  border:1.5px solid var(--grid);
+  border-radius:12px;
+  padding:14px;
+  transition:all .2s;
+}
+.split-half.done{background:rgba(91,135,232,.12);border-color:var(--moved)}
+.split-eq{font-size:21px;color:var(--ink);margin-bottom:10px}
+.split-inrow{display:flex;gap:8px;align-items:center}
+.go-small{padding:8px 16px;font-size:19px}
+.split-hint{font-family:var(--font-ui);color:var(--teacher);font-size:15px;margin-top:6px;min-height:18px;line-height:1.25}
+.auto-reveal{
+  font-family:var(--font-mono);
+  font-size:24px;
+  color:var(--moved);
+  background:rgba(91,135,232,.12);
+  display:inline-block;
+  padding:10px 18px;
+  border-radius:12px;
+  opacity:0;
+  transform:translateY(8px);
+  transition:opacity .5s ease, transform .5s ease;
+}
+.auto-reveal.visible{
+  opacity:1;
+  transform:translateY(0);
+}
+.choice-btn{
+  font-family:var(--font-ui);
+  font-size:20px;
+  background:var(--card);
+  border:2.5px solid var(--grid);
+  color:var(--ink);
+  border-radius:12px;
+  padding:10px 18px;
+  cursor:pointer;
+  transition:all .15s;
+}
+.choice-btn:hover{border-color:var(--ink)}
+.choice-btn.shake{animation:shake .35s;border-color:var(--teacher)}
+.lbl{font-size:26px;color:var(--pencil)}
+.hint{font-family:var(--font-ui);font-weight:500;color:var(--teacher);font-size:15px;margin-top:12px;min-height:20px;line-height:1.4;}
+.hint.good{color:var(--ok)}
+.next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:8px;box-shadow:0 6px 18px var(--ok-shadow);}
+/* ─── статистика ─── */
+.stats{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+.stat{flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:12px 14px;text-align:center;}
+.stat .v{font-family:var(--font-ui);font-weight:700;font-size:22px;color:var(--ink);}
+.stat .l{font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-6);}
+.stars{color:#FFB800;font-size:20px;letter-spacing:2px;}
+/* ─── теория ─── */
+.theory{display:flex;gap:14px;margin-top:16px;flex-wrap:wrap;align-items:stretch}
+.tcard{flex:1;min-width:290px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:18px 20px;}
+.tt{font-family:var(--font-ui);font-weight:700;font-size:17px;color:var(--pencil);margin-bottom:10px;}
+.tex{font-size:18px;color:var(--ink);background:var(--hl-05);border-radius:8px;padding:8px 10px;margin:6px 0}
+.talg{font-family:var(--font-ui);font-weight:400;font-size:14px;color:var(--muted-4);padding-left:20px;line-height:1.6;}
+.talg li{margin:5px 0;}
+.ttrap{font-family:var(--font-ui);font-weight:500;font-size:13px;color:var(--teacher);margin-top:8px;line-height:1.45;}
+.abc-legend{
+  font-size:26px;
+  display:flex;
+  align-items:center;
+  gap:2px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
+}
+.abc-legend .tag{
+  padding:3px 10px;
+  border-radius:9px;
+  font-weight:700;
+}
+.abc-legend .t-a{background:#E3EBFF;color:var(--ink)}
+.abc-legend .t-b{background:#FFE8E4;color:var(--teacher)}
+.abc-legend .t-c{background:#E1F3E8;color:var(--ok)}
+.abc-def{
+  font-family:var(--font-ui);
+  font-size:19px;
+  color:var(--muted-4);
+  margin:6px 0;
+  display:flex;
+  gap:9px;
+  align-items:baseline;
+  line-height:1.4;
+}
+.abc-def .dot{width:13px;height:13px;border-radius:50%;flex:0 0 13px;transform:translateY(1px)}
+.d-a{background:#7C97E8}.d-b{background:#E8837B}.d-c{background:#69BC8C}
+@media(max-width:480px){
+  .sheet{padding-left:56px}
+  .eqline{font-size:22px}
+}
+
+.theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
+.theme-toggle:hover{border-color:var(--ink)}
+.theme-toggle:active{transform:scale(.92)}
+.home-btn{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
+.home-btn:hover{border-color:var(--ink)}
+.home-btn:active{transform:scale(.92)}
+</style>
+</head>
+<body>
+<a class="home-btn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
+<button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<script>(function(){
+  var btn=document.getElementById('themeToggle');
+  function apply(t, persist){
+    document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = t === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    if (persist) { try{ localStorage.setItem('theme', t); }catch(e){} }
+  }
+  apply(document.documentElement.getAttribute('data-theme') || 'light', false);
+  btn.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur, true);
+  });
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onSystemChange = function(e){
+      var explicit = false;
+      try{ explicit = !!localStorage.getItem('theme'); }catch(err){}
+      if (explicit) return;
+      apply(e.matches ? 'dark' : 'light', false);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
+    else if (mq.addListener) mq.addListener(onSystemChange);
+  }
+})();</script>
+<div class="wrap">
+  <h1>Квадратные уравнения</h1>
+  <div class="sub">от простых случаев до дискриминанта — шаг за шагом, без готовых ответов</div>
+
+  <div class="levels" id="levels"></div>
+
+  <div class="sheet">
+    <div class="corner">
+      <button class="refresh-btn" id="refreshBtn" title="Обновить пример">⟳</button>
+      <span id="taskNum">пример №1</span>
+    </div>
+    <div class="eqline" id="eqLine"></div>
+    <div class="steps-wrap" id="frozen"></div>
+  </div>
+
+  <div class="panel">
+    <div class="prompt" id="prompt"></div>
+    <div class="inrow" id="inputArea"></div>
+    <button class="next-btn" id="nextBtn" style="display:none">Следующий пример →</button>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="v" id="stSolved">0</div><div class="l">решено</div></div>
+    <div class="stat"><div class="v" id="stStreak">0</div><div class="l">серия без ошибок</div></div>
+    <div class="stat"><div class="v stars" id="stStars">—</div><div class="l">этот пример</div></div>
+  </div>
+
+  <div class="theory">
+    <div class="tcard">
+      <div class="tt">Формулы</div>
+      <div class="abc-legend"><span class="tag t-a">a</span>x² + <span class="tag t-b">b</span>x + <span class="tag t-c">c</span> = 0</div>
+      <div class="abc-def"><span class="dot d-a"></span><b>a</b> — коэффициент перед x² (стоит прямо перед иксом в квадрате).</div>
+      <div class="abc-def"><span class="dot d-b"></span><b>b</b> — коэффициент перед x (стоит перед одиночным иксом).</div>
+      <div class="abc-def"><span class="dot d-c"></span><b>c</b> — свободный член: число без иксов вообще.</div>
+      <div class="tex">D = b² − 4ac</div>
+      <div class="tex">x = <span class="frac"><span class="num">−b ± √D</span><span class="den">2a</span></span> &nbsp;— при D &gt; 0</div>
+      <div class="tex">x = <span class="frac"><span class="num">−b</span><span class="den">2a</span></span> &nbsp;— при D = 0</div>
+      <div class="tt" style="margin-top:14px;font-size:20px">Теорема Виета</div>
+      <div class="tex">ax² + bx + c = 0</div>
+      <div class="tex">x₁ + x₂ = <span class="frac"><span class="num">−b</span><span class="den">a</span></span></div>
+      <div class="tex">x₁ · x₂ = <span class="frac"><span class="num">c</span><span class="den">a</span></span></div>
+    </div>
+    <div class="tcard">
+      <div class="tt">Особые случаи</div>
+      <ul class="talg">
+        <li><b>D &gt; 0</b> — два корня.</li>
+        <li><b>D = 0</b> — один корень (два совпавших).</li>
+        <li><b>D &lt; 0</b> — действительных корней нет.</li>
+      </ul>
+      <div class="ttrap">⚠ В ax²+bx=0 корень x=0 — тоже настоящий корень, его легко потерять.</div>
+      <div class="ttrap">⚠ В ax²+c=0 при x²&gt;0 корней два: +√N и −√N — <b>потому что и положительное, и отрицательное число в квадрате дают одно и то же N.</b></div>
+      <div class="ttrap">⚠ Квадрат отрицательного числа положителен — не теряй знак при возведении b в квадрат.</div>
+    </div>
+  </div>
+</div>
+
+<button class="keypad-toggle" id="kpToggle" title="Показать клавиатуру" style="display:none">⌨</button>
+<div class="keypad-float" id="keypadFloat" style="display:none">
+  <button class="keypad-close" id="kpClose" title="Скрыть клавиатуру">✕</button>
+  <div class="keypad" id="keypadButtons"></div>
+</div>
+
+<script>
+/* ───────── утилиты ───────── */
+const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const pick = a=>a[ri(0,a.length-1)];
+const randNZ = (a,b)=>{ let v=0; while(v===0) v=ri(a,b); return v; };
+const numText = n => n<0 ? '−'+Math.abs(n) : String(n);
+const fracHTML = (num, den) => `<span class="frac"><span class="num">${num}</span><span class="den">${den}</span></span>`;
+const negTerm = v => v<0 ? `−(${numText(v)})` : `−${numText(v)}`;
+
+function termText(t, leading){
+  const s = t.coef<0 ? '−' : '+';
+  const abs = Math.abs(t.coef);
+  let body;
+  if(t.pow===2) body = (abs===1?'':abs)+'x²';
+  else if(t.pow===1) body = (abs===1?'':abs)+'x';
+  else body = String(abs);
+  if(leading) return (t.coef<0 ? '−' : '') + body;
+  return s+' '+body;
+}
+function sideText(terms){ return terms.map((t,i)=>termText(t,i===0)).join(' '); }
+
+/* ───────── генерация ───────── */
+function genNoC(){
+  const a = randNZ(-6,6);
+  const root2 = randNZ(-9,9);
+  const b = -a*root2;
+  return {a,b,x1:0,x2:root2};
+}
+
+function genNoB(){
+  const a = randNZ(-6,6);
+  const hasRoots = Math.random()<0.8;
+  let N;
+  if(hasRoots){ const r=ri(1,9); N=r*r; } else { N=-ri(1,50); }
+  const c = -a*N;
+  return {a,c,N,hasRoots, r: hasRoots?Math.sqrt(N):null};
+}
+
+function genVieta(){
+  while(true){
+    const x1=randNZ(-9,9), x2=randNZ(-9,9);
+    const a = Math.random()<0.6 ? 1 : pick([2,-2,3,-3,4,-4,5,-5]);
+    const b = -a*(x1+x2), c = a*x1*x2;
+    if(Math.abs(b)>100 || Math.abs(c)>450) continue;
+    return {a,b,c,x1,x2};
+  }
+}
+
+function genDiscriminant(forceD){
+  while(true){
+    const a = randNZ(-3,3);
+    const roll = Math.random();
+    if(forceD==='neg' || (forceD===null && roll<0.10)){
+      const b = randNZ(-8,8);
+      let c;
+      if(a>0) c = Math.ceil((b*b)/(4*a)) + ri(1,5);
+      else    c = Math.floor((b*b)/(4*a)) - ri(1,5);
+      if(c===0) continue;
+      const D = b*b-4*a*c;
+      if(D>=0 || Math.abs(c)>200) continue;
+      return {a,b,c,D,roots:null};
+    }
+    if(forceD==='zero' || (forceD===null && roll<0.25)){
+      const x0 = randNZ(-7,7);
+      const b=-2*a*x0, c=a*x0*x0;
+      if(b===0 || c===0) continue;
+      const D=b*b-4*a*c;
+      if(D!==0) continue;
+      return {a,b,c,D:0,roots:[x0,x0]};
+    }
+    const x1r=randNZ(-6,6), x2r=randNZ(-6,6);
+    if(x1r===x2r) continue;
+    const b=-a*(x1r+x2r), c=a*x1r*x2r;
+    if(b===0 || c===0) continue;
+    const D=b*b-4*a*c;
+    if(D<=0) continue;
+    const sq=Math.sqrt(D);
+    if(!Number.isInteger(sq)) continue;
+    return {a,b,c,D,roots:[x1r,x2r]};
+  }
+}
+
+/* ───────── тексты уравнений ───────── */
+function eqTextNoC(P){ return sideText([{coef:P.a,pow:2},{coef:P.b,pow:1}]) + ' = 0'; }
+function eqTextNoB(P){ return sideText([{coef:P.a,pow:2},{coef:P.c,pow:0}]) + ' = 0'; }
+function eqTextVieta(P){ return sideText([{coef:P.a,pow:2},{coef:P.b,pow:1},{coef:P.c,pow:0}]) + ' = 0'; }
+function eqTextDisc(P){ return sideText([{coef:P.a,pow:2},{coef:P.b,pow:1},{coef:P.c,pow:0}]) + ' = 0'; }
+
+/* ───────── шаги по видам задач ───────── */
+function stepsNoC(P){
+  return [
+    { id:'factor', type:'factorNoC',
+      prompt: () => `Вынеси общий множитель за скобку — сам реши, что выносить: можно только x, а можно x вместе с числовым множителем. Заполни разложение.`,
+      checkFour: (k,p,sign,qMag) => { const q = sign==='+' ? qMag : -qMag; return k!==0 && p!==0 && k*p===P.a && k*q===P.b; },
+      onSolved: (ctx,k,p,sign,qMag) => { ctx.k=k; ctx.p=p; ctx.q = sign==='+' ? qMag : -qMag; },
+      record: (k,p,sign,qMag) => { const q = sign==='+' ? qMag : -qMag; return `${termText({coef:k,pow:1},true)}(${termText({coef:p,pow:1},true)} ${termText({coef:q,pow:0},false)}) = 0`; },
+      hint: exam => exam ? 'Перемножь множитель на скобку — должно получиться исходное уравнение.' : 'Общий множитель обязан делить нацело и коэффициент при x², и коэффициент при x. Проверь себя: перемножь свой множитель на скобку — должно получиться в точности исходное уравнение.'
+    },
+    { id:'roots', type:'dualRoots',
+      introRecord: ctx => `${termText({coef:ctx.k,pow:1},true)} = 0 &nbsp;&nbsp;или&nbsp;&nbsp; ${termText({coef:ctx.p,pow:1},true)} ${termText({coef:ctx.q,pow:0},false)} = 0`,
+      prompt: () => `Произведение равно нулю, если хотя бы один из множителей равен нулю. Реши оба уравнения — слева и справа.`,
+      leftEq: (ctx) => `${termText({coef:ctx.k,pow:1},true)} = 0`,
+      rightEq: (ctx) => `${termText({coef:ctx.p,pow:1},true)} ${termText({coef:ctx.q,pow:0},false)} = 0`,
+      expectedLeft: () => 0,
+      expectedRight: (ctx) => -ctx.q/ctx.p,
+      recordLeft: v => `x₁ = ${v}`,
+      recordRight: v => `x₂ = ${v}`,
+      hintLeft: exam => exam ? 'k ≠ 0.' : '(число)·x = 0 всегда даёт x = 0 — ведь число перед x точно не равно нулю.',
+      hintRight: exam => exam ? 'Перенеси число, раздели на коэффициент.' : 'Перенеси свободное число в другую часть (знак поменяется), затем раздели обе части на коэффициент перед x.'
+    }
+  ];
+}
+
+function stepsNoB(P){
+  const steps = [
+    { id:'isolate', type:'isolateMove',
+      finalRecord: () => `x² = ${P.N}`,
+    },
+    { id:'classify', type:'choice',
+      prompt: ()=>`x² = ${P.N}. Какое это число?`,
+      choices:[{id:'pos',label:'Положительное — два корня'},{id:'neg',label:'Отрицательное — корней нет'}],
+      expected: P.hasRoots ? 'pos' : 'neg',
+      record: v => v==='pos' ? 'x² — положительное число → два корня' : 'x² — отрицательное число → корней нет',
+      hint: () => 'Квадрат числа не может быть отрицательным — если x² оказалось отрицательным, решений нет.'
+    }
+  ];
+  if(P.hasRoots){
+    steps.push(
+      { id:'roots', type:'dualRoots',
+        introRecord: () => `x₁ = √${P.N} &nbsp;&nbsp; x₂ = −√${P.N}`,
+        prompt: () => {
+          const base = `Реши уравнение x² = ${P.N} — у него ДВА корня: x = √${P.N} и x = −√${P.N}. Найди оба сразу.`;
+          const why = ' <b>И плюс, и минус в квадрате дают одно и то же положительное число — вот почему корней два.</b>';
+          return S.exam ? base : base + why;
+        },
+        leftEq: () => `x₁ = √${P.N}`,
+        rightEq: () => `x₂ = −√${P.N}`,
+        expectedLeft: () => P.r,
+        expectedRight: () => -P.r,
+        recordLeft: v => `x₁ = ${v}`,
+        recordRight: v => `x₂ = ${v}`,
+        hintLeft: () => `Найди число, квадрат которого равен ${P.N}.`,
+        hintRight: exam => exam ? 'Есть и отрицательный корень.' : 'У уравнения x² = N всегда ДВА корня: +√N и −√N — не теряй отрицательный!'
+      }
+    );
+  }
+  return steps;
+}
+
+function stepsVieta(P){
+  const sumTarget = -P.b/P.a, prodTarget = P.c/P.a;
+  return [
+    { id:'substitute', type:'vietaSubst',
+      prompt: () => `Подставь в теорему Виета числа из уравнения ${eqTextVieta(P)}. Заполни обе дроби.`,
+      checkSum: (num,den) => num===-P.b && den===P.a,
+      checkProd: (num,den) => num===P.c && den===P.a,
+      recordSum: (num,den) => `x₁ + x₂ = ${fracHTML(num,den)}`,
+      recordProd: (num,den) => `x₁ · x₂ = ${fracHTML(num,den)}`,
+      hintSum: () => 'В числителе — минус коэффициент перед x (то есть −b), в знаменателе — коэффициент перед x² (то есть a).',
+      hintProd: () => 'В числителе — свободный член (то есть c), в знаменателе — коэффициент перед x² (то есть a).'
+    },
+    { id:'reduce', type:'vietaReduce',
+      sumTarget, prodTarget,
+      prompt: () => `Раздели обе дроби — чему равны x₁ + x₂ и x₁ · x₂ целыми числами?`,
+      checkSum: (v) => v===sumTarget,
+      checkProd: (v) => v===prodTarget,
+      record: () => `x₁ + x₂ = ${numText(sumTarget)}<br>x₁ · x₂ = ${numText(prodTarget)}`,
+      hintSum: () => `Раздели числитель на знаменатель: ${-P.b} ÷ ${P.a}.`,
+      hintProd: () => `Раздели числитель на знаменатель: ${P.c} ÷ ${P.a}.`
+    },
+    { id:'guess', type:'pair',
+      sumTarget, prodTarget,
+      prompt: ()=>`Подбери пару чисел: их сумма должна быть равна ${numText(sumTarget)}, а произведение — ${numText(prodTarget)}.`,
+      checkPair: (x1g,x2g)=> (x1g+x2g===sumTarget && x1g*x2g===prodTarget),
+      record: (x1g,x2g)=>`x₁ = ${x1g}, x₂ = ${x2g}`,
+      hint: (sumOk,prodOk,exam)=>{
+        if(exam) return (!sumOk && !prodOk) ? 'Не сходится ни сумма, ни произведение.' : (!sumOk ? 'Сумма не сходится.' : 'Произведение не сходится.');
+        if(!sumOk && !prodOk) return `Ни сумма, ни произведение не сходятся. Переберите пары делителей числа ${numText(prodTarget)}.`;
+        if(!sumOk) return 'Произведение верное, а сумма не сходится — попробуй другую пару с тем же произведением.';
+        return 'Сумма верная, а произведение не сходится — попробуй другую пару с той же суммой.';
+      }
+    }
+  ];
+}
+
+function stepsDiscriminant(P, mode){
+  const guided = mode==='guided';
+  const steps = [
+    { id:'extract', type:'blanks',
+      prompt: () => `Выпиши коэффициенты a, b и c из уравнения ${eqTextDisc(P)} — вместе с их знаками.`,
+      blankIds:['bA','bB','bC'], expected:[P.a,P.b,P.c],
+      renderHTML: () => `<span class="lbl">a = </span><input class="num small" id="bA" type="text" inputmode="none" placeholder="?">`+
+        `<span class="lbl">&nbsp;&nbsp;b = </span><input class="num small" id="bB" type="text" inputmode="none" placeholder="?">`+
+        `<span class="lbl">&nbsp;&nbsp;c = </span><input class="num small" id="bC" type="text" inputmode="none" placeholder="?">`,
+      record: vals => `a = ${numText(vals[0])}, &nbsp; b = ${numText(vals[1])}, &nbsp; c = ${numText(vals[2])}`,
+      hint: exam => exam ? 'Не путай знаки.' : 'Коэффициент — это число вместе со своим знаком, стоящее перед соответствующей степенью x (для c — свободный член).'
+    },
+    { id:'substituteD', type:'blanks',
+      prompt: () => `Подставь коэффициенты в формулу дискриминанта.`,
+      blankIds:['bB2','bA2','bC2'], expected:[P.b,P.a,P.c],
+      renderHTML: () => `<span class="lbl">D = ( </span><input class="num small" id="bB2" type="text" inputmode="none" placeholder="${S.exam?'?':'b'}">`+
+        `<span class="lbl"> )² − 4 · ( </span><input class="num small" id="bA2" type="text" inputmode="none" placeholder="${S.exam?'?':'a'}">`+
+        `<span class="lbl"> ) · ( </span><input class="num small" id="bC2" type="text" inputmode="none" placeholder="${S.exam?'?':'c'}">`+
+        `<span class="lbl"> )</span>`,
+      record: vals => `D = (${numText(vals[0])})² − 4·(${numText(vals[1])})·(${numText(vals[2])})`,
+      hint: exam => exam ? 'Первое место — b, второе — a, третье — c.' : 'В скобки подставляем ровно то, что выписали на прошлом шаге: сначала b (его возводим в квадрат), потом a и c — в произведение 4ac.'
+    },
+  ];
+  if(guided){
+    // обучение: D считается автоматически
+    steps.push(
+      { id:'computeD', type:'auto',
+        record: () => `D = ${P.D}`,
+        prompt: () => `D = ${P.D}. Дискриминант посчитан — двигаемся дальше.`
+      },
+      { id:'sign', type:'auto',
+        record: () => P.D>0 ? 'D > 0 → два корня' : (P.D===0 ? 'D = 0 → один корень' : 'D < 0 → корней нет'),
+        prompt: () => P.D>0 ? 'D > 0 — значит, корней два.' : 'D ≤ 0.'
+      }
+    );
+  } else {
+    steps.push(
+      { id:'computeD', type:'number',
+        prompt: () => 'Теперь досчитай — чему равно D?',
+        expected: P.D,
+        record: v => `D = ${v}`,
+        hint: exam => exam ? 'Не забудь про знак перед 4ac.' : 'Сначала возведи b в квадрат, отдельно посчитай 4ac, затем вычти — если 4ac отрицательное, вычитание превращается в сложение.'
+      },
+      { id:'sign', type:'choice',
+        prompt:()=>'Определи знак дискриминанта — от этого зависит дальнейший план решения.',
+        choices:[{id:'pos',label:'D > 0 — два корня'},{id:'zero',label:'D = 0 — один корень'},{id:'neg',label:'D < 0 — корней нет'}],
+        expected: P.D>0 ? 'pos' : (P.D===0 ? 'zero' : 'neg'),
+        record: v => v==='pos' ? 'D > 0 → два корня' : (v==='zero' ? 'D = 0 → один корень' : 'D < 0 → корней нет'),
+        hint: () => 'Посмотри на посчитанное значение D: положительное, ноль или отрицательное?' }
+    );
+  }
+  if(P.D>0){
+    const sq = Math.sqrt(P.D);
+    const xPlus = (-P.b+sq)/(2*P.a), xMinus = (-P.b-sq)/(2*P.a);
+    if(guided){
+      // обучение: формула подставляется автоматически, ученик находит √D и считает корни
+      steps.push(
+        { id:'substituteX', type:'auto',
+          record: () => `x = ${fracHTML(negTerm(P.b)+' ± √'+numText(P.D), '2·('+numText(P.a)+')')}`,
+          prompt: () => `Формула заполнена: x = ${fracHTML(negTerm(P.b)+' ± √'+numText(P.D), '2·('+numText(P.a)+')')}`
+        },
+        { id:'sqrtD', type:'number',
+          prompt: () => `Извлеки корень из дискриминанта: √${P.D} = ?`,
+          expected: sq,
+          record: v => `√D = √${P.D} = ${v}`,
+          hint: () => 'Ищи число, квадрат которого равен D.'
+        },
+        { id:'roots', type:'dualRoots',
+          prompt: () => `Теперь посчитай оба корня — слева с плюсом, справа с минусом.`,
+          leftEq: () => `x₁ = ${fracHTML(negTerm(P.b)+' + '+numText(sq), '2·('+numText(P.a)+')')}`,
+          rightEq: () => `x₂ = ${fracHTML(negTerm(P.b)+' − '+numText(sq), '2·('+numText(P.a)+')')}`,
+          expectedLeft: () => xPlus,
+          expectedRight: () => xMinus,
+          recordLeft: v => `x₁ = ${v}`,
+          recordRight: v => `x₂ = ${v}`,
+          hintLeft: () => 'Считай по действиям: числитель, потом дели.',
+          hintRight: () => 'Теперь со знаком «минус» перед корнем.'
+        }
+      );
+    } else {
+      steps.push(
+        { id:'substituteX', type:'blanks',
+          prompt: () => `Подставь a, b и найденный дискриминант в формулу корней.`,
+          blankIds:['bB3','bD3','bA3'], expected:[P.b,P.D,P.a],
+          renderHTML: () => `<span class="lbl">x = </span><span class="frac">`+
+            `<span class="num"><span class="lbl">−(</span> <input class="num small" id="bB3" type="text" inputmode="none" placeholder="${S.exam?'?':'b'}"> <span class="lbl">) ± √(</span> <input class="num small" id="bD3" type="text" inputmode="none" placeholder="${S.exam?'?':'D'}"> <span class="lbl">)</span></span>`+
+            `<span class="den"><span class="lbl">2 · (</span> <input class="num small" id="bA3" type="text" inputmode="none" placeholder="${S.exam?'?':'a'}"> <span class="lbl">)</span></span>`+
+            `</span>`,
+          record: vals => `x = ${fracHTML(negTerm(vals[0])+' ± √'+numText(vals[1]), '2·('+numText(vals[2])+')')}`,
+          hint: exam => exam ? 'Числитель: −b ± √D. Знаменатель: 2a.' : 'В числитель подставь b (с минусом впереди) и найденный D под корень; в знаменатель — 2, умноженное на a.'
+        },
+        { id:'sqrtD', type:'number',
+          prompt: () => `Извлеки корень из дискриминанта: √${P.D} = ?`,
+          expected: sq,
+          record: v => `√D = √${P.D} = ${v}`,
+          hint: exam => exam ? 'Ищи число, квадрат которого равен D.' : 'Какое число, умноженное само на себя, даёт D? Это и есть √D.'
+        },
+        { id:'roots', type:'dualRoots',
+          prompt: () => `Корень найден — формула разъехалась на два варианта. Посчитай оба.`,
+          leftEq: () => `x₁ = ${fracHTML(negTerm(P.b)+' + '+numText(sq), '2·('+numText(P.a)+')')}`,
+          rightEq: () => `x₂ = ${fracHTML(negTerm(P.b)+' − '+numText(sq), '2·('+numText(P.a)+')')}`,
+          expectedLeft: () => xPlus,
+          expectedRight: () => xMinus,
+          recordLeft: v => `x₁ = ${v}`,
+          recordRight: v => `x₂ = ${v}`,
+          hintLeft: exam => exam ? `x₁ = ${fracHTML(negTerm(P.b)+' + '+numText(sq), '2·('+numText(P.a)+')')}.` : 'Подставь знак «плюс» и считай по действиям — сначала числитель, потом дели.',
+          hintRight: exam => exam ? `x₂ = ${fracHTML(negTerm(P.b)+' − '+numText(sq), '2·('+numText(P.a)+')')}.` : `Теперь знак «минус» — посчитай (${negTerm(P.b)} − ${numText(sq)}), затем раздели на 2·(${numText(P.a)}).`
+        }
+      );
+    }
+  } else if(P.D===0){
+    steps.push(
+      { id:'substituteX0', type:'blanks',
+        prompt: () => `Подставь a и b в формулу единственного корня.`,
+        blankIds:['bB4','bA4'], expected:[P.b,P.a],
+        renderHTML: () => `<span class="lbl">x = </span><span class="frac">`+
+          `<span class="num"><span class="lbl">−(</span> <input class="num small" id="bB4" type="text" inputmode="none" placeholder="${S.exam?'?':'b'}"> <span class="lbl">)</span></span>`+
+          `<span class="den"><span class="lbl">2 · (</span> <input class="num small" id="bA4" type="text" inputmode="none" placeholder="${S.exam?'?':'a'}"> <span class="lbl">)</span></span>`+
+          `</span>`,
+        record: vals => `x = ${fracHTML(negTerm(vals[0]), '2·('+numText(vals[1])+')')}`,
+        hint: () => 'В числитель — минус b, в знаменатель — 2, умноженное на a.'
+      },
+      { id:'x0', type:'number', prompt:()=>'Досчитай — чему равен этот единственный корень?', expected:-P.b/(2*P.a),
+        record:v=>`x = ${v}`,
+        hint: () => 'При D = 0 формула упрощается: корень всего один.' }
+    );
+  }
+  return steps;
+}
+function stepsSprint(P){
+  return [
+    { id:'sign', type:'choice',
+      prompt:()=>'Не вычисляя корней — только по виду уравнения определи знак дискриминанта.',
+      choices:[{id:'pos',label:'D > 0'},{id:'zero',label:'D = 0'},{id:'neg',label:'D < 0'}],
+      expected: P.D>0 ? 'pos' : (P.D===0 ? 'zero' : 'neg'),
+      record: v => v==='pos' ? 'D > 0' : (v==='zero' ? 'D = 0' : 'D < 0'),
+      hint: () => 'Сравни b² и 4ac — какое из них больше?' }
+  ];
+}
+
+/* ───────── уровни ───────── */
+const LEVELS = [
+  {id:0, name:'1. Без c',              desc:'ax²+bx=0 — вынесение x за скобку'},
+  {id:1, name:'2. Без b',              desc:'ax²+c=0 — извлечение корня'},
+  {id:2, name:'3. Виета',              desc:'подбор корней по теореме Виета'},
+  {id:3, name:'4. D: обучение',        desc:'простые числа, подсказки — считай только финал'},
+  {id:4, name:'5. D: тренировка',      desc:'простые числа, без подсказок'},
+  {id:5, name:'6. D: сложный',         desc:'крупные числа, a>1, иногда нет корней'},
+  {id:6, name:'7. D: ОГЭ',            desc:'стиль экзамена, 90% с корнями'},
+  {id:7, name:'8. Ловушки',            desc:'D=0 и D<0 — особые случаи'},
+  {id:8, name:'9. Спринт',             desc:'быстро определи знак D'},
+  {id:9, name:'10. Экзамен',           desc:'всё вперемешку'},
+];
+let curLevel = 0;
+const solvedByLevel = [0,0,0,0,0,0,0,0,0,0];
+let totalSolved = 0, streak = 0, taskCounter = 0;
+
+/* генерация по сложностям дискриминанта */
+function genDiscEasy(){
+  // a=1, маленькие целые корни, всегда D>0
+  while(true){
+    const a = 1;
+    const x1r = ri(-5,5), x2r = ri(-5,5);
+    if(x1r===x2r) continue;
+    const b=-a*(x1r+x2r), c=a*x1r*x2r;
+    if(b===0 || c===0) continue;
+    if(Math.abs(b)>15 || Math.abs(c)>30) continue;
+    const D=b*b-4*a*c;
+    if(D<=0) continue;
+    const sq=Math.sqrt(D);
+    if(!Number.isInteger(sq)) continue;
+    return {a,b,c,D,roots:[x1r,x2r]};
+  }
+}
+
+function genDiscHard(){
+  // a всегда >1, числа покрупнее, иногда D<0/D=0 (~10%)
+  while(true){
+    const a = pick([2,-2,3,-3]);
+    const roll = Math.random();
+    if(roll<0.10){
+      const b = randNZ(-8,8);
+      let c2;
+      if(a>0) c2 = Math.ceil((b*b)/(4*a)) + ri(1,5);
+      else    c2 = Math.floor((b*b)/(4*a)) - ri(1,5);
+      if(c2===0) continue;
+      const D = b*b-4*a*c2;
+      if(D>=0 || Math.abs(c2)>200) continue;
+      return {a,b,c:c2,D,roots:null};
+    }
+    const x1r=randNZ(-6,6), x2r=randNZ(-6,6);
+    if(x1r===x2r) continue;
+    const b=-a*(x1r+x2r), c=a*x1r*x2r;
+    if(b===0 || c===0) continue;
+    const D=b*b-4*a*c;
+    if(D<=0) continue;
+    const sq=Math.sqrt(D);
+    if(!Number.isInteger(sq)) continue;
+    if(Math.abs(b)>50 || Math.abs(c)>200) continue;
+    return {a,b,c,D,roots:[x1r,x2r]};
+  }
+}
+
+function genDiscOGE(){
+  // стиль ОГЭ: a=1,2,3, маленькие числа, 90% с корнями
+  while(true){
+    const a = pick([1,1,1,2,2,3]);
+    const roll = Math.random();
+    if(roll<0.10){
+      const b = randNZ(-6,6);
+      let c2;
+      if(a>0) c2 = Math.ceil((b*b)/(4*a)) + ri(1,3);
+      else    c2 = Math.floor((b*b)/(4*a)) - ri(1,3);
+      if(c2===0) continue;
+      const D = b*b-4*a*c2;
+      if(D>=0 || Math.abs(c2)>100) continue;
+      return {a,b,c:c2,D,roots:null};
+    }
+    const x1r=randNZ(-5,5), x2r=randNZ(-5,5);
+    if(x1r===x2r) continue;
+    const b=-a*(x1r+x2r), c=a*x1r*x2r;
+    if(b===0 || c===0) continue;
+    if(Math.abs(b)>20 || Math.abs(c)>50) continue;
+    const D=b*b-4*a*c;
+    if(D<=0) continue;
+    const sq=Math.sqrt(D);
+    if(!Number.isInteger(sq)) continue;
+    return {a,b,c,D,roots:[x1r,x2r]};
+  }
+}
+
+function gen(level){
+  if(level===9) level = ri(0,8);
+  let P;
+  if(level===0){ P = {kind:'noC', ...genNoC()}; P.eqText = eqTextNoC(P); P.steps = stepsNoC(P); }
+  else if(level===1){ P = {kind:'noB', ...genNoB()}; P.eqText = eqTextNoB(P); P.steps = stepsNoB(P); }
+  else if(level===2){ P = {kind:'vieta', ...genVieta()}; P.eqText = eqTextVieta(P); P.steps = stepsVieta(P); }
+  else if(level===3){ const d = genDiscEasy(); P = {kind:'discriminant', ...d}; P.eqText = eqTextDisc(P); P.steps = stepsDiscriminant(P, 'guided'); }
+  else if(level===4){ const d = genDiscEasy(); P = {kind:'discriminant', ...d}; P.eqText = eqTextDisc(P); P.steps = stepsDiscriminant(P, 'full'); }
+  else if(level===5){ const d = genDiscHard(); P = {kind:'discriminant', ...d}; P.eqText = eqTextDisc(P); P.steps = stepsDiscriminant(P, 'full'); }
+  else if(level===6){ const d = genDiscOGE(); P = {kind:'discriminant', ...d}; P.eqText = eqTextDisc(P); P.steps = stepsDiscriminant(P, 'full'); }
+  else if(level===7){ const forced = Math.random()<0.5?'zero':'neg'; P = {kind:'discriminant', ...genDiscriminant(forced)}; P.eqText = eqTextDisc(P); P.steps = stepsDiscriminant(P, 'full'); }
+  else if(level===8){ P = {kind:'sprint', ...genDiscriminant(null)}; P.eqText = eqTextDisc(P); P.steps = stepsSprint(P); }
+  else { P = {kind:'sprint', ...genDiscriminant(null)}; P.eqText = eqTextDisc(P); P.steps = stepsSprint(P); }
+  return P;
+}
+
+/* ───────── состояние ───────── */
+let P=null, S=null;
+
+function newProblem(){
+  P = gen(curLevel);
+  taskCounter++;
+  S = {
+    phase:'preview',
+    stepIdx:0,
+    frozenSteps:[],
+    errStep:0, errTotal:0,
+    exam: curLevel===9,
+    ctx: {},
+  };
+  document.getElementById('taskNum').textContent = 'пример №'+taskCounter;
+  document.getElementById('nextBtn').style.display='none';
+  document.getElementById('stStars').textContent='—';
+  setHint('');
+  renderAll(); setPrompt(); renderInputs();
+}
+document.getElementById('refreshBtn').onclick = newProblem;
+
+function startSolving(){
+  S.phase = 'solve';
+  renderAll(); setPrompt(); renderInputs();
+}
+
+/* ───────── отрисовка ───────── */
+function renderAll(){
+  document.getElementById('eqLine').textContent = P.eqText;
+  document.getElementById('frozen').innerHTML = S.frozenSteps.join('');
+}
+
+function setPrompt(){
+  const p = document.getElementById('prompt');
+  if(S.phase==='preview'){
+    p.innerHTML = 'Посмотри на уравнение спокойно — спешить некуда.<br>Когда будешь готов, жми «Начать».';
+    return;
+  }
+  if(S.phase==='done'){
+    p.innerHTML = 'Уравнение решено! 🎉';
+    return;
+  }
+  const step = P.steps[S.stepIdx];
+  if(step.type==='isolateMove'){
+    if(!S.mv) mvInit();
+    if(S.mv.phase==='move'){
+      p.innerHTML = 'Перед тобой два слагаемых. Сам выбери, что перенести через «=», чтобы x² остался один слева.';
+    } else if(S.mv.phase==='divide'){
+      p.innerHTML = 'Появилась черта — за ней записываем, <b>на что делим обе части</b>.<br>Спиши коэффициент перед x² (со знаком!) или коснись его в уравнении.';
+    } else if(S.mv.phase==='cancel'){
+      p.innerHTML = 'Делим обе части на коэффициент перед x²…';
+    } else if(S.mv.phase==='compute'){
+      p.innerHTML = `Осталось посчитать деление: ${numText(S.mv.M)} : (${numText(S.mv.K)}) = ? Чему равен x²?`;
+    }
+    return;
+  }
+  p.innerHTML = step.prompt(S.ctx);
+}
+
+function renderInputs(){
+  const area = document.getElementById('inputArea');
+  if(S.phase==='preview'){
+    area.innerHTML = `<button class="go" id="goBtn">Начать →</button>`;
+    document.getElementById('goBtn').onclick = startSolving;
+    return;
+  }
+  if(S.phase==='done'){ area.innerHTML=''; return; }
+  const step = P.steps[S.stepIdx];
+  if(step.type==='isolateMove'){
+    if(!S.mv) mvInit();
+    renderIsolateMove();
+    return;
+  }
+  if(step.type==='number'){
+    area.innerHTML = `
+      <input class="num" id="ans" type="text" inputmode="none" placeholder="?">
+      <button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>`;
+    document.getElementById('goBtn').onclick = submitNumber;
+    document.getElementById('ans').addEventListener('keydown', e=>{ if(e.key==='Enter') submitNumber(); });
+    setTimeout(()=>{ const el=document.getElementById('ans'); if(el) el.focus(); }, 30);
+  } else if(step.type==='choice'){
+    area.innerHTML = `<div class="choices">${step.choices.map(c=>`<button class="choice-btn" data-id="${c.id}">${c.label}</button>`).join('')}</div>`;
+    area.querySelectorAll('.choice-btn').forEach(b=>b.onclick=()=>submitChoice(b.dataset.id,b));
+  } else if(step.type==='factorNoC'){
+    S.tempSign = null;
+    area.innerHTML = `
+      <div class="factor-row">
+        <div class="fbox"><input class="num small" id="ansK" type="text" inputmode="none" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="?"><div class="fcap">числоX</div></div>
+        <div class="fbox"><div class="paren-box">(</div><div class="fcap">&nbsp;</div></div>
+        <div class="fbox"><input class="num small" id="ansP" type="text" inputmode="none" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="?"><div class="fcap">числоX</div></div>
+        <div class="fbox">
+          <div class="signtoggle" id="signToggle">
+            <button type="button" class="sbtn" data-sign="+">+</button>
+            <button type="button" class="sbtn" data-sign="−">−</button>
+          </div>
+          <div class="fcap">знак</div>
+        </div>
+        <div class="fbox"><input class="num small" id="ansQ" type="text" inputmode="none" placeholder="?"><div class="fcap">число</div></div>
+        <div class="fbox"><div class="paren-box">)</div><div class="fcap">&nbsp;</div></div>
+        <div class="fbox"><div class="paren-box">= 0</div><div class="fcap">&nbsp;</div></div>
+        <button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>
+      </div>`;
+    area.querySelectorAll('.sbtn').forEach(b=>b.onclick=()=>{
+      area.querySelectorAll('.sbtn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      S.tempSign = b.dataset.sign;
+    });
+    document.getElementById('goBtn').onclick = submitFactorNoC;
+    area.querySelectorAll('input').forEach(i=>i.addEventListener('keydown', e=>{ if(e.key==='Enter') submitFactorNoC(); }));
+    setTimeout(()=>{ const el=document.getElementById('ansK'); if(el) el.focus(); }, 30);
+  } else if(step.type==='dualRoots'){
+    S.dual = {};
+    area.innerHTML = `
+      <div class="split-row">
+        <div class="split-half" id="halfLeft">
+          <div class="split-eq">${step.leftEq(S.ctx)}</div>
+          <div class="split-inrow">
+            <input class="num small" id="ansLeft" type="text" inputmode="none" placeholder="?">
+            <button class="go go-small" id="goLeft">ОК</button>
+          </div>
+          <div class="split-hint" id="hintLeft"></div>
+        </div>
+        <div class="split-half" id="halfRight">
+          <div class="split-eq">${step.rightEq(S.ctx)}</div>
+          <div class="split-inrow">
+            <input class="num small" id="ansRight" type="text" inputmode="none" placeholder="?">
+            <button class="go go-small" id="goRight">ОК</button>
+          </div>
+          <div class="split-hint" id="hintRight"></div>
+        </div>
+      </div>`;
+    document.getElementById('goLeft').onclick = ()=>submitDualSide('left');
+    document.getElementById('goRight').onclick = ()=>submitDualSide('right');
+    document.getElementById('ansLeft').addEventListener('keydown', e=>{ if(e.key==='Enter') submitDualSide('left'); });
+    document.getElementById('ansRight').addEventListener('keydown', e=>{ if(e.key==='Enter') submitDualSide('right'); });
+    setTimeout(()=>{ const el=document.getElementById('ansLeft'); if(el) el.focus(); }, 30);
+  } else if(step.type==='vietaSubst'){
+    area.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:14px;width:100%">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="lbl">x₁ + x₂ =</span>
+          <div class="frac-input">
+            <input class="frac-cell" id="vsNum1" type="text" inputmode="none" placeholder="?">
+            <div class="frac-line"></div>
+            <input class="frac-cell" id="vsDen1" type="text" inputmode="none" placeholder="?">
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="lbl">x₁ · x₂ =</span>
+          <div class="frac-input">
+            <input class="frac-cell" id="vsNum2" type="text" inputmode="none" placeholder="?">
+            <div class="frac-line"></div>
+            <input class="frac-cell" id="vsDen2" type="text" inputmode="none" placeholder="?">
+          </div>
+        </div>
+        <button class="go" id="goBtn" style="align-self:flex-start">${S.exam?'Готово':'ОК'}</button>
+      </div>`;
+    document.getElementById('goBtn').onclick = submitVietaSubst;
+    area.querySelectorAll('input').forEach(i=>i.addEventListener('keydown', e=>{ if(e.key==='Enter') submitVietaSubst(); }));
+    setTimeout(()=>{ const el=document.getElementById('vsNum1'); if(el) el.focus(); }, 30);
+  } else if(step.type==='vietaReduce'){
+    area.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:14px;width:100%">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="lbl">x₁ + x₂ =</span>
+          <input class="num" id="vrSum" type="text" inputmode="none" placeholder="?" style="width:80px">
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="lbl">x₁ · x₂ =</span>
+          <input class="num" id="vrProd" type="text" inputmode="none" placeholder="?" style="width:80px">
+        </div>
+        <button class="go" id="goBtn" style="align-self:flex-start">${S.exam?'Готово':'ОК'}</button>
+      </div>`;
+    document.getElementById('goBtn').onclick = submitVietaReduce;
+    area.querySelectorAll('input').forEach(i=>i.addEventListener('keydown', e=>{ if(e.key==='Enter') submitVietaReduce(); }));
+    setTimeout(()=>{ const el=document.getElementById('vrSum'); if(el) el.focus(); }, 30);
+  } else if(step.type==='blanks'){
+    renderBlanksStep(step);
+  } else if(step.type==='auto'){
+    // показываем результат с задержкой, чтобы ученик успел заметить
+    area.innerHTML = `<div class="auto-reveal" id="autoReveal">${step.record()}</div>`;
+    setTimeout(()=>{
+      const el = document.getElementById('autoReveal');
+      if(el) el.classList.add('visible');
+    }, 200);
+    setTimeout(()=>{
+      advanceStep(step.record());
+    }, 2200);
+  } else if(step.type==='pair'){
+    area.innerHTML = `
+      <span class="lbl">x₁ =</span>
+      <input class="num small" id="ansX1" type="text" inputmode="none" placeholder="?">
+      <span class="lbl">x₂ =</span>
+      <input class="num small" id="ansX2" type="text" inputmode="none" placeholder="?">
+      <button class="go" id="goBtn">Проверить</button>`;
+    document.getElementById('goBtn').onclick = submitPair;
+    area.querySelectorAll('input').forEach(i=>i.addEventListener('keydown', e=>{ if(e.key==='Enter') submitPair(); }));
+    setTimeout(()=>{ const el=document.getElementById('ansX1'); if(el) el.focus(); }, 30);
+  }
+}
+
+function setHint(t, good=false){
+  const h = document.getElementById('hint');
+  h.innerHTML = t;
+  h.className = 'hint'+(good?' good':'');
+}
+
+function resolveExpected(step, ctx){
+  return typeof step.expected === 'function' ? step.expected(ctx) : step.expected;
+}
+
+
+/* ───────── общий переход к следующему шагу ───────── */
+function stepLineHTML(inner){
+  const tall = inner.includes('class="frac"') ? ' stepline-frac' : '';
+  return `<span class="stepline${tall}">${inner}</span>`;
+}
+
+function advanceStep(recordHTML){
+  S.frozenSteps.push(stepLineHTML(recordHTML));
+  S.errStep = 0;
+  S.stepIdx++;
+  renderAll();
+  if(S.stepIdx >= P.steps.length){
+    setTimeout(finish, 300);
+  } else {
+    const nextStep = P.steps[S.stepIdx];
+    if(nextStep.introRecord){
+      S.frozenSteps.push(stepLineHTML(nextStep.introRecord(S.ctx)));
+      renderAll();
+    }
+    setPrompt(); renderInputs();
+  }
+}
+
+/* ───────── обработчики ответов ───────── */
+function submitNumber(){
+  const inp = document.getElementById('ans');
+  if(!inp || inp.value==='') return;
+  const v = Number(inp.value);
+  const step = P.steps[S.stepIdx];
+  const expected = resolveExpected(step, S.ctx);
+  if(v !== expected){
+    S.errStep++; S.errTotal++;
+    inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+    setHint(step.hint(S.exam));
+    inp.value='';
+    return;
+  }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  step.onSolved && step.onSolved(S.ctx, v);
+  advanceStep(step.record(v));
+}
+
+function submitChoice(id, btnEl){
+  const step = P.steps[S.stepIdx];
+  const expected = resolveExpected(step, S.ctx);
+  if(id !== expected){
+    S.errStep++; S.errTotal++;
+    btnEl.classList.remove('shake'); void btnEl.offsetWidth; btnEl.classList.add('shake');
+    setHint(step.hint(S.exam));
+    return;
+  }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  step.onSolved && step.onSolved(S.ctx, id);
+  advanceStep(step.record(id));
+}
+
+function parseXTerm(raw){
+  let s = String(raw).trim().toLowerCase().replace(/\s+/g,'');
+  if(s==='') return null;
+  s = s.replace(/[−–—]/g,'-');
+  s = s.replace(/х/g,'x');
+  if(!s.includes('x')) return null;
+  const numPart = s.replace(/x/g,'');
+  let coef;
+  if(numPart===''||numPart==='+') coef=1;
+  else if(numPart==='-') coef=-1;
+  else { coef = Number(numPart); if(!Number.isFinite(coef)) return null; }
+  return coef;
+}
+
+/* ───────── isolateMove: перенос + деление (портировано из линейного тренажёра) ───────── */
+function mvInit(){
+  S.mv = {
+    phase: 'move',
+    L: [ {coef:P.a, pow:2, id:1, moved:false}, {coef:P.c, pow:0, id:2, moved:false} ],
+    R: [],
+    K: null, M: null,
+  };
+}
+
+function mvMisplaced(){
+  return [...S.mv.L.filter(t=>t.pow!==2), ...S.mv.R.filter(t=>t.pow===2)];
+}
+
+function renderIsolateMove(){
+  const area = document.getElementById('inputArea');
+  const mv = S.mv;
+  if(mv.phase==='move'){
+    const chip = (t,leading,side) => `<span class="term tap ${t.moved?'moved':''}" data-id="${t.id}" data-side="${side}">${termText(t,leading)}</span>`;
+    const leftHTML = mv.L.map((t,i)=>chip(t,i===0,'L')).join('');
+    const rightHTML = mv.R.length ? mv.R.map((t,i)=>chip(t,i===0,'R')).join('') : `<span class="term">0</span>`;
+    const goBtn = S.exam ? `<button class="go" id="mvGoBtn2" style="margin-left:10px">Готово</button>` : '';
+    area.innerHTML = `<div class="eqline2" id="mvEq">${leftHTML}<span class="eq-sign">=</span>${rightHTML}${goBtn}</div>`;
+    area.querySelectorAll('.term.tap').forEach(el=>el.onclick=()=>mvTapTerm(el));
+    if(S.exam) document.getElementById('mvGoBtn2').onclick = mvCheckMoveDone;
+  } else if(mv.phase==='divide'){
+    area.innerHTML = `<div class="eqline2">
+      <span class="term tap" id="mvChipK">${numText(mv.L[0].coef)}</span><span style="font-size:24px">x²</span>
+      <span class="eq-sign">=</span>
+      <span class="term tap" id="mvChipM">${numText(mv.R[0].coef)}</span>
+      <span class="divbar"></span><span class="divcolon">:</span>
+      <input class="num small" id="mvDiv" type="text" inputmode="none" placeholder="?">
+      <button class="go" id="mvGoBtn" style="margin-left:8px">${S.exam?'Готово':'ОК'}</button>
+    </div>`;
+    document.getElementById('mvChipK').onclick = ()=>mvFillDiv(mv.L[0].coef,'mvChipK');
+    document.getElementById('mvChipM').onclick = ()=>mvFillDiv(mv.R[0].coef,'mvChipM');
+    document.getElementById('mvGoBtn').onclick = mvSubmitDiv;
+    document.getElementById('mvDiv').addEventListener('keydown', e=>{ if(e.key==='Enter') mvSubmitDiv(); });
+    setTimeout(()=>{ const el=document.getElementById('mvDiv'); if(el) el.focus(); }, 500);
+  } else if(mv.phase==='cancel'){
+    area.innerHTML = `<div class="eqline2">
+      <span class="frac"><span class="num"><span class="strikeable" id="mvS1">${numText(mv.K)}</span>x²</span><span class="den"><span class="strikeable" id="mvS2">${numText(mv.K)}</span></span></span>
+      <span class="eq-sign">=</span>
+      <span class="frac"><span class="num">${numText(mv.M)}</span><span class="den">${numText(mv.K)}</span></span>
+    </div>`;
+  } else if(mv.phase==='compute'){
+    area.innerHTML = `<div class="eqline2">
+      <span class="frac"><span class="num"><span class="strikeable struck" id="mvS1">${numText(mv.K)}</span>x²</span><span class="den"><span class="strikeable struck" id="mvS2">${numText(mv.K)}</span></span></span>
+      <span class="eq-sign">=</span>
+      <span class="frac"><span class="num">${numText(mv.M)}</span><span class="den">${numText(mv.K)}</span></span>
+      <span style="font-size:22px;margin:0 4px">=</span>
+      <input class="num small" id="mvCompute" type="text" inputmode="none" placeholder="?">
+      <button class="go" id="mvComputeBtn">${S.exam?'Готово':'ОК'}</button>
+    </div>`;
+    document.getElementById('mvComputeBtn').onclick = mvSubmitCompute;
+    document.getElementById('mvCompute').addEventListener('keydown', e=>{ if(e.key==='Enter') mvSubmitCompute(); });
+    setTimeout(()=>{ const el=document.getElementById('mvCompute'); if(el) el.focus(); }, 30);
+  }
+}
+
+function mvTapTerm(el){
+  const id = Number(el.dataset.id), side = el.dataset.side;
+  const arr = side==='L' ? S.mv.L : S.mv.R;
+  const t = arr.find(x=>x.id===id);
+  if(S.exam){ mvPerformMove(t, side, el); return; }
+  const wrong = (t.pow===2 && side==='R') || (t.pow!==2 && side==='L');
+  if(!wrong){
+    S.errTotal++;
+    el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+    setHint(t.pow===2 ? 'x² уже стоит на своём месте — слева. Переносить нужно другое слагаемое.' : 'Это число уже справа — двигать его дальше некуда.');
+    return;
+  }
+  mvPerformMove(t, side, el);
+}
+
+function mvPerformMove(t, side, el){
+  const from = side==='L' ? S.mv.L : S.mv.R;
+  const to   = side==='L' ? S.mv.R : S.mv.L;
+  const oldText = termText(t,false);
+  from.splice(from.indexOf(t),1);
+  const nt = {...t, coef:-t.coef, moved:true};
+  to.push(nt);
+  const startRect = el.getBoundingClientRect();
+  renderIsolateMove();
+  const target = document.querySelector(`.term[data-id="${t.id}"]`);
+  if(target){
+    const endRect = target.getBoundingClientRect();
+    target.style.visibility='hidden';
+    const fly = document.createElement('span');
+    fly.className='flyer';
+    fly.textContent = oldText;
+    fly.style.left = startRect.left+'px'; fly.style.top = startRect.top+'px';
+    document.body.appendChild(fly);
+    requestAnimationFrame(()=>{ fly.style.left=endRect.left+'px'; fly.style.top=endRect.top+'px'; });
+    setTimeout(()=>{
+      fly.textContent = termText(nt,false);
+      fly.classList.add('flip');
+    }, 320);
+    setTimeout(()=>{
+      fly.remove();
+      target.style.visibility='';
+      target.classList.add('pop');
+      mvAfterMove();
+    }, 680);
+  } else {
+    mvAfterMove();
+  }
+}
+
+function mvAfterMove(){
+  if(S.exam){ renderIsolateMove(); return; }
+  if(mvMisplaced().length===0){
+    setHint('Перенесли через «=»: знак поменялся!', true);
+    setTimeout(()=>{ S.mv.phase='divide'; setPrompt(); renderInputs(); }, 650);
+  } else {
+    renderIsolateMove();
+  }
+}
+
+function mvCheckMoveDone(){
+  if(mvMisplaced().length===0){
+    setHint('Перенос верный.', true);
+    setTimeout(()=>{ S.mv.phase='divide'; setPrompt(); renderInputs(); }, 400);
+  } else {
+    S.errTotal++;
+    setHint('Расположение неверное — x² должен остаться слева, число — уйти направо.');
+  }
+}
+
+function mvFillDiv(v, chipId){
+  const inD = document.getElementById('mvDiv');
+  const chip = document.getElementById(chipId);
+  if(!inD) return;
+  const land = ()=>{ inD.value=v; if(!S.exam) mvSubmitDiv(); };
+  if(chip){
+    const a = chip.getBoundingClientRect(), b = inD.getBoundingClientRect();
+    const fly = document.createElement('span');
+    fly.className='flyer';
+    fly.textContent = numText(v);
+    fly.style.left=a.left+'px'; fly.style.top=a.top+'px';
+    document.body.appendChild(fly);
+    requestAnimationFrame(()=>{ fly.style.left=b.left+'px'; fly.style.top=b.top+'px'; });
+    setTimeout(()=>{ fly.remove(); land(); }, 680);
+  } else {
+    land();
+  }
+}
+
+function mvSubmitDiv(){
+  const inD = document.getElementById('mvDiv');
+  if(!inD || inD.value==='') return;
+  const v = Number(inD.value);
+  const trueK = S.mv.L[0].coef;
+  if(v !== trueK){
+    S.errTotal++;
+    inD.classList.remove('shake'); void inD.offsetWidth; inD.classList.add('shake');
+    if(S.exam){
+      setHint('Делим на коэффициент перед x².');
+    } else if(v === S.mv.R[0].coef){
+      setHint('Делим на коэффициент перед x², а не на правую часть!');
+    } else {
+      setHint('Спиши число, которое стоит перед x² — со всеми его знаками.');
+    }
+    inD.value='';
+    return;
+  }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  S.mv.K = trueK; S.mv.M = S.mv.R[0].coef;
+  S.mv.phase = 'cancel';
+  renderIsolateMove();
+  setTimeout(()=>{
+    const s1=document.getElementById('mvS1'), s2=document.getElementById('mvS2');
+    if(s1) s1.classList.add('struck');
+    if(s2) s2.classList.add('struck');
+  }, 350);
+  setTimeout(()=>{
+    S.mv.phase = 'compute';
+    setPrompt(); renderInputs();
+  }, 1400);
+}
+
+function mvSubmitCompute(){
+  const inp = document.getElementById('mvCompute');
+  if(!inp || inp.value==='') return;
+  const v = Number(inp.value);
+  const trueN = S.mv.M / S.mv.K;
+  if(v !== trueN){
+    S.errTotal++;
+    inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+    setHint(S.exam ? 'Пересчитай деление.' : 'Раздели числитель на знаменатель по действиям — не забудь про знаки: минус на минус даёт плюс.');
+    inp.value='';
+    return;
+  }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  mvFinish();
+}
+
+function mvFinish(){
+  const step = P.steps[S.stepIdx];
+  advanceStep(step.finalRecord());
+}
+
+function submitFactorNoC(){
+  const iK = document.getElementById('ansK'), iP = document.getElementById('ansP'), iQ = document.getElementById('ansQ');
+  if(!iK || !iP || !iQ || iK.value==='' || iP.value==='' || iQ.value==='') return;
+  if(!S.tempSign){ setHint('Выбери знак — плюс или минус.'); return; }
+  const step = P.steps[S.stepIdx];
+  const k = parseXTerm(iK.value), p = parseXTerm(iP.value), qMag = Number(iQ.value);
+  if(k===null || p===null){
+    S.errStep++; S.errTotal++;
+    if(k===null){ iK.classList.remove('shake'); void iK.offsetWidth; iK.classList.add('shake'); }
+    if(p===null){ iP.classList.remove('shake'); void iP.offsetWidth; iP.classList.add('shake'); }
+    setHint('В первых двух окошках должны быть слагаемые с x — например «4x» или «−x». Не забудь дописать x.');
+    iK.value=''; iP.value=''; iQ.value='';
+    return;
+  }
+  if(!step.checkFour(k,p,S.tempSign,qMag)){
+    S.errStep++; S.errTotal++;
+    [iK,iP,iQ].forEach(i=>{ i.classList.remove('shake'); void i.offsetWidth; i.classList.add('shake'); });
+    setHint(step.hint(S.exam));
+    iK.value=''; iP.value=''; iQ.value='';
+    return;
+  }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  step.onSolved && step.onSolved(S.ctx, k,p,S.tempSign,qMag);
+  advanceStep(step.record(k,p,S.tempSign,qMag));
+}
+
+function submitDualSide(side){
+  const step = P.steps[S.stepIdx];
+  const inp = document.getElementById(side==='left' ? 'ansLeft' : 'ansRight');
+  if(!inp || inp.value==='') return;
+  const v = Number(inp.value);
+  const expected = side==='left' ? step.expectedLeft(S.ctx) : step.expectedRight(S.ctx);
+  const hintFn = side==='left' ? step.hintLeft : step.hintRight;
+  const hintEl = document.getElementById(side==='left' ? 'hintLeft' : 'hintRight');
+  if(v !== expected){
+    S.errStep++; S.errTotal++;
+    inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+    hintEl.textContent = hintFn(S.exam);
+    inp.value='';
+    return;
+  }
+  hintEl.textContent = '';
+  inp.disabled = true;
+  document.getElementById(side==='left' ? 'goLeft' : 'goRight').disabled = true;
+  document.getElementById(side==='left' ? 'halfLeft' : 'halfRight').classList.add('done');
+  S.dual[side] = v;
+  if(S.dual.left !== undefined && S.dual.right !== undefined){
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    const rec = step.recordLeft(S.dual.left) + ' &nbsp; ' + step.recordRight(S.dual.right);
+    setTimeout(()=>advanceStep(rec), 500);
+  }
+}
+
+function submitVietaSubst(){
+  const n1 = document.getElementById('vsNum1'), d1 = document.getElementById('vsDen1');
+  const n2 = document.getElementById('vsNum2'), d2 = document.getElementById('vsDen2');
+  if(!n1 || !d1 || !n2 || !d2 || n1.value==='' || d1.value==='' || n2.value==='' || d2.value==='') return;
+  const num1 = Number(n1.value), den1 = Number(d1.value), num2 = Number(n2.value), den2 = Number(d2.value);
+  const step = P.steps[S.stepIdx];
+  const sumOk = step.checkSum(num1,den1), prodOk = step.checkProd(num2,den2);
+  if(!sumOk || !prodOk){
+    S.errTotal++;
+    if(!sumOk){ [n1,d1].forEach(i=>{ i.classList.remove('shake'); void i.offsetWidth; i.classList.add('shake'); }); }
+    if(!prodOk){ [n2,d2].forEach(i=>{ i.classList.remove('shake'); void i.offsetWidth; i.classList.add('shake'); }); }
+    if(!sumOk && !prodOk) setHint(step.hintSum() + ' ' + step.hintProd());
+    else setHint(!sumOk ? step.hintSum() : step.hintProd());
+    return;
+  }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  advanceStep(step.recordSum(num1,den1) + '<br>' + step.recordProd(num2,den2));
+}
+
+function submitVietaReduce(){
+  const sEl = document.getElementById('vrSum'), pEl = document.getElementById('vrProd');
+  if(!sEl || !pEl || sEl.value==='' || pEl.value==='') return;
+  const sumVal = Number(sEl.value), prodVal = Number(pEl.value);
+  const step = P.steps[S.stepIdx];
+  const sumOk = step.checkSum(sumVal), prodOk = step.checkProd(prodVal);
+  if(!sumOk || !prodOk){
+    S.errTotal++;
+    if(!sumOk){ sEl.classList.remove('shake'); void sEl.offsetWidth; sEl.classList.add('shake'); }
+    if(!prodOk){ pEl.classList.remove('shake'); void pEl.offsetWidth; pEl.classList.add('shake'); }
+    if(!sumOk && !prodOk) setHint(step.hintSum() + ' ' + step.hintProd());
+    else setHint(!sumOk ? step.hintSum() : step.hintProd());
+    return;
+  }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  advanceStep(step.record());
+}
+
+function renderBlanksStep(step){
+  const area = document.getElementById('inputArea');
+  area.innerHTML = step.renderHTML() + `<button class="go" id="goBtn" style="margin-left:10px">${S.exam?'Готово':'ОК'}</button>`;
+  document.getElementById('goBtn').onclick = submitBlanks;
+  step.blankIds.forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('keydown', e=>{ if(e.key==='Enter') submitBlanks(); });
+  });
+  setTimeout(()=>{ const el=document.getElementById(step.blankIds[0]); if(el) el.focus(); }, 30);
+}
+
+function submitBlanks(){
+  const step = P.steps[S.stepIdx];
+  const els = step.blankIds.map(id=>document.getElementById(id));
+  if(els.some(el=>!el || el.value==='')) return;
+  const vals = els.map(el=>Number(el.value));
+  const ok = vals.every((v,i)=>v===step.expected[i]);
+  if(!ok){
+    S.errTotal++;
+    els.forEach((el,i)=>{
+      if(vals[i]!==step.expected[i]){ el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+    });
+    setHint(step.hint(S.exam));
+    return;
+  }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  advanceStep(step.record(vals));
+}
+
+function submitPair(){
+  const i1 = document.getElementById('ansX1'), i2 = document.getElementById('ansX2');
+  if(!i1 || !i2 || i1.value==='' || i2.value==='') return;
+  const a = Number(i1.value), b = Number(i2.value);
+  const step = P.steps[S.stepIdx];
+  if(step.checkPair(a,b)){
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    step.onSolved && step.onSolved(S.ctx, a,b);
+    advanceStep(step.record(a,b));
+    return;
+  }
+  S.errStep++; S.errTotal++;
+  const sumOk = (a+b === step.sumTarget), prodOk = (a*b === step.prodTarget);
+  i1.classList.remove('shake'); void i1.offsetWidth; i1.classList.add('shake');
+  i2.classList.remove('shake'); void i2.offsetWidth; i2.classList.add('shake');
+  setHint(step.hint(sumOk, prodOk, S.exam));
+  i1.value=''; i2.value='';
+}
+
+/* ───────── финал ───────── */
+function answerHTML(P){
+  switch(P.kind){
+    case 'noC': return `Ответ: x₁ = 0, x₂ = ${numText(P.x2)}`;
+    case 'noB': return P.hasRoots ? `Ответ: x₁ = ${numText(P.r)}, x₂ = ${numText(-P.r)}` : 'Ответ: корней нет';
+    case 'vieta': return `Ответ: x₁ = ${numText(P.x1)}, x₂ = ${numText(P.x2)}`;
+    case 'discriminant': {
+      if(P.D<0) return 'Ответ: корней нет';
+      if(P.D===0) return `Ответ: x = ${numText(P.roots[0])}`;
+      const sq=Math.sqrt(P.D);
+      const xP=(-P.b+sq)/(2*P.a), xM=(-P.b-sq)/(2*P.a);
+      return `Ответ: x₁ = ${numText(xP)}, x₂ = ${numText(xM)}`;
+    }
+    case 'sprint': return 'Знак дискриминанта определён верно!';
+  }
+}
+
+function finish(){
+  S.phase = 'done';
+  S.frozenSteps.push(`<div class="stepline ok">${answerHTML(P)}</div>`);
+  renderAll(); setPrompt(); renderInputs();
+  let stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
+  document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
+  totalSolved++; solvedByLevel[curLevel]++;
+  streak = (S.errTotal===0) ? streak+1 : 0;
+  document.getElementById('stSolved').textContent = totalSolved;
+  document.getElementById('stStreak').textContent = streak;
+  setHint(S.errTotal===0 ? 'Без единой ошибки — блестяще!' : `Решено! Ошибок по пути: ${S.errTotal}.`, S.errTotal===0);
+  document.getElementById('nextBtn').style.display='block';
+  renderLevels();
+}
+
+/* ───────── интерфейс уровней ───────── */
+function renderLevels(){
+  const el = document.getElementById('levels');
+  el.innerHTML = LEVELS.map(L=>
+    `<button class="lvl ${L.id===curLevel?'active':''}" data-id="${L.id}" title="${L.desc}">
+      ${L.name}${solvedByLevel[L.id]>=5?'<span class="done-mark">★</span>':''}
+    </button>`
+  ).join('');
+  el.querySelectorAll('.lvl').forEach(b=>b.onclick=()=>{
+    curLevel = Number(b.dataset.id);
+    renderLevels(); newProblem();
+  });
+}
+document.getElementById('nextBtn').onclick = newProblem;
+
+/* ───────── стрелочки и плавающая клавиатура ───────── */
+let activeInputId = 'ans';
+let keypadOpen = true;
+
+function enhanceNumInputs(container){
+  container.querySelectorAll('input.num').forEach(inp=>{
+    if(inp.dataset.enhanced) return;
+    inp.dataset.enhanced = '1';
+    const wrap = document.createElement('span');
+    wrap.className = 'num-wrap';
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.appendChild(inp);
+    const spin = document.createElement('span');
+    spin.className = 'spin';
+    spin.innerHTML = `<button type="button" class="spin-btn" data-dir="1">▲</button><button type="button" class="spin-btn" data-dir="-1">▼</button>`;
+    wrap.appendChild(spin);
+    spin.querySelectorAll('.spin-btn').forEach(btn=>{
+      btn.onclick = ()=>{
+        let v = Number(inp.value);
+        if(!Number.isFinite(v)) v = 0;
+        v += Number(btn.dataset.dir);
+        inp.value = String(v);
+        inp.focus();
+      };
+    });
+    if(inp.id) inp.addEventListener('focus', ()=>{ activeInputId = inp.id; });
+  });
+  // узкие поля внутри дробей — стрелочки туда не влезают, но клавиатура по фокусу работает
+  container.querySelectorAll('input.frac-cell').forEach(inp=>{
+    if(inp.dataset.enhanced) return;
+    inp.dataset.enhanced = '1';
+    if(inp.id) inp.addEventListener('focus', ()=>{ activeInputId = inp.id; });
+  });
+  syncKeypadVisibility(container);
+}
+
+function syncKeypadVisibility(container){
+  const hasInputs = container.querySelectorAll('input.num, input.frac-cell').length > 0;
+  document.getElementById('keypadFloat').style.display = (hasInputs && keypadOpen) ? 'block' : 'none';
+  document.getElementById('kpToggle').style.display = (hasInputs && !keypadOpen) ? 'flex' : 'none';
+}
+
+function setupInputEnhancer(containerId){
+  const container = document.getElementById(containerId);
+  if(!container) return;
+  const observer = new MutationObserver(()=>enhanceNumInputs(container));
+  observer.observe(container, {childList:true, subtree:true});
+  enhanceNumInputs(container);
+}
+
+function keypadPress(ch){
+  if(ch==='enter'){ document.getElementById('goBtn')?.click(); return; }
+  const inp = document.getElementById(activeInputId);
+  if(!inp) return;
+  if(ch==='back') inp.value = inp.value.slice(0,-1);
+  else inp.value = (inp.value||'') + ch;
+  inp.focus();
+}
+
+function setupFloatingKeypad(){
+  const keys = ['7','8','9','4','5','6','1','2','3','−','0','⌫','x'];
+  document.getElementById('keypadButtons').innerHTML = keys.map(k=>{
+    let cls = '';
+    if(k==='−') cls='kp-minus';
+    else if(k==='x') cls='kp-x';
+    else if(k==='⌫') cls='kp-back';
+    const val = k==='⌫' ? 'back' : (k==='−' ? '-' : k);
+    return `<button type="button" class="${cls}" data-key="${val}">${k}</button>`;
+  }).join('') + `<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>`;
+  document.querySelectorAll('#keypadButtons button').forEach(btn=>{
+    btn.onclick = ()=>keypadPress(btn.dataset.key);
+  });
+  document.getElementById('kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(document.getElementById('inputArea')); };
+  document.getElementById('kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(document.getElementById('inputArea')); };
+}
+
+
+setupFloatingKeypad();
+setupInputEnhancer('inputArea');
+renderLevels();
+newProblem();
+</script>
+</body>
+</html>
