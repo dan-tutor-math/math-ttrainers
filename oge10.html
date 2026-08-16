@@ -99,7 +99,65 @@ body{
   min-height:100vh;
   padding:18px 12px 60px;
 }
-.wrap{max-width:820px;margin:0 auto}
+.wrap{max-width:820px;margin:0 auto;position:relative;z-index:1;pointer-events:none}
+.wrap > *{pointer-events:auto}
+
+/* ─── интерактивная доска на фоне вокруг примера ─── */
+#boardCanvas{position:fixed;top:0;left:0;z-index:0;touch-action:none;cursor:crosshair;}
+#boardSpace{height:0;pointer-events:none;transition:height .2s ease;}
+.board-toolbar{position:fixed;right:18px;bottom:18px;z-index:50;display:flex;gap:8px;align-items:center;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;padding:9px 11px;box-shadow:var(--shadow);}
+.toolbar-sep{width:1px;align-self:stretch;background:var(--glass-border);margin:2px 0;}
+.board-tool-btn{width:34px;height:34px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:border-color .15s, background .15s;}
+.board-tool-btn:hover{border-color:var(--ink);}
+.board-tool-btn.active{background:var(--ink);border-color:var(--ink);}
+.board-tool-btn .dot{border-radius:50%;background:var(--pencil);display:block;}
+.board-tool-btn.active .dot{background:#fff;}
+.board-tool-btn.eraser{font-size:15px;}
+.board-tool-btn.pen-main{font-size:15px;}
+.board-tool-btn.color-btn.active{background:var(--glass);border-color:var(--ink);box-shadow:0 0 0 2px var(--ink);}
+.tool-group{position:relative;}
+/* всплывающее окошко с размерами (для ручки и ластика) — управляется из JS через
+   класс .open, а не через :hover, потому что чистый CSS-hover рвётся, стоит
+   курсору чуть отклониться от прямой линии между кнопкой и окошком */
+.size-flyout{position:absolute;bottom:100%;right:0;margin-bottom:10px;display:none;gap:8px;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;padding:8px;box-shadow:var(--shadow);}
+.size-flyout.open{display:flex;}
+/* невидимый мостик над кнопкой, чтобы курсор не «выпадал» из зоны наведения,
+   пока едет от кнопки к окошку */
+.tool-group::after{content:'';position:absolute;left:0;right:0;bottom:100%;height:14px;}
+
+/* ─── всплывающая палитра для «своего» цвета ─── */
+.board-tool-btn.custom-color-btn{overflow:hidden;}
+.color-picker-flyout{flex-direction:column;align-items:stretch;width:200px;padding:12px;gap:10px;}
+.cp-sv-wrap{position:relative;width:100%;height:120px;border-radius:12px;overflow:hidden;cursor:crosshair;touch-action:none;}
+.cp-sv{display:block;width:100%;height:100%;}
+.cp-sv-thumb{position:absolute;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35),0 1px 3px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none;top:0;left:0;}
+.cp-row{display:flex;align-items:center;gap:8px;}
+.cp-eyedropper{width:28px;height:28px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--pencil);}
+.cp-eyedropper:hover{border-color:var(--ink);}
+.cp-swatch{width:26px;height:26px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);box-shadow:inset 0 0 0 2px rgba(255,255,255,.5);}
+.cp-hue-wrap{position:relative;flex:1;height:16px;touch-action:none;}
+.cp-hue{position:absolute;inset:0;border-radius:8px;background:linear-gradient(to right,#ff0000,#ffff00,#00ff00,#00ffff,#0000ff,#ff00ff,#ff0000);cursor:pointer;}
+.cp-hue-thumb{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35),0 1px 3px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none;}
+.cp-rgb-row{display:flex;gap:6px;}
+.cp-field{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;}
+.cp-field input{width:100%;box-sizing:border-box;text-align:center;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);color:var(--pencil);font-family:var(--font-mono);font-size:12px;padding:5px 2px;}
+.cp-field label{font-size:10px;color:var(--muted-3);font-family:var(--font-ui);}
+
+.board-view-toolbar{position:fixed;left:18px;bottom:18px;z-index:50;display:flex;gap:8px;align-items:center;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;padding:9px 11px;box-shadow:var(--shadow);}
+.board-zoom-label{min-width:44px;height:34px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-3);padding:0 6px;}
+.board-zoom-label:hover{border-color:var(--ink);}
+.board-tool-btn.hand-tool{font-size:16px;}
+.board-tool-btn.clear-btn{font-size:15px;}
+
+/* ─── доска изначально выключена — включается отдельной кнопкой под переключателем темы ─── */
+html:not([data-board="on"]) #boardCanvas,
+html:not([data-board="on"]) .board-toolbar,
+html:not([data-board="on"]) .board-view-toolbar{display:none;}
+html[data-board="on"] #boardSpace{height:72vh;}
+html[data-board="on"] body{background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    var(--bg);}
 h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,5vw,34px);color:var(--pencil);text-align:center;}
 .sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 22px;}
 
@@ -128,11 +186,15 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .mode-card.random{background:linear-gradient(135deg, var(--hl-10), transparent);border-color:var(--ink);}
 
 /* ─── шапка задачи ─── */
-.task-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.task-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
 .back-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 14px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);}
 .back-btn:hover{border-color:var(--ink)}
 .task-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3)}
 .corner{font-family:var(--font-ui);font-weight:500;display:flex;align-items:center;gap:10px;}
+.type-nav{display:flex;align-items:center;gap:8px;}
+.type-nav-btn{height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-ui);font-weight:600;font-size:12px;line-height:1;cursor:pointer;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;transition:transform .12s, border-color .12s;}
+.type-nav-btn:hover{border-color:var(--ink)}
+.type-nav-btn:active{transform:scale(.9)}
 /* ─── плавающая клавиатура ─── */
 .keypad{display:grid;grid-template-columns:repeat(3, 44px);gap:6px;}
 .keypad button{width:44px;height:40px;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-mono);font-size:18px;cursor:pointer;touch-action:manipulation;}
@@ -142,10 +204,12 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .keypad button.kp-comma{font-weight:700;color:var(--ink);}
 .keypad button.kp-enter{grid-column:span 2;width:auto;height:38px;font-family:var(--font-ui);font-weight:600;font-size:14px;background:var(--ink);color:#fff;border-color:var(--ink);}
 .keypad button.kp-enter:active{background:var(--ink-active);}
-.keypad-float{position:fixed;top:220px;right:20px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:50;}
+.keypad-float{position:fixed;top:112px;right:16px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:50;}
 .keypad-close{position:absolute;top:-11px;right:-11px;width:26px;height:26px;border-radius:50%;background:var(--teacher);color:#fff;border:2px solid #fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.keypad-toggle{position:fixed;top:220px;right:20px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50;}
-@media(max-width:720px){.keypad-float,.keypad-toggle{top:auto;bottom:16px;right:16px}}
+.keypad-drag-handle{position:absolute;top:-11px;left:-11px;width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;border:2px solid #fff;font-size:12px;line-height:1;cursor:grab;display:flex;align-items:center;justify-content:center;touch-action:none;}
+.keypad-drag-handle:active{cursor:grabbing;}
+.keypad-toggle{position:fixed;top:112px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50;}
+@media(max-width:720px){.keypad-float{top:auto;bottom:16px;right:16px}}
 .refresh-btn{width:28px;height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}
 .refresh-btn:hover{border-color:var(--ink);transform:rotate(80deg)}
 .refresh-btn:active{transform:scale(.9)}
@@ -262,6 +326,12 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
 .mixed-vfrac{display:inline-flex;flex-direction:column;align-items:center;gap:5px;}
 .mixed-bar{width:52px;height:2px;background:currentColor;}
 
+/* ─── плашка Тренировка/Экзамен ─── */
+.submode-tabs{display:flex;gap:8px;margin-bottom:14px;}
+.submode-tab{flex:1;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:10px 6px;cursor:pointer;text-align:center;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:border-color .15s, color .15s, background .15s;}
+.submode-tab:hover{border-color:var(--ink);}
+.submode-tab.active{color:#fff;background:var(--ink);border-color:var(--ink);}
+
 /* ─── план решения ─── */
 .plan{font-family:var(--font-ui);font-weight:500;font-size:14px;color:var(--muted-4);background:var(--hl-10);border-radius:14px;padding:12px 15px;margin:2px 0 14px;line-height:1.5;}
 .plan b{color:var(--ink)}
@@ -270,6 +340,11 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
 .explain{font-family:var(--font-ui);font-size:15px;color:var(--muted-4);line-height:1.55;}
 .explain b{color:var(--ink)}
 .next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:14px;box-shadow:0 6px 18px var(--ok-shadow);}
+.solution-btn{display:none;width:100%;font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--ink);background:var(--glass);border:1.5px dashed var(--ink);border-radius:14px;padding:12px 18px;cursor:pointer;margin-bottom:14px;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:background .12s;}
+.solution-btn:hover{background:var(--hl-10);}
+.solution-btn:active{transform:scale(.98);}
+.euler-svg{display:block;margin:14px auto 4px;max-width:100%;height:auto;}
+.tree-svg{display:block;margin:14px auto 4px;max-width:100%;height:auto;}
 
 /* ─── статистика ─── */
 .stats{display:flex;gap:10px;flex-wrap:wrap;}
@@ -280,6 +355,8 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
 .theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
 .theme-toggle:hover{border-color:var(--ink)}
 .theme-toggle:active{transform:scale(.92)}
+.board-visibility-toggle{top:64px;}
+.board-visibility-toggle.active{background:var(--ink);border-color:var(--ink);color:#fff;}
 .home-btn{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
 .home-btn:hover{border-color:var(--ink)}
 .home-btn:active{transform:scale(.92)}
@@ -289,6 +366,7 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
 <body>
 <a class="home-btn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
 <button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<button class="theme-toggle board-visibility-toggle" id="boardVisibilityToggle" title="Показать доску" aria-label="Показать/скрыть доску">🖊️</button>
 <script>(function(){
   var btn=document.getElementById('themeToggle');
   function apply(t, persist){
@@ -313,6 +391,85 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
     else if (mq.addListener) mq.addListener(onSystemChange);
   }
 })();</script>
+<script>(function(){
+  var btn = document.getElementById('boardVisibilityToggle');
+  function apply(on){
+    document.documentElement.setAttribute('data-board', on ? 'on' : 'off');
+    btn.classList.toggle('active', on);
+    btn.title = on ? 'Скрыть доску' : 'Показать доску';
+  }
+  apply(false); // доска изначально выключена
+  btn.addEventListener('click', function(){
+    apply(document.documentElement.getAttribute('data-board') !== 'on');
+  });
+})();</script>
+
+<canvas id="boardCanvas"></canvas>
+<div class="board-toolbar" id="boardToolbar">
+  <div class="tool-group">
+    <button class="board-tool-btn pen-main active" data-tool="pen" title="Ручка">✏️</button>
+    <div class="size-flyout">
+      <button class="board-tool-btn" data-tool="pen" data-width="1" title="Самая тонкая"><span class="dot" style="width:4px;height:4px"></span></button>
+      <button class="board-tool-btn active" data-tool="pen" data-width="2" title="Тонкая"><span class="dot" style="width:6px;height:6px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="3" title="Тонкая+"><span class="dot" style="width:8px;height:8px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="4" title="Средняя"><span class="dot" style="width:11px;height:11px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="6" title="Средняя+"><span class="dot" style="width:15px;height:15px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="9" title="Толстая"><span class="dot" style="width:20px;height:20px"></span></button>
+    </div>
+  </div>
+  <span class="toolbar-sep"></span>
+  <button class="board-tool-btn color-btn active" data-color="#000000" title="Чёрный"><span class="dot" style="width:14px;height:14px;background:#000000"></span></button>
+  <button class="board-tool-btn color-btn" data-color="#FF3B30" title="Красный"><span class="dot" style="width:14px;height:14px;background:#FF3B30"></span></button>
+  <button class="board-tool-btn color-btn" data-color="#0A84FF" title="Синий"><span class="dot" style="width:14px;height:14px;background:#0A84FF"></span></button>
+  <div class="tool-group">
+    <button class="board-tool-btn color-btn custom-color-btn" data-color="#AF52DE" title="Свой цвет" id="customColorBtn">
+      <span class="dot custom-color-dot" id="customColorDot" style="width:16px;height:16px;background:conic-gradient(from 180deg,#ff0000,#ffff00,#00ff00,#00ffff,#0000ff,#ff00ff,#ff0000)"></span>
+    </button>
+    <div class="size-flyout color-picker-flyout">
+      <div class="cp-sv-wrap">
+        <canvas id="cpSvCanvas" class="cp-sv" width="176" height="120"></canvas>
+        <div class="cp-sv-thumb" id="cpSvThumb"></div>
+      </div>
+      <div class="cp-row">
+        <button class="cp-eyedropper" id="cpEyedropper" title="Пипетка — взять цвет с экрана" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19.2 3.8a2.7 2.7 0 0 1 0 3.8l-1.4 1.4-3.8-3.8L15.4 3.8a2.7 2.7 0 0 1 3.8 0Z" fill="currentColor"></path>
+            <path d="M12.6 6.6l3.8 3.8L6 20.8l-4 1 1-4L12.6 6.6Z" fill="currentColor"></path>
+          </svg>
+        </button>
+        <div class="cp-swatch" id="cpSwatch"></div>
+        <div class="cp-hue-wrap">
+          <div class="cp-hue" id="cpHue"></div>
+          <div class="cp-hue-thumb" id="cpHueThumb"></div>
+        </div>
+      </div>
+      <div class="cp-rgb-row">
+        <div class="cp-field"><input type="text" inputmode="numeric" maxlength="3" id="cpR" value="0"><label>R</label></div>
+        <div class="cp-field"><input type="text" inputmode="numeric" maxlength="3" id="cpG" value="0"><label>G</label></div>
+        <div class="cp-field"><input type="text" inputmode="numeric" maxlength="3" id="cpB" value="0"><label>B</label></div>
+      </div>
+    </div>
+  </div>
+  <span class="toolbar-sep"></span>
+  <button class="board-tool-btn" data-tool="line" title="Прямая линия">╱</button>
+  <div class="tool-group">
+    <button class="board-tool-btn eraser" data-tool="eraser" title="Ластик">🧽</button>
+    <div class="size-flyout">
+      <button class="board-tool-btn" data-tool="eraser" data-size="14" title="Маленький ластик"><span class="dot" style="width:6px;height:6px"></span></button>
+      <button class="board-tool-btn" data-tool="eraser" data-size="26" title="Средний ластик"><span class="dot" style="width:10px;height:10px"></span></button>
+      <button class="board-tool-btn" data-tool="eraser" data-size="44" title="Большой ластик"><span class="dot" style="width:16px;height:16px"></span></button>
+    </div>
+  </div>
+</div>
+
+<div class="board-view-toolbar" id="boardViewToolbar">
+  <button class="board-tool-btn" id="zoomOutBtn" title="Уменьшить">−</button>
+  <button class="board-zoom-label" id="zoomResetBtn" title="Сбросить вид">100%</button>
+  <button class="board-tool-btn" id="zoomInBtn" title="Увеличить">+</button>
+  <span class="toolbar-sep"></span>
+  <button class="board-tool-btn hand-tool" data-tool="hand" title="Рука — перемещать доску">✋</button>
+  <button class="board-tool-btn clear-btn" id="clearBoardBtn" title="Стереть всё">🗑️</button>
+</div>
 
 <div class="wrap">
   <h1>ОГЭ №10. Теория вероятности</h1>
@@ -324,11 +481,20 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
 
   <div id="taskArea" style="display:none">
     <div class="task-head">
-      <button class="back-btn" id="backBtn">← все типы</button>
+      <div class="type-nav">
+        <button class="back-btn" id="backBtn">← все типы</button>
+        <button class="type-nav-btn" id="prevTypeBtn" title="Предыдущий тип">◀ Предыдущий тип</button>
+        <button class="type-nav-btn" id="nextTypeBtn" title="Следующий тип">Следующий тип ▶</button>
+      </div>
       <div class="corner">
         <div class="task-title" id="taskTitle"></div>
         <button class="refresh-btn" id="refreshBtn" title="Обновить задание">⟳</button>
       </div>
+    </div>
+
+    <div class="submode-tabs">
+      <button class="submode-tab active" id="tabPractice">Тренировка</button>
+      <button class="submode-tab" id="tabExam">Экзамен</button>
     </div>
 
     <div class="panel" id="questionPanel" style="display:none">
@@ -359,6 +525,8 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
       <div class="hint" id="stepHint"></div>
     </div>
 
+    <button class="solution-btn" id="showSolutionBtn" style="display:none">Показать решение и ответ</button>
+
     <div class="panel" id="finalPanel" style="display:none">
       <div class="prompt" id="finalPrompt">Запиши итоговую вероятность десятичной дробью:</div>
       <div class="inrow">
@@ -379,10 +547,11 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
       <div class="stat"><div class="v" id="stStreak">0</div><div class="l">серия без ошибок</div></div>
     </div>
   </div>
-</div>
+<div id="boardSpace" aria-hidden="true"></div></div>
 
 <button class="keypad-toggle" id="kpToggle" title="Показать клавиатуру" style="display:none">⌨</button>
 <div class="keypad-float" id="keypadFloat" style="display:none">
+  <button class="keypad-drag-handle" id="kpDragHandle" title="Перетащить клавиатуру" aria-label="Переместить клавиатуру">✋</button>
   <button class="keypad-close" id="kpClose" title="Скрыть клавиатуру">✕</button>
   <div class="keypad" id="keypadButtons"></div>
 </div>
@@ -918,19 +1087,357 @@ function gen_type11(){
   };
 }
 
+/* ═══════════════ дополнительные типы из конспекта (простая проверка ответа,
+   без пошагового интерактивного решения — только «показать решение и ответ») ═══════════════ */
+
+/* ─── SVG: дерево случайного опыта и диаграммы Эйлера ─── */
+function svgText(x,y,t,opts){
+  opts = opts||{};
+  const size=opts.size||15, weight=opts.weight||500, color=opts.color||'var(--pencil)', anchor=opts.anchor||'middle';
+  return `<text x="${x}" y="${y}" text-anchor="${anchor}" font-family="var(--font-ui)" font-size="${size}" font-weight="${weight}" fill="${color}">${t}</text>`;
+}
+function buildTreeSVG(p1,p2,p3){
+  const q1 = Math.round((1-p1)*100)/100, q2 = Math.round((1-p2)*100)/100, q3 = Math.round((1-p3)*100)/100;
+  const S=[300,26], A=[150,110], NA=[450,110], B1=[75,196], NB1=[225,196], B2=[375,196], NB2=[525,196];
+  const line=(p,q)=>`<line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}" stroke="var(--ink)" stroke-width="1.6"/>`;
+  const dot=p=>`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="var(--ink)"/>`;
+  const mid=(p,q)=>[(p[0]+q[0])/2,(p[1]+q[1])/2];
+  const m1=mid(S,A), m2=mid(S,NA), m3=mid(A,B1), m4=mid(A,NB1), m5=mid(NA,B2), m6=mid(NA,NB2);
+  return `<svg class="tree-svg" viewBox="0 0 600 240" xmlns="http://www.w3.org/2000/svg">
+${line(S,A)}${line(S,NA)}${line(A,B1)}${line(A,NB1)}${line(NA,B2)}${line(NA,NB2)}
+${dot(S)}${dot(A)}${dot(NA)}${dot(B1)}${dot(NB1)}${dot(B2)}${dot(NB2)}
+${svgText(S[0],S[1]-12,'S',{size:16})}
+${svgText(A[0]-16,A[1]-6,'A',{size:16,anchor:'end'})}
+${svgText(NA[0]+16,NA[1]-6,'Ā',{size:16,anchor:'start'})}
+${svgText(B1[0],B1[1]+20,'B')}${svgText(NB1[0],NB1[1]+20,'B̄')}
+${svgText(B2[0],B2[1]+20,'B')}${svgText(NB2[0],NB2[1]+20,'B̄')}
+${svgText(m1[0]-16,m1[1]-6,fmtRu(p1),{size:13,anchor:'end'})}
+${svgText(m2[0]+16,m2[1]-6,fmtRu(q1),{size:13,anchor:'start'})}
+${svgText(m3[0]-14,m3[1]+2,fmtRu(p2),{size:13,anchor:'end'})}
+${svgText(m4[0]+14,m4[1]+2,fmtRu(q2),{size:13,anchor:'start'})}
+${svgText(m5[0]-14,m5[1]+2,fmtRu(p3),{size:13,anchor:'end'})}
+${svgText(m6[0]+14,m6[1]+2,fmtRu(q3),{size:13,anchor:'start'})}
+</svg>`;
+}
+function svgEulerFrame(){
+  return `<rect x="4" y="4" width="392" height="252" fill="none" stroke="var(--pencil)" stroke-width="1.4"/>
+<circle cx="140" cy="140" r="95" fill="none" stroke="var(--ink)" stroke-width="1.6"/>
+<circle cx="260" cy="140" r="95" fill="none" stroke="var(--ink)" stroke-width="1.6"/>
+${svgText(35,55,'A',{size:17,weight:600})}${svgText(352,55,'B',{size:17,weight:600})}`;
+}
+function buildEulerRegionsSVG(outside,aOnly,both,bOnly,mode){
+  const fmt = v => mode==='count' ? String(v) : fmtRu(v);
+  return `<svg class="euler-svg" viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg">
+${svgEulerFrame()}
+${svgText(200,25,fmt(outside))}
+${svgText(95,140,fmt(aOnly))}
+${svgText(200,145,fmt(both))}
+${svgText(305,140,fmt(bOnly))}
+</svg>`;
+}
+function buildEulerDotsSVG(points,mode){
+  const parts = points.map(p=>{
+    const c = `<circle cx="${p.x}" cy="${p.y}" r="3" fill="var(--pencil)"/>`;
+    const t = mode==='prob' ? svgText(p.x+8,p.y+4,fmtRu(p.v),{size:12,anchor:'start'}) : '';
+    return c+t;
+  }).join('');
+  return `<svg class="euler-svg" viewBox="0 0 400 260" xmlns="http://www.w3.org/2000/svg">
+${svgEulerFrame()}
+${parts}
+</svg>`;
+}
+const EULER_SLOTS = {
+  outside: [[200,25],[200,255],[45,55],[355,55]],
+  aOnly:   [[85,90],[75,140],[95,190],[115,115]],
+  both:    [[185,110],[200,150],[215,120],[195,175]],
+  bOnly:   [[315,90],[325,140],[305,190],[285,115]],
+};
+
+/* ─── чашки/фонарики/маркеры — простая дополняющая вероятность (2 категории) ─── */
+function gen_type12(){
+  const total = pick([8,10,16,20,25,40,50]);
+  const red = ri(1,total-1);
+  const favorable = total-red;
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `У бабушки ${total} чашек: ${red} с красными цветами, остальные с синими. Бабушка наливает чай в случайно выбранную чашку. Найдите вероятность того, что это будет чашка с синими цветами.`,
+    answer,
+    explain: `С синими цветами — ${total} − ${red} = ${favorable} чашек. Всего чашек — ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`,
+    simple:true
+  };
+}
+function gen_type13(){
+  const total = pick([16,20,25,40,50,80,100]);
+  const broken = ri(1, Math.max(1,Math.round(total*0.15)));
+  const favorable = total-broken;
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `В среднем из ${total} карманных фонариков, поступивших в продажу, ${broken} неисправных. Найдите вероятность того, что выбранный наудачу в магазине фонарик окажется исправен.`,
+    answer,
+    explain: `Исправных фонариков — ${total} − ${broken} = ${favorable}. Всего фонариков — ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`,
+    simple:true
+  };
+}
+function gen_type18(){
+  const total = pick([8,10,16,20,25,40,50]);
+  const black = ri(1,total-1);
+  const favorable = total-black;
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `Под классной доской в лотке лежат ${black} чёрных и ${favorable} синих маркеров для доски. Из коробки берут случайный маркер. Найдите вероятность того, что он окажется синим.`,
+    answer,
+    explain: `Синих маркеров — ${favorable}. Всего маркеров — ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`,
+    simple:true
+  };
+}
+
+/* ─── лыжники — вероятность «или» из трёх категорий ─── */
+function gen_type14(){
+  const total = pick([16,20,25,40,50]);
+  const parts = splitN(total,3);
+  const favorable = parts[1]+parts[2];
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `В лыжных гонках участвуют ${parts[0]} спортсменов из России, ${parts[1]} спортсменов из Норвегии и ${parts[2]} спортсменов из Швеции. Порядок, в котором спортсмены стартуют, определяется жребием. Найдите вероятность того, что первым будет стартовать спортсмен из Норвегии или Швеции.`,
+    answer,
+    explain: `Из Норвегии или Швеции — ${parts[1]} + ${parts[2]} = ${favorable} спортсменов. Всего спортсменов — ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`,
+    simple:true
+  };
+}
+
+/* ─── ручки: дана вероятность плохого исхода, найти вероятность хорошего ─── */
+function gen_type15(){
+  const badPercent = ri(4,40);
+  const bad = badPercent/100;
+  const answer = Math.round((1-bad)*10000)/10000;
+  return {
+    prompt: `Вероятность того, что новая шариковая ручка пишет плохо (или не пишет), равна ${fmtRu(bad)}. Покупатель в магазине выбирает одну шариковую ручку. Найдите вероятность того, что эта ручка пишет хорошо.`,
+    answer,
+    explain: `Событие «пишет хорошо» противоположно событию «пишет плохо (или не пишет)». P = 1 − ${fmtRu(bad)} = ${fmtRu(answer)}.`,
+    simple:true
+  };
+}
+
+/* ─── ручки в магазине канцтоваров — вероятность «или» из нескольких категорий ─── */
+function gen_type16(){
+  const total = pick([40,50,80,100,160,200]);
+  let red=1, green=1, purple=1, rest=0;
+  for(let tries=0; tries<40; tries++){
+    red = ri(Math.max(1,Math.round(total*0.08)), Math.round(total*0.3));
+    green = ri(Math.max(1,Math.round(total*0.08)), Math.round(total*0.3));
+    purple = ri(Math.max(1,Math.round(total*0.15)), Math.round(total*0.4));
+    rest = total-red-green-purple;
+    if(rest>=2 && rest%2===0) break;
+  }
+  const favorable = red+purple;
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `В магазине канцтоваров продаётся ${total} ручек: ${red} красных, ${green} зелёных, ${purple} фиолетовых, остальные синие и чёрные, их поровну. Найдите вероятность того, что случайно выбранная в этом магазине ручка будет красной или фиолетовой.`,
+    answer,
+    explain: `Красных или фиолетовых — ${red} + ${purple} = ${favorable}. Всего ручек — ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`,
+    simple:true
+  };
+}
+
+/* ─── пазлы — простая вероятность (подарки детям) ─── */
+const KID_NAMES = [{nom:'Саша',dat:'Саше'},{nom:'Вася',dat:'Васе'},{nom:'Настя',dat:'Насте'},{nom:'Максим',dat:'Максиму'},{nom:'Соня',dat:'Соне'}];
+function gen_type17(){
+  const total = pick([16,20,25,40,50]);
+  const cars = ri(1,total-1);
+  const kid = pick(KID_NAMES);
+  const answer = Math.round((cars/total)*10000)/10000;
+  return {
+    prompt: `Родительский комитет закупил ${total} пазлов для подарков детям в связи с окончанием учебного года, из них ${cars} с машинами и ${total-cars} с видами городов. Подарки распределяются случайным образом между ${total} детьми, среди которых есть ${kid.nom}. Найдите вероятность того, что ${kid.dat} достанется пазл с машиной.`,
+    answer,
+    explain: `Пазлов с машиной — ${cars} из ${total}. P = ${cars}⁄${total} = ${fmtRu(answer)}.`,
+    simple:true
+  };
+}
+
+/* ─── карандаши — условная вероятность (без возвращения) ─── */
+function gen_type19(){
+  const D = pick([8,10,16,20,25,40,50]); // всего−1
+  const total = D+1;
+  const green = ri(2,total-1);
+  const yellow = total-green;
+  const favorable = green-1;
+  const answer = Math.round((favorable/D)*10000)/10000;
+  return {
+    prompt: `Из ящика, где хранятся ${yellow} жёлтых и ${green} зелёных карандашей, не глядя достали два карандаша. Известно, что первый карандаш оказался зелёным. Найдите вероятность того, что второй карандаш тоже оказался зелёным.`,
+    answer,
+    explain: `После того как достали один зелёный карандаш, зелёных осталось ${green} − 1 = ${favorable}, а всего карандашей осталось ${total} − 1 = ${D}. P = ${favorable}⁄${D} = ${fmtRu(answer)}.`,
+    simple:true
+  };
+}
+
+/* ─── кубик дважды — сумма равна одному из трёх значений ─── */
+const SUM_TRIPLES = [[3,4,5],[2,4,6],[8,10,12],[9,10,11],[7,11,12]];
+function gen_type20(){
+  const [s1,s2,s3] = pick(SUM_TRIPLES);
+  const c1=SUM_COUNT[s1], c2=SUM_COUNT[s2], c3=SUM_COUNT[s3];
+  const favorable = c1+c2+c3, total=36;
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `Симметричный игральный кубик бросают два раза. Найдите вероятность события «сумма выпавших очков равна ${s1}, ${s2} или ${s3}».`,
+    answer,
+    explain: `Сумма ${s1} получается ${c1} способами (${sumCombosText(s1)}), сумма ${s2} — ${c2} способами (${sumCombosText(s2)}), сумма ${s3} — ${c3} способами (${sumCombosText(s3)}). Благоприятных исходов — ${c1}+${c2}+${c3} = ${favorable}. Всего исходов при двух бросках — 6·6 = ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`,
+    simple:true
+  };
+}
+
+/* ─── монета: номер броска не важен — вероятность решки в конкретном броске ─── */
+const ORD_UNITS_PREP = ['','первом','втором','третьем','четвёртом','пятом','шестом','седьмом','восьмом','девятом'];
+const ORD_TEENS_PREP = ['десятом','одиннадцатом','двенадцатом','тринадцатом','четырнадцатом','пятнадцатом','шестнадцатом','семнадцатом','восемнадцатом','девятнадцатом'];
+const CARD_TENS = ['','','двадцать','тридцать','сорок','пятьдесят'];
+const ORD_TENS_PREP = ['','','двадцатом','тридцатом','сороковом','пятидесятом'];
+function ordinalRu(n){
+  if(n<10) return ORD_UNITS_PREP[n];
+  if(n<20) return ORD_TEENS_PREP[n-10];
+  const tens=Math.floor(n/10), units=n%10;
+  if(units===0) return ORD_TENS_PREP[tens];
+  return `${CARD_TENS[tens]} ${ORD_UNITS_PREP[units]}`;
+}
+function gen_type21(){
+  const total = pick([10,16,20,25,40,50]);
+  const heads = ri(Math.round(total*0.3), Math.round(total*0.7));
+  const favorable = total-heads;
+  const pos = ri(1,total);
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `Монету бросили ${total} раз. Известно, что орёл выпал ${heads} раз. Найдите вероятность того, что при ${ordinalRu(pos)} по счёту броске выпала решка.`,
+    answer,
+    explain: `Все ${total} бросков равноправны — любой из них с одинаковой вероятностью мог оказаться решкой, независимо от его номера по счёту. Решка выпала ${total} − ${heads} = ${favorable} раз из ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`,
+    simple:true
+  };
+}
+
+/* ─── базовое определение вероятности: N и N(A) даны напрямую ─── */
+function gen_type22(){
+  const total = pick([8,10,16,20,25,40,50]);
+  const favorable = ri(1,total-1);
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `В случайном опыте N = ${total} равновозможных элементарных событий, из которых N(A) = ${favorable} благоприятствуют событию A. Вычислите вероятность события A.`,
+    answer,
+    explain: `По определению вероятности P(A) = N(A) ⁄ N = ${favorable}⁄${total} = ${fmtRu(answer)}.`,
+    simple:true
+  };
+}
+
+/* ─── дерево случайного опыта — формула полной вероятности ─── */
+const TREE_PRESETS = [
+  {p1:0.25,p2:0.8,p3:0.4}, {p1:0.3,p2:0.7,p3:0.2}, {p1:0.4,p2:0.6,p3:0.9},
+  {p1:0.2,p2:0.5,p3:0.8}, {p1:0.6,p2:0.3,p3:0.7},
+];
+function gen_type23(){
+  const {p1,p2,p3} = pick(TREE_PRESETS);
+  const q1 = Math.round((1-p1)*100)/100;
+  const t1 = Math.round(p1*p2*10000)/10000, t2 = Math.round(q1*p3*10000)/10000;
+  const answer = Math.round((t1+t2)*10000)/10000;
+  return {
+    prompt: `На рисунке изображено дерево случайного опыта. Найдите вероятность события B.${buildTreeSVG(p1,p2,p3)}`,
+    answer,
+    explain: `По формуле полной вероятности: P(B) = P(A)·P(B|A) + P(Ā)·P(B|Ā) = ${fmtRu(p1)}·${fmtRu(p2)} + ${fmtRu(q1)}·${fmtRu(p3)} = ${fmtRu(t1)} + ${fmtRu(t2)} = ${fmtRu(answer)}.`,
+    simple:true
+  };
+}
+
+/* ─── диаграмма Эйлера: вероятности в 4 областях ─── */
+function gen_type24(){
+  const parts = splitN(10,4);
+  const [outside,aOnly,both,bOnly] = parts.map(x=>Math.round(x)/10);
+  const answer = Math.round((both+bOnly)*100)/100;
+  return {
+    prompt: `На рисунке изображена диаграмма Эйлера для случайных событий A и B в некотором случайном опыте с равновозможными исходами. В каждой из четырёх областей указана вероятность соответствующего события. Найдите вероятность события B.${buildEulerRegionsSVG(outside,aOnly,both,bOnly,'prob')}`,
+    answer,
+    explain: `Событие B — это объединение области «только B» и области пересечения A и B. P(B) = ${fmtRu(bOnly)} + ${fmtRu(both)} = ${fmtRu(answer)}.`,
+    simple:true
+  };
+}
+
+/* ─── диаграмма Эйлера: количество исходов в 4 областях ─── */
+function gen_type25(){
+  const total = pick([40,50,80,100,20,25,16]);
+  const [outside,aOnly,both,bOnly] = splitN(total,4);
+  const answer = Math.round((aOnly/total)*10000)/10000;
+  return {
+    prompt: `На рисунке изображена диаграмма Эйлера для случайных событий A и B в некотором случайном опыте с равновозможными исходами. В каждой области указано, сколько исходов принадлежит этой области. Найдите вероятность события A ∩ <span style="text-decoration:overline">B</span>.${buildEulerRegionsSVG(outside,aOnly,both,bOnly,'count')}`,
+    answer,
+    explain: `Событие A∩B̅ — это область «только A», в ней ${aOnly} исходов. Всего исходов — ${outside}+${aOnly}+${both}+${bOnly} = ${total}. P = ${aOnly}⁄${total} = ${fmtRu(answer)}.`,
+    simple:true
+  };
+}
+
+/* ─── диаграмма Эйлера: точки с вероятностями рядом с каждой ─── */
+const EULER_DIST8 = [[1,2,3,2],[2,2,2,2],[1,3,2,2],[2,1,3,2],[3,2,1,2],[2,3,1,2]];
+function gen_type26(){
+  const dist = pick(EULER_DIST8);
+  const keys = ['outside','aOnly','both','bOnly'];
+  const totalPts = dist.reduce((a,b)=>a+b,0);
+  const percents = splitN(100,totalPts);
+  let i=0;
+  const groups = {outside:[],aOnly:[],both:[],bOnly:[]};
+  keys.forEach((key,gi)=>{ for(let k=0;k<dist[gi];k++){ groups[key].push(percents[i]/100); i++; } });
+  const points = [];
+  keys.forEach(key=>{ groups[key].forEach((v,idx)=>{ const [x,y]=EULER_SLOTS[key][idx]; points.push({x,y,v}); }); });
+  const outsideVals = groups.outside;
+  const answer = Math.round(outsideVals.reduce((a,b)=>a+b,0)*100)/100;
+  return {
+    prompt: `На рисунке изображена диаграмма Эйлера для случайных событий A и B в некотором случайном опыте с равновозможными исходами. Точками показаны все элементарные события и около каждого указана его вероятность. Найдите вероятность события <span style="text-decoration:overline">A∪B</span>.${buildEulerDotsSVG(points,'prob')}`,
+    answer,
+    explain: `Событие «ни A, ни B» — это точки вне обоих кругов. Складываем их вероятности: ${outsideVals.map(fmtRu).join(' + ')} = ${fmtRu(answer)}.`,
+    simple:true
+  };
+}
+
+/* ─── диаграмма Эйлера: точки без вероятностей, все равновозможны ─── */
+const EULER_DIST10 = [[2,3,2,3],[3,2,3,2],[2,2,3,3],[3,3,2,2],[2,4,2,2],[2,2,2,4]];
+function gen_type27(){
+  const dist = pick(EULER_DIST10);
+  const keys = ['outside','aOnly','both','bOnly'];
+  const total = dist.reduce((a,b)=>a+b,0);
+  const favorable = dist[3]; // bOnly
+  const points = [];
+  keys.forEach((key,gi)=>{ for(let k=0;k<dist[gi];k++){ const [x,y]=EULER_SLOTS[key][k]; points.push({x,y}); } });
+  const answer = Math.round((favorable/total)*10000)/10000;
+  return {
+    prompt: `На рисунке изображена диаграмма Эйлера для случайных событий A и B в некотором случайном опыте. Точками показаны все равновозможные элементарные события опыта. Найдите вероятность события <span style="text-decoration:overline">A</span>∩B.${buildEulerDotsSVG(points,'count')}`,
+    answer,
+    explain: `Событие «не A, но B» — это точки в области B без пересечения с A, их ${favorable}. Всего точек — ${total}. P = ${favorable}⁄${total} = ${fmtRu(answer)}.`,
+    simple:true
+  };
+}
+
+/* ═══════════════ объединение совпадающих по смыслу прототипов ═══════════════
+   Несколько типов оказались, по сути, одной и той же задачей в разной
+   словесной обёртке — вместо отдельных пунктов в списке они теперь один
+   пункт, который каждый раз случайно выбирает один из исходных сценариев.
+   Сама математика/генерация чисел внутри каждого сценария не менялась. */
+function gen_merged_categorical(){ return pick([gen_type1, gen_type2])(); }
+function gen_merged_complement(){ return pick([gen_type3, gen_type4, gen_type5, gen_type12, gen_type13, gen_type17, gen_type18])(); }
+function gen_merged_or_two(){ return pick([gen_type14, gen_type16])(); }
+function gen_merged_dice_sum(){ return pick([gen_type7, gen_type20])(); }
+function gen_merged_euler_regions(){ return pick([gen_type24, gen_type25])(); }
+function gen_merged_euler_dots(){ return pick([gen_type26, gen_type27])(); }
+
 /* ═══════════════ реестр типов ═══════════════ */
 const MODES = [
-  { id:'type1', title:'Тип 1', gen:gen_type1 },
-  { id:'type2', title:'Тип 2', gen:gen_type2 },
-  { id:'type3', title:'Тип 3', gen:gen_type3 },
-  { id:'type4', title:'Тип 4', gen:gen_type4 },
-  { id:'type5', title:'Тип 5', gen:gen_type5 },
-  { id:'type6', title:'Тип 6', gen:gen_type6 },
-  { id:'type7', title:'Тип 7', gen:gen_type7 },
-  { id:'type8', title:'Тип 8', gen:gen_type8 },
-  { id:'type9', title:'Тип 9', gen:gen_type9 },
-  { id:'type10', title:'Тип 10', gen:gen_type10 },
-  { id:'type11', title:'Тип 11', gen:gen_type11 },
+  { id:'type1', title:'Тип 1', gen:gen_merged_categorical },
+  { id:'type2', title:'Тип 2', gen:gen_merged_complement },
+  { id:'type3', title:'Тип 3', gen:gen_type6 },
+  { id:'type4', title:'Тип 4', gen:gen_merged_dice_sum },
+  { id:'type5', title:'Тип 5', gen:gen_type8 },
+  { id:'type6', title:'Тип 6', gen:gen_type9 },
+  { id:'type7', title:'Тип 7', gen:gen_type10 },
+  { id:'type8', title:'Тип 8', gen:gen_type11 },
+  { id:'type9', title:'Тип 9', gen:gen_merged_or_two },
+  { id:'type10', title:'Тип 10', gen:gen_type15 },
+  { id:'type11', title:'Тип 11', gen:gen_type19 },
+  { id:'type12', title:'Тип 12', gen:gen_type21 },
+  { id:'type13', title:'Тип 13', gen:gen_type22 },
+  { id:'type14', title:'Тип 14', gen:gen_type23 },
+  { id:'type15', title:'Тип 15', gen:gen_merged_euler_regions },
+  { id:'type16', title:'Тип 16', gen:gen_merged_euler_dots },
 ];
 
 const SHARED_PLAN = `Вероятность равна отношению количества благоприятных исходов к общему числу исходов: P = благоприятные ⁄ все. Сначала сам определи оба числа и запиши дробь, а затем раздели её в столбик, чтобы получить десятичный ответ.`;
@@ -938,7 +1445,8 @@ const SHARED_PLAN = `Вероятность равна отношению кол
 /* ═══════════════ управление ═══════════════ */
 let totalSolved=0, streak=0, totalErrors=0;
 let curMode=null, curTask=null, stepIdx=0;
-let taskAnswered=false, stepsDone=false, finalErrStep=0;
+let taskAnswered=false, stepsDone=false, finalErrStep=0, solutionShown=false;
+let curSubMode='practice', examAttempts=0;
 
 const els = {
   picker: document.getElementById('pickerArea'),
@@ -947,6 +1455,10 @@ const els = {
   backBtn: document.getElementById('backBtn'),
   taskTitle: document.getElementById('taskTitle'),
   refreshBtn: document.getElementById('refreshBtn'),
+  prevTypeBtn: document.getElementById('prevTypeBtn'),
+  nextTypeBtn: document.getElementById('nextTypeBtn'),
+  tabPractice: document.getElementById('tabPractice'),
+  tabExam: document.getElementById('tabExam'),
   questionPanel: document.getElementById('questionPanel'),
   questionPromptText: document.getElementById('questionPromptText'),
   planPanel: document.getElementById('planPanel'),
@@ -967,6 +1479,7 @@ const els = {
   finalInput: document.getElementById('finalInput'),
   finalGo: document.getElementById('finalGo'),
   finalHint: document.getElementById('finalHint'),
+  showSolutionBtn: document.getElementById('showSolutionBtn'),
   mainPanel: document.getElementById('mainPanel'),
   explainBox: document.getElementById('explainBox'),
   nextBtn: document.getElementById('nextBtn'),
@@ -1005,8 +1518,21 @@ function startMode(id){
   els.taskArea.style.display='block';
   const m = id==='random' ? null : MODES.find(x=>x.id===id);
   els.taskTitle.textContent = m ? m.title : 'Все типы вперемешку';
+  const showNav = id!=='random';
+  els.prevTypeBtn.style.display = showNav ? 'inline-flex' : 'none';
+  els.nextTypeBtn.style.display = showNav ? 'inline-flex' : 'none';
   newTask();
 }
+function navigateType(delta){
+  const idx = MODES.findIndex(x=>x.id===curMode);
+  if(idx===-1) return; // в «случайно» стрелки скрыты
+  const newIdx = (idx + delta + MODES.length) % MODES.length;
+  curMode = MODES[newIdx].id;
+  els.taskTitle.textContent = MODES[newIdx].title;
+  newTask();
+}
+els.prevTypeBtn.onclick = ()=>navigateType(-1);
+els.nextTypeBtn.onclick = ()=>navigateType(1);
 els.backBtn.onclick = ()=>{
   els.taskArea.style.display='none';
   els.picker.style.display='block';
@@ -1015,6 +1541,15 @@ els.backBtn.onclick = ()=>{
 };
 els.refreshBtn.onclick = newTask;
 
+function switchSubMode(mode){
+  curSubMode = mode;
+  els.tabPractice.classList.toggle('active', mode==='practice');
+  els.tabExam.classList.toggle('active', mode==='exam');
+  newTask();
+}
+els.tabPractice.onclick = ()=>switchSubMode('practice');
+els.tabExam.onclick = ()=>switchSubMode('exam');
+
 function newTask(){
   const m = curMode==='random' ? pick(MODES) : MODES.find(x=>x.id===curMode);
   curTask = m.gen();
@@ -1022,15 +1557,8 @@ function newTask(){
   taskAnswered = false;
   stepsDone = false;
   finalErrStep = 0;
-
-  curTask.steps = [
-    { type:'fracfill2',
-      question:`Вероятность равна отношению количества благоприятных исходов к общему числу исходов. Впиши дробь сам:`,
-      num: curTask.favorable, den: curTask.total },
-    { type:'div', dividend:String(curTask.favorable), divisor:curTask.total, decimal:true,
-      maxDecimalDigits: decimalDigitsOf(curTask.answer),
-      question:`Разделим дробь в столбик, чтобы получить десятичную вероятность.` },
-  ];
+  examAttempts = 0;
+  solutionShown = false;
 
   // страница всегда открывается на тексте задания, а не на месте прошлого скролла
   window.scrollTo(0,0);
@@ -1038,13 +1566,9 @@ function newTask(){
   els.questionPanel.style.display='block';
   els.questionPromptText.innerHTML = curTask.prompt;
 
-  els.planPanel.style.display='block';
-  els.planText.innerHTML = `<b>План решения.</b> ${SHARED_PLAN}`;
-
   els.fracPanel.style.display='none';
   els.sheetArea.style.display='none';
   els.qaPanel.style.display='none';
-  els.finalPanel.style.display='none';
   els.finalInput.disabled=false;
   els.finalGo.disabled=false;
 
@@ -1052,8 +1576,64 @@ function newTask(){
   els.nextBtn.style.display='none';
   els.explainBox.style.display='none';
 
-  runStep();
+  if (curSubMode === 'exam') {
+    // экзамен: для ЛЮБОГО типа — сразу поле ответа, без пошаговых подсказок.
+    // Кнопка «показать решение» появится только после 5 неверных попыток.
+    curTask.steps = [];
+    els.planPanel.style.display='none';
+    els.showSolutionBtn.style.display='none';
+    els.showSolutionBtn.textContent = 'Показать решение и ответ';
+    els.showSolutionBtn.onclick = null;
+    showFinalPanel();
+  } else if (curTask.simple) {
+    // тренировка, упрощённые типы (без пошаговой дроби/деления в столбик) —
+    // сразу предлагаем вписать итоговый ответ, а решение можно посмотреть по кнопке
+    curTask.steps = [];
+    els.planPanel.style.display='none';
+    els.showSolutionBtn.style.display='block';
+    els.showSolutionBtn.textContent = 'Показать решение и ответ';
+    els.showSolutionBtn.onclick = ()=>{
+      if (taskAnswered) return;
+      if (solutionShown) hideSolution(); else revealSolution();
+    };
+    showFinalPanel();
+  } else {
+    els.showSolutionBtn.style.display='none';
+    els.planPanel.style.display='block';
+    els.planText.innerHTML = `<b>План решения.</b> ${SHARED_PLAN}`;
+    els.finalPanel.style.display='none';
+    curTask.steps = [
+      { type:'fracfill2',
+        question:`Вероятность равна отношению количества благоприятных исходов к общему числу исходов. Впиши дробь сам:`,
+        num: curTask.favorable, den: curTask.total },
+      { type:'div', dividend:String(curTask.favorable), divisor:curTask.total, decimal:true,
+        maxDecimalDigits: decimalDigitsOf(curTask.answer),
+        question:`Разделим дробь в столбик, чтобы получить десятичную вероятность.` },
+    ];
+    runStep();
+  }
 }
+
+function revealSolution(){
+  solutionShown = true;
+  els.showSolutionBtn.textContent = 'Скрыть решение и ответ';
+  els.mainPanel.style.display='block';
+  els.explainBox.style.display='block';
+  els.explainBox.innerHTML = `<b>Решение:</b> ${curTask.explain}`;
+  els.nextBtn.style.display='block';
+  els.mainPanel.classList.remove('reveal');
+  void els.mainPanel.offsetWidth;
+  els.mainPanel.classList.add('reveal');
+}
+function hideSolution(){
+  solutionShown = false;
+  els.showSolutionBtn.textContent = 'Показать решение и ответ';
+  els.mainPanel.style.display='none';
+  els.explainBox.style.display='none';
+  els.nextBtn.style.display='none';
+}
+/* els.showSolutionBtn.onclick назначается в newTask() отдельно для каждого
+   режима (тренировка/экзамен) — см. выше */
 
 function runStep(){
   if(taskAnswered) return;
@@ -1103,17 +1683,34 @@ function submitFinal(){
   if(raw==='') return;
   const ok = normDec(raw) === normDec(curTask.answer);
   if(!ok){
-    finalErrStep++;
     totalErrors++; els.stErrors.textContent = totalErrors;
     streak = 0; els.stStreak.textContent = streak;
     els.finalInput.classList.remove('shake'); void els.finalInput.offsetWidth; els.finalInput.classList.add('shake');
-    if(finalErrStep>=3){
-      els.finalHint.textContent = `Правильный ответ: ${fmtRu(curTask.answer)}.`;
-      els.finalHint.className='hint';
-      finishRound();
+    if(curSubMode==='exam'){
+      examAttempts++;
+      const left = 5 - examAttempts;
+      if(left<=0){
+        els.finalHint.textContent = 'Попытки закончились — можешь посмотреть решение.';
+        els.finalHint.className='hint';
+        els.finalInput.disabled = true;
+        els.finalGo.disabled = true;
+        els.showSolutionBtn.style.display='block';
+        els.showSolutionBtn.textContent = 'Показать решение и ответ';
+        els.showSolutionBtn.onclick = finishRound;
+      } else {
+        els.finalHint.textContent = `Неверно. Осталось попыток: ${left}.`;
+        els.finalHint.className='hint';
+      }
     } else {
-      els.finalHint.textContent='Попробуй ещё раз.';
-      els.finalHint.className='hint';
+      finalErrStep++;
+      if(finalErrStep>=3){
+        els.finalHint.textContent = `Правильный ответ: ${fmtRu(curTask.answer)}.`;
+        els.finalHint.className='hint';
+        finishRound();
+      } else {
+        els.finalHint.textContent='Попробуй ещё раз.';
+        els.finalHint.className='hint';
+      }
     }
     els.finalInput.value=''; els.finalInput.focus({preventScroll:true});
     return;
@@ -1136,6 +1733,7 @@ function finishRound(){
 }
 
 function finishTask(){
+  els.showSolutionBtn.style.display='none';
   const fading = [els.sheetArea, els.qaPanel, els.planPanel, els.fracPanel, els.finalPanel].filter(el=>el.style.display!=='none');
   fading.forEach(el=>el.classList.add('fade-out'));
   setTimeout(()=>{
@@ -1172,6 +1770,51 @@ function setupFloatingKeypad(){
   });
   document.getElementById('kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(); };
   document.getElementById('kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(); };
+  makeKeypadDraggable(document.getElementById('keypadFloat'), document.getElementById('kpDragHandle'));
+}
+function makeKeypadDraggable(floatEl, handleEl){
+  if(!floatEl || !handleEl || floatEl._dragReady) return;
+  floatEl._dragReady = true;
+  let dragging = false, offsetX = 0, offsetY = 0;
+  function clamp(x, y){
+    const w = floatEl.offsetWidth, h = floatEl.offsetHeight;
+    const maxX = Math.max(4, window.innerWidth - w - 4);
+    const maxY = Math.max(4, window.innerHeight - h - 4);
+    return { x: Math.min(Math.max(x, 4), maxX), y: Math.min(Math.max(y, 4), maxY) };
+  }
+  function onPointerDown(e){
+    dragging = true;
+    const rect = floatEl.getBoundingClientRect();
+    floatEl.style.left = rect.left + 'px';
+    floatEl.style.top = rect.top + 'px';
+    floatEl.style.right = 'auto';
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    try{ handleEl.setPointerCapture(e.pointerId); }catch(err){}
+    e.preventDefault();
+  }
+  function onPointerMove(e){
+    if(!dragging) return;
+    const pos = clamp(e.clientX - offsetX, e.clientY - offsetY);
+    floatEl.style.left = pos.x + 'px';
+    floatEl.style.top = pos.y + 'px';
+  }
+  function onPointerUp(e){
+    dragging = false;
+    try{ handleEl.releasePointerCapture(e.pointerId); }catch(err){}
+  }
+  handleEl.addEventListener('pointerdown', onPointerDown);
+  handleEl.addEventListener('pointermove', onPointerMove);
+  handleEl.addEventListener('pointerup', onPointerUp);
+  handleEl.addEventListener('pointercancel', onPointerUp);
+  window.addEventListener('resize', ()=>{
+    if(floatEl.style.left && floatEl.style.left!=='auto'){
+      const rect = floatEl.getBoundingClientRect();
+      const pos = clamp(rect.left, rect.top);
+      floatEl.style.left = pos.x + 'px';
+      floatEl.style.top = pos.y + 'px';
+    }
+  });
 }
 let activeStepInput = null;
 document.addEventListener('focusin', e=>{
@@ -1210,5 +1853,546 @@ function syncKeypadVisibility(){
 renderPicker();
 setupFloatingKeypad();
 </script>
-</body>
-</html>
+
+
+
+<script>
+/* ═══════════════ интерактивная доска на фоне ═══════════════ */
+(function(){
+  const canvas = document.getElementById('boardCanvas');
+  const ctx = canvas.getContext('2d');
+  // отдельный оффскрин-слой только для чернил: ластик (destination-out) стирает
+  // содержимое ТОЛЬКО этого слоя, а сетка рисуется отдельно на основном холсте
+  // и затем чернила накладываются сверху обычным source-over — так ластик
+  // больше не «прогрызает» дыры в клетчатой сетке
+  const inkCanvas = document.createElement('canvas');
+  const inkCtx = inkCanvas.getContext('2d');
+  const toolbar = document.getElementById('boardToolbar');
+  const zoomResetBtn = document.getElementById('zoomResetBtn');
+
+  // ═══ модель данных: штрихи хранятся в «мировых» координатах (=координаты
+  // документа, как обычный page-scroll), а не в пикселях экрана. Холст же —
+  // это просто окно viewport-размера, которое на каждый кадр перерисовывает
+  // видимый кусок этого мира с учётом прокрутки страницы, панорамирования
+  // и масштаба. Так рисунок всегда остаётся «приклеен» к странице, а зум
+  // по-настоящему приближает/отдаляет содержимое, а не просто холст. ═══
+
+  let tool = 'pen';          // 'pen' | 'eraser' | 'line' | 'hand'
+  let penWidth = 2;          // тонкая по умолчанию
+  let penColor = '#000000';  // чёрный по умолчанию
+  let eraserSize = 26;       // средний ластик по умолчанию
+  let dpr = Math.max(1, window.devicePixelRatio || 1);
+
+  let strokes = [];          // завершённые штрихи: {tool,color,width,points:[{x,y}...]}
+  let currentStroke = null;  // штрих, который рисуется прямо сейчас (для живого превью)
+  const UNDO_LIMIT = 60;
+  const undoStack = [];      // снимки массива strokes (лёгкие — это просто точки, не пиксели)
+
+  // ── масштаб и панорамирование (в «мировых» пикселях) ──
+  let viewScale = 1, panX = 0, panY = 0;
+  const ZOOM_MIN = 0.5, ZOOM_MAX = 3, ZOOM_STEP = 1.2;
+
+  function worldToScreenTransform(){
+    // screen = (world - scroll - pan) * viewScale, всё затем ещё раз умножается на dpr
+    const s = viewScale * dpr;
+    return [s, 0, 0, s, -(window.scrollX + panX) * s, -(window.scrollY + panY) * s];
+  }
+  function screenToWorld(clientX, clientY){
+    return {
+      x: clientX / viewScale + window.scrollX + panX,
+      y: clientY / viewScale + window.scrollY + panY,
+    };
+  }
+
+  function resizeCanvas(){
+    dpr = Math.max(1, window.devicePixelRatio || 1);
+    const w = window.innerWidth, h = window.innerHeight;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    inkCanvas.width = canvas.width;
+    inkCanvas.height = canvas.height;
+    redraw();
+  }
+
+  function drawStroke(targetCtx, s){
+    if (!s || s.points.length === 0) return;
+    targetCtx.save();
+    targetCtx.globalCompositeOperation = (s.tool === 'eraser') ? 'destination-out' : 'source-over';
+    targetCtx.strokeStyle = s.color || '#000';
+    targetCtx.lineWidth = s.width;
+    targetCtx.lineCap = 'round';
+    targetCtx.lineJoin = 'round';
+    const pts = s.points;
+    targetCtx.beginPath();
+    if (pts.length === 1) {
+      // одиночная точка — рисуем короткий отрезок «на месте»
+      const p = pts[0];
+      targetCtx.moveTo(p.x, p.y);
+      targetCtx.lineTo(p.x + 0.01, p.y + 0.01);
+    } else if (pts.length === 2) {
+      // ровно 2 точки — это либо инструмент «линия» (должна остаться идеально
+      // прямой), либо очень короткий росчерк, где сглаживать нечего
+      targetCtx.moveTo(pts[0].x, pts[0].y);
+      targetCtx.lineTo(pts[1].x, pts[1].y);
+    } else {
+      // сглаживание через квадратичные кривые по серединам отрезков —
+      // стандартный приём для рисования от руки: убирает «углы» на изломах,
+      // не требуя менять сами записанные точки
+      targetCtx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length - 1; i++) {
+        const midX = (pts[i].x + pts[i + 1].x) / 2;
+        const midY = (pts[i].y + pts[i + 1].y) / 2;
+        targetCtx.quadraticCurveTo(pts[i].x, pts[i].y, midX, midY);
+      }
+      const last = pts[pts.length - 1];
+      const prev = pts[pts.length - 2];
+      targetCtx.quadraticCurveTo(prev.x, prev.y, last.x, last.y);
+    }
+    targetCtx.stroke();
+    targetCtx.restore();
+  }
+
+  let redrawScheduled = false;
+  const GRID_SIZE = 24; // мировые единицы — тот же шаг, что раньше был у CSS-сетки на фоне
+
+  function drawGrid(){
+    const topLeft = screenToWorld(0, 0);
+    const bottomRight = screenToWorld(window.innerWidth, window.innerHeight);
+    const gridColor = (getComputedStyle(document.documentElement).getPropertyValue('--grid') || '#DCE4F0').trim();
+    const startX = Math.floor(topLeft.x / GRID_SIZE) * GRID_SIZE;
+    const startY = Math.floor(topLeft.y / GRID_SIZE) * GRID_SIZE;
+    ctx.save();
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = startX; x <= bottomRight.x; x += GRID_SIZE) {
+      ctx.moveTo(x, topLeft.y);
+      ctx.lineTo(x, bottomRight.y);
+    }
+    for (let y = startY; y <= bottomRight.y; y += GRID_SIZE) {
+      ctx.moveTo(topLeft.x, y);
+      ctx.lineTo(bottomRight.x, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function redraw(){
+    if (redrawScheduled) return;
+    redrawScheduled = true;
+    requestAnimationFrame(()=>{
+      redrawScheduled = false;
+      const m = worldToScreenTransform();
+
+      // 1) чернила — на отдельном слое, чтобы ластик (destination-out) стирал
+      // только их, а не сетку под ними
+      inkCtx.save();
+      inkCtx.setTransform(1, 0, 0, 1, 0, 0);
+      inkCtx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
+      inkCtx.restore();
+      inkCtx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+      for (const s of strokes) drawStroke(inkCtx, s);
+      if (currentStroke) drawStroke(inkCtx, currentStroke);
+
+      // 2) основной холст: сетка, затем чернила поверх обычным наложением
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+      ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+      drawGrid();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(inkCanvas, 0, 0);
+    });
+  }
+
+  function pushUndo(){
+    undoStack.push(strokes.slice());
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  }
+  function undo(){
+    if (undoStack.length === 0) return;
+    strokes = undoStack.pop();
+    redraw();
+  }
+  function clearBoard(){
+    pushUndo();
+    strokes = [];
+    redraw();
+  }
+
+  // ── панорамирование: средняя ИЛИ правая кнопка мыши, ИЛИ инструмент «рука» + левая кнопка ──
+  let panning = false;
+  let panStartClientX = 0, panStartClientY = 0, panStartPanX = 0, panStartPanY = 0;
+
+  function startPan(e){
+    panning = true;
+    try { canvas.setPointerCapture(e.pointerId); } catch(_){}
+    panStartClientX = e.clientX; panStartClientY = e.clientY;
+    panStartPanX = panX; panStartPanY = panY;
+    updateCursor();
+  }
+  function updateCursor(){
+    canvas.style.cursor = panning ? 'grabbing' : (tool === 'hand' ? 'grab' : 'crosshair');
+  }
+
+  let drawing = false;
+
+  canvas.addEventListener('contextmenu', e=> e.preventDefault()); // правая кнопка теперь двигает доску, а не открывает системное меню
+  canvas.addEventListener('pointerdown', e=>{
+    if (e.button === 1 || e.button === 2) { startPan(e); e.preventDefault(); return; } // средняя ИЛИ правая кнопка — панорамирование
+    if (tool === 'hand') {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      startPan(e); e.preventDefault(); return;
+    }
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+    drawing = true;
+    try { canvas.setPointerCapture(e.pointerId); } catch(_){}
+    pushUndo();
+    const p = screenToWorld(e.clientX, e.clientY);
+    if (tool === 'line') {
+      currentStroke = { tool: 'line', color: penColor, width: penWidth, points: [p, p] };
+    } else if (tool === 'eraser') {
+      currentStroke = { tool: 'eraser', width: eraserSize, points: [p] };
+    } else {
+      currentStroke = { tool: 'pen', color: penColor, width: penWidth, points: [p] };
+    }
+    redraw();
+    e.preventDefault();
+  });
+
+  canvas.addEventListener('pointermove', e=>{
+    if (panning) {
+      panX = panStartPanX - (e.clientX - panStartClientX) / viewScale;
+      panY = panStartPanY - (e.clientY - panStartClientY) / viewScale;
+      redraw();
+      e.preventDefault();
+      return;
+    }
+    if (!drawing || !currentStroke) return;
+    if (tool === 'line') {
+      const p = screenToWorld(e.clientX, e.clientY);
+      currentStroke.points[1] = p; // линия — всегда ровно 2 точки: старт и текущая
+    } else {
+      // getCoalescedEvents() восстанавливает промежуточные точки, которые браузер
+      // «схлопнул» при быстром движении мыши/пера — это повышает эффективную
+      // частоту дискретизации и вместе со сглаживанием в drawStroke() даёт
+      // заметно менее угловатую линию
+      const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+      const list = events.length ? events : [e];
+      for (const ev of list) {
+        const p = screenToWorld(ev.clientX, ev.clientY);
+        currentStroke.points.push(p);
+      }
+    }
+    redraw();
+    e.preventDefault();
+  });
+
+  function endStroke(e){
+    if (panning) {
+      panning = false;
+      try { canvas.releasePointerCapture(e.pointerId); } catch(_){}
+      updateCursor();
+      return;
+    }
+    if (!drawing) return;
+    drawing = false;
+    if (currentStroke) {
+      // на случай, если pointerup пришёл без предшествующего pointermove
+      // ровно в этой точке — досчитываем финальную позицию по самому событию
+      if (typeof e.clientX === 'number') {
+        const p = screenToWorld(e.clientX, e.clientY);
+        if (tool === 'line') currentStroke.points[1] = p;
+        else currentStroke.points.push(p);
+      }
+      strokes.push(currentStroke);
+      currentStroke = null;
+    }
+    try { canvas.releasePointerCapture(e.pointerId); } catch(_){}
+    redraw();
+  }
+  canvas.addEventListener('pointerup', endStroke);
+  canvas.addEventListener('pointercancel', endStroke);
+
+  // ── инструменты (ручка/ластик/линия/рука) — общая группа, активен ровно один ──
+  // кнопка «рука» лежит в отдельной (второй) панели, поэтому ищем по всему документу
+  const toolBtns = [...document.querySelectorAll('[data-tool]')];
+  const eraserMainBtn = toolbar.querySelector('.eraser');
+  const penMainBtn = toolbar.querySelector('.pen-main');
+
+  function setActiveTool(btn){
+    toolBtns.forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    if (btn.dataset.tool === 'eraser' && btn !== eraserMainBtn) {
+      eraserMainBtn.classList.add('active');
+    }
+    if (btn.dataset.tool === 'pen' && btn !== penMainBtn) {
+      penMainBtn.classList.add('active');
+    }
+  }
+
+  toolBtns.forEach(btn=>{
+    btn.onclick = ()=>{
+      setActiveTool(btn);
+      const t = btn.dataset.tool;
+      if (t === 'pen') {
+        tool = 'pen';
+        if (btn.dataset.width) penWidth = Number(btn.dataset.width);
+      } else if (t === 'line') {
+        tool = 'line';
+      } else if (t === 'eraser') {
+        tool = 'eraser';
+        if (btn.dataset.size) eraserSize = Number(btn.dataset.size);
+      } else if (t === 'hand') {
+        tool = 'hand';
+      }
+      updateCursor();
+    };
+  });
+
+  // ── всплывающие окошки с размерами (ручка/ластик): наведение показывает,
+  // уход прячет — но с небольшой задержкой, чтобы курсор успевал доехать до
+  // окошка, даже если путь неидеально прямой ──
+  const HOVER_HIDE_DELAY = 350;
+  [...document.querySelectorAll('.tool-group')].forEach(group=>{
+    const flyout = group.querySelector('.size-flyout');
+    if (!flyout) return;
+    let hideTimer = null;
+    function show(){ clearTimeout(hideTimer); flyout.classList.add('open'); }
+    function scheduleHide(){ clearTimeout(hideTimer); hideTimer = setTimeout(()=> flyout.classList.remove('open'), HOVER_HIDE_DELAY); }
+    group.addEventListener('mouseenter', show);
+    group.addEventListener('mouseleave', scheduleHide);
+    flyout.addEventListener('mouseenter', show);
+    flyout.addEventListener('mouseleave', scheduleHide);
+  });
+
+  // ── цвет ручки — независимая группа ──
+  const colorBtns = [...toolbar.querySelectorAll('[data-color]')];
+  const firstPenBtn = toolbar.querySelector('[data-tool="pen"][data-width]');
+  colorBtns.forEach(btn=>{
+    btn.onclick = ()=>{
+      colorBtns.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      penColor = btn.dataset.color;
+      tool = 'pen';
+      const widthBtn = toolbar.querySelector(`[data-tool="pen"][data-width="${penWidth}"]`) || firstPenBtn;
+      setActiveTool(widthBtn);
+    };
+  });
+
+  // ── «свой» цвет: SV-квадрат + слайдер оттенка + RGB-поля + пипетка ──
+  function hsvToRgb(h, s, v){
+    h = ((h % 360) + 360) % 360;
+    const c = v * s;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = v - c;
+    let r = 0, g = 0, b = 0;
+    if (h < 60) { r = c; g = x; b = 0; }
+    else if (h < 120) { r = x; g = c; b = 0; }
+    else if (h < 180) { r = 0; g = c; b = x; }
+    else if (h < 240) { r = 0; g = x; b = c; }
+    else if (h < 300) { r = x; g = 0; b = c; }
+    else { r = c; g = 0; b = x; }
+    return { r: Math.round((r + m) * 255), g: Math.round((g + m) * 255), b: Math.round((b + m) * 255) };
+  }
+  function rgbToHsv(r, g, b){
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+    let h = 0;
+    if (d !== 0) {
+      if (max === r) h = 60 * (((g - b) / d) % 6);
+      else if (max === g) h = 60 * ((b - r) / d + 2);
+      else h = 60 * ((r - g) / d + 4);
+    }
+    if (h < 0) h += 360;
+    return { h, s: max === 0 ? 0 : d / max, v: max };
+  }
+  function rgbToHex(r, g, b){
+    return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('').toUpperCase();
+  }
+  function hexToRgb(hex){
+    const m = /^#?([0-9a-f]{6})$/i.exec((hex || '').trim());
+    if (!m) return null;
+    const n = parseInt(m[1], 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+
+  const customColorBtn = document.getElementById('customColorBtn');
+  const customColorDot = document.getElementById('customColorDot');
+  const cpSvCanvas = document.getElementById('cpSvCanvas');
+  const cpSvCtx = cpSvCanvas.getContext('2d');
+  const cpSvThumb = document.getElementById('cpSvThumb');
+  const cpHue = document.getElementById('cpHue');
+  const cpHueThumb = document.getElementById('cpHueThumb');
+  const cpSwatch = document.getElementById('cpSwatch');
+  const cpEyedropper = document.getElementById('cpEyedropper');
+  const cpR = document.getElementById('cpR'), cpG = document.getElementById('cpG'), cpB = document.getElementById('cpB');
+
+  let customHue = 280, customSat = 0.71, customVal = 0.87; // стартовый фиолетовый — просто заготовка на будущее
+
+  function renderSvSquare(){
+    const w = cpSvCanvas.width, h = cpSvCanvas.height;
+    const hc = hsvToRgb(customHue, 1, 1);
+    cpSvCtx.fillStyle = `rgb(${hc.r},${hc.g},${hc.b})`;
+    cpSvCtx.fillRect(0, 0, w, h);
+    const wg = cpSvCtx.createLinearGradient(0, 0, w, 0);
+    wg.addColorStop(0, 'rgba(255,255,255,1)');
+    wg.addColorStop(1, 'rgba(255,255,255,0)');
+    cpSvCtx.fillStyle = wg;
+    cpSvCtx.fillRect(0, 0, w, h);
+    const bg = cpSvCtx.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, 'rgba(0,0,0,0)');
+    bg.addColorStop(1, 'rgba(0,0,0,1)');
+    cpSvCtx.fillStyle = bg;
+    cpSvCtx.fillRect(0, 0, w, h);
+  }
+  function updateCpThumbs(){
+    cpSvThumb.style.left = (customSat * 100) + '%';
+    cpSvThumb.style.top = ((1 - customVal) * 100) + '%';
+    cpHueThumb.style.left = (customHue / 360 * 100) + '%';
+  }
+  // opts.updateInputs=false — не перезаписывать RGB-поля (когда цвет и так пришёл из них)
+  // opts.activate=false — только обновить визуал кнопки/окошка, не делать цвет активным цветом пера
+  function setCustomColor(rgb, opts){
+    opts = opts || {};
+    const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+    customColorBtn.dataset.color = hex;
+    cpSwatch.style.background = hex;
+    customColorDot.style.background = hex;
+    if (opts.updateInputs !== false) { cpR.value = rgb.r; cpG.value = rgb.g; cpB.value = rgb.b; }
+    updateCpThumbs();
+    if (opts.activate !== false) customColorBtn.click(); // переиспользуем обычный обработчик цветовых кнопок
+    return hex;
+  }
+
+  renderSvSquare();
+  setCustomColor(hsvToRgb(customHue, customSat, customVal), { activate: false });
+
+  let svDragging = false;
+  function pickFromSv(e){
+    const rect = cpSvCanvas.getBoundingClientRect();
+    customSat = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    customVal = 1 - Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    setCustomColor(hsvToRgb(customHue, customSat, customVal));
+  }
+  cpSvCanvas.addEventListener('pointerdown', e=>{
+    svDragging = true;
+    cpSvCanvas.setPointerCapture(e.pointerId);
+    pickFromSv(e);
+    e.preventDefault(); e.stopPropagation();
+  });
+  cpSvCanvas.addEventListener('pointermove', e=>{
+    if (!svDragging) return;
+    pickFromSv(e);
+    e.preventDefault(); e.stopPropagation();
+  });
+  cpSvCanvas.addEventListener('pointerup', e=>{
+    svDragging = false;
+    try { cpSvCanvas.releasePointerCapture(e.pointerId); } catch(_){}
+    e.stopPropagation();
+  });
+
+  let hueDragging = false;
+  function pickFromHue(e){
+    const rect = cpHue.getBoundingClientRect();
+    customHue = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * 360;
+    renderSvSquare();
+    setCustomColor(hsvToRgb(customHue, customSat, customVal));
+  }
+  cpHue.addEventListener('pointerdown', e=>{
+    hueDragging = true;
+    cpHue.setPointerCapture(e.pointerId);
+    pickFromHue(e);
+    e.preventDefault(); e.stopPropagation();
+  });
+  cpHue.addEventListener('pointermove', e=>{
+    if (!hueDragging) return;
+    pickFromHue(e);
+    e.preventDefault(); e.stopPropagation();
+  });
+  cpHue.addEventListener('pointerup', e=>{
+    hueDragging = false;
+    try { cpHue.releasePointerCapture(e.pointerId); } catch(_){}
+    e.stopPropagation();
+  });
+
+  function clampByte(n){
+    n = Math.round(Number(n));
+    if (!Number.isFinite(n)) n = 0;
+    return Math.max(0, Math.min(255, n));
+  }
+  function onRgbInputChange(){
+    const r = clampByte(cpR.value), g = clampByte(cpG.value), b = clampByte(cpB.value);
+    cpR.value = r; cpG.value = g; cpB.value = b;
+    const hsv = rgbToHsv(r, g, b);
+    customHue = hsv.h; customSat = hsv.s; customVal = hsv.v;
+    renderSvSquare();
+    setCustomColor({ r, g, b }, { updateInputs: false });
+  }
+  [cpR, cpG, cpB].forEach(inp=>{
+    inp.addEventListener('input', ()=>{ inp.value = inp.value.replace(/[^\d]/g, '').slice(0, 3); });
+    inp.addEventListener('change', onRgbInputChange);
+    inp.addEventListener('blur', onRgbInputChange);
+    inp.addEventListener('keydown', e=>{ if (e.key === 'Enter') inp.blur(); });
+    inp.addEventListener('pointerdown', e=> e.stopPropagation());
+  });
+
+  cpEyedropper.addEventListener('click', async e=>{
+    e.preventDefault(); e.stopPropagation();
+    if (!window.EyeDropper) return; // браузер не поддерживает EyeDropper API — кнопка просто неактивна
+    try {
+      const ed = new EyeDropper();
+      const result = await ed.open();
+      const rgb = hexToRgb(result.sRGBHex);
+      if (rgb) {
+        const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+        customHue = hsv.h; customSat = hsv.s; customVal = hsv.v;
+        renderSvSquare();
+        setCustomColor(rgb);
+      }
+    } catch(_) { /* пользователь отменил выбор пипеткой */ }
+  });
+  if (!window.EyeDropper) cpEyedropper.style.opacity = '0.4';
+
+  // ── отмена последнего действия: Ctrl+Z / ⌘+Z ──
+  window.addEventListener('keydown', e=>{
+    const tag = (e.target && e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      undo();
+    }
+  });
+
+  document.getElementById('clearBoardBtn').onclick = clearBoard;
+
+  // ── масштаб: кнопки +/− и сброс вида ──
+  function zoomBy(factor){
+    viewScale = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, viewScale * factor));
+    zoomResetBtn.textContent = Math.round(viewScale * 100) + '%';
+    redraw();
+  }
+  document.getElementById('zoomInBtn').onclick = ()=> zoomBy(ZOOM_STEP);
+  document.getElementById('zoomOutBtn').onclick = ()=> zoomBy(1 / ZOOM_STEP);
+  zoomResetBtn.onclick = ()=>{
+    viewScale = 1; panX = 0; panY = 0;
+    zoomResetBtn.textContent = '100%';
+    redraw();
+  };
+
+  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('scroll', redraw, { passive: true });
+  // при переключении светлой/тёмной темы перекрашиваем сетку без ожидания
+  // следующего рисования/скролла/зума
+  if (window.MutationObserver) {
+    new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+  resizeCanvas();
+  updateCursor();
+})();
+</script>
+</body></html>

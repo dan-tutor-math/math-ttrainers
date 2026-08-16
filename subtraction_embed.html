@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Тренажёр: вычитание в столбик</title>
+<title>Тренажёр: вычитание в столбик — свой пример</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -100,19 +100,14 @@ body{
 .wrap{max-width:1040px;margin:0 auto}
 h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(26px,5vw,38px);color:var(--pencil);text-align:center;}
 .sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 18px;}
-.levels{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px}
-.lvl{font-family:var(--font-ui);font-weight:600;font-size:14px;border:1px solid var(--glass-border);background:var(--glass);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border-radius:999px;padding:8px 16px;cursor:pointer;color:var(--muted-3);transition:all .15s;}
-.lvl:hover{border-color:var(--ink)}
-.lvl.active{background:var(--ink);border-color:var(--ink);color:#fff;box-shadow:0 6px 16px var(--hl-35);}
-.lvl .done-mark{color:#FFB800;margin-left:4px;}
-.lvl.custom{border-style:dashed;color:var(--ink);}
-.lvl.custom.active{background:var(--ink);border-style:solid;color:#fff;}
 .custom-caption{font-family:var(--font-ui);font-weight:500;font-size:13px;color:var(--muted-1);margin-bottom:14px;}
-.custom-row{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
-.custom-num{font-family:var(--font-mono);font-size:calc(var(--cell)*.62);color:var(--ink);background:transparent;border:none;outline:none;border-bottom:2.5px solid var(--glass-border);padding:4px 2px;width:150px;text-align:right;}
+.custom-col{display:inline-flex;flex-direction:column;min-width:180px;}
+.custom-col-row{display:flex;align-items:center;gap:10px;justify-content:flex-end;}
+.custom-op{font-family:var(--font-ui);font-weight:700;font-size:calc(var(--cell)*.55);color:var(--pencil);width:1.1em;text-align:center;flex:0 0 auto;}
+.custom-num{font-family:var(--font-mono);font-size:calc(var(--cell)*.62);color:var(--ink);background:transparent;border:none;outline:none;padding:4px 2px;width:150px;text-align:right;}
 .custom-num::placeholder{color:var(--muted-7)}
-.custom-num:focus{background:var(--hl-14);border-radius:6px;border-bottom-color:var(--ink);}
-.custom-op{font-family:var(--font-ui);font-weight:700;font-size:24px;color:var(--pencil);}
+.custom-num:focus{background:var(--hl-14);border-radius:6px;}
+.custom-col-line{border-top:2.5px solid var(--ink);margin-top:6px;}
 .custom-actions{margin-top:18px;}
 .custom-hint{font-family:var(--font-ui);font-weight:500;color:var(--teacher);font-size:14px;margin-top:10px;min-height:18px;}
 .sheet{
@@ -276,7 +271,7 @@ button.go:active{transform:scale(.96)}
   var btn=document.getElementById('themeToggle');
   function apply(t, persist){
     document.documentElement.setAttribute('data-theme', t);
-    btn.textContent = t === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
     if (persist) { try{ localStorage.setItem('theme', t); }catch(e){} }
   }
   apply(document.documentElement.getAttribute('data-theme') || 'light', false);
@@ -298,16 +293,14 @@ button.go:active{transform:scale(.96)}
 })();</script>
 <div class="wrap">
   <h1>Вычитание в столбик</h1>
-  <div class="sub">разряд за разрядом, с заимствованием — сам решаешь, у кого занять</div>
+  <div class="sub">свой пример — впиши числа и решай разряд за разрядом, с заимствованием</div>
 
-  <div class="levels" id="levels"></div>
-
-  <div class="sheet" id="customSheet" style="display:none">
+  <div class="sheet" id="customSheet">
     <div class="custom-caption">Впиши свои числа (первое больше второго)</div>
-    <div class="custom-row">
-      <input id="customTop" type="text" inputmode="numeric" class="custom-num" placeholder="512" autocomplete="off" maxlength="9">
-      <span class="custom-op">−</span>
-      <input id="customBottom" type="text" inputmode="numeric" class="custom-num" placeholder="87" autocomplete="off" maxlength="9">
+    <div class="custom-col">
+      <div class="custom-col-row"><span class="custom-op" style="visibility:hidden">−</span><input id="customTop" type="text" inputmode="numeric" class="custom-num" placeholder="512" autocomplete="off" maxlength="9"></div>
+      <div class="custom-col-row"><span class="custom-op">−</span><input id="customBottom" type="text" inputmode="numeric" class="custom-num" placeholder="87" autocomplete="off" maxlength="9"></div>
+      <div class="custom-col-line"></div>
     </div>
     <div class="custom-actions">
       <button class="go" id="customGoBtn">Решать →</button>
@@ -315,19 +308,19 @@ button.go:active{transform:scale(.96)}
     <div class="custom-hint" id="customHint"></div>
   </div>
 
-  <div class="sheet" id="mainSheet">
+  <div class="sheet" id="mainSheet" style="display:none">
     <div class="corner">
-      <button class="refresh-btn" id="refreshBtn" title="Обновить пример">⟳</button>
-      <span id="taskNum">пример №1</span>
+      <button class="refresh-btn" id="refreshBtn" title="Начать заново">⟳</button>
+      <span id="taskNum">свой пример</span>
     </div>
     <div id="board"></div>
     <div class="mresult" id="result"></div>
   </div>
 
-  <div class="panel" id="mainPanel">
+  <div class="panel" id="mainPanel" style="display:none">
     <div class="prompt" id="prompt"></div>
     <div class="inrow" id="inputArea"></div>
-    <button class="next-btn" id="nextBtn" style="display:none">Следующий пример →</button>
+    <button class="next-btn" id="nextBtn" style="display:none">Другой пример →</button>
     <div class="hint" id="hint"></div>
   </div>
 
@@ -364,8 +357,7 @@ button.go:active{transform:scale(.96)}
 </div>
 
 <script>
-const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
-const pick = a=>a[ri(0,a.length-1)];
+const pick = a=>a[Math.floor(Math.random()*a.length)];
 
 function simulateSubtraction(T_in, B_in){
   const n = T_in.length;
@@ -394,76 +386,13 @@ function simulateSubtraction(T_in, B_in){
   return {resultDigits, events, T};
 }
 
-function genSub(topLen, bottomLen, opts={}){
-  let guard=0;
-  while(true){
-    guard++; if(guard>8000) throw 'genSub: не удалось сгенерировать';
-    const bottomVal = ri(Math.pow(10,bottomLen-1), Math.pow(10,bottomLen)-1);
-    const topVal = ri(Math.pow(10,topLen-1), Math.pow(10,topLen)-1);
-    if(topVal <= bottomVal) continue;
-    const topDigits = String(topVal).split('').map(Number);
-    const bottomDigitsRaw = String(bottomVal).split('').map(Number);
-    const bottomDigits = new Array(topLen-bottomDigitsRaw.length).fill(0).concat(bottomDigitsRaw);
-    const sim = simulateSubtraction(topDigits, bottomDigits);
-    const hasBorrow = sim.events.length > 0;
-    const hasZeroChain = sim.events.some(e=>e.chain.length>1);
-    if(opts.requireBorrow && !hasBorrow) continue;
-    if(opts.requireZeroChain && !hasZeroChain) continue;
-    if(opts.forbidZeroChain && hasZeroChain) continue;
-    return {topVal, bottomVal, topDigits, bottomDigits, sim};
-  }
-}
-
-const LEVELS = [
-  {id:0, name:'Уровень 1', desc:'2-значное − 1-значное, простое заимствование', gen:()=>genSub(2,1,{requireBorrow:true, forbidZeroChain:true})},
-  {id:1, name:'Уровень 2', desc:'3-значное − 1-значное', gen:()=>genSub(3,1,{requireBorrow:true})},
-  {id:2, name:'Уровень 3', desc:'2-значное − 2-значное', gen:()=>genSub(2,2,{})},
-  {id:3, name:'Уровень 4', desc:'3-значное − 2-значное', gen:()=>genSub(3,2,{})},
-  {id:4, name:'Уровень 5', desc:'через ноль — сложные цепочки', gen:()=>genSub(3,3,{requireZeroChain:true})},
-  {id:5, name:'Уровень 6', desc:'4-значное − 4-значное', gen:()=>genSub(4,4,{})},
-  {id:6, name:'Экзамен',   desc:'вперемешку'},
-];
-let curLevel = 0;
-const solvedByLevel = [0,0,0,0,0,0,0];
 let totalSolved = 0, streak = 0, taskCounter = 0;
-
-function gen(level){
-  if(level===6) level = ri(0,5);
-  return LEVELS[level].gen();
-}
-
 let P=null, S=null;
 
-function newProblem(){
-  P = gen(curLevel);
-  taskCounter++;
-  S = {
-    phase:'preview',
-    T: [...P.topDigits],
-    pos: 0,
-    subPhase: 'check',
-    chainIdx: null,
-    lentPositions: [],
-    borrowedThisDigit: false,
-    workingVal: null,
-    resultDigits: [],
-    errTotal: 0,
-    exam: curLevel===6,
-  };
-  document.getElementById('taskNum').textContent = 'пример №'+taskCounter;
-  document.getElementById('nextBtn').style.display='none';
-  document.getElementById('stStars').textContent='—';
-  document.getElementById('result').textContent='';
-  setHint('');
-  renderAll(); setPrompt(); renderInputs();
+function boardWidth(){
+  return P.topDigits.length + 1;
 }
-document.getElementById('refreshBtn').onclick = newProblem;
-
-function startSolving(){
-  S.phase = 'solve';
-  enterDigit();
-  renderAll(); setPrompt(); renderInputs();
-}
+function realIdxFromPos(pos){ return P.topDigits.length - 1 - pos; }
 
 function enterDigit(){
   // решаем, с чего начать текущий разряд: если снизу настоящий ноль — сравнивать нечего,
@@ -477,10 +406,11 @@ function enterDigit(){
   }
 }
 
-function boardWidth(){
-  return P.topDigits.length + 1;
+function startSolving(){
+  S.phase = 'solve';
+  enterDigit();
+  renderAll(); setPrompt(); renderInputs();
 }
-function realIdxFromPos(pos){ return P.topDigits.length - 1 - pos; }
 
 function renderAll(){
   const board = document.getElementById('board');
@@ -648,7 +578,7 @@ function renderInputs(){
   }
   area.innerHTML = `
     ${numInputHTML('ans')}
-    <button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>`;
+    <button class="go" id="goBtn">ОК</button>`;
   document.getElementById('goBtn').onclick = submitAnswer;
   attachSpinners(area);
   activeInputId = 'ans';
@@ -668,9 +598,7 @@ function answerCheck(saysYes){
   const enough = S.T[realIdx] >= P.bottomDigits[realIdx];
   if(saysYes !== enough){
     S.errTotal++;
-    if(S.exam){
-      setHint('Сравни цифры ещё раз.');
-    } else if(hasDot){
+    if(hasDot){
       setHint('Не забудь про точку: отсюда уже заняли, значит на самом деле здесь на 1 меньше, чем написано.');
     } else {
       setHint(`Сравни: сверху ${S.T[realIdx]}, снизу ${P.bottomDigits[realIdx]}. Хватает ли сверху, чтобы вычесть без остатка в минус?`);
@@ -693,7 +621,7 @@ function onBorrowTap(){
   if(S.T[S.chainIdx]===0){
     // ноль в цепочке — молча становится 9, отмечается точкой; вопрос "сколько тут на самом деле"
     // всплывёт позже, когда дойдёт очередь до этого разряда
-    setHint(S.exam ? 'У нуля нечего занять — идём дальше влево.' : 'У нуля самого нечего одолжить — он ставит точку и сам сначала занимает у следующего соседа слева. Так по цепочке идём, пока не найдём разряд, где реально есть что отдать.', true);
+    setHint('У нуля самого нечего одолжить — он ставит точку и сам сначала занимает у следующего соседа слева. Так по цепочке идём, пока не найдём разряд, где реально есть что отдать.', true);
     S.T[S.chainIdx] = 9;
     S.lentPositions.push(S.chainIdx);
     S.chainIdx--;
@@ -728,9 +656,7 @@ function submitAnswer(){
     if(v!==expected){
       S.errTotal++;
       inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
-      if(S.exam){
-        setHint('Проверь вычитание.');
-      } else if(hasDot){
+      if(hasDot){
         setHint(`Не забудь: над этой цифрой точка — значит, отсюда уже заняли, и здесь на самом деле на 1 меньше, чем написано.`);
       } else {
         setHint(`Посчитай: ${S.workingVal} − ${P.bottomDigits[realIdx]}.`);
@@ -758,48 +684,30 @@ function finish(){
   S.phase='done';
   renderAll(); setPrompt(); renderInputs();
   document.getElementById('result').textContent = `${P.topVal} − ${P.bottomVal} = ${P.topVal-P.bottomVal}`;
+  try{ window.parent.postMessage({source:'oge-calc-history', op:'sub', expr:`${P.topVal} − ${P.bottomVal} = ${P.topVal-P.bottomVal}`, result:P.topVal-P.bottomVal}, '*'); }catch(e){}
   let stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
   document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
-  totalSolved++; if(!P.custom) solvedByLevel[curLevel]++;
+  totalSolved++;
   streak = (S.errTotal===0) ? streak+1 : 0;
   document.getElementById('stSolved').textContent = totalSolved;
   document.getElementById('stStreak').textContent = streak;
   setHint(S.errTotal===0 ? 'Без единой ошибки — блестяще!' : `Решено! Ошибок по пути: ${S.errTotal}.`, S.errTotal===0);
   document.getElementById('nextBtn').style.display='block';
-  renderLevels();
 }
+document.getElementById('nextBtn').onclick = showCustomEntry;
 
-function renderLevels(){
-  const el = document.getElementById('levels');
-  el.innerHTML = LEVELS.map(L=>
-    `<button class="lvl ${L.id===curLevel?'active':''}" data-id="${L.id}" title="${L.desc}">
-      ${L.name}${solvedByLevel[L.id]>=5?'<span class="done-mark">★</span>':''}
-    </button>`
-  ).join('') + `<button class="lvl custom" id="customToggle" title="Ввести свои числа">✏️ Свой пример</button>`;
-  el.querySelectorAll('.lvl[data-id]').forEach(b=>b.onclick=()=>{
-    curLevel = Number(b.dataset.id);
-    hideCustomPanel();
-    renderLevels(); newProblem();
-  });
-  document.getElementById('customToggle').onclick = toggleCustomPanel;
-}
-document.getElementById('nextBtn').onclick = newProblem;
-
-/* ───────── свой пример ───────── */
-function toggleCustomPanel(){
-  const sheet = document.getElementById('customSheet');
-  const showing = sheet.style.display !== 'none';
-  sheet.style.display = showing ? 'none' : 'block';
-  document.getElementById('mainSheet').style.display = showing ? 'block' : 'none';
-  document.getElementById('mainPanel').style.display = showing ? 'block' : 'none';
+/* ───────── свой пример (единственный режим) ───────── */
+function showCustomEntry(){
+  document.getElementById('customSheet').style.display='block';
+  document.getElementById('mainSheet').style.display='none';
+  document.getElementById('mainPanel').style.display='none';
   document.getElementById('customHint').textContent = '';
+  document.getElementById('customTop').value='';
+  document.getElementById('customBottom').value='';
   syncKeypadVisibility();
-  if(!showing){
-    sheet.scrollIntoView({behavior:'smooth', block:'nearest'});
-    setTimeout(()=>document.getElementById('customTop').focus(), 30);
-  }
+  setTimeout(()=>document.getElementById('customTop').focus(), 30);
 }
-function hideCustomPanel(){
+function showSolveArea(){
   document.getElementById('customSheet').style.display='none';
   document.getElementById('mainSheet').style.display='block';
   document.getElementById('mainPanel').style.display='block';
@@ -823,19 +731,16 @@ function startCustomProblem(){
   const bottomDigitsRaw = String(bottomVal).split('').map(Number);
   const bottomDigits = new Array(topDigits.length-bottomDigitsRaw.length).fill(0).concat(bottomDigitsRaw);
   const sim = simulateSubtraction(topDigits, bottomDigits);
-  P = {topVal, bottomVal, topDigits, bottomDigits, sim, custom:true};
+  P = {topVal, bottomVal, topDigits, bottomDigits, sim};
   taskCounter++;
   S = {
     phase:'preview', T:[...P.topDigits], pos:0, subPhase:'check', chainIdx:null,
-    lentPositions:[], borrowedThisDigit:false, workingVal:null, resultDigits:[], errTotal:0, exam:false,
+    lentPositions:[], borrowedThisDigit:false, workingVal:null, resultDigits:[], errTotal:0,
   };
-  document.getElementById('taskNum').textContent = 'свой пример';
   document.getElementById('nextBtn').style.display='none';
   document.getElementById('stStars').textContent='—';
   document.getElementById('result').textContent='';
-  hideCustomPanel();
-  document.getElementById('customTop').value='';
-  document.getElementById('customBottom').value='';
+  showSolveArea();
   setHint('');
   renderAll(); setPrompt(); renderInputs();
 }
@@ -845,7 +750,7 @@ document.getElementById('customBottom').addEventListener('keydown', e=>{ if(e.ke
 document.getElementById('customTop').addEventListener('focus', ()=>{ activeInputId='customTop'; });
 document.getElementById('customBottom').addEventListener('focus', ()=>{ activeInputId='customBottom'; });
 
-let activeInputId = 'ans';
+let activeInputId = 'customTop';
 let keypadOpen = true;
 function setupFloatingKeypad(){
   const keys = ['7','8','9','4','5','6','1','2','3','−','0','⌫'];
@@ -881,9 +786,9 @@ function syncKeypadVisibility(){
   document.getElementById('kpToggle').style.display = (needsInput && !keypadOpen) ? 'flex' : 'none';
 }
 
+document.getElementById('refreshBtn').onclick = showCustomEntry;
 setupFloatingKeypad();
-renderLevels();
-newProblem();
+showCustomEntry();
 
 /* ───────── встраивание внутрь другой страницы (например, oge1_5.html) через iframe ───────── */
 (function(){
@@ -892,9 +797,6 @@ newProblem();
     if(params.get('embed')==='1'){
       const hb = document.querySelector('.home-btn'); if(hb) hb.style.display='none';
       const tt = document.getElementById('themeToggle'); if(tt) tt.style.display='none';
-    }
-    if(params.get('custom')==='1'){
-      setTimeout(()=>{ const bt = document.getElementById('customToggle'); if(bt) bt.click(); }, 0);
     }
   }catch(e){}
 })();

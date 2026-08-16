@@ -1,0 +1,3687 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ОГЭ №9 — уравнения</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font-ui:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Sora','Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,-apple-system,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#EEF1F7;
+  --blob-1:rgba(120,150,255,.16);
+  --blob-2:rgba(190,150,230,.14);
+  --card:rgba(255,255,255,.8);
+  --glass:rgba(255,255,255,.55);
+  --glass-strong:rgba(255,255,255,.72);
+  --glass-border:rgba(255,255,255,.85);
+  --glass-inset:rgba(255,255,255,.55);
+  --hl:var(--hl-14);
+  --muted-1:#8E8E93;
+  --muted-2:#6E6E73;
+  --muted-3:#48484A;
+  --muted-4:#3A3A3C;
+  --muted-5:#1D1D1F;
+  --muted-6:#8E8E93;
+  --muted-7:#C7C7CC;
+  --muted-8:#8E8E93;
+  --paper:#FDFCF7;
+  --grid:#DCE4F0;
+  --margin-red:#FF9F0A;
+  --ink:#004C99;
+  --ink-active:#003A75;
+  --pencil:#1D1D1F;
+  --teacher:#FF3B30;
+  --ok:#248A3D;
+  --ok-tint:rgba(36,138,61,.1);
+  --ok-shadow:rgba(36,138,61,.3);
+  --moved:#5AC8FA;
+  --shadow:0 10px 34px rgba(20,30,60,.08);
+  --cell:34px;
+  --hl-04:rgba(0,76,153,.04);
+  --hl-05:rgba(0,76,153,.05);
+  --hl-06:rgba(0,76,153,.06);
+  --hl-10:rgba(0,76,153,.10);
+  --hl-12:rgba(0,76,153,.12);
+  --hl-14:var(--hl);
+  --hl-16:rgba(0,76,153,.16);
+  --hl-35:rgba(0,76,153,.35);
+}
+html[data-theme="dark"]{
+  --bg:#0B0E1A;
+  --blob-1:rgba(90,110,255,.22);
+  --blob-2:rgba(150,90,220,.18);
+  --paper:#151A2C;
+  --card:rgba(30,37,64,.82);
+  --glass:rgba(40,46,74,.5);
+  --glass-strong:rgba(46,53,84,.65);
+  --glass-border:rgba(255,255,255,.12);
+  --glass-inset:rgba(255,255,255,.07);
+  --hl:rgba(40,110,214,.26);
+  --grid:#232A44;
+  --margin-red:#FF9F0A;
+  --ink:#2E7DE0;
+  --ink-active:#4A93F0;
+  --pencil:#F2F3F5;
+  --teacher:#FF6961;
+  --ok:#3E8E5B;
+  --ok-tint:rgba(62,142,91,.14);
+  --ok-shadow:rgba(62,142,91,.35);
+  --moved:#64D2FF;
+  --shadow:0 10px 40px rgba(0,0,0,.55);
+  --hl-04:rgba(46,125,224,.06);
+  --hl-05:rgba(46,125,224,.08);
+  --hl-06:rgba(46,125,224,.1);
+  --hl-10:rgba(46,125,224,.16);
+  --hl-12:rgba(46,125,224,.19);
+  --hl-14:var(--hl);
+  --hl-16:rgba(46,125,224,.26);
+  --hl-35:rgba(46,125,224,.5);
+  --muted-1:#9A9AA2;
+  --muted-2:#9A9AA2;
+  --muted-3:#AEAEB4;
+  --muted-4:#C7C7CC;
+  --muted-5:#F2F3F5;
+  --muted-6:#9A9AA2;
+  --muted-7:#3A3F55;
+  --muted-8:#9A9AA2;
+  --hover-1:rgba(127,160,255,.08);
+  --hover-2:rgba(127,160,255,.14);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    var(--bg);
+  font-family:var(--font-ui);
+  color:var(--pencil);
+  min-height:100vh;
+  padding:18px 12px 60px;
+}
+.wrap{max-width:820px;margin:0 auto;position:relative;z-index:1;pointer-events:none}
+.wrap > *{pointer-events:auto}
+
+/* ─── интерактивная доска на фоне вокруг примера ─── */
+#boardCanvas{position:fixed;top:0;left:0;z-index:0;touch-action:none;cursor:crosshair;}
+#boardSpace{height:0;pointer-events:none;transition:height .2s ease;}
+.board-toolbar{position:fixed;right:18px;bottom:18px;z-index:50;display:flex;gap:8px;align-items:center;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;padding:9px 11px;box-shadow:var(--shadow);}
+.toolbar-sep{width:1px;align-self:stretch;background:var(--glass-border);margin:2px 0;}
+.board-tool-btn{width:34px;height:34px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:border-color .15s, background .15s;}
+.board-tool-btn:hover{border-color:var(--ink);}
+.board-tool-btn.active{background:var(--ink);border-color:var(--ink);}
+.board-tool-btn .dot{border-radius:50%;background:var(--pencil);display:block;}
+.board-tool-btn.active .dot{background:#fff;}
+.board-tool-btn.eraser{font-size:15px;}
+.board-tool-btn.pen-main{font-size:15px;}
+.board-tool-btn.color-btn.active{background:var(--glass);border-color:var(--ink);box-shadow:0 0 0 2px var(--ink);}
+.tool-group{position:relative;}
+/* всплывающее окошко с размерами (для ручки и ластика) — управляется из JS через
+   класс .open, а не через :hover, потому что чистый CSS-hover рвётся, стоит
+   курсору чуть отклониться от прямой линии между кнопкой и окошком */
+.size-flyout{position:absolute;bottom:100%;right:0;margin-bottom:10px;display:none;gap:8px;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;padding:8px;box-shadow:var(--shadow);}
+.size-flyout.open{display:flex;}
+/* невидимый мостик над кнопкой, чтобы курсор не «выпадал» из зоны наведения,
+   пока едет от кнопки к окошку */
+.tool-group::after{content:'';position:absolute;left:0;right:0;bottom:100%;height:14px;}
+
+/* ─── всплывающая палитра для «своего» цвета ─── */
+.board-tool-btn.custom-color-btn{overflow:hidden;}
+.color-picker-flyout{flex-direction:column;align-items:stretch;width:200px;padding:12px;gap:10px;}
+.cp-sv-wrap{position:relative;width:100%;height:120px;border-radius:12px;overflow:hidden;cursor:crosshair;touch-action:none;}
+.cp-sv{display:block;width:100%;height:100%;}
+.cp-sv-thumb{position:absolute;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35),0 1px 3px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none;top:0;left:0;}
+.cp-row{display:flex;align-items:center;gap:8px;}
+.cp-eyedropper{width:28px;height:28px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--pencil);}
+.cp-eyedropper:hover{border-color:var(--ink);}
+.cp-swatch{width:26px;height:26px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);box-shadow:inset 0 0 0 2px rgba(255,255,255,.5);}
+.cp-hue-wrap{position:relative;flex:1;height:16px;touch-action:none;}
+.cp-hue{position:absolute;inset:0;border-radius:8px;background:linear-gradient(to right,#ff0000,#ffff00,#00ff00,#00ffff,#0000ff,#ff00ff,#ff0000);cursor:pointer;}
+.cp-hue-thumb{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35),0 1px 3px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none;}
+.cp-rgb-row{display:flex;gap:6px;}
+.cp-field{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;}
+.cp-field input{width:100%;box-sizing:border-box;text-align:center;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);color:var(--pencil);font-family:var(--font-mono);font-size:12px;padding:5px 2px;}
+.cp-field label{font-size:10px;color:var(--muted-3);font-family:var(--font-ui);}
+
+.board-view-toolbar{position:fixed;left:18px;bottom:18px;z-index:50;display:flex;gap:8px;align-items:center;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;padding:9px 11px;box-shadow:var(--shadow);}
+.board-zoom-label{min-width:44px;height:34px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-3);padding:0 6px;}
+.board-zoom-label:hover{border-color:var(--ink);}
+.board-tool-btn.hand-tool{font-size:16px;}
+.board-tool-btn.clear-btn{font-size:15px;}
+
+/* ─── доска изначально выключена — включается отдельной кнопкой под переключателем темы ─── */
+html:not([data-board="on"]) #boardCanvas,
+html:not([data-board="on"]) .board-toolbar,
+html:not([data-board="on"]) .board-view-toolbar{display:none;}
+html[data-board="on"] #boardSpace{height:72vh;}
+html[data-board="on"] body{background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    var(--bg);}
+h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,5vw,34px);color:var(--pencil);text-align:center;}
+.sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 22px;}
+.group-title{font-family:var(--font-ui);font-weight:700;font-size:14px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.04em;margin:18px 2px 8px;}
+.group-title:first-child{margin-top:0}
+.modes{display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
+.mode-card{
+  display:flex;align-items:center;flex-wrap:wrap;gap:6px 16px;text-align:left;
+  background:var(--glass);
+  backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
+  border:1px solid var(--glass-border);border-radius:14px;
+  box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);
+  padding:11px 18px;cursor:pointer;transition:transform .12s, border-color .12s;font-family:var(--font-ui);
+}
+.mode-card:hover{border-color:var(--ink); transform:translateX(3px)}
+.mode-card .mtitle{font-weight:600;font-size:15px;color:var(--pencil);line-height:1.3;flex:1 1 260px;margin:0;}
+.mode-card .msub{font-family:var(--font-ui);font-weight:500;font-size:12.5px;color:var(--muted-2);flex-basis:100%;margin-top:2px;}
+.back-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 14px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);margin-bottom:14px;display:inline-block;}
+.back-btn:hover{border-color:var(--ink)}
+.panel{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:20px;margin-bottom:14px;}
+@keyframes revealUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+#mainPanel.reveal{animation:revealUp .38s cubic-bezier(.22,.9,.35,1) both;}
+@keyframes correctPop{0%{transform:scale(.94);}55%{transform:scale(1.025);}100%{transform:scale(1);}}
+.mcq-btn.correct{animation:correctPop .32s ease;}
+.prompt{font-family:var(--font-ui);font-weight:500;font-size:clamp(16px,3vw,19px);color:var(--muted-5);margin-bottom:14px;line-height:1.5;}
+.task-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.submode-tabs{display:flex;gap:8px;margin-bottom:14px;}
+.submode-tab{flex:1;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:10px 6px;cursor:pointer;text-align:center;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:border-color .15s, color .15s, background .15s;}
+.submode-tab:hover{border-color:var(--ink);}
+.submode-tab.active{color:#fff;background:var(--ink);border-color:var(--ink);}
+.coming-soon{font-family:var(--font-ui);font-weight:500;font-size:15px;color:var(--muted-3);text-align:center;padding:34px 16px;line-height:1.5;}
+.task-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3)}
+.corner{font-family:var(--font-ui);font-weight:500;display:flex;align-items:center;gap:10px;}
+.refresh-btn{width:28px;height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}
+.refresh-btn:hover{border-color:var(--ink);transform:rotate(80deg)}
+.refresh-btn:active{transform:scale(.9)}
+.mcq-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3);margin-bottom:10px;}
+.mcq-options{display:flex;flex-direction:column;gap:8px;}
+.change-answer-btn{display:none;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--teacher);background:none;border:none;padding:10px 2px 0;cursor:pointer;text-decoration:underline;animation:revealUp .3s ease both;}
+.change-answer-btn:active{opacity:.6}
+.mcq-btn{
+  display:flex;align-items:center;gap:10px;text-align:left;
+  font-family:var(--font-mono);font-size:16px;color:var(--pencil);
+  background:var(--card);border:1.5px solid var(--glass-border);border-radius:14px;
+  padding:12px 16px;cursor:pointer;transition:border-color .12s, background .12s;
+}
+.mcq-btn .mlabel{font-family:var(--font-ui);font-weight:700;color:var(--muted-1);flex:0 0 auto;}
+.mcq-btn:hover:not(.disabled){border-color:var(--ink)}
+.mcq-btn.correct{border-color:var(--ok);background:var(--ok-tint);color:var(--ok);}
+.mcq-btn.wrong{border-color:var(--teacher);background:rgba(255,59,48,.1);color:var(--teacher);}
+.mcq-btn.disabled{cursor:default}
+.explain{font-family:var(--font-ui);font-size:15px;color:var(--muted-4);line-height:1.55;}
+.explain b{color:var(--ink)}
+.next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:14px;box-shadow:0 6px 18px var(--ok-shadow);}
+.stats{display:flex;gap:10px;flex-wrap:wrap;}
+.stat{flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:12px 14px;text-align:center;}
+.stat .v{font-family:var(--font-ui);font-weight:700;font-size:22px;color:var(--ink);}
+.stat .l{font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-6);}
+.theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
+.theme-toggle:hover{border-color:var(--ink)}
+.theme-toggle:active{transform:scale(.92)}
+.board-visibility-toggle{top:64px;}
+.board-visibility-toggle.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+.home-btn{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
+.home-btn:hover{border-color:var(--ink)}
+.home-btn:active{transform:scale(.92)}
+
+/* ── скопированные движки: linear.html (#linEngineArea) и quadratic.html (#quadEngineArea) ── */
+html[data-theme="dark"] #linEngineArea input {background:var(--card)}html[data-theme="dark"] #linEngineArea input.num.good {background:rgba(78,209,140,.16)}html[data-theme="dark"] #linEngineArea .flyer {background:rgba(255,211,77,.18)}
+html[data-theme="dark"] #quadEngineArea input {background:var(--card)}html[data-theme="dark"] #quadEngineArea .abc-legend .t-a {background:rgba(127,160,255,.16)}html[data-theme="dark"] #quadEngineArea .abc-legend .t-b {background:rgba(255,107,91,.16)}html[data-theme="dark"] #quadEngineArea .abc-legend .t-c {background:rgba(78,209,140,.16)}html[data-theme="dark"] #quadEngineArea .flyer {background:rgba(255,211,77,.18)}
+#linEngineArea * {box-sizing:border-box;margin:0;padding:0}#linEngineArea body {
+  background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--bg);
+  background-size:auto,auto,24px 24px,24px 24px,auto;
+  font-family:var(--font-ui);
+  color:var(--pencil);
+  min-height:100vh;
+  padding:18px 12px 60px;
+}#linEngineArea .wrap {max-width:1040px;margin:0 auto}#linEngineArea h1 {font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(26px,5vw,38px);color:var(--pencil);text-align:center;}#linEngineArea .sub {font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 18px;}#linEngineArea .levels {display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px}#linEngineArea .lvl {font-family:var(--font-ui);font-weight:600;font-size:14px;border:1px solid var(--glass-border);background:var(--glass);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border-radius:999px;padding:8px 16px;cursor:pointer;color:var(--muted-3);transition:all .15s;}#linEngineArea .lvl:hover {border-color:var(--ink)}#linEngineArea .lvl.active {background:var(--ink);border-color:var(--ink);color:#fff;box-shadow:0 6px 16px var(--hl-35);}#linEngineArea .lvl .done-mark {color:#FFB800;margin-left:4px;}#linEngineArea /* ─── тетрадный лист ─── */
+.sheet {
+  position:relative;
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--paper);
+  background-size:var(--cell) var(--cell);
+  border:1px solid var(--glass-border);
+  border-radius:20px;
+  box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);
+  padding:calc(var(--cell)) calc(var(--cell)*.7) calc(var(--cell)) calc(var(--cell)*2);
+  min-height:calc(var(--cell)*8);
+  overflow:hidden;
+}#linEngineArea .sheet::before {
+  content:'';
+  position:absolute;
+  top:0;bottom:0;
+  left:calc(var(--cell)*1.5);
+  width:2px;
+  background:var(--margin-red);
+  opacity:.55;
+}#linEngineArea .corner {font-family:var(--font-ui);font-weight:500;position:absolute;top:6px;right:12px;color:var(--muted-1);font-size:13px;display:flex;align-items:center;gap:8px;}#linEngineArea .refresh-btn {width:28px;height:28px;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}#linEngineArea .refresh-btn:hover {border-color:var(--ink);transform:rotate(80deg)}#linEngineArea .refresh-btn:active {transform:scale(.9)}#linEngineArea /* ─── строки уравнения ─── */
+.eqline {
+  display:flex;
+  align-items:center;
+  flex-wrap:wrap;
+  gap:6px;
+  height:var(--cell);
+  font-size:24px;
+  color:var(--ink);
+  margin-bottom:0;
+}#linEngineArea .eqline.eqline-frac {height:calc(var(--cell)*3)}#linEngineArea .eqline.frozen {opacity:.85}#linEngineArea .eqline.plain {
+  display:block;
+  height:auto;
+  font-size:22px;
+  line-height:calc(var(--cell)*1);
+  white-space:normal;
+  word-spacing:1px;
+}#linEngineArea .eq-sign {padding:0 4px;color:var(--pencil)}#linEngineArea .term {
+  display:inline-flex;
+  align-items:center;
+  padding:2px 12px;
+  border-radius:10px;
+  background:var(--hl-06);
+  border:2px solid transparent;
+  white-space:nowrap;
+  line-height:1;
+}#linEngineArea .term.moved {color:var(--moved);background:rgba(91,135,232,.14)}#linEngineArea .term.tap {
+  cursor:pointer;
+  border-color:var(--hl-35);
+  border-style:dashed;
+  transition:transform .12s, border-color .12s;
+}#linEngineArea .term.tap:hover {transform:translateY(-2px);border-color:var(--ink)}#linEngineArea .term.placed {border-style:solid;border-color:rgba(46,125,83,.4)}#linEngineArea .term.shake {animation:shake .35s}#linEngineArea .term.pop {animation:pop .45s}#linEngineArea .term.highlight {
+  background:var(--hl-16);
+  border-color:var(--ink);
+  box-shadow:0 0 0 3px var(--hl-12);
+  transform:translateY(-1px);
+  transition:all .15s;
+}#linEngineArea .term.target {
+  outline:2px dashed var(--teacher);
+  outline-offset:2px;
+  animation:pulseTarget 1s infinite;
+}
+@keyframes pulseTarget{50%{outline-color:transparent}}#linEngineArea .term.struck-soft {opacity:.35;text-decoration:line-through}#linEngineArea .fountain-svg {position:fixed;left:0;top:0;width:100vw;height:100vh;pointer-events:none;z-index:40}#linEngineArea .fountain-path {fill:none;stroke:var(--teacher);stroke-width:3;stroke-linecap:round;opacity:.85}
+@keyframes shake{
+  20%{transform:translateX(-6px)}40%{transform:translateX(6px)}
+  60%{transform:translateX(-4px)}80%{transform:translateX(4px)}
+}
+@keyframes pop{
+  0%{transform:scale(1)}
+  50%{transform:scale(1.6)}
+  100%{transform:scale(1)}
+}
+@keyframes signPop{
+  0%   { transform:scale(1) rotate(0deg); color:inherit; }
+  25%  { transform:scale(2.4) rotate(-18deg); color:var(--teacher); }
+  55%  { transform:scale(2.4) rotate(14deg); color:var(--teacher); }
+  100% { transform:scale(1) rotate(0deg); color:var(--moved); }
+}#linEngineArea /* летящий клон */
+.flyer {
+  position:fixed;
+  z-index:50;
+  display:inline-flex;
+  align-items:center;
+  padding:5px 12px;
+  border-radius:10px;
+  background:#FFF8E8;
+  box-shadow:0 6px 18px rgba(0,0,0,.18);
+  font-family:var(--font-mono);
+  font-size:24px;
+  color:var(--ink);
+  pointer-events:none;
+  transition:left .65s cubic-bezier(.4,.1,.3,1), top .65s cubic-bezier(.4,.1,.3,1);
+  white-space:nowrap;
+}#linEngineArea .flyer.flip {color:var(--moved);animation:pop .6s}#linEngineArea .flyer-sign {display:inline-block}#linEngineArea .flyer.flip .flyer-sign {animation:signPop .6s ease}#linEngineArea /* дроби */
+.frac {
+  display:inline-flex;
+  flex-direction:column;
+  align-items:center;
+  vertical-align:middle;
+  line-height:1.15;
+  margin:0 2px;
+}#linEngineArea .frac .den {border-top:2.5px solid var(--ink);padding:2px 8px 0}#linEngineArea .frac .num {padding:0 8px 2px}#linEngineArea .strikeable {position:relative;display:inline-block;padding:0 2px}#linEngineArea .strikeable::after {
+  content:'';
+  position:absolute;
+  left:-4%;top:52%;
+  width:108%;height:3px;
+  background:var(--teacher);
+  border-radius:2px;
+  transform:rotate(-16deg) scaleX(0);
+  transform-origin:left center;
+  transition:transform .5s ease;
+}#linEngineArea .strikeable.struck::after {transform:rotate(-16deg) scaleX(1)}#linEngineArea .strikeable.struck {color:var(--muted-7);transition:color .5s .3s}#linEngineArea .divbar {
+  display:inline-block;
+  width:0;
+  border-left:2.5px solid var(--ink);
+  height:28px;
+  margin:0 10px 0 14px;
+  vertical-align:middle;
+  transform-origin:center;
+  animation:grow .5s ease;
+}
+@keyframes grow{from{transform:scaleY(0)}}#linEngineArea .divcolon {font-size:26px;color:var(--ink);animation:fadein .4s .3s backwards}
+@keyframes fadein{from{opacity:0}}#linEngineArea input.slot {
+  width:84px;
+  font-size:22px;
+  padding:5px 8px;
+  animation:fadein .4s .5s backwards;
+}#linEngineArea .eqline input.num.slot {height:28px;padding:0 8px}#linEngineArea .check-line {
+  font-family:var(--font-ui);
+  font-size:20px;
+  color:var(--ok);
+  display:flex;
+  align-items:center;
+  height:var(--cell);
+  margin-top:0;
+}#linEngineArea /* ─── панель ─── */
+.panel {background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:20px;margin-top:16px;}#linEngineArea .prompt {font-family:var(--font-ui);font-weight:500;font-size:clamp(17px,3.2vw,20px);color:var(--muted-5);margin-bottom:12px;line-height:1.4;}#linEngineArea .prompt b {color:var(--ink)}#linEngineArea .inrow {display:flex;gap:10px;align-items:center;flex-wrap:wrap}#linEngineArea .inrow .lbl {font-size:24px;color:var(--ink)}#linEngineArea input.num {
+  font-family:var(--font-mono);
+  font-size:24px;
+  padding:9px 12px;
+  border:1px solid var(--glass-border);
+  background:var(--card);
+  border-radius:14px 0 0 14px;
+  border-right:none;
+  color:var(--ink);
+  width:110px;
+}#linEngineArea input.num:focus {outline:none;border-color:var(--ink)}#linEngineArea input.num.shake {animation:shake .35s}#linEngineArea input.num.good {border-color:var(--ok);background:#F0FAF4}#linEngineArea .num-wrap {display:inline-flex;align-items:stretch;vertical-align:middle}#linEngineArea .spin {display:flex;flex-direction:column;border:1px solid var(--glass-border);background:var(--card);border-radius:0 14px 14px 0;overflow:hidden;}#linEngineArea .spin-btn {flex:1;width:32px;border:none;background:transparent;color:var(--ink);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;touch-action:manipulation;}#linEngineArea .spin-btn:first-child {border-bottom:1px solid var(--glass-border);}#linEngineArea .spin-btn:active {background:var(--hl);}#linEngineArea .keypad {display:grid;grid-template-columns:repeat(3, 44px);gap:6px;}#linEngineArea .keypad button {width:44px;height:40px;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-mono);font-size:18px;cursor:pointer;touch-action:manipulation;}#linEngineArea .keypad button:active {background:var(--hl);}#linEngineArea .keypad button.kp-minus {color:var(--teacher);font-weight:700;}#linEngineArea .keypad button.kp-x {color:var(--moved);font-weight:700;font-style:italic}#linEngineArea .keypad button.kp-back {font-size:15px;color:var(--muted-6);}#linEngineArea .keypad button.kp-enter {grid-column:span 2;width:auto;height:40px;font-family:var(--font-ui);font-weight:600;font-size:14px;background:var(--ink);color:#fff;border-color:var(--ink);}#linEngineArea .keypad button.kp-enter:active {background:var(--ink-active);}#linEngineArea .keypad-float {position:fixed;top:112px;right:16px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:50;}#linEngineArea .keypad-close {position:absolute;top:-11px;right:-11px;width:26px;height:26px;border-radius:50%;background:var(--teacher);color:#fff;border:2px solid #fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}#linEngineArea .keypad-drag-handle {position:absolute;top:-11px;left:-11px;width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;border:2px solid #fff;font-size:12px;line-height:1;cursor:grab;display:flex;align-items:center;justify-content:center;touch-action:none;}#linEngineArea .keypad-drag-handle:active {cursor:grabbing;}#linEngineArea .keypad-toggle {position:fixed;top:112px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50;}
+@media(max-width:720px){#linEngineArea .keypad-float {top:auto;bottom:16px;right:16px}}#linEngineArea button.go {font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ink);color:#fff;border:none;border-radius:14px;padding:11px 26px;cursor:pointer;box-shadow:0 6px 18px var(--hl-35);}#linEngineArea button.go:active {transform:scale(.96)}#linEngineArea .hint {font-family:var(--font-ui);font-weight:500;color:var(--teacher);font-size:15px;margin-top:12px;min-height:20px;line-height:1.4;}#linEngineArea .hint.good {color:var(--ok)}#linEngineArea .next-btn {font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:8px;box-shadow:0 6px 18px var(--ok-shadow);}#linEngineArea /* ─── статистика и теория ─── */
+.stats {display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}#linEngineArea .stat {flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:12px 14px;text-align:center;}#linEngineArea .stat .v {font-family:var(--font-ui);font-weight:700;font-size:22px;color:var(--ink);}#linEngineArea .stat .l {font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-6);}#linEngineArea .stars {color:#FFB800;font-size:20px;letter-spacing:2px;}#linEngineArea .theory {display:flex;gap:14px;margin-top:16px;flex-wrap:wrap;align-items:stretch}#linEngineArea .tcard {flex:1;min-width:290px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:18px 20px;}#linEngineArea .tt {font-family:var(--font-ui);font-weight:700;font-size:17px;color:var(--pencil);margin-bottom:10px;}#linEngineArea .talg {font-family:var(--font-ui);font-weight:400;font-size:14px;color:var(--muted-4);padding-left:20px;line-height:1.6;}#linEngineArea .talg li {margin:5px 0;}#linEngineArea .ttrap {font-family:var(--font-ui);font-weight:500;font-size:13px;color:var(--teacher);margin-top:8px;line-height:1.45;}#linEngineArea .tex {
+  font-size:18px;color:var(--ink);
+  background:var(--hl-05);
+  border-radius:8px;padding:8px 10px;margin:6px 0;
+}
+@media(max-width:480px){:root {--cell:30px}#linEngineArea .eqline {font-size:21px}#linEngineArea input.num {width:90px}
+}
+
+
+#quadEngineArea * {box-sizing:border-box;margin:0;padding:0}#quadEngineArea body {
+  background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--bg);
+  background-size:auto,auto,24px 24px,24px 24px,auto;
+  font-family:var(--font-ui);
+  color:var(--pencil);
+  min-height:100vh;
+  padding:18px 12px 60px;
+}#quadEngineArea .wrap {max-width:1040px;margin:0 auto}#quadEngineArea h1 {font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(26px,5vw,38px);color:var(--pencil);text-align:center;}#quadEngineArea .sub {font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 18px;}#quadEngineArea .levels {display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px}#quadEngineArea .lvl {font-family:var(--font-ui);font-weight:600;font-size:14px;border:1px solid var(--glass-border);background:var(--glass);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border-radius:999px;padding:8px 16px;cursor:pointer;color:var(--muted-3);transition:all .15s;}#quadEngineArea .lvl:hover {border-color:var(--ink)}#quadEngineArea .lvl.active {background:var(--ink);border-color:var(--ink);color:#fff;box-shadow:0 6px 16px var(--hl-35);}#quadEngineArea .lvl .done-mark {color:#FFB800;margin-left:4px;}#quadEngineArea /* ─── тетрадный лист ─── */
+.sheet {
+  position:relative;
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--paper);
+  background-size:34px 34px;
+  border:1px solid var(--glass-border);
+  border-radius:20px;
+  box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);
+  padding:34px 24px 34px 68px;
+  min-height:280px;
+}#quadEngineArea .sheet::before {
+  content:'';
+  position:absolute;
+  top:0;bottom:0;
+  left:51px;
+  width:2px;
+  background:var(--margin-red);
+  opacity:.55;
+}#quadEngineArea .corner {font-family:var(--font-ui);font-weight:500;position:absolute;top:6px;right:12px;color:var(--muted-1);font-size:13px;display:flex;align-items:center;gap:8px;}#quadEngineArea .refresh-btn {width:28px;height:28px;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}#quadEngineArea .refresh-btn:hover {border-color:var(--ink);transform:rotate(80deg)}#quadEngineArea .refresh-btn:active {transform:scale(.9)}#quadEngineArea .eqline {
+  font-size:26px;
+  color:var(--ink);
+  line-height:34px;
+  margin-bottom:0;
+}#quadEngineArea .stepline {
+  font-family:var(--font-mono);
+  font-size:21px;
+  color:var(--moved);
+  background:rgba(91,135,232,.10);
+  display:flex;
+  align-items:center;
+  width:fit-content;
+  line-height:1.15;
+  height:34px;
+  padding:0 12px;
+  border-radius:9px;
+  margin:0;
+}#quadEngineArea .stepline.stepline-frac {height:102px}#quadEngineArea .stepline.ok {
+  color:var(--ok);
+  background:rgba(46,125,83,.08);
+  font-family:var(--font-ui);
+  font-size:22px;
+  display:block;
+  line-height:34px;
+  margin-top:0;
+  padding:0 4px;
+}#quadEngineArea .steps-wrap {margin-top:0;display:flex;flex-direction:column}#quadEngineArea /* ─── панель вопроса ─── */
+.panel {background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:20px;margin-top:16px;}#quadEngineArea .prompt {font-family:var(--font-ui);font-weight:500;font-size:clamp(17px,3.2vw,20px);color:var(--muted-5);margin-bottom:12px;line-height:1.4;}#quadEngineArea .prompt b {color:var(--ink)}#quadEngineArea .inrow {display:flex;gap:10px;align-items:center;flex-wrap:wrap}#quadEngineArea input.num {
+  font-family:var(--font-mono);
+  font-size:24px;
+  padding:9px 12px;
+  border:1px solid var(--glass-border);
+  background:var(--card);
+  border-radius:14px 0 0 14px;
+  border-right:none;
+  color:var(--ink);
+  width:110px;
+}#quadEngineArea input.num.small {width:92px}#quadEngineArea input.num:focus {outline:none;border-color:var(--ink)}#quadEngineArea .num-wrap {display:inline-flex;align-items:stretch;vertical-align:middle}#quadEngineArea .spin {display:flex;flex-direction:column;border:1px solid var(--glass-border);background:var(--card);border-radius:0 14px 14px 0;overflow:hidden;}#quadEngineArea .spin-btn {flex:1;width:32px;border:none;background:transparent;color:var(--ink);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;touch-action:manipulation;}#quadEngineArea .spin-btn:first-child {border-bottom:1px solid var(--glass-border);}#quadEngineArea .spin-btn:active {background:var(--hl);}#quadEngineArea .keypad {display:grid;grid-template-columns:repeat(3, 44px);gap:6px;}#quadEngineArea .keypad button {width:44px;height:40px;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-mono);font-size:18px;cursor:pointer;touch-action:manipulation;}#quadEngineArea .keypad button:active {background:var(--hl);}#quadEngineArea .keypad button.kp-minus {color:var(--teacher);font-weight:700;}#quadEngineArea .keypad button.kp-x {color:var(--moved);font-weight:700;font-style:italic}#quadEngineArea .keypad button.kp-back {font-size:15px;color:var(--muted-6);}#quadEngineArea .keypad button.kp-enter {grid-column:span 2;width:auto;height:40px;font-family:var(--font-ui);font-weight:600;font-size:14px;background:var(--ink);color:#fff;border-color:var(--ink);}#quadEngineArea .keypad button.kp-enter:active {background:var(--ink-active);}#quadEngineArea .keypad-float {position:fixed;top:112px;right:16px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:50;}#quadEngineArea .keypad-close {position:absolute;top:-11px;right:-11px;width:26px;height:26px;border-radius:50%;background:var(--teacher);color:#fff;border:2px solid #fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}#quadEngineArea .keypad-drag-handle {position:absolute;top:-11px;left:-11px;width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;border:2px solid #fff;font-size:12px;line-height:1;cursor:grab;display:flex;align-items:center;justify-content:center;touch-action:none;}#quadEngineArea .keypad-drag-handle:active {cursor:grabbing;}#quadEngineArea .keypad-toggle {position:fixed;top:112px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50;}
+@media(max-width:720px){#quadEngineArea .keypad-float {top:auto;bottom:16px;right:16px}}#quadEngineArea input.num.shake {animation:shake .35s}
+@keyframes shake{
+  20%{transform:translateX(-7px)}40%{transform:translateX(7px)}
+  60%{transform:translateX(-5px)}80%{transform:translateX(5px)}
+}#quadEngineArea button.go {font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ink);color:#fff;border:none;border-radius:14px;padding:11px 26px;cursor:pointer;box-shadow:0 6px 18px var(--hl-35);}#quadEngineArea button.go:active {transform:scale(.96)}#quadEngineArea .choices {display:flex;flex-wrap:wrap;gap:10px}#quadEngineArea .eqline2 {display:flex;align-items:center;flex-wrap:wrap;gap:6px;font-size:26px;color:var(--ink);min-height:50px}#quadEngineArea .eq-sign {padding:0 4px;color:var(--pencil)}#quadEngineArea .term {display:inline-flex;align-items:center;padding:5px 12px;border-radius:10px;background:var(--hl-06);border:2px solid transparent;white-space:nowrap;line-height:1}#quadEngineArea .term.moved {color:var(--moved);background:rgba(91,135,232,.14)}#quadEngineArea .term.tap {cursor:pointer;border-color:var(--hl-35);border-style:dashed;transition:transform .12s,border-color .12s}#quadEngineArea .term.tap:hover {transform:translateY(-2px);border-color:var(--ink)}#quadEngineArea .term.shake {animation:shake .35s}#quadEngineArea .term.pop {animation:pop .45s}
+@keyframes pop{0%{transform:scale(1)}50%{transform:scale(1.35)}100%{transform:scale(1)}}#quadEngineArea .flyer {position:fixed;z-index:50;display:inline-flex;align-items:center;padding:5px 12px;border-radius:10px;background:#FFF8E8;box-shadow:0 6px 18px rgba(0,0,0,.18);font-family:var(--font-mono);font-size:26px;color:var(--ink);pointer-events:none;transition:left .65s cubic-bezier(.4,.1,.3,1), top .65s cubic-bezier(.4,.1,.3,1);white-space:nowrap}#quadEngineArea .flyer.flip {color:var(--moved);animation:pop .45s}#quadEngineArea .divbar {display:inline-block;width:0;border-left:2.5px solid var(--ink);height:40px;margin:0 10px 0 14px;vertical-align:middle;animation:grow .5s ease}
+@keyframes grow{from{transform:scaleY(0)}}#quadEngineArea .divcolon {font-size:24px;color:var(--ink);animation:fadein .4s .3s backwards}
+@keyframes fadein{from{opacity:0}}#quadEngineArea .strikeable {position:relative;display:inline-block;padding:0 2px}#quadEngineArea .strikeable::after {content:'';position:absolute;left:-4%;top:52%;width:108%;height:3px;background:var(--teacher);border-radius:2px;transform:rotate(-16deg) scaleX(0);transform-origin:left center;transition:transform .5s ease}#quadEngineArea .strikeable.struck::after {transform:rotate(-16deg) scaleX(1)}#quadEngineArea .strikeable.struck {color:var(--muted-7);transition:color .5s .3s}#quadEngineArea .frac {display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.15;margin:0 2px}#quadEngineArea .frac-input {display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;margin:0 6px}#quadEngineArea .frac-cell {
+  width:64px;
+  text-align:center;
+  font-family:var(--font-mono);
+  font-size:20px;
+  padding:5px 6px;
+  border:1px solid var(--glass-border);
+  background:var(--card);
+  border-radius:8px;
+  color:var(--ink);
+}#quadEngineArea .frac-cell:focus {outline:none;border-color:var(--ink)}#quadEngineArea .frac-line {width:64px;height:2.5px;background:var(--ink);margin:5px 0}#quadEngineArea .frac .den {border-top:3px solid var(--ink);padding:5px 8px 0}#quadEngineArea .frac .num {padding:0 8px 5px}#quadEngineArea .factor-row {display:flex;align-items:flex-end;gap:5px;flex-wrap:wrap}#quadEngineArea .fbox {display:flex;flex-direction:column;align-items:center;gap:4px}#quadEngineArea .paren-box {
+  height:44px;
+  display:flex;
+  align-items:center;
+  font-size:26px;
+  color:var(--pencil);
+  padding:0 2px;
+}#quadEngineArea .fcap {font-family:var(--font-ui);font-size:12px;color:var(--muted-8);white-space:nowrap;line-height:1.1}#quadEngineArea .signtoggle {display:flex;gap:4px}#quadEngineArea .sbtn {
+  width:34px;height:38px;
+  border:2px solid var(--grid);
+  border-radius:8px;
+  background:var(--card);
+  color:var(--ink);
+  font-size:20px;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-family:var(--font-mono);
+}#quadEngineArea .sbtn.active {background:var(--ink);color:#fff;border-color:var(--ink)}#quadEngineArea .sbtn.shake {animation:shake .35s;border-color:var(--teacher)}#quadEngineArea .split-row {display:flex;gap:14px;flex-wrap:wrap;width:100%}#quadEngineArea .split-half {
+  flex:1;min-width:170px;
+  background:var(--hl-04);
+  border:1.5px solid var(--grid);
+  border-radius:12px;
+  padding:14px;
+  transition:all .2s;
+}#quadEngineArea .split-half.done {background:rgba(91,135,232,.12);border-color:var(--moved)}#quadEngineArea .split-eq {font-size:21px;color:var(--ink);margin-bottom:10px}#quadEngineArea .split-inrow {display:flex;gap:8px;align-items:center}#quadEngineArea .go-small {padding:8px 16px;font-size:19px}#quadEngineArea .split-hint {font-family:var(--font-ui);color:var(--teacher);font-size:15px;margin-top:6px;min-height:18px;line-height:1.25}#quadEngineArea .auto-reveal {
+  font-family:var(--font-mono);
+  font-size:24px;
+  color:var(--moved);
+  background:rgba(91,135,232,.12);
+  display:inline-block;
+  padding:10px 18px;
+  border-radius:12px;
+  opacity:0;
+  transform:translateY(8px);
+  transition:opacity .5s ease, transform .5s ease;
+}#quadEngineArea .auto-reveal.visible {
+  opacity:1;
+  transform:translateY(0);
+}#quadEngineArea .choice-btn {
+  font-family:var(--font-ui);
+  font-size:20px;
+  background:var(--card);
+  border:2.5px solid var(--grid);
+  color:var(--ink);
+  border-radius:12px;
+  padding:10px 18px;
+  cursor:pointer;
+  transition:all .15s;
+}#quadEngineArea .choice-btn:hover {border-color:var(--ink)}#quadEngineArea .choice-btn.shake {animation:shake .35s;border-color:var(--teacher)}#quadEngineArea .lbl {font-size:26px;color:var(--pencil)}#quadEngineArea .hint {font-family:var(--font-ui);font-weight:500;color:var(--teacher);font-size:15px;margin-top:12px;min-height:20px;line-height:1.4;}#quadEngineArea .hint.good {color:var(--ok)}#quadEngineArea .next-btn {font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:8px;box-shadow:0 6px 18px var(--ok-shadow);}#quadEngineArea /* ─── статистика ─── */
+.stats {display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}#quadEngineArea .stat {flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:12px 14px;text-align:center;}#quadEngineArea .stat .v {font-family:var(--font-ui);font-weight:700;font-size:22px;color:var(--ink);}#quadEngineArea .stat .l {font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-6);}#quadEngineArea .stars {color:#FFB800;font-size:20px;letter-spacing:2px;}#quadEngineArea /* ─── теория ─── */
+.theory {display:flex;gap:14px;margin-top:16px;flex-wrap:wrap;align-items:stretch}#quadEngineArea .tcard {flex:1;min-width:290px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:18px 20px;}#quadEngineArea .tt {font-family:var(--font-ui);font-weight:700;font-size:17px;color:var(--pencil);margin-bottom:10px;}#quadEngineArea .tex {font-size:18px;color:var(--ink);background:var(--hl-05);border-radius:8px;padding:8px 10px;margin:6px 0}#quadEngineArea .talg {font-family:var(--font-ui);font-weight:400;font-size:14px;color:var(--muted-4);padding-left:20px;line-height:1.6;}#quadEngineArea .talg li {margin:5px 0;}#quadEngineArea .ttrap {font-family:var(--font-ui);font-weight:500;font-size:13px;color:var(--teacher);margin-top:8px;line-height:1.45;}#quadEngineArea .abc-legend {
+  font-size:26px;
+  display:flex;
+  align-items:center;
+  gap:2px;
+  flex-wrap:wrap;
+  margin-bottom:12px;
+}#quadEngineArea .abc-legend .tag {
+  padding:3px 10px;
+  border-radius:9px;
+  font-weight:700;
+}#quadEngineArea .abc-legend .t-a {background:#E3EBFF;color:var(--ink)}#quadEngineArea .abc-legend .t-b {background:#FFE8E4;color:var(--teacher)}#quadEngineArea .abc-legend .t-c {background:#E1F3E8;color:var(--ok)}#quadEngineArea .abc-def {
+  font-family:var(--font-ui);
+  font-size:19px;
+  color:var(--muted-4);
+  margin:6px 0;
+  display:flex;
+  gap:9px;
+  align-items:baseline;
+  line-height:1.4;
+}#quadEngineArea .abc-def .dot {width:13px;height:13px;border-radius:50%;flex:0 0 13px;transform:translateY(1px)}#quadEngineArea .d-a {background:#7C97E8}#quadEngineArea .d-b {background:#E8837B}#quadEngineArea .d-c {background:#69BC8C}
+@media(max-width:480px){#quadEngineArea .sheet {padding-left:56px}#quadEngineArea .eqline {font-size:22px}
+}
+
+
+</style>
+</head>
+<body>
+<a class="home-btn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
+<button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<button class="theme-toggle board-visibility-toggle" id="boardVisibilityToggle" title="Показать доску" aria-label="Показать/скрыть доску">🖊️</button>
+<script>(function(){
+  var btn=document.getElementById('themeToggle');
+  function apply(t, persist){
+    document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    if (persist) { try{ localStorage.setItem('theme', t); }catch(e){} }
+  }
+  apply(document.documentElement.getAttribute('data-theme') || 'light', false);
+  btn.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur, true);
+  });
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onSystemChange = function(e){
+      var explicit = false;
+      try{ explicit = !!localStorage.getItem('theme'); }catch(err){}
+      if (explicit) return;
+      apply(e.matches ? 'dark' : 'light', false);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
+    else if (mq.addListener) mq.addListener(onSystemChange);
+  }
+})();</script>
+<script>(function(){
+  var btn = document.getElementById('boardVisibilityToggle');
+  function apply(on){
+    document.documentElement.setAttribute('data-board', on ? 'on' : 'off');
+    btn.classList.toggle('active', on);
+    btn.title = on ? 'Скрыть доску' : 'Показать доску';
+  }
+  apply(false); // доска изначально выключена
+  btn.addEventListener('click', function(){
+    apply(document.documentElement.getAttribute('data-board') !== 'on');
+  });
+})();</script>
+
+<canvas id="boardCanvas"></canvas>
+<div class="board-toolbar" id="boardToolbar">
+  <div class="tool-group">
+    <button class="board-tool-btn pen-main active" data-tool="pen" title="Ручка">✏️</button>
+    <div class="size-flyout">
+      <button class="board-tool-btn" data-tool="pen" data-width="1" title="Самая тонкая"><span class="dot" style="width:4px;height:4px"></span></button>
+      <button class="board-tool-btn active" data-tool="pen" data-width="2" title="Тонкая"><span class="dot" style="width:6px;height:6px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="3" title="Тонкая+"><span class="dot" style="width:8px;height:8px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="4" title="Средняя"><span class="dot" style="width:11px;height:11px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="6" title="Средняя+"><span class="dot" style="width:15px;height:15px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="9" title="Толстая"><span class="dot" style="width:20px;height:20px"></span></button>
+    </div>
+  </div>
+  <span class="toolbar-sep"></span>
+  <button class="board-tool-btn color-btn active" data-color="#000000" title="Чёрный"><span class="dot" style="width:14px;height:14px;background:#000000"></span></button>
+  <button class="board-tool-btn color-btn" data-color="#FF3B30" title="Красный"><span class="dot" style="width:14px;height:14px;background:#FF3B30"></span></button>
+  <button class="board-tool-btn color-btn" data-color="#0A84FF" title="Синий"><span class="dot" style="width:14px;height:14px;background:#0A84FF"></span></button>
+  <div class="tool-group">
+    <button class="board-tool-btn color-btn custom-color-btn" data-color="#AF52DE" title="Свой цвет" id="customColorBtn">
+      <span class="dot custom-color-dot" id="customColorDot" style="width:16px;height:16px;background:conic-gradient(from 180deg,#ff0000,#ffff00,#00ff00,#00ffff,#0000ff,#ff00ff,#ff0000)"></span>
+    </button>
+    <div class="size-flyout color-picker-flyout">
+      <div class="cp-sv-wrap">
+        <canvas id="cpSvCanvas" class="cp-sv" width="176" height="120"></canvas>
+        <div class="cp-sv-thumb" id="cpSvThumb"></div>
+      </div>
+      <div class="cp-row">
+        <button class="cp-eyedropper" id="cpEyedropper" title="Пипетка — взять цвет с экрана" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19.2 3.8a2.7 2.7 0 0 1 0 3.8l-1.4 1.4-3.8-3.8L15.4 3.8a2.7 2.7 0 0 1 3.8 0Z" fill="currentColor"></path>
+            <path d="M12.6 6.6l3.8 3.8L6 20.8l-4 1 1-4L12.6 6.6Z" fill="currentColor"></path>
+          </svg>
+        </button>
+        <div class="cp-swatch" id="cpSwatch"></div>
+        <div class="cp-hue-wrap">
+          <div class="cp-hue" id="cpHue"></div>
+          <div class="cp-hue-thumb" id="cpHueThumb"></div>
+        </div>
+      </div>
+      <div class="cp-rgb-row">
+        <div class="cp-field"><input type="text" inputmode="numeric" maxlength="3" id="cpR" value="0"><label>R</label></div>
+        <div class="cp-field"><input type="text" inputmode="numeric" maxlength="3" id="cpG" value="0"><label>G</label></div>
+        <div class="cp-field"><input type="text" inputmode="numeric" maxlength="3" id="cpB" value="0"><label>B</label></div>
+      </div>
+    </div>
+  </div>
+  <span class="toolbar-sep"></span>
+  <button class="board-tool-btn" data-tool="line" title="Прямая линия">╱</button>
+  <div class="tool-group">
+    <button class="board-tool-btn eraser" data-tool="eraser" title="Ластик">🧽</button>
+    <div class="size-flyout">
+      <button class="board-tool-btn" data-tool="eraser" data-size="14" title="Маленький ластик"><span class="dot" style="width:6px;height:6px"></span></button>
+      <button class="board-tool-btn" data-tool="eraser" data-size="26" title="Средний ластик"><span class="dot" style="width:10px;height:10px"></span></button>
+      <button class="board-tool-btn" data-tool="eraser" data-size="44" title="Большой ластик"><span class="dot" style="width:16px;height:16px"></span></button>
+    </div>
+  </div>
+</div>
+
+<div class="board-view-toolbar" id="boardViewToolbar">
+  <button class="board-tool-btn" id="zoomOutBtn" title="Уменьшить">−</button>
+  <button class="board-zoom-label" id="zoomResetBtn" title="Сбросить вид">100%</button>
+  <button class="board-tool-btn" id="zoomInBtn" title="Увеличить">+</button>
+  <span class="toolbar-sep"></span>
+  <button class="board-tool-btn hand-tool" data-tool="hand" title="Рука — перемещать доску">✋</button>
+  <button class="board-tool-btn clear-btn" id="clearBoardBtn" title="Стереть всё">🗑️</button>
+</div>
+
+<div class="wrap">
+  <h1>ОГЭ №9. Уравнения</h1>
+  <div class="sub">линейные и квадратные — в полном виде, как в отдельных тренажёрах, плюс дробно-рациональные</div>
+
+  <div id="pickerArea">
+    <div class="modes">
+      <div class="mode-card" data-id="linear"><div class="mtitle">Линейное уравнение</div><div class="msub">перенос слагаемых, скобки, деление — по шагам</div></div>
+      <div class="mode-card" data-id="quadratic"><div class="mtitle">Квадратное уравнение</div><div class="msub">от простых случаев до дискриминанта — по шагам</div></div>
+      <div class="mode-card" data-id="rational"><div class="mtitle">Дробно-рациональное уравнение</div><div class="msub">равенство дроби нулю</div></div>
+    </div>
+  </div>
+
+  <div id="taskArea" style="display:none">
+    <div class="task-head">
+      <button class="back-btn" id="backBtn">← все типы</button>
+      <div class="corner">
+        <div class="task-title" id="taskTitle"></div>
+        <button class="refresh-btn" id="mcqRefreshBtn" title="Обновить задание">⟳</button>
+      </div>
+    </div>
+
+    <div class="submode-tabs">
+      <button class="submode-tab" id="tabLearn">Обучение</button>
+      <button class="submode-tab" id="tabPractice">Тренировка</button>
+      <button class="submode-tab active" id="tabExam">Экзамен</button>
+    </div>
+
+    <div class="panel coming-soon" id="comingSoonPanel" style="display:none"></div>
+
+    <div class="panel" id="questionPanel" style="display:none">
+      <div class="prompt" id="questionPromptText"></div>
+      <div class="mcq-title">Варианты ответа:</div>
+      <div class="mcq-options" id="mcqOptions"></div>
+      <button class="change-answer-btn" id="changeAnswerBtn" style="display:none">✎ Изменить ответ</button>
+    </div>
+
+    <div class="panel" id="mainPanel" style="display:none">
+      <div class="explain" id="explainBox" style="display:none"></div>
+      <button class="next-btn" id="nextBtn" style="display:none">Следующий пример →</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="v" id="mcqStSolved">0</div><div class="l">решено</div></div>
+      <div class="stat"><div class="v" id="stErrors">0</div><div class="l">ошибок</div></div>
+      <div class="stat"><div class="v" id="mcqStStreak">0</div><div class="l">серия без ошибок</div></div>
+    </div>
+  </div>
+
+  <div id="linEngineArea" style="display:none"></div>
+
+  <div id="quadEngineArea" style="display:none"></div>
+<div id="boardSpace" aria-hidden="true"></div></div>
+
+<script>
+const LIN_ENGINE_HTML = "<button class=\"back-btn\" id=\"linBackBtn\">← все типы</button><div class=\"wrap\">\n  <h1>Линейные уравнения</h1>\n  <div class=\"sub\">переносим — знак меняется! раскрываем скобки фонтанчиком, считаем и делим</div>\n\n  <div class=\"levels\" id=\"levels\"></div>\n\n  <div class=\"sheet\">\n    <div class=\"corner\" id=\"cornerWrap\">\n      <button class=\"refresh-btn\" id=\"refreshBtn\" title=\"Обновить пример\">⟳</button>\n      <span id=\"taskNum\">пример №1</span>\n    </div>\n    <div id=\"frozen\"></div>\n    <div id=\"live\"></div>\n  </div>\n\n  <div class=\"panel\">\n    <div class=\"prompt\" id=\"prompt\"></div>\n    <div class=\"inrow\" id=\"inputArea\"></div>\n    <button class=\"next-btn\" id=\"nextBtn\" style=\"display:none\">Следующее уравнение →</button>\n    <div class=\"hint\" id=\"hint\"></div>\n  </div>\n\n  <div class=\"stats\">\n    <div class=\"stat\"><div class=\"v\" id=\"stSolved\">0</div><div class=\"l\">решено</div></div>\n    <div class=\"stat\"><div class=\"v\" id=\"stStreak\">0</div><div class=\"l\">серия без ошибок</div></div>\n    <div class=\"stat\"><div class=\"v stars\" id=\"stStars\">—</div><div class=\"l\">это уравнение</div></div>\n  </div>\n\n  <div class=\"theory\">\n    <div class=\"tcard\">\n      <div class=\"tt\">Алгоритм</div>\n      <ol class=\"talg\">\n        <li>Переносим: слагаемые <b>с x — влево</b>, <b>числа — вправо</b>. При переносе через «=» знак меняется на противоположный!</li>\n        <li>Приводим подобные: считаем иксы слева, числа справа.</li>\n        <li>Делим <b>обе части</b> на число перед x.</li>\n      </ol>\n      <div class=\"tex\">5x − 7 = 2x + 8 &nbsp;→&nbsp; 5x − 2x = 8 + 7 &nbsp;→&nbsp; 3x = 15 &nbsp;→&nbsp; x = 5</div>\n    </div>\n    <div class=\"tcard\">\n      <div class=\"tt\">Ловушки</div>\n      <div class=\"ttrap\">⚠ Знак меняется только у тех слагаемых, которые переносим. Кто остался на месте — знак не трогаем!</div>\n      <div class=\"ttrap\">⚠ Делим именно на число перед x — со всеми его знаками. Если там −3, делим на −3.</div>\n      <div class=\"ttrap\">⚠ Минус на плюс при делении даёт минус: 12 : (−3) = −4.</div>\n      <div class=\"ttrap\">⚠ Проверяй себя подстановкой: подставь ответ в исходное уравнение.</div>\n    </div>\n  </div>\n</div><button class=\"keypad-toggle\" id=\"lin_kpToggle\" title=\"Показать клавиатуру\" style=\"display:none\">⌨</button>\n<div class=\"keypad-float\" id=\"lin_keypadFloat\" style=\"display:none\">\n  <button class=\"keypad-drag-handle\" id=\"lin_kpDragHandle\" title=\"Перетащить клавиатуру\" aria-label=\"Переместить клавиатуру\">✋</button>\n  <button class=\"keypad-close\" id=\"lin_kpClose\" title=\"Скрыть клавиатуру\">✕</button>\n  <div class=\"keypad\" id=\"lin_keypadButtons\"></div>\n</div>";
+const QUAD_ENGINE_HTML = "<button class=\"back-btn\" id=\"quadBackBtn\">← все типы</button><div class=\"wrap\">\n  <h1>Квадратные уравнения</h1>\n  <div class=\"sub\">от простых случаев до дискриминанта — шаг за шагом, без готовых ответов</div>\n\n  <div class=\"levels\" id=\"levels\"></div>\n\n  <div class=\"sheet\">\n    <div class=\"corner\">\n      <button class=\"refresh-btn\" id=\"refreshBtn\" title=\"Обновить пример\">⟳</button>\n      <span id=\"taskNum\">пример №1</span>\n    </div>\n    <div class=\"eqline\" id=\"eqLine\"></div>\n    <div class=\"steps-wrap\" id=\"frozen\"></div>\n  </div>\n\n  <div class=\"panel\">\n    <div class=\"prompt\" id=\"prompt\"></div>\n    <div class=\"inrow\" id=\"inputArea\"></div>\n    <button class=\"next-btn\" id=\"nextBtn\" style=\"display:none\">Следующий пример →</button>\n    <div class=\"hint\" id=\"hint\"></div>\n  </div>\n\n  <div class=\"stats\">\n    <div class=\"stat\"><div class=\"v\" id=\"stSolved\">0</div><div class=\"l\">решено</div></div>\n    <div class=\"stat\"><div class=\"v\" id=\"stStreak\">0</div><div class=\"l\">серия без ошибок</div></div>\n    <div class=\"stat\"><div class=\"v stars\" id=\"stStars\">—</div><div class=\"l\">этот пример</div></div>\n  </div>\n\n  <div class=\"theory\">\n    <div class=\"tcard\">\n      <div class=\"tt\">Формулы</div>\n      <div class=\"abc-legend\"><span class=\"tag t-a\">a</span>x² + <span class=\"tag t-b\">b</span>x + <span class=\"tag t-c\">c</span> = 0</div>\n      <div class=\"abc-def\"><span class=\"dot d-a\"></span><b>a</b> — коэффициент перед x² (стоит прямо перед иксом в квадрате).</div>\n      <div class=\"abc-def\"><span class=\"dot d-b\"></span><b>b</b> — коэффициент перед x (стоит перед одиночным иксом).</div>\n      <div class=\"abc-def\"><span class=\"dot d-c\"></span><b>c</b> — свободный член: число без иксов вообще.</div>\n      <div class=\"tex\">D = b² − 4ac</div>\n      <div class=\"tex\">x = <span class=\"frac\"><span class=\"num\">−b ± √D</span><span class=\"den\">2a</span></span> &nbsp;— при D &gt; 0</div>\n      <div class=\"tex\">x = <span class=\"frac\"><span class=\"num\">−b</span><span class=\"den\">2a</span></span> &nbsp;— при D = 0</div>\n      <div class=\"tt\" style=\"margin-top:14px;font-size:20px\">Теорема Виета</div>\n      <div class=\"tex\">ax² + bx + c = 0</div>\n      <div class=\"tex\">x₁ + x₂ = <span class=\"frac\"><span class=\"num\">−b</span><span class=\"den\">a</span></span></div>\n      <div class=\"tex\">x₁ · x₂ = <span class=\"frac\"><span class=\"num\">c</span><span class=\"den\">a</span></span></div>\n    </div>\n    <div class=\"tcard\">\n      <div class=\"tt\">Особые случаи</div>\n      <ul class=\"talg\">\n        <li><b>D &gt; 0</b> — два корня.</li>\n        <li><b>D = 0</b> — один корень (два совпавших).</li>\n        <li><b>D &lt; 0</b> — действительных корней нет.</li>\n      </ul>\n      <div class=\"ttrap\">⚠ В ax²+bx=0 корень x=0 — тоже настоящий корень, его легко потерять.</div>\n      <div class=\"ttrap\">⚠ В ax²+c=0 при x²&gt;0 корней два: +√N и −√N — <b>потому что и положительное, и отрицательное число в квадрате дают одно и то же N.</b></div>\n      <div class=\"ttrap\">⚠ Квадрат отрицательного числа положителен — не теряй знак при возведении b в квадрат.</div>\n    </div>\n  </div>\n</div><button class=\"keypad-toggle\" id=\"quad_kpToggle\" title=\"Показать клавиатуру\" style=\"display:none\">⌨</button>\n<div class=\"keypad-float\" id=\"quad_keypadFloat\" style=\"display:none\">\n  <button class=\"keypad-drag-handle\" id=\"quad_kpDragHandle\" title=\"Перетащить клавиатуру\" aria-label=\"Переместить клавиатуру\">✋</button>\n  <button class=\"keypad-close\" id=\"quad_kpClose\" title=\"Скрыть клавиатуру\">✕</button>\n  <div class=\"keypad\" id=\"quad_keypadButtons\"></div>\n</div>";
+</script>
+
+<script>
+/* ═══════════════ утилиты (общий MCQ-движок для дробно-рационального) ═══════════════ */
+const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function shuffleArr(arr) {
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+function buildOptions(correct, candidates, fallbackGen) {
+  const seen = new Set([correct]);
+  const picked = [];
+  for (const c of candidates) {
+    if (!seen.has(c)) { seen.add(c); picked.push(c); }
+    if (picked.length === 3) break;
+  }
+  let guard = 0;
+  while (picked.length < 3 && guard < 30) {
+    guard++;
+    const extra = fallbackGen(guard);
+    if (!seen.has(extra)) { seen.add(extra); picked.push(extra); }
+  }
+  return shuffleArr([correct, ...picked]);
+}
+
+function gen_rational_eq() {
+  const a = ri(-9,9);
+  let b = ri(-9,9);
+  while (b===a) b = ri(-9,9);
+  const term = v => v>=0? `x − ${v}` : `x + ${Math.abs(v)}`;
+  const correct = a;
+  const wrong1 = b;
+  const wrong2 = a+b;
+  const wrong3 = -a;
+  const options = buildOptions(String(correct), shuffleArr([wrong1,wrong2,wrong3]).map(String), k=>String(correct+(k%2?1:-1)*k));
+  return {
+    prompt: `Решите уравнение:<br><b>(${term(a)}) / (${term(b)}) = 0</b>`,
+    options, correctIndex: options.indexOf(String(correct)),
+    explain: `Дробь равна нулю, когда числитель равен нулю, а знаменатель — нет: x = ${a} (при этом x ≠ ${b}, что выполняется).`
+  };
+}
+
+/* ═══════════════ управление (общий MCQ-движок) ═══════════════ */
+let totalSolved = 0, streak = 0, totalErrors = 0;
+let curTask = null, taskAnswered = false, optionsLocked = false, hadWrongPick = false;
+
+const els = {
+  picker: document.getElementById('pickerArea'),
+  taskArea: document.getElementById('taskArea'),
+  backBtn: document.getElementById('backBtn'),
+  taskTitle: document.getElementById('taskTitle'),
+  refreshBtn: document.getElementById('mcqRefreshBtn'),
+  tabLearn: document.getElementById('tabLearn'),
+  tabPractice: document.getElementById('tabPractice'),
+  tabExam: document.getElementById('tabExam'),
+  comingSoonPanel: document.getElementById('comingSoonPanel'),
+  questionPanel: document.getElementById('questionPanel'),
+  questionPromptText: document.getElementById('questionPromptText'),
+  mcqOptions: document.getElementById('mcqOptions'),
+  changeAnswerBtn: document.getElementById('changeAnswerBtn'),
+  mainPanel: document.getElementById('mainPanel'),
+  explainBox: document.getElementById('explainBox'),
+  nextBtn: document.getElementById('nextBtn'),
+  stSolved: document.getElementById('mcqStSolved'),
+  stErrors: document.getElementById('stErrors'),
+  stStreak: document.getElementById('mcqStStreak'),
+};
+
+const COMING_SOON_TEXT = {
+  learn: '🚧 Режим «Обучение» ещё в разработке. Здесь появится подробное объяснение решения — со всеми подсказками, шаг за шагом.',
+  practice: '🚧 Режим «Тренировка» ещё в разработке. Здесь будут задания с частью подсказок — уже поменьше, чем в «Обучении».',
+};
+
+let curSubMode = 'exam';
+
+function hideAllViews(){
+  els.picker.style.display = 'none';
+  els.taskArea.style.display = 'none';
+  const linArea = document.getElementById('linEngineArea');
+  const quadArea = document.getElementById('quadEngineArea');
+  linArea.style.display = 'none';
+  quadArea.style.display = 'none';
+  // tear down whichever custom engine was mounted, so their internal ids
+  // (shared between the two engines, e.g. #refreshBtn/#prompt/#goBtn) never
+  // coexist in the DOM at the same time
+  linArea.innerHTML = '';
+  quadArea.innerHTML = '';
+}
+function showPicker(){
+  hideAllViews();
+  els.picker.style.display = 'block';
+  window.scrollTo(0,0);
+}
+
+document.querySelectorAll('.mode-card').forEach(card => {
+  card.onclick = () => {
+    const id = card.dataset.id;
+    hideAllViews();
+    window.scrollTo(0,0);
+    if (id === 'linear') {
+      const area = document.getElementById('linEngineArea');
+      area.innerHTML = LIN_ENGINE_HTML;
+      area.style.display = 'block';
+      document.getElementById('linBackBtn').onclick = showPicker;
+      window.startLinearEngine();
+    } else if (id === 'quadratic') {
+      const area = document.getElementById('quadEngineArea');
+      area.innerHTML = QUAD_ENGINE_HTML;
+      area.style.display = 'block';
+      document.getElementById('quadBackBtn').onclick = showPicker;
+      window.startQuadraticEngine();
+    } else if (id === 'rational') {
+      els.taskArea.style.display = 'block';
+      els.taskTitle.textContent = 'Дробно-рациональное уравнение';
+      switchSubMode('exam');
+    }
+  };
+});
+els.backBtn.onclick = showPicker;
+
+function switchSubMode(mode) {
+  curSubMode = mode;
+  els.tabLearn.classList.toggle('active', mode === 'learn');
+  els.tabPractice.classList.toggle('active', mode === 'practice');
+  els.tabExam.classList.toggle('active', mode === 'exam');
+
+  if (mode === 'exam') {
+    els.comingSoonPanel.style.display = 'none';
+    els.refreshBtn.style.display = 'inline-flex';
+    newTask();
+  } else {
+    els.questionPanel.style.display = 'none';
+    els.mainPanel.style.display = 'none';
+    els.refreshBtn.style.display = 'none';
+    els.comingSoonPanel.textContent = COMING_SOON_TEXT[mode];
+    els.comingSoonPanel.style.display = 'block';
+  }
+}
+els.tabLearn.onclick = () => switchSubMode('learn');
+els.tabPractice.onclick = () => switchSubMode('practice');
+els.tabExam.onclick = () => switchSubMode('exam');
+els.refreshBtn.onclick = () => { if (curSubMode === 'exam') newTask(); };
+
+function newTask() {
+  curTask = gen_rational_eq();
+  taskAnswered = false;
+  optionsLocked = false;
+  hadWrongPick = false;
+
+  window.scrollTo(0, 0);
+
+  els.questionPanel.style.display = 'block';
+  els.questionPromptText.innerHTML = curTask.prompt;
+
+  els.mcqOptions.innerHTML = curTask.options.map((opt, i) =>
+    `<button class="mcq-btn" data-i="${i}"><span class="mlabel">${i + 1})</span><span>${opt}</span></button>`
+  ).join('');
+  els.changeAnswerBtn.style.display = 'none';
+  attachMCQHandlers();
+
+  els.mainPanel.style.display = 'none';
+  els.explainBox.style.display = 'none';
+  els.nextBtn.style.display = 'none';
+}
+
+function attachMCQHandlers() {
+  const btns = [...els.mcqOptions.querySelectorAll('.mcq-btn')];
+  btns.forEach(b => {
+    b.onclick = () => {
+      if (optionsLocked || taskAnswered) return;
+      optionsLocked = true;
+      els.changeAnswerBtn.style.display = 'none';
+      const i = Number(b.dataset.i);
+      btns.forEach(x => { x.onclick = null; x.classList.add('disabled'); });
+      if (i === curTask.correctIndex) {
+        b.classList.add('correct');
+        streak++; totalSolved++;
+        els.stSolved.textContent = totalSolved;
+        els.stStreak.textContent = streak;
+        taskAnswered = true;
+        finishTask();
+      } else if (hadWrongPick) {
+        b.classList.add('wrong');
+        btns[curTask.correctIndex].classList.add('correct');
+        streak = 0; totalErrors++;
+        els.stErrors.textContent = totalErrors;
+        els.stStreak.textContent = streak;
+        taskAnswered = true;
+        finishTask();
+      } else {
+        b.classList.add('wrong');
+        hadWrongPick = true;
+        streak = 0; totalErrors++;
+        els.stErrors.textContent = totalErrors;
+        els.stStreak.textContent = streak;
+        els.changeAnswerBtn.style.display = 'block';
+      }
+    };
+  });
+}
+
+els.changeAnswerBtn.onclick = () => {
+  if (taskAnswered) return;
+  optionsLocked = false;
+  const btns = [...els.mcqOptions.querySelectorAll('.mcq-btn')];
+  btns.forEach(b => b.classList.remove('wrong', 'correct', 'disabled'));
+  els.changeAnswerBtn.style.display = 'none';
+  attachMCQHandlers();
+};
+
+function finishTask() {
+  els.mainPanel.style.display = 'block';
+  els.explainBox.style.display = 'block';
+  els.explainBox.innerHTML = `<b>Решение:</b> ${curTask.explain}`;
+  els.nextBtn.style.display = 'block';
+  els.mainPanel.classList.remove('reveal');
+  void els.mainPanel.offsetWidth;
+  els.mainPanel.classList.add('reveal');
+}
+els.nextBtn.onclick = newTask;
+</script>
+
+<script>
+function makeKeypadDraggable(floatEl, handleEl){
+  if(!floatEl || !handleEl || floatEl._dragReady) return;
+  floatEl._dragReady = true;
+  let dragging = false, offsetX = 0, offsetY = 0;
+  function clamp(x, y){
+    const w = floatEl.offsetWidth, h = floatEl.offsetHeight;
+    const maxX = Math.max(4, window.innerWidth - w - 4);
+    const maxY = Math.max(4, window.innerHeight - h - 4);
+    return { x: Math.min(Math.max(x, 4), maxX), y: Math.min(Math.max(y, 4), maxY) };
+  }
+  function onPointerDown(e){
+    dragging = true;
+    const rect = floatEl.getBoundingClientRect();
+    floatEl.style.left = rect.left + 'px';
+    floatEl.style.top = rect.top + 'px';
+    floatEl.style.right = 'auto';
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    try{ handleEl.setPointerCapture(e.pointerId); }catch(err){}
+    e.preventDefault();
+  }
+  function onPointerMove(e){
+    if(!dragging) return;
+    const pos = clamp(e.clientX - offsetX, e.clientY - offsetY);
+    floatEl.style.left = pos.x + 'px';
+    floatEl.style.top = pos.y + 'px';
+  }
+  function onPointerUp(e){
+    dragging = false;
+    try{ handleEl.releasePointerCapture(e.pointerId); }catch(err){}
+  }
+  handleEl.addEventListener('pointerdown', onPointerDown);
+  handleEl.addEventListener('pointermove', onPointerMove);
+  handleEl.addEventListener('pointerup', onPointerUp);
+  handleEl.addEventListener('pointercancel', onPointerUp);
+  window.addEventListener('resize', ()=>{
+    if(floatEl.style.left && floatEl.style.left!=='auto'){
+      const rect = floatEl.getBoundingClientRect();
+      const pos = clamp(rect.left, rect.top);
+      floatEl.style.left = pos.x + 'px';
+      floatEl.style.top = pos.y + 'px';
+    }
+  });
+}
+window.startLinearEngine = (function(){
+
+/* ───────── уровни и генерация ───────── */
+const LEVELS = [
+  {id:0, name:'1. Разминка',            desc:'2–3 икса с двух сторон, знаки вперемешку'},
+  {id:1, name:'2. Много слагаемых',     desc:'6–8 слагаемых в уравнении'},
+  {id:2, name:'3. Скобки',              desc:'раскрытие через умножение — фонтанчик, знак множителя разный'},
+  {id:3, name:'4. Два фонтанчика',      desc:'скобка слева и справа + свободные слагаемые'},
+  {id:4, name:'5. Экзамен',             desc:'всё вперемешку'},
+];
+let curLevel = 0;
+const solvedByLevel = [0,0,0,0,0];
+let totalSolved = 0, streak = 0, taskCounter = 0, uid = 0;
+
+const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const pick = a=>a[ri(0,a.length-1)];
+const T = (coef,isX)=>({coef, isX, id:++uid, moved:false});
+
+function buildEq(nXL, nXR, nCL, nCR){
+  while(true){
+    let x0=ri(-9,9); if(x0===0) continue;
+    const nz=()=>{let v=0; while(v===0) v=ri(-9,9); return v;};
+    const xL=Array.from({length:nXL},nz), xR=Array.from({length:nXR},nz);
+    const K = xL.reduce((s,v)=>s+v,0) - xR.reduce((s,v)=>s+v,0);
+    if(Math.abs(K)<2 || Math.abs(K)>12) continue;
+    const M = K*x0;
+    const cL=Array.from({length:nCL},nz);
+    const cR=Array.from({length:nCR-1},nz);
+    const lastR = M + cL.reduce((s,v)=>s+v,0) - cR.reduce((s,v)=>s+v,0);
+    if(lastR===0 || Math.abs(lastR)>40) continue;
+    cR.push(lastR);
+    const mix=arr=>arr.sort(()=>Math.random()-.5);
+    const L=mix([...xL.map(v=>T(v,true)), ...cL.map(v=>T(v,false))]);
+    const R=mix([...xR.map(v=>T(v,true)), ...cR.map(v=>T(v,false))]);
+    return {L, R, x0};
+  }
+}
+
+function genBracketSpec(){
+  const m = ri(2,6) * (Math.random()<0.5 ? 1 : -1);
+  const p = randNZ(-6,6), q = randNZ(-9,9);
+  return {m, p, q, A:m*p, B:m*q};
+}
+
+function genDoubleBracket(){
+  while(true){
+    let x0=ri(-9,9); if(x0===0) continue;
+    const bL=genBracketSpec(), bR=genBracketSpec();
+    if(Math.abs(bL.A)>45 || Math.abs(bR.A)>45) continue;
+    const swap = Math.random()<0.5;
+    let exL, exR, KLx, KLc, KRx, KRc;
+    if(!swap){
+      const eL = randNZ(-6,6);                       // доп. икс слева
+      KLx = bL.A + eL; KLc = bL.B; KRx = bR.A;
+      const eR = (KLx*x0+KLc) - (KRx*x0+bR.B);        // доп. число справа
+      if(eR===0 || Math.abs(eR)>40) continue;
+      exL={coef:eL,isX:true}; exR={coef:eR,isX:false};
+      KRc = bR.B+eR;
+    } else {
+      const eR = randNZ(-6,6);                        // доп. икс справа
+      KRx = bR.A + eR; KRc = bR.B; KLx = bL.A;
+      const eL = (KRx*x0+KRc) - (KLx*x0+bL.B);         // доп. число слева
+      if(eL===0 || Math.abs(eL)>40) continue;
+      exR={coef:eR,isX:true}; exL={coef:eL,isX:false};
+      KLc = bL.B+eL;
+    }
+    const K = KLx-KRx;
+    if(Math.abs(K)<2 || Math.abs(K)>14) continue;
+    return {isBracket:true, isDouble:true, bL, bR, exL, exR, x0};
+  }
+}
+
+function randNZ(a,b){ let v=0; while(v===0) v=ri(a,b); return v; }
+
+function genBracket(mSign){
+  while(true){
+    let x0=ri(-9,9); if(x0===0) continue;
+    const p = randNZ(-6,6), q = randNZ(-9,9);
+    let m = ri(2,6); if(mSign<0) m=-m;
+    const A=m*p, B=m*q;
+    if(Math.abs(A)>45) continue;
+    const c = ri(-8,8);
+    const K = A-c;
+    if(Math.abs(K)<2 || Math.abs(K)>14) continue;
+    const d = B + K*x0;
+    if(d===0 || Math.abs(d)>60) continue;
+    const R=[];
+    if(c!==0) R.push(T(c,true));
+    R.push(T(d,false));
+    return {isBracket:true, m,p,q,A,B,c,d,R,x0};
+  }
+}
+
+function gen(level){
+  if(level===4) level = ri(0,3);
+  if(level===2) return genBracket(Math.random()<0.5 ? 1 : -1);
+  if(level===3) return genDoubleBracket();
+  if(level===0){
+    // разминка: 2–3 икса, раскиданных по обеим сторонам, по числу с каждой
+    const nX=ri(2,3), nXL=ri(1,nX-1), nXR=nX-nXL;
+    return buildEq(nXL, nXR, 1, 1);
+  }
+  // много слагаемых: 6–8 штук
+  while(true){
+    const nXL=ri(1,3), nXR=ri(1,3), nCL=ri(1,2), nCR=ri(1,2);
+    const total=nXL+nXR+nCL+nCR;
+    if(total<6 || total>8) continue;
+    return buildEq(nXL, nXR, nCL, nCR);
+  }
+}
+
+/* ───────── форматирование ───────── */
+function termText(t, leading){
+  const s = t.coef<0 ? '−' : '+';
+  const abs = Math.abs(t.coef);
+  const body = t.isX ? (abs===1 ? 'x' : abs+'x') : String(abs);
+  if(leading) return (t.coef<0 ? '−' : '') + body;
+  return s+' '+body;
+}
+function numText(n){ return n<0 ? '−'+Math.abs(n) : String(n); }
+function sideText(terms){
+  return terms.map((t,i)=>termText(t,i===0)).join(' ');
+}
+
+/* ───────── состояние ───────── */
+let P=null, S=null;
+
+function newProblem(){
+  clearFountain();
+  P = gen(curLevel);
+  taskCounter++;
+  S = {
+    phase: 'preview',
+    L: P.isBracket ? null : P.L.map(t=>({...t})),
+    R: P.isBracket ? null : P.R.map(t=>({...t})),
+    K:null, M:null,
+    errStep:0, errTotal:0, helped:false, movedOn:false,
+    exam: curLevel===4,
+    frozen:[],
+    br: P.isDouble ? {steps:['Lp','Lq','Rp','Rq'], pos:0}
+        : (P.isBracket ? {step:'p', doneP:false, doneQ:false} : null),
+  };
+  document.getElementById('taskNum').textContent = 'пример №'+taskCounter;
+  document.getElementById('nextBtn').style.display='none';
+  document.getElementById('stStars').textContent='—';
+  setHint('');
+  renderAll(); setPrompt(); renderInputs();
+}
+
+function startSolving(){
+  if(!P.isBracket) S.frozen.push(frozenHTML(S.L, S.R));
+  S.phase = P.isBracket ? 'bracket' : 'move';
+  renderAll(); setPrompt(); renderInputs();
+}
+
+function frozenHTML(L, R, opts={}){
+  const chip = (t,i)=>`<span class="term ${t.moved?'moved':''}" data-isx="${t.isX}">${termText(t,i===0)}</span>`;
+  return `<div class="eqline frozen">${L.map(chip).join('')}<span class="eq-sign">=</span>${R.map(chip).join('')}</div>`;
+}
+
+function misplaced(){
+  return [...S.L.filter(t=>!t.isX), ...S.R.filter(t=>t.isX)];
+}
+
+/* ───────── отрисовка ───────── */
+function renderAll(){
+  document.getElementById('frozen').innerHTML = S.frozen.join('');
+  const live = document.getElementById('live');
+  if(S.phase==='preview'){
+    const twoTerms = (a,b) => [a,b].map((t,i)=>termText(t,i===0)).join(' ');
+    let text;
+    if(P.isDouble){
+      const brText = b => `${numText(b.m)}(${twoTerms({coef:b.p,isX:true},{coef:b.q,isX:false})})`;
+      const exText = t => t ? ' '+termText(t,false) : '';
+      text = `${brText(P.bL)}${exText(P.exL)} = ${brText(P.bR)}${exText(P.exR)}`;
+    } else if(P.isBracket){
+      const rightText = P.R.map((t,i)=>termText(t,i===0)).join(' ');
+      text = `${numText(P.m)}(${twoTerms({coef:P.p,isX:true},{coef:P.q,isX:false})}) = ${rightText}`;
+    } else {
+      const lText = S.L.map((t,i)=>termText(t,i===0)).join(' ');
+      const rText = S.R.map((t,i)=>termText(t,i===0)).join(' ');
+      text = `${lText} = ${rText}`;
+    }
+    live.innerHTML = `<div class="eqline plain">${text}</div>`;
+  } else if(S.phase==='bracket' && P.isDouble){
+    const steps=S.br.steps, pos=S.br.pos, cur=steps[pos];
+    const mkBr = (b, side) => {
+      const mDisp = numText(b.m);
+      const innerP={coef:b.p,isX:true}, innerQ={coef:b.q,isX:false};
+      const idxP = steps.indexOf(side+'p'), idxQ = steps.indexOf(side+'q');
+      const pClass = cur===side+'p' ? 'target' : (idxP<pos ? 'struck-soft' : '');
+      const qClass = cur===side+'q' ? 'target' : (idxQ<pos ? 'struck-soft' : '');
+      return `<span class="term" id="br${side}M">${mDisp}</span><span style="font-size:24px">(</span>`+
+        `<span class="term ${pClass}" id="br${side}P">${termText(innerP,true)}</span>`+
+        `<span class="term ${qClass}" id="br${side}Q">${termText(innerQ,false)}</span>`+
+        `<span style="font-size:24px">)</span>`;
+    };
+    const exHTML = t => t ? `<span class="term">${termText(t,false)}</span>` : '';
+    const doneHTML = doubleResultsHTML(pos);
+    live.innerHTML = `
+      <div class="eqline" id="brEq">
+        ${mkBr(P.bL,'L')}${exHTML(P.exL)}
+        <span class="eq-sign">=</span>
+        ${mkBr(P.bR,'R')}${exHTML(P.exR)}
+      </div>
+      <div class="eqline" id="brResults">${doneHTML}</div>`;
+    if(cur) drawFountain('br'+cur[0]+'M', 'br'+cur[0]+(cur[1]==='p'?'P':'Q'));
+  } else if(S.phase==='bracket'){
+    const innerP={coef:P.p,isX:true}, innerQ={coef:P.q,isX:false};
+    const mDisp = numText(P.m);
+    const pClass = S.br.step==='p' ? 'target' : (S.br.doneP ? 'struck-soft' : '');
+    const qClass = S.br.step==='q' ? 'target' : (S.br.doneQ ? 'struck-soft' : '');
+    const rightHTML = P.R.map((t,i)=>`<span class="term">${termText(t,i===0)}</span>`).join('');
+    const doneHTML =
+      (S.br.doneP ? `<span class="term pop" style="color:var(--teacher)">${termText({coef:P.A,isX:true}, true)}</span>` : '') +
+      (S.br.doneQ ? `<span class="term pop" style="color:var(--teacher)">${termText({coef:P.B,isX:false}, !S.br.doneP)}</span>` : '');
+    live.innerHTML = `
+      <div class="eqline" id="brEq">
+        <span class="term" id="brM">${mDisp}</span><span style="font-size:24px">(</span>
+        <span class="term ${pClass}" id="brP">${termText(innerP,true)}</span>
+        <span class="term ${qClass}" id="brQ">${termText(innerQ,false)}</span>
+        <span style="font-size:24px">)</span><span class="eq-sign">=</span>${rightHTML}
+      </div>
+      <div class="eqline" id="brResults">${doneHTML}</div>`;
+    drawFountain('brM', S.br.step==='p' ? 'brP' : 'brQ');
+  } else if(S.phase==='move'){
+    const chip = (t,i,side)=>
+      `<span class="term tap ${t.moved?'moved':''}" data-id="${t.id}" data-side="${side}">${termText(t,i===0)}</span>`;
+    live.innerHTML = `<div class="eqline" id="liveEq">${S.L.map((t,i)=>chip(t,i,'L')).join('')}<span class="eq-sign">=</span>${S.R.map((t,i)=>chip(t,i,'R')).join('')}</div>`;
+    live.querySelectorAll('.term').forEach(el=>el.onclick=()=>tapTerm(el));
+  } else if(S.phase==='collect'){
+    live.innerHTML = '';
+  } else if(S.phase==='divide'){
+    live.innerHTML = `<div class="eqline">
+      <span class="term tap" id="chipK">${numText(S.K)}</span><span style="font-size:24px">x</span>
+      <span class="eq-sign">=</span>
+      <span class="term tap" id="chipM">${numText(S.M)}</span>
+      <span class="divbar"></span><span class="divcolon">:</span>
+      <input class="num slot" id="inDiv" type="text" inputmode="none" placeholder="?">
+    </div>`;
+    document.getElementById('chipK').onclick = ()=>fillDiv(S.K, 'chipK');
+    document.getElementById('chipM').onclick = ()=>fillDiv(S.M, 'chipM');
+    const inD = document.getElementById('inDiv');
+    inD.addEventListener('keydown', e=>{ if(e.key==='Enter') submitDiv(); });
+    setTimeout(()=>inD.focus(), 600);
+  } else if(S.phase==='cancel'){
+    live.innerHTML = `<div class="eqline eqline-frac">
+      <span class="frac"><span class="num"><span class="strikeable" id="k1">${numText(S.K)}</span>x</span><span class="den"><span class="strikeable" id="k2">${numText(S.K)}</span></span></span>
+      <span class="eq-sign">=</span>
+      <span class="frac"><span class="num">${numText(S.M)}</span><span class="den">${numText(S.K)}</span></span>
+    </div>`;
+  } else if(S.phase==='xval'){
+    live.innerHTML = `<div class="eqline eqline-frac">
+      <span style="font-size:24px">x</span><span class="eq-sign">=</span>
+      <span class="frac"><span class="num">${numText(S.M)}</span><span class="den">${numText(S.K)}</span></span>
+      <span class="eq-sign">=</span><span class="term" style="border:2px dashed var(--teacher)">?</span>
+    </div>`;
+  } else {
+    live.innerHTML = '';
+  }
+}
+
+function setPrompt(){
+  const p = document.getElementById('prompt');
+  switch(S.phase){
+    case 'preview':
+      p.innerHTML = `Посмотри на уравнение спокойно — спешить некуда.<br>Когда будешь готов, жми «Начать».`;
+      break;
+    case 'bracket': {
+      if(P.isDouble){
+        const steps=S.br.steps, cur=steps[S.br.pos];
+        if(cur){
+          const b = cur[0]==='L' ? P.bL : P.bR;
+          const term = cur[1]==='p' ? termText({coef:b.p,isX:true},true) : termText({coef:b.q,isX:false},true);
+          const mDisp = numText(b.m);
+          const side = cur[0]==='L' ? 'слева' : 'справа';
+          p.innerHTML = `Фонтанчик ${side}: множитель обязан долететь до каждого слагаемого в своей скобке.<br>${mDisp} · ${term} = ?`;
+        }
+        break;
+      }
+      const term = S.br.step==='p' ? termText({coef:P.p,isX:true},true) : termText({coef:P.q,isX:false},true);
+      const mDisp = numText(P.m);
+      p.innerHTML = `Фонтанчик умножения: множитель обязан долететь до <b>каждого</b> слагаемого в скобках.<br>${mDisp} · ${term} = ?`;
+      break;
+    }
+    case 'move':
+      p.innerHTML = `Наведи порядок: слагаемые <b>с x — влево</b>, <b>числа — вправо</b>.<br>Касание переносит слагаемое через «=» (знак меняется). Расставляй как угодно — когда решишь, что готово, жми <b>«Готово»</b>.`;
+      break;
+    case 'collect':
+      p.innerHTML = `Приведи подобные: <b>${sideText(S.L)}</b> слева и <b>${sideText(S.R)}</b> справа.`;
+      break;
+    case 'divide':
+      p.innerHTML = `Появилась черта — за ней записываем, <b>на что делим обе части</b>.<br>Спиши число перед x (со знаком!) или коснись его в уравнении.`;
+      break;
+    case 'cancel':
+      p.innerHTML = `Делим обе части на <b>${numText(S.K)}</b>. Слева ${numText(S.K)} сокращается — остаётся чистый x!`;
+      break;
+    case 'xval':
+      p.innerHTML = `Сосчитай: <b>${numText(S.M)} : (${numText(S.K)})</b> = ?`;
+      break;
+    case 'done':
+      p.innerHTML = `Уравнение решено! 🎉`;
+      break;
+  }
+}
+
+function renderInputs(){
+  const area = document.getElementById('inputArea');
+  if(S.phase==='preview'){
+    area.innerHTML = `<button class="go" id="goBtn">Начать →</button>`;
+    document.getElementById('goBtn').onclick = startSolving;
+  } else if(S.phase==='bracket'){
+    let needsX = false;
+    if(P.isDouble){ const cur=S.br.steps[S.br.pos]; needsX = cur ? cur[1]==='p' : false; }
+    else { needsX = S.br.step==='p'; }
+    const placeholder = needsX ? 'напр. 12x' : 'напр. −4';
+    area.innerHTML = `
+      <input class="num slot" id="brAns" type="text" inputmode="none" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="${placeholder}">
+      <button class="go" id="goBtn">ОК</button>`;
+    document.getElementById('goBtn').onclick = submitBracket;
+    document.getElementById('brAns').addEventListener('keydown', e=>{ if(e.key==='Enter') submitBracket(); });
+    setTimeout(()=>{ const el=document.getElementById('brAns'); if(el) el.focus(); }, 500);
+  } else if(S.phase==='move'){
+    area.innerHTML = `<button class="go" id="goBtn">Готово</button>`;
+    document.getElementById('goBtn').onclick = checkMoveDone;
+  } else if(S.phase==='collect'){
+    area.innerHTML = `
+      <input class="num" id="inK" type="text" inputmode="none" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="напр. −11x">
+      <span class="lbl">=</span>
+      <input class="num" id="inM" type="text" inputmode="none" placeholder="?">
+      <button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>`;
+    document.getElementById('goBtn').onclick = submitCollect;
+    area.querySelectorAll('input').forEach(i=>i.addEventListener('keydown',e=>{if(e.key==='Enter')submitCollect();}));
+    const inK = document.getElementById('inK'), inM = document.getElementById('inM');
+    inK.addEventListener('focus', ()=>highlightCollectType(true, true));
+    inK.addEventListener('blur',  ()=>highlightCollectType(true, false));
+    inM.addEventListener('focus', ()=>highlightCollectType(false, true));
+    inM.addEventListener('blur',  ()=>highlightCollectType(false, false));
+    setTimeout(()=>inK.focus(),30);
+  } else if(S.phase==='xval'){
+    area.innerHTML = `
+      <span class="lbl">x&nbsp;=</span>
+      <input class="num" id="inX" type="text" inputmode="none" placeholder="?">
+      <button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>`;
+    document.getElementById('goBtn').onclick = submitX;
+    document.getElementById('inX').addEventListener('keydown',e=>{if(e.key==='Enter')submitX();});
+    setTimeout(()=>document.getElementById('inX').focus(),30);
+  } else if(S.phase==='divide'){
+    area.innerHTML = `<button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>`;
+    document.getElementById('goBtn').onclick = submitDiv;
+  } else {
+    area.innerHTML = '';
+  }
+}
+
+function highlightCollectType(isX, on){
+  const lines = document.querySelectorAll('#frozen .eqline.frozen');
+  const line = lines[lines.length-1];
+  if(!line) return;
+  line.querySelectorAll(`.term[data-isx="${isX}"]`).forEach(el=>el.classList.toggle('highlight', on));
+}
+
+function setHint(t, good=false){
+  const h = document.getElementById('hint');
+  h.innerHTML = t;
+  h.className = 'hint'+(good?' good':'');
+}
+
+/* ───────── фаза 0: скобки (фонтанчик) ───────── */
+let fountainSvg = null;
+function clearFountain(){ if(fountainSvg){ fountainSvg.remove(); fountainSvg=null; } }
+function drawFountain(fromId, toId){
+  clearFountain();
+  const a = document.getElementById(fromId), b = document.getElementById(toId);
+  if(!a || !b) return;
+  const ra=a.getBoundingClientRect(), rb=b.getBoundingClientRect();
+  const x1=ra.left+ra.width/2, y1=ra.top;
+  const x2=rb.left+rb.width/2, y2=rb.top;
+  const midX=(x1+x2)/2, midY=Math.min(y1,y2)-55;
+  const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+  svg.setAttribute('class','fountain-svg');
+  const path=document.createElementNS('http://www.w3.org/2000/svg','path');
+  path.setAttribute('d', `M ${x1} ${y1} Q ${midX} ${midY} ${x2} ${y2}`);
+  path.setAttribute('class','fountain-path');
+  svg.appendChild(path);
+  document.body.appendChild(svg);
+  const len = path.getTotalLength();
+  path.style.strokeDasharray = len;
+  path.style.strokeDashoffset = len;
+  requestAnimationFrame(()=>{
+    path.style.transition='stroke-dashoffset .5s ease';
+    path.style.strokeDashoffset = 0;
+  });
+  fountainSvg = svg;
+}
+
+function parseBracketInput(raw){
+  let s = String(raw).trim().toLowerCase().replace(/\s+/g,'');
+  if(s==='') return null;
+  s = s.replace(/[−–—]/g,'-');              // юникодные минусы → обычный дефис
+  s = s.replace(/х/g,'x');                   // кириллическая «х» → латинская «x»
+  const hasX = s.includes('x');
+  const numPart = s.replace(/x/g,'');
+  let coef;
+  if(numPart===''||numPart==='+') coef=1;
+  else if(numPart==='-') coef=-1;
+  else { coef = Number(numPart); if(!Number.isFinite(coef)) return null; }
+  return {coef, hasX};
+}
+
+function bracketHint(reason, needsX, exam){
+  if(reason==='missing-x') return exam ? 'Не хватает x.' : 'Результат — слагаемое с x. Допиши x к числу.';
+  if(reason==='extra-x')   return exam ? 'Тут лишний x.'  : 'Здесь получается просто число, без x — это свободный член.';
+  if(reason==='invalid')   return 'Введи ' + (needsX ? 'число с x, например 12x.' : 'число, например −4.');
+  return exam ? 'Проверь знак и само умножение.'
+              : 'Проверь знак: минус на минус даёт плюс, минус на плюс — минус. И саму таблицу умножения.';
+}
+
+function checkBracketAnswer(raw, expCoef, needsX){
+  const parsed = parseBracketInput(raw);
+  if(!parsed) return {ok:false, reason:'invalid'};
+  if(needsX && !parsed.hasX) return {ok:false, reason:'missing-x'};
+  if(!needsX && parsed.hasX) return {ok:false, reason:'extra-x'};
+  if(parsed.coef !== expCoef) return {ok:false, reason:'number'};
+  return {ok:true};
+}
+
+function landingSpot(row, fallbackTop){
+  if(!row) return null;
+  const kids = row.children;
+  if(kids.length>0){
+    const r = kids[kids.length-1].getBoundingClientRect();
+    return {left:r.right+8, top:r.top};
+  }
+  const r = row.getBoundingClientRect();
+  return {left:r.left+4, top:r.top || fallbackTop};
+}
+
+function flyNumber(fromEl, destRect, text){
+  if(!fromEl || !destRect) return;
+  const a = fromEl.getBoundingClientRect();
+  const fly = document.createElement('span');
+  fly.className='flyer';
+  fly.textContent = text;
+  fly.style.left = a.left+'px';
+  fly.style.top = a.top+'px';
+  document.body.appendChild(fly);
+  requestAnimationFrame(()=>{ fly.style.left=destRect.left+'px'; fly.style.top=destRect.top+'px'; });
+  setTimeout(()=>fly.remove(), 680);
+}
+
+function doubleResultsHTML(pos){
+  const chip  = (coef,isX,leading,isNew) =>
+    `<span class="term${isNew?' pop':''}" style="color:var(--teacher)">${termText({coef,isX},leading)}</span>`;
+  const plain = (t,isNew) =>
+    `<span class="term${isNew?' pop':''}">${termText(t,false)}</span>`;
+  let html='';
+  if(pos>=1) html += chip(P.bL.A, true, true, pos===1);
+  if(pos>=2) html += chip(P.bL.B, false, false, pos===2);
+  if(pos>=2) html += plain(P.exL, pos===2);
+  if(pos>=2) html += `<span class="eq-sign">=</span>`;
+  if(pos>=3) html += chip(P.bR.A, true, true, pos===3);
+  if(pos>=4) html += chip(P.bR.B, false, false, pos===4);
+  if(pos>=4) html += plain(P.exR, pos===4);
+  return html;
+}
+
+function submitBracket(){
+  const inp = document.getElementById('brAns');
+  if(!inp || inp.value==='') return;
+  if(P.isDouble) submitBracketDouble(inp);
+  else submitBracketSingle(inp);
+}
+
+function submitBracketDouble(inp){
+  const steps=S.br.steps, cur=steps[S.br.pos];
+  const b = cur[0]==='L' ? P.bL : P.bR;
+  const needsX = cur[1]==='p';
+  const exp = needsX ? b.A : b.B;
+  const check = checkBracketAnswer(inp.value, exp, needsX);
+  if(!check.ok){
+    S.errStep = (S.errStep||0)+1; S.errTotal++;
+    inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+    setHint(bracketHint(check.reason, needsX, S.exam));
+    if(!S.exam && S.errStep>=3 && check.reason==='number'){
+      setHint(needsX
+        ? 'Перемножь множитель и коэффициент при x отдельно от знака: сначала модули, потом знак.'
+        : 'Перемножь множитель и свободное число отдельно от знака: сначала модули, потом знак.');
+      S.errStep = 0;
+    }
+    inp.value='';
+    return;
+  }
+  const fromEl = document.getElementById('br'+cur[0]+(needsX?'P':'Q'));
+  const resultsRow = document.getElementById('brResults');
+  flyNumber(fromEl, landingSpot(resultsRow, fromEl?fromEl.getBoundingClientRect().top+50:0), termText({coef:exp,isX:needsX}, S.br.pos===0));
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  inp.value='';
+  S.errStep = 0;
+  S.br.pos++;
+  if(S.br.pos >= steps.length){
+    setTimeout(finishBracketDouble, 680);
+  } else {
+    setTimeout(()=>{ renderAll(); setPrompt(); renderInputs(); }, 680);
+  }
+}
+
+function finishBracketDouble(){
+  clearFountain();
+  const mkFrozenBr = (b) => {
+    const mDisp = numText(b.m);
+    const innerP={coef:b.p,isX:true}, innerQ={coef:b.q,isX:false};
+    return `<span class="term">${mDisp}</span><span style="font-size:24px">(</span>`+
+      `<span class="term">${termText(innerP,true)}</span><span class="term">${termText(innerQ,false)}</span>`+
+      `<span style="font-size:24px">)</span>`;
+  };
+  const exHTML = t => t ? `<span class="term">${termText(t,false)}</span>` : '';
+  S.frozen.push(
+    `<div class="eqline frozen">${mkFrozenBr(P.bL)}${exHTML(P.exL)}<span class="eq-sign">=</span>${mkFrozenBr(P.bR)}${exHTML(P.exR)}</div>`);
+  const Lterms = [T(P.bL.A,true), T(P.bL.B,false)];
+  if(P.exL) Lterms.push(T(P.exL.coef, P.exL.isX));
+  const Rterms = [T(P.bR.A,true), T(P.bR.B,false)];
+  if(P.exR) Rterms.push(T(P.exR.coef, P.exR.isX));
+  S.L = Lterms;
+  S.R = Rterms;
+  S.phase = 'move';
+  S.errStep = 0;
+  renderAll(); setPrompt(); renderInputs();
+}
+
+function submitBracketSingle(inp){
+  const isP = S.br.step==='p';
+  const exp = isP ? P.A : P.B;
+  const check = checkBracketAnswer(inp.value, exp, isP);
+  if(!check.ok){
+    S.errStep = (S.errStep||0)+1; S.errTotal++;
+    inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+    setHint(bracketHint(check.reason, isP, S.exam));
+    if(!S.exam && S.errStep>=3 && check.reason==='number'){
+      setHint(isP
+        ? 'Перемножь множитель и коэффициент при x отдельно от знака: сначала модули, потом знак.'
+        : 'Перемножь множитель и свободное число отдельно от знака: сначала модули, потом знак.');
+      S.errStep = 0;
+    }
+    inp.value='';
+    return;
+  }
+  const fromEl = document.getElementById(isP ? 'brP' : 'brQ');
+  const resultsRow = document.getElementById('brResults');
+  flyNumber(fromEl, landingSpot(resultsRow, fromEl?fromEl.getBoundingClientRect().top+50:0), termText({coef:exp,isX:isP}, !S.br.doneP));
+  if(isP){ S.br.doneP = true; S.br.step='q'; }
+  else { S.br.doneQ = true; }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  inp.value='';
+  S.errStep = 0;
+  if(S.br.doneP && S.br.doneQ){
+    setTimeout(finishBracket, 680);
+  } else {
+    setTimeout(()=>{ renderAll(); setPrompt(); renderInputs(); }, 680);
+  }
+}
+
+function finishBracket(){
+  clearFountain();
+  const mDisp = numText(P.m);
+  const innerP={coef:P.p,isX:true}, innerQ={coef:P.q,isX:false};
+  const rightHTML = P.R.map((t,i)=>`<span class="term">${termText(t,i===0)}</span>`).join('');
+  S.frozen.push(
+    `<div class="eqline frozen"><span class="term">${mDisp}</span>`+
+    `<span style="font-size:24px">(</span><span class="term">${termText(innerP,true)}</span>`+
+    `<span class="term">${termText(innerQ,false)}</span><span style="font-size:24px">)</span>`+
+    `<span class="eq-sign">=</span>${rightHTML}</div>`);
+  S.L = [T(P.A,true), T(P.B,false)];
+  S.R = P.R.map(t=>({...t}));
+  S.phase = 'move';
+  S.errStep = 0;
+  renderAll(); setPrompt(); renderInputs();
+}
+
+/* ───────── фаза 1: перенос ───────── */
+function tapTerm(el){
+  if(S.phase!=='move') return;
+  const id = Number(el.dataset.id), side = el.dataset.side;
+  const arr = side==='L' ? S.L : S.R;
+  const t = arr.find(x=>x.id===id);
+  // переносим что угодно куда угодно — без подсказок и блокировок в процессе;
+  // правильность расстановки проверяется только по нажатию «Готово»
+  performMove(t, side, el);
+}
+
+function flyerHTML(text){
+  return `<span class="flyer-sign">${text[0]}</span>${text.slice(1)}`;
+}
+
+function performMove(t, side, el){
+  const from = side==='L' ? S.L : S.R;
+  const to   = side==='L' ? S.R : S.L;
+  const oldText = termText(t, false);
+  // убираем из старой стороны, добавляем с новым знаком
+  from.splice(from.indexOf(t),1);
+  const nt = {...t, coef:-t.coef, moved:true};
+  to.push(nt);
+
+  const startRect = el.getBoundingClientRect();
+  renderAll();
+  const newEl = document.querySelector(`#liveEq .term[data-id="${t.id}"]`) ||
+                document.querySelector(`.term[data-id="${t.id}"]`);
+  const endEl = document.querySelector(`#liveEq .term[data-id="${nt.id}"]`);
+  // найдём приземлившийся чип (id сохранился)
+  const target = endEl || newEl;
+  if(target){
+    const endRect = target.getBoundingClientRect();
+    target.style.visibility='hidden';
+    const fly = document.createElement('span');
+    fly.className='flyer';
+    fly.innerHTML = flyerHTML(oldText.replace('+ ','+').replace('− ','−'));
+    fly.style.left = startRect.left+'px';
+    fly.style.top = startRect.top+'px';
+    document.body.appendChild(fly);
+    requestAnimationFrame(()=>{
+      fly.style.left = endRect.left+'px';
+      fly.style.top = endRect.top+'px';
+    });
+    setTimeout(()=>{   // середина полёта: знак меняется!
+      fly.innerHTML = flyerHTML(termText(nt,false).replace('+ ','+').replace('− ','−'));
+      fly.classList.add('flip');
+    }, 320);
+    setTimeout(()=>{
+      fly.remove();
+      target.style.visibility='';
+      target.classList.add('pop');
+      afterMove(t, nt);
+    }, 680);
+  } else {
+    afterMove(t, nt);
+  }
+}
+
+function goCollect(){
+  if(S.movedOn) return;
+  S.movedOn = true;
+  S.frozen.push(frozenHTML(S.L, S.R));
+  S.phase='collect';
+  S.K = S.L.reduce((s,x)=>s+x.coef,0);
+  S.M = S.R.reduce((s,x)=>s+x.coef,0);
+  renderAll(); setPrompt(); renderInputs();
+}
+
+function afterMove(t, nt){
+  S.errStep = 0;
+  const oldS = termText(t,true), newS = termText(nt,true);
+  setHint(`Перенесли через «=»: было <b>${oldS}</b>, стало <b>${newS}</b>. Знак поменялся!`, true);
+}
+
+function checkMoveDone(){
+  const badL = S.L.some(t=>!t.isX), badR = S.R.some(t=>t.isX);
+  if(!badL && !badR){
+    setHint('Перенос верный.', true);
+    setTimeout(goCollect, 400);
+    return;
+  }
+  S.errTotal++;
+  const msg = [];
+  if(badL) msg.push('Слева остались лишние слагаемые.');
+  if(badR) msg.push('Справа остались лишние слагаемые.');
+  setHint(msg.join('<br>'));
+}
+
+/* ───────── фаза 2: приведение подобных ───────── */
+function submitCollect(){
+  const iK = document.getElementById('inK'), iM = document.getElementById('inM');
+  if(iK.value==='' || iM.value==='') { setHint('Заполни оба окошка.'); return; }
+  // слева теперь нужно вписать x самому (не просто число) — переиспользуем тот же
+  // разбор, что и для ответов фонтанчика умножения (12x / −4 и т.п.)
+  const parsedK = parseBracketInput(iK.value);
+  const vM = Number(iM.value);
+  const missingX = !!parsedK && !parsedK.hasX;
+  const okK = !!parsedK && parsedK.hasX && parsedK.coef===S.K;
+  const okM = vM===S.M;
+  iK.classList.toggle('good', okK);
+  iM.classList.toggle('good', okM);
+  if(okK && okM){
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    S.phase='divide'; S.errStep=0;
+    renderAll(); setPrompt(); renderInputs();
+    return;
+  }
+  S.errStep++; S.errTotal++;
+  let msg = [];
+  if(!okK){ iK.classList.remove('shake'); void iK.offsetWidth; iK.classList.add('shake'); }
+  if(!okM){ iM.classList.remove('shake'); void iM.offsetWidth; iM.classList.add('shake'); }
+  if(!okK && missingX){
+    msg.push(S.exam ? 'Слева не хватает x.' : 'Слева получается слагаемое с x — допиши x к числу.');
+  } else if(S.exam){
+    if(!okK) msg.push('Слева неверно — внимание на знаки.');
+    if(!okM) msg.push('Справа неверно — внимание на знаки.');
+  } else {
+    const xs = S.L.map((t,i)=>termText(t,i===0)).join(' ');
+    const ns = S.R.map((t,i)=>termText(t,i===0)).join(' ');
+    if(!okK) msg.push(`Слева: ${xs} — считай коэффициенты при x, не теряя знаки, и не забудь x в ответе.`);
+    if(!okM) msg.push(`Справа: ${ns} — сложи числа со знаками.`);
+  }
+  setHint(msg.join('<br>'));
+  if(!S.exam && S.errStep>=3){
+    setHint('Пересчитай по одному слагаемому слева направо, проговаривая знак каждого. Минусы — самое коварное место.');
+    S.errStep = 0;
+  }
+}
+
+/* ───────── фаза 3: деление ───────── */
+function fillDiv(v, chipId){
+  const inD = document.getElementById('inDiv');
+  const chip = document.getElementById(chipId);
+  if(!inD) return;
+  const land = ()=>{ inD.value=v; if(!S.exam) submitDiv(); };
+  // число перелетает из уравнения за черту
+  if(chip){
+    const a = chip.getBoundingClientRect(), b = inD.getBoundingClientRect();
+    const fly = document.createElement('span');
+    fly.className='flyer';
+    fly.textContent = numText(v);
+    fly.style.left=a.left+'px'; fly.style.top=a.top+'px';
+    document.body.appendChild(fly);
+    requestAnimationFrame(()=>{ fly.style.left=b.left+'px'; fly.style.top=b.top+'px'; });
+    setTimeout(()=>{ fly.remove(); land(); }, 680);
+  } else {
+    land();
+  }
+}
+
+function submitDiv(){
+  const inD = document.getElementById('inDiv');
+  if(!inD || inD.value==='') return;
+  const v = Number(inD.value);
+  if(v === S.K){
+    setHint(`Верно: делим обе части на ${numText(S.K)}.`, true);
+    // строка с чертой сохраняется в решении
+    const kDisp = S.K<0 ? '('+numText(S.K)+')' : numText(S.K);
+    S.frozen.push(
+      `<div class="eqline frozen"><span class="term">${numText(S.K)}x</span><span class="eq-sign">=</span>`+
+      `<span class="term">${numText(S.M)}</span>`+
+      `<span class="divbar"></span><span class="divcolon">:</span>`+
+      `<span class="term" style="color:var(--teacher)">${kDisp}</span></div>`);
+    proceedCancel();
+    return;
+  }
+  S.errStep++; S.errTotal++;
+  inD.classList.remove('shake'); void inD.offsetWidth; inD.classList.add('shake');
+  if(S.exam){
+    setHint(v === -S.K ? 'Проверь знак числа.' : 'Не то число. Делим на то, что стоит перед x.');
+  } else if(v === S.M){
+    setHint(`Делим на <b>число перед иксом</b>, а не на правую часть! Правая часть — это то, что мы делим.`);
+  } else if(v === -S.K){
+    setHint(S.K<0
+      ? `Почти! Перед иксом стоит число с минусом — делим на него <b>вместе с минусом</b>.`
+      : `Почти! Перед иксом число без минуса — спиши его как есть.`);
+  } else {
+    setHint(`Списываем число, которое стоит перед x — со всеми его знаками.`);
+  }
+  inD.value='';
+  if(!S.exam && S.errStep>=3){
+    setHint('Нужное число стоит вплотную слева от x. Можно коснуться его — и оно само перелетит за черту.');
+    S.errStep = 0;
+  }
+}
+
+function proceedCancel(){
+  S.errStep = 0;
+  S.phase='cancel';
+  renderAll(); setPrompt(); renderInputs();
+  setTimeout(()=>{
+    document.getElementById('k1').classList.add('struck');
+    document.getElementById('k2').classList.add('struck');
+  }, 700);
+  setTimeout(()=>{
+    // строка с сокращением остаётся в решении навсегда
+    S.frozen.push(
+      `<div class="eqline eqline-frac frozen">`+
+      `<span class="frac"><span class="num"><span class="strikeable struck">${numText(S.K)}</span>x</span><span class="den"><span class="strikeable struck">${numText(S.K)}</span></span></span>`+
+      `<span class="eq-sign">=</span>`+
+      `<span class="frac"><span class="num">${numText(S.M)}</span><span class="den">${numText(S.K)}</span></span>`+
+      `</div>`);
+    S.phase='xval';
+    renderAll(); setPrompt(); renderInputs();
+  }, 2800);
+}
+
+/* ───────── фаза 4: значение x ───────── */
+function submitX(){
+  const iX = document.getElementById('inX');
+  if(iX.value==='') return;
+  const v = Number(iX.value);
+  if(v !== P.x0){
+    S.errStep++; S.errTotal++;
+    iX.classList.remove('shake'); void iX.offsetWidth; iX.classList.add('shake');
+    if(S.exam){
+      setHint(v === -P.x0 ? 'Проверь знак.' : 'Пересчитай деление.');
+    } else if(v === -P.x0){
+      setHint(`Знак! Посмотри на знаки обоих чисел: одинаковые дают плюс, разные — минус.`);
+    } else {
+      setHint(`Раздели сначала числа без знаков, а потом определи знак результата.`);
+    }
+    if(!S.exam && S.errStep>=3){
+      setHint('Правило знаков: одинаковые — плюс, разные — минус. А деление проверь умножением: ответ × делитель должен дать делимое.');
+      S.errStep = 0;
+    }
+    return;
+  }
+  finish();
+}
+
+function finish(){
+  S.phase='done';
+  S.frozen.push(
+    `<div class="eqline eqline-frac frozen"><span style="font-size:24px">x</span><span class="eq-sign">=</span>`+
+    `<span class="frac"><span class="num">${numText(S.M)}</span><span class="den">${numText(S.K)}</span></span>`+
+    `<span class="eq-sign">=</span><span class="term" style="color:var(--ok);border:2px solid rgba(46,125,83,.4)">${numText(P.x0)}</span></div>`);
+  const lv = P.isDouble
+    ? P.bL.m*(P.bL.p*P.x0+P.bL.q) + (P.exL ? P.exL.coef*(P.exL.isX?P.x0:1) : 0)
+    : (P.isBracket
+        ? P.m*(P.p*P.x0+P.q)
+        : P.L.reduce((s,t)=>s+t.coef*(t.isX?P.x0:1),0));
+  S.frozen.push(`<div class="check-line">Проверка: подставим x = ${numText(P.x0)} → обе части равны ${numText(lv)} ✓</div>`);
+  renderAll(); setPrompt(); renderInputs();
+  let stars = S.helped ? 1 : (S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1));
+  document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
+  totalSolved++; solvedByLevel[curLevel]++;
+  streak = (S.errTotal===0) ? streak+1 : 0;
+  document.getElementById('stSolved').textContent = totalSolved;
+  document.getElementById('stStreak').textContent = streak;
+  setHint(S.errTotal===0 ? 'Без единой ошибки — блестяще!' : `Решено! Ошибок по пути: ${S.errTotal}.`, S.errTotal===0);
+  document.getElementById('nextBtn').style.display='block';
+  renderLevels();
+}
+
+/* ───────── интерфейс ───────── */
+function renderLevels(){
+  const el = document.getElementById('levels');
+  el.innerHTML = LEVELS.map(L=>
+    `<button class="lvl ${L.id===curLevel?'active':''}" data-id="${L.id}" title="${L.desc}">
+      ${L.name}${solvedByLevel[L.id]>=5?'<span class="done-mark">★</span>':''}
+    </button>`
+  ).join('');
+  el.querySelectorAll('.lvl').forEach(b=>b.onclick=()=>{
+    curLevel = Number(b.dataset.id);
+    renderLevels(); newProblem();
+  });
+}
+
+/* ───────── стрелочки и плавающая клавиатура ───────── */
+let activeInputId = 'ans';
+let keypadOpen = true;
+
+function enhanceNumInputs(container){
+  const inputs = container.querySelectorAll('input.num');
+  inputs.forEach(inp=>{
+    if(inp.dataset.enhanced) return;
+    inp.dataset.enhanced = '1';
+    const wrap = document.createElement('span');
+    wrap.className = 'num-wrap';
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.appendChild(inp);
+    const spin = document.createElement('span');
+    spin.className = 'spin';
+    spin.innerHTML = `<button type="button" class="spin-btn" data-dir="1">▲</button><button type="button" class="spin-btn" data-dir="-1">▼</button>`;
+    wrap.appendChild(spin);
+    spin.querySelectorAll('.spin-btn').forEach(btn=>{
+      btn.onclick = ()=>{
+        let v = Number(inp.value);
+        if(!Number.isFinite(v)) v = 0;
+        v += Number(btn.dataset.dir);
+        inp.value = String(v);
+        inp.focus();
+      };
+    });
+    if(inp.id) inp.addEventListener('focus', ()=>{ activeInputId = inp.id; });
+  });
+  syncKeypadVisibility();
+}
+
+function syncKeypadVisibility(){
+  // проверяем оба контейнера сразу, чтобы фазы, где поле живёт в live (например divide),
+  // не гасили клавиатуру, если в этот момент inputArea пустует
+  const live = document.getElementById('live');
+  const area = document.getElementById('inputArea');
+  const hasInputs = (live && live.querySelectorAll('input.num').length > 0)
+                  || (area && area.querySelectorAll('input.num').length > 0);
+  document.getElementById('lin_keypadFloat').style.display = (hasInputs && keypadOpen) ? 'block' : 'none';
+  document.getElementById('lin_kpToggle').style.display = (hasInputs && !keypadOpen) ? 'flex' : 'none';
+}
+
+function setupInputEnhancer(containerId){
+  const container = document.getElementById(containerId);
+  if(!container) return;
+  const observer = new MutationObserver(()=>enhanceNumInputs(container));
+  observer.observe(container, {childList:true, subtree:true});
+  enhanceNumInputs(container);
+}
+
+function keypadPress(ch){
+  if(ch==='enter'){ document.getElementById('goBtn')?.click(); return; }
+  const inp = document.getElementById(activeInputId);
+  if(!inp) return;
+  if(ch==='back') inp.value = inp.value.slice(0,-1);
+  else inp.value = (inp.value||'') + ch;
+  inp.focus();
+}
+
+function setupFloatingKeypad(){
+  const keys = ['7','8','9','4','5','6','1','2','3','−','0','⌫','x'];
+  document.getElementById('lin_keypadButtons').innerHTML = keys.map(k=>{
+    let cls = '';
+    if(k==='−') cls='kp-minus';
+    else if(k==='x') cls='kp-x';
+    else if(k==='⌫') cls='kp-back';
+    const val = k==='⌫' ? 'back' : (k==='−' ? '-' : k);
+    return `<button type="button" class="${cls}" data-key="${val}">${k}</button>`;
+  }).join('') + `<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>`;
+  document.querySelectorAll('#keypadButtons button').forEach(btn=>{
+    btn.onclick = ()=>keypadPress(btn.dataset.key);
+  });
+  document.getElementById('lin_kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(); };
+  document.getElementById('lin_kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(); };
+  makeKeypadDraggable(document.getElementById('lin_keypadFloat'), document.getElementById('lin_kpDragHandle'));
+}
+
+
+return function start(){
+  document.getElementById('refreshBtn').onclick = newProblem;
+  document.getElementById('nextBtn').onclick = newProblem;
+  setupFloatingKeypad();
+  setupInputEnhancer('inputArea');
+  setupInputEnhancer('live');
+  curLevel = 0;
+  for(let i=0;i<solvedByLevel.length;i++) solvedByLevel[i]=0;
+  totalSolved = 0; streak = 0; taskCounter = 0;
+  document.getElementById('stSolved').textContent = '0';
+  document.getElementById('stStreak').textContent = '0';
+  renderLevels();
+  newProblem();
+};
+})();
+</script>
+<script>
+window.startQuadraticEngine = (function(){
+
+/* ───────── утилиты ───────── */
+const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const pick = a=>a[ri(0,a.length-1)];
+const randNZ = (a,b)=>{ let v=0; while(v===0) v=ri(a,b); return v; };
+const numText = n => n<0 ? '−'+Math.abs(n) : String(n);
+const fracHTML = (num, den) => `<span class="frac"><span class="num">${num}</span><span class="den">${den}</span></span>`;
+const negTerm = v => v<0 ? `−(${numText(v)})` : `−${numText(v)}`;
+
+function termText(t, leading){
+  const s = t.coef<0 ? '−' : '+';
+  const abs = Math.abs(t.coef);
+  let body;
+  if(t.pow===2) body = (abs===1?'':abs)+'x²';
+  else if(t.pow===1) body = (abs===1?'':abs)+'x';
+  else body = String(abs);
+  if(leading) return (t.coef<0 ? '−' : '') + body;
+  return s+' '+body;
+}
+function sideText(terms){ return terms.map((t,i)=>termText(t,i===0)).join(' '); }
+
+/* ───────── генерация ───────── */
+function genNoC(){
+  const a = randNZ(-6,6);
+  const root2 = randNZ(-9,9);
+  const b = -a*root2;
+  return {a,b,x1:0,x2:root2};
+}
+
+function genNoB(){
+  const a = randNZ(-6,6);
+  const hasRoots = Math.random()<0.8;
+  let N;
+  if(hasRoots){ const r=ri(1,9); N=r*r; } else { N=-ri(1,50); }
+  const c = -a*N;
+  return {a,c,N,hasRoots, r: hasRoots?Math.sqrt(N):null};
+}
+
+function genVieta(){
+  while(true){
+    const x1=randNZ(-9,9), x2=randNZ(-9,9);
+    const a = Math.random()<0.6 ? 1 : pick([2,-2,3,-3,4,-4,5,-5]);
+    const b = -a*(x1+x2), c = a*x1*x2;
+    if(Math.abs(b)>100 || Math.abs(c)>450) continue;
+    return {a,b,c,x1,x2};
+  }
+}
+
+function genDiscriminant(forceD){
+  while(true){
+    const a = randNZ(-3,3);
+    const roll = Math.random();
+    if(forceD==='neg' || (forceD===null && roll<0.10)){
+      const b = randNZ(-8,8);
+      let c;
+      if(a>0) c = Math.ceil((b*b)/(4*a)) + ri(1,5);
+      else    c = Math.floor((b*b)/(4*a)) - ri(1,5);
+      if(c===0) continue;
+      const D = b*b-4*a*c;
+      if(D>=0 || Math.abs(c)>200) continue;
+      return {a,b,c,D,roots:null};
+    }
+    if(forceD==='zero' || (forceD===null && roll<0.25)){
+      const x0 = randNZ(-7,7);
+      const b=-2*a*x0, c=a*x0*x0;
+      if(b===0 || c===0) continue;
+      const D=b*b-4*a*c;
+      if(D!==0) continue;
+      return {a,b,c,D:0,roots:[x0,x0]};
+    }
+    const x1r=randNZ(-6,6), x2r=randNZ(-6,6);
+    if(x1r===x2r) continue;
+    const b=-a*(x1r+x2r), c=a*x1r*x2r;
+    if(b===0 || c===0) continue;
+    const D=b*b-4*a*c;
+    if(D<=0) continue;
+    const sq=Math.sqrt(D);
+    if(!Number.isInteger(sq)) continue;
+    return {a,b,c,D,roots:[x1r,x2r]};
+  }
+}
+
+/* ───────── тексты уравнений ───────── */
+function eqTextNoC(P){ return sideText([{coef:P.a,pow:2},{coef:P.b,pow:1}]) + ' = 0'; }
+function eqTextNoB(P){ return sideText([{coef:P.a,pow:2},{coef:P.c,pow:0}]) + ' = 0'; }
+function eqTextVieta(P){ return sideText([{coef:P.a,pow:2},{coef:P.b,pow:1},{coef:P.c,pow:0}]) + ' = 0'; }
+function eqTextDisc(P){ return sideText([{coef:P.a,pow:2},{coef:P.b,pow:1},{coef:P.c,pow:0}]) + ' = 0'; }
+
+/* ───────── шаги по видам задач ───────── */
+function stepsNoC(P){
+  return [
+    { id:'factor', type:'factorNoC',
+      prompt: () => `Вынеси общий множитель за скобку — сам реши, что выносить: можно только x, а можно x вместе с числовым множителем. Заполни разложение.`,
+      checkFour: (k,p,sign,qMag) => { const q = sign==='+' ? qMag : -qMag; return k!==0 && p!==0 && k*p===P.a && k*q===P.b; },
+      onSolved: (ctx,k,p,sign,qMag) => { ctx.k=k; ctx.p=p; ctx.q = sign==='+' ? qMag : -qMag; },
+      record: (k,p,sign,qMag) => { const q = sign==='+' ? qMag : -qMag; return `${termText({coef:k,pow:1},true)}(${termText({coef:p,pow:1},true)} ${termText({coef:q,pow:0},false)}) = 0`; },
+      hint: exam => exam ? 'Перемножь множитель на скобку — должно получиться исходное уравнение.' : 'Общий множитель обязан делить нацело и коэффициент при x², и коэффициент при x. Проверь себя: перемножь свой множитель на скобку — должно получиться в точности исходное уравнение.'
+    },
+    { id:'roots', type:'dualRoots',
+      introRecord: ctx => `${termText({coef:ctx.k,pow:1},true)} = 0 &nbsp;&nbsp;или&nbsp;&nbsp; ${termText({coef:ctx.p,pow:1},true)} ${termText({coef:ctx.q,pow:0},false)} = 0`,
+      prompt: () => `Произведение равно нулю, если хотя бы один из множителей равен нулю. Реши оба уравнения — слева и справа.`,
+      leftEq: (ctx) => `${termText({coef:ctx.k,pow:1},true)} = 0`,
+      rightEq: (ctx) => `${termText({coef:ctx.p,pow:1},true)} ${termText({coef:ctx.q,pow:0},false)} = 0`,
+      expectedLeft: () => 0,
+      expectedRight: (ctx) => -ctx.q/ctx.p,
+      recordLeft: v => `x₁ = ${v}`,
+      recordRight: v => `x₂ = ${v}`,
+      hintLeft: exam => exam ? 'k ≠ 0.' : '(число)·x = 0 всегда даёт x = 0 — ведь число перед x точно не равно нулю.',
+      hintRight: exam => exam ? 'Перенеси число, раздели на коэффициент.' : 'Перенеси свободное число в другую часть (знак поменяется), затем раздели обе части на коэффициент перед x.'
+    }
+  ];
+}
+
+function stepsNoB(P){
+  const steps = [
+    { id:'isolate', type:'isolateMove',
+      finalRecord: () => `x² = ${P.N}`,
+    },
+    { id:'classify', type:'choice',
+      prompt: ()=>`x² = ${P.N}. Какое это число?`,
+      choices:[{id:'pos',label:'Положительное — два корня'},{id:'neg',label:'Отрицательное — корней нет'}],
+      expected: P.hasRoots ? 'pos' : 'neg',
+      record: v => v==='pos' ? 'x² — положительное число → два корня' : 'x² — отрицательное число → корней нет',
+      hint: () => 'Квадрат числа не может быть отрицательным — если x² оказалось отрицательным, решений нет.'
+    }
+  ];
+  if(P.hasRoots){
+    steps.push(
+      { id:'roots', type:'dualRoots',
+        introRecord: () => `x₁ = √${P.N} &nbsp;&nbsp; x₂ = −√${P.N}`,
+        prompt: () => {
+          const base = `Реши уравнение x² = ${P.N} — у него ДВА корня: x = √${P.N} и x = −√${P.N}. Найди оба сразу.`;
+          const why = ' <b>И плюс, и минус в квадрате дают одно и то же положительное число — вот почему корней два.</b>';
+          return S.exam ? base : base + why;
+        },
+        leftEq: () => `x₁ = √${P.N}`,
+        rightEq: () => `x₂ = −√${P.N}`,
+        expectedLeft: () => P.r,
+        expectedRight: () => -P.r,
+        recordLeft: v => `x₁ = ${v}`,
+        recordRight: v => `x₂ = ${v}`,
+        hintLeft: () => `Найди число, квадрат которого равен ${P.N}.`,
+        hintRight: exam => exam ? 'Есть и отрицательный корень.' : 'У уравнения x² = N всегда ДВА корня: +√N и −√N — не теряй отрицательный!'
+      }
+    );
+  }
+  return steps;
+}
+
+function stepsVieta(P){
+  const sumTarget = -P.b/P.a, prodTarget = P.c/P.a;
+  return [
+    { id:'substitute', type:'vietaSubst',
+      prompt: () => `Подставь в теорему Виета числа из уравнения ${eqTextVieta(P)}. Заполни обе дроби.`,
+      checkSum: (num,den) => num===-P.b && den===P.a,
+      checkProd: (num,den) => num===P.c && den===P.a,
+      recordSum: (num,den) => `x₁ + x₂ = ${fracHTML(num,den)}`,
+      recordProd: (num,den) => `x₁ · x₂ = ${fracHTML(num,den)}`,
+      hintSum: () => 'В числителе — минус коэффициент перед x (то есть −b), в знаменателе — коэффициент перед x² (то есть a).',
+      hintProd: () => 'В числителе — свободный член (то есть c), в знаменателе — коэффициент перед x² (то есть a).'
+    },
+    { id:'reduce', type:'vietaReduce',
+      sumTarget, prodTarget,
+      prompt: () => `Раздели обе дроби — чему равны x₁ + x₂ и x₁ · x₂ целыми числами?`,
+      checkSum: (v) => v===sumTarget,
+      checkProd: (v) => v===prodTarget,
+      record: () => `x₁ + x₂ = ${numText(sumTarget)}<br>x₁ · x₂ = ${numText(prodTarget)}`,
+      hintSum: () => `Раздели числитель на знаменатель: ${-P.b} ÷ ${P.a}.`,
+      hintProd: () => `Раздели числитель на знаменатель: ${P.c} ÷ ${P.a}.`
+    },
+    { id:'guess', type:'pair',
+      sumTarget, prodTarget,
+      prompt: ()=>`Подбери пару чисел: их сумма должна быть равна ${numText(sumTarget)}, а произведение — ${numText(prodTarget)}.`,
+      checkPair: (x1g,x2g)=> (x1g+x2g===sumTarget && x1g*x2g===prodTarget),
+      record: (x1g,x2g)=>`x₁ = ${x1g}, x₂ = ${x2g}`,
+      hint: (sumOk,prodOk,exam)=>{
+        if(exam) return (!sumOk && !prodOk) ? 'Не сходится ни сумма, ни произведение.' : (!sumOk ? 'Сумма не сходится.' : 'Произведение не сходится.');
+        if(!sumOk && !prodOk) return `Ни сумма, ни произведение не сходятся. Переберите пары делителей числа ${numText(prodTarget)}.`;
+        if(!sumOk) return 'Произведение верное, а сумма не сходится — попробуй другую пару с тем же произведением.';
+        return 'Сумма верная, а произведение не сходится — попробуй другую пару с той же суммой.';
+      }
+    }
+  ];
+}
+
+function stepsDiscriminant(P, mode){
+  const guided = mode==='guided';
+  const steps = [
+    { id:'extract', type:'blanks',
+      prompt: () => `Выпиши коэффициенты a, b и c из уравнения ${eqTextDisc(P)} — вместе с их знаками.`,
+      blankIds:['bA','bB','bC'], expected:[P.a,P.b,P.c],
+      renderHTML: () => `<span class="lbl">a = </span><input class="num small" id="bA" type="text" inputmode="none" placeholder="?">`+
+        `<span class="lbl">&nbsp;&nbsp;b = </span><input class="num small" id="bB" type="text" inputmode="none" placeholder="?">`+
+        `<span class="lbl">&nbsp;&nbsp;c = </span><input class="num small" id="bC" type="text" inputmode="none" placeholder="?">`,
+      record: vals => `a = ${numText(vals[0])}, &nbsp; b = ${numText(vals[1])}, &nbsp; c = ${numText(vals[2])}`,
+      hint: exam => exam ? 'Не путай знаки.' : 'Коэффициент — это число вместе со своим знаком, стоящее перед соответствующей степенью x (для c — свободный член).'
+    },
+    { id:'substituteD', type:'blanks',
+      prompt: () => `Подставь коэффициенты в формулу дискриминанта.`,
+      blankIds:['bB2','bA2','bC2'], expected:[P.b,P.a,P.c],
+      renderHTML: () => `<span class="lbl">D = ( </span><input class="num small" id="bB2" type="text" inputmode="none" placeholder="${S.exam?'?':'b'}">`+
+        `<span class="lbl"> )² − 4 · ( </span><input class="num small" id="bA2" type="text" inputmode="none" placeholder="${S.exam?'?':'a'}">`+
+        `<span class="lbl"> ) · ( </span><input class="num small" id="bC2" type="text" inputmode="none" placeholder="${S.exam?'?':'c'}">`+
+        `<span class="lbl"> )</span>`,
+      record: vals => `D = (${numText(vals[0])})² − 4·(${numText(vals[1])})·(${numText(vals[2])})`,
+      hint: exam => exam ? 'Первое место — b, второе — a, третье — c.' : 'В скобки подставляем ровно то, что выписали на прошлом шаге: сначала b (его возводим в квадрат), потом a и c — в произведение 4ac.'
+    },
+  ];
+  if(guided){
+    // обучение: D считается автоматически
+    steps.push(
+      { id:'computeD', type:'auto',
+        record: () => `D = ${P.D}`,
+        prompt: () => `D = ${P.D}. Дискриминант посчитан — двигаемся дальше.`
+      },
+      { id:'sign', type:'auto',
+        record: () => P.D>0 ? 'D > 0 → два корня' : (P.D===0 ? 'D = 0 → один корень' : 'D < 0 → корней нет'),
+        prompt: () => P.D>0 ? 'D > 0 — значит, корней два.' : 'D ≤ 0.'
+      }
+    );
+  } else {
+    steps.push(
+      { id:'computeD', type:'number',
+        prompt: () => 'Теперь досчитай — чему равно D?',
+        expected: P.D,
+        record: v => `D = ${v}`,
+        hint: exam => exam ? 'Не забудь про знак перед 4ac.' : 'Сначала возведи b в квадрат, отдельно посчитай 4ac, затем вычти — если 4ac отрицательное, вычитание превращается в сложение.'
+      },
+      { id:'sign', type:'choice',
+        prompt:()=>'Определи знак дискриминанта — от этого зависит дальнейший план решения.',
+        choices:[{id:'pos',label:'D > 0 — два корня'},{id:'zero',label:'D = 0 — один корень'},{id:'neg',label:'D < 0 — корней нет'}],
+        expected: P.D>0 ? 'pos' : (P.D===0 ? 'zero' : 'neg'),
+        record: v => v==='pos' ? 'D > 0 → два корня' : (v==='zero' ? 'D = 0 → один корень' : 'D < 0 → корней нет'),
+        hint: () => 'Посмотри на посчитанное значение D: положительное, ноль или отрицательное?' }
+    );
+  }
+  if(P.D>0){
+    const sq = Math.sqrt(P.D);
+    const xPlus = (-P.b+sq)/(2*P.a), xMinus = (-P.b-sq)/(2*P.a);
+    if(guided){
+      // обучение: формула подставляется автоматически, ученик находит √D и считает корни
+      steps.push(
+        { id:'substituteX', type:'auto',
+          record: () => `x = ${fracHTML(negTerm(P.b)+' ± √'+numText(P.D), '2·('+numText(P.a)+')')}`,
+          prompt: () => `Формула заполнена: x = ${fracHTML(negTerm(P.b)+' ± √'+numText(P.D), '2·('+numText(P.a)+')')}`
+        },
+        { id:'sqrtD', type:'number',
+          prompt: () => `Извлеки корень из дискриминанта: √${P.D} = ?`,
+          expected: sq,
+          record: v => `√D = √${P.D} = ${v}`,
+          hint: () => 'Ищи число, квадрат которого равен D.'
+        },
+        { id:'roots', type:'dualRoots',
+          prompt: () => `Теперь посчитай оба корня — слева с плюсом, справа с минусом.`,
+          leftEq: () => `x₁ = ${fracHTML(negTerm(P.b)+' + '+numText(sq), '2·('+numText(P.a)+')')}`,
+          rightEq: () => `x₂ = ${fracHTML(negTerm(P.b)+' − '+numText(sq), '2·('+numText(P.a)+')')}`,
+          expectedLeft: () => xPlus,
+          expectedRight: () => xMinus,
+          recordLeft: v => `x₁ = ${v}`,
+          recordRight: v => `x₂ = ${v}`,
+          hintLeft: () => 'Считай по действиям: числитель, потом дели.',
+          hintRight: () => 'Теперь со знаком «минус» перед корнем.'
+        }
+      );
+    } else {
+      steps.push(
+        { id:'substituteX', type:'blanks',
+          prompt: () => `Подставь a, b и найденный дискриминант в формулу корней.`,
+          blankIds:['bB3','bD3','bA3'], expected:[P.b,P.D,P.a],
+          renderHTML: () => `<span class="lbl">x = </span><span class="frac">`+
+            `<span class="num"><span class="lbl">−(</span> <input class="num small" id="bB3" type="text" inputmode="none" placeholder="${S.exam?'?':'b'}"> <span class="lbl">) ± √(</span> <input class="num small" id="bD3" type="text" inputmode="none" placeholder="${S.exam?'?':'D'}"> <span class="lbl">)</span></span>`+
+            `<span class="den"><span class="lbl">2 · (</span> <input class="num small" id="bA3" type="text" inputmode="none" placeholder="${S.exam?'?':'a'}"> <span class="lbl">)</span></span>`+
+            `</span>`,
+          record: vals => `x = ${fracHTML(negTerm(vals[0])+' ± √'+numText(vals[1]), '2·('+numText(vals[2])+')')}`,
+          hint: exam => exam ? 'Числитель: −b ± √D. Знаменатель: 2a.' : 'В числитель подставь b (с минусом впереди) и найденный D под корень; в знаменатель — 2, умноженное на a.'
+        },
+        { id:'sqrtD', type:'number',
+          prompt: () => `Извлеки корень из дискриминанта: √${P.D} = ?`,
+          expected: sq,
+          record: v => `√D = √${P.D} = ${v}`,
+          hint: exam => exam ? 'Ищи число, квадрат которого равен D.' : 'Какое число, умноженное само на себя, даёт D? Это и есть √D.'
+        },
+        { id:'roots', type:'dualRoots',
+          prompt: () => `Корень найден — формула разъехалась на два варианта. Посчитай оба.`,
+          leftEq: () => `x₁ = ${fracHTML(negTerm(P.b)+' + '+numText(sq), '2·('+numText(P.a)+')')}`,
+          rightEq: () => `x₂ = ${fracHTML(negTerm(P.b)+' − '+numText(sq), '2·('+numText(P.a)+')')}`,
+          expectedLeft: () => xPlus,
+          expectedRight: () => xMinus,
+          recordLeft: v => `x₁ = ${v}`,
+          recordRight: v => `x₂ = ${v}`,
+          hintLeft: exam => exam ? `x₁ = ${fracHTML(negTerm(P.b)+' + '+numText(sq), '2·('+numText(P.a)+')')}.` : 'Подставь знак «плюс» и считай по действиям — сначала числитель, потом дели.',
+          hintRight: exam => exam ? `x₂ = ${fracHTML(negTerm(P.b)+' − '+numText(sq), '2·('+numText(P.a)+')')}.` : `Теперь знак «минус» — посчитай (${negTerm(P.b)} − ${numText(sq)}), затем раздели на 2·(${numText(P.a)}).`
+        }
+      );
+    }
+  } else if(P.D===0){
+    steps.push(
+      { id:'substituteX0', type:'blanks',
+        prompt: () => `Подставь a и b в формулу единственного корня.`,
+        blankIds:['bB4','bA4'], expected:[P.b,P.a],
+        renderHTML: () => `<span class="lbl">x = </span><span class="frac">`+
+          `<span class="num"><span class="lbl">−(</span> <input class="num small" id="bB4" type="text" inputmode="none" placeholder="${S.exam?'?':'b'}"> <span class="lbl">)</span></span>`+
+          `<span class="den"><span class="lbl">2 · (</span> <input class="num small" id="bA4" type="text" inputmode="none" placeholder="${S.exam?'?':'a'}"> <span class="lbl">)</span></span>`+
+          `</span>`,
+        record: vals => `x = ${fracHTML(negTerm(vals[0]), '2·('+numText(vals[1])+')')}`,
+        hint: () => 'В числитель — минус b, в знаменатель — 2, умноженное на a.'
+      },
+      { id:'x0', type:'number', prompt:()=>'Досчитай — чему равен этот единственный корень?', expected:-P.b/(2*P.a),
+        record:v=>`x = ${v}`,
+        hint: () => 'При D = 0 формула упрощается: корень всего один.' }
+    );
+  }
+  return steps;
+}
+function stepsSprint(P){
+  return [
+    { id:'sign', type:'choice',
+      prompt:()=>'Не вычисляя корней — только по виду уравнения определи знак дискриминанта.',
+      choices:[{id:'pos',label:'D > 0'},{id:'zero',label:'D = 0'},{id:'neg',label:'D < 0'}],
+      expected: P.D>0 ? 'pos' : (P.D===0 ? 'zero' : 'neg'),
+      record: v => v==='pos' ? 'D > 0' : (v==='zero' ? 'D = 0' : 'D < 0'),
+      hint: () => 'Сравни b² и 4ac — какое из них больше?' }
+  ];
+}
+
+/* ───────── уровни ───────── */
+const LEVELS = [
+  {id:0, name:'1. Без c',              desc:'ax²+bx=0 — вынесение x за скобку'},
+  {id:1, name:'2. Без b',              desc:'ax²+c=0 — извлечение корня'},
+  {id:2, name:'3. Виета',              desc:'подбор корней по теореме Виета'},
+  {id:3, name:'4. D: обучение',        desc:'простые числа, подсказки — считай только финал'},
+  {id:4, name:'5. D: тренировка',      desc:'простые числа, без подсказок'},
+  {id:5, name:'6. D: сложный',         desc:'крупные числа, a>1, иногда нет корней'},
+  {id:6, name:'7. D: ОГЭ',            desc:'стиль экзамена, 90% с корнями'},
+  {id:7, name:'8. Ловушки',            desc:'D=0 и D<0 — особые случаи'},
+  {id:8, name:'9. Спринт',             desc:'быстро определи знак D'},
+  {id:9, name:'10. Экзамен',           desc:'всё вперемешку'},
+];
+let curLevel = 0;
+const solvedByLevel = [0,0,0,0,0,0,0,0,0,0];
+let totalSolved = 0, streak = 0, taskCounter = 0;
+
+/* генерация по сложностям дискриминанта */
+function genDiscEasy(){
+  // a=1, маленькие целые корни, всегда D>0
+  while(true){
+    const a = 1;
+    const x1r = ri(-5,5), x2r = ri(-5,5);
+    if(x1r===x2r) continue;
+    const b=-a*(x1r+x2r), c=a*x1r*x2r;
+    if(b===0 || c===0) continue;
+    if(Math.abs(b)>15 || Math.abs(c)>30) continue;
+    const D=b*b-4*a*c;
+    if(D<=0) continue;
+    const sq=Math.sqrt(D);
+    if(!Number.isInteger(sq)) continue;
+    return {a,b,c,D,roots:[x1r,x2r]};
+  }
+}
+
+function genDiscHard(){
+  // a всегда >1, числа покрупнее, иногда D<0/D=0 (~10%)
+  while(true){
+    const a = pick([2,-2,3,-3]);
+    const roll = Math.random();
+    if(roll<0.10){
+      const b = randNZ(-8,8);
+      let c2;
+      if(a>0) c2 = Math.ceil((b*b)/(4*a)) + ri(1,5);
+      else    c2 = Math.floor((b*b)/(4*a)) - ri(1,5);
+      if(c2===0) continue;
+      const D = b*b-4*a*c2;
+      if(D>=0 || Math.abs(c2)>200) continue;
+      return {a,b,c:c2,D,roots:null};
+    }
+    const x1r=randNZ(-6,6), x2r=randNZ(-6,6);
+    if(x1r===x2r) continue;
+    const b=-a*(x1r+x2r), c=a*x1r*x2r;
+    if(b===0 || c===0) continue;
+    const D=b*b-4*a*c;
+    if(D<=0) continue;
+    const sq=Math.sqrt(D);
+    if(!Number.isInteger(sq)) continue;
+    if(Math.abs(b)>50 || Math.abs(c)>200) continue;
+    return {a,b,c,D,roots:[x1r,x2r]};
+  }
+}
+
+function genDiscOGE(){
+  // стиль ОГЭ: a=1,2,3, маленькие числа, 90% с корнями
+  while(true){
+    const a = pick([1,1,1,2,2,3]);
+    const roll = Math.random();
+    if(roll<0.10){
+      const b = randNZ(-6,6);
+      let c2;
+      if(a>0) c2 = Math.ceil((b*b)/(4*a)) + ri(1,3);
+      else    c2 = Math.floor((b*b)/(4*a)) - ri(1,3);
+      if(c2===0) continue;
+      const D = b*b-4*a*c2;
+      if(D>=0 || Math.abs(c2)>100) continue;
+      return {a,b,c:c2,D,roots:null};
+    }
+    const x1r=randNZ(-5,5), x2r=randNZ(-5,5);
+    if(x1r===x2r) continue;
+    const b=-a*(x1r+x2r), c=a*x1r*x2r;
+    if(b===0 || c===0) continue;
+    if(Math.abs(b)>20 || Math.abs(c)>50) continue;
+    const D=b*b-4*a*c;
+    if(D<=0) continue;
+    const sq=Math.sqrt(D);
+    if(!Number.isInteger(sq)) continue;
+    return {a,b,c,D,roots:[x1r,x2r]};
+  }
+}
+
+function gen(level){
+  if(level===9) level = ri(0,8);
+  let P;
+  if(level===0){ P = {kind:'noC', ...genNoC()}; P.eqText = eqTextNoC(P); P.steps = stepsNoC(P); }
+  else if(level===1){ P = {kind:'noB', ...genNoB()}; P.eqText = eqTextNoB(P); P.steps = stepsNoB(P); }
+  else if(level===2){ P = {kind:'vieta', ...genVieta()}; P.eqText = eqTextVieta(P); P.steps = stepsVieta(P); }
+  else if(level===3){ const d = genDiscEasy(); P = {kind:'discriminant', ...d}; P.eqText = eqTextDisc(P); P.steps = stepsDiscriminant(P, 'guided'); }
+  else if(level===4){ const d = genDiscEasy(); P = {kind:'discriminant', ...d}; P.eqText = eqTextDisc(P); P.steps = stepsDiscriminant(P, 'full'); }
+  else if(level===5){ const d = genDiscHard(); P = {kind:'discriminant', ...d}; P.eqText = eqTextDisc(P); P.steps = stepsDiscriminant(P, 'full'); }
+  else if(level===6){ const d = genDiscOGE(); P = {kind:'discriminant', ...d}; P.eqText = eqTextDisc(P); P.steps = stepsDiscriminant(P, 'full'); }
+  else if(level===7){ const forced = Math.random()<0.5?'zero':'neg'; P = {kind:'discriminant', ...genDiscriminant(forced)}; P.eqText = eqTextDisc(P); P.steps = stepsDiscriminant(P, 'full'); }
+  else if(level===8){ P = {kind:'sprint', ...genDiscriminant(null)}; P.eqText = eqTextDisc(P); P.steps = stepsSprint(P); }
+  else { P = {kind:'sprint', ...genDiscriminant(null)}; P.eqText = eqTextDisc(P); P.steps = stepsSprint(P); }
+  return P;
+}
+
+/* ───────── состояние ───────── */
+let P=null, S=null;
+
+function newProblem(){
+  P = gen(curLevel);
+  taskCounter++;
+  S = {
+    phase:'preview',
+    stepIdx:0,
+    frozenSteps:[],
+    errStep:0, errTotal:0,
+    exam: curLevel===9,
+    ctx: {},
+  };
+  document.getElementById('taskNum').textContent = 'пример №'+taskCounter;
+  document.getElementById('nextBtn').style.display='none';
+  document.getElementById('stStars').textContent='—';
+  setHint('');
+  renderAll(); setPrompt(); renderInputs();
+}
+
+function startSolving(){
+  S.phase = 'solve';
+  renderAll(); setPrompt(); renderInputs();
+}
+
+/* ───────── отрисовка ───────── */
+function renderAll(){
+  document.getElementById('eqLine').textContent = P.eqText;
+  document.getElementById('frozen').innerHTML = S.frozenSteps.join('');
+}
+
+function setPrompt(){
+  const p = document.getElementById('prompt');
+  if(S.phase==='preview'){
+    p.innerHTML = 'Посмотри на уравнение спокойно — спешить некуда.<br>Когда будешь готов, жми «Начать».';
+    return;
+  }
+  if(S.phase==='done'){
+    p.innerHTML = 'Уравнение решено! 🎉';
+    return;
+  }
+  const step = P.steps[S.stepIdx];
+  if(step.type==='isolateMove'){
+    if(!S.mv) mvInit();
+    if(S.mv.phase==='move'){
+      p.innerHTML = 'Перед тобой два слагаемых. Сам выбери, что перенести через «=», чтобы x² остался один слева.';
+    } else if(S.mv.phase==='divide'){
+      p.innerHTML = 'Появилась черта — за ней записываем, <b>на что делим обе части</b>.<br>Спиши коэффициент перед x² (со знаком!) или коснись его в уравнении.';
+    } else if(S.mv.phase==='cancel'){
+      p.innerHTML = 'Делим обе части на коэффициент перед x²…';
+    } else if(S.mv.phase==='compute'){
+      p.innerHTML = `Осталось посчитать деление: ${numText(S.mv.M)} : (${numText(S.mv.K)}) = ? Чему равен x²?`;
+    }
+    return;
+  }
+  p.innerHTML = step.prompt(S.ctx);
+}
+
+function renderInputs(){
+  const area = document.getElementById('inputArea');
+  if(S.phase==='preview'){
+    area.innerHTML = `<button class="go" id="goBtn">Начать →</button>`;
+    document.getElementById('goBtn').onclick = startSolving;
+    return;
+  }
+  if(S.phase==='done'){ area.innerHTML=''; return; }
+  const step = P.steps[S.stepIdx];
+  if(step.type==='isolateMove'){
+    if(!S.mv) mvInit();
+    renderIsolateMove();
+    return;
+  }
+  if(step.type==='number'){
+    area.innerHTML = `
+      <input class="num" id="ans" type="text" inputmode="none" placeholder="?">
+      <button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>`;
+    document.getElementById('goBtn').onclick = submitNumber;
+    document.getElementById('ans').addEventListener('keydown', e=>{ if(e.key==='Enter') submitNumber(); });
+    setTimeout(()=>{ const el=document.getElementById('ans'); if(el) el.focus(); }, 30);
+  } else if(step.type==='choice'){
+    area.innerHTML = `<div class="choices">${step.choices.map(c=>`<button class="choice-btn" data-id="${c.id}">${c.label}</button>`).join('')}</div>`;
+    area.querySelectorAll('.choice-btn').forEach(b=>b.onclick=()=>submitChoice(b.dataset.id,b));
+  } else if(step.type==='factorNoC'){
+    S.tempSign = null;
+    area.innerHTML = `
+      <div class="factor-row">
+        <div class="fbox"><input class="num small" id="ansK" type="text" inputmode="none" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="?"><div class="fcap">числоX</div></div>
+        <div class="fbox"><div class="paren-box">(</div><div class="fcap">&nbsp;</div></div>
+        <div class="fbox"><input class="num small" id="ansP" type="text" inputmode="none" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="?"><div class="fcap">числоX</div></div>
+        <div class="fbox">
+          <div class="signtoggle" id="signToggle">
+            <button type="button" class="sbtn" data-sign="+">+</button>
+            <button type="button" class="sbtn" data-sign="−">−</button>
+          </div>
+          <div class="fcap">знак</div>
+        </div>
+        <div class="fbox"><input class="num small" id="ansQ" type="text" inputmode="none" placeholder="?"><div class="fcap">число</div></div>
+        <div class="fbox"><div class="paren-box">)</div><div class="fcap">&nbsp;</div></div>
+        <div class="fbox"><div class="paren-box">= 0</div><div class="fcap">&nbsp;</div></div>
+        <button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>
+      </div>`;
+    area.querySelectorAll('.sbtn').forEach(b=>b.onclick=()=>{
+      area.querySelectorAll('.sbtn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+      S.tempSign = b.dataset.sign;
+    });
+    document.getElementById('goBtn').onclick = submitFactorNoC;
+    area.querySelectorAll('input').forEach(i=>i.addEventListener('keydown', e=>{ if(e.key==='Enter') submitFactorNoC(); }));
+    setTimeout(()=>{ const el=document.getElementById('ansK'); if(el) el.focus(); }, 30);
+  } else if(step.type==='dualRoots'){
+    S.dual = {};
+    area.innerHTML = `
+      <div class="split-row">
+        <div class="split-half" id="halfLeft">
+          <div class="split-eq">${step.leftEq(S.ctx)}</div>
+          <div class="split-inrow">
+            <input class="num small" id="ansLeft" type="text" inputmode="none" placeholder="?">
+            <button class="go go-small" id="goLeft">ОК</button>
+          </div>
+          <div class="split-hint" id="hintLeft"></div>
+        </div>
+        <div class="split-half" id="halfRight">
+          <div class="split-eq">${step.rightEq(S.ctx)}</div>
+          <div class="split-inrow">
+            <input class="num small" id="ansRight" type="text" inputmode="none" placeholder="?">
+            <button class="go go-small" id="goRight">ОК</button>
+          </div>
+          <div class="split-hint" id="hintRight"></div>
+        </div>
+      </div>`;
+    document.getElementById('goLeft').onclick = ()=>submitDualSide('left');
+    document.getElementById('goRight').onclick = ()=>submitDualSide('right');
+    document.getElementById('ansLeft').addEventListener('keydown', e=>{ if(e.key==='Enter') submitDualSide('left'); });
+    document.getElementById('ansRight').addEventListener('keydown', e=>{ if(e.key==='Enter') submitDualSide('right'); });
+    setTimeout(()=>{ const el=document.getElementById('ansLeft'); if(el) el.focus(); }, 30);
+  } else if(step.type==='vietaSubst'){
+    area.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:14px;width:100%">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="lbl">x₁ + x₂ =</span>
+          <div class="frac-input">
+            <input class="frac-cell" id="vsNum1" type="text" inputmode="none" placeholder="?">
+            <div class="frac-line"></div>
+            <input class="frac-cell" id="vsDen1" type="text" inputmode="none" placeholder="?">
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="lbl">x₁ · x₂ =</span>
+          <div class="frac-input">
+            <input class="frac-cell" id="vsNum2" type="text" inputmode="none" placeholder="?">
+            <div class="frac-line"></div>
+            <input class="frac-cell" id="vsDen2" type="text" inputmode="none" placeholder="?">
+          </div>
+        </div>
+        <button class="go" id="goBtn" style="align-self:flex-start">${S.exam?'Готово':'ОК'}</button>
+      </div>`;
+    document.getElementById('goBtn').onclick = submitVietaSubst;
+    area.querySelectorAll('input').forEach(i=>i.addEventListener('keydown', e=>{ if(e.key==='Enter') submitVietaSubst(); }));
+    setTimeout(()=>{ const el=document.getElementById('vsNum1'); if(el) el.focus(); }, 30);
+  } else if(step.type==='vietaReduce'){
+    area.innerHTML = `
+      <div style="display:flex;flex-direction:column;gap:14px;width:100%">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="lbl">x₁ + x₂ =</span>
+          <input class="num" id="vrSum" type="text" inputmode="none" placeholder="?" style="width:80px">
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="lbl">x₁ · x₂ =</span>
+          <input class="num" id="vrProd" type="text" inputmode="none" placeholder="?" style="width:80px">
+        </div>
+        <button class="go" id="goBtn" style="align-self:flex-start">${S.exam?'Готово':'ОК'}</button>
+      </div>`;
+    document.getElementById('goBtn').onclick = submitVietaReduce;
+    area.querySelectorAll('input').forEach(i=>i.addEventListener('keydown', e=>{ if(e.key==='Enter') submitVietaReduce(); }));
+    setTimeout(()=>{ const el=document.getElementById('vrSum'); if(el) el.focus(); }, 30);
+  } else if(step.type==='blanks'){
+    renderBlanksStep(step);
+  } else if(step.type==='auto'){
+    // показываем результат с задержкой, чтобы ученик успел заметить
+    area.innerHTML = `<div class="auto-reveal" id="autoReveal">${step.record()}</div>`;
+    setTimeout(()=>{
+      const el = document.getElementById('autoReveal');
+      if(el) el.classList.add('visible');
+    }, 200);
+    setTimeout(()=>{
+      advanceStep(step.record());
+    }, 2200);
+  } else if(step.type==='pair'){
+    area.innerHTML = `
+      <span class="lbl">x₁ =</span>
+      <input class="num small" id="ansX1" type="text" inputmode="none" placeholder="?">
+      <span class="lbl">x₂ =</span>
+      <input class="num small" id="ansX2" type="text" inputmode="none" placeholder="?">
+      <button class="go" id="goBtn">Проверить</button>`;
+    document.getElementById('goBtn').onclick = submitPair;
+    area.querySelectorAll('input').forEach(i=>i.addEventListener('keydown', e=>{ if(e.key==='Enter') submitPair(); }));
+    setTimeout(()=>{ const el=document.getElementById('ansX1'); if(el) el.focus(); }, 30);
+  }
+}
+
+function setHint(t, good=false){
+  const h = document.getElementById('hint');
+  h.innerHTML = t;
+  h.className = 'hint'+(good?' good':'');
+}
+
+function resolveExpected(step, ctx){
+  return typeof step.expected === 'function' ? step.expected(ctx) : step.expected;
+}
+
+
+/* ───────── общий переход к следующему шагу ───────── */
+function stepLineHTML(inner){
+  const tall = inner.includes('class="frac"') ? ' stepline-frac' : '';
+  return `<span class="stepline${tall}">${inner}</span>`;
+}
+
+function advanceStep(recordHTML){
+  S.frozenSteps.push(stepLineHTML(recordHTML));
+  S.errStep = 0;
+  S.stepIdx++;
+  renderAll();
+  if(S.stepIdx >= P.steps.length){
+    setTimeout(finish, 300);
+  } else {
+    const nextStep = P.steps[S.stepIdx];
+    if(nextStep.introRecord){
+      S.frozenSteps.push(stepLineHTML(nextStep.introRecord(S.ctx)));
+      renderAll();
+    }
+    setPrompt(); renderInputs();
+  }
+}
+
+/* ───────── обработчики ответов ───────── */
+function submitNumber(){
+  const inp = document.getElementById('ans');
+  if(!inp || inp.value==='') return;
+  const v = Number(inp.value);
+  const step = P.steps[S.stepIdx];
+  const expected = resolveExpected(step, S.ctx);
+  if(v !== expected){
+    S.errStep++; S.errTotal++;
+    inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+    setHint(step.hint(S.exam));
+    inp.value='';
+    return;
+  }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  step.onSolved && step.onSolved(S.ctx, v);
+  advanceStep(step.record(v));
+}
+
+function submitChoice(id, btnEl){
+  const step = P.steps[S.stepIdx];
+  const expected = resolveExpected(step, S.ctx);
+  if(id !== expected){
+    S.errStep++; S.errTotal++;
+    btnEl.classList.remove('shake'); void btnEl.offsetWidth; btnEl.classList.add('shake');
+    setHint(step.hint(S.exam));
+    return;
+  }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  step.onSolved && step.onSolved(S.ctx, id);
+  advanceStep(step.record(id));
+}
+
+function parseXTerm(raw){
+  let s = String(raw).trim().toLowerCase().replace(/\s+/g,'');
+  if(s==='') return null;
+  s = s.replace(/[−–—]/g,'-');
+  s = s.replace(/х/g,'x');
+  if(!s.includes('x')) return null;
+  const numPart = s.replace(/x/g,'');
+  let coef;
+  if(numPart===''||numPart==='+') coef=1;
+  else if(numPart==='-') coef=-1;
+  else { coef = Number(numPart); if(!Number.isFinite(coef)) return null; }
+  return coef;
+}
+
+/* ───────── isolateMove: перенос + деление (портировано из линейного тренажёра) ───────── */
+function mvInit(){
+  S.mv = {
+    phase: 'move',
+    L: [ {coef:P.a, pow:2, id:1, moved:false}, {coef:P.c, pow:0, id:2, moved:false} ],
+    R: [],
+    K: null, M: null,
+  };
+}
+
+function mvMisplaced(){
+  return [...S.mv.L.filter(t=>t.pow!==2), ...S.mv.R.filter(t=>t.pow===2)];
+}
+
+function renderIsolateMove(){
+  const area = document.getElementById('inputArea');
+  const mv = S.mv;
+  if(mv.phase==='move'){
+    const chip = (t,leading,side) => `<span class="term tap ${t.moved?'moved':''}" data-id="${t.id}" data-side="${side}">${termText(t,leading)}</span>`;
+    const leftHTML = mv.L.map((t,i)=>chip(t,i===0,'L')).join('');
+    const rightHTML = mv.R.length ? mv.R.map((t,i)=>chip(t,i===0,'R')).join('') : `<span class="term">0</span>`;
+    const goBtn = S.exam ? `<button class="go" id="mvGoBtn2" style="margin-left:10px">Готово</button>` : '';
+    area.innerHTML = `<div class="eqline2" id="mvEq">${leftHTML}<span class="eq-sign">=</span>${rightHTML}${goBtn}</div>`;
+    area.querySelectorAll('.term.tap').forEach(el=>el.onclick=()=>mvTapTerm(el));
+    if(S.exam) document.getElementById('mvGoBtn2').onclick = mvCheckMoveDone;
+  } else if(mv.phase==='divide'){
+    area.innerHTML = `<div class="eqline2">
+      <span class="term tap" id="mvChipK">${numText(mv.L[0].coef)}</span><span style="font-size:24px">x²</span>
+      <span class="eq-sign">=</span>
+      <span class="term tap" id="mvChipM">${numText(mv.R[0].coef)}</span>
+      <span class="divbar"></span><span class="divcolon">:</span>
+      <input class="num small" id="mvDiv" type="text" inputmode="none" placeholder="?">
+      <button class="go" id="mvGoBtn" style="margin-left:8px">${S.exam?'Готово':'ОК'}</button>
+    </div>`;
+    document.getElementById('mvChipK').onclick = ()=>mvFillDiv(mv.L[0].coef,'mvChipK');
+    document.getElementById('mvChipM').onclick = ()=>mvFillDiv(mv.R[0].coef,'mvChipM');
+    document.getElementById('mvGoBtn').onclick = mvSubmitDiv;
+    document.getElementById('mvDiv').addEventListener('keydown', e=>{ if(e.key==='Enter') mvSubmitDiv(); });
+    setTimeout(()=>{ const el=document.getElementById('mvDiv'); if(el) el.focus(); }, 500);
+  } else if(mv.phase==='cancel'){
+    area.innerHTML = `<div class="eqline2">
+      <span class="frac"><span class="num"><span class="strikeable" id="mvS1">${numText(mv.K)}</span>x²</span><span class="den"><span class="strikeable" id="mvS2">${numText(mv.K)}</span></span></span>
+      <span class="eq-sign">=</span>
+      <span class="frac"><span class="num">${numText(mv.M)}</span><span class="den">${numText(mv.K)}</span></span>
+    </div>`;
+  } else if(mv.phase==='compute'){
+    area.innerHTML = `<div class="eqline2">
+      <span class="frac"><span class="num"><span class="strikeable struck" id="mvS1">${numText(mv.K)}</span>x²</span><span class="den"><span class="strikeable struck" id="mvS2">${numText(mv.K)}</span></span></span>
+      <span class="eq-sign">=</span>
+      <span class="frac"><span class="num">${numText(mv.M)}</span><span class="den">${numText(mv.K)}</span></span>
+      <span style="font-size:22px;margin:0 4px">=</span>
+      <input class="num small" id="mvCompute" type="text" inputmode="none" placeholder="?">
+      <button class="go" id="mvComputeBtn">${S.exam?'Готово':'ОК'}</button>
+    </div>`;
+    document.getElementById('mvComputeBtn').onclick = mvSubmitCompute;
+    document.getElementById('mvCompute').addEventListener('keydown', e=>{ if(e.key==='Enter') mvSubmitCompute(); });
+    setTimeout(()=>{ const el=document.getElementById('mvCompute'); if(el) el.focus(); }, 30);
+  }
+}
+
+function mvTapTerm(el){
+  const id = Number(el.dataset.id), side = el.dataset.side;
+  const arr = side==='L' ? S.mv.L : S.mv.R;
+  const t = arr.find(x=>x.id===id);
+  if(S.exam){ mvPerformMove(t, side, el); return; }
+  const wrong = (t.pow===2 && side==='R') || (t.pow!==2 && side==='L');
+  if(!wrong){
+    S.errTotal++;
+    el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+    setHint(t.pow===2 ? 'x² уже стоит на своём месте — слева. Переносить нужно другое слагаемое.' : 'Это число уже справа — двигать его дальше некуда.');
+    return;
+  }
+  mvPerformMove(t, side, el);
+}
+
+function mvPerformMove(t, side, el){
+  const from = side==='L' ? S.mv.L : S.mv.R;
+  const to   = side==='L' ? S.mv.R : S.mv.L;
+  const oldText = termText(t,false);
+  from.splice(from.indexOf(t),1);
+  const nt = {...t, coef:-t.coef, moved:true};
+  to.push(nt);
+  const startRect = el.getBoundingClientRect();
+  renderIsolateMove();
+  const target = document.querySelector(`.term[data-id="${t.id}"]`);
+  if(target){
+    const endRect = target.getBoundingClientRect();
+    target.style.visibility='hidden';
+    const fly = document.createElement('span');
+    fly.className='flyer';
+    fly.textContent = oldText;
+    fly.style.left = startRect.left+'px'; fly.style.top = startRect.top+'px';
+    document.body.appendChild(fly);
+    requestAnimationFrame(()=>{ fly.style.left=endRect.left+'px'; fly.style.top=endRect.top+'px'; });
+    setTimeout(()=>{
+      fly.textContent = termText(nt,false);
+      fly.classList.add('flip');
+    }, 320);
+    setTimeout(()=>{
+      fly.remove();
+      target.style.visibility='';
+      target.classList.add('pop');
+      mvAfterMove();
+    }, 680);
+  } else {
+    mvAfterMove();
+  }
+}
+
+function mvAfterMove(){
+  if(S.exam){ renderIsolateMove(); return; }
+  if(mvMisplaced().length===0){
+    setHint('Перенесли через «=»: знак поменялся!', true);
+    setTimeout(()=>{ S.mv.phase='divide'; setPrompt(); renderInputs(); }, 650);
+  } else {
+    renderIsolateMove();
+  }
+}
+
+function mvCheckMoveDone(){
+  if(mvMisplaced().length===0){
+    setHint('Перенос верный.', true);
+    setTimeout(()=>{ S.mv.phase='divide'; setPrompt(); renderInputs(); }, 400);
+  } else {
+    S.errTotal++;
+    setHint('Расположение неверное — x² должен остаться слева, число — уйти направо.');
+  }
+}
+
+function mvFillDiv(v, chipId){
+  const inD = document.getElementById('mvDiv');
+  const chip = document.getElementById(chipId);
+  if(!inD) return;
+  const land = ()=>{ inD.value=v; if(!S.exam) mvSubmitDiv(); };
+  if(chip){
+    const a = chip.getBoundingClientRect(), b = inD.getBoundingClientRect();
+    const fly = document.createElement('span');
+    fly.className='flyer';
+    fly.textContent = numText(v);
+    fly.style.left=a.left+'px'; fly.style.top=a.top+'px';
+    document.body.appendChild(fly);
+    requestAnimationFrame(()=>{ fly.style.left=b.left+'px'; fly.style.top=b.top+'px'; });
+    setTimeout(()=>{ fly.remove(); land(); }, 680);
+  } else {
+    land();
+  }
+}
+
+function mvSubmitDiv(){
+  const inD = document.getElementById('mvDiv');
+  if(!inD || inD.value==='') return;
+  const v = Number(inD.value);
+  const trueK = S.mv.L[0].coef;
+  if(v !== trueK){
+    S.errTotal++;
+    inD.classList.remove('shake'); void inD.offsetWidth; inD.classList.add('shake');
+    if(S.exam){
+      setHint('Делим на коэффициент перед x².');
+    } else if(v === S.mv.R[0].coef){
+      setHint('Делим на коэффициент перед x², а не на правую часть!');
+    } else {
+      setHint('Спиши число, которое стоит перед x² — со всеми его знаками.');
+    }
+    inD.value='';
+    return;
+  }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  S.mv.K = trueK; S.mv.M = S.mv.R[0].coef;
+  S.mv.phase = 'cancel';
+  renderIsolateMove();
+  setTimeout(()=>{
+    const s1=document.getElementById('mvS1'), s2=document.getElementById('mvS2');
+    if(s1) s1.classList.add('struck');
+    if(s2) s2.classList.add('struck');
+  }, 350);
+  setTimeout(()=>{
+    S.mv.phase = 'compute';
+    setPrompt(); renderInputs();
+  }, 1400);
+}
+
+function mvSubmitCompute(){
+  const inp = document.getElementById('mvCompute');
+  if(!inp || inp.value==='') return;
+  const v = Number(inp.value);
+  const trueN = S.mv.M / S.mv.K;
+  if(v !== trueN){
+    S.errTotal++;
+    inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+    setHint(S.exam ? 'Пересчитай деление.' : 'Раздели числитель на знаменатель по действиям — не забудь про знаки: минус на минус даёт плюс.');
+    inp.value='';
+    return;
+  }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  mvFinish();
+}
+
+function mvFinish(){
+  const step = P.steps[S.stepIdx];
+  advanceStep(step.finalRecord());
+}
+
+function submitFactorNoC(){
+  const iK = document.getElementById('ansK'), iP = document.getElementById('ansP'), iQ = document.getElementById('ansQ');
+  if(!iK || !iP || !iQ || iK.value==='' || iP.value==='' || iQ.value==='') return;
+  if(!S.tempSign){ setHint('Выбери знак — плюс или минус.'); return; }
+  const step = P.steps[S.stepIdx];
+  const k = parseXTerm(iK.value), p = parseXTerm(iP.value), qMag = Number(iQ.value);
+  if(k===null || p===null){
+    S.errStep++; S.errTotal++;
+    if(k===null){ iK.classList.remove('shake'); void iK.offsetWidth; iK.classList.add('shake'); }
+    if(p===null){ iP.classList.remove('shake'); void iP.offsetWidth; iP.classList.add('shake'); }
+    setHint('В первых двух окошках должны быть слагаемые с x — например «4x» или «−x». Не забудь дописать x.');
+    iK.value=''; iP.value=''; iQ.value='';
+    return;
+  }
+  if(!step.checkFour(k,p,S.tempSign,qMag)){
+    S.errStep++; S.errTotal++;
+    [iK,iP,iQ].forEach(i=>{ i.classList.remove('shake'); void i.offsetWidth; i.classList.add('shake'); });
+    setHint(step.hint(S.exam));
+    iK.value=''; iP.value=''; iQ.value='';
+    return;
+  }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  step.onSolved && step.onSolved(S.ctx, k,p,S.tempSign,qMag);
+  advanceStep(step.record(k,p,S.tempSign,qMag));
+}
+
+function submitDualSide(side){
+  const step = P.steps[S.stepIdx];
+  const inp = document.getElementById(side==='left' ? 'ansLeft' : 'ansRight');
+  if(!inp || inp.value==='') return;
+  const v = Number(inp.value);
+  const expected = side==='left' ? step.expectedLeft(S.ctx) : step.expectedRight(S.ctx);
+  const hintFn = side==='left' ? step.hintLeft : step.hintRight;
+  const hintEl = document.getElementById(side==='left' ? 'hintLeft' : 'hintRight');
+  if(v !== expected){
+    S.errStep++; S.errTotal++;
+    inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
+    hintEl.textContent = hintFn(S.exam);
+    inp.value='';
+    return;
+  }
+  hintEl.textContent = '';
+  inp.disabled = true;
+  document.getElementById(side==='left' ? 'goLeft' : 'goRight').disabled = true;
+  document.getElementById(side==='left' ? 'halfLeft' : 'halfRight').classList.add('done');
+  S.dual[side] = v;
+  if(S.dual.left !== undefined && S.dual.right !== undefined){
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    const rec = step.recordLeft(S.dual.left) + ' &nbsp; ' + step.recordRight(S.dual.right);
+    setTimeout(()=>advanceStep(rec), 500);
+  }
+}
+
+function submitVietaSubst(){
+  const n1 = document.getElementById('vsNum1'), d1 = document.getElementById('vsDen1');
+  const n2 = document.getElementById('vsNum2'), d2 = document.getElementById('vsDen2');
+  if(!n1 || !d1 || !n2 || !d2 || n1.value==='' || d1.value==='' || n2.value==='' || d2.value==='') return;
+  const num1 = Number(n1.value), den1 = Number(d1.value), num2 = Number(n2.value), den2 = Number(d2.value);
+  const step = P.steps[S.stepIdx];
+  const sumOk = step.checkSum(num1,den1), prodOk = step.checkProd(num2,den2);
+  if(!sumOk || !prodOk){
+    S.errTotal++;
+    if(!sumOk){ [n1,d1].forEach(i=>{ i.classList.remove('shake'); void i.offsetWidth; i.classList.add('shake'); }); }
+    if(!prodOk){ [n2,d2].forEach(i=>{ i.classList.remove('shake'); void i.offsetWidth; i.classList.add('shake'); }); }
+    if(!sumOk && !prodOk) setHint(step.hintSum() + ' ' + step.hintProd());
+    else setHint(!sumOk ? step.hintSum() : step.hintProd());
+    return;
+  }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  advanceStep(step.recordSum(num1,den1) + '<br>' + step.recordProd(num2,den2));
+}
+
+function submitVietaReduce(){
+  const sEl = document.getElementById('vrSum'), pEl = document.getElementById('vrProd');
+  if(!sEl || !pEl || sEl.value==='' || pEl.value==='') return;
+  const sumVal = Number(sEl.value), prodVal = Number(pEl.value);
+  const step = P.steps[S.stepIdx];
+  const sumOk = step.checkSum(sumVal), prodOk = step.checkProd(prodVal);
+  if(!sumOk || !prodOk){
+    S.errTotal++;
+    if(!sumOk){ sEl.classList.remove('shake'); void sEl.offsetWidth; sEl.classList.add('shake'); }
+    if(!prodOk){ pEl.classList.remove('shake'); void pEl.offsetWidth; pEl.classList.add('shake'); }
+    if(!sumOk && !prodOk) setHint(step.hintSum() + ' ' + step.hintProd());
+    else setHint(!sumOk ? step.hintSum() : step.hintProd());
+    return;
+  }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  advanceStep(step.record());
+}
+
+function renderBlanksStep(step){
+  const area = document.getElementById('inputArea');
+  area.innerHTML = step.renderHTML() + `<button class="go" id="goBtn" style="margin-left:10px">${S.exam?'Готово':'ОК'}</button>`;
+  document.getElementById('goBtn').onclick = submitBlanks;
+  step.blankIds.forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.addEventListener('keydown', e=>{ if(e.key==='Enter') submitBlanks(); });
+  });
+  setTimeout(()=>{ const el=document.getElementById(step.blankIds[0]); if(el) el.focus(); }, 30);
+}
+
+function submitBlanks(){
+  const step = P.steps[S.stepIdx];
+  const els = step.blankIds.map(id=>document.getElementById(id));
+  if(els.some(el=>!el || el.value==='')) return;
+  const vals = els.map(el=>Number(el.value));
+  const ok = vals.every((v,i)=>v===step.expected[i]);
+  if(!ok){
+    S.errTotal++;
+    els.forEach((el,i)=>{
+      if(vals[i]!==step.expected[i]){ el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+    });
+    setHint(step.hint(S.exam));
+    return;
+  }
+  setHint(pick(['Верно!','Точно!','Отлично!']), true);
+  advanceStep(step.record(vals));
+}
+
+function submitPair(){
+  const i1 = document.getElementById('ansX1'), i2 = document.getElementById('ansX2');
+  if(!i1 || !i2 || i1.value==='' || i2.value==='') return;
+  const a = Number(i1.value), b = Number(i2.value);
+  const step = P.steps[S.stepIdx];
+  if(step.checkPair(a,b)){
+    setHint(pick(['Верно!','Точно!','Отлично!']), true);
+    step.onSolved && step.onSolved(S.ctx, a,b);
+    advanceStep(step.record(a,b));
+    return;
+  }
+  S.errStep++; S.errTotal++;
+  const sumOk = (a+b === step.sumTarget), prodOk = (a*b === step.prodTarget);
+  i1.classList.remove('shake'); void i1.offsetWidth; i1.classList.add('shake');
+  i2.classList.remove('shake'); void i2.offsetWidth; i2.classList.add('shake');
+  setHint(step.hint(sumOk, prodOk, S.exam));
+  i1.value=''; i2.value='';
+}
+
+/* ───────── финал ───────── */
+function answerHTML(P){
+  switch(P.kind){
+    case 'noC': return `Ответ: x₁ = 0, x₂ = ${numText(P.x2)}`;
+    case 'noB': return P.hasRoots ? `Ответ: x₁ = ${numText(P.r)}, x₂ = ${numText(-P.r)}` : 'Ответ: корней нет';
+    case 'vieta': return `Ответ: x₁ = ${numText(P.x1)}, x₂ = ${numText(P.x2)}`;
+    case 'discriminant': {
+      if(P.D<0) return 'Ответ: корней нет';
+      if(P.D===0) return `Ответ: x = ${numText(P.roots[0])}`;
+      const sq=Math.sqrt(P.D);
+      const xP=(-P.b+sq)/(2*P.a), xM=(-P.b-sq)/(2*P.a);
+      return `Ответ: x₁ = ${numText(xP)}, x₂ = ${numText(xM)}`;
+    }
+    case 'sprint': return 'Знак дискриминанта определён верно!';
+  }
+}
+
+function finish(){
+  S.phase = 'done';
+  S.frozenSteps.push(`<div class="stepline ok">${answerHTML(P)}</div>`);
+  renderAll(); setPrompt(); renderInputs();
+  let stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
+  document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
+  totalSolved++; solvedByLevel[curLevel]++;
+  streak = (S.errTotal===0) ? streak+1 : 0;
+  document.getElementById('stSolved').textContent = totalSolved;
+  document.getElementById('stStreak').textContent = streak;
+  setHint(S.errTotal===0 ? 'Без единой ошибки — блестяще!' : `Решено! Ошибок по пути: ${S.errTotal}.`, S.errTotal===0);
+  document.getElementById('nextBtn').style.display='block';
+  renderLevels();
+}
+
+/* ───────── интерфейс уровней ───────── */
+function renderLevels(){
+  const el = document.getElementById('levels');
+  el.innerHTML = LEVELS.map(L=>
+    `<button class="lvl ${L.id===curLevel?'active':''}" data-id="${L.id}" title="${L.desc}">
+      ${L.name}${solvedByLevel[L.id]>=5?'<span class="done-mark">★</span>':''}
+    </button>`
+  ).join('');
+  el.querySelectorAll('.lvl').forEach(b=>b.onclick=()=>{
+    curLevel = Number(b.dataset.id);
+    renderLevels(); newProblem();
+  });
+}
+
+/* ───────── стрелочки и плавающая клавиатура ───────── */
+let activeInputId = 'ans';
+let keypadOpen = true;
+
+function enhanceNumInputs(container){
+  container.querySelectorAll('input.num').forEach(inp=>{
+    if(inp.dataset.enhanced) return;
+    inp.dataset.enhanced = '1';
+    const wrap = document.createElement('span');
+    wrap.className = 'num-wrap';
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.appendChild(inp);
+    const spin = document.createElement('span');
+    spin.className = 'spin';
+    spin.innerHTML = `<button type="button" class="spin-btn" data-dir="1">▲</button><button type="button" class="spin-btn" data-dir="-1">▼</button>`;
+    wrap.appendChild(spin);
+    spin.querySelectorAll('.spin-btn').forEach(btn=>{
+      btn.onclick = ()=>{
+        let v = Number(inp.value);
+        if(!Number.isFinite(v)) v = 0;
+        v += Number(btn.dataset.dir);
+        inp.value = String(v);
+        inp.focus();
+      };
+    });
+    if(inp.id) inp.addEventListener('focus', ()=>{ activeInputId = inp.id; });
+  });
+  // узкие поля внутри дробей — стрелочки туда не влезают, но клавиатура по фокусу работает
+  container.querySelectorAll('input.frac-cell').forEach(inp=>{
+    if(inp.dataset.enhanced) return;
+    inp.dataset.enhanced = '1';
+    if(inp.id) inp.addEventListener('focus', ()=>{ activeInputId = inp.id; });
+  });
+  syncKeypadVisibility(container);
+}
+
+function syncKeypadVisibility(container){
+  const hasInputs = container.querySelectorAll('input.num, input.frac-cell').length > 0;
+  document.getElementById('quad_keypadFloat').style.display = (hasInputs && keypadOpen) ? 'block' : 'none';
+  document.getElementById('quad_kpToggle').style.display = (hasInputs && !keypadOpen) ? 'flex' : 'none';
+}
+
+function setupInputEnhancer(containerId){
+  const container = document.getElementById(containerId);
+  if(!container) return;
+  const observer = new MutationObserver(()=>enhanceNumInputs(container));
+  observer.observe(container, {childList:true, subtree:true});
+  enhanceNumInputs(container);
+}
+
+function keypadPress(ch){
+  if(ch==='enter'){ document.getElementById('goBtn')?.click(); return; }
+  const inp = document.getElementById(activeInputId);
+  if(!inp) return;
+  if(ch==='back') inp.value = inp.value.slice(0,-1);
+  else inp.value = (inp.value||'') + ch;
+  inp.focus();
+}
+
+function setupFloatingKeypad(){
+  const keys = ['7','8','9','4','5','6','1','2','3','−','0','⌫','x'];
+  document.getElementById('quad_keypadButtons').innerHTML = keys.map(k=>{
+    let cls = '';
+    if(k==='−') cls='kp-minus';
+    else if(k==='x') cls='kp-x';
+    else if(k==='⌫') cls='kp-back';
+    const val = k==='⌫' ? 'back' : (k==='−' ? '-' : k);
+    return `<button type="button" class="${cls}" data-key="${val}">${k}</button>`;
+  }).join('') + `<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>`;
+  document.querySelectorAll('#keypadButtons button').forEach(btn=>{
+    btn.onclick = ()=>keypadPress(btn.dataset.key);
+  });
+  document.getElementById('quad_kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(document.getElementById('inputArea')); };
+  document.getElementById('quad_kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(document.getElementById('inputArea')); };
+  makeKeypadDraggable(document.getElementById('quad_keypadFloat'), document.getElementById('quad_kpDragHandle'));
+}
+
+
+return function start(){
+  document.getElementById('refreshBtn').onclick = newProblem;
+  document.getElementById('nextBtn').onclick = newProblem;
+  setupFloatingKeypad();
+  setupInputEnhancer('inputArea');
+  curLevel = 0;
+  for(let i=0;i<solvedByLevel.length;i++) solvedByLevel[i]=0;
+  totalSolved = 0; streak = 0; taskCounter = 0;
+  document.getElementById('stSolved').textContent = '0';
+  document.getElementById('stStreak').textContent = '0';
+  renderLevels();
+  newProblem();
+};
+})();
+</script>
+
+
+
+<script>
+/* ═══════════════ интерактивная доска на фоне ═══════════════ */
+(function(){
+  const canvas = document.getElementById('boardCanvas');
+  const ctx = canvas.getContext('2d');
+  // отдельный оффскрин-слой только для чернил: ластик (destination-out) стирает
+  // содержимое ТОЛЬКО этого слоя, а сетка рисуется отдельно на основном холсте
+  // и затем чернила накладываются сверху обычным source-over — так ластик
+  // больше не «прогрызает» дыры в клетчатой сетке
+  const inkCanvas = document.createElement('canvas');
+  const inkCtx = inkCanvas.getContext('2d');
+  const toolbar = document.getElementById('boardToolbar');
+  const zoomResetBtn = document.getElementById('zoomResetBtn');
+
+  // ═══ модель данных: штрихи хранятся в «мировых» координатах (=координаты
+  // документа, как обычный page-scroll), а не в пикселях экрана. Холст же —
+  // это просто окно viewport-размера, которое на каждый кадр перерисовывает
+  // видимый кусок этого мира с учётом прокрутки страницы, панорамирования
+  // и масштаба. Так рисунок всегда остаётся «приклеен» к странице, а зум
+  // по-настоящему приближает/отдаляет содержимое, а не просто холст. ═══
+
+  let tool = 'pen';          // 'pen' | 'eraser' | 'line' | 'hand'
+  let penWidth = 2;          // тонкая по умолчанию
+  let penColor = '#000000';  // чёрный по умолчанию
+  let eraserSize = 26;       // средний ластик по умолчанию
+  let dpr = Math.max(1, window.devicePixelRatio || 1);
+
+  let strokes = [];          // завершённые штрихи: {tool,color,width,points:[{x,y}...]}
+  let currentStroke = null;  // штрих, который рисуется прямо сейчас (для живого превью)
+  const UNDO_LIMIT = 60;
+  const undoStack = [];      // снимки массива strokes (лёгкие — это просто точки, не пиксели)
+
+  // ── масштаб и панорамирование (в «мировых» пикселях) ──
+  let viewScale = 1, panX = 0, panY = 0;
+  const ZOOM_MIN = 0.5, ZOOM_MAX = 3, ZOOM_STEP = 1.2;
+
+  function worldToScreenTransform(){
+    // screen = (world - scroll - pan) * viewScale, всё затем ещё раз умножается на dpr
+    const s = viewScale * dpr;
+    return [s, 0, 0, s, -(window.scrollX + panX) * s, -(window.scrollY + panY) * s];
+  }
+  function screenToWorld(clientX, clientY){
+    return {
+      x: clientX / viewScale + window.scrollX + panX,
+      y: clientY / viewScale + window.scrollY + panY,
+    };
+  }
+
+  function resizeCanvas(){
+    dpr = Math.max(1, window.devicePixelRatio || 1);
+    const w = window.innerWidth, h = window.innerHeight;
+    canvas.width = Math.round(w * dpr);
+    canvas.height = Math.round(h * dpr);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    inkCanvas.width = canvas.width;
+    inkCanvas.height = canvas.height;
+    redraw();
+  }
+
+  function drawStroke(targetCtx, s){
+    if (!s || s.points.length === 0) return;
+    targetCtx.save();
+    targetCtx.globalCompositeOperation = (s.tool === 'eraser') ? 'destination-out' : 'source-over';
+    targetCtx.strokeStyle = s.color || '#000';
+    targetCtx.lineWidth = s.width;
+    targetCtx.lineCap = 'round';
+    targetCtx.lineJoin = 'round';
+    const pts = s.points;
+    targetCtx.beginPath();
+    if (pts.length === 1) {
+      // одиночная точка — рисуем короткий отрезок «на месте»
+      const p = pts[0];
+      targetCtx.moveTo(p.x, p.y);
+      targetCtx.lineTo(p.x + 0.01, p.y + 0.01);
+    } else if (pts.length === 2) {
+      // ровно 2 точки — это либо инструмент «линия» (должна остаться идеально
+      // прямой), либо очень короткий росчерк, где сглаживать нечего
+      targetCtx.moveTo(pts[0].x, pts[0].y);
+      targetCtx.lineTo(pts[1].x, pts[1].y);
+    } else {
+      // сглаживание через квадратичные кривые по серединам отрезков —
+      // стандартный приём для рисования от руки: убирает «углы» на изломах,
+      // не требуя менять сами записанные точки
+      targetCtx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length - 1; i++) {
+        const midX = (pts[i].x + pts[i + 1].x) / 2;
+        const midY = (pts[i].y + pts[i + 1].y) / 2;
+        targetCtx.quadraticCurveTo(pts[i].x, pts[i].y, midX, midY);
+      }
+      const last = pts[pts.length - 1];
+      const prev = pts[pts.length - 2];
+      targetCtx.quadraticCurveTo(prev.x, prev.y, last.x, last.y);
+    }
+    targetCtx.stroke();
+    targetCtx.restore();
+  }
+
+  let redrawScheduled = false;
+  const GRID_SIZE = 24; // мировые единицы — тот же шаг, что раньше был у CSS-сетки на фоне
+
+  function drawGrid(){
+    const topLeft = screenToWorld(0, 0);
+    const bottomRight = screenToWorld(window.innerWidth, window.innerHeight);
+    const gridColor = (getComputedStyle(document.documentElement).getPropertyValue('--grid') || '#DCE4F0').trim();
+    const startX = Math.floor(topLeft.x / GRID_SIZE) * GRID_SIZE;
+    const startY = Math.floor(topLeft.y / GRID_SIZE) * GRID_SIZE;
+    ctx.save();
+    ctx.strokeStyle = gridColor;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = startX; x <= bottomRight.x; x += GRID_SIZE) {
+      ctx.moveTo(x, topLeft.y);
+      ctx.lineTo(x, bottomRight.y);
+    }
+    for (let y = startY; y <= bottomRight.y; y += GRID_SIZE) {
+      ctx.moveTo(topLeft.x, y);
+      ctx.lineTo(bottomRight.x, y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function redraw(){
+    if (redrawScheduled) return;
+    redrawScheduled = true;
+    requestAnimationFrame(()=>{
+      redrawScheduled = false;
+      const m = worldToScreenTransform();
+
+      // 1) чернила — на отдельном слое, чтобы ластик (destination-out) стирал
+      // только их, а не сетку под ними
+      inkCtx.save();
+      inkCtx.setTransform(1, 0, 0, 1, 0, 0);
+      inkCtx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
+      inkCtx.restore();
+      inkCtx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+      for (const s of strokes) drawStroke(inkCtx, s);
+      if (currentStroke) drawStroke(inkCtx, currentStroke);
+
+      // 2) основной холст: сетка, затем чернила поверх обычным наложением
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+      ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+      drawGrid();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(inkCanvas, 0, 0);
+    });
+  }
+
+  function pushUndo(){
+    undoStack.push(strokes.slice());
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  }
+  function undo(){
+    if (undoStack.length === 0) return;
+    strokes = undoStack.pop();
+    redraw();
+  }
+  function clearBoard(){
+    pushUndo();
+    strokes = [];
+    redraw();
+  }
+
+  // ── панорамирование: средняя ИЛИ правая кнопка мыши, ИЛИ инструмент «рука» + левая кнопка ──
+  let panning = false;
+  let panStartClientX = 0, panStartClientY = 0, panStartPanX = 0, panStartPanY = 0;
+
+  function startPan(e){
+    panning = true;
+    try { canvas.setPointerCapture(e.pointerId); } catch(_){}
+    panStartClientX = e.clientX; panStartClientY = e.clientY;
+    panStartPanX = panX; panStartPanY = panY;
+    updateCursor();
+  }
+  function updateCursor(){
+    canvas.style.cursor = panning ? 'grabbing' : (tool === 'hand' ? 'grab' : 'crosshair');
+  }
+
+  let drawing = false;
+
+  canvas.addEventListener('contextmenu', e=> e.preventDefault()); // правая кнопка теперь двигает доску, а не открывает системное меню
+  canvas.addEventListener('pointerdown', e=>{
+    if (e.button === 1 || e.button === 2) { startPan(e); e.preventDefault(); return; } // средняя ИЛИ правая кнопка — панорамирование
+    if (tool === 'hand') {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      startPan(e); e.preventDefault(); return;
+    }
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+    drawing = true;
+    try { canvas.setPointerCapture(e.pointerId); } catch(_){}
+    pushUndo();
+    const p = screenToWorld(e.clientX, e.clientY);
+    if (tool === 'line') {
+      currentStroke = { tool: 'line', color: penColor, width: penWidth, points: [p, p] };
+    } else if (tool === 'eraser') {
+      currentStroke = { tool: 'eraser', width: eraserSize, points: [p] };
+    } else {
+      currentStroke = { tool: 'pen', color: penColor, width: penWidth, points: [p] };
+    }
+    redraw();
+    e.preventDefault();
+  });
+
+  canvas.addEventListener('pointermove', e=>{
+    if (panning) {
+      panX = panStartPanX - (e.clientX - panStartClientX) / viewScale;
+      panY = panStartPanY - (e.clientY - panStartClientY) / viewScale;
+      redraw();
+      e.preventDefault();
+      return;
+    }
+    if (!drawing || !currentStroke) return;
+    if (tool === 'line') {
+      const p = screenToWorld(e.clientX, e.clientY);
+      currentStroke.points[1] = p; // линия — всегда ровно 2 точки: старт и текущая
+    } else {
+      // getCoalescedEvents() восстанавливает промежуточные точки, которые браузер
+      // «схлопнул» при быстром движении мыши/пера — это повышает эффективную
+      // частоту дискретизации и вместе со сглаживанием в drawStroke() даёт
+      // заметно менее угловатую линию
+      const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+      const list = events.length ? events : [e];
+      for (const ev of list) {
+        const p = screenToWorld(ev.clientX, ev.clientY);
+        currentStroke.points.push(p);
+      }
+    }
+    redraw();
+    e.preventDefault();
+  });
+
+  function endStroke(e){
+    if (panning) {
+      panning = false;
+      try { canvas.releasePointerCapture(e.pointerId); } catch(_){}
+      updateCursor();
+      return;
+    }
+    if (!drawing) return;
+    drawing = false;
+    if (currentStroke) {
+      // на случай, если pointerup пришёл без предшествующего pointermove
+      // ровно в этой точке — досчитываем финальную позицию по самому событию
+      if (typeof e.clientX === 'number') {
+        const p = screenToWorld(e.clientX, e.clientY);
+        if (tool === 'line') currentStroke.points[1] = p;
+        else currentStroke.points.push(p);
+      }
+      strokes.push(currentStroke);
+      currentStroke = null;
+    }
+    try { canvas.releasePointerCapture(e.pointerId); } catch(_){}
+    redraw();
+  }
+  canvas.addEventListener('pointerup', endStroke);
+  canvas.addEventListener('pointercancel', endStroke);
+
+  // ── инструменты (ручка/ластик/линия/рука) — общая группа, активен ровно один ──
+  // кнопка «рука» лежит в отдельной (второй) панели, поэтому ищем по всему документу
+  const toolBtns = [...document.querySelectorAll('[data-tool]')];
+  const eraserMainBtn = toolbar.querySelector('.eraser');
+  const penMainBtn = toolbar.querySelector('.pen-main');
+
+  function setActiveTool(btn){
+    toolBtns.forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    if (btn.dataset.tool === 'eraser' && btn !== eraserMainBtn) {
+      eraserMainBtn.classList.add('active');
+    }
+    if (btn.dataset.tool === 'pen' && btn !== penMainBtn) {
+      penMainBtn.classList.add('active');
+    }
+  }
+
+  toolBtns.forEach(btn=>{
+    btn.onclick = ()=>{
+      setActiveTool(btn);
+      const t = btn.dataset.tool;
+      if (t === 'pen') {
+        tool = 'pen';
+        if (btn.dataset.width) penWidth = Number(btn.dataset.width);
+      } else if (t === 'line') {
+        tool = 'line';
+      } else if (t === 'eraser') {
+        tool = 'eraser';
+        if (btn.dataset.size) eraserSize = Number(btn.dataset.size);
+      } else if (t === 'hand') {
+        tool = 'hand';
+      }
+      updateCursor();
+    };
+  });
+
+  // ── всплывающие окошки с размерами (ручка/ластик): наведение показывает,
+  // уход прячет — но с небольшой задержкой, чтобы курсор успевал доехать до
+  // окошка, даже если путь неидеально прямой ──
+  const HOVER_HIDE_DELAY = 350;
+  [...document.querySelectorAll('.tool-group')].forEach(group=>{
+    const flyout = group.querySelector('.size-flyout');
+    if (!flyout) return;
+    let hideTimer = null;
+    function show(){ clearTimeout(hideTimer); flyout.classList.add('open'); }
+    function scheduleHide(){ clearTimeout(hideTimer); hideTimer = setTimeout(()=> flyout.classList.remove('open'), HOVER_HIDE_DELAY); }
+    group.addEventListener('mouseenter', show);
+    group.addEventListener('mouseleave', scheduleHide);
+    flyout.addEventListener('mouseenter', show);
+    flyout.addEventListener('mouseleave', scheduleHide);
+  });
+
+  // ── цвет ручки — независимая группа ──
+  const colorBtns = [...toolbar.querySelectorAll('[data-color]')];
+  const firstPenBtn = toolbar.querySelector('[data-tool="pen"][data-width]');
+  colorBtns.forEach(btn=>{
+    btn.onclick = ()=>{
+      colorBtns.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      penColor = btn.dataset.color;
+      tool = 'pen';
+      const widthBtn = toolbar.querySelector(`[data-tool="pen"][data-width="${penWidth}"]`) || firstPenBtn;
+      setActiveTool(widthBtn);
+    };
+  });
+
+  // ── «свой» цвет: SV-квадрат + слайдер оттенка + RGB-поля + пипетка ──
+  function hsvToRgb(h, s, v){
+    h = ((h % 360) + 360) % 360;
+    const c = v * s;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = v - c;
+    let r = 0, g = 0, b = 0;
+    if (h < 60) { r = c; g = x; b = 0; }
+    else if (h < 120) { r = x; g = c; b = 0; }
+    else if (h < 180) { r = 0; g = c; b = x; }
+    else if (h < 240) { r = 0; g = x; b = c; }
+    else if (h < 300) { r = x; g = 0; b = c; }
+    else { r = c; g = 0; b = x; }
+    return { r: Math.round((r + m) * 255), g: Math.round((g + m) * 255), b: Math.round((b + m) * 255) };
+  }
+  function rgbToHsv(r, g, b){
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+    let h = 0;
+    if (d !== 0) {
+      if (max === r) h = 60 * (((g - b) / d) % 6);
+      else if (max === g) h = 60 * ((b - r) / d + 2);
+      else h = 60 * ((r - g) / d + 4);
+    }
+    if (h < 0) h += 360;
+    return { h, s: max === 0 ? 0 : d / max, v: max };
+  }
+  function rgbToHex(r, g, b){
+    return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('').toUpperCase();
+  }
+  function hexToRgb(hex){
+    const m = /^#?([0-9a-f]{6})$/i.exec((hex || '').trim());
+    if (!m) return null;
+    const n = parseInt(m[1], 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+
+  const customColorBtn = document.getElementById('customColorBtn');
+  const customColorDot = document.getElementById('customColorDot');
+  const cpSvCanvas = document.getElementById('cpSvCanvas');
+  const cpSvCtx = cpSvCanvas.getContext('2d');
+  const cpSvThumb = document.getElementById('cpSvThumb');
+  const cpHue = document.getElementById('cpHue');
+  const cpHueThumb = document.getElementById('cpHueThumb');
+  const cpSwatch = document.getElementById('cpSwatch');
+  const cpEyedropper = document.getElementById('cpEyedropper');
+  const cpR = document.getElementById('cpR'), cpG = document.getElementById('cpG'), cpB = document.getElementById('cpB');
+
+  let customHue = 280, customSat = 0.71, customVal = 0.87; // стартовый фиолетовый — просто заготовка на будущее
+
+  function renderSvSquare(){
+    const w = cpSvCanvas.width, h = cpSvCanvas.height;
+    const hc = hsvToRgb(customHue, 1, 1);
+    cpSvCtx.fillStyle = `rgb(${hc.r},${hc.g},${hc.b})`;
+    cpSvCtx.fillRect(0, 0, w, h);
+    const wg = cpSvCtx.createLinearGradient(0, 0, w, 0);
+    wg.addColorStop(0, 'rgba(255,255,255,1)');
+    wg.addColorStop(1, 'rgba(255,255,255,0)');
+    cpSvCtx.fillStyle = wg;
+    cpSvCtx.fillRect(0, 0, w, h);
+    const bg = cpSvCtx.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, 'rgba(0,0,0,0)');
+    bg.addColorStop(1, 'rgba(0,0,0,1)');
+    cpSvCtx.fillStyle = bg;
+    cpSvCtx.fillRect(0, 0, w, h);
+  }
+  function updateCpThumbs(){
+    cpSvThumb.style.left = (customSat * 100) + '%';
+    cpSvThumb.style.top = ((1 - customVal) * 100) + '%';
+    cpHueThumb.style.left = (customHue / 360 * 100) + '%';
+  }
+  // opts.updateInputs=false — не перезаписывать RGB-поля (когда цвет и так пришёл из них)
+  // opts.activate=false — только обновить визуал кнопки/окошка, не делать цвет активным цветом пера
+  function setCustomColor(rgb, opts){
+    opts = opts || {};
+    const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+    customColorBtn.dataset.color = hex;
+    cpSwatch.style.background = hex;
+    customColorDot.style.background = hex;
+    if (opts.updateInputs !== false) { cpR.value = rgb.r; cpG.value = rgb.g; cpB.value = rgb.b; }
+    updateCpThumbs();
+    if (opts.activate !== false) customColorBtn.click(); // переиспользуем обычный обработчик цветовых кнопок
+    return hex;
+  }
+
+  renderSvSquare();
+  setCustomColor(hsvToRgb(customHue, customSat, customVal), { activate: false });
+
+  let svDragging = false;
+  function pickFromSv(e){
+    const rect = cpSvCanvas.getBoundingClientRect();
+    customSat = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    customVal = 1 - Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    setCustomColor(hsvToRgb(customHue, customSat, customVal));
+  }
+  cpSvCanvas.addEventListener('pointerdown', e=>{
+    svDragging = true;
+    cpSvCanvas.setPointerCapture(e.pointerId);
+    pickFromSv(e);
+    e.preventDefault(); e.stopPropagation();
+  });
+  cpSvCanvas.addEventListener('pointermove', e=>{
+    if (!svDragging) return;
+    pickFromSv(e);
+    e.preventDefault(); e.stopPropagation();
+  });
+  cpSvCanvas.addEventListener('pointerup', e=>{
+    svDragging = false;
+    try { cpSvCanvas.releasePointerCapture(e.pointerId); } catch(_){}
+    e.stopPropagation();
+  });
+
+  let hueDragging = false;
+  function pickFromHue(e){
+    const rect = cpHue.getBoundingClientRect();
+    customHue = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * 360;
+    renderSvSquare();
+    setCustomColor(hsvToRgb(customHue, customSat, customVal));
+  }
+  cpHue.addEventListener('pointerdown', e=>{
+    hueDragging = true;
+    cpHue.setPointerCapture(e.pointerId);
+    pickFromHue(e);
+    e.preventDefault(); e.stopPropagation();
+  });
+  cpHue.addEventListener('pointermove', e=>{
+    if (!hueDragging) return;
+    pickFromHue(e);
+    e.preventDefault(); e.stopPropagation();
+  });
+  cpHue.addEventListener('pointerup', e=>{
+    hueDragging = false;
+    try { cpHue.releasePointerCapture(e.pointerId); } catch(_){}
+    e.stopPropagation();
+  });
+
+  function clampByte(n){
+    n = Math.round(Number(n));
+    if (!Number.isFinite(n)) n = 0;
+    return Math.max(0, Math.min(255, n));
+  }
+  function onRgbInputChange(){
+    const r = clampByte(cpR.value), g = clampByte(cpG.value), b = clampByte(cpB.value);
+    cpR.value = r; cpG.value = g; cpB.value = b;
+    const hsv = rgbToHsv(r, g, b);
+    customHue = hsv.h; customSat = hsv.s; customVal = hsv.v;
+    renderSvSquare();
+    setCustomColor({ r, g, b }, { updateInputs: false });
+  }
+  [cpR, cpG, cpB].forEach(inp=>{
+    inp.addEventListener('input', ()=>{ inp.value = inp.value.replace(/[^\d]/g, '').slice(0, 3); });
+    inp.addEventListener('change', onRgbInputChange);
+    inp.addEventListener('blur', onRgbInputChange);
+    inp.addEventListener('keydown', e=>{ if (e.key === 'Enter') inp.blur(); });
+    inp.addEventListener('pointerdown', e=> e.stopPropagation());
+  });
+
+  cpEyedropper.addEventListener('click', async e=>{
+    e.preventDefault(); e.stopPropagation();
+    if (!window.EyeDropper) return; // браузер не поддерживает EyeDropper API — кнопка просто неактивна
+    try {
+      const ed = new EyeDropper();
+      const result = await ed.open();
+      const rgb = hexToRgb(result.sRGBHex);
+      if (rgb) {
+        const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+        customHue = hsv.h; customSat = hsv.s; customVal = hsv.v;
+        renderSvSquare();
+        setCustomColor(rgb);
+      }
+    } catch(_) { /* пользователь отменил выбор пипеткой */ }
+  });
+  if (!window.EyeDropper) cpEyedropper.style.opacity = '0.4';
+
+  // ── отмена последнего действия: Ctrl+Z / ⌘+Z ──
+  window.addEventListener('keydown', e=>{
+    const tag = (e.target && e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      undo();
+    }
+  });
+
+  document.getElementById('clearBoardBtn').onclick = clearBoard;
+
+  // ── масштаб: кнопки +/− и сброс вида ──
+  function zoomBy(factor){
+    viewScale = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, viewScale * factor));
+    zoomResetBtn.textContent = Math.round(viewScale * 100) + '%';
+    redraw();
+  }
+  document.getElementById('zoomInBtn').onclick = ()=> zoomBy(ZOOM_STEP);
+  document.getElementById('zoomOutBtn').onclick = ()=> zoomBy(1 / ZOOM_STEP);
+  zoomResetBtn.onclick = ()=>{
+    viewScale = 1; panX = 0; panY = 0;
+    zoomResetBtn.textContent = '100%';
+    redraw();
+  };
+
+  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('scroll', redraw, { passive: true });
+  // при переключении светлой/тёмной темы перекрашиваем сетку без ожидания
+  // следующего рисования/скролла/зума
+  if (window.MutationObserver) {
+    new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  }
+  resizeCanvas();
+  updateCursor();
+})();
+</script>
+</body></html>

@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Тренажёр: деление в столбик</title>
+<title>Тренажёр: деление в столбик — свой пример</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -107,14 +107,6 @@ body{
 .wrap{max-width:760px;margin:0 auto}
 h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(26px,5vw,38px);color:var(--pencil);text-align:center;}
 .sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 18px;}
-/* ─── уровни ─── */
-.levels{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px}
-.lvl{font-family:var(--font-ui);font-weight:600;font-size:14px;border:1px solid var(--glass-border);background:var(--glass);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border-radius:999px;padding:8px 16px;cursor:pointer;color:var(--muted-3);transition:all .15s;}
-.lvl:hover{border-color:var(--ink)}
-.lvl.active{background:var(--ink);border-color:var(--ink);color:#fff;box-shadow:0 6px 16px var(--hl-35);}
-.lvl .done-mark{color:#FFB800;margin-left:4px;}
-.lvl.custom{border-style:dashed;color:var(--ink);}
-.lvl.custom.active{background:var(--ink);border-style:solid;color:#fff;}
 /* ─── свой пример: ввод прямо в уголок ─── */
 .custom-caption{font-family:var(--font-ui);font-weight:500;font-size:13px;color:var(--muted-1);margin-bottom:calc(var(--cell)*.3);}
 .corner-input-wrap{display:flex;align-items:flex-end;}
@@ -160,6 +152,9 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
   opacity:.55;
 }
 .corner{font-family:var(--font-ui);font-weight:500;position:absolute;top:6px;right:12px;color:var(--muted-1);font-size:13px;display:flex;align-items:center;gap:8px;}
+.refresh-btn{width:28px;height:28px;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}
+.refresh-btn:hover{border-color:var(--ink);transform:rotate(80deg)}
+.refresh-btn:active{transform:scale(.9)}
 /* ─── сетка уголка ─── */
 #board{display:inline-block;min-width:100%;position:relative;}
 .bring-down-ghost{
@@ -317,7 +312,7 @@ button.go:active{transform:scale(.96)}
   var btn=document.getElementById('themeToggle');
   function apply(t, persist){
     document.documentElement.setAttribute('data-theme', t);
-    btn.textContent = t === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
     if (persist) { try{ localStorage.setItem('theme', t); }catch(e){} }
   }
   apply(document.documentElement.getAttribute('data-theme') || 'light', false);
@@ -339,11 +334,9 @@ button.go:active{transform:scale(.96)}
 })();</script>
 <div class="wrap">
   <h1>Деление в столбик</h1>
-  <div class="sub">решаем по шагам, как в тетради — с проверкой каждого действия</div>
+  <div class="sub">свой пример — впиши делимое и делитель прямо в уголок</div>
 
-  <div class="levels" id="levels"></div>
-
-  <div class="sheet" id="customSheet" style="display:none">
+  <div class="sheet" id="customSheet">
     <div class="custom-caption">Впиши свой пример прямо в уголок</div>
     <div class="corner-input-wrap">
       <input id="customDividend" type="text" inputmode="numeric" class="corner-input div-input" placeholder="153" autocomplete="off" maxlength="9">
@@ -356,13 +349,16 @@ button.go:active{transform:scale(.96)}
     <div class="custom-hint" id="customHint"></div>
   </div>
 
-  <div class="sheet" id="mainSheet">
-    <div class="corner" id="taskNum">пример №1</div>
+  <div class="sheet" id="mainSheet" style="display:none">
+    <div class="corner">
+      <button class="refresh-btn" id="refreshBtn" title="Начать заново">⟳</button>
+      <span id="taskNum">свой пример</span>
+    </div>
     <div id="board"></div>
     <div class="result-line" id="result"></div>
   </div>
 
-  <div class="panel" id="mainPanel">
+  <div class="panel" id="mainPanel" style="display:none">
     <div class="prompt" id="prompt"></div>
     <div class="inrow" id="inputRow">
       <div class="num-wrap" style="flex:1">
@@ -374,7 +370,7 @@ button.go:active{transform:scale(.96)}
       </div>
       <button class="go" id="goBtn">ОК</button>
     </div>
-    <button class="next-btn" id="nextBtn" style="display:none">Следующий пример →</button>
+    <button class="next-btn" id="nextBtn" style="display:none">Другой пример →</button>
     <div class="hint" id="hint"></div>
   </div>
 
@@ -418,108 +414,13 @@ button.go:active{transform:scale(.96)}
 </div>
 
 <script>
-/* ───────────── уровни ───────────── */
-const LEVELS = [
-  {id:0, name:'1. Основа',              desc:'однозначный делитель'},
-  {id:1, name:'2. Ноль в середине',     desc:'0 внутри частного'},
-  {id:2, name:'3. Ноль на конце',       desc:'0 в конце частного'},
-  {id:3, name:'4. С остатком',          desc:'деление с остатком'},
-  {id:4, name:'5. Двузначный делитель', desc:'делитель 11–29'},
-  {id:5, name:'6. Трёхзначный делитель',desc:'делитель 102–329'},
-  {id:6, name:'7. Десятичная дробь',    desc:'запятая в частном'},
-  {id:7, name:'8. Ноль целых',          desc:'делимое меньше делителя: 0,…'},
-  {id:8, name:'9. Экзамен',             desc:'всё вперемешку'},
-];
-let curLevel = 0;
-const solvedByLevel = [0,0,0,0,0,0,0,0,0];
+const pick = arr=>arr[Math.floor(Math.random()*arr.length)];
+
 let totalSolved = 0, streak = 0, taskCounter = 0;
-
-const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
-const pick = arr=>arr[ri(0,arr.length-1)];
-
-function digitsNoZero(len){
-  let s = String(ri(1,9));
-  for(let i=1;i<len;i++) s += String(ri(1,9));
-  return s;
-}
-function genProblem(level){
-  if(level===8) level = ri(0,7);
-  let v, q, r=0;
-  if(level===7){            // ноль целых: делимое меньше делителя
-    const vs = [2,4,5,8,12,16,20,25,40,50];
-    while(true){
-      v = pick(vs);
-      const D = ri(1, v-1);
-      if((D*100) % v === 0){
-        return {dividend:String(D), divisor:v, q:String(D/v), r:0, decimal:true};
-      }
-    }
-  }
-  if(level===0){            // основа
-    v = ri(3,9);
-    q = Number(digitsNoZero(ri(3,4)));
-  } else if(level===1){     // ноль в середине частного
-    v = ri(3,9);
-    const len = ri(3,4);
-    let s = String(ri(1,9));
-    const zeroPos = ri(1,len-2);
-    for(let i=1;i<len;i++) s += (i===zeroPos ? '0' : String(ri(1,9)));
-    if(s[len-1]==='0') s = s.slice(0,-1)+String(ri(1,9));
-    q = Number(s);
-  } else if(level===2){     // ноль на конце частного
-    v = ri(3,9);
-    q = Number(digitsNoZero(ri(2,3)) + (Math.random()<.4 ? '00' : '0'));
-  } else if(level===3){     // с остатком
-    v = ri(4,9);
-    q = Number(digitsNoZero(ri(3,4)));
-    r = ri(1,v-1);
-  } else if(level===4){     // двузначный делитель
-    v = pick([12,13,14,15,16,17,18,19,21,23,24,25,26]);
-    q = Number(digitsNoZero(ri(2,3)));
-    if(Math.random()<.35) r = ri(1,v-1);
-  } else if(level===5){     // трёхзначный делитель
-    v = ri(102,329);
-    q = Number(digitsNoZero(Math.random()<.5 ? 2 : 3));
-    if(Math.random()<.35) r = ri(1, Math.min(v-1, 99) + ri(0, v-100));
-    if(r>=v) r = v-1;
-  } else {                  // десятичная дробь: делится нацело только после запятой
-    const opts = {2:[5], 4:[5,25,75], 5:[2,4,6,8], 6:[5], 8:[5,25,75]};
-    v = pick([2,4,5,6,8]);
-    const f = pick(opts[v]);
-    const k = (f<10) ? 1 : 2;
-    const qi = ri(3,99);                       // целая часть частного
-    const N = qi*Math.pow(10,k) + f;           // частное × 10^k
-    const dividend = N*v/Math.pow(10,k);       // по построению целое
-    return {dividend:String(dividend), divisor:v, q:String(N/Math.pow(10,k)), r:0, decimal:true};
-  }
-  const dividend = q*v + r;
-  return {dividend:String(dividend), divisor:v, q:String(q), r};
-}
 
 /* ───────────── состояние примера ───────────── */
 let P=null, S=null;
 let pendingBringDownAnim = null;  // мета для анимации «сноса» цифры вниз
-
-function newProblem(){
-  P = genProblem(curLevel);
-  taskCounter++;
-  S = {
-    phase:'group',
-    pos:0, w:0,
-    qStr:'',
-    log:[],        // {type:'sub'|'val', text, endCol}
-    errStep:0, errTotal:0, helped:false, commaDone:false, ext:'',
-  };
-  document.getElementById('taskNum').textContent = 'пример №'+taskCounter;
-  document.getElementById('result').textContent = '';
-  document.getElementById('nextBtn').style.display='none';
-  document.getElementById('inputRow').style.display='flex';
-  syncKeypadVisibility();
-  document.getElementById('stStars').textContent='—';
-  setHint('');
-  render(); setPrompt();
-  focusInput();
-}
 
 function firstGroupLen(){
   let g=1;
@@ -843,10 +744,11 @@ function finish(rem, truncated){
       ? `${P.dividend} : ${P.divisor} = ${S.qStr} (ост. ${rem})`
       : `${P.dividend} : ${P.divisor} = ${S.qStr}`;
   }
+  try{ window.parent.postMessage({source:'oge-calc-history', op:'div', expr:res.textContent, result:S.qStr}, '*'); }catch(e){}
   // звёзды
   let stars = S.helped ? 1 : (S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1));
   document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
-  totalSolved++; if(!P.custom) solvedByLevel[curLevel]++;
+  totalSolved++;
   streak = (S.errTotal===0) ? streak+1 : 0;
   document.getElementById('stSolved').textContent = totalSolved;
   document.getElementById('stStreak').textContent = streak;
@@ -854,43 +756,21 @@ function finish(rem, truncated){
   document.getElementById('inputRow').style.display='none';
   syncKeypadVisibility();
   document.getElementById('nextBtn').style.display='block';
-  renderLevels();
 }
+document.getElementById('nextBtn').onclick = showCustomEntry;
 
-/* ───────────── интерфейс ───────────── */
-function renderLevels(){
-  const el = document.getElementById('levels');
-  el.innerHTML = LEVELS.map(L=>
-    `<button class="lvl ${L.id===curLevel?'active':''}" data-id="${L.id}" title="${L.desc}">
-      ${L.name}${solvedByLevel[L.id]>=5?'<span class="done-mark">★</span>':''}
-    </button>`
-  ).join('') + `<button class="lvl custom" id="customToggle" title="Ввести своё делимое и делитель">✏️ Свой пример</button>`;
-  el.querySelectorAll('.lvl[data-id]').forEach(b=>b.onclick=()=>{
-    curLevel = Number(b.dataset.id);
-    hideCustomPanel();
-    renderLevels(); newProblem();
-  });
-  document.getElementById('customToggle').onclick = toggleCustomPanel;
-}
-
-/* ───────────── свой пример: ввод прямо в уголок ─────────────
-   вместо отдельной формы показываем такой же "уголок" (лист в клетку),
-   как при решении, только вместо готового примера в нём — два пустых
-   поля на месте делимого и делителя */
-function toggleCustomPanel(){
-  const sheet = document.getElementById('customSheet');
-  const showing = sheet.style.display !== 'none';
-  sheet.style.display = showing ? 'none' : 'block';
-  document.getElementById('mainSheet').style.display = showing ? 'block' : 'none';
-  document.getElementById('mainPanel').style.display = showing ? 'block' : 'none';
+/* ───────────── свой пример: ввод прямо в уголок (единственный режим) ───────────── */
+function showCustomEntry(){
+  document.getElementById('customSheet').style.display='block';
+  document.getElementById('mainSheet').style.display='none';
+  document.getElementById('mainPanel').style.display='none';
   document.getElementById('customHint').textContent = '';
+  document.getElementById('customDividend').value = '';
+  document.getElementById('customDivisor').value = '';
   syncKeypadVisibility();
-  if(!showing){
-    sheet.scrollIntoView({behavior:'smooth', block:'nearest'});
-    setTimeout(()=>document.getElementById('customDividend').focus(), 30);
-  }
+  setTimeout(()=>document.getElementById('customDividend').focus(), 30);
 }
-function hideCustomPanel(){
+function showSolveArea(){
   document.getElementById('customSheet').style.display='none';
   document.getElementById('mainSheet').style.display='block';
   document.getElementById('mainPanel').style.display='block';
@@ -906,14 +786,13 @@ function startCustomProblem(){
     return;
   }
   hintEl.textContent = '';
-  P = { dividend:String(dividendNum), divisor:divisorNum, decimal:true, maxDecimalDigits:6, custom:true };
+  P = { dividend:String(dividendNum), divisor:divisorNum, decimal:true, maxDecimalDigits:6 };
   taskCounter++;
   S = { phase:'group', pos:0, w:0, qStr:'', log:[], errStep:0, errTotal:0, helped:false, commaDone:false, ext:'' };
-  document.getElementById('taskNum').textContent = 'свой пример';
   document.getElementById('result').textContent = '';
   document.getElementById('nextBtn').style.display='none';
   document.getElementById('inputRow').style.display='flex';
-  hideCustomPanel();
+  showSolveArea();
   document.getElementById('customDividend').value = '';
   document.getElementById('customDivisor').value = '';
   document.getElementById('stStars').textContent='—';
@@ -930,10 +809,9 @@ function focusInput(){
 }
 document.getElementById('goBtn').onclick = submit;
 document.getElementById('ans').addEventListener('keydown', e=>{ if(e.key==='Enter') submit(); });
-document.getElementById('nextBtn').onclick = newProblem;
 
 /* ───────── стрелочки и плавающая клавиатура ───────── */
-let activeInputId = 'ans';
+let activeInputId = 'customDividend';
 let keypadOpen = true;
 document.getElementById('ans').addEventListener('focus', ()=>{ activeInputId='ans'; });
 ['customDividend','customDivisor'].forEach(id=>{
@@ -984,9 +862,9 @@ function syncKeypadVisibility(){
 }
 
 
+document.getElementById('refreshBtn').onclick = showCustomEntry;
 setupFloatingKeypad();
-renderLevels();
-newProblem();
+showCustomEntry();
 
 /* ───────── встраивание внутрь другой страницы (например, oge1_5.html) через iframe ───────── */
 (function(){
@@ -995,9 +873,6 @@ newProblem();
     if(params.get('embed')==='1'){
       const hb = document.querySelector('.home-btn'); if(hb) hb.style.display='none';
       const tt = document.getElementById('themeToggle'); if(tt) tt.style.display='none';
-    }
-    if(params.get('custom')==='1'){
-      setTimeout(()=>{ const bt = document.getElementById('customToggle'); if(bt) bt.click(); }, 0);
     }
   }catch(e){}
 })();

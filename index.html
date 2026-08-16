@@ -207,6 +207,23 @@ footer{text-align:center;font-family:var(--font-ui);font-weight:500;color:var(--
    чтобы добавить тренажёр в существующую тему — добавь элемент в её items */
 const TOPICS = [
   {
+    title: 'ОГЭ',
+    items: [
+      { name: '№1–5. Практические задачи',      href: 'oge1_5.html',  eq: 'шины, тарифы, участок…' },
+      { name: '№6. Числа и вычисления',         href: 'oge6.html',    eq: '(−2,5)³ · 0,4 = ?' },
+      { name: '№7. Сравнение и оценка чисел',   href: 'oge7.html',    eq: '5 < √27 < 6' },
+      { name: '№8. Выражения и формулы',        href: 'oge8.html',    eq: 'a²−b² = (a−b)(a+b)' },
+      { name: '№9. Уравнения и неравенства',    href: 'oge9.html',    eq: '3x²−7x+2 = 0' },
+      { name: '№10. Теория вероятности',        href: 'oge10.html',   eq: 'P(A) = 5⁄20 = 0,25' },
+      { name: '№11. Графики функций',           href: 'oge11.html',   eq: 'y = kx + b' },
+      { name: '№12. Вычисления по формулам',    href: 'oge12.html',   eq: 'v = v₀ + at' },
+      { name: '№13. Неравенства',               href: 'oge13.html',   eq: 'x² − 9 ≤ 0 ⟺ [−3; 3]' },
+      { name: '№14. Прогрессии',                href: 'oge14.html',   eq: 'aₙ = a₁ + (n−1)d' },
+      { name: '№15–18. Геометрия',              href: 'oge15_18.html',eq: 'S, P, теорема Пифагора' },
+      { name: '№19. Верные утверждения',        href: 'oge19.html',   eq: 'верно / неверно' },
+    ]
+  },
+  {
     title: 'Действия с числами',
     items: [
       { name: 'Сложение в столбик',    href: 'addition.html',       eq: '999 + 1 = ?' },
@@ -227,24 +244,6 @@ const TOPICS = [
     items: [
       { name: 'Умножение дробей',      href: 'fraction_multiply.html', eq: '4⁄9 × 3⁄8 = ?' },
       { name: 'Деление дробей',        href: 'fraction_divide.html',   eq: '2⁄3 ÷ 4⁄5 = ?' },
-    ]
-  },
-  {
-    title: 'ОГЭ',
-    items: [
-      { name: '№7. Сравнение и оценка чисел', href: 'oge7.html', eq: '5 < √27 < 6' },
-      { name: '№10. Теория вероятности', href: 'oge10.html', eq: 'P(A) = 5⁄20 = 0,25' },
-      { name: '№13. Неравенства', href: 'oge13.html', eq: 'x² − 9 ≤ 0 ⟺ [−3; 3]' },
-    ],
-    groups: [
-      {
-        title: '№9 · Уравнения',
-        items: [
-          { name: 'Линейные уравнения',    href: 'linear.html',    eq: '3(2x−5)+x = 2x−7' },
-          { name: 'Квадратные уравнения',  href: 'quadratic.html', eq: '2x² − 7x + 3 = 0' },
-          { name: 'Системы уравнений',     href: null,             eq: null },
-        ]
-      }
     ]
   },
 ];

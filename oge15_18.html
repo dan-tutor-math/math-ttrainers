@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ОГЭ №13 — неравенства</title>
+<title>ОГЭ №15–18 — геометрия</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -82,8 +82,6 @@ body{
   min-height:100vh;
   padding:18px 12px 60px;
 }
-/* клетчатая сетка теперь рисуется самим холстом доски (см. #boardCanvas ниже),
-   чтобы она масштабировалась вместе с зумом, а не оставалась фоном страницы */
 .wrap{max-width:820px;margin:0 auto;position:relative;z-index:1;pointer-events:none}
 .wrap > *{pointer-events:auto}
 
@@ -145,8 +143,6 @@ html[data-board="on"] body{background:
     var(--bg);}
 h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,5vw,34px);color:var(--pencil);text-align:center;}
 .sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 22px;}
-
-/* ─── выбор типа (группами) ─── */
 .group-title{font-family:var(--font-ui);font-weight:700;font-size:14px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.04em;margin:18px 2px 8px;}
 .group-title:first-child{margin-top:0}
 .modes{display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
@@ -161,8 +157,9 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .mode-card:hover{border-color:var(--ink); transform:translateX(3px)}
 .mode-card .mtitle{font-weight:600;font-size:15px;color:var(--pencil);line-height:1.3;flex:1 1 260px;margin:0;}
 .mode-card.random{background:linear-gradient(135deg, var(--hl-10), transparent);border-color:var(--ink);margin-bottom:14px;}
-
-/* ─── шапка задачи ─── */
+.mode-card.soon{opacity:.55;cursor:default;}
+.mode-card.soon:hover{border-color:var(--glass-border);transform:none;}
+.soon-badge{font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-1);background:var(--glass);border-radius:8px;padding:3px 8px;}
 .task-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
 .submode-tabs{display:flex;gap:8px;margin-bottom:14px;}
 .submode-tab{flex:1;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:10px 6px;cursor:pointer;text-align:center;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:border-color .15s, color .15s, background .15s;}
@@ -176,22 +173,15 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .refresh-btn{width:28px;height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}
 .refresh-btn:hover{border-color:var(--ink);transform:rotate(80deg)}
 .refresh-btn:active{transform:scale(.9)}
-
-/* ─── панель ─── */
 .panel{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:20px;margin-bottom:14px;}
 @keyframes revealUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
 #mainPanel.reveal{animation:revealUp .38s cubic-bezier(.22,.9,.35,1) both;}
 @keyframes correctPop{0%{transform:scale(.94);}55%{transform:scale(1.025);}100%{transform:scale(1);}}
 .mcq-btn.correct{animation:correctPop .32s ease;}
-.prompt{font-family:var(--font-ui);font-weight:500;font-size:clamp(17px,3.2vw,20px);color:var(--muted-5);margin-bottom:14px;line-height:1.4;}
-
-/* ─── система неравенств: фигурная скобка + строки друг под другом ─── */
-.ineq-system{display:flex;align-items:stretch;gap:10px;margin:10px 0 2px;}
-.sys-brace{display:flex;align-items:center;font-family:Georgia,'Times New Roman',serif;font-size:2.3em;line-height:.5;color:var(--muted-5);font-weight:300;transform:scaleY(1.05);}
-.sys-lines{display:flex;flex-direction:column;justify-content:center;gap:6px;}
-.sys-line{font-family:var(--font-mono);font-size:19px;color:var(--muted-5);white-space:nowrap;}
-
-/* ─── MCQ ─── */
+.prompt{font-family:var(--font-ui);font-weight:500;font-size:clamp(16px,3vw,19px);color:var(--muted-5);margin-bottom:14px;line-height:1.5;}
+.data-table{width:100%;border-collapse:collapse;margin:10px 0 4px;font-family:var(--font-mono);font-size:14px;}
+.data-table th,.data-table td{border:1px solid var(--glass-border);padding:6px 10px;text-align:center;}
+.data-table th{background:var(--glass);font-family:var(--font-ui);font-weight:600;color:var(--muted-3);}
 .mcq-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3);margin-bottom:10px;}
 .mcq-options{display:flex;flex-direction:column;gap:8px;}
 .change-answer-btn{display:none;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--teacher);background:none;border:none;padding:10px 2px 0;cursor:pointer;text-decoration:underline;animation:revealUp .3s ease both;}
@@ -207,17 +197,13 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .mcq-btn.correct{border-color:var(--ok);background:var(--ok-tint);color:var(--ok);}
 .mcq-btn.wrong{border-color:var(--teacher);background:rgba(255,59,48,.1);color:var(--teacher);}
 .mcq-btn.disabled{cursor:default}
-
 .explain{font-family:var(--font-ui);font-size:15px;color:var(--muted-4);line-height:1.55;}
 .explain b{color:var(--ink)}
 .next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:14px;box-shadow:0 6px 18px var(--ok-shadow);}
-
-/* ─── статистика ─── */
 .stats{display:flex;gap:10px;flex-wrap:wrap;}
 .stat{flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:12px 14px;text-align:center;}
 .stat .v{font-family:var(--font-ui);font-weight:700;font-size:22px;color:var(--ink);}
 .stat .l{font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-6);}
-
 .theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
 .theme-toggle:hover{border-color:var(--ink)}
 .theme-toggle:active{transform:scale(.92)}
@@ -226,6 +212,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .home-btn{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
 .home-btn:hover{border-color:var(--ink)}
 .home-btn:active{transform:scale(.92)}
+
 </style>
 </head>
 <body>
@@ -234,10 +221,6 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <button class="theme-toggle board-visibility-toggle" id="boardVisibilityToggle" title="Показать доску" aria-label="Показать/скрыть доску">🖊️</button>
 <script>(function(){
   var btn=document.getElementById('themeToggle');
-  // persist=true — только когда пользователь сам нажал кнопку; тогда выбор
-  // запоминается и больше не переопределяется системной темой. Пока выбор
-  // не сделан явно, тема всегда идёт за темой браузера/системы — в том числе
-  // «на лету», если её поменяли прямо во время открытой страницы
   function apply(t, persist){
     document.documentElement.setAttribute('data-theme', t);
     btn.textContent = t === 'dark' ? '☀️' : '🌙';
@@ -253,7 +236,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
     var onSystemChange = function(e){
       var explicit = false;
       try{ explicit = !!localStorage.getItem('theme'); }catch(err){}
-      if (explicit) return; // пользователь уже выбрал тему вручную — не перебиваем его выбор
+      if (explicit) return;
       apply(e.matches ? 'dark' : 'light', false);
     };
     if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
@@ -302,8 +285,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       <div class="cp-row">
         <button class="cp-eyedropper" id="cpEyedropper" title="Пипетка — взять цвет с экрана" type="button">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M19.2 3.8a2.7 2.7 0 0 1 0 3.8l-1.4 1.4-3.8-3.8L15.4 3.8a2.7 2.7 0 0 1 3.8 0Z" fill="currentColor"/>
-            <path d="M12.6 6.6l3.8 3.8L6 20.8l-4 1 1-4L12.6 6.6Z" fill="currentColor"/>
+            <path d="M19.2 3.8a2.7 2.7 0 0 1 0 3.8l-1.4 1.4-3.8-3.8L15.4 3.8a2.7 2.7 0 0 1 3.8 0Z" fill="currentColor"></path>
+            <path d="M12.6 6.6l3.8 3.8L6 20.8l-4 1 1-4L12.6 6.6Z" fill="currentColor"></path>
           </svg>
         </button>
         <div class="cp-swatch" id="cpSwatch"></div>
@@ -341,8 +324,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 </div>
 
 <div class="wrap">
-  <h1>ОГЭ №13. Неравенства</h1>
-  <div class="sub">выбери тип задания — реши неравенство и выбери верный вариант</div>
+  <h1>ОГЭ №15–18. Геометрия</h1>
+  <div class="sub">треугольники, окружность, четырёхугольники, клетчатая бумага</div>
 
   <div id="pickerArea">
     <div class="mode-card random" data-id="random">
@@ -386,9 +369,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       <div class="stat"><div class="v" id="stStreak">0</div><div class="l">серия без ошибок</div></div>
     </div>
   </div>
-
-  <div id="boardSpace" aria-hidden="true"></div>
-</div>
+<div id="boardSpace" aria-hidden="true"></div></div>
 
 <script>
 /* ═══════════════ утилиты ═══════════════ */
@@ -406,13 +387,14 @@ function fmtNum(x) {
   const r = Math.round(x * 100) / 100;
   return (Number.isInteger(r) ? String(r) : String(r).replace('.', ',')).replace('-', '−');
 }
-function flipOp(op) { return { '<': '>', '>': '<', '≤': '≥', '≥': '≤' }[op]; }
-function fmtRay(boundary, incl, dirGT) {
-  const b = fmtNum(boundary);
-  return dirGT ? `${incl ? '[' : '('}${b}; +∞)` : `(−∞; ${b}${incl ? ']' : ')'}`;
-}
-function fmtSegment(lo, hi, loIncl, hiIncl) {
-  return `${loIncl ? '[' : '('}${fmtNum(lo)}; ${fmtNum(hi)}${hiIncl ? ']' : ')'}`;
+function gcd(a,b){ a=Math.abs(a); b=Math.abs(b); while(b){ [a,b]=[b,a%b]; } return a || 1; }
+function fmtFrac(num, den){
+  if (den < 0) { den = -den; num = -num; }
+  const g = gcd(num, den);
+  num /= g; den /= g;
+  if (den === 1) return fmtNum(num);
+  const sign = num < 0 ? '−' : '';
+  return `${sign}${Math.abs(num)}/${den}`;
 }
 function buildOptions(correct, candidates, fallbackGen) {
   const seen = new Set([correct]);
@@ -429,308 +411,109 @@ function buildOptions(correct, candidates, fallbackGen) {
   }
   return shuffleArr([correct, ...picked]);
 }
+function tableHTML(headers, rows) {
+  return `<table class="data-table"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>` +
+    `<tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
 
-/* ═══════════════ ЛИНЕЙНЫЕ НЕРАВЕНСТВА ═══════════════ */
-function gen_L1() {
-  // в ~70% примеров итоговый коэффициент при x должен получиться отрицательным
-  // (значит при делении знак неравенства меняется — это и есть та самая
-  // «фишка», которую чаще всего спрашивают на экзамене)
-  const wantNegative = Math.random() < 0.7;
-  for (let t = 0; t < 500; t++) {
-    const b1 = ri(2, 9), b2 = ri(1, 9), c1 = ri(10, 50), e = ri(1, 9), d = ri(10, 80);
-    const op = pick(['<', '>', '≤', '≥']);
-    const coefX = e - b1;
-    if (coefX === 0) continue;
-    if ((coefX < 0) !== wantNegative) continue;
-    const rhsConst = d - c1 - b1 * b2;
-    const boundaryRaw = rhsConst / coefX;
-    const b10 = Math.round(boundaryRaw * 10);
-    if (Math.abs(b10 - boundaryRaw * 10) > 1e-9) continue;
-    const boundary = b10 / 10;
-    if (Math.abs(boundary) > 60) continue;
 
-    let finalOp = coefX < 0 ? flipOp(op) : op;
-    const strict = (finalOp === '<' || finalOp === '>');
-    const dirGT = (finalOp === '>' || finalOp === '≥');
-    const correct = fmtRay(boundary, !strict, dirGT);
-    const candidates = shuffleArr([
-      fmtRay(boundary, !strict, !dirGT),
-      fmtRay(-boundary, !strict, dirGT),
-      fmtRay(boundary, strict, dirGT),
-      fmtRay(-boundary, !strict, !dirGT),
-      fmtRay(boundary, strict, !dirGT),
-    ]);
-    const options = buildOptions(correct, candidates, k => fmtRay(boundary + k, !strict, dirGT));
+function gen_triangle_angles(){
+  const a1 = ri(30,100);
+  let a2 = ri(30, Math.max(31, 170-a1-10));
+  if (a1+a2 >= 175) a2 = 175-a1;
+  if (a2 < 20) a2 = 20;
+  const a3 = 180-a1-a2;
+  const correct = a3;
+  const wrong1 = 180-a1;
+  const wrong2 = a1+a2;
+  const wrong3 = correct + pick([-15,-10,10,15]);
+  const options = buildOptions(String(correct), shuffleArr([wrong1,wrong2,wrong3]).map(String), k=>String(correct+(k%2?1:-1)*7*k));
+  return {
+    prompt: `В треугольнике два угла равны ${a1}° и ${a2}°. Найдите третий угол.`,
+    options, correctIndex: options.indexOf(String(correct)),
+    explain: `Сумма углов треугольника равна 180°. Третий угол = 180° − ${a1}° − ${a2}° = ${correct}°.`
+  };
+}
+
+function gen_circle_angle(){
+  const central = pick([40,50,60,70,80,100,120,140]);
+  const correct = central/2;
+  const wrong1 = central;
+  const wrong2 = central*2;
+  const wrong3 = correct + pick([-10,-5,5,10]);
+  const options = buildOptions(String(correct), shuffleArr([wrong1,wrong2,wrong3]).map(String), k=>String(correct+(k%2?1:-1)*5*k));
+  return {
+    prompt: `Центральный угол окружности равен ${central}°. Найдите вписанный угол, опирающийся на ту же дугу.`,
+    options, correctIndex: options.indexOf(String(correct)),
+    explain: `Вписанный угол в два раза меньше центрального угла, опирающегося на ту же дугу: ${central}° / 2 = ${correct}°.`
+  };
+}
+
+function gen_quad_area(){
+  const type = pick(['rect','parallelogram']);
+  if (type==='rect'){
+    const a = ri(4,15), b = ri(3,12);
+    const correct = a*b;
+    const wrong1 = 2*(a+b);
+    const wrong2 = Math.round(a*b/2);
+    const wrong3 = correct + pick([-8,-4,4,8]);
+    const options = buildOptions(String(correct), shuffleArr([wrong1,wrong2,wrong3]).map(String), k=>String(correct+(k%2?1:-1)*4*k));
     return {
-      subtype: 'Л1',
-      prompt: `Решите неравенство ${c1} − ${b1}(x − ${b2}) ${op} ${d} − ${e}x.`,
-      options, correctIndex: options.indexOf(correct),
-      explain: `${c1} − ${b1}(x − ${b2}) ${op} ${d} − ${e}x ⟺ ${coefX}x ${op} ${rhsConst} ⟺ x ${finalOp} ${fmtNum(boundary)}. Ответ: ${correct}.`
-    };
-  }
-  return gen_L1();
-}
-
-function gen_L2() {
-  // тот же принцип: ~70% примеров с отрицательным итоговым коэффициентом при x
-  const wantNegative = Math.random() < 0.7;
-  for (let t = 0; t < 500; t++) {
-    const a = ri(2, 9), b = ri(5, 40) * pick([1, -1]);
-    const c = ri(2, 9), d = ri(5, 60) * pick([1, -1]);
-    if (a === c) continue;
-    const op = pick(['<', '>', '≤', '≥']);
-    const coefX = a - c;
-    if ((coefX < 0) !== wantNegative) continue;
-    const rhsConst = d - b;
-    const boundaryRaw = rhsConst / coefX;
-    const b10 = Math.round(boundaryRaw * 10);
-    if (Math.abs(b10 - boundaryRaw * 10) > 1e-9) continue;
-    const boundary = b10 / 10;
-    if (Math.abs(boundary) > 60) continue;
-
-    let finalOp = coefX < 0 ? flipOp(op) : op;
-    const strict = (finalOp === '<' || finalOp === '>');
-    const dirGT = (finalOp === '>' || finalOp === '≥');
-    const correct = fmtRay(boundary, !strict, dirGT);
-    const candidates = shuffleArr([
-      fmtRay(boundary, !strict, !dirGT),
-      fmtRay(-boundary, !strict, dirGT),
-      fmtRay(boundary, strict, dirGT),
-      fmtRay(-boundary, !strict, !dirGT),
-      fmtRay(boundary, strict, !dirGT),
-    ]);
-    const options = buildOptions(correct, candidates, k => fmtRay(boundary + k, !strict, dirGT));
-    const bStr = b >= 0 ? `+ ${b}` : `− ${Math.abs(b)}`;
-    const dStr = d >= 0 ? `+ ${d}` : `− ${Math.abs(d)}`;
-    return {
-      subtype: 'Л2',
-      prompt: `Решите неравенство ${a}x ${bStr} ${op} ${c}x ${dStr}.`,
-      options, correctIndex: options.indexOf(correct),
-      explain: `${a}x ${bStr} ${op} ${c}x ${dStr} ⟺ ${coefX}x ${op} ${rhsConst} ⟺ x ${finalOp} ${fmtNum(boundary)}. Ответ: ${correct}.`
-    };
-  }
-  return gen_L2();
-}
-
-/* ═══════════════ СИСТЕМЫ НЕРАВЕНСТВ ═══════════════ */
-function oneLinearPart(forceSign) {
-  for (let t = 0; t < 500; t++) {
-    let a = ri(1, 9) * pick([1, -1]);
-    if (forceSign === 'neg' && a > 0) a = -a;
-    if (forceSign === 'pos' && a < 0) a = -a;
-    const b = ri(1, 40) * pick([1, -1]);
-    const c = ri(1, 40) * pick([1, -1]);
-    const op = pick(['<', '>', '≤', '≥']);
-    if (a === 0) continue;
-    const boundaryRaw = (c - b) / a;
-    const b10 = Math.round(boundaryRaw * 10);
-    if (Math.abs(b10 - boundaryRaw * 10) > 1e-9) continue;
-    const boundary = b10 / 10;
-    if (Math.abs(boundary) > 30) continue;
-    const finalOp = a < 0 ? flipOp(op) : op;
-    const strict = (finalOp === '<' || finalOp === '>');
-    const dirGT = (finalOp === '>' || finalOp === '≥');
-    const bStr = b >= 0 ? `+ ${b}` : `− ${Math.abs(b)}`;
-    // вариативность записи: иногда x-часть первая (ax+b), иногда числовая часть первая (b+ax)
-    const xFirst = Math.random() < 0.6;
-    const text = xFirst
-      ? `${fmtNum(a)}x ${bStr} ${op} ${fmtNum(c)}`
-      : `${fmtNum(b)} ${a >= 0 ? '+' : '−'} ${Math.abs(a)}x ${op} ${fmtNum(c)}`;
-    return { text, boundary, incl: !strict, dirGT };
-  }
-  return oneLinearPart(forceSign);
-}
-
-// собирает систему как в учебнике: фигурная скобка слева, строки друг под другом
-function fmtSystemHTML(line1, line2) {
-  return `<div class="ineq-system"><span class="sys-brace">{</span><span class="sys-lines"><span class="sys-line">${line1}</span><span class="sys-line">${line2}</span></span></div>`;
-}
-
-function gen_S1() {
-  for (let t = 0; t < 500; t++) {
-    // с шансом 70% хотя бы одно из неравенств системы получает отрицательный
-    // коэффициент при x (значит там встретится деление на отрицательное число)
-    const wantNegative = Math.random() < 0.7;
-    let p1, p2;
-    if (wantNegative) {
-      const negFirst = Math.random() < 0.5;
-      p1 = oneLinearPart(negFirst ? 'neg' : undefined);
-      p2 = oneLinearPart(negFirst ? undefined : 'neg');
-    } else {
-      p1 = oneLinearPart('pos');
-      p2 = oneLinearPart('pos');
-    }
-    const lows = [], highs = [];
-    for (const p of [p1, p2]) {
-      if (p.dirGT) lows.push({ v: p.boundary, incl: p.incl });
-      else highs.push({ v: p.boundary, incl: p.incl });
-    }
-    if (lows.length !== 1 || highs.length !== 1) continue;
-    const lo = lows[0], hi = highs[0];
-    if (lo.v >= hi.v) continue;
-    const correct = fmtSegment(lo.v, hi.v, lo.incl, hi.incl);
-    const candidates = shuffleArr([
-      fmtSegment(lo.v, hi.v, !lo.incl, !hi.incl),
-      fmtSegment(-hi.v, -lo.v, hi.incl, lo.incl),
-      fmtRay(lo.v, lo.incl, true),
-      fmtRay(hi.v, hi.incl, false),
-      fmtSegment(lo.v, hi.v, !lo.incl, hi.incl),
-      fmtSegment(lo.v, hi.v, lo.incl, !hi.incl),
-    ]);
-    const options = buildOptions(correct, candidates, k => fmtSegment(lo.v - k, hi.v + k, lo.incl, hi.incl));
-    return {
-      subtype: 'С1',
-      prompt: `Решите систему неравенств:${fmtSystemHTML(p1.text, p2.text)}`,
-      options, correctIndex: options.indexOf(correct),
-      explain: `Первое: ${p1.text} ⟺ x ${p1.dirGT ? '>' : '<'}${p1.incl ? '=' : ''} ${fmtNum(p1.boundary)}. Второе: ${p2.text} ⟺ x ${p2.dirGT ? '>' : '<'}${p2.incl ? '=' : ''} ${fmtNum(p2.boundary)}. Пересечение: ${correct}.`
-    };
-  }
-  return gen_S1();
-}
-
-function gen_S2() {
-  for (let t = 0; t < 500; t++) {
-    const wantNegative = Math.random() < 0.7;
-    let p1, p2;
-    if (wantNegative) {
-      const negFirst = Math.random() < 0.5;
-      p1 = oneLinearPart(negFirst ? 'neg' : undefined);
-      p2 = oneLinearPart(negFirst ? undefined : 'neg');
-    } else {
-      p1 = oneLinearPart('pos');
-      p2 = oneLinearPart('pos');
-    }
-    if (p1.dirGT === p2.dirGT) continue;
-    const lower = p1.dirGT ? p1 : p2;
-    const upper = p1.dirGT ? p2 : p1;
-    if (lower.boundary < upper.boundary) continue;
-    if (lower.boundary === upper.boundary && lower.incl && upper.incl) continue;
-    const options = shuffleArr([
-      'система не имеет решений',
-      fmtSegment(upper.boundary, lower.boundary, upper.incl, lower.incl),
-      fmtRay(lower.boundary, lower.incl, true),
-      fmtRay(upper.boundary, upper.incl, false),
-    ]);
-    return {
-      subtype: 'С2',
-      prompt: `Решите систему неравенств:${fmtSystemHTML(p1.text, p2.text)}`,
-      options, correctIndex: options.indexOf('система не имеет решений'),
-      explain: `Первое неравенство даёт x ${p1.dirGT ? '>' : '<'}${p1.incl ? '=' : ''} ${fmtNum(p1.boundary)}, второе — x ${p2.dirGT ? '>' : '<'}${p2.incl ? '=' : ''} ${fmtNum(p2.boundary)}. Промежутки не пересекаются, значит система не имеет решений.`
-    };
-  }
-  return gen_S2();
-}
-
-/* ═══════════════ КВАДРАТНЫЕ НЕРАВЕНСТВА ═══════════════ */
-function gen_K1() {
-  const a = ri(3, 12);
-  const useMinus = Math.random() < 0.8;
-  const op = pick(['<', '>', '≤', '≥']);
-  if (useMinus) {
-    const strict = (op === '<' || op === '>');
-    const inside = (op === '<' || op === '≤');
-    const insideStr = fmtSegment(-a, a, !strict, !strict);
-    const outsideStr = `(−∞; ${fmtNum(-a)}${strict ? ')' : ']'} ∪ ${strict ? '(' : '['}${fmtNum(a)}; +∞)`;
-    const correctStr = inside ? insideStr : outsideStr;
-    const wrongStr = inside ? outsideStr : insideStr;
-    const options = shuffleArr([correctStr, wrongStr, fmtSegment(-a, a, strict, strict), 'нет решений']);
-    return {
-      subtype: 'К1',
-      prompt: `Укажите решение неравенства x² − ${a * a} ${op} 0.`,
-      options, correctIndex: options.indexOf(correctStr),
-      explain: `x² − ${a * a} ${op} 0 ⟺ (x − ${a})(x + ${a}) ${op} 0 ⟺ ${correctStr}.`
+      prompt: `Найдите площадь прямоугольника со сторонами ${a} см и ${b} см.`,
+      options, correctIndex: options.indexOf(String(correct)),
+      explain: `Площадь прямоугольника: S = a · b = ${a} · ${b} = ${correct} см².`
     };
   } else {
-    const alwaysTrue = (op === '>' || op === '≥');
-    const correct = alwaysTrue ? '(−∞; +∞)' : 'нет решений';
-    const options = shuffleArr([correct, alwaysTrue ? 'нет решений' : '(−∞; +∞)', fmtSegment(-a, a, true, true), fmtRay(a, true, true)]);
+    const a = ri(5,14), h = ri(3,10);
+    const correct = a*h;
+    const wrong1 = 2*a*h;
+    const wrong2 = a+h;
+    const wrong3 = correct + pick([-6,-3,3,6]);
+    const options = buildOptions(String(correct), shuffleArr([wrong1,wrong2,wrong3]).map(String), k=>String(correct+(k%2?1:-1)*4*k));
     return {
-      subtype: 'К1',
-      prompt: `Укажите решение неравенства x² + ${a * a} ${op} 0.`,
-      options, correctIndex: options.indexOf(correct),
-      explain: `Квадрат числа не может быть отрицательным, поэтому x² + ${a * a} ${alwaysTrue ? 'всегда больше 0 — верно при любом x' : 'всегда больше 0 — условие ' + op + ' 0 не выполняется никогда'}. Ответ: ${correct}.`
+      prompt: `Основание параллелограмма равно ${a} см, а высота, проведённая к этому основанию, равна ${h} см. Найдите площадь параллелограмма.`,
+      options, correctIndex: options.indexOf(String(correct)),
+      explain: `Площадь параллелограмма: S = a · h = ${a} · ${h} = ${correct} см².`
     };
   }
 }
 
-function gen_K2() {
-  const a = ri(3, 12);
-  const op = pick(['<', '>', '≤', '≥']);
-  const strict = (op === '<' || op === '>');
-  const inside = (op === '>' || op === '≥');
-  const insideStr = fmtSegment(0, a, !strict, !strict);
-  const outsideStr = `(−∞; 0${strict ? ')' : ']'} ∪ ${strict ? '(' : '['}${fmtNum(a)}; +∞)`;
-  const correctStr = inside ? insideStr : outsideStr;
-  const wrongStr = inside ? outsideStr : insideStr;
-  const options = shuffleArr([correctStr, wrongStr, fmtSegment(0, a, strict, strict), 'нет решений']);
+function gen_grid_area(){
+  const w = ri(3,8), h = ri(3,8);
+  const correct = w*h/2;
+  const correctStr = fmtNum(correct);
+  const options = buildOptions(correctStr, shuffleArr([w*h, w+h, correct+pick([-2,-1,1,2])]).map(fmtNum), k=>fmtNum(correct+(k%2?1:-1)*k));
+  const cell=18, cols=w+2, rows=h+2;
+  const W=cols*cell, H=rows*cell;
+  let gridLines='';
+  for(let i=0;i<=cols;i++) gridLines+=`<line x1="${i*cell}" y1="0" x2="${i*cell}" y2="${H}" stroke="var(--grid)" stroke-width="1"/>`;
+  for(let j=0;j<=rows;j++) gridLines+=`<line x1="0" y1="${j*cell}" x2="${W}" y2="${j*cell}" stroke="var(--grid)" stroke-width="1"/>`;
+  const x0=cell, y0=H-cell;
+  const p1=[x0,y0], p2=[x0+w*cell,y0], p3=[x0,y0-h*cell];
+  const tri = `<polygon points="${p1.join(',')} ${p2.join(',')} ${p3.join(',')}" fill="var(--hl-14)" stroke="var(--ink)" stroke-width="2"/>`;
+  const svg = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="display:block;margin:10px auto;background:var(--paper);border-radius:12px;border:1px solid var(--glass-border);">${gridLines}${tri}</svg>`;
   return {
-    subtype: 'К2',
-    prompt: `Укажите решение неравенства ${a}x − x² ${op} 0.`,
+    prompt: `Найдите площадь треугольника, изображённого на клетчатой бумаге (сторона клетки равна 1).${svg}`,
     options, correctIndex: options.indexOf(correctStr),
-    explain: `${a}x − x² ${op} 0 ⟺ x(${a} − x) ${op} 0 ⟺ ${correctStr}.`
+    explain: `Треугольник прямоугольный, катеты равны ${w} и ${h} клеткам. S = (a · b)/2 = (${w} · ${h})/2 = ${correctStr}.`
   };
 }
 
-function gen_K3() {
-  const a = ri(1, 9), b = ri(1, 9);
-  const op = pick(['<', '>', '≤', '≥']);
-  const strict = (op === '<' || op === '>');
-  const inside = (op === '<' || op === '≤');
-  const insideStr = fmtSegment(-a, b, !strict, !strict);
-  const outsideStr = `(−∞; ${fmtNum(-a)}${strict ? ')' : ']'} ∪ ${strict ? '(' : '['}${fmtNum(b)}; +∞)`;
-  const correctStr = inside ? insideStr : outsideStr;
-  const wrongStr = inside ? outsideStr : insideStr;
-  const options = shuffleArr([correctStr, wrongStr, fmtSegment(-a, b, strict, strict), 'нет решений']);
-  return {
-    subtype: 'К3',
-    prompt: `Укажите решение неравенства (x + ${a})(x − ${b}) ${op} 0.`,
-    options, correctIndex: options.indexOf(correctStr),
-    explain: `Корни: x = −${a} и x = ${b}. Между корнями произведение отрицательно, вне — положительно. Ответ: ${correctStr}.`
-  };
-}
-
-function gen_K4() {
-  for (let t = 0; t < 500; t++) {
-    const rootNum = ri(2, 12), rootDen = pick([1, 2, 4]);
-    const a = rootDen * rootDen * pick([1, 2, 3]);
-    const b = a * rootNum * rootNum / (rootDen * rootDen);
-    if (!Number.isInteger(b) || b <= 0) continue;
-    const root = rootNum / rootDen;
-    const op = pick(['<', '>', '≤', '≥']);
-    const strict = (op === '<' || op === '>');
-    const inside = (op === '<' || op === '≤');
-    const insideStr = fmtSegment(-root, root, !strict, !strict);
-    const outsideStr = `(−∞; ${fmtNum(-root)}${strict ? ')' : ']'} ∪ ${strict ? '(' : '['}${fmtNum(root)}; +∞)`;
-    const correctStr = inside ? insideStr : outsideStr;
-    const wrongStr = inside ? outsideStr : insideStr;
-    const options = shuffleArr([correctStr, wrongStr, fmtSegment(-root, root, strict, strict), 'нет решений']);
-    return {
-      subtype: 'К4',
-      prompt: `Укажите решение неравенства ${a}x² ${op} ${b}.`,
-      options, correctIndex: options.indexOf(correctStr),
-      explain: `${a}x² ${op} ${b} ⟺ x² ${op} ${fmtNum(b / a)} ⟺ |x| ${op} ${fmtNum(root)} ⟺ ${correctStr}.`
-    };
-  }
-  return gen_K4();
-}
 
 /* ═══════════════ реестр типов ═══════════════ */
+
 const GROUPS = [
-  { title: 'Линейные неравенства', modes: [
-    // сначала без скобок (проще), потом со скобками — gen_L1/gen_L2 сами функции
-    // не переименовывались, просто поменяли местами, какая из них идёт первой
-    { id: 'L1', title: 'Линейное неравенство тип 1', gen: gen_L2 },
-    { id: 'L2', title: 'Линейное неравенство тип 2', gen: gen_L1 },
+  { title: '№15. Треугольники', modes: [
+    { id: 'tri', title: 'Сумма углов треугольника', gen: gen_triangle_angles },
   ]},
-  { title: 'Системы неравенств', modes: [
-    { id: 'S1', title: 'Система неравенств тип 1', gen: gen_S1 },
-    { id: 'S2', title: 'Система неравенств тип 2', gen: gen_S2 },
+  { title: '№16. Окружность', modes: [
+    { id: 'circ', title: 'Центральный и вписанный угол', gen: gen_circle_angle },
   ]},
-  { title: 'Квадратные неравенства', modes: [
-    { id: 'K1', title: 'Квадратное неравенство тип 1', gen: gen_K1 },
-    { id: 'K2', title: 'Квадратное неравенство тип 2', gen: gen_K2 },
-    { id: 'K3', title: 'Квадратное неравенство тип 3', gen: gen_K3 },
-    { id: 'K4', title: 'Квадратное неравенство тип 4', gen: gen_K4 },
+  { title: '№17. Четырёхугольники', modes: [
+    { id: 'quadarea', title: 'Площадь прямоугольника / параллелограмма', gen: gen_quad_area },
+  ]},
+  { title: '№18. Клетчатая бумага', modes: [
+    { id: 'grid', title: 'Площадь фигуры по клеткам', gen: gen_grid_area },
   ]},
 ];
 const ALL_MODES = GROUPS.flatMap(g => g.modes);
@@ -769,7 +552,7 @@ function renderPicker() {
       ${g.modes.map(m => `<div class="mode-card" data-id="${m.id}"><div class="mtitle">${m.title}</div></div>`).join('')}
     </div>
   `).join('');
-  document.querySelectorAll('.mode-card').forEach(card => {
+  els.modesGrid.querySelectorAll('.mode-card').forEach(card => {
     card.onclick = () => { curMode = card.dataset.id; openTask(); };
   });
 }
@@ -779,7 +562,7 @@ const COMING_SOON_TEXT = {
   practice: '🚧 Режим «Тренировка» ещё в разработке. Здесь будут задания с частью подсказок — уже поменьше, чем в «Обучении».',
 };
 
-let curSubMode = 'exam'; // 'learn' | 'practice' | 'exam'
+let curSubMode = 'exam';
 
 function openTask() {
   els.picker.style.display = 'none';
@@ -849,7 +632,6 @@ function attachMCQHandlers() {
       const i = Number(b.dataset.i);
       btns.forEach(x => { x.onclick = null; x.classList.add('disabled'); });
       if (i === curTask.correctIndex) {
-        // выбрал верно — раунд завершён
         b.classList.add('correct');
         streak++; totalSolved++;
         els.stSolved.textContent = totalSolved;
@@ -857,7 +639,6 @@ function attachMCQHandlers() {
         taskAnswered = true;
         finishTask();
       } else if (hadWrongPick) {
-        // вторая ошибка подряд — дальше просто показываем правильный ответ
         b.classList.add('wrong');
         btns[curTask.correctIndex].classList.add('correct');
         streak = 0; totalErrors++;
@@ -866,8 +647,6 @@ function attachMCQHandlers() {
         taskAnswered = true;
         finishTask();
       } else {
-        // первая ошибка — правильный ответ пока не показываем, даём шанс
-        // передумать через кнопку «изменить ответ»
         b.classList.add('wrong');
         hadWrongPick = true;
         streak = 0; totalErrors++;
@@ -880,8 +659,6 @@ function attachMCQHandlers() {
 }
 
 els.changeAnswerBtn.onclick = () => {
-  // отменяем последний (возможно, случайный) выбор — снова открываем
-  // варианты для клика, ничего в статистике при этом не меняется
   if (taskAnswered) return;
   optionsLocked = false;
   const btns = [...els.mcqOptions.querySelectorAll('.mcq-btn')];
@@ -903,6 +680,8 @@ els.nextBtn.onclick = newTask;
 
 renderPicker();
 </script>
+
+
 
 <script>
 /* ═══════════════ интерактивная доска на фоне ═══════════════ */
@@ -1443,5 +1222,4 @@ renderPicker();
   updateCursor();
 })();
 </script>
-</body>
-</html>
+</body></html>

@@ -772,8 +772,8 @@ function renderInputs(){
     document.getElementById('goBtn').onclick = checkMoveDone;
   } else if(S.phase==='collect'){
     area.innerHTML = `
-      <input class="num" id="inK" type="text" inputmode="none" placeholder="?">
-      <span class="lbl">x&nbsp;&nbsp;=</span>
+      <input class="num" id="inK" type="text" inputmode="none" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="напр. −11x">
+      <span class="lbl">=</span>
       <input class="num" id="inM" type="text" inputmode="none" placeholder="?">
       <button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>`;
     document.getElementById('goBtn').onclick = submitCollect;
@@ -1117,8 +1117,13 @@ function checkMoveDone(){
 function submitCollect(){
   const iK = document.getElementById('inK'), iM = document.getElementById('inM');
   if(iK.value==='' || iM.value==='') { setHint('Заполни оба окошка.'); return; }
-  const vK = Number(iK.value), vM = Number(iM.value);
-  const okK = vK===S.K, okM = vM===S.M;
+  // слева теперь нужно вписать x самому (не просто число) — переиспользуем тот же
+  // разбор, что и для ответов фонтанчика умножения (12x / −4 и т.п.)
+  const parsedK = parseBracketInput(iK.value);
+  const vM = Number(iM.value);
+  const missingX = !!parsedK && !parsedK.hasX;
+  const okK = !!parsedK && parsedK.hasX && parsedK.coef===S.K;
+  const okM = vM===S.M;
   iK.classList.toggle('good', okK);
   iM.classList.toggle('good', okM);
   if(okK && okM){
@@ -1131,13 +1136,15 @@ function submitCollect(){
   let msg = [];
   if(!okK){ iK.classList.remove('shake'); void iK.offsetWidth; iK.classList.add('shake'); }
   if(!okM){ iM.classList.remove('shake'); void iM.offsetWidth; iM.classList.add('shake'); }
-  if(S.exam){
+  if(!okK && missingX){
+    msg.push(S.exam ? 'Слева не хватает x.' : 'Слева получается слагаемое с x — допиши x к числу.');
+  } else if(S.exam){
     if(!okK) msg.push('Слева неверно — внимание на знаки.');
     if(!okM) msg.push('Справа неверно — внимание на знаки.');
   } else {
     const xs = S.L.map((t,i)=>termText(t,i===0)).join(' ');
     const ns = S.R.map((t,i)=>termText(t,i===0)).join(' ');
-    if(!okK) msg.push(`Слева: ${xs} — считай коэффициенты при x, не теряя знаки.`);
+    if(!okK) msg.push(`Слева: ${xs} — считай коэффициенты при x, не теряя знаки, и не забудь x в ответе.`);
     if(!okM) msg.push(`Справа: ${ns} — сложи числа со знаками.`);
   }
   setHint(msg.join('<br>'));
