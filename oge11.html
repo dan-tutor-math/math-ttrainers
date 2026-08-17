@@ -85,12 +85,42 @@ body{
 .wrap{max-width:820px;margin:0 auto;position:relative;z-index:1;pointer-events:none}
 .wrap > *{pointer-events:auto}
 
+/* ─── калькулятор в столбик (свой пример) — встраивает настоящие тренажёры через iframe ─── */
+.calc-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.calc-tool-btn{flex:1;min-width:130px;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:11px 8px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s, border-color .12s, background .12s, color .12s;}
+.calc-tool-btn:active{transform:scale(.96)}
+.calc-tool-btn:hover{border-color:var(--ink)}
+.calc-tool-btn.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.calc-panel{display:none;position:relative;padding:18px;}
+.calc-panel-close{position:absolute;top:12px;right:12px;width:28px;height:28px;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass-strong);color:var(--muted-3);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;transition:transform .15s;}
+.calc-panel-close:active{transform:scale(.9)}
+.calc-panel-close:hover{border-color:var(--ink)}
+.calc-panel-title{font-family:var(--font-ui);font-weight:700;font-size:15px;color:var(--pencil);margin-bottom:14px;padding-right:32px;}
+.calc-iframe{display:block;width:100%;border:none;border-radius:14px;background:transparent;}
+.calc-history-panel{display:none;position:relative;padding:18px;margin-bottom:14px;}
+.calc-history-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding-right:32px;}
+.calc-history-filter{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:10px;padding:6px 12px;cursor:pointer;transition:transform .15s, border-color .12s, background .12s, color .12s;}
+.calc-history-filter:active{transform:scale(.96)}
+.calc-history-filter:hover{border-color:var(--ink)}
+.calc-history-filter.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.calc-history-list{display:flex;flex-direction:column;}
+.calc-history-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--glass-border);}
+.calc-history-row:first-child{border-top:none;}
+.calc-history-num{font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-6);min-width:20px;}
+.calc-history-expr{font-family:var(--font-mono);font-size:15px;color:var(--pencil);flex:1;}
+.calc-history-copy{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:10px;padding:6px 10px;cursor:pointer;white-space:nowrap;transition:border-color .12s, background .12s;}
+.calc-history-copy:hover{border-color:var(--ink)}
+.calc-history-copy:active{transform:scale(.96)}
+.calc-history-empty{font-family:var(--font-ui);font-size:14px;color:var(--muted-6);text-align:center;padding:16px 0;}
+
 /* ─── интерактивная доска на фоне вокруг примера ─── */
-#boardCanvas{position:fixed;top:0;left:0;z-index:0;touch-action:none;cursor:crosshair;}
+#boardCanvas{position:fixed;top:0;left:0;z-index:2;touch-action:none;cursor:crosshair;border-radius:20px;}
+#boardCanvasBg{position:fixed;top:0;left:0;z-index:0;touch-action:none;cursor:crosshair;}
 #boardSpace{height:0;pointer-events:none;transition:height .2s ease;}
 .board-toolbar{position:fixed;right:18px;bottom:18px;z-index:50;display:flex;gap:8px;align-items:center;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;padding:9px 11px;box-shadow:var(--shadow);}
 .toolbar-sep{width:1px;align-self:stretch;background:var(--glass-border);margin:2px 0;}
-.board-tool-btn{width:34px;height:34px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:border-color .15s, background .15s;}
+.board-tool-btn{width:34px;height:34px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s, border-color .15s, background .15s;}
+.board-tool-btn:active{transform:scale(.92)}
 .board-tool-btn:hover{border-color:var(--ink);}
 .board-tool-btn.active{background:var(--ink);border-color:var(--ink);}
 .board-tool-btn .dot{border-radius:50%;background:var(--pencil);display:block;}
@@ -115,7 +145,8 @@ body{
 .cp-sv{display:block;width:100%;height:100%;}
 .cp-sv-thumb{position:absolute;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35),0 1px 3px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none;top:0;left:0;}
 .cp-row{display:flex;align-items:center;gap:8px;}
-.cp-eyedropper{width:28px;height:28px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--pencil);}
+.cp-eyedropper{width:28px;height:28px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--pencil);transition:transform .15s;}
+.cp-eyedropper:active{transform:scale(.9)}
 .cp-eyedropper:hover{border-color:var(--ink);}
 .cp-swatch{width:26px;height:26px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);box-shadow:inset 0 0 0 2px rgba(255,255,255,.5);}
 .cp-hue-wrap{position:relative;flex:1;height:16px;touch-action:none;}
@@ -127,20 +158,76 @@ body{
 .cp-field label{font-size:10px;color:var(--muted-3);font-family:var(--font-ui);}
 
 .board-view-toolbar{position:fixed;left:18px;bottom:18px;z-index:50;display:flex;gap:8px;align-items:center;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;padding:9px 11px;box-shadow:var(--shadow);}
-.board-zoom-label{min-width:44px;height:34px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-3);padding:0 6px;}
+.board-zoom-label{min-width:44px;height:34px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-3);padding:0 6px;transition:transform .15s;}
+.board-zoom-label:active{transform:scale(.92)}
 .board-zoom-label:hover{border-color:var(--ink);}
 .board-tool-btn.hand-tool{font-size:16px;}
 .board-tool-btn.clear-btn{font-size:15px;}
 
 /* ─── доска изначально выключена — включается отдельной кнопкой под переключателем темы ─── */
 html:not([data-board="on"]) #boardCanvas,
+html:not([data-board="on"]) #boardCanvasBg,
 html:not([data-board="on"]) .board-toolbar,
 html:not([data-board="on"]) .board-view-toolbar{display:none;}
-html[data-board="on"] #boardSpace{height:72vh;}
+html[data-board="on"] #boardSpace{height:72vh;transition:height .32s ease;}
+/* при свёрнутых подсказках место под алгоритмами/счётчиками освобождается — отдаём его доске */
+html[data-board="on"][data-focus="on"] #boardSpace{height:90vh;}
 html[data-board="on"] body{background:
     radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
     radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
     var(--bg);}
+/* ─── свернуть подсказки: освобождает место для записи на доске ─── */
+.focus-toggle{position:fixed;top:112px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
+.focus-toggle:hover{border-color:var(--ink)}
+.focus-toggle:active{transform:scale(.92)}
+
+/* ─── аккуратное сворачивание: max-height/opacity вместо мгновенного display:none ─── */
+h1,.sub,.stats,.example-history-toggle,.example-history-panel,.submode-tabs{overflow:hidden;min-height:0;transition:max-height .32s ease, opacity .22s ease, margin .32s ease;}
+h1{max-height:64px}
+.sub{max-height:50px}
+.stats{max-height:90px}
+.example-history-toggle{max-height:56px}
+.example-history-panel{max-height:220px}
+.submode-tabs{max-height:56px}
+html[data-focus="on"] h1,
+html[data-focus="on"] .sub,
+html[data-focus="on"] .stats,
+html[data-focus="on"] .example-history-toggle,
+html[data-focus="on"] .example-history-panel,
+html[data-focus="on"] .submode-tabs{
+  max-height:0;
+  min-height:0;
+  padding:0;
+  border-width:0;
+  opacity:0;
+  margin-top:0;
+  margin-bottom:0;
+  pointer-events:none;
+}
+html[data-focus="on"] #pickerArea{display:none!important;}
+
+/* ─── медали за пять решённых примеров подряд в этом прототипе ─── */
+.mode-medals{font-family:var(--font-ui);font-size:12px;margin-top:4px;opacity:.85;}
+.medal-badge-row{display:inline-flex;gap:3px;margin-left:8px;font-size:15px;vertical-align:middle;}
+.medal-tray{position:fixed;left:0;right:0;bottom:0;z-index:150;display:none;gap:7px;align-items:center;padding:8px 16px;overflow-x:auto;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border-top:1px solid var(--glass-border);}
+.medal-tray.show{display:flex;}
+.medal-tray-icon{font-size:20px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.2));animation:medalPop .45s cubic-bezier(.34,1.56,.64,1) both;flex:none;}
+@keyframes medalPop{0%{transform:scale(0);}70%{transform:scale(1.3);}100%{transform:scale(1);}}
+.medal-flyer{position:fixed;z-index:300;pointer-events:none;font-size:44px;filter:drop-shadow(0 4px 14px rgba(0,0,0,.3));transition:transform .85s cubic-bezier(.32,.9,.35,1), opacity .85s ease .1s;}
+
+/* ─── история последних пяти примеров этого прототипа ─── */
+.example-history-toggle{display:block;width:100%;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:11px 18px;cursor:pointer;margin-top:18px;margin-bottom:14px;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s, background .12s;}
+.example-history-toggle:active{transform:scale(.98)}
+.example-history-toggle:hover{background:var(--hl-10);}
+.example-history-panel{display:none;position:relative;padding:18px;margin-bottom:14px;}
+.example-history-list{display:flex;flex-direction:column;}
+.example-history-row{display:flex;align-items:flex-start;gap:10px;padding:10px 0;border-top:1px solid var(--glass-border);}
+.example-history-row:first-child{border-top:none;}
+.example-history-mark{font-size:16px;flex:none;margin-top:1px;}
+.example-history-prompt{font-family:var(--font-mono);font-size:14px;color:var(--pencil);line-height:1.4;}
+.example-history-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;}
+.example-history-answer{font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--ok);line-height:1.3;}
+.example-history-empty{font-family:var(--font-ui);font-size:14px;color:var(--muted-6);text-align:center;padding:16px 0;}
 h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,5vw,34px);color:var(--pencil);text-align:center;}
 .sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 22px;}
 .group-title{font-family:var(--font-ui);font-weight:700;font-size:14px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.04em;margin:18px 2px 8px;}
@@ -162,11 +249,13 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .soon-badge{font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-1);background:var(--glass);border-radius:8px;padding:3px 8px;}
 .task-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
 .submode-tabs{display:flex;gap:8px;margin-bottom:14px;}
-.submode-tab{flex:1;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:10px 6px;cursor:pointer;text-align:center;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:border-color .15s, color .15s, background .15s;}
+.submode-tab{flex:1;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:10px 6px;cursor:pointer;text-align:center;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s, border-color .15s, color .15s, background .15s;}
+.submode-tab:active{transform:scale(.96)}
 .submode-tab:hover{border-color:var(--ink);}
 .submode-tab.active{color:#fff;background:var(--ink);border-color:var(--ink);}
 .coming-soon{font-family:var(--font-ui);font-weight:500;font-size:15px;color:var(--muted-3);text-align:center;padding:34px 16px;line-height:1.5;}
-.back-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 14px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);}
+.back-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 14px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);transition:transform .15s;}
+.back-btn:active{transform:scale(.96)}
 .back-btn:hover{border-color:var(--ink)}
 .task-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3)}
 .corner{font-family:var(--font-ui);font-weight:500;display:flex;align-items:center;gap:10px;}
@@ -184,14 +273,15 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .data-table th{background:var(--glass);font-family:var(--font-ui);font-weight:600;color:var(--muted-3);}
 .mcq-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3);margin-bottom:10px;}
 .mcq-options{display:flex;flex-direction:column;gap:8px;}
-.change-answer-btn{display:none;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--teacher);background:none;border:none;padding:10px 2px 0;cursor:pointer;text-decoration:underline;animation:revealUp .3s ease both;}
+.change-answer-btn{display:none;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--teacher);background:none;border:none;padding:10px 2px 0;cursor:pointer;text-decoration:underline;animation:revealUp .3s ease both;transition:opacity .15s;}
 .change-answer-btn:active{opacity:.6}
 .mcq-btn{
   display:flex;align-items:center;gap:10px;text-align:left;
   font-family:var(--font-mono);font-size:16px;color:var(--pencil);
   background:var(--card);border:1.5px solid var(--glass-border);border-radius:14px;
-  padding:12px 16px;cursor:pointer;transition:border-color .12s, background .12s;
+  padding:12px 16px;cursor:pointer;transition:transform .15s, border-color .12s, background .12s;
 }
+.mcq-btn:active{transform:scale(.96)}
 .mcq-btn .mlabel{font-family:var(--font-ui);font-weight:700;color:var(--muted-1);flex:0 0 auto;}
 .mcq-btn:hover:not(.disabled){border-color:var(--ink)}
 .mcq-btn.correct{border-color:var(--ok);background:var(--ok-tint);color:var(--ok);}
@@ -199,7 +289,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .mcq-btn.disabled{cursor:default}
 .explain{font-family:var(--font-ui);font-size:15px;color:var(--muted-4);line-height:1.55;}
 .explain b{color:var(--ink)}
-.next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:14px;box-shadow:0 6px 18px var(--ok-shadow);}
+.next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:14px;box-shadow:0 6px 18px var(--ok-shadow);transition:transform .15s;}
+.next-btn:active{transform:scale(.98)}
 .stats{display:flex;gap:10px;flex-wrap:wrap;}
 .stat{flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:12px 14px;text-align:center;}
 .stat .v{font-family:var(--font-ui);font-weight:700;font-size:22px;color:var(--ink);}
@@ -207,7 +298,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
 .theme-toggle:hover{border-color:var(--ink)}
 .theme-toggle:active{transform:scale(.92)}
-.board-visibility-toggle{top:64px;}
+.board-visibility-toggle{top:64px;transition:transform .15s;}
+.board-visibility-toggle:active{transform:scale(.92)}
 .board-visibility-toggle.active{background:var(--ink);border-color:var(--ink);color:#fff;}
 .home-btn{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
 .home-btn:hover{border-color:var(--ink)}
@@ -256,6 +348,24 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
   });
 })();</script>
 
+<!-- кнопка "свернуть подсказки" намеренно лежит здесь, СНАРУЖИ .wrap, а не внутри
+     него: у .wrap свой контекст наложения (нужен для доски), и любой position:fixed
+     элемент ВНУТРИ .wrap не смог бы пробиться выше #boardCanvas по z-index -->
+<button class="focus-toggle" id="focusToggle" title="Свернуть подсказки" aria-label="Свернуть/показать подсказки и алгоритм">⛶</button>
+  <script>(function(){
+    var btn = document.getElementById('focusToggle');
+    function apply(on){
+      document.documentElement.setAttribute('data-focus', on ? 'on' : 'off');
+      btn.title = on ? 'Показать подсказки' : 'Свернуть подсказки';
+    }
+    apply(false);
+    btn.addEventListener('click', function(){
+      apply(document.documentElement.getAttribute('data-focus') !== 'on');
+    });
+  })();</script>
+
+
+<canvas id="boardCanvasBg"></canvas>
 <canvas id="boardCanvas"></canvas>
 <div class="board-toolbar" id="boardToolbar">
   <div class="tool-group">
@@ -339,6 +449,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       <button class="back-btn" id="backBtn">← все типы</button>
       <div class="corner">
         <div class="task-title" id="taskTitle"></div>
+        <span class="medal-badge-row" id="medalBadgeRow"></span>
         <button class="refresh-btn" id="refreshBtn" title="Обновить задание">⟳</button>
       </div>
     </div>
@@ -363,13 +474,48 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       <button class="next-btn" id="nextBtn" style="display:none">Следующий пример →</button>
     </div>
 
+    <div class="calc-tools" id="calcTools">
+      <button class="calc-tool-btn" data-op="add">+ Сложить</button>
+      <button class="calc-tool-btn" data-op="sub">− Вычесть</button>
+      <button class="calc-tool-btn" data-op="mul">× Умножить</button>
+      <button class="calc-tool-btn" data-op="div">÷ Поделить</button>
+      <button class="calc-tool-btn" id="calcHistoryBtn">🕓 История</button>
+    </div>
+    <div class="panel calc-history-panel" id="calcHistoryPanel">
+      <button class="calc-panel-close" id="calcHistoryClose" title="Закрыть">✕</button>
+      <div class="calc-panel-title">История решений</div>
+      <div class="calc-history-filters" id="calcHistoryFilters">
+        <button class="calc-history-filter active" data-filter="all">Все</button>
+        <button class="calc-history-filter" data-filter="add">+</button>
+        <button class="calc-history-filter" data-filter="sub">−</button>
+        <button class="calc-history-filter" data-filter="mul">×</button>
+        <button class="calc-history-filter" data-filter="div">÷</button>
+      </div>
+      <div class="calc-history-list" id="calcHistoryList"></div>
+      <div class="calc-history-empty" id="calcHistoryEmpty">Пока пусто — реши что-нибудь в калькуляторе.</div>
+    </div>
+    <div class="panel calc-panel" id="calcPanel">
+      <button class="calc-panel-close" id="calcPanelClose" title="Закрыть">✕</button>
+      <div class="calc-panel-title" id="calcPanelTitle"></div>
+      <iframe class="calc-iframe" id="calcIframe" title="Калькулятор в столбик"></iframe>
+    </div>
+
     <div class="stats">
       <div class="stat"><div class="v" id="stSolved">0</div><div class="l">решено</div></div>
       <div class="stat"><div class="v" id="stErrors">0</div><div class="l">ошибок</div></div>
       <div class="stat"><div class="v" id="stStreak">0</div><div class="l">серия без ошибок</div></div>
     </div>
+
+    <button class="example-history-toggle" id="exampleHistoryToggle">🕓 История примеров (0)</button>
+    <div class="panel example-history-panel" id="exampleHistoryPanel">
+      <button class="calc-panel-close" id="exampleHistoryClose" title="Закрыть">✕</button>
+      <div class="calc-panel-title">Последние примеры этого типа</div>
+      <div class="example-history-list" id="exampleHistoryList"></div>
+      <div class="example-history-empty" id="exampleHistoryEmpty">Пока пусто — реши что-нибудь.</div>
+    </div>
   </div>
-<div id="boardSpace" aria-hidden="true"></div></div>
+<div class="medal-tray" id="medalTray" aria-hidden="true"></div>
+  <div id="boardSpace" aria-hidden="true"></div></div>
 
 <script>
 /* ═══════════════ утилиты ═══════════════ */
@@ -507,16 +653,161 @@ const els = {
   stStreak: document.getElementById('stStreak'),
 };
 
+/* ═══════════════ память по прототипам + история + медали (localStorage) ═══════════════
+   Каждый прототип (mode-card) хранит свой прогресс отдельно, под собственным ключом,
+   поэтому переход между типами не теряет ни текущий пример, ни счётчик медалей —
+   и всё это переживает перезагрузку страницы. */
+const PROGRESS_NS = 'ogeProg:oge11:';
+function loadProg(modeId) {
+  try { const raw = localStorage.getItem(PROGRESS_NS + modeId); return raw ? JSON.parse(raw) : null; }
+  catch (e) { return null; }
+}
+function saveProg(modeId, data) {
+  try { data.lastActiveAt = Date.now(); localStorage.setItem(PROGRESS_NS + modeId, JSON.stringify(data)); } catch (e) {}
+}
+function freshProg() {
+  return { task: null, answered: false, hadWrongPick: false, pickedIndex: null,
+           solvedInBatch: 0, errorsInBatch: 0, history: [], medals: { gold: 0, silver: 0, bronze: 0 } };
+}
+const SESSION_GAP_MS = 3 * 60 * 60 * 1000; // 3 часа без захода в этот прототип — считаем, что началась новая учебная сессия
+function loadProgOrFresh(key) {
+  const saved = loadProg(key);
+  if (!saved) return freshProg();
+  if (!saved.lastActiveAt || (Date.now() - saved.lastActiveAt) > SESSION_GAP_MS) {
+    // новая сессия после паузы: обнуляем историю примеров и прогресс к медали (и незавершённую задачу),
+    // но уже полученные медали не трогаем — это заслуженное достижение, а не сессионное состояние
+    return Object.assign(freshProg(), { medals: saved.medals || { gold: 0, silver: 0, bronze: 0 } });
+  }
+  return saved;
+}
+let curProg = freshProg(); // прогресс ТЕКУЩЕГО прототипа — зеркалится в localStorage при каждом изменении
+
+const MEDAL_EMOJI = { gold: '🥇', silver: '🥈', bronze: '🥉' };
+const MEDAL_TITLE = { gold: 'Золото — пять примеров без ошибок', silver: 'Серебро — пять примеров, 1–2 ошибки', bronze: 'Бронза — пять примеров решено' };
+
+function renderMedalBadges() {
+  const row = document.getElementById('medalBadgeRow');
+  if (!row) return;
+  const m = curProg.medals || {};
+  row.textContent = ['gold', 'silver', 'bronze'].filter(t => m[t]).map(t => `${MEDAL_EMOJI[t]}×${m[t]}`).join(' ');
+}
+function renderExampleHistory() {
+  const list = document.getElementById('exampleHistoryList');
+  const empty = document.getElementById('exampleHistoryEmpty');
+  const btn = document.getElementById('exampleHistoryToggle');
+  if (!list) return;
+  const items = curProg.history || [];
+  btn.textContent = `🕓 История примеров (${items.length})`;
+  list.innerHTML = '';
+  empty.style.display = items.length ? 'none' : 'block';
+  items.forEach(h => {
+    const row = document.createElement('div');
+    row.className = 'example-history-row';
+    const mark = document.createElement('span');
+    mark.className = 'example-history-mark';
+    mark.textContent = h.correct ? (h.hadError ? '🟡' : '✅') : '❌';
+    const body = document.createElement('div');
+    body.className = 'example-history-body';
+    const prompt = document.createElement('span');
+    prompt.className = 'example-history-prompt';
+    prompt.innerHTML = h.prompt;
+    body.appendChild(prompt);
+    if (h.answer) {
+      const answer = document.createElement('span');
+      answer.className = 'example-history-answer';
+      answer.innerHTML = 'Ответ: ' + h.answer;
+      body.appendChild(answer);
+    }
+    row.appendChild(mark);
+    row.appendChild(body);
+    list.appendChild(row);
+  });
+}
+document.getElementById('exampleHistoryToggle').onclick = () => {
+  const panel = document.getElementById('exampleHistoryPanel');
+  const willOpen = panel.style.display !== 'block';
+  panel.style.display = willOpen ? 'block' : 'none';
+  if (willOpen) panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+document.getElementById('exampleHistoryClose').onclick = () => {
+  document.getElementById('exampleHistoryPanel').style.display = 'none';
+};
+
+function playMedalAnimation(tier) {
+  const tray = document.getElementById('medalTray');
+  const emoji = MEDAL_EMOJI[tier];
+  const titleRect = els.taskTitle.getBoundingClientRect();
+  const flyer = document.createElement('div');
+  flyer.className = 'medal-flyer';
+  flyer.textContent = emoji;
+  flyer.style.left = (titleRect.left + titleRect.width / 2 - 22) + 'px';
+  flyer.style.top = (titleRect.top - 10) + 'px';
+  flyer.style.opacity = '0';
+  flyer.style.transform = 'scale(.4)';
+  document.body.appendChild(flyer);
+
+  requestAnimationFrame(() => {
+    flyer.style.opacity = '1';
+    flyer.style.transform = 'scale(1.3)';
+    setTimeout(() => {
+      tray.classList.add('show');
+      const trayRect = tray.getBoundingClientRect();
+      const curRect = flyer.getBoundingClientRect();
+      const dx = (trayRect.left + 24) - curRect.left;
+      const dy = (trayRect.top + trayRect.height / 2 - 10) - curRect.top;
+      flyer.style.transform = `translate(${dx}px, ${dy}px) scale(.5)`;
+      flyer.style.opacity = '0.15';
+      setTimeout(() => {
+        flyer.remove();
+        const icon = document.createElement('span');
+        icon.className = 'medal-tray-icon';
+        icon.textContent = emoji;
+        icon.title = MEDAL_TITLE[tier];
+        tray.appendChild(icon);
+      }, 900);
+    }, 650);
+  });
+}
+
+function recordSolve() {
+  const gotItRight = curProg.pickedIndex === curTask.correctIndex;
+  curProg.history.unshift({ prompt: curTask.prompt, correct: gotItRight, hadError: !!curProg.hadWrongPick, answer: curTask.options[curTask.correctIndex] });
+  curProg.history = curProg.history.slice(0, 5);
+  curProg.solvedInBatch = (curProg.solvedInBatch || 0) + 1;
+
+  let awardedTier = null;
+  if (curProg.solvedInBatch >= 5) {
+    const errs = curProg.errorsInBatch || 0;
+    awardedTier = errs === 0 ? 'gold' : (errs <= 2 ? 'silver' : 'bronze');
+    curProg.medals[awardedTier] = (curProg.medals[awardedTier] || 0) + 1;
+    curProg.solvedInBatch = 0;
+    curProg.errorsInBatch = 0;
+  }
+  saveProg(curMode, curProg);
+  renderMedalBadges();
+  renderExampleHistory();
+  if (awardedTier) playMedalAnimation(awardedTier);
+}
+
 function renderPicker() {
   els.modesGrid.innerHTML = GROUPS.map(g => `
     <div class="group-title">${g.title}</div>
     <div class="modes">
-      ${g.modes.map(m => `<div class="mode-card" data-id="${m.id}"><div class="mtitle">${m.title}</div></div>`).join('')}
+      ${g.modes.map(m => {
+        const p = loadProg(m.id);
+        const meds = p && p.medals;
+        const badges = meds ? ['gold', 'silver', 'bronze'].filter(t => meds[t]).map(t => `${MEDAL_EMOJI[t]}${meds[t]}`).join(' ') : '';
+        return `<div class="mode-card" data-id="${m.id}"><div class="mtitle">${m.title}</div>${badges ? `<div class="mode-medals">${badges}</div>` : ''}</div>`;
+      }).join('')}
     </div>
   `).join('');
   els.modesGrid.querySelectorAll('.mode-card').forEach(card => {
     card.onclick = () => { curMode = card.dataset.id; openTask(); };
   });
+  // карточка «🎲 Случайно» живёт вне #modesGrid статично в разметке — её нужно
+  // привязывать отдельно (раньше эта кнопка была нерабочей)
+  const randomCard = document.querySelector('.mode-card.random[data-id]');
+  if (randomCard) randomCard.onclick = () => { curMode = randomCard.dataset.id; openTask(); };
 }
 
 const COMING_SOON_TEXT = {
@@ -531,11 +822,15 @@ function openTask() {
   els.taskArea.style.display = 'block';
   const m = curMode === 'random' ? null : ALL_MODES.find(x => x.id === curMode);
   els.taskTitle.textContent = curMode === 'random' ? 'Случайно' : m.title;
+  curProg = (curMode !== 'random') ? loadProgOrFresh(curMode) : freshProg();
+  renderMedalBadges();
+  renderExampleHistory();
   switchSubMode('exam');
 }
 els.backBtn.onclick = () => {
   els.taskArea.style.display = 'none';
   els.picker.style.display = 'block';
+  renderPicker();
 };
 els.refreshBtn.onclick = () => { if (curSubMode === 'exam') newTask(); };
 
@@ -548,7 +843,7 @@ function switchSubMode(mode) {
   if (mode === 'exam') {
     els.comingSoonPanel.style.display = 'none';
     els.refreshBtn.style.display = 'inline-flex';
-    newTask();
+    resumeOrNewTask();
   } else {
     els.questionPanel.style.display = 'none';
     els.mainPanel.style.display = 'none';
@@ -561,15 +856,7 @@ els.tabLearn.onclick = () => switchSubMode('learn');
 els.tabPractice.onclick = () => switchSubMode('practice');
 els.tabExam.onclick = () => switchSubMode('exam');
 
-function newTask() {
-  const m = curMode === 'random' ? pick(ALL_MODES) : ALL_MODES.find(x => x.id === curMode);
-  curTask = m.gen();
-  taskAnswered = false;
-  optionsLocked = false;
-  hadWrongPick = false;
-
-  window.scrollTo(0, 0);
-
+function renderCurrentTask() {
   els.questionPanel.style.display = 'block';
   els.questionPromptText.innerHTML = curTask.prompt;
 
@@ -582,6 +869,54 @@ function newTask() {
   els.mainPanel.style.display = 'none';
   els.explainBox.style.display = 'none';
   els.nextBtn.style.display = 'none';
+}
+
+function newTask() {
+  const m = curMode === 'random' ? pick(ALL_MODES) : ALL_MODES.find(x => x.id === curMode);
+  curTask = m.gen();
+  taskAnswered = false;
+  optionsLocked = false;
+  hadWrongPick = false;
+
+  window.scrollTo(0, 0);
+  renderCurrentTask();
+
+  if (curMode !== 'random') {
+    curProg.task = curTask;
+    curProg.answered = false;
+    curProg.hadWrongPick = false;
+    curProg.pickedIndex = null;
+    saveProg(curMode, curProg);
+  }
+}
+
+// при входе в прототип — восстановить последний пример (если есть), а не выдавать новый
+function resumeOrNewTask() {
+  if (curMode !== 'random' && curProg && curProg.task) {
+    curTask = curProg.task;
+    taskAnswered = !!curProg.answered;
+    hadWrongPick = !!curProg.hadWrongPick;
+    optionsLocked = taskAnswered;
+
+    window.scrollTo(0, 0);
+    renderCurrentTask();
+
+    const btns = [...els.mcqOptions.querySelectorAll('.mcq-btn')];
+    if (taskAnswered) {
+      btns.forEach(b => { b.onclick = null; b.classList.add('disabled'); });
+      if (typeof curProg.pickedIndex === 'number' && curProg.pickedIndex !== curTask.correctIndex && btns[curProg.pickedIndex]) {
+        btns[curProg.pickedIndex].classList.add('wrong');
+      }
+      if (btns[curTask.correctIndex]) btns[curTask.correctIndex].classList.add('correct');
+      finishTask(false);
+    } else if (hadWrongPick && typeof curProg.pickedIndex === 'number') {
+      optionsLocked = true;
+      if (btns[curProg.pickedIndex]) btns[curProg.pickedIndex].classList.add('wrong');
+      els.changeAnswerBtn.style.display = 'block';
+    }
+  } else {
+    newTask();
+  }
 }
 
 function attachMCQHandlers() {
@@ -599,6 +934,7 @@ function attachMCQHandlers() {
         els.stSolved.textContent = totalSolved;
         els.stStreak.textContent = streak;
         taskAnswered = true;
+        if (curMode !== 'random') { curProg.answered = true; curProg.pickedIndex = i; saveProg(curMode, curProg); }
         finishTask();
       } else if (hadWrongPick) {
         b.classList.add('wrong');
@@ -607,6 +943,7 @@ function attachMCQHandlers() {
         els.stErrors.textContent = totalErrors;
         els.stStreak.textContent = streak;
         taskAnswered = true;
+        if (curMode !== 'random') { curProg.answered = true; curProg.pickedIndex = i; curProg.errorsInBatch = (curProg.errorsInBatch || 0) + 1; saveProg(curMode, curProg); }
         finishTask();
       } else {
         b.classList.add('wrong');
@@ -615,6 +952,7 @@ function attachMCQHandlers() {
         els.stErrors.textContent = totalErrors;
         els.stStreak.textContent = streak;
         els.changeAnswerBtn.style.display = 'block';
+        if (curMode !== 'random') { curProg.hadWrongPick = true; curProg.pickedIndex = i; curProg.errorsInBatch = (curProg.errorsInBatch || 0) + 1; saveProg(curMode, curProg); }
       }
     };
   });
@@ -629,7 +967,8 @@ els.changeAnswerBtn.onclick = () => {
   attachMCQHandlers();
 };
 
-function finishTask() {
+function finishTask(isFreshSolve) {
+  if (isFreshSolve === undefined) isFreshSolve = true;
   els.mainPanel.style.display = 'block';
   els.explainBox.style.display = 'block';
   els.explainBox.innerHTML = `<b>Решение:</b> ${curTask.explain}`;
@@ -637,6 +976,8 @@ function finishTask() {
   els.mainPanel.classList.remove('reveal');
   void els.mainPanel.offsetWidth;
   els.mainPanel.classList.add('reveal');
+
+  if (isFreshSolve && curMode !== 'random') recordSolve();
 }
 els.nextBtn.onclick = newTask;
 
@@ -644,6 +985,52 @@ renderPicker();
 </script>
 
 
+
+<script>
+/* ─── плавная посадка блоков при изменении высоты .panel/.sheet ───
+   Раньше при появлении подсказки/кнопки "дальше" панель ввода мгновенно
+   скачком меняла высоту, а всё что ниже (статистика, теория) так же
+   мгновенно дёргалось следом — расстояния оставались верными, но сам
+   скачок выглядел "криво". ResizeObserver ловит ЛЮБОЕ изменение высоты
+   независимо от того, какая функция его вызвала, и вместо мгновенного
+   скачка красиво анимирует высоту — весь интерфейс ниже плавно
+   "съезжает" на новое место, сохраняя одинаковый отступ всегда. */
+function setupAutoHeightAnimation(el, duration){
+  if(!el || typeof ResizeObserver==='undefined') return;
+  duration = duration || 280;
+  let lastH = null, resizing = false, settleTimer = null;
+  const ro = new ResizeObserver(entries=>{
+    if(resizing) return;
+    const entry = entries[0];
+    const cs = getComputedStyle(el);
+    const newH = (entry.borderBoxSize && entry.borderBoxSize[0])
+      ? entry.borderBoxSize[0].blockSize
+      : entry.contentRect.height + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    if(lastH===null){ lastH=newH; return; }
+    if(Math.abs(newH-lastH)<1) return;
+    const oldH = lastH;
+    lastH = newH;
+    resizing = true;
+    el.style.height = oldH+'px';
+    el.style.overflow = 'hidden';
+    void el.offsetHeight;
+    el.style.transition = 'height '+duration+'ms cubic-bezier(.4,0,.2,1)';
+    requestAnimationFrame(()=>{ el.style.height = newH+'px'; });
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(()=>{
+      el.style.transition = '';
+      el.style.height = '';
+      el.style.overflow = '';
+      resizing = false;
+      lastH = el.getBoundingClientRect().height;
+    }, duration+50);
+  });
+  ro.observe(el);
+}
+const PANEL_ANIM_SELECTOR = '.panel:not(.calc-history-panel):not(.calc-panel):not(.example-history-panel):not(.coming-soon):not(.theory-block)';
+document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimation(p));
+
+</script>
 
 <script>
 /* ═══════════════ интерактивная доска на фоне ═══════════════ */
@@ -656,6 +1043,15 @@ renderPicker();
   // больше не «прогрызает» дыры в клетчатой сетке
   const inkCanvas = document.createElement('canvas');
   const inkCtx = inkCanvas.getContext('2d');
+
+  // второй, независимый холст — «фон»: лежит на всю страницу НИЖЕ обычного
+  // контента (z-index:-1 в CSS), поэтому карточки задания перекрывают его
+  // собой, а свободное место вокруг них доступно для рисования
+  const canvasBg = document.getElementById('boardCanvasBg');
+  const ctxBg = canvasBg.getContext('2d');
+  const inkCanvasBg = document.createElement('canvas');
+  const inkCtxBg = inkCanvasBg.getContext('2d');
+
   const toolbar = document.getElementById('boardToolbar');
   const zoomResetBtn = document.getElementById('zoomResetBtn');
 
@@ -677,32 +1073,68 @@ renderPicker();
   const UNDO_LIMIT = 60;
   const undoStack = [];      // снимки массива strokes (лёгкие — это просто точки, не пиксели)
 
-  // ── масштаб и панорамирование (в «мировых» пикселях) ──
+  // ── масштаб и панорамирование (в локальных пикселях листа) ──
   let viewScale = 1, panX = 0, panY = 0;
   const ZOOM_MIN = 0.5, ZOOM_MAX = 3, ZOOM_STEP = 1.2;
 
+  // ── доска пишет строго поверх «тетрадного листа» примера (.sheet), а не
+  // поверх всей страницы: холст каждый кадр подгоняется под текущий
+  // getBoundingClientRect() этого листа, поэтому локальные координаты —
+  // это просто пиксели внутри листа, без поправки на прокрутку страницы ──
+  let boardTarget = null;
+  function resolveBoardTarget(){
+    // первая рабочая зона доски — всегда именно тетрадный лист примера (.sheet),
+    // независимо от режима фокуса; вторая зона (фон) обслуживается отдельным
+    // холстом ниже и в этот выбор не входит
+    const sheets = [...document.querySelectorAll('.sheet')];
+    for (const el of sheets) if (el.offsetParent !== null) return el;
+    const fallbacks = [document.getElementById('mainPanel'), document.getElementById('taskArea'), document.querySelector('.panel')];
+    for (const el of fallbacks) if (el && el.offsetParent !== null) return el;
+    return null;
+  }
+
   function worldToScreenTransform(){
-    // screen = (world - scroll - pan) * viewScale, всё затем ещё раз умножается на dpr
     const s = viewScale * dpr;
-    return [s, 0, 0, s, -(window.scrollX + panX) * s, -(window.scrollY + panY) * s];
+    return [s, 0, 0, s, -panX * s, -panY * s];
   }
   function screenToWorld(clientX, clientY){
+    const rect = canvas.getBoundingClientRect();
     return {
-      x: clientX / viewScale + window.scrollX + panX,
-      y: clientY / viewScale + window.scrollY + panY,
+      x: (clientX - rect.left) / viewScale + panX,
+      y: (clientY - rect.top) / viewScale + panY,
     };
   }
 
   function resizeCanvas(){
     dpr = Math.max(1, window.devicePixelRatio || 1);
-    const w = window.innerWidth, h = window.innerHeight;
-    canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
+    syncBoardTarget();
+    redraw();
+  }
+
+  // ── синхронизирует размер/положение холста с текущим прямоугольником
+  // листа; вызывается каждый кадр, пока доска включена, — так холст сам
+  // следует за прокруткой страницы, ресайзом окна и ростом листа (например,
+  // когда в столбик дописывается новая строка) ──
+  function syncBoardTarget(){
+    const el = resolveBoardTarget();
+    boardTarget = el;
+    if (!el) { canvas.style.display = 'none'; return false; }
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) { canvas.style.display = 'none'; return false; }
+    canvas.style.display = '';
+    canvas.style.left = rect.left + 'px';
+    canvas.style.top = rect.top + 'px';
+    const w = Math.round(rect.width), h = Math.round(rect.height);
     canvas.style.width = w + 'px';
     canvas.style.height = h + 'px';
-    inkCanvas.width = canvas.width;
-    inkCanvas.height = canvas.height;
-    redraw();
+    const pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+    if (canvas.width !== pw || canvas.height !== ph) {
+      canvas.width = pw;
+      canvas.height = ph;
+      inkCanvas.width = pw;
+      inkCanvas.height = ph;
+    }
+    return true;
   }
 
   function drawStroke(targetCtx, s){
@@ -744,39 +1176,19 @@ renderPicker();
   }
 
   let redrawScheduled = false;
-  const GRID_SIZE = 24; // мировые единицы — тот же шаг, что раньше был у CSS-сетки на фоне
-
-  function drawGrid(){
-    const topLeft = screenToWorld(0, 0);
-    const bottomRight = screenToWorld(window.innerWidth, window.innerHeight);
-    const gridColor = (getComputedStyle(document.documentElement).getPropertyValue('--grid') || '#DCE4F0').trim();
-    const startX = Math.floor(topLeft.x / GRID_SIZE) * GRID_SIZE;
-    const startY = Math.floor(topLeft.y / GRID_SIZE) * GRID_SIZE;
-    ctx.save();
-    ctx.strokeStyle = gridColor;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let x = startX; x <= bottomRight.x; x += GRID_SIZE) {
-      ctx.moveTo(x, topLeft.y);
-      ctx.lineTo(x, bottomRight.y);
-    }
-    for (let y = startY; y <= bottomRight.y; y += GRID_SIZE) {
-      ctx.moveTo(topLeft.x, y);
-      ctx.lineTo(bottomRight.x, y);
-    }
-    ctx.stroke();
-    ctx.restore();
-  }
 
   function redraw(){
     if (redrawScheduled) return;
     redrawScheduled = true;
     requestAnimationFrame(()=>{
       redrawScheduled = false;
+      if (!boardTarget) return;
       const m = worldToScreenTransform();
 
-      // 1) чернила — на отдельном слое, чтобы ластик (destination-out) стирал
-      // только их, а не сетку под ними
+      // чернила рисуются на отдельном слое (чтобы ластик стирал только их),
+      // а затем накладываются на основной холст обычным source-over —
+      // свою сетку холст больше не рисует: клетка — это фон самого .sheet,
+      // доска лишь пишет поверх него прозрачным слоем
       inkCtx.save();
       inkCtx.setTransform(1, 0, 0, 1, 0, 0);
       inkCtx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
@@ -785,31 +1197,33 @@ renderPicker();
       for (const s of strokes) drawStroke(inkCtx, s);
       if (currentStroke) drawStroke(inkCtx, currentStroke);
 
-      // 2) основной холст: сетка, затем чернила поверх обычным наложением
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.restore();
-      ctx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
-      drawGrid();
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.drawImage(inkCanvas, 0, 0);
     });
   }
 
-  function pushUndo(){
-    undoStack.push(strokes.slice());
+  function pushUndo(surface){
+    undoStack.push({ surface, data: (surface === 'bg' ? bgStrokes : strokes).slice() });
     if (undoStack.length > UNDO_LIMIT) undoStack.shift();
   }
   function undo(){
+    // общий стек на обе поверхности: Ctrl+Z отменяет последнее действие,
+    // где бы оно ни произошло — на листе или на фоне
     if (undoStack.length === 0) return;
-    strokes = undoStack.pop();
-    redraw();
+    const entry = undoStack.pop();
+    if (entry.surface === 'bg') { bgStrokes = entry.data; redrawBg(); }
+    else { strokes = entry.data; redraw(); }
   }
   function clearBoard(){
-    pushUndo();
+    pushUndo('sheet');
     strokes = [];
+    pushUndo('bg');
+    bgStrokes = [];
     redraw();
+    redrawBg();
   }
 
   // ── панорамирование: средняя ИЛИ правая кнопка мыши, ИЛИ инструмент «рука» + левая кнопка ──
@@ -825,6 +1239,7 @@ renderPicker();
   }
   function updateCursor(){
     canvas.style.cursor = panning ? 'grabbing' : (tool === 'hand' ? 'grab' : 'crosshair');
+    canvasBg.style.cursor = bgPanning ? 'grabbing' : (tool === 'hand' ? 'grab' : 'crosshair');
   }
 
   let drawing = false;
@@ -840,7 +1255,7 @@ renderPicker();
 
     drawing = true;
     try { canvas.setPointerCapture(e.pointerId); } catch(_){}
-    pushUndo();
+    pushUndo('sheet');
     const p = screenToWorld(e.clientX, e.clientY);
     if (tool === 'line') {
       currentStroke = { tool: 'line', color: penColor, width: penWidth, points: [p, p] };
@@ -906,6 +1321,167 @@ renderPicker();
   }
   canvas.addEventListener('pointerup', endStroke);
   canvas.addEventListener('pointercancel', endStroke);
+
+  /* ─────────────── вторая зона доски: фон (вся страница) ───────────────
+     координаты «мировые» — как обычная прокрутка страницы, — поэтому
+     рисунок остаётся «приклеен» к странице при скролле; здесь же живут
+     полноценные панорамирование и масштаб (кнопки +/− в тулбаре) */
+
+  let bgStrokes = [];
+  let bgCurrentStroke = null;
+  let bgViewScale = 1, bgPanX = 0, bgPanY = 0;
+  const BG_GRID = 24; // px — совпадает с шагом клетки основного дизайна (--grid)
+
+  function bgWorldToScreenTransform(){
+    const s = bgViewScale * dpr;
+    return [s, 0, 0, s, -(bgPanX + window.scrollX) * s, -(bgPanY + window.scrollY) * s];
+  }
+  function bgScreenToWorld(clientX, clientY){
+    return {
+      x: clientX / bgViewScale + bgPanX + window.scrollX,
+      y: clientY / bgViewScale + bgPanY + window.scrollY,
+    };
+  }
+
+  function resizeBgCanvas(){
+    dpr = Math.max(1, window.devicePixelRatio || 1);
+    const w = window.innerWidth, h = window.innerHeight;
+    canvasBg.style.width = w + 'px';
+    canvasBg.style.height = h + 'px';
+    const pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+    if (canvasBg.width !== pw || canvasBg.height !== ph) {
+      canvasBg.width = pw;
+      canvasBg.height = ph;
+      inkCanvasBg.width = pw;
+      inkCanvasBg.height = ph;
+    }
+    redrawBg();
+  }
+
+  function drawBgGrid(){
+    const topLeft = bgScreenToWorld(0, 0);
+    const bottomRight = bgScreenToWorld(window.innerWidth, window.innerHeight);
+    const gridColor = (getComputedStyle(document.documentElement).getPropertyValue('--grid') || '#dfe6f3').trim() || '#dfe6f3';
+    const startX = Math.floor(topLeft.x / BG_GRID) * BG_GRID;
+    const startY = Math.floor(topLeft.y / BG_GRID) * BG_GRID;
+    ctxBg.strokeStyle = gridColor;
+    ctxBg.lineWidth = 1 / bgViewScale;
+    ctxBg.beginPath();
+    for (let x = startX; x <= bottomRight.x; x += BG_GRID) { ctxBg.moveTo(x, topLeft.y); ctxBg.lineTo(x, bottomRight.y); }
+    for (let y = startY; y <= bottomRight.y; y += BG_GRID) { ctxBg.moveTo(topLeft.x, y); ctxBg.lineTo(bottomRight.x, y); }
+    ctxBg.stroke();
+  }
+
+  let bgRedrawScheduled = false;
+  function redrawBg(){
+    if (bgRedrawScheduled) return;
+    bgRedrawScheduled = true;
+    requestAnimationFrame(()=>{
+      bgRedrawScheduled = false;
+      const m = bgWorldToScreenTransform();
+
+      inkCtxBg.save();
+      inkCtxBg.setTransform(1, 0, 0, 1, 0, 0);
+      inkCtxBg.clearRect(0, 0, inkCanvasBg.width, inkCanvasBg.height);
+      inkCtxBg.restore();
+      inkCtxBg.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+      for (const s of bgStrokes) drawStroke(inkCtxBg, s);
+      if (bgCurrentStroke) drawStroke(inkCtxBg, bgCurrentStroke);
+
+      ctxBg.setTransform(1, 0, 0, 1, 0, 0);
+      ctxBg.clearRect(0, 0, canvasBg.width, canvasBg.height);
+      ctxBg.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+      drawBgGrid();
+      ctxBg.setTransform(1, 0, 0, 1, 0, 0);
+      ctxBg.drawImage(inkCanvasBg, 0, 0);
+    });
+  }
+
+  // ── панорамирование фона: средняя/правая кнопка мыши, ИЛИ «рука» + левая ──
+  let bgPanning = false;
+  let bgPanStartClientX = 0, bgPanStartClientY = 0, bgPanStartPanX = 0, bgPanStartPanY = 0;
+
+  function startBgPan(e){
+    bgPanning = true;
+    try { canvasBg.setPointerCapture(e.pointerId); } catch(_){}
+    bgPanStartClientX = e.clientX; bgPanStartClientY = e.clientY;
+    bgPanStartPanX = bgPanX; bgPanStartPanY = bgPanY;
+    updateCursor();
+  }
+
+  let bgDrawing = false;
+
+  canvasBg.addEventListener('contextmenu', e=> e.preventDefault());
+  canvasBg.addEventListener('pointerdown', e=>{
+    if (e.button === 1 || e.button === 2) { startBgPan(e); e.preventDefault(); return; }
+    if (tool === 'hand') {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      startBgPan(e); e.preventDefault(); return;
+    }
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+    bgDrawing = true;
+    try { canvasBg.setPointerCapture(e.pointerId); } catch(_){}
+    pushUndo('bg');
+    const p = bgScreenToWorld(e.clientX, e.clientY);
+    if (tool === 'line') {
+      bgCurrentStroke = { tool: 'line', color: penColor, width: penWidth, points: [p, p] };
+    } else if (tool === 'eraser') {
+      bgCurrentStroke = { tool: 'eraser', width: eraserSize, points: [p] };
+    } else {
+      bgCurrentStroke = { tool: 'pen', color: penColor, width: penWidth, points: [p] };
+    }
+    redrawBg();
+    e.preventDefault();
+  });
+
+  canvasBg.addEventListener('pointermove', e=>{
+    if (bgPanning) {
+      bgPanX = bgPanStartPanX - (e.clientX - bgPanStartClientX) / bgViewScale;
+      bgPanY = bgPanStartPanY - (e.clientY - bgPanStartClientY) / bgViewScale;
+      redrawBg();
+      e.preventDefault();
+      return;
+    }
+    if (!bgDrawing || !bgCurrentStroke) return;
+    if (tool === 'line') {
+      const p = bgScreenToWorld(e.clientX, e.clientY);
+      bgCurrentStroke.points[1] = p;
+    } else {
+      const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+      const list = events.length ? events : [e];
+      for (const ev of list) {
+        const p = bgScreenToWorld(ev.clientX, ev.clientY);
+        bgCurrentStroke.points.push(p);
+      }
+    }
+    redrawBg();
+    e.preventDefault();
+  });
+
+  function endBgStroke(e){
+    if (bgPanning) {
+      bgPanning = false;
+      try { canvasBg.releasePointerCapture(e.pointerId); } catch(_){}
+      updateCursor();
+      return;
+    }
+    if (!bgDrawing) return;
+    bgDrawing = false;
+    if (bgCurrentStroke) {
+      if (typeof e.clientX === 'number') {
+        const p = bgScreenToWorld(e.clientX, e.clientY);
+        if (tool === 'line') bgCurrentStroke.points[1] = p;
+        else bgCurrentStroke.points.push(p);
+      }
+      bgStrokes.push(bgCurrentStroke);
+      bgCurrentStroke = null;
+    }
+    try { canvasBg.releasePointerCapture(e.pointerId); } catch(_){}
+    redrawBg();
+  }
+  canvasBg.addEventListener('pointerup', endBgStroke);
+  canvasBg.addEventListener('pointercancel', endBgStroke);
 
   // ── инструменты (ручка/ластик/линия/рука) — общая группа, активен ровно один ──
   // кнопка «рука» лежит в отдельной (второй) панели, поэтому ищем по всему документу
@@ -1159,29 +1735,181 @@ renderPicker();
 
   document.getElementById('clearBoardBtn').onclick = clearBoard;
 
-  // ── масштаб: кнопки +/− и сброс вида ──
+  // ── масштаб фона: кнопки +/− и сброс вида (у листа своего зума нет) ──
   function zoomBy(factor){
-    viewScale = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, viewScale * factor));
-    zoomResetBtn.textContent = Math.round(viewScale * 100) + '%';
-    redraw();
+    bgViewScale = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, bgViewScale * factor));
+    zoomResetBtn.textContent = Math.round(bgViewScale * 100) + '%';
+    redrawBg();
   }
   document.getElementById('zoomInBtn').onclick = ()=> zoomBy(ZOOM_STEP);
   document.getElementById('zoomOutBtn').onclick = ()=> zoomBy(1 / ZOOM_STEP);
   zoomResetBtn.onclick = ()=>{
-    viewScale = 1; panX = 0; panY = 0;
+    bgViewScale = 1; bgPanX = 0; bgPanY = 0;
     zoomResetBtn.textContent = '100%';
-    redraw();
+    redrawBg();
   };
 
-  window.addEventListener('resize', resizeCanvas);
-  window.addEventListener('scroll', redraw, { passive: true });
-  // при переключении светлой/тёмной темы перекрашиваем сетку без ожидания
-  // следующего рисования/скролла/зума
-  if (window.MutationObserver) {
-    new MutationObserver(redraw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  window.addEventListener('resize', ()=>{ resizeCanvas(); resizeBgCanvas(); });
+
+  // ── доска активна, только пока data-board="on": как только атрибут
+  // появляется, запускаем цикл, который каждый кадр подгоняет лист под текущий
+  // прямоугольник .sheet и перерисовывает фон с учётом прокрутки страницы —
+  // а как только доску выключают, цикл сам останавливается ──
+  let rafHandle = null;
+  function boardLoop(){
+    if (document.documentElement.getAttribute('data-board') !== 'on') { rafHandle = null; return; }
+    syncBoardTarget();
+    redraw();
+    redrawBg();
+    rafHandle = requestAnimationFrame(boardLoop);
   }
+  function ensureLoopRunning(){
+    if (rafHandle == null && document.documentElement.getAttribute('data-board') === 'on') {
+      rafHandle = requestAnimationFrame(boardLoop);
+    }
+  }
+  if (window.MutationObserver) {
+    new MutationObserver(ensureLoopRunning).observe(document.documentElement, { attributes: true, attributeFilter: ['data-board'] });
+  }
+  ensureLoopRunning();
   resizeCanvas();
+  resizeBgCanvas();
   updateCursor();
 })();
 </script>
+<script>
+/* ═══════════════ калькулятор в столбик («свой пример») ═══════════════
+   Встраивает через iframe те же тренажёры сложения/вычитания/умножения/
+   деления в столбик (файлы *_embed.html), чтобы часть примеров можно было
+   решать вообще без использования тетради. Самостоятельный блок — не
+   зависит от структуры els этого файла, ищет свои элементы напрямую. */
+(function(){
+  const CALC_OP_META = {
+    add: { title: '➕ Сложение в столбик — свой пример', file: 'addition_embed.html' },
+    sub: { title: '➖ Вычитание в столбик — свой пример', file: 'subtraction_embed.html' },
+    mul: { title: '✖️ Умножение в столбик — свой пример', file: 'multiplication_embed.html' },
+    div: { title: '➗ Деление в столбик — свой пример', file: 'division_embed.html' },
+  };
+
+  const calcPanel = document.getElementById('calcPanel');
+  const calcPanelTitle = document.getElementById('calcPanelTitle');
+  const calcIframe = document.getElementById('calcIframe');
+  const calcPanelClose = document.getElementById('calcPanelClose');
+  const calcHistoryBtn = document.getElementById('calcHistoryBtn');
+  const calcHistoryPanel = document.getElementById('calcHistoryPanel');
+  const calcHistoryClose = document.getElementById('calcHistoryClose');
+  const calcHistoryList = document.getElementById('calcHistoryList');
+  const calcHistoryEmpty = document.getElementById('calcHistoryEmpty');
+  if (!calcPanel || !calcIframe) return; // блока калькулятора на странице нет — выходим тихо
+
+  let calcResizeTimer = null;
+
+  function openCalc(op) {
+    calcPanel.style.display = 'block';
+    calcPanelTitle.textContent = CALC_OP_META[op].title;
+    calcIframe.style.height = '760px';
+    calcIframe.src = `${CALC_OP_META[op].file}?embed=1`;
+    document.querySelectorAll('.calc-tool-btn[data-op]').forEach(b => b.classList.toggle('active', b.dataset.op === op));
+    calcPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    clearInterval(calcResizeTimer);
+    calcResizeTimer = setInterval(fitCalcIframe, 400);
+  }
+  function fitCalcIframe() {
+    if (!calcIframe || calcPanel.style.display === 'none') { clearInterval(calcResizeTimer); return; }
+    try {
+      const doc = calcIframe.contentWindow && calcIframe.contentWindow.document;
+      if (doc && doc.documentElement) {
+        const h = Math.max(doc.documentElement.scrollHeight, doc.body ? doc.body.scrollHeight : 0);
+        if (h > 0) calcIframe.style.height = (h + 20) + 'px';
+      }
+    } catch (e) { /* кросс-доменные ограничения — оставляем текущую высоту */ }
+  }
+  function closeCalc() {
+    calcPanel.style.display = 'none';
+    calcIframe.src = 'about:blank';
+    clearInterval(calcResizeTimer);
+    document.querySelectorAll('.calc-tool-btn[data-op]').forEach(b => b.classList.remove('active'));
+  }
+  document.querySelectorAll('.calc-tool-btn[data-op]').forEach(btn => {
+    btn.onclick = () => openCalc(btn.dataset.op);
+  });
+  if (calcPanelClose) calcPanelClose.onclick = closeCalc;
+  calcIframe.addEventListener('load', fitCalcIframe);
+
+  /* ─── история решений: копится за всё время, пока открыта страница ─── */
+  let calcHistory = [];
+  let calcHistoryNextId = 1;
+  let calcHistoryFilter = 'all';
+
+  function addCalcHistoryEntry(op, expr, result) {
+    calcHistory.push({ id: calcHistoryNextId++, op, expr, result });
+    if (calcHistoryPanel.style.display === 'block') renderCalcHistory();
+  }
+  function renderCalcHistory() {
+    const items = calcHistoryFilter === 'all' ? calcHistory : calcHistory.filter(h => h.op === calcHistoryFilter);
+    calcHistoryList.innerHTML = '';
+    calcHistoryEmpty.style.display = items.length ? 'none' : 'block';
+    items.slice().reverse().forEach(h => {
+      const row = document.createElement('div');
+      row.className = 'calc-history-row';
+      const num = document.createElement('span');
+      num.className = 'calc-history-num';
+      num.textContent = '№' + h.id;
+      const expr = document.createElement('span');
+      expr.className = 'calc-history-expr';
+      expr.textContent = h.expr;
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'calc-history-copy';
+      copyBtn.textContent = '⧉ ' + h.result;
+      copyBtn.title = 'Скопировать результат';
+      copyBtn.onclick = () => copyCalcResult(h.result, copyBtn);
+      row.appendChild(num);
+      row.appendChild(expr);
+      row.appendChild(copyBtn);
+      calcHistoryList.appendChild(row);
+    });
+  }
+  function copyCalcResult(result, btn) {
+    const done = () => {
+      btn.textContent = '✓ скопировано';
+      setTimeout(() => { btn.textContent = '⧉ ' + result; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(String(result)).then(done).catch(done);
+    } else {
+      done();
+    }
+  }
+  function toggleCalcHistory() {
+    const willOpen = calcHistoryPanel.style.display !== 'block';
+    calcHistoryPanel.style.display = willOpen ? 'block' : 'none';
+    calcHistoryBtn.classList.toggle('active', willOpen);
+    if (willOpen) {
+      renderCalcHistory();
+      calcHistoryPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+  function closeCalcHistory() {
+    calcHistoryPanel.style.display = 'none';
+    calcHistoryBtn.classList.remove('active');
+  }
+  document.querySelectorAll('.calc-history-filter').forEach(btn => {
+    btn.onclick = () => {
+      calcHistoryFilter = btn.dataset.filter;
+      document.querySelectorAll('.calc-history-filter').forEach(b => b.classList.toggle('active', b === btn));
+      renderCalcHistory();
+    };
+  });
+  if (calcHistoryBtn) calcHistoryBtn.onclick = toggleCalcHistory;
+  if (calcHistoryClose) calcHistoryClose.onclick = closeCalcHistory;
+
+  window.addEventListener('message', (e) => {
+    const d = e.data;
+    if (d && d.source === 'oge-calc-history' && d.op && d.expr && d.result !== undefined) {
+      addCalcHistoryEntry(d.op, d.expr, d.result);
+    }
+  });
+})();
+</script>
+
 </body></html>

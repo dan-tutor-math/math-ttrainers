@@ -104,12 +104,14 @@ body{
   min-height:100vh;
   padding:18px 12px 60px;
 }
-.wrap{max-width:760px;margin:0 auto}
+.wrap{max-width:760px;margin:0 auto;position:relative;z-index:1;pointer-events:none}
+.wrap > *{pointer-events:auto}
 h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(26px,5vw,38px);color:var(--pencil);text-align:center;}
 .sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 18px;}
 /* ─── уровни ─── */
 .levels{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px}
-.lvl{font-family:var(--font-ui);font-weight:600;font-size:14px;border:1px solid var(--glass-border);background:var(--glass);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border-radius:999px;padding:8px 16px;cursor:pointer;color:var(--muted-3);transition:all .15s;}
+.lvl{font-family:var(--font-ui);font-weight:600;font-size:14px;border:1px solid var(--glass-border);background:var(--glass);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border-radius:999px;padding:8px 16px;cursor:pointer;color:var(--muted-3);transition:transform .15s, all .15s;}
+.lvl:active{transform:scale(.96)}
 .lvl:hover{border-color:var(--ink)}
 .lvl.active{background:var(--ink);border-color:var(--ink);color:#fff;box-shadow:0 6px 16px var(--hl-35);}
 .lvl .done-mark{color:#FFB800;margin-left:4px;}
@@ -245,14 +247,19 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .keypad button.kp-enter{grid-column:span 3;width:auto;height:38px;font-family:var(--font-ui);font-weight:600;font-size:14px;background:var(--ink);color:#fff;border-color:var(--ink);}
 .keypad button.kp-enter:active{background:var(--ink-active);}
 .keypad-float{position:fixed;top:220px;right:20px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:50;}
-.keypad-close{position:absolute;top:-11px;right:-11px;width:26px;height:26px;border-radius:50%;background:var(--teacher);color:#fff;border:2px solid #fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
-.keypad-toggle{position:fixed;top:220px;right:20px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50;}
+.keypad-close{position:absolute;top:-11px;right:-11px;width:26px;height:26px;border-radius:50%;background:var(--teacher);color:#fff;border:2px solid #fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s;}
+.keypad-close:active{transform:scale(.9)}
+.keypad-drag-handle{position:absolute;top:-11px;left:-11px;width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;border:2px solid #fff;font-size:12px;line-height:1;cursor:grab;display:flex;align-items:center;justify-content:center;touch-action:none;}
+.keypad-drag-handle:active{cursor:grabbing;}
+.keypad-toggle{position:fixed;top:220px;right:20px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50;transition:transform .15s;}
+.keypad-toggle:active{transform:scale(.92)}
 @media(max-width:720px){.keypad-float,.keypad-toggle{top:auto;bottom:16px;right:16px}}
 button.go{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ink);color:#fff;border:none;border-radius:14px;padding:11px 26px;cursor:pointer;box-shadow:0 6px 18px var(--hl-35);}
 button.go:active{transform:scale(.96)}
 .hint{font-family:var(--font-ui);font-weight:500;color:var(--teacher);font-size:15px;margin-top:12px;min-height:20px;line-height:1.4;}
 .hint.good{color:var(--ok)}
-.next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:8px;box-shadow:0 6px 18px var(--ok-shadow);}
+.next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:8px;box-shadow:0 6px 18px var(--ok-shadow);transition:transform .15s;}
+.next-btn:active{transform:scale(.98)}
 /* ─── статистика ─── */
 .stats{
   display:flex;
@@ -302,9 +309,116 @@ button.go:active{transform:scale(.96)}
   .sheet{padding-left:calc(var(--cell)*2)}
 }
 
+/* ─── интерактивная доска на фоне вокруг примера ─── */
+#boardCanvas{position:fixed;top:0;left:0;z-index:2;touch-action:none;cursor:crosshair;border-radius:20px;}
+#boardCanvasBg{position:fixed;top:0;left:0;z-index:0;touch-action:none;cursor:crosshair;}
+#boardSpace{height:0;pointer-events:none;transition:height .2s ease;}
+.board-toolbar{position:fixed;right:18px;bottom:18px;z-index:50;display:flex;gap:8px;align-items:center;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;padding:9px 11px;box-shadow:var(--shadow);}
+.toolbar-sep{width:1px;align-self:stretch;background:var(--glass-border);margin:2px 0;}
+.board-tool-btn{width:34px;height:34px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s, border-color .15s, background .15s;}
+.board-tool-btn:active{transform:scale(.92)}
+.board-tool-btn:hover{border-color:var(--ink);}
+.board-tool-btn.active{background:var(--ink);border-color:var(--ink);}
+.board-tool-btn .dot{border-radius:50%;background:var(--pencil);display:block;}
+.board-tool-btn.active .dot{background:#fff;}
+.board-tool-btn.eraser{font-size:15px;}
+.board-tool-btn.pen-main{font-size:15px;}
+.board-tool-btn.color-btn.active{background:var(--glass);border-color:var(--ink);box-shadow:0 0 0 2px var(--ink);}
+.tool-group{position:relative;}
+/* всплывающее окошко с размерами (для ручки и ластика) — управляется из JS через
+   класс .open, а не через :hover, потому что чистый CSS-hover рвётся, стоит
+   курсору чуть отклониться от прямой линии между кнопкой и окошком */
+.size-flyout{position:absolute;bottom:100%;right:0;margin-bottom:10px;display:none;gap:8px;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;padding:8px;box-shadow:var(--shadow);}
+.size-flyout.open{display:flex;}
+/* невидимый мостик над кнопкой, чтобы курсор не «выпадал» из зоны наведения,
+   пока едет от кнопки к окошку */
+.tool-group::after{content:'';position:absolute;left:0;right:0;bottom:100%;height:14px;}
+
+/* ─── всплывающая палитра для «своего» цвета ─── */
+.board-tool-btn.custom-color-btn{overflow:hidden;}
+.color-picker-flyout{flex-direction:column;align-items:stretch;width:200px;padding:12px;gap:10px;}
+.cp-sv-wrap{position:relative;width:100%;height:120px;border-radius:12px;overflow:hidden;cursor:crosshair;touch-action:none;}
+.cp-sv{display:block;width:100%;height:100%;}
+.cp-sv-thumb{position:absolute;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35),0 1px 3px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none;top:0;left:0;}
+.cp-row{display:flex;align-items:center;gap:8px;}
+.cp-eyedropper{width:28px;height:28px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--pencil);transition:transform .15s;}
+.cp-eyedropper:active{transform:scale(.9)}
+.cp-eyedropper:hover{border-color:var(--ink);}
+.cp-swatch{width:26px;height:26px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);box-shadow:inset 0 0 0 2px rgba(255,255,255,.5);}
+.cp-hue-wrap{position:relative;flex:1;height:16px;touch-action:none;}
+.cp-hue{position:absolute;inset:0;border-radius:8px;background:linear-gradient(to right,#ff0000,#ffff00,#00ff00,#00ffff,#0000ff,#ff00ff,#ff0000);cursor:pointer;}
+.cp-hue-thumb{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35),0 1px 3px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none;}
+.cp-rgb-row{display:flex;gap:6px;}
+.cp-field{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;}
+.cp-field input{width:100%;box-sizing:border-box;text-align:center;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);color:var(--pencil);font-family:var(--font-mono);font-size:12px;padding:5px 2px;}
+.cp-field label{font-size:10px;color:var(--muted-3);font-family:var(--font-ui);}
+
+.board-view-toolbar{position:fixed;left:18px;bottom:18px;z-index:50;display:flex;gap:8px;align-items:center;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;padding:9px 11px;box-shadow:var(--shadow);}
+.board-zoom-label{min-width:44px;height:34px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-3);padding:0 6px;transition:transform .15s;}
+.board-zoom-label:active{transform:scale(.92)}
+.board-zoom-label:hover{border-color:var(--ink);}
+.board-tool-btn.hand-tool{font-size:16px;}
+.board-tool-btn.clear-btn{font-size:15px;}
+
+/* ─── доска изначально выключена — включается отдельной кнопкой под переключателем темы ─── */
+html:not([data-board="on"]) #boardCanvas,
+html:not([data-board="on"]) #boardCanvasBg,
+html:not([data-board="on"]) .board-toolbar,
+html:not([data-board="on"]) .board-view-toolbar{display:none;}
+html[data-board="on"] #boardSpace{height:72vh;transition:height .32s ease;}
+/* при свёрнутых подсказках место под алгоритмами/счётчиками освобождается — отдаём его доске */
+html[data-board="on"][data-focus="on"] #boardSpace{height:90vh;}
+html[data-board="on"] body{background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    var(--bg);}
+
+/* ─── свернуть подсказки: освобождает место для записи на доске ─── */
+.focus-toggle{position:fixed;top:160px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
+.focus-toggle:hover{border-color:var(--ink)}
+.focus-toggle:active{transform:scale(.92)}
+
+/* ─── аккуратное сворачивание: max-height/opacity вместо мгновенного display:none ─── */
+h1,.sub,.levels,.theory,.stats,.hint{overflow:hidden;min-height:0;transition:max-height .32s ease, opacity .22s ease, margin .32s ease;}
+h1{max-height:64px}
+.sub{max-height:50px}
+/* .levels{max-height:Npx} было мало на очень узких экранах — карточки уровней
+   переносятся на 3+ строки, и низ списка обрезался. У division.html 9 уровней
+   с более длинными подписями, чем у большинства других файлов — общий "щедрый"
+   набор ступеней (как у quadratic.html) тут ВСЁ РАВНО оказался мал, поэтому
+   здесь отдельные, ещё более высокие значения, измеренные реальным рендером. */
+.levels{max-height:160px}
+@media(max-width:650px){.levels{max-height:220px}}
+@media(max-width:480px){.levels{max-height:270px}}
+@media(max-width:400px){.levels{max-height:320px}}
+@media(max-width:340px){.levels{max-height:360px}}
+.theory{max-height:602px}
+/* самые узкие экраны (~320-340px) переносят текст теории ещё сильнее — измерено реальным рендером, с запасом */
+@media(max-width:420px){.theory{max-height:1150px}}
+.stats{max-height:90px}
+.hint{max-height:50px}
+html[data-focus="on"] h1,
+html[data-focus="on"] .sub,
+html[data-focus="on"] .levels,
+html[data-focus="on"] .theory,
+html[data-focus="on"] .stats,
+html[data-focus="on"] .hint{
+  max-height:0;
+  min-height:0;
+  padding:0;
+  border-width:0;
+  opacity:0;
+  margin-top:0;
+  margin-bottom:0;
+  pointer-events:none;
+}
+
 .theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
 .theme-toggle:hover{border-color:var(--ink)}
 .theme-toggle:active{transform:scale(.92)}
+.board-visibility-toggle{top:64px;transition:transform .15s;}
+.board-visibility-toggle:active{transform:scale(.92)}
+.board-visibility-toggle.active{background:var(--ink);border-color:var(--ink);color:#fff;}
 .home-btn{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
 .home-btn:hover{border-color:var(--ink)}
 .home-btn:active{transform:scale(.92)}
@@ -313,6 +427,7 @@ button.go:active{transform:scale(.96)}
 <body>
 <a class="home-btn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
 <button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<button class="theme-toggle board-visibility-toggle" id="boardVisibilityToggle" title="Показать доску" aria-label="Показать/скрыть доску">🖊️</button>
 <script>(function(){
   var btn=document.getElementById('themeToggle');
   function apply(t, persist){
@@ -337,6 +452,104 @@ button.go:active{transform:scale(.96)}
     else if (mq.addListener) mq.addListener(onSystemChange);
   }
 })();</script>
+<script>(function(){
+  var btn = document.getElementById('boardVisibilityToggle');
+  function apply(on){
+    document.documentElement.setAttribute('data-board', on ? 'on' : 'off');
+    btn.classList.toggle('active', on);
+    btn.title = on ? 'Скрыть доску' : 'Показать доску';
+  }
+  apply(false); // доска изначально выключена
+  btn.addEventListener('click', function(){
+    apply(document.documentElement.getAttribute('data-board') !== 'on');
+  });
+})();</script>
+
+<!-- кнопка "свернуть подсказки" намеренно лежит здесь, СНАРУЖИ .wrap, а не внутри
+     него: у .wrap свой контекст наложения (нужен для доски), и любой position:fixed
+     элемент ВНУТРИ .wrap не смог бы пробиться выше #boardCanvas по z-index -->
+<button class="focus-toggle" id="focusToggle" title="Свернуть подсказки" aria-label="Свернуть/показать подсказки и алгоритм">⛶</button>
+  <script>(function(){
+    var btn = document.getElementById('focusToggle');
+    function apply(on){
+      document.documentElement.setAttribute('data-focus', on ? 'on' : 'off');
+      btn.title = on ? 'Показать подсказки' : 'Свернуть подсказки';
+    }
+    apply(false);
+    btn.addEventListener('click', function(){
+      apply(document.documentElement.getAttribute('data-focus') !== 'on');
+    });
+  })();</script>
+
+
+<canvas id="boardCanvasBg"></canvas>
+<canvas id="boardCanvas"></canvas>
+<div class="board-toolbar" id="boardToolbar">
+  <div class="tool-group">
+    <button class="board-tool-btn pen-main active" data-tool="pen" title="Ручка">✏️</button>
+    <div class="size-flyout">
+      <button class="board-tool-btn" data-tool="pen" data-width="1" title="Самая тонкая"><span class="dot" style="width:4px;height:4px"></span></button>
+      <button class="board-tool-btn active" data-tool="pen" data-width="2" title="Тонкая"><span class="dot" style="width:6px;height:6px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="3" title="Тонкая+"><span class="dot" style="width:8px;height:8px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="4" title="Средняя"><span class="dot" style="width:11px;height:11px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="6" title="Средняя+"><span class="dot" style="width:15px;height:15px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="9" title="Толстая"><span class="dot" style="width:20px;height:20px"></span></button>
+    </div>
+  </div>
+  <span class="toolbar-sep"></span>
+  <button class="board-tool-btn color-btn active" data-color="#000000" title="Чёрный"><span class="dot" style="width:14px;height:14px;background:#000000"></span></button>
+  <button class="board-tool-btn color-btn" data-color="#FF3B30" title="Красный"><span class="dot" style="width:14px;height:14px;background:#FF3B30"></span></button>
+  <button class="board-tool-btn color-btn" data-color="#0A84FF" title="Синий"><span class="dot" style="width:14px;height:14px;background:#0A84FF"></span></button>
+  <div class="tool-group">
+    <button class="board-tool-btn color-btn custom-color-btn" data-color="#AF52DE" title="Свой цвет" id="customColorBtn">
+      <span class="dot custom-color-dot" id="customColorDot" style="width:16px;height:16px;background:conic-gradient(from 180deg,#ff0000,#ffff00,#00ff00,#00ffff,#0000ff,#ff00ff,#ff0000)"></span>
+    </button>
+    <div class="size-flyout color-picker-flyout">
+      <div class="cp-sv-wrap">
+        <canvas id="cpSvCanvas" class="cp-sv" width="176" height="120"></canvas>
+        <div class="cp-sv-thumb" id="cpSvThumb"></div>
+      </div>
+      <div class="cp-row">
+        <button class="cp-eyedropper" id="cpEyedropper" title="Пипетка — взять цвет с экрана" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19.2 3.8a2.7 2.7 0 0 1 0 3.8l-1.4 1.4-3.8-3.8L15.4 3.8a2.7 2.7 0 0 1 3.8 0Z" fill="currentColor"></path>
+            <path d="M12.6 6.6l3.8 3.8L6 20.8l-4 1 1-4L12.6 6.6Z" fill="currentColor"></path>
+          </svg>
+        </button>
+        <div class="cp-swatch" id="cpSwatch"></div>
+        <div class="cp-hue-wrap">
+          <div class="cp-hue" id="cpHue"></div>
+          <div class="cp-hue-thumb" id="cpHueThumb"></div>
+        </div>
+      </div>
+      <div class="cp-rgb-row">
+        <div class="cp-field"><input type="text" inputmode="numeric" maxlength="3" id="cpR" value="0"><label>R</label></div>
+        <div class="cp-field"><input type="text" inputmode="numeric" maxlength="3" id="cpG" value="0"><label>G</label></div>
+        <div class="cp-field"><input type="text" inputmode="numeric" maxlength="3" id="cpB" value="0"><label>B</label></div>
+      </div>
+    </div>
+  </div>
+  <span class="toolbar-sep"></span>
+  <button class="board-tool-btn" data-tool="line" title="Прямая линия">╱</button>
+  <div class="tool-group">
+    <button class="board-tool-btn eraser" data-tool="eraser" title="Ластик">🧽</button>
+    <div class="size-flyout">
+      <button class="board-tool-btn" data-tool="eraser" data-size="14" title="Маленький ластик"><span class="dot" style="width:6px;height:6px"></span></button>
+      <button class="board-tool-btn" data-tool="eraser" data-size="26" title="Средний ластик"><span class="dot" style="width:10px;height:10px"></span></button>
+      <button class="board-tool-btn" data-tool="eraser" data-size="44" title="Большой ластик"><span class="dot" style="width:16px;height:16px"></span></button>
+    </div>
+  </div>
+</div>
+
+<div class="board-view-toolbar" id="boardViewToolbar">
+  <button class="board-tool-btn" id="zoomOutBtn" title="Уменьшить">−</button>
+  <button class="board-zoom-label" id="zoomResetBtn" title="Сбросить вид">100%</button>
+  <button class="board-tool-btn" id="zoomInBtn" title="Увеличить">+</button>
+  <span class="toolbar-sep"></span>
+  <button class="board-tool-btn hand-tool" data-tool="hand" title="Рука — перемещать доску">✋</button>
+  <button class="board-tool-btn clear-btn" id="clearBoardBtn" title="Стереть всё">🗑️</button>
+</div>
+
 <div class="wrap">
   <h1>Деление в столбик</h1>
   <div class="sub">решаем по шагам, как в тетради — с проверкой каждого действия</div>
@@ -380,6 +593,7 @@ button.go:active{transform:scale(.96)}
 
   <button class="keypad-toggle" id="kpToggle" title="Показать клавиатуру" style="display:none">⌨</button>
   <div class="keypad-float" id="keypadFloat" style="display:none">
+    <button class="keypad-drag-handle" id="kpDragHandle" title="Перетащить клавиатуру" aria-label="Переместить клавиатуру">✋</button>
     <button class="keypad-close" id="kpClose" title="Скрыть клавиатуру">✕</button>
     <div class="keypad" id="keypadButtons"></div>
   </div>
@@ -415,7 +629,7 @@ button.go:active{transform:scale(.96)}
       <div class="ttrap">⚠ Цифры кончились, а остаток есть? Ставим в частном <b>запятую</b>, сносим ноль и делим дальше — получится десятичная дробь.</div>
     </div>
   </div>
-</div>
+<div id="boardSpace" aria-hidden="true"></div></div>
 
 <script>
 /* ───────────── уровни ───────────── */
@@ -656,12 +870,49 @@ function hintFor(ans){
   }
 }
 
+/* ───────── ввод ответа словами: "тридцать четыре" наравне с "34" ───────── */
+function parseRuNumber(raw){
+  if(raw==null) return NaN;
+  const s=String(raw).trim();
+  if(s==='') return NaN;
+  const plain=s.replace(',','.');
+  if(/^[+-]?\d+(\.\d+)?$/.test(plain)) return Number(plain);
+  return parseRuNumberWords(s);
+}
+function parseRuNumberWords(raw){
+  let s=raw.toLowerCase().replace(/ё/g,'е').replace(/[-−–]/g,' ').replace(/\s+/g,' ').trim();
+  if(s==='') return NaN;
+  let negative=false;
+  if(/^минус\s+/.test(s)){ negative=true; s=s.replace(/^минус\s+/,''); }
+  else if(s==='минус') return NaN;
+  const words=s.split(' ').filter(Boolean);
+  if(!words.length) return NaN;
+  const ones={ноль:0,один:1,одна:1,одно:1,два:2,две:2,три:3,четыре:4,пять:5,шесть:6,семь:7,восемь:8,девять:9,
+    десять:10,одиннадцать:11,двенадцать:12,тринадцать:13,четырнадцать:14,пятнадцать:15,шестнадцать:16,семнадцать:17,восемнадцать:18,девятнадцать:19};
+  const tens={двадцать:20,тридцать:30,сорок:40,пятьдесят:50,шестьдесят:60,семьдесят:70,восемьдесят:80,девяносто:90};
+  const hundreds={сто:100,двести:200,триста:300,четыреста:400,пятьсот:500,шестьсот:600,семьсот:700,восемьсот:800,девятьсот:900};
+  const thousandWords=new Set(['тысяча','тысячи','тысяч']);
+  const millionWords=new Set(['миллион','миллиона','миллионов']);
+  let total=0, current=0, matched=false;
+  for(const w of words){
+    if(w in hundreds){ current+=hundreds[w]; matched=true; continue; }
+    if(w in tens){ current+=tens[w]; matched=true; continue; }
+    if(w in ones){ current+=ones[w]; matched=true; continue; }
+    if(thousandWords.has(w)){ total+=(current||1)*1000; current=0; matched=true; continue; }
+    if(millionWords.has(w)){ total+=(current||1)*1000000; current=0; matched=true; continue; }
+    return NaN;
+  }
+  total+=current;
+  if(!matched) return NaN;
+  return negative?-total:total;
+}
+
 /* ───────────── логика шагов ───────────── */
 function submit(){
   if(S.phase==='done') return;
   const input = document.getElementById('ans');
   if(input.value==='') return;
-  const ans = Number(input.value);
+  const ans = parseRuNumber(input.value);
   const exp = expected();
 
   if(ans !== exp){
@@ -961,6 +1212,51 @@ function setupFloatingKeypad(){
   });
   document.getElementById('kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(); };
   document.getElementById('kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(); };
+  makeKeypadDraggable(document.getElementById('keypadFloat'), document.getElementById('kpDragHandle'));
+}
+function makeKeypadDraggable(floatEl, handleEl){
+  if(!floatEl || !handleEl || floatEl._dragReady) return;
+  floatEl._dragReady = true;
+  let dragging = false, offsetX = 0, offsetY = 0;
+  function clamp(x, y){
+    const w = floatEl.offsetWidth, h = floatEl.offsetHeight;
+    const maxX = Math.max(4, window.innerWidth - w - 4);
+    const maxY = Math.max(4, window.innerHeight - h - 4);
+    return { x: Math.min(Math.max(x, 4), maxX), y: Math.min(Math.max(y, 4), maxY) };
+  }
+  function onPointerDown(e){
+    dragging = true;
+    const rect = floatEl.getBoundingClientRect();
+    floatEl.style.left = rect.left + 'px';
+    floatEl.style.top = rect.top + 'px';
+    floatEl.style.right = 'auto';
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    try{ handleEl.setPointerCapture(e.pointerId); }catch(err){}
+    e.preventDefault();
+  }
+  function onPointerMove(e){
+    if(!dragging) return;
+    const pos = clamp(e.clientX - offsetX, e.clientY - offsetY);
+    floatEl.style.left = pos.x + 'px';
+    floatEl.style.top = pos.y + 'px';
+  }
+  function onPointerUp(e){
+    dragging = false;
+    try{ handleEl.releasePointerCapture(e.pointerId); }catch(err){}
+  }
+  handleEl.addEventListener('pointerdown', onPointerDown);
+  handleEl.addEventListener('pointermove', onPointerMove);
+  handleEl.addEventListener('pointerup', onPointerUp);
+  handleEl.addEventListener('pointercancel', onPointerUp);
+  window.addEventListener('resize', ()=>{
+    if(floatEl.style.left && floatEl.style.left!=='auto'){
+      const rect = floatEl.getBoundingClientRect();
+      const pos = clamp(rect.left, rect.top);
+      floatEl.style.left = pos.x + 'px';
+      floatEl.style.top = pos.y + 'px';
+    }
+  });
 }
 function keypadPress(ch){
   if(ch==='enter'){
@@ -1000,6 +1296,798 @@ newProblem();
       setTimeout(()=>{ const bt = document.getElementById('customToggle'); if(bt) bt.click(); }, 0);
     }
   }catch(e){}
+})();
+</script>
+
+<script>
+/* ─── плавная посадка блоков при изменении высоты .panel/.sheet ───
+   Раньше при появлении подсказки/кнопки "дальше" панель ввода мгновенно
+   скачком меняла высоту, а всё что ниже (статистика, теория) так же
+   мгновенно дёргалось следом — расстояния оставались верными, но сам
+   скачок выглядел "криво". ResizeObserver ловит ЛЮБОЕ изменение высоты
+   независимо от того, какая функция его вызвала, и вместо мгновенного
+   скачка красиво анимирует высоту — весь интерфейс ниже плавно
+   "съезжает" на новое место, сохраняя одинаковый отступ всегда. */
+function setupAutoHeightAnimation(el, duration){
+  if(!el || typeof ResizeObserver==='undefined') return;
+  duration = duration || 280;
+  let lastH = null, resizing = false, settleTimer = null;
+  const ro = new ResizeObserver(entries=>{
+    if(resizing) return;
+    const entry = entries[0];
+    const cs = getComputedStyle(el);
+    const newH = (entry.borderBoxSize && entry.borderBoxSize[0])
+      ? entry.borderBoxSize[0].blockSize
+      : entry.contentRect.height + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    if(lastH===null){ lastH=newH; return; }
+    if(Math.abs(newH-lastH)<1) return;
+    const oldH = lastH;
+    lastH = newH;
+    resizing = true;
+    el.style.height = oldH+'px';
+    el.style.overflow = 'hidden';
+    void el.offsetHeight;
+    el.style.transition = 'height '+duration+'ms cubic-bezier(.4,0,.2,1)';
+    requestAnimationFrame(()=>{ el.style.height = newH+'px'; });
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(()=>{
+      el.style.transition = '';
+      el.style.height = '';
+      el.style.overflow = '';
+      resizing = false;
+      lastH = el.getBoundingClientRect().height;
+    }, duration+50);
+  });
+  ro.observe(el);
+}
+const PANEL_ANIM_SELECTOR = '.panel:not(.calc-history-panel):not(.calc-panel):not(.example-history-panel):not(.coming-soon):not(.theory-block)';
+document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimation(p));
+setupAutoHeightAnimation(document.getElementById('mainSheet'));
+</script>
+
+<script>
+/* ═══════════════ интерактивная доска на фоне ═══════════════ */
+(function(){
+  const canvas = document.getElementById('boardCanvas');
+  const ctx = canvas.getContext('2d');
+  // отдельный оффскрин-слой только для чернил: ластик (destination-out) стирает
+  // содержимое ТОЛЬКО этого слоя, а сетка рисуется отдельно на основном холсте
+  // и затем чернила накладываются сверху обычным source-over — так ластик
+  // больше не «прогрызает» дыры в клетчатой сетке
+  const inkCanvas = document.createElement('canvas');
+  const inkCtx = inkCanvas.getContext('2d');
+
+  // второй, независимый холст — «фон»: лежит на всю страницу НИЖЕ обычного
+  // контента (z-index:-1 в CSS), поэтому карточки задания перекрывают его
+  // собой, а свободное место вокруг них доступно для рисования
+  const canvasBg = document.getElementById('boardCanvasBg');
+  const ctxBg = canvasBg.getContext('2d');
+  const inkCanvasBg = document.createElement('canvas');
+  const inkCtxBg = inkCanvasBg.getContext('2d');
+
+  const toolbar = document.getElementById('boardToolbar');
+  const zoomResetBtn = document.getElementById('zoomResetBtn');
+
+  // ═══ модель данных: штрихи хранятся в «мировых» координатах (=координаты
+  // документа, как обычный page-scroll), а не в пикселях экрана. Холст же —
+  // это просто окно viewport-размера, которое на каждый кадр перерисовывает
+  // видимый кусок этого мира с учётом прокрутки страницы, панорамирования
+  // и масштаба. Так рисунок всегда остаётся «приклеен» к странице, а зум
+  // по-настоящему приближает/отдаляет содержимое, а не просто холст. ═══
+
+  let tool = 'pen';          // 'pen' | 'eraser' | 'line' | 'hand'
+  let penWidth = 2;          // тонкая по умолчанию
+  let penColor = '#000000';  // чёрный по умолчанию
+  let eraserSize = 26;       // средний ластик по умолчанию
+  let dpr = Math.max(1, window.devicePixelRatio || 1);
+
+  let strokes = [];          // завершённые штрихи: {tool,color,width,points:[{x,y}...]}
+  let currentStroke = null;  // штрих, который рисуется прямо сейчас (для живого превью)
+  const UNDO_LIMIT = 60;
+  const undoStack = [];      // снимки массива strokes (лёгкие — это просто точки, не пиксели)
+
+  // ── масштаб и панорамирование (в локальных пикселях листа) ──
+  let viewScale = 1, panX = 0, panY = 0;
+  const ZOOM_MIN = 0.5, ZOOM_MAX = 3, ZOOM_STEP = 1.2;
+
+  // ── доска пишет строго поверх «тетрадного листа» примера (.sheet), а не
+  // поверх всей страницы: холст каждый кадр подгоняется под текущий
+  // getBoundingClientRect() этого листа, поэтому локальные координаты —
+  // это просто пиксели внутри листа, без поправки на прокрутку страницы ──
+  let boardTarget = null;
+  function resolveBoardTarget(){
+    // первая рабочая зона доски — всегда именно тетрадный лист примера (.sheet),
+    // независимо от режима фокуса; вторая зона (фон) обслуживается отдельным
+    // холстом ниже и в этот выбор не входит
+    const sheets = [...document.querySelectorAll('.sheet')];
+    for (const el of sheets) if (el.offsetParent !== null) return el;
+    const fallbacks = [document.getElementById('mainPanel'), document.getElementById('taskArea'), document.querySelector('.panel')];
+    for (const el of fallbacks) if (el && el.offsetParent !== null) return el;
+    return null;
+  }
+
+  function worldToScreenTransform(){
+    const s = viewScale * dpr;
+    return [s, 0, 0, s, -panX * s, -panY * s];
+  }
+  function screenToWorld(clientX, clientY){
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: (clientX - rect.left) / viewScale + panX,
+      y: (clientY - rect.top) / viewScale + panY,
+    };
+  }
+
+  function resizeCanvas(){
+    dpr = Math.max(1, window.devicePixelRatio || 1);
+    syncBoardTarget();
+    redraw();
+  }
+
+  // ── синхронизирует размер/положение холста с текущим прямоугольником
+  // листа; вызывается каждый кадр, пока доска включена, — так холст сам
+  // следует за прокруткой страницы, ресайзом окна и ростом листа (например,
+  // когда в столбик дописывается новая строка) ──
+  function syncBoardTarget(){
+    const el = resolveBoardTarget();
+    boardTarget = el;
+    if (!el) { canvas.style.display = 'none'; return false; }
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) { canvas.style.display = 'none'; return false; }
+    canvas.style.display = '';
+    canvas.style.left = rect.left + 'px';
+    canvas.style.top = rect.top + 'px';
+    const w = Math.round(rect.width), h = Math.round(rect.height);
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    const pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+    if (canvas.width !== pw || canvas.height !== ph) {
+      canvas.width = pw;
+      canvas.height = ph;
+      inkCanvas.width = pw;
+      inkCanvas.height = ph;
+    }
+    return true;
+  }
+
+  function drawStroke(targetCtx, s){
+    if (!s || s.points.length === 0) return;
+    targetCtx.save();
+    targetCtx.globalCompositeOperation = (s.tool === 'eraser') ? 'destination-out' : 'source-over';
+    targetCtx.strokeStyle = s.color || '#000';
+    targetCtx.lineWidth = s.width;
+    targetCtx.lineCap = 'round';
+    targetCtx.lineJoin = 'round';
+    const pts = s.points;
+    targetCtx.beginPath();
+    if (pts.length === 1) {
+      // одиночная точка — рисуем короткий отрезок «на месте»
+      const p = pts[0];
+      targetCtx.moveTo(p.x, p.y);
+      targetCtx.lineTo(p.x + 0.01, p.y + 0.01);
+    } else if (pts.length === 2) {
+      // ровно 2 точки — это либо инструмент «линия» (должна остаться идеально
+      // прямой), либо очень короткий росчерк, где сглаживать нечего
+      targetCtx.moveTo(pts[0].x, pts[0].y);
+      targetCtx.lineTo(pts[1].x, pts[1].y);
+    } else {
+      // сглаживание через квадратичные кривые по серединам отрезков —
+      // стандартный приём для рисования от руки: убирает «углы» на изломах,
+      // не требуя менять сами записанные точки
+      targetCtx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length - 1; i++) {
+        const midX = (pts[i].x + pts[i + 1].x) / 2;
+        const midY = (pts[i].y + pts[i + 1].y) / 2;
+        targetCtx.quadraticCurveTo(pts[i].x, pts[i].y, midX, midY);
+      }
+      const last = pts[pts.length - 1];
+      const prev = pts[pts.length - 2];
+      targetCtx.quadraticCurveTo(prev.x, prev.y, last.x, last.y);
+    }
+    targetCtx.stroke();
+    targetCtx.restore();
+  }
+
+  let redrawScheduled = false;
+
+  function redraw(){
+    if (redrawScheduled) return;
+    redrawScheduled = true;
+    requestAnimationFrame(()=>{
+      redrawScheduled = false;
+      if (!boardTarget) return;
+      const m = worldToScreenTransform();
+
+      // чернила рисуются на отдельном слое (чтобы ластик стирал только их),
+      // а затем накладываются на основной холст обычным source-over —
+      // свою сетку холст больше не рисует: клетка — это фон самого .sheet,
+      // доска лишь пишет поверх него прозрачным слоем
+      inkCtx.save();
+      inkCtx.setTransform(1, 0, 0, 1, 0, 0);
+      inkCtx.clearRect(0, 0, inkCanvas.width, inkCanvas.height);
+      inkCtx.restore();
+      inkCtx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+      for (const s of strokes) drawStroke(inkCtx, s);
+      if (currentStroke) drawStroke(inkCtx, currentStroke);
+
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+      ctx.drawImage(inkCanvas, 0, 0);
+    });
+  }
+
+  function pushUndo(surface){
+    undoStack.push({ surface, data: (surface === 'bg' ? bgStrokes : strokes).slice() });
+    if (undoStack.length > UNDO_LIMIT) undoStack.shift();
+  }
+  function undo(){
+    // общий стек на обе поверхности: Ctrl+Z отменяет последнее действие,
+    // где бы оно ни произошло — на листе или на фоне
+    if (undoStack.length === 0) return;
+    const entry = undoStack.pop();
+    if (entry.surface === 'bg') { bgStrokes = entry.data; redrawBg(); }
+    else { strokes = entry.data; redraw(); }
+  }
+  function clearBoard(){
+    pushUndo('sheet');
+    strokes = [];
+    pushUndo('bg');
+    bgStrokes = [];
+    redraw();
+    redrawBg();
+  }
+
+  // ── панорамирование: средняя ИЛИ правая кнопка мыши, ИЛИ инструмент «рука» + левая кнопка ──
+  let panning = false;
+  let panStartClientX = 0, panStartClientY = 0, panStartPanX = 0, panStartPanY = 0;
+
+  function startPan(e){
+    panning = true;
+    try { canvas.setPointerCapture(e.pointerId); } catch(_){}
+    panStartClientX = e.clientX; panStartClientY = e.clientY;
+    panStartPanX = panX; panStartPanY = panY;
+    updateCursor();
+  }
+  function updateCursor(){
+    canvas.style.cursor = panning ? 'grabbing' : (tool === 'hand' ? 'grab' : 'crosshair');
+    canvasBg.style.cursor = bgPanning ? 'grabbing' : (tool === 'hand' ? 'grab' : 'crosshair');
+  }
+
+  let drawing = false;
+
+  canvas.addEventListener('contextmenu', e=> e.preventDefault()); // правая кнопка теперь двигает доску, а не открывает системное меню
+  canvas.addEventListener('pointerdown', e=>{
+    if (e.button === 1 || e.button === 2) { startPan(e); e.preventDefault(); return; } // средняя ИЛИ правая кнопка — панорамирование
+    if (tool === 'hand') {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      startPan(e); e.preventDefault(); return;
+    }
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+    drawing = true;
+    try { canvas.setPointerCapture(e.pointerId); } catch(_){}
+    pushUndo('sheet');
+    const p = screenToWorld(e.clientX, e.clientY);
+    if (tool === 'line') {
+      currentStroke = { tool: 'line', color: penColor, width: penWidth, points: [p, p] };
+    } else if (tool === 'eraser') {
+      currentStroke = { tool: 'eraser', width: eraserSize, points: [p] };
+    } else {
+      currentStroke = { tool: 'pen', color: penColor, width: penWidth, points: [p] };
+    }
+    redraw();
+    e.preventDefault();
+  });
+
+  canvas.addEventListener('pointermove', e=>{
+    if (panning) {
+      panX = panStartPanX - (e.clientX - panStartClientX) / viewScale;
+      panY = panStartPanY - (e.clientY - panStartClientY) / viewScale;
+      redraw();
+      e.preventDefault();
+      return;
+    }
+    if (!drawing || !currentStroke) return;
+    if (tool === 'line') {
+      const p = screenToWorld(e.clientX, e.clientY);
+      currentStroke.points[1] = p; // линия — всегда ровно 2 точки: старт и текущая
+    } else {
+      // getCoalescedEvents() восстанавливает промежуточные точки, которые браузер
+      // «схлопнул» при быстром движении мыши/пера — это повышает эффективную
+      // частоту дискретизации и вместе со сглаживанием в drawStroke() даёт
+      // заметно менее угловатую линию
+      const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+      const list = events.length ? events : [e];
+      for (const ev of list) {
+        const p = screenToWorld(ev.clientX, ev.clientY);
+        currentStroke.points.push(p);
+      }
+    }
+    redraw();
+    e.preventDefault();
+  });
+
+  function endStroke(e){
+    if (panning) {
+      panning = false;
+      try { canvas.releasePointerCapture(e.pointerId); } catch(_){}
+      updateCursor();
+      return;
+    }
+    if (!drawing) return;
+    drawing = false;
+    if (currentStroke) {
+      // на случай, если pointerup пришёл без предшествующего pointermove
+      // ровно в этой точке — досчитываем финальную позицию по самому событию
+      if (typeof e.clientX === 'number') {
+        const p = screenToWorld(e.clientX, e.clientY);
+        if (tool === 'line') currentStroke.points[1] = p;
+        else currentStroke.points.push(p);
+      }
+      strokes.push(currentStroke);
+      currentStroke = null;
+    }
+    try { canvas.releasePointerCapture(e.pointerId); } catch(_){}
+    redraw();
+  }
+  canvas.addEventListener('pointerup', endStroke);
+  canvas.addEventListener('pointercancel', endStroke);
+
+  /* ─────────────── вторая зона доски: фон (вся страница) ───────────────
+     координаты «мировые» — как обычная прокрутка страницы, — поэтому
+     рисунок остаётся «приклеен» к странице при скролле; здесь же живут
+     полноценные панорамирование и масштаб (кнопки +/− в тулбаре) */
+
+  let bgStrokes = [];
+  let bgCurrentStroke = null;
+  let bgViewScale = 1, bgPanX = 0, bgPanY = 0;
+  const BG_GRID = 24; // px — совпадает с шагом клетки основного дизайна (--grid)
+
+  function bgWorldToScreenTransform(){
+    const s = bgViewScale * dpr;
+    return [s, 0, 0, s, -(bgPanX + window.scrollX) * s, -(bgPanY + window.scrollY) * s];
+  }
+  function bgScreenToWorld(clientX, clientY){
+    return {
+      x: clientX / bgViewScale + bgPanX + window.scrollX,
+      y: clientY / bgViewScale + bgPanY + window.scrollY,
+    };
+  }
+
+  function resizeBgCanvas(){
+    dpr = Math.max(1, window.devicePixelRatio || 1);
+    const w = window.innerWidth, h = window.innerHeight;
+    canvasBg.style.width = w + 'px';
+    canvasBg.style.height = h + 'px';
+    const pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+    if (canvasBg.width !== pw || canvasBg.height !== ph) {
+      canvasBg.width = pw;
+      canvasBg.height = ph;
+      inkCanvasBg.width = pw;
+      inkCanvasBg.height = ph;
+    }
+    redrawBg();
+  }
+
+  function drawBgGrid(){
+    const topLeft = bgScreenToWorld(0, 0);
+    const bottomRight = bgScreenToWorld(window.innerWidth, window.innerHeight);
+    const gridColor = (getComputedStyle(document.documentElement).getPropertyValue('--grid') || '#dfe6f3').trim() || '#dfe6f3';
+    const startX = Math.floor(topLeft.x / BG_GRID) * BG_GRID;
+    const startY = Math.floor(topLeft.y / BG_GRID) * BG_GRID;
+    ctxBg.strokeStyle = gridColor;
+    ctxBg.lineWidth = 1 / bgViewScale;
+    ctxBg.beginPath();
+    for (let x = startX; x <= bottomRight.x; x += BG_GRID) { ctxBg.moveTo(x, topLeft.y); ctxBg.lineTo(x, bottomRight.y); }
+    for (let y = startY; y <= bottomRight.y; y += BG_GRID) { ctxBg.moveTo(topLeft.x, y); ctxBg.lineTo(bottomRight.x, y); }
+    ctxBg.stroke();
+  }
+
+  let bgRedrawScheduled = false;
+  function redrawBg(){
+    if (bgRedrawScheduled) return;
+    bgRedrawScheduled = true;
+    requestAnimationFrame(()=>{
+      bgRedrawScheduled = false;
+      const m = bgWorldToScreenTransform();
+
+      inkCtxBg.save();
+      inkCtxBg.setTransform(1, 0, 0, 1, 0, 0);
+      inkCtxBg.clearRect(0, 0, inkCanvasBg.width, inkCanvasBg.height);
+      inkCtxBg.restore();
+      inkCtxBg.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+      for (const s of bgStrokes) drawStroke(inkCtxBg, s);
+      if (bgCurrentStroke) drawStroke(inkCtxBg, bgCurrentStroke);
+
+      ctxBg.setTransform(1, 0, 0, 1, 0, 0);
+      ctxBg.clearRect(0, 0, canvasBg.width, canvasBg.height);
+      ctxBg.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
+      drawBgGrid();
+      ctxBg.setTransform(1, 0, 0, 1, 0, 0);
+      ctxBg.drawImage(inkCanvasBg, 0, 0);
+    });
+  }
+
+  // ── панорамирование фона: средняя/правая кнопка мыши, ИЛИ «рука» + левая ──
+  let bgPanning = false;
+  let bgPanStartClientX = 0, bgPanStartClientY = 0, bgPanStartPanX = 0, bgPanStartPanY = 0;
+
+  function startBgPan(e){
+    bgPanning = true;
+    try { canvasBg.setPointerCapture(e.pointerId); } catch(_){}
+    bgPanStartClientX = e.clientX; bgPanStartClientY = e.clientY;
+    bgPanStartPanX = bgPanX; bgPanStartPanY = bgPanY;
+    updateCursor();
+  }
+
+  let bgDrawing = false;
+
+  canvasBg.addEventListener('contextmenu', e=> e.preventDefault());
+  canvasBg.addEventListener('pointerdown', e=>{
+    if (e.button === 1 || e.button === 2) { startBgPan(e); e.preventDefault(); return; }
+    if (tool === 'hand') {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      startBgPan(e); e.preventDefault(); return;
+    }
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+
+    bgDrawing = true;
+    try { canvasBg.setPointerCapture(e.pointerId); } catch(_){}
+    pushUndo('bg');
+    const p = bgScreenToWorld(e.clientX, e.clientY);
+    if (tool === 'line') {
+      bgCurrentStroke = { tool: 'line', color: penColor, width: penWidth, points: [p, p] };
+    } else if (tool === 'eraser') {
+      bgCurrentStroke = { tool: 'eraser', width: eraserSize, points: [p] };
+    } else {
+      bgCurrentStroke = { tool: 'pen', color: penColor, width: penWidth, points: [p] };
+    }
+    redrawBg();
+    e.preventDefault();
+  });
+
+  canvasBg.addEventListener('pointermove', e=>{
+    if (bgPanning) {
+      bgPanX = bgPanStartPanX - (e.clientX - bgPanStartClientX) / bgViewScale;
+      bgPanY = bgPanStartPanY - (e.clientY - bgPanStartClientY) / bgViewScale;
+      redrawBg();
+      e.preventDefault();
+      return;
+    }
+    if (!bgDrawing || !bgCurrentStroke) return;
+    if (tool === 'line') {
+      const p = bgScreenToWorld(e.clientX, e.clientY);
+      bgCurrentStroke.points[1] = p;
+    } else {
+      const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+      const list = events.length ? events : [e];
+      for (const ev of list) {
+        const p = bgScreenToWorld(ev.clientX, ev.clientY);
+        bgCurrentStroke.points.push(p);
+      }
+    }
+    redrawBg();
+    e.preventDefault();
+  });
+
+  function endBgStroke(e){
+    if (bgPanning) {
+      bgPanning = false;
+      try { canvasBg.releasePointerCapture(e.pointerId); } catch(_){}
+      updateCursor();
+      return;
+    }
+    if (!bgDrawing) return;
+    bgDrawing = false;
+    if (bgCurrentStroke) {
+      if (typeof e.clientX === 'number') {
+        const p = bgScreenToWorld(e.clientX, e.clientY);
+        if (tool === 'line') bgCurrentStroke.points[1] = p;
+        else bgCurrentStroke.points.push(p);
+      }
+      bgStrokes.push(bgCurrentStroke);
+      bgCurrentStroke = null;
+    }
+    try { canvasBg.releasePointerCapture(e.pointerId); } catch(_){}
+    redrawBg();
+  }
+  canvasBg.addEventListener('pointerup', endBgStroke);
+  canvasBg.addEventListener('pointercancel', endBgStroke);
+
+  // ── инструменты (ручка/ластик/линия/рука) — общая группа, активен ровно один ──
+  // кнопка «рука» лежит в отдельной (второй) панели, поэтому ищем по всему документу
+  const toolBtns = [...document.querySelectorAll('[data-tool]')];
+  const eraserMainBtn = toolbar.querySelector('.eraser');
+  const penMainBtn = toolbar.querySelector('.pen-main');
+
+  function setActiveTool(btn){
+    toolBtns.forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    if (btn.dataset.tool === 'eraser' && btn !== eraserMainBtn) {
+      eraserMainBtn.classList.add('active');
+    }
+    if (btn.dataset.tool === 'pen' && btn !== penMainBtn) {
+      penMainBtn.classList.add('active');
+    }
+  }
+
+  toolBtns.forEach(btn=>{
+    btn.onclick = ()=>{
+      setActiveTool(btn);
+      const t = btn.dataset.tool;
+      if (t === 'pen') {
+        tool = 'pen';
+        if (btn.dataset.width) penWidth = Number(btn.dataset.width);
+      } else if (t === 'line') {
+        tool = 'line';
+      } else if (t === 'eraser') {
+        tool = 'eraser';
+        if (btn.dataset.size) eraserSize = Number(btn.dataset.size);
+      } else if (t === 'hand') {
+        tool = 'hand';
+      }
+      updateCursor();
+    };
+  });
+
+  // ── всплывающие окошки с размерами (ручка/ластик): наведение показывает,
+  // уход прячет — но с небольшой задержкой, чтобы курсор успевал доехать до
+  // окошка, даже если путь неидеально прямой ──
+  const HOVER_HIDE_DELAY = 350;
+  [...document.querySelectorAll('.tool-group')].forEach(group=>{
+    const flyout = group.querySelector('.size-flyout');
+    if (!flyout) return;
+    let hideTimer = null;
+    function show(){ clearTimeout(hideTimer); flyout.classList.add('open'); }
+    function scheduleHide(){ clearTimeout(hideTimer); hideTimer = setTimeout(()=> flyout.classList.remove('open'), HOVER_HIDE_DELAY); }
+    group.addEventListener('mouseenter', show);
+    group.addEventListener('mouseleave', scheduleHide);
+    flyout.addEventListener('mouseenter', show);
+    flyout.addEventListener('mouseleave', scheduleHide);
+  });
+
+  // ── цвет ручки — независимая группа ──
+  const colorBtns = [...toolbar.querySelectorAll('[data-color]')];
+  const firstPenBtn = toolbar.querySelector('[data-tool="pen"][data-width]');
+  colorBtns.forEach(btn=>{
+    btn.onclick = ()=>{
+      colorBtns.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      penColor = btn.dataset.color;
+      tool = 'pen';
+      const widthBtn = toolbar.querySelector(`[data-tool="pen"][data-width="${penWidth}"]`) || firstPenBtn;
+      setActiveTool(widthBtn);
+    };
+  });
+
+  // ── «свой» цвет: SV-квадрат + слайдер оттенка + RGB-поля + пипетка ──
+  function hsvToRgb(h, s, v){
+    h = ((h % 360) + 360) % 360;
+    const c = v * s;
+    const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+    const m = v - c;
+    let r = 0, g = 0, b = 0;
+    if (h < 60) { r = c; g = x; b = 0; }
+    else if (h < 120) { r = x; g = c; b = 0; }
+    else if (h < 180) { r = 0; g = c; b = x; }
+    else if (h < 240) { r = 0; g = x; b = c; }
+    else if (h < 300) { r = x; g = 0; b = c; }
+    else { r = c; g = 0; b = x; }
+    return { r: Math.round((r + m) * 255), g: Math.round((g + m) * 255), b: Math.round((b + m) * 255) };
+  }
+  function rgbToHsv(r, g, b){
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min;
+    let h = 0;
+    if (d !== 0) {
+      if (max === r) h = 60 * (((g - b) / d) % 6);
+      else if (max === g) h = 60 * ((b - r) / d + 2);
+      else h = 60 * ((r - g) / d + 4);
+    }
+    if (h < 0) h += 360;
+    return { h, s: max === 0 ? 0 : d / max, v: max };
+  }
+  function rgbToHex(r, g, b){
+    return '#' + [r, g, b].map(v => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0')).join('').toUpperCase();
+  }
+  function hexToRgb(hex){
+    const m = /^#?([0-9a-f]{6})$/i.exec((hex || '').trim());
+    if (!m) return null;
+    const n = parseInt(m[1], 16);
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+
+  const customColorBtn = document.getElementById('customColorBtn');
+  const customColorDot = document.getElementById('customColorDot');
+  const cpSvCanvas = document.getElementById('cpSvCanvas');
+  const cpSvCtx = cpSvCanvas.getContext('2d');
+  const cpSvThumb = document.getElementById('cpSvThumb');
+  const cpHue = document.getElementById('cpHue');
+  const cpHueThumb = document.getElementById('cpHueThumb');
+  const cpSwatch = document.getElementById('cpSwatch');
+  const cpEyedropper = document.getElementById('cpEyedropper');
+  const cpR = document.getElementById('cpR'), cpG = document.getElementById('cpG'), cpB = document.getElementById('cpB');
+
+  let customHue = 280, customSat = 0.71, customVal = 0.87; // стартовый фиолетовый — просто заготовка на будущее
+
+  function renderSvSquare(){
+    const w = cpSvCanvas.width, h = cpSvCanvas.height;
+    const hc = hsvToRgb(customHue, 1, 1);
+    cpSvCtx.fillStyle = `rgb(${hc.r},${hc.g},${hc.b})`;
+    cpSvCtx.fillRect(0, 0, w, h);
+    const wg = cpSvCtx.createLinearGradient(0, 0, w, 0);
+    wg.addColorStop(0, 'rgba(255,255,255,1)');
+    wg.addColorStop(1, 'rgba(255,255,255,0)');
+    cpSvCtx.fillStyle = wg;
+    cpSvCtx.fillRect(0, 0, w, h);
+    const bg = cpSvCtx.createLinearGradient(0, 0, 0, h);
+    bg.addColorStop(0, 'rgba(0,0,0,0)');
+    bg.addColorStop(1, 'rgba(0,0,0,1)');
+    cpSvCtx.fillStyle = bg;
+    cpSvCtx.fillRect(0, 0, w, h);
+  }
+  function updateCpThumbs(){
+    cpSvThumb.style.left = (customSat * 100) + '%';
+    cpSvThumb.style.top = ((1 - customVal) * 100) + '%';
+    cpHueThumb.style.left = (customHue / 360 * 100) + '%';
+  }
+  // opts.updateInputs=false — не перезаписывать RGB-поля (когда цвет и так пришёл из них)
+  // opts.activate=false — только обновить визуал кнопки/окошка, не делать цвет активным цветом пера
+  function setCustomColor(rgb, opts){
+    opts = opts || {};
+    const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
+    customColorBtn.dataset.color = hex;
+    cpSwatch.style.background = hex;
+    customColorDot.style.background = hex;
+    if (opts.updateInputs !== false) { cpR.value = rgb.r; cpG.value = rgb.g; cpB.value = rgb.b; }
+    updateCpThumbs();
+    if (opts.activate !== false) customColorBtn.click(); // переиспользуем обычный обработчик цветовых кнопок
+    return hex;
+  }
+
+  renderSvSquare();
+  setCustomColor(hsvToRgb(customHue, customSat, customVal), { activate: false });
+
+  let svDragging = false;
+  function pickFromSv(e){
+    const rect = cpSvCanvas.getBoundingClientRect();
+    customSat = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    customVal = 1 - Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+    setCustomColor(hsvToRgb(customHue, customSat, customVal));
+  }
+  cpSvCanvas.addEventListener('pointerdown', e=>{
+    svDragging = true;
+    cpSvCanvas.setPointerCapture(e.pointerId);
+    pickFromSv(e);
+    e.preventDefault(); e.stopPropagation();
+  });
+  cpSvCanvas.addEventListener('pointermove', e=>{
+    if (!svDragging) return;
+    pickFromSv(e);
+    e.preventDefault(); e.stopPropagation();
+  });
+  cpSvCanvas.addEventListener('pointerup', e=>{
+    svDragging = false;
+    try { cpSvCanvas.releasePointerCapture(e.pointerId); } catch(_){}
+    e.stopPropagation();
+  });
+
+  let hueDragging = false;
+  function pickFromHue(e){
+    const rect = cpHue.getBoundingClientRect();
+    customHue = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width)) * 360;
+    renderSvSquare();
+    setCustomColor(hsvToRgb(customHue, customSat, customVal));
+  }
+  cpHue.addEventListener('pointerdown', e=>{
+    hueDragging = true;
+    cpHue.setPointerCapture(e.pointerId);
+    pickFromHue(e);
+    e.preventDefault(); e.stopPropagation();
+  });
+  cpHue.addEventListener('pointermove', e=>{
+    if (!hueDragging) return;
+    pickFromHue(e);
+    e.preventDefault(); e.stopPropagation();
+  });
+  cpHue.addEventListener('pointerup', e=>{
+    hueDragging = false;
+    try { cpHue.releasePointerCapture(e.pointerId); } catch(_){}
+    e.stopPropagation();
+  });
+
+  function clampByte(n){
+    n = Math.round(Number(n));
+    if (!Number.isFinite(n)) n = 0;
+    return Math.max(0, Math.min(255, n));
+  }
+  function onRgbInputChange(){
+    const r = clampByte(cpR.value), g = clampByte(cpG.value), b = clampByte(cpB.value);
+    cpR.value = r; cpG.value = g; cpB.value = b;
+    const hsv = rgbToHsv(r, g, b);
+    customHue = hsv.h; customSat = hsv.s; customVal = hsv.v;
+    renderSvSquare();
+    setCustomColor({ r, g, b }, { updateInputs: false });
+  }
+  [cpR, cpG, cpB].forEach(inp=>{
+    inp.addEventListener('input', ()=>{ inp.value = inp.value.replace(/[^\d]/g, '').slice(0, 3); });
+    inp.addEventListener('change', onRgbInputChange);
+    inp.addEventListener('blur', onRgbInputChange);
+    inp.addEventListener('keydown', e=>{ if (e.key === 'Enter') inp.blur(); });
+    inp.addEventListener('pointerdown', e=> e.stopPropagation());
+  });
+
+  cpEyedropper.addEventListener('click', async e=>{
+    e.preventDefault(); e.stopPropagation();
+    if (!window.EyeDropper) return; // браузер не поддерживает EyeDropper API — кнопка просто неактивна
+    try {
+      const ed = new EyeDropper();
+      const result = await ed.open();
+      const rgb = hexToRgb(result.sRGBHex);
+      if (rgb) {
+        const hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
+        customHue = hsv.h; customSat = hsv.s; customVal = hsv.v;
+        renderSvSquare();
+        setCustomColor(rgb);
+      }
+    } catch(_) { /* пользователь отменил выбор пипеткой */ }
+  });
+  if (!window.EyeDropper) cpEyedropper.style.opacity = '0.4';
+
+  // ── отмена последнего действия: Ctrl+Z / ⌘+Z ──
+  window.addEventListener('keydown', e=>{
+    const tag = (e.target && e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z')) {
+      e.preventDefault();
+      undo();
+    }
+  });
+
+  document.getElementById('clearBoardBtn').onclick = clearBoard;
+
+  // ── масштаб фона: кнопки +/− и сброс вида (у листа своего зума нет) ──
+  function zoomBy(factor){
+    bgViewScale = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, bgViewScale * factor));
+    zoomResetBtn.textContent = Math.round(bgViewScale * 100) + '%';
+    redrawBg();
+  }
+  document.getElementById('zoomInBtn').onclick = ()=> zoomBy(ZOOM_STEP);
+  document.getElementById('zoomOutBtn').onclick = ()=> zoomBy(1 / ZOOM_STEP);
+  zoomResetBtn.onclick = ()=>{
+    bgViewScale = 1; bgPanX = 0; bgPanY = 0;
+    zoomResetBtn.textContent = '100%';
+    redrawBg();
+  };
+
+  window.addEventListener('resize', ()=>{ resizeCanvas(); resizeBgCanvas(); });
+
+  // ── доска активна, только пока data-board="on": как только атрибут
+  // появляется, запускаем цикл, который каждый кадр подгоняет лист под текущий
+  // прямоугольник .sheet и перерисовывает фон с учётом прокрутки страницы —
+  // а как только доску выключают, цикл сам останавливается ──
+  let rafHandle = null;
+  function boardLoop(){
+    if (document.documentElement.getAttribute('data-board') !== 'on') { rafHandle = null; return; }
+    syncBoardTarget();
+    redraw();
+    redrawBg();
+    rafHandle = requestAnimationFrame(boardLoop);
+  }
+  function ensureLoopRunning(){
+    if (rafHandle == null && document.documentElement.getAttribute('data-board') === 'on') {
+      rafHandle = requestAnimationFrame(boardLoop);
+    }
+  }
+  if (window.MutationObserver) {
+    new MutationObserver(ensureLoopRunning).observe(document.documentElement, { attributes: true, attributeFilter: ['data-board'] });
+  }
+  ensureLoopRunning();
+  resizeCanvas();
+  resizeBgCanvas();
+  updateCursor();
 })();
 </script>
 </body>
