@@ -82,8 +82,22 @@ body{
   min-height:100vh;
   padding:18px 12px 60px;
 }
-.wrap{max-width:820px;margin:0 auto;position:relative;z-index:1;pointer-events:none}
+.wrap{max-width:820px;margin:0 auto;position:relative;pointer-events:none}
 .wrap > *{pointer-events:auto}
+/* пока доска включена: всё содержимое .wrap не перехватывает клики (можно рисовать
+   поверх текста/картинок/таблиц), кроме самих управляющих элементов — их явно
+   возвращаем выше холста; заодно снимаем backdrop-filter (он создаёт свой контекст
+   наложения и не даёт кнопкам внутри карточек пробиться выше холста по z-index) */
+html[data-board="on"] .wrap *{pointer-events:none;}
+html[data-board="on"] .wrap button,
+html[data-board="on"] .wrap input,
+html[data-board="on"] .wrap select,
+html[data-board="on"] .wrap textarea,
+html[data-board="on"] .wrap a,
+html[data-board="on"] .wrap [contenteditable="true"],
+html[data-board="on"] .wrap [role="button"]{pointer-events:auto;position:relative;z-index:3;}
+html[data-board="on"] .wrap,
+html[data-board="on"] .wrap *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
 
 /* ─── калькулятор в столбик (свой пример) — встраивает настоящие тренажёры через iframe ─── */
 .calc-tools{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
