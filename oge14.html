@@ -1817,8 +1817,9 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     try {
       const doc = calcIframe.contentWindow && calcIframe.contentWindow.document;
       if (doc && doc.documentElement) {
-        const h = Math.max(doc.documentElement.scrollHeight, doc.body ? doc.body.scrollHeight : 0);
-        if (h > 0) calcIframe.style.height = (h + 20) + 'px';
+      const wrapEl = doc.querySelector('.wrap');
+      const h = wrapEl ? wrapEl.getBoundingClientRect().height : Math.max(doc.documentElement.scrollHeight, doc.body ? doc.body.scrollHeight : 0);
+      if (h > 0) calcIframe.style.height = (Math.ceil(h) + 40) + 'px';
       }
     } catch (e) { /* кросс-доменные ограничения — оставляем текущую высоту */ }
   }

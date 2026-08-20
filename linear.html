@@ -107,8 +107,25 @@ body{
   min-height:100vh;
   padding:18px 12px 60px;
 }
-.wrap{max-width:1040px;margin:0 auto;position:relative;z-index:1;pointer-events:none}
+.wrap{max-width:1040px;margin:0 auto;position:relative;pointer-events:none}
 .wrap > *{pointer-events:auto}
+/* пока доска включена: всё содержимое .wrap не перехватывает клики (можно рисовать
+   поверх текста/картинок/таблиц/шагов решения), кроме самих управляющих элементов —
+   их явно возвращаем выше холста; заодно снимаем backdrop-filter (создаёт свой
+   контекст наложения) и transform/animation (то же самое, например у карточек
+   с анимацией появления) — иначе кнопки/чипы внутри не пробьются выше холста */
+html[data-board="on"] .wrap *{pointer-events:none;}
+html[data-board="on"] .wrap button,
+html[data-board="on"] .wrap input,
+html[data-board="on"] .wrap select,
+html[data-board="on"] .wrap textarea,
+html[data-board="on"] .wrap a,
+html[data-board="on"] .wrap [contenteditable="true"],
+html[data-board="on"] .wrap [role="button"],
+html[data-board="on"] .wrap .term{pointer-events:auto;position:relative;z-index:3;}
+html[data-board="on"] .wrap,
+html[data-board="on"] .wrap *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
+html[data-board="on"] .wrap *:not(button):not(input):not(select):not(textarea):not(a):not([contenteditable="true"]):not([role="button"]):not(.term){transform:none!important;animation:none!important;}
 h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(26px,5vw,38px);color:var(--pencil);text-align:center;}
 .sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 18px;}
 .levels{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px}
@@ -2560,8 +2577,9 @@ setupAutoHeightAnimation(document.querySelector('.sheet'));
     try {
       const doc = calcIframe.contentWindow && calcIframe.contentWindow.document;
       if (doc && doc.documentElement) {
-        const h = Math.max(doc.documentElement.scrollHeight, doc.body ? doc.body.scrollHeight : 0);
-        if (h > 0) calcIframe.style.height = (h + 20) + 'px';
+      const wrapEl = doc.querySelector('.wrap');
+      const h = wrapEl ? wrapEl.getBoundingClientRect().height : Math.max(doc.documentElement.scrollHeight, doc.body ? doc.body.scrollHeight : 0);
+      if (h > 0) calcIframe.style.height = (Math.ceil(h) + 40) + 'px';
       }
     } catch (e) { /* кросс-доменные ограничения — оставляем текущую высоту */ }
   }
