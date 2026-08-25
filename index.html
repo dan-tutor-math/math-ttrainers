@@ -99,6 +99,19 @@ body{
 .wrap{max-width:760px;margin:0 auto}
 h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(26px,5vw,38px);color:var(--pencil);text-align:center;}
 .sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 18px;}
+.nav-bar{position:sticky;top:10px;z-index:100;margin-bottom:16px;}
+.nav-tabs,.nav-subtabs{display:flex;gap:6px;flex-wrap:wrap;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:18px;padding:7px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);}
+.nav-subtabs{margin-top:8px;padding:6px;border-radius:16px;}
+.nav-tab,.nav-subtab{flex:1 1 auto;text-align:center;font-family:var(--font-ui);color:var(--muted-3);background:none;border:none;border-radius:12px;padding:11px 12px;cursor:pointer;transition:background .15s,color .15s;white-space:nowrap;}
+.nav-tab{font-weight:700;font-size:15px;}
+.nav-subtab{font-weight:600;font-size:13px;padding:8px 10px;}
+.nav-tab:hover,.nav-subtab:hover{background:var(--hover-1);color:var(--pencil);}
+.nav-tab.active,.nav-subtab.active{background:var(--ink);color:#fff;}
+.nav-tab .tcount,.nav-subtab .tcount{opacity:.65;font-weight:500;}
+.section-title{font-family:var(--font-ui);font-weight:700;font-size:14px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.04em;padding:14px 22px 8px;}
+.section-title:first-child{padding-top:18px;}
+.section-title .count{font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-1);text-transform:none;letter-spacing:0;margin-left:6px;}
+.coming-soon-tab{font-family:var(--font-ui);font-weight:500;font-size:15px;color:var(--muted-3);text-align:center;padding:34px 20px;line-height:1.5;}
 .topics{display:flex;flex-direction:column;gap:12px}
 .topic{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);overflow:hidden;}
 .topic-header{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 22px;background:none;border:none;cursor:pointer;text-align:left;font-family:var(--font-ui);font-weight:700;font-size:18px;color:var(--pencil);}
@@ -118,6 +131,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
   flex-direction:column;
   gap:2px;
 }
+.topic-list:first-child{padding-top:14px;}
 .topic-item{
   display:flex;
   align-items:center;
@@ -189,7 +203,12 @@ footer{text-align:center;font-family:var(--font-ui);font-weight:500;color:var(--
 })();</script>
 <div class="wrap">
   <h1>Тренажёры</h1>
-  <div class="sub">выбери тему — внутри откроется список тренажёров</div>
+  <div class="sub">выбери раздел — список тренажёров откроется ниже</div>
+
+  <div class="nav-bar" id="navBar">
+    <div class="nav-tabs" id="mainTabs"></div>
+    <div class="nav-subtabs" id="subTabs" style="display:none"></div>
+  </div>
 
   <div class="topics" id="topics"></div>
 
@@ -202,51 +221,83 @@ footer{text-align:center;font-family:var(--font-ui);font-weight:500;color:var(--
 </div>
 
 <script>
-/* ───────── темы и тренажёры внутри них ─────────
-   чтобы добавить новую тему — просто добавь новый объект в этот массив;
-   чтобы добавить тренажёр в существующую тему — добавь элемент в её items */
-const TOPICS = [
-  {
-    title: 'ОГЭ',
-    items: [
-      { name: '№1–5. Практические задачи',      href: 'oge1_5.html',  eq: 'шины, тарифы, участок…' },
-      { name: '№6. Числа и вычисления',         href: 'oge6.html',    eq: '(−2,5)³ · 0,4 = ?' },
-      { name: '№7. Сравнение и оценка чисел',   href: 'oge7.html',    eq: '5 < √27 < 6' },
-      { name: '№8. Выражения и формулы',        href: 'oge8.html',    eq: 'a²−b² = (a−b)(a+b)' },
-      { name: '№9. Уравнения и неравенства',    href: 'oge9.html',    eq: '3x²−7x+2 = 0' },
-      { name: '№10. Теория вероятности',        href: 'oge10.html',   eq: 'P(A) = 5⁄20 = 0,25' },
-      { name: '№11. Графики функций',           href: 'oge11.html',   eq: 'y = kx + b' },
-      { name: '№12. Вычисления по формулам',    href: 'oge12.html',   eq: 'v = v₀ + at' },
-      { name: '№13. Неравенства',               href: 'oge13.html',   eq: 'x² − 9 ≤ 0 ⟺ [−3; 3]' },
-      { name: '№14. Прогрессии',                href: 'oge14.html',   eq: 'aₙ = a₁ + (n−1)d' },
-      { name: '№15–18. Геометрия',              href: 'oge15_18.html',eq: 'S, P, теорема Пифагора' },
-      { name: '№19. Верные утверждения',        href: 'oge19.html',   eq: 'верно / неверно' },
-    ]
-  },
-  {
-    title: 'Действия с числами',
-    items: [
-      { name: 'Сложение в столбик',    href: 'addition.html',       eq: '999 + 1 = ?' },
-      { name: 'Вычитание в столбик',   href: 'subtraction.html',    eq: '700 − 458 = ?' },
-      { name: 'Умножение в столбик',   href: 'multiplication.html', eq: '347 × 26 = ?' },
-      { name: 'Деление в столбик',     href: 'division.html',       eq: '4826 : 7 = ?' },
-    ]
-  },
-  {
-    title: 'Уравнения',
-    items: [
-      { name: 'Линейные уравнения',    href: 'linear.html',    eq: '3(2x−5)+x = 2x−7' },
-      { name: 'Квадратные уравнения',  href: 'quadratic.html', eq: '2x² − 7x + 3 = 0' },
-    ]
-  },
-  {
-    title: 'Действия с дробями',
-    items: [
-      { name: 'Умножение дробей',      href: 'fraction_multiply.html', eq: '4⁄9 × 3⁄8 = ?' },
-      { name: 'Деление дробей',        href: 'fraction_divide.html',   eq: '2⁄3 ÷ 4⁄5 = ?' },
-    ]
-  },
+/* ───────── реестр тренажёров ─────────
+   каждый тренажёр описан один раз, здесь; чтобы добавить новый — добавь запись сюда,
+   а в NAV просто ссылайся на её id (одну и ту же ссылку можно вставлять в сколько
+   угодно вкладок, файл при этом не копируется) */
+const TRAINERS = {
+  oge1_5:   { name: '№1–5. Практические задачи',      href: 'oge1_5.html',            eq: 'шины, тарифы, участок…' },
+  oge6:     { name: '№6. Числа и вычисления',         href: 'oge6.html',              eq: '1/10 + 29/20 = ?' },
+  oge7:     { name: '№7. Сравнение и оценка чисел',   href: 'oge7.html',              eq: '5 < √27 < 6' },
+  oge8:     { name: '№8. Выражения и формулы',        href: 'oge8.html',              eq: 'a²−b² = (a−b)(a+b)' },
+  oge9:     { name: '№9. Уравнения и неравенства',    href: 'oge9.html',              eq: '3x²−7x+2 = 0' },
+  oge10:    { name: '№10. Теория вероятности',        href: 'oge10.html',             eq: 'P(A) = 5⁄20 = 0,25' },
+  oge11:    { name: '№11. Графики функций',           href: 'oge11.html',             eq: 'y = kx + b' },
+  oge12:    { name: '№12. Вычисления по формулам',    href: 'oge12.html',             eq: 'v = v₀ + at' },
+  oge13:    { name: '№13. Неравенства',               href: 'oge13.html',             eq: 'x² − 9 ≤ 0 ⟺ [−3; 3]' },
+  oge14:    { name: '№14. Прогрессии',                href: 'oge14.html',             eq: 'aₙ = a₁ + (n−1)d' },
+  oge15_18: { name: '№15–18. Геометрия',              href: 'oge15_18.html',          eq: 'S, P, теорема Пифагора' },
+  oge19:    { name: '№19. Верные утверждения',        href: 'oge19.html',             eq: 'верно / неверно' },
+  add_col:  { name: 'Сложение в столбик',             href: 'addition.html',          eq: '999 + 1 = ?' },
+  sub_col:  { name: 'Вычитание в столбик',            href: 'subtraction.html',       eq: '700 − 458 = ?' },
+  mul_col:  { name: 'Умножение в столбик',            href: 'multiplication.html',    eq: '347 × 26 = ?' },
+  div_col:  { name: 'Деление в столбик',              href: 'division.html',          eq: '4826 : 7 = ?' },
+  linear:   { name: 'Линейные уравнения',             href: 'linear.html',            eq: '3(2x−5)+x = 2x−7' },
+  quadratic:{ name: 'Квадратные уравнения',           href: 'quadratic.html',         eq: '2x² − 7x + 3 = 0' },
+  frac_mul: { name: 'Умножение дробей',               href: 'fraction_multiply.html', eq: '4⁄9 × 3⁄8 = ?' },
+  frac_div: { name: 'Деление дробей',                 href: 'fraction_divide.html',   eq: '2⁄3 ÷ 4⁄5 = ?' },
+  neg_pos:  { name: 'Сложение и вычитание положительных и отрицательных чисел', href: null, eq: '−7 + 12 = ?' },
+};
+
+/* ───────── дерево разделов ─────────
+   у вкладки либо есть subtabs (тогда открываются они), либо сразу groups (плоская вкладка).
+   soon:true — вкладка пока без тренажёров ("скоро"). items — id-шники из TRAINERS. */
+const NAV = [
+  { id: 'exams', title: 'Экзамены', subtabs: [
+    { id: 'oge',      title: 'ОГЭ',           groups: [ { items: ['oge1_5','oge6','oge7','oge8','oge9','oge10','oge11','oge12','oge13','oge14','oge15_18','oge19'] } ] },
+    { id: 'ege_prof', title: 'ЕГЭ профиль',   groups: [], soon: true },
+    { id: 'ege_base', title: 'ЕГЭ база',      groups: [], soon: true },
+    { id: 'vpr',      title: 'ВПР / МЦКО',    groups: [], soon: true },
+  ]},
+  { id: 'grades', title: 'Классы', subtabs: [
+    { id: 'g5', title: '5 класс', groups: [
+      { title: 'Действия с числами', items: ['add_col','sub_col','mul_col','div_col'] },
+      { title: 'Действия с дробями', items: ['frac_mul','frac_div'] },
+    ]},
+    { id: 'g6', title: '6 класс', groups: [
+      { title: 'Положительные и отрицательные числа', items: ['neg_pos'] },
+      { title: 'Действия с дробями', items: ['frac_mul','frac_div','oge6'] },
+    ]},
+    { id: 'g7', title: '7 класс', groups: [
+      { title: 'Уравнения', items: ['linear'] },
+    ]},
+    { id: 'g8', title: '8 класс', groups: [
+      { title: 'Уравнения', items: ['quadratic'] },
+    ]},
+    { id: 'g9', title: '9 класс', groups: [
+      { title: 'Подготовка к ОГЭ', items: ['oge9','oge10','oge13','oge14'] },
+    ]},
+  ]},
+  { id: 'base', title: 'Основа', groups: [
+    { title: 'Действия с числами', items: ['add_col','sub_col','mul_col','div_col'] },
+    { title: 'Положительные и отрицательные числа', items: ['neg_pos'] },
+    { title: 'Действия с дробями', items: ['frac_mul','frac_div','oge6'] },
+    { title: 'Уравнения', items: ['linear','quadratic'] },
+  ]},
 ];
+
+const NAV_STATE_KEY = 'ogeNav:state';
+let curTabId = null, curSubtabId = null;
+(function restoreNavState(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(NAV_STATE_KEY) || 'null');
+    if (saved && NAV.some(t => t.id === saved.tabId)) { curTabId = saved.tabId; curSubtabId = saved.subtabId || null; }
+  } catch(e){}
+  if (!curTabId) curTabId = NAV[0].id;
+})();
+function saveNavState(){
+  try { localStorage.setItem(NAV_STATE_KEY, JSON.stringify({ tabId: curTabId, subtabId: curSubtabId })); } catch(e){}
+}
 
 function itemHTML(it, ii){
   if(!it.href){
@@ -268,70 +319,84 @@ function itemHTML(it, ii){
   `;
 }
 
-function topicCount(t){
-  const own = t.items.filter(it=>it.href).length;
-  const grouped = (t.groups||[]).reduce((sum,g)=>sum+g.items.filter(it=>it.href).length, 0);
-  return own + grouped;
+function groupsCount(groups){
+  return (groups||[]).reduce((sum,g)=>sum + g.items.filter(id=>TRAINERS[id] && TRAINERS[id].href).length, 0);
 }
 
-function renderTopics(){
+function getCurTab(){ return NAV.find(t => t.id === curTabId) || NAV[0]; }
+function getCurSubtab(){
+  const tab = getCurTab();
+  if (!tab.subtabs) return null;
+  return tab.subtabs.find(s => s.id === curSubtabId) || tab.subtabs[0];
+}
+// то, что реально сейчас показываем: либо подвкладка, либо сама вкладка (если плоская)
+function getActiveDef(){
+  const tab = getCurTab();
+  return tab.subtabs ? getCurSubtab() : tab;
+}
+
+function renderNav(){
+  const mainEl = document.getElementById('mainTabs');
+  mainEl.innerHTML = NAV.map(t => {
+    const n = t.subtabs ? t.subtabs.reduce((s,st)=>s+groupsCount(st.groups),0) : groupsCount(t.groups);
+    return `<button class="nav-tab${t.id===curTabId?' active':''}" data-id="${t.id}">${t.title}<span class="tcount"> · ${n}</span></button>`;
+  }).join('');
+  mainEl.querySelectorAll('.nav-tab').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      curTabId = btn.dataset.id;
+      const tab = getCurTab();
+      curSubtabId = tab.subtabs ? tab.subtabs[0].id : null;
+      saveNavState();
+      renderNav();
+      renderContent();
+    });
+  });
+
+  const subEl = document.getElementById('subTabs');
+  const tab = getCurTab();
+  if (tab.subtabs) {
+    if (!tab.subtabs.some(s=>s.id===curSubtabId)) curSubtabId = tab.subtabs[0].id;
+    subEl.style.display = 'flex';
+    subEl.innerHTML = tab.subtabs.map(s => {
+      const n = groupsCount(s.groups);
+      return `<button class="nav-subtab${s.id===curSubtabId?' active':''}" data-id="${s.id}">${s.title}${s.soon?'':` <span class="tcount"> · ${n}</span>`}</button>`;
+    }).join('');
+    subEl.querySelectorAll('.nav-subtab').forEach(btn=>{
+      btn.addEventListener('click', ()=>{
+        curSubtabId = btn.dataset.id;
+        saveNavState();
+        renderNav();
+        renderContent();
+      });
+    });
+  } else {
+    subEl.style.display = 'none';
+    subEl.innerHTML = '';
+  }
+}
+
+function renderContent(){
   const el = document.getElementById('topics');
-  el.innerHTML = TOPICS.map((t, ti) => {
-    const n = topicCount(t);
+  const def = getActiveDef();
+  if (!def || def.soon || !(def.groups||[]).length) {
+    el.innerHTML = `<div class="topic"><div class="coming-soon-tab">🚧 Здесь пока нет тренажёров — они появятся в числе первых, когда будут готовы.</div></div>`;
+    return;
+  }
+  el.innerHTML = def.groups.map(g => {
+    const items = g.items.map(id => TRAINERS[id]).filter(Boolean);
     return `
-    <div class="topic" id="topic-${ti}">
-      <button class="topic-header" data-idx="${ti}">
-        <span>${t.title}<span class="count">— ${n} тренажёр${pluralSuffix(n)}</span></span>
-        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-      </button>
-      <div class="topic-body">
+      <div class="topic">
+        ${g.title ? `<div class="section-title">${g.title}</div>` : ''}
         <div class="topic-list">
-          ${t.items.map((it, ii) => itemHTML(it, ii)).join('')}
-          ${(t.groups||[]).map((g, gi) => {
-            const gn = g.items.filter(it=>it.href).length;
-            return `
-            <div class="group" id="topic-${ti}-group-${gi}">
-              <button class="group-header" data-tidx="${ti}" data-gidx="${gi}">
-                <span>${g.title}<span class="count">— ${gn} тренажёр${pluralSuffix(gn)}</span></span>
-                <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"></polyline></svg>
-              </button>
-              <div class="group-body">
-                <div class="group-list">
-                  ${g.items.map((it, ii) => itemHTML(it, ii)).join('')}
-                </div>
-              </div>
-            </div>
-          `;}).join('')}
+          ${items.map((it, ii) => itemHTML(it, ii)).join('')}
         </div>
       </div>
-    </div>
-  `;}).join('');
-
-  el.querySelectorAll('.topic-header').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      const topic = document.getElementById('topic-'+btn.dataset.idx);
-      topic.classList.toggle('open');
-    });
-  });
-
-  el.querySelectorAll('.group-header').forEach(btn=>{
-    btn.addEventListener('click', (e)=>{
-      e.stopPropagation();
-      const group = document.getElementById('topic-'+btn.dataset.tidx+'-group-'+btn.dataset.gidx);
-      group.classList.toggle('open');
-    });
-  });
+    `;
+  }).join('');
 }
 
-function pluralSuffix(n){
-  const mod10 = n%10, mod100 = n%100;
-  if(mod100>=11 && mod100<=14) return 'ов';
-  if(mod10===1) return '';
-  if(mod10>=2 && mod10<=4) return 'а';
-  return 'ов';
-}
-
-renderTopics();
+renderNav();
+renderContent();
 </script>
 </body>
 </html>

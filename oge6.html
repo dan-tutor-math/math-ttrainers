@@ -268,6 +268,10 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .mode-card.soon:hover{border-color:var(--glass-border);transform:none;}
 .soon-badge{font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-1);background:var(--glass);border-radius:8px;padding:3px 8px;}
 .task-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.type-nav{display:flex;align-items:center;gap:8px;}
+.type-nav-btn{height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-ui);font-weight:600;font-size:12px;line-height:1;cursor:pointer;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;transition:transform .12s, border-color .12s;}
+.type-nav-btn:hover{border-color:var(--ink)}
+.type-nav-btn:active{transform:scale(.9)}
 .submode-tabs{display:flex;gap:8px;margin-bottom:14px;}
 .submode-tab{flex:1;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:10px 6px;cursor:pointer;text-align:center;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s, border-color .15s, color .15s, background .15s;}
 .submode-tab:active{transform:scale(.96)}
@@ -315,6 +319,48 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .stat{flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:12px 14px;text-align:center;}
 .stat .v{font-family:var(--font-ui);font-weight:700;font-size:22px;color:var(--ink);}
 .stat .l{font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-6);}
+
+/* ─── вертикальная запись выражения (дроби столбиком, как в реальном ОГЭ) ─── */
+.expr-display{font-family:'Times New Roman', Georgia, serif;font-size:26px;color:var(--muted-5);text-align:center;padding:14px 0 6px;}
+.expr-display .frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.3;margin:0 4px;}
+.expr-display .frac .num{padding:0 8px 4px;}
+.expr-display .frac .den{padding:4px 8px 0;border-top:1.8px solid currentColor;}
+.expr-display .frac .frac{font-size:.72em;}
+.expr-display .op{margin:0 10px;}
+
+/* ─── ввод числового ответа ─── */
+.input-answer-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.answer-input{
+  font-family:var(--font-mono);font-size:19px;color:var(--ink);
+  background:var(--card);border:1.5px solid var(--glass-border);border-radius:14px;
+  padding:11px 14px;width:130px;
+}
+.answer-input:focus{outline:none;border-color:var(--ink)}
+.answer-input.good{border-color:var(--ok);background:var(--ok-tint);color:var(--ok);}
+.answer-input.bad{border-color:var(--teacher);background:rgba(255,59,48,.1);color:var(--teacher);}
+@keyframes shakeInput{20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.answer-input.shake{animation:shakeInput .35s;}
+.check-btn{font-family:var(--font-ui);font-weight:600;font-size:15px;background:var(--ink);color:#fff;border:none;border-radius:14px;padding:11px 22px;cursor:pointer;transition:transform .15s;}
+.check-btn:active{transform:scale(.98)}
+.check-btn:disabled{opacity:.5;cursor:default}
+
+/* ─── плавающая клавиатура ─── */
+.keypad{display:grid;grid-template-columns:repeat(3, 44px);gap:6px}
+.keypad button{width:44px;height:40px;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-mono);font-size:18px;cursor:pointer;touch-action:manipulation}
+.keypad button:active{background:var(--hl)}
+.keypad button.kp-minus{color:var(--teacher);font-weight:700}
+.keypad button.kp-comma{color:var(--ink);font-weight:700}
+.keypad button.kp-back{grid-column:span 3;width:auto;height:36px;font-size:15px;color:var(--muted-6);}
+.keypad button.kp-enter{grid-column:span 3;width:auto;height:38px;font-family:var(--font-ui);font-weight:600;font-size:14px;background:var(--ink);color:#fff;border-color:var(--ink);}
+.keypad button.kp-enter:active{background:var(--ink-active);}
+.keypad-float{position:fixed;top:160px;right:16px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:50}
+.keypad-close{position:absolute;top:-11px;right:-11px;width:26px;height:26px;border-radius:50%;background:var(--teacher);color:#fff;border:2px solid #fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s;}
+.keypad-close:active{transform:scale(.9)}
+.keypad-drag-handle{position:absolute;top:-11px;left:-11px;width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;border:2px solid #fff;font-size:12px;line-height:1;cursor:grab;display:flex;align-items:center;justify-content:center;touch-action:none;}
+.keypad-toggle{position:fixed;top:160px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50;transition:transform .15s;}
+.keypad-toggle:active{transform:scale(.92)}
+@media(max-width:720px){.keypad-float,.keypad-toggle{top:auto;bottom:16px;right:16px}}
+
 .theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
 .theme-toggle:hover{border-color:var(--ink)}
 .theme-toggle:active{transform:scale(.92)}
@@ -466,7 +512,11 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
   <div id="taskArea" style="display:none">
     <div class="task-head">
-      <button class="back-btn" id="backBtn">← все типы</button>
+      <div class="type-nav">
+        <button class="back-btn" id="backBtn">← все типы</button>
+        <button class="type-nav-btn" id="prevTypeBtn" title="Предыдущий тип">◀ Предыдущий тип</button>
+        <button class="type-nav-btn" id="nextTypeBtn" title="Следующий тип">Следующий тип ▶</button>
+      </div>
       <div class="corner">
         <div class="task-title" id="taskTitle"></div>
         <span class="medal-badge-row" id="medalBadgeRow"></span>
@@ -484,9 +534,10 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
     <div class="panel" id="questionPanel" style="display:none">
       <div class="prompt" id="questionPromptText"></div>
-      <div class="mcq-title">Варианты ответа:</div>
-      <div class="mcq-options" id="mcqOptions"></div>
-      <button class="change-answer-btn" id="changeAnswerBtn" style="display:none">✎ Изменить ответ</button>
+      <div class="input-answer-row" id="inputAnswerArea">
+        <input type="text" inputmode="decimal" class="answer-input" id="answerInput" placeholder="?" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <button class="check-btn" id="checkAnswerBtn">Проверить</button>
+      </div>
     </div>
 
     <div class="panel" id="mainPanel" style="display:none">
@@ -537,6 +588,13 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <div class="medal-tray" id="medalTray" aria-hidden="true"></div>
   <div id="boardSpace" aria-hidden="true"></div></div>
 
+<button class="keypad-toggle" id="kpToggle" title="Показать клавиатуру" style="display:none">⌨</button>
+<div class="keypad-float" id="keypadFloat" style="display:none">
+  <button class="keypad-drag-handle" id="kpDragHandle" title="Перетащить клавиатуру" aria-label="Переместить клавиатуру">✋</button>
+  <button class="keypad-close" id="kpClose" title="Скрыть клавиатуру">✕</button>
+  <div class="keypad" id="keypadButtons"></div>
+</div>
+
 <script>
 /* ═══════════════ утилиты ═══════════════ */
 const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -554,109 +612,221 @@ function fmtNum(x) {
   return (Number.isInteger(r) ? String(r) : String(r).replace('.', ',')).replace('-', '−');
 }
 function gcd(a,b){ a=Math.abs(a); b=Math.abs(b); while(b){ [a,b]=[b,a%b]; } return a || 1; }
-function fmtFrac(num, den){
+function lcm(a,b){ return Math.abs(a*b)/gcd(a,b); }
+// после сокращения знаменатель состоит только из множителей 2 и 5 ⇔ дробь — конечная десятичная
+function isTerminatingDen(den){
+  let d = Math.abs(den);
+  if (d === 0) return false;
+  while (d % 2 === 0) d /= 2;
+  while (d % 5 === 0) d /= 5;
+  return d === 1;
+}
+function reduceFrac(num, den){
   if (den < 0) { den = -den; num = -num; }
-  const g = gcd(num, den);
-  num /= g; den /= g;
-  if (den === 1) return fmtNum(num);
-  const sign = num < 0 ? '−' : '';
-  return `${sign}${Math.abs(num)}/${den}`;
+  const g = gcd(num, den) || 1;
+  return [num / g, den / g];
 }
-function buildOptions(correct, candidates, fallbackGen) {
-  const seen = new Set([correct]);
-  const picked = [];
-  for (const c of candidates) {
-    if (!seen.has(c)) { seen.add(c); picked.push(c); }
-    if (picked.length === 3) break;
-  }
-  let guard = 0;
-  while (picked.length < 3 && guard < 30) {
-    guard++;
-    const extra = fallbackGen(guard);
-    if (!seen.has(extra)) { seen.add(extra); picked.push(extra); }
-  }
-  return shuffleArr([correct, ...picked]);
+// точная десятичная запись num/den (знаменатель после сокращения — только 2 и 5):
+// value — Number для сравнения с вводом ученика, str — строка с запятой для показа в решении
+function exactDecimal(num, den){
+  const [n, d] = reduceFrac(num, den);
+  const sign = n < 0 ? '−' : '';
+  let dd = d, twos = 0, fives = 0;
+  while (dd % 2 === 0) { dd /= 2; twos++; }
+  while (dd % 5 === 0) { dd /= 5; fives++; }
+  const places = Math.max(twos, fives);
+  const scale = Math.pow(10, places);
+  const intVal = Math.round(Math.abs(n) * scale / d);
+  const s = String(intVal).padStart(places + 1, '0');
+  const intPart = places > 0 ? s.slice(0, -places) : s;
+  const fracPart = places > 0 ? s.slice(-places) : '';
+  const str = sign + intPart + (places > 0 ? ',' + fracPart : '');
+  const value = (n < 0 ? -1 : 1) * intVal / scale;
+  return { str, value };
 }
-function tableHTML(headers, rows) {
-  return `<table class="data-table"><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>` +
-    `<tbody>${rows.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+// целое intVal хранит значение × 10^places (напр. 155 при places=2 → "1,55")
+function fmtDecimalFromInt(intVal, places){
+  const sign = intVal < 0 ? '−' : '';
+  const s = String(Math.abs(intVal)).padStart(places + 1, '0');
+  const intPart = places > 0 ? s.slice(0, -places) : s;
+  const fracPart = places > 0 ? s.slice(-places) : '';
+  return sign + intPart + (places > 0 ? ',' + fracPart : '');
 }
+function renderFrac(numHtml, denHtml){
+  return `<span class="frac"><span class="num">${numHtml}</span><span class="den">${denHtml}</span></span>`;
+}
+function exprWrap(html){
+  return `<div class="expr-display">${html}</div>`;
+}
+// сколько знаков после запятой даст знаменатель (после сокращения — только 2 и 5);
+// Infinity, если знаменатель не 2,5-гладкий (бесконечная десятичная дробь)
+function decimalPlaces(den){
+  let d = Math.abs(den), twos = 0, fives = 0;
+  if (d === 0) return Infinity;
+  while (d % 2 === 0) { d /= 2; twos++; }
+  while (d % 5 === 0) { d /= 5; fives++; }
+  return d === 1 ? Math.max(twos, fives) : Infinity;
+}
+// раскладывает n на «хороший» множитель (степени 2 и 5) и «плохой» остаток (прочие простые)
+function twoFiveSplit(n){
+  let d = Math.abs(n), twos = 0, fives = 0;
+  while (d % 2 === 0) { d /= 2; twos++; }
+  while (d % 5 === 0) { d /= 5; fives++; }
+  return { twos, fives, bad: d };
+}
+// знаменатели сложения/вычитания — все делители 100: их НОК тоже делит 100,
+// поэтому результат гарантированно укладывается в ≤2 знака после запятой
+const ADD_SUB_POOL = [2,4,5,10,20,25,50];
+// знаменатели умножения/деления — можно "неудобные" (3, 7, 9, 21…), но числитель
+// специально строится кратным их "плохой" части, чтобы она сократилась без остатка
+const MD_POOL = [2,3,4,5,6,7,9,10,12,14,15,18,20,21,25,28,30,35];
 
+/* ═══════════════ 9 прототипов задания 6 ОГЭ ═══════════════ */
 
-function gen_calc_frac(){
-  const b = pick([2,3,4,5,6]);
-  const d = pick([2,3,4,5,6]);
-  const a = ri(1, b*2);
-  const c = ri(1, d*2);
-  const op = pick(['+','-']);
-  const numer = op === '+' ? a*d + c*b : a*d - c*b;
-  const denom = b*d;
-  const correct = fmtFrac(numer, denom);
-  const wrong1 = fmtFrac(op==='+' ? a*d - c*b : a*d + c*b, denom);
-  const wrong2 = fmtFrac(a+c, b+d);
-  const wrong3 = fmtFrac(numer, b+d);
-  const options = buildOptions(correct, shuffleArr([wrong1,wrong2,wrong3]).filter(w=>w!==correct), k=>fmtFrac(numer+k, denom));
+function gen_p1_frac_add(){
+  const b = pick(ADD_SUB_POOL), d = pick(ADD_SUB_POOL);
+  const a = ri(1, b*2), c = ri(1, d*2);
+  const L = lcm(b,d);
+  const an = a*(L/b), cn = c*(L/d);
+  const { str, value } = exactDecimal(an+cn, L);
   return {
-    prompt: `Найдите значение выражения:<br><b>${a}/${b} ${op} ${c}/${d}</b>`,
-    options, correctIndex: options.indexOf(correct),
-    explain: `${a}/${b} ${op} ${c}/${d} = (${a}·${d} ${op} ${c}·${b})/(${b}·${d}) = ${numer}/${denom} = ${correct}.`
+    prompt: `Найдите значение выражения:` + exprWrap(`${renderFrac(a,b)}<span class="op">+</span>${renderFrac(c,d)}`),
+    correctValue: value,
+    explain: `Общий знаменатель — ${L}. ${a}/${b} = ${an}/${L}, ${c}/${d} = ${cn}/${L}. ${an}/${L} + ${cn}/${L} = ${an+cn}/${L} = ${str}.`
   };
 }
 
-function gen_calc_percent(){
-  const whole = pick([200,300,400,500,600,800,1000,1200]);
-  const pct = pick([5,10,15,20,25,30,40,50,60,75]);
-  const part = (whole/100)*pct;
-  if (Math.random() < 0.5) {
-    const correct = part;
-    const wrong1 = Math.round(whole/pct);
-    const wrong2 = Math.round(whole*pct/1000);
-    const wrong3 = correct + pick([-30,-20,20,30,40]);
-    const options = buildOptions(String(correct), shuffleArr([wrong1,wrong2,wrong3]).map(String), k=>String(correct+(k%2?1:-1)*15*k));
-    return {
-      prompt: `Найдите ${pct}% от числа ${whole}.`,
-      options, correctIndex: options.indexOf(String(correct)),
-      explain: `${pct}% от ${whole} — это ${whole} · ${pct}/100 = ${correct}.`
-    };
-  } else {
-    const correct = whole;
-    const wrong1 = Math.round(part*pct/100);
-    const wrong2 = Math.round(part/pct);
-    const wrong3 = correct + pick([-100,-50,50,100]);
-    const options = buildOptions(String(correct), shuffleArr([wrong1,wrong2,wrong3]).map(String), k=>String(correct+(k%2?1:-1)*50*k));
-    return {
-      prompt: `Число ${part} составляет ${pct}% от неизвестного числа. Найдите это число.`,
-      options, correctIndex: options.indexOf(String(correct)),
-      explain: `Если ${part} — это ${pct}%, то всё число равно ${part} : ${pct} · 100 = ${correct}.`
-    };
-  }
-}
-
-function gen_calc_power(){
-  const a = pick([2,3,5]);
-  const m = ri(2,4), n = ri(1,3);
-  const expExp = ri(1, Math.min(4, m+n-1));
-  const k = m+n-expExp;
-  const correct = Math.pow(a, expExp);
-  const wrong1 = Math.pow(a, m+n+k);
-  const wrong2 = Math.round(Math.pow(a, Math.max(1, Math.round((m*n)/Math.max(1,k)))));
-  const wrong3 = correct * a;
-  const options = buildOptions(String(correct), shuffleArr([wrong1, wrong2, wrong3]).map(String), kk=>String(correct + (kk%2?1:-1)*a*kk));
+function gen_p2_frac_sub(){
+  const b = pick(ADD_SUB_POOL), d = pick(ADD_SUB_POOL);
+  const a = ri(1, b*2), c = ri(1, d*2);
+  const L = lcm(b,d);
+  const an = a*(L/b), cn = c*(L/d);
+  const { str, value } = exactDecimal(an-cn, L);
   return {
-    prompt: `Найдите значение выражения:<br><b>${a}<sup>${m}</sup> · ${a}<sup>${n}</sup> : ${a}<sup>${k}</sup></b>`,
-    options, correctIndex: options.indexOf(String(correct)),
-    explain: `${a}^${m} · ${a}^${n} : ${a}^${k} = ${a}^(${m}+${n}−${k}) = ${a}^${expExp} = ${correct}.`
+    prompt: `Найдите значение выражения:` + exprWrap(`${renderFrac(a,b)}<span class="op">−</span>${renderFrac(c,d)}`),
+    correctValue: value,
+    explain: `Общий знаменатель — ${L}. ${a}/${b} = ${an}/${L}, ${c}/${d} = ${cn}/${L}. ${an}/${L} − ${cn}/${L} = ${an-cn}/${L} = ${str}.`
   };
 }
 
+// выбирает вторую "ногу" пары так, чтобы суммарный запас двоек/пятёрок не превышал 2 —
+// тогда b·d (или b·c2 при делении) гарантированно даёт ≤2 знака после запятой
+function pickMdPartner(first){
+  const fe = twoFiveSplit(first);
+  const options = MD_POOL.filter(x => {
+    const e = twoFiveSplit(x);
+    return fe.twos + e.twos <= 2 && fe.fives + e.fives <= 2;
+  });
+  return pick(options.length ? options : [first]);
+}
+
+function gen_p3_frac_mul(){
+  const b = pick(MD_POOL), d = pickMdPartner(b);
+  const be = twoFiveSplit(b), de = twoFiveSplit(d);
+  const a = be.bad * ri(1, Math.max(1, Math.round(b*2/be.bad)));
+  const c = de.bad * ri(1, Math.max(1, Math.round(d*2/de.bad)));
+  const num = a*c, den = b*d;
+  const { str, value } = exactDecimal(num, den);
+  return {
+    prompt: `Найдите значение выражения:` + exprWrap(`${renderFrac(a,b)}<span class="op">·</span>${renderFrac(c,d)}`),
+    correctValue: value,
+    explain: `${a}/${b} · ${c}/${d} = (${a}·${c})/(${b}·${d}) = ${num}/${den} = ${str}.`
+  };
+}
+
+function gen_p4_frac_div(){
+  const b = pick(MD_POOL), c2 = pickMdPartner(b);
+  const be = twoFiveSplit(b), ce = twoFiveSplit(c2);
+  const a = be.bad * ri(1, Math.max(1, Math.round(b*2/be.bad)));
+  const d2 = ce.bad * ri(1, Math.max(1, Math.round(c2*2/ce.bad)));
+  const num = a*d2, den = b*c2;
+  const { str, value } = exactDecimal(num, den);
+  return {
+    prompt: `Найдите значение выражения:` + exprWrap(`${renderFrac(a,b)}<span class="op">:</span>${renderFrac(c2,d2)}`),
+    correctValue: value,
+    explain: `${a}/${b} : ${c2}/${d2} = ${a}/${b} · ${d2}/${c2} = (${a}·${d2})/(${b}·${c2}) = ${num}/${den} = ${str}.`
+  };
+}
+
+function gen_p5_dec_add(){
+  const xI = ri(11,98), yI = ri(11,98);
+  const sumI = xI + yI;
+  return {
+    prompt: `Найдите значение выражения:` + exprWrap(`${fmtDecimalFromInt(xI,1)}<span class="op">+</span>${fmtDecimalFromInt(yI,1)}`),
+    correctValue: sumI/10,
+    explain: `${fmtDecimalFromInt(xI,1)} + ${fmtDecimalFromInt(yI,1)} = ${fmtDecimalFromInt(sumI,1)}.`
+  };
+}
+
+function gen_p6_dec_sub(){
+  const xI = ri(11,98), yI = ri(11,98);
+  const diffI = xI - yI;
+  return {
+    prompt: `Найдите значение выражения:` + exprWrap(`${fmtDecimalFromInt(xI,1)}<span class="op">−</span>${fmtDecimalFromInt(yI,1)}`),
+    correctValue: diffI/10,
+    explain: `${fmtDecimalFromInt(xI,1)} − ${fmtDecimalFromInt(yI,1)} = ${fmtDecimalFromInt(diffI,1)}.`
+  };
+}
+
+function gen_p7_dec_mul(){
+  const xI = ri(11,98), yI = ri(11,98);
+  const prodI = xI * yI;
+  return {
+    prompt: `Найдите значение выражения:` + exprWrap(`${fmtDecimalFromInt(xI,1)}<span class="op">·</span>${fmtDecimalFromInt(yI,1)}`),
+    correctValue: prodI/100,
+    explain: `${fmtDecimalFromInt(xI,1)} · ${fmtDecimalFromInt(yI,1)} = ${fmtDecimalFromInt(prodI,2)}.`
+  };
+}
+
+function gen_p8_dec_div(){
+  const q = ri(2,15);
+  const yI = ri(2,20);
+  const xI = yI * q;
+  return {
+    prompt: `Найдите значение выражения:` + exprWrap(renderFrac(fmtDecimalFromInt(xI,1), fmtDecimalFromInt(yI,1))),
+    correctValue: q,
+    explain: `${fmtDecimalFromInt(xI,1)} : ${fmtDecimalFromInt(yI,1)} = ${q}.`
+  };
+}
+
+function gen_p9_nested(){
+  let p,q,L,innerNum,tries=0;
+  do {
+    p = pick(MD_POOL); q = pick(MD_POOL);
+    if (q === p) q = pick(MD_POOL);
+    L = lcm(p,q);
+    innerNum = L/p + L/q;
+    tries++;
+  } while (decimalPlaces(reduceFrac(L, innerNum)[1]) > 2 && tries < 200);
+  if (decimalPlaces(reduceFrac(L, innerNum)[1]) > 2) {
+    // подстраховка: пример из настоящего ОГЭ, если случайный перебор не уложился в лимит попыток
+    p = 30; q = 42; L = lcm(p,q); innerNum = L/p + L/q;
+  }
+  const { str, value } = exactDecimal(L, innerNum);
+  return {
+    prompt: `Найдите значение выражения:` + exprWrap(renderFrac('1', `${renderFrac(1,p)}<span class="op">+</span>${renderFrac(1,q)}`)),
+    correctValue: value,
+    explain: `1/${p} + 1/${q} = ${L/p}/${L} + ${L/q}/${L} = ${innerNum}/${L}. Вся дробь равна 1 : ${innerNum}/${L} = ${L}/${innerNum} = ${str}.`
+  };
+}
 
 /* ═══════════════ реестр типов ═══════════════ */
 
 const GROUPS = [
-  { title: 'Вычисления', modes: [
-    { id: 'frac', title: 'Выражение с обыкновенными дробями', gen: gen_calc_frac },
-    { id: 'percent', title: 'Проценты от числа и число по проценту', gen: gen_calc_percent },
-    { id: 'power', title: 'Выражение со степенями', gen: gen_calc_power },
+  { title: 'Обыкновенные дроби', modes: [
+    { id: 'p1', title: 'Сложение обыкновенных дробей', gen: gen_p1_frac_add },
+    { id: 'p2', title: 'Вычитание обыкновенных дробей', gen: gen_p2_frac_sub },
+    { id: 'p3', title: 'Умножение обыкновенных дробей', gen: gen_p3_frac_mul },
+    { id: 'p4', title: 'Деление обыкновенных дробей', gen: gen_p4_frac_div },
+  ]},
+  { title: 'Десятичные дроби', modes: [
+    { id: 'p5', title: 'Сложение десятичных дробей', gen: gen_p5_dec_add },
+    { id: 'p6', title: 'Вычитание десятичных дробей', gen: gen_p6_dec_sub },
+    { id: 'p7', title: 'Умножение десятичных дробей', gen: gen_p7_dec_mul },
+    { id: 'p8', title: 'Деление десятичных дробей', gen: gen_p8_dec_div },
+  ]},
+  { title: 'Сложное выражение', modes: [
+    { id: 'p9', title: 'Многоэтажная дробь', gen: gen_p9_nested },
   ]},
 ];
 const ALL_MODES = GROUPS.flatMap(g => g.modes);
@@ -672,14 +842,17 @@ const els = {
   backBtn: document.getElementById('backBtn'),
   taskTitle: document.getElementById('taskTitle'),
   refreshBtn: document.getElementById('refreshBtn'),
+  prevTypeBtn: document.getElementById('prevTypeBtn'),
+  nextTypeBtn: document.getElementById('nextTypeBtn'),
   tabLearn: document.getElementById('tabLearn'),
   tabPractice: document.getElementById('tabPractice'),
   tabExam: document.getElementById('tabExam'),
   comingSoonPanel: document.getElementById('comingSoonPanel'),
   questionPanel: document.getElementById('questionPanel'),
   questionPromptText: document.getElementById('questionPromptText'),
-  mcqOptions: document.getElementById('mcqOptions'),
-  changeAnswerBtn: document.getElementById('changeAnswerBtn'),
+  inputAnswerArea: document.getElementById('inputAnswerArea'),
+  answerInput: document.getElementById('answerInput'),
+  checkAnswerBtn: document.getElementById('checkAnswerBtn'),
   mainPanel: document.getElementById('mainPanel'),
   explainBox: document.getElementById('explainBox'),
   nextBtn: document.getElementById('nextBtn'),
@@ -805,8 +978,10 @@ function playMedalAnimation(tier) {
 }
 
 function recordSolve() {
-  const gotItRight = curProg.pickedIndex === curTask.correctIndex;
-  curProg.history.unshift({ prompt: curTask.prompt, correct: gotItRight, hadError: !!curProg.hadWrongPick, answer: curTask.options[curTask.correctIndex] });
+  // ввод текстом всегда завершается показом верного значения (даже после ошибок) —
+  // "верно"/"неверно" тут не различаем, только было ли по пути 🟡-исправление (hadError)
+  const gotItRight = true;
+  curProg.history.unshift({ prompt: curTask.prompt, correct: gotItRight, hadError: !!curProg.hadWrongPick, answer: String(curTask.correctValue) });
   curProg.history = curProg.history.slice(0, 5);
   curProg.solvedInBatch = (curProg.solvedInBatch || 0) + 1;
 
@@ -857,6 +1032,9 @@ function openTask() {
   els.taskArea.style.display = 'block';
   const m = curMode === 'random' ? null : ALL_MODES.find(x => x.id === curMode);
   els.taskTitle.textContent = curMode === 'random' ? 'Случайно' : m.title;
+  const showTypeNav = curMode !== 'random';
+  els.prevTypeBtn.style.display = showTypeNav ? 'inline-flex' : 'none';
+  els.nextTypeBtn.style.display = showTypeNav ? 'inline-flex' : 'none';
   curProg = (curMode !== 'random') ? loadProgOrFresh(curMode) : freshProg();
   renderMedalBadges();
   renderExampleHistory();
@@ -867,6 +1045,19 @@ els.backBtn.onclick = () => {
   els.picker.style.display = 'block';
   renderPicker();
 };
+function navigateType(delta){
+  const idx = ALL_MODES.findIndex(x=>x.id===curMode);
+  if(idx===-1) return; // в «случайно» стрелки скрыты
+  const newIdx = (idx + delta + ALL_MODES.length) % ALL_MODES.length;
+  curMode = ALL_MODES[newIdx].id;
+  els.taskTitle.textContent = ALL_MODES[newIdx].title;
+  curProg = loadProgOrFresh(curMode);
+  renderMedalBadges();
+  renderExampleHistory();
+  resumeOrNewTask();
+}
+els.prevTypeBtn.onclick = ()=>navigateType(-1);
+els.nextTypeBtn.onclick = ()=>navigateType(1);
 els.refreshBtn.onclick = () => { if (curSubMode === 'exam') newTask(); };
 
 function switchSubMode(mode) {
@@ -892,35 +1083,34 @@ els.tabPractice.onclick = () => switchSubMode('practice');
 els.tabExam.onclick = () => switchSubMode('exam');
 
 function renderCurrentTask() {
+  window.scrollTo(0, 0);
   els.questionPanel.style.display = 'block';
   els.questionPromptText.innerHTML = curTask.prompt;
 
-  els.mcqOptions.innerHTML = curTask.options.map((opt, i) =>
-    `<button class="mcq-btn" data-i="${i}"><span class="mlabel">${i + 1})</span><span>${opt}</span></button>`
-  ).join('');
-  els.changeAnswerBtn.style.display = 'none';
-  attachMCQHandlers();
+  els.answerInput.value = '';
+  els.answerInput.classList.remove('good', 'bad', 'shake');
+  els.answerInput.disabled = false;
+  els.checkAnswerBtn.disabled = false;
+  setTimeout(() => els.answerInput.focus(), 30);
 
   els.mainPanel.style.display = 'none';
   els.explainBox.style.display = 'none';
   els.nextBtn.style.display = 'none';
+  syncKeypadVisibility();
 }
 
 function newTask() {
   const m = curMode === 'random' ? pick(ALL_MODES) : ALL_MODES.find(x => x.id === curMode);
   curTask = m.gen();
   taskAnswered = false;
-  optionsLocked = false;
   hadWrongPick = false;
 
-  window.scrollTo(0, 0);
   renderCurrentTask();
 
   if (curMode !== 'random') {
     curProg.task = curTask;
     curProg.answered = false;
     curProg.hadWrongPick = false;
-    curProg.pickedIndex = null;
     saveProg(curMode, curProg);
   }
 }
@@ -931,76 +1121,73 @@ function resumeOrNewTask() {
     curTask = curProg.task;
     taskAnswered = !!curProg.answered;
     hadWrongPick = !!curProg.hadWrongPick;
-    optionsLocked = taskAnswered;
 
-    window.scrollTo(0, 0);
     renderCurrentTask();
 
-    const btns = [...els.mcqOptions.querySelectorAll('.mcq-btn')];
     if (taskAnswered) {
-      btns.forEach(b => { b.onclick = null; b.classList.add('disabled'); });
-      if (typeof curProg.pickedIndex === 'number' && curProg.pickedIndex !== curTask.correctIndex && btns[curProg.pickedIndex]) {
-        btns[curProg.pickedIndex].classList.add('wrong');
-      }
-      if (btns[curTask.correctIndex]) btns[curTask.correctIndex].classList.add('correct');
+      els.answerInput.value = String(curTask.correctValue);
+      els.answerInput.classList.add('good');
+      els.answerInput.disabled = true;
+      els.checkAnswerBtn.disabled = true;
+      syncKeypadVisibility();
       finishTask(false);
-    } else if (hadWrongPick && typeof curProg.pickedIndex === 'number') {
-      optionsLocked = true;
-      if (btns[curProg.pickedIndex]) btns[curProg.pickedIndex].classList.add('wrong');
-      els.changeAnswerBtn.style.display = 'block';
+    } else if (hadWrongPick) {
+      els.answerInput.classList.add('bad');
     }
   } else {
     newTask();
   }
 }
 
-function attachMCQHandlers() {
-  const btns = [...els.mcqOptions.querySelectorAll('.mcq-btn')];
-  btns.forEach(b => {
-    b.onclick = () => {
-      if (optionsLocked || taskAnswered) return;
-      optionsLocked = true;
-      els.changeAnswerBtn.style.display = 'none';
-      const i = Number(b.dataset.i);
-      btns.forEach(x => { x.onclick = null; x.classList.add('disabled'); });
-      if (i === curTask.correctIndex) {
-        b.classList.add('correct');
-        streak++; totalSolved++;
-        els.stSolved.textContent = totalSolved;
-        els.stStreak.textContent = streak;
-        taskAnswered = true;
-        if (curMode !== 'random') { curProg.answered = true; curProg.pickedIndex = i; saveProg(curMode, curProg); }
-        finishTask();
-      } else if (hadWrongPick) {
-        b.classList.add('wrong');
-        btns[curTask.correctIndex].classList.add('correct');
-        streak = 0; totalErrors++;
-        els.stErrors.textContent = totalErrors;
-        els.stStreak.textContent = streak;
-        taskAnswered = true;
-        if (curMode !== 'random') { curProg.answered = true; curProg.pickedIndex = i; curProg.errorsInBatch = (curProg.errorsInBatch || 0) + 1; saveProg(curMode, curProg); }
-        finishTask();
-      } else {
-        b.classList.add('wrong');
-        hadWrongPick = true;
-        streak = 0; totalErrors++;
-        els.stErrors.textContent = totalErrors;
-        els.stStreak.textContent = streak;
-        els.changeAnswerBtn.style.display = 'block';
-        if (curMode !== 'random') { curProg.hadWrongPick = true; curProg.pickedIndex = i; curProg.errorsInBatch = (curProg.errorsInBatch || 0) + 1; saveProg(curMode, curProg); }
-      }
-    };
-  });
-}
-
-els.changeAnswerBtn.onclick = () => {
+function submitInputAnswer() {
   if (taskAnswered) return;
-  optionsLocked = false;
-  const btns = [...els.mcqOptions.querySelectorAll('.mcq-btn')];
-  btns.forEach(b => b.classList.remove('wrong', 'correct', 'disabled'));
-  els.changeAnswerBtn.style.display = 'none';
-  attachMCQHandlers();
-};
+  const raw = els.answerInput.value.trim().replace(',', '.');
+  if (raw === '') return;
+  const val = parseFloat(raw);
+  const isCorrect = Number.isFinite(val) && Math.abs(val - curTask.correctValue) < 1e-9;
+
+  if (isCorrect) {
+    els.answerInput.classList.remove('bad');
+    els.answerInput.classList.add('good');
+    els.answerInput.disabled = true;
+    els.checkAnswerBtn.disabled = true;
+    streak++; totalSolved++;
+    els.stSolved.textContent = totalSolved;
+    els.stStreak.textContent = streak;
+    taskAnswered = true;
+    syncKeypadVisibility();
+    if (curMode !== 'random') { curProg.answered = true; saveProg(curMode, curProg); }
+    finishTask(true);
+  } else if (hadWrongPick) {
+    els.answerInput.value = String(curTask.correctValue);
+    els.answerInput.classList.remove('bad');
+    els.answerInput.classList.add('good');
+    els.answerInput.disabled = true;
+    els.checkAnswerBtn.disabled = true;
+    streak = 0; totalErrors++;
+    els.stErrors.textContent = totalErrors;
+    els.stStreak.textContent = streak;
+    taskAnswered = true;
+    syncKeypadVisibility();
+    if (curMode !== 'random') { curProg.answered = true; saveProg(curMode, curProg); }
+    finishTask(true);
+  } else {
+    hadWrongPick = true;
+    streak = 0; totalErrors++;
+    els.stErrors.textContent = totalErrors;
+    els.stStreak.textContent = streak;
+    els.answerInput.classList.remove('shake');
+    void els.answerInput.offsetWidth;
+    els.answerInput.classList.add('bad', 'shake');
+    if (curMode !== 'random') {
+      if (!curProg.hadWrongPick) curProg.errorsInBatch = (curProg.errorsInBatch || 0) + 1;
+      curProg.hadWrongPick = true;
+      saveProg(curMode, curProg);
+    }
+  }
+}
+els.checkAnswerBtn.onclick = submitInputAnswer;
+els.answerInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitInputAnswer(); });
 
 function finishTask(isFreshSolve) {
   if (isFreshSolve === undefined) isFreshSolve = true;
@@ -1015,6 +1202,87 @@ function finishTask(isFreshSolve) {
   if (isFreshSolve && curMode !== 'random') recordSolve();
 }
 els.nextBtn.onclick = newTask;
+
+/* ───────── плавающая клавиатура ───────── */
+let keypadOpen = true;
+function setupFloatingKeypad(){
+  const keys = ['7','8','9','4','5','6','1','2','3',',','0','−'];
+  document.getElementById('keypadButtons').innerHTML = keys.map(k=>{
+    const cls = k==='−' ? 'kp-minus' : (k===',' ? 'kp-comma' : '');
+    // на кнопке — красивый минус «−», но в поле вставляем обычный ASCII-дефис,
+    // иначе parseFloat при проверке ответа его не распознает
+    const val = k==='−' ? '-' : k;
+    return `<button type="button" class="${cls}" data-key="${val}">${k}</button>`;
+  }).join('') +
+    `<button type="button" class="kp-back" data-key="back">⌫ Стереть</button>` +
+    `<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>`;
+  document.querySelectorAll('#keypadButtons button').forEach(btn=>{
+    btn.onclick = ()=>keypadPress(btn.dataset.key);
+  });
+  document.getElementById('kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(); };
+  document.getElementById('kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(); };
+  makeKeypadDraggable(document.getElementById('keypadFloat'), document.getElementById('kpDragHandle'));
+}
+function makeKeypadDraggable(floatEl, handleEl){
+  if(!floatEl || !handleEl || floatEl._dragReady) return;
+  floatEl._dragReady = true;
+  let dragging = false, offsetX = 0, offsetY = 0;
+  function clamp(x, y){
+    const w = floatEl.offsetWidth, h = floatEl.offsetHeight;
+    const maxX = Math.max(4, window.innerWidth - w - 4);
+    const maxY = Math.max(4, window.innerHeight - h - 4);
+    return { x: Math.min(Math.max(x, 4), maxX), y: Math.min(Math.max(y, 4), maxY) };
+  }
+  function onPointerDown(e){
+    dragging = true;
+    const rect = floatEl.getBoundingClientRect();
+    floatEl.style.left = rect.left + 'px';
+    floatEl.style.top = rect.top + 'px';
+    floatEl.style.right = 'auto';
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    try{ handleEl.setPointerCapture(e.pointerId); }catch(err){}
+    e.preventDefault();
+  }
+  function onPointerMove(e){
+    if(!dragging) return;
+    const pos = clamp(e.clientX - offsetX, e.clientY - offsetY);
+    floatEl.style.left = pos.x + 'px';
+    floatEl.style.top = pos.y + 'px';
+  }
+  function onPointerUp(e){
+    dragging = false;
+    try{ handleEl.releasePointerCapture(e.pointerId); }catch(err){}
+  }
+  handleEl.addEventListener('pointerdown', onPointerDown);
+  handleEl.addEventListener('pointermove', onPointerMove);
+  handleEl.addEventListener('pointerup', onPointerUp);
+  handleEl.addEventListener('pointercancel', onPointerUp);
+  window.addEventListener('resize', ()=>{
+    if(floatEl.style.left && floatEl.style.left!=='auto'){
+      const rect = floatEl.getBoundingClientRect();
+      const pos = clamp(rect.left, rect.top);
+      floatEl.style.left = pos.x + 'px';
+      floatEl.style.top = pos.y + 'px';
+    }
+  });
+}
+function keypadPress(ch){
+  const inp = els.answerInput;
+  if(!inp || inp.disabled) return;
+  if(ch==='enter'){ submitInputAnswer(); return; }
+  if(ch==='back') inp.value = inp.value.slice(0,-1);
+  else inp.value = (inp.value||'') + ch;
+  inp.focus();
+}
+function syncKeypadVisibility(){
+  const needsInput = els.taskArea.style.display !== 'none' &&
+    els.questionPanel.style.display !== 'none' &&
+    !els.answerInput.disabled;
+  document.getElementById('keypadFloat').style.display = (needsInput && keypadOpen) ? 'block' : 'none';
+  document.getElementById('kpToggle').style.display = (needsInput && !keypadOpen) ? 'flex' : 'none';
+}
+setupFloatingKeypad();
 
 renderPicker();
 </script>

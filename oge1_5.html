@@ -170,7 +170,7 @@ html[data-board="on"] body{background:
     var(--bg);}
 
 /* ─── свернуть подсказки: освобождает место для записи на доске ─── */
-.focus-toggle{position:fixed;top:160px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
+.focus-toggle{position:fixed;top:112px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
 .focus-toggle:hover{border-color:var(--ink)}
 .focus-toggle:active{transform:scale(.92)}
 
@@ -261,6 +261,10 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
 /* ─── шапка задачи ─── */
 .task-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.type-nav{display:flex;align-items:center;gap:8px;}
+.type-nav-btn{height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-ui);font-weight:600;font-size:12px;line-height:1;cursor:pointer;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;transition:transform .12s, border-color .12s;}
+.type-nav-btn:hover{border-color:var(--ink)}
+.type-nav-btn:active{transform:scale(.9)}
 .submode-tabs{display:flex;gap:8px;margin-bottom:14px;}
 .submode-tab{flex:1;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:10px 6px;cursor:pointer;text-align:center;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s, border-color .15s, color .15s, background .15s;}
 .submode-tab:active{transform:scale(.96)}
@@ -399,12 +403,12 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .keypad button.kp-back{font-size:15px;color:var(--muted-6)}
 .keypad button.kp-enter{grid-column:span 3;width:auto;height:38px;font-family:var(--font-ui);font-weight:600;font-size:14px;background:var(--ink);color:#fff;border-color:var(--ink);}
 .keypad button.kp-enter:active{background:var(--ink-active);}
-.keypad-float{position:fixed;top:220px;right:20px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:50}
+.keypad-float{position:fixed;top:160px;right:16px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:50}
 .keypad-close{position:absolute;top:-11px;right:-11px;width:26px;height:26px;border-radius:50%;background:var(--teacher);color:#fff;border:2px solid #fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s;}
 .keypad-close:active{transform:scale(.9)}
 .keypad-drag-handle{position:absolute;top:-11px;left:-11px;width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;border:2px solid #fff;font-size:12px;line-height:1;cursor:grab;display:flex;align-items:center;justify-content:center;touch-action:none;}
 .keypad-drag-handle:active{cursor:grabbing;}
-.keypad-toggle{position:fixed;top:220px;right:20px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50;transition:transform .15s;}
+.keypad-toggle{position:fixed;top:160px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50;transition:transform .15s;}
 .keypad-toggle:active{transform:scale(.92)}
 @media(max-width:720px){.keypad-float,.keypad-toggle{top:auto;bottom:16px;right:16px}}
 
@@ -565,7 +569,11 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
   <div id="taskArea" style="display:none">
     <div class="task-head">
-      <button class="back-btn" id="backBtn">← назад</button>
+      <div class="type-nav">
+        <button class="back-btn" id="backBtn">← назад</button>
+        <button class="type-nav-btn" id="prevTypeBtn" title="Предыдущий тип">◀ Предыдущий тип</button>
+        <button class="type-nav-btn" id="nextTypeBtn" title="Следующий тип">Следующий тип ▶</button>
+      </div>
       <div class="corner">
         <div class="task-title" id="taskTitle"></div>
         <span class="medal-badge-row" id="medalBadgeRow"></span>
@@ -993,6 +1001,8 @@ const els = {
   taskArea: document.getElementById('taskArea'),
   modesGrid: document.getElementById('modesGrid'),
   backBtn: document.getElementById('backBtn'),
+  prevTypeBtn: document.getElementById('prevTypeBtn'),
+  nextTypeBtn: document.getElementById('nextTypeBtn'),
   taskTitle: document.getElementById('taskTitle'),
   refreshBtn: document.getElementById('refreshBtn'),
   tabLearn: document.getElementById('tabLearn'),
@@ -1273,6 +1283,7 @@ function openTask() {
   }
 
   updateTasksetNav();
+  updateTypeNav();
   switchSubMode(curSubMode, true);
 }
 els.theoryToggleBtn.onclick = () => {
@@ -1308,6 +1319,36 @@ function navigateTaskset(delta) {
 }
 els.prevTaskBtn.onclick = () => navigateTaskset(-1);
 els.nextTaskBtn.onclick = () => navigateTaskset(1);
+
+/* переход «следующий/предыдущий тип» — листает соседние прототипы внутри той же
+   тематической группы (например, между «Стоимость связи» и «Сравнение тарифов»).
+   Внутри «Шины» (taskset) кнопки скрыты — там уже есть своя навигация по заданиям. */
+function findGroupOf(modeId) {
+  return GROUPS.find(g => g.modes.some(m => m.id === modeId));
+}
+function updateTypeNav() {
+  const group = (curMode === 'random' || curTasksetRef) ? null : findGroupOf(curMode);
+  const showNav = !!group && group.modes.length > 1;
+  els.prevTypeBtn.style.display = showNav ? 'inline-flex' : 'none';
+  els.nextTypeBtn.style.display = showNav ? 'inline-flex' : 'none';
+}
+function navigateType(delta) {
+  if (curTasksetRef) return;
+  const group = findGroupOf(curMode);
+  if (!group) return;
+  const idx = group.modes.findIndex(m => m.id === curMode);
+  if (idx === -1) return;
+  const newIdx = (idx + delta + group.modes.length) % group.modes.length;
+  const target = group.modes[newIdx];
+  if (target.kind === 'taskset') {
+    enterTaskset(target);
+  } else {
+    curMode = target.id;
+    openTask();
+  }
+}
+els.prevTypeBtn.onclick = () => navigateType(-1);
+els.nextTypeBtn.onclick = () => navigateType(1);
 
 function switchSubMode(mode, isEntering) {
   curSubMode = mode;

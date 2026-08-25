@@ -248,6 +248,10 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .mode-card.soon:hover{border-color:var(--glass-border);transform:none;}
 .soon-badge{font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-1);background:var(--glass);border-radius:8px;padding:3px 8px;}
 .task-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.type-nav{display:flex;align-items:center;gap:8px;}
+.type-nav-btn{height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-ui);font-weight:600;font-size:12px;line-height:1;cursor:pointer;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;transition:transform .12s, border-color .12s;}
+.type-nav-btn:hover{border-color:var(--ink)}
+.type-nav-btn:active{transform:scale(.9)}
 .submode-tabs{display:flex;gap:8px;margin-bottom:14px;}
 .submode-tab{flex:1;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:10px 6px;cursor:pointer;text-align:center;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s, border-color .15s, color .15s, background .15s;}
 .submode-tab:active{transform:scale(.96)}
@@ -446,7 +450,11 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
   <div id="taskArea" style="display:none">
     <div class="task-head">
-      <button class="back-btn" id="backBtn">← все типы</button>
+      <div class="type-nav">
+        <button class="back-btn" id="backBtn">← все типы</button>
+        <button class="type-nav-btn" id="prevTypeBtn" title="Предыдущий тип">◀ Предыдущий тип</button>
+        <button class="type-nav-btn" id="nextTypeBtn" title="Следующий тип">Следующий тип ▶</button>
+      </div>
       <div class="corner">
         <div class="task-title" id="taskTitle"></div>
         <span class="medal-badge-row" id="medalBadgeRow"></span>
@@ -633,6 +641,8 @@ const els = {
   backBtn: document.getElementById('backBtn'),
   taskTitle: document.getElementById('taskTitle'),
   refreshBtn: document.getElementById('refreshBtn'),
+  prevTypeBtn: document.getElementById('prevTypeBtn'),
+  nextTypeBtn: document.getElementById('nextTypeBtn'),
   tabLearn: document.getElementById('tabLearn'),
   tabPractice: document.getElementById('tabPractice'),
   tabExam: document.getElementById('tabExam'),
@@ -818,6 +828,9 @@ function openTask() {
   els.taskArea.style.display = 'block';
   const m = curMode === 'random' ? null : ALL_MODES.find(x => x.id === curMode);
   els.taskTitle.textContent = curMode === 'random' ? 'Случайно' : m.title;
+  const showTypeNav = curMode !== 'random';
+  els.prevTypeBtn.style.display = showTypeNav ? 'inline-flex' : 'none';
+  els.nextTypeBtn.style.display = showTypeNav ? 'inline-flex' : 'none';
   curProg = (curMode !== 'random') ? loadProgOrFresh(curMode) : freshProg();
   renderMedalBadges();
   renderExampleHistory();
@@ -828,6 +841,19 @@ els.backBtn.onclick = () => {
   els.picker.style.display = 'block';
   renderPicker();
 };
+function navigateType(delta){
+  const idx = ALL_MODES.findIndex(x=>x.id===curMode);
+  if(idx===-1) return; // в «случайно» стрелки скрыты
+  const newIdx = (idx + delta + ALL_MODES.length) % ALL_MODES.length;
+  curMode = ALL_MODES[newIdx].id;
+  els.taskTitle.textContent = ALL_MODES[newIdx].title;
+  curProg = loadProgOrFresh(curMode);
+  renderMedalBadges();
+  renderExampleHistory();
+  resumeOrNewTask();
+}
+els.prevTypeBtn.onclick = ()=>navigateType(-1);
+els.nextTypeBtn.onclick = ()=>navigateType(1);
 els.refreshBtn.onclick = () => { if (curSubMode === 'exam') newTask(); };
 
 function switchSubMode(mode) {
