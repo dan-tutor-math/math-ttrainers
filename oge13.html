@@ -269,6 +269,10 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .refresh-btn{width:28px;height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}
 .refresh-btn:hover{border-color:var(--ink);transform:rotate(80deg)}
 .refresh-btn:active{transform:scale(.9)}
+.basket-add-btn{width:28px;height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:13px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .15s, border-color .12s, background .2s, color .2s;}
+.basket-add-btn:hover{border-color:var(--ink)}
+.basket-add-btn:active{transform:scale(.9)}
+.basket-add-btn.ok{background:var(--ok, #34c759);border-color:var(--ok, #34c759);color:#fff;}
 
 /* ─── панель ─── */
 .panel{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:20px;margin-bottom:14px;}
@@ -475,6 +479,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       <div class="corner">
         <div class="task-title" id="taskTitle"></div>
         <span class="medal-badge-row" id="medalBadgeRow"></span>
+        <button class="basket-add-btn" id="basketAddBtn" title="В подборку">📥</button>
         <button class="refresh-btn" id="refreshBtn" title="Обновить задание">⟳</button>
       </div>
     </div>
@@ -543,6 +548,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
   <div id="boardSpace" aria-hidden="true"></div>
 </div>
 
+<script src="basket-core.js"></script>
 <script>
 /* ═══════════════ утилиты ═══════════════ */
 const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -1114,6 +1120,15 @@ els.prevTypeBtn.onclick = ()=>navigateType(-1);
 els.nextTypeBtn.onclick = ()=>navigateType(1);
 els.refreshBtn.onclick = () => { if (curSubMode === 'exam') newTask(); };
 
+els.basketAddBtn = document.getElementById('basketAddBtn');
+els.basketAddBtn.onclick = () => {
+  const rich = window.Basket ? window.Basket.extractFromSelectorsRich(['#questionPanel']) : null;
+  if (!rich || !rich.text) return;
+  window.Basket.add({ trainerId: 'oge13', modeTitle: els.taskTitle.textContent, text: rich.text, html: rich.html });
+  els.basketAddBtn.classList.add('ok');
+  els.basketAddBtn.textContent = '✓';
+  setTimeout(() => { els.basketAddBtn.classList.remove('ok'); els.basketAddBtn.textContent = '📥'; }, 900);
+};
 function switchSubMode(mode) {
   curSubMode = mode;
   els.tabLearn.classList.toggle('active', mode === 'learn');
@@ -1366,7 +1381,7 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     // холстом ниже и в этот выбор не входит
     const sheets = [...document.querySelectorAll('.sheet')];
     for (const el of sheets) if (el.offsetParent !== null) return el;
-    const fallbacks = [document.getElementById('mainPanel'), document.getElementById('taskArea'), document.querySelector('.panel')];
+    const fallbacks = [document.getElementById('taskArea'), document.querySelector('.panel')];
     for (const el of fallbacks) if (el && el.offsetParent !== null) return el;
     return null;
   }
@@ -1504,6 +1519,20 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     redrawBg();
   }
 
+  // ── если перед началом рисования фокус оставался в текстовом поле (например,
+  // пользователь только что напечатал ответ и, не кликнув мимо, сразу начал
+  // писать на доске), это поле продолжает считаться "активным" — и следующее
+  // Ctrl+Z/⌘+Z уходит в системную отмену ввода текста, а не в отмену штриха.
+  // Снимаем фокус в момент начала взаимодействия с доской, чтобы Ctrl+Z всегда
+  // попадал в undo() доски ──
+  function blurActiveFormField(){
+    const el = document.activeElement;
+    if (el && el !== document.body) {
+      const tag = (el.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || el.isContentEditable) el.blur();
+    }
+  }
+
   // ── панорамирование: средняя ИЛИ правая кнопка мыши, ИЛИ инструмент «рука» + левая кнопка ──
   let panning = false;
   let panStartClientX = 0, panStartClientY = 0, panStartPanX = 0, panStartPanY = 0;
@@ -1524,6 +1553,7 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
 
   canvas.addEventListener('contextmenu', e=> e.preventDefault()); // правая кнопка теперь двигает доску, а не открывает системное меню
   canvas.addEventListener('pointerdown', e=>{
+    blurActiveFormField();
     if (e.button === 1 || e.button === 2) { startPan(e); e.preventDefault(); return; } // средняя ИЛИ правая кнопка — панорамирование
     if (tool === 'hand') {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -1691,6 +1721,7 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
 
   canvasBg.addEventListener('contextmenu', e=> e.preventDefault());
   canvasBg.addEventListener('pointerdown', e=>{
+    blurActiveFormField();
     if (e.button === 1 || e.button === 2) { startBgPan(e); e.preventDefault(); return; }
     if (tool === 'hand') {
       if (e.pointerType === 'mouse' && e.button !== 0) return;

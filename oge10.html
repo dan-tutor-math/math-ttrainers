@@ -327,6 +327,10 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .refresh-btn{width:28px;height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}
 .refresh-btn:hover{border-color:var(--ink);transform:rotate(80deg)}
 .refresh-btn:active{transform:scale(.9)}
+.basket-add-btn{width:28px;height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:13px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .15s, border-color .12s, background .2s, color .2s;}
+.basket-add-btn:hover{border-color:var(--ink)}
+.basket-add-btn:active{transform:scale(.9)}
+.basket-add-btn.ok{background:var(--ok, #34c759);border-color:var(--ok, #34c759);color:#fff;}
 
 /* ─── тетрадный лист (для деления в столбик) ─── */
 .sheet{
@@ -624,6 +628,7 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
       <div class="corner">
         <div class="task-title" id="taskTitle"></div>
         <span class="medal-badge-row" id="medalBadgeRow"></span>
+        <button class="basket-add-btn" id="basketAddBtn" title="В подборку">📥</button>
         <button class="refresh-btn" id="refreshBtn" title="Обновить задание">⟳</button>
       </div>
     </div>
@@ -727,6 +732,7 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
   <div class="keypad" id="keypadButtons"></div>
 </div>
 
+<script src="basket-core.js"></script>
 <script>
 /* ═══════════════ утилиты ═══════════════ */
 const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
@@ -1891,6 +1897,15 @@ els.backBtn.onclick = ()=>{
 };
 els.refreshBtn.onclick = newTask;
 
+els.basketAddBtn = document.getElementById('basketAddBtn');
+els.basketAddBtn.onclick = () => {
+  const rich = window.Basket ? window.Basket.extractFromSelectorsRich(['#questionPanel']) : null;
+  if (!rich || !rich.text) return;
+  window.Basket.add({ trainerId: 'oge10', modeTitle: els.taskTitle.textContent, text: rich.text, html: rich.html });
+  els.basketAddBtn.classList.add('ok');
+  els.basketAddBtn.textContent = '✓';
+  setTimeout(() => { els.basketAddBtn.classList.remove('ok'); els.basketAddBtn.textContent = '📥'; }, 900);
+};
 function switchSubMode(mode){
   curSubMode = mode;
   els.tabPractice.classList.toggle('active', mode==='practice');
@@ -1939,10 +1954,11 @@ function renderCurrentTask(){
     };
     showFinalPanel();
   } else {
-    els.showSolutionBtn.style.display='none';
+    // тренировка, обычные типы — как и для «простых» типов, сразу можно
+    // вписать итоговый ответ напрямую; пошаговое решение (дробь → деление
+    // в столбик) теперь не навязывается, а доступно по кнопке
     els.planPanel.style.display='block';
     els.planText.innerHTML = `<b>План решения.</b> ${SHARED_PLAN}`;
-    els.finalPanel.style.display='none';
     curTask.steps = [
       { type:'fracfill2',
         question:`Вероятность равна отношению количества благоприятных исходов к общему числу исходов. Впиши дробь сам:`,
@@ -1951,7 +1967,16 @@ function renderCurrentTask(){
         maxDecimalDigits: decimalDigitsOf(curTask.answer),
         question:`Разделим дробь в столбик, чтобы получить десятичную вероятность.` },
     ];
-    runStep();
+    els.showSolutionBtn.style.display='block';
+    els.showSolutionBtn.textContent = '🧮 Решить по шагам';
+    els.showSolutionBtn.onclick = ()=>{
+      if (taskAnswered) return;
+      els.finalPanel.style.display='none';
+      els.showSolutionBtn.style.display='none';
+      stepIdx = 0;
+      runStep();
+    };
+    showFinalPanel();
   }
 }
 
@@ -2356,7 +2381,7 @@ setupAutoHeightAnimation(document.querySelector('.sheet'));
     // холстом ниже и в этот выбор не входит
     const sheets = [...document.querySelectorAll('.sheet')];
     for (const el of sheets) if (el.offsetParent !== null) return el;
-    const fallbacks = [document.getElementById('mainPanel'), document.getElementById('taskArea'), document.querySelector('.panel')];
+    const fallbacks = [document.getElementById('taskArea'), document.querySelector('.panel')];
     for (const el of fallbacks) if (el && el.offsetParent !== null) return el;
     return null;
   }
@@ -2494,6 +2519,20 @@ setupAutoHeightAnimation(document.querySelector('.sheet'));
     redrawBg();
   }
 
+  // ── если перед началом рисования фокус оставался в текстовом поле (например,
+  // пользователь только что напечатал ответ и, не кликнув мимо, сразу начал
+  // писать на доске), это поле продолжает считаться "активным" — и следующее
+  // Ctrl+Z/⌘+Z уходит в системную отмену ввода текста, а не в отмену штриха.
+  // Снимаем фокус в момент начала взаимодействия с доской, чтобы Ctrl+Z всегда
+  // попадал в undo() доски ──
+  function blurActiveFormField(){
+    const el = document.activeElement;
+    if (el && el !== document.body) {
+      const tag = (el.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || el.isContentEditable) el.blur();
+    }
+  }
+
   // ── панорамирование: средняя ИЛИ правая кнопка мыши, ИЛИ инструмент «рука» + левая кнопка ──
   let panning = false;
   let panStartClientX = 0, panStartClientY = 0, panStartPanX = 0, panStartPanY = 0;
@@ -2514,6 +2553,7 @@ setupAutoHeightAnimation(document.querySelector('.sheet'));
 
   canvas.addEventListener('contextmenu', e=> e.preventDefault()); // правая кнопка теперь двигает доску, а не открывает системное меню
   canvas.addEventListener('pointerdown', e=>{
+    blurActiveFormField();
     if (e.button === 1 || e.button === 2) { startPan(e); e.preventDefault(); return; } // средняя ИЛИ правая кнопка — панорамирование
     if (tool === 'hand') {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -2681,6 +2721,7 @@ setupAutoHeightAnimation(document.querySelector('.sheet'));
 
   canvasBg.addEventListener('contextmenu', e=> e.preventDefault());
   canvasBg.addEventListener('pointerdown', e=>{
+    blurActiveFormField();
     if (e.button === 1 || e.button === 2) { startBgPan(e); e.preventDefault(); return; }
     if (tool === 'hand') {
       if (e.pointerType === 'mouse' && e.button !== 0) return;

@@ -98,7 +98,9 @@ body{
 }
 .wrap{max-width:760px;margin:0 auto}
 h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(26px,5vw,38px);color:var(--pencil);text-align:center;}
-.sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 18px;}
+.sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 10px;}
+.reset-progress-link{display:block;margin:0 auto 18px;font-family:var(--font-ui);font-weight:600;font-size:12.5px;color:var(--muted-2);background:none;border:none;text-decoration:underline;text-underline-offset:2px;cursor:pointer;padding:2px 4px;transition:color .12s;}
+.reset-progress-link:hover{color:var(--ink)}
 .nav-bar{position:sticky;top:10px;z-index:100;margin-bottom:16px;}
 .nav-tabs,.nav-subtabs{display:flex;gap:6px;flex-wrap:wrap;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:18px;padding:7px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);}
 .nav-subtabs{margin-top:8px;padding:6px;border-radius:16px;}
@@ -173,10 +175,114 @@ footer{text-align:center;font-family:var(--font-ui);font-weight:500;color:var(--
 .theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
 .theme-toggle:hover{border-color:var(--ink)}
 .theme-toggle:active{transform:scale(.92)}
+
+/* «Подборка» — отдельная от предметной навигации, платформенная функция,
+   поэтому вынесена квадратной иконкой в левый верхний угол, зеркально
+   переключателю темы справа */
+.basket-toggle{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s, background .12s, color .12s;}
+.basket-toggle svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+.basket-toggle:hover{border-color:var(--ink)}
+.basket-toggle:active{transform:scale(.92)}
+.basket-toggle.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.basket-toggle .badge{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--teacher);color:#fff;font-family:var(--font-ui);font-size:10.5px;font-weight:700;display:none;align-items:center;justify-content:center;line-height:1;box-shadow:0 0 0 2px var(--bg,#fff);}
+
+/* «Доски» — второй платформенный инструмент, сразу под «Подборкой» в том же левом углу */
+.boards-toggle{position:fixed;top:64px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
+.boards-toggle svg{width:19px;height:19px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;}
+.boards-toggle:hover{border-color:var(--ink)}
+.boards-toggle:active{transform:scale(.92)}
+
+/* ───────── подборка ───────── */
+.basket-toolbar{margin-bottom:14px;}
+.basket-toolbar-row{display:flex;gap:10px;flex-wrap:wrap;padding:14px;}
+.basket-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:#fff;background:var(--ink);border:none;border-radius:12px;padding:10px 16px;cursor:pointer;transition:transform .15s;}
+.basket-btn:active{transform:scale(.96)}
+.basket-btn.quiet{background:var(--glass-strong);color:var(--ink);border:1px solid var(--glass-border);}
+.basket-list{padding:4px 16px 14px;}
+.basket-item{border-bottom:1px solid var(--glass-border);padding:12px 0;}
+.basket-item:last-child{border-bottom:none;}
+.basket-item-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:6px;}
+.basket-item-src{font-family:var(--font-ui);font-weight:600;font-size:12.5px;color:var(--muted-2);}
+.basket-item-text{font-family:var(--font-ui);font-size:15px;color:var(--pencil);line-height:1.5;white-space:pre-line;}
+.basket-item .rm{border:none;background:none;color:var(--teacher);font-size:18px;cursor:pointer;padding:2px 6px;line-height:1;}
+.basket-item .rm:hover{opacity:.7}
+
+/* вертикальная дробь в тексте задания — и на экране, и на печати;
+   вложенные (многоэтажные) дроби рисуются чуть мельче внешней */
+.basket-frac{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;vertical-align:middle;margin:0 4px;line-height:1.2;font-variant-numeric:tabular-nums;position:relative;top:.12em;white-space:nowrap;}
+.bf-n, .bf-d{padding:0 2px;}
+.bf-bar{display:block;width:100%;border-top:1.5px solid currentColor;margin:2px 0;}
+.basket-frac .basket-frac{font-size:.82em;margin:0 3px;}
+
+/* список вариантов ответа — некликабельный пронумерованный список,
+   отдельно от текста условия. Короткие числовые/дробные варианты (кнопки
+   .mcq-options в тренажёре) выстраиваются в один ряд, как на самом экзамене
+   — .basket-opt-list-inline; более длинные утверждения (верно/неверно)
+   остаются по одному в строке — обычный .basket-opt-list */
+.basket-opt-list{margin-top:8px;display:flex;flex-direction:column;gap:5px;}
+.basket-opt-list-inline{flex-direction:row;flex-wrap:wrap;gap:8px 26px;justify-content:center;}
+.basket-opt{padding:1px 0;}
+
+/* блочный элемент условия (заголовок, отдельный абзац и т.п.) — реально
+   начинается с новой строки, а не склеивается с соседним текстом */
+.basket-block{margin:4px 0;}
+.basket-block:first-child{margin-top:0;}
+.basket-block:last-child{margin-bottom:0;}
+
+/* картинка из теории/задания — того же небольшого размера, что и в самом
+   тренажёре, а не растянута на всю ширину карточки; несколько картинок
+   подряд встают в ряд, как и в оригинале */
+.basket-img{display:inline-block;width:160px;max-width:42%;height:auto;margin:6px 10px 6px 0;vertical-align:top;border-radius:4px;}
+.basket-fig-row{margin-bottom:8px;}
+
+/* таблица — тот же чёрно-белый стиль, что и у остального задания */
+.basket-table{border-collapse:collapse;margin:10px 0;font-family:var(--font-ui);font-size:14px;}
+.basket-table td, .basket-table th{border:1px solid currentColor;padding:6px 10px;text-align:center;}
+.basket-table th{font-weight:700;}
+
+/* числовая прямая — реконструирована из координат (left:%), не текст.
+   basket-numline-row центрирует её и ставит на отдельную строку — не
+   встык к предложению с условием */
+.basket-numline-row{margin:14px 0;text-align:center;}
+.basket-numline{position:relative;display:inline-block;vertical-align:middle;width:220px;max-width:80%;height:44px;margin:8px 6px;}
+.bnl-line{position:absolute;left:2px;right:2px;top:22px;height:2px;background:currentColor;}
+.bnl-tick{position:absolute;top:14px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;}
+.bnl-tickmark{width:2px;height:16px;background:currentColor;}
+.bnl-ticklabel{font-size:13px;margin-top:2px;white-space:nowrap;}
+/* точка центрируется точно на самой прямой (см. .bnl-line — top:22px,
+   высота 2px, центр на 23px), а не «пришивается» строкой ниже подписи —
+   подпись подвешена над точкой отдельным абсолютным блоком, не занимая
+   места в потоке (та же схема, что и в живом виджете тренажёра) */
+.bnl-point{position:absolute;top:23px;transform:translate(-50%,-50%);}
+.bnl-dot{display:block;width:9px;height:9px;border-radius:50%;background:currentColor;}
+.bnl-plabel{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);margin-bottom:5px;font-size:13px;font-weight:700;white-space:nowrap;}
+
+@media print{
+  body{background:#fff !important;padding:0;}
+  h1, .sub, .reset-progress-link, .nav-bar, .basket-toolbar, .basket-item .rm, .feedback, footer, .theme-toggle, .basket-toggle, .boards-toggle{display:none !important;}
+  .topic, .basket-item{background:#fff !important;border:none !important;box-shadow:none !important;backdrop-filter:none !important;border-radius:0 !important;}
+  .basket-item{border-bottom:1px solid #000 !important;padding:6px 0;}
+  body, .wrap, .basket-item-text, .basket-item-src{color:#000 !important;}
+  .basket-item-text{font-size:12.5px;line-height:1.35;}
+  .basket-frac{margin:0 4px;font-size:1.05em;}
+  .bf-bar{border-top:1.5px solid #000;margin:2px 0;}
+  .basket-opt-list{margin-top:6px;gap:3px;}
+  .basket-img{width:150px;max-width:36%;margin:4px 8px 4px 0;}
+  .basket-fig-row{margin-bottom:4px;}
+  .basket-table{font-size:11px;margin:6px 0;}
+  .basket-table td, .basket-table th{padding:3px 6px;}
+}
 </style>
 </head>
 <body>
 <button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<button class="basket-toggle" id="basketToggle" title="Подборка" aria-label="Подборка">
+  <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+  <span class="badge" id="basketBadge">0</span>
+</button>
+<a class="boards-toggle" href="boards.html" title="Доски" aria-label="Доски">
+  <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="9" y1="10" x2="9" y2="20"/></svg>
+</a>
 <script>(function(){
   var btn=document.getElementById('themeToggle');
   function apply(t, persist){
@@ -204,6 +310,7 @@ footer{text-align:center;font-family:var(--font-ui);font-weight:500;color:var(--
 <div class="wrap">
   <h1>Тренажёры</h1>
   <div class="sub">выбери раздел — список тренажёров откроется ниже</div>
+  <button class="reset-progress-link" id="resetProgressBtn" title="Стереть весь сохранённый прогресс, медали и историю по всем тренажёрам — например, перед занятием с новым учеником">🔁 Сбросить весь прогресс (новый ученик)</button>
 
   <div class="nav-bar" id="navBar">
     <div class="nav-tabs" id="mainTabs"></div>
@@ -220,6 +327,7 @@ footer{text-align:center;font-family:var(--font-ui);font-weight:500;color:var(--
   <footer>Ещё темы появятся здесь по мере готовности</footer>
 </div>
 
+<script src="basket-core.js"></script>
 <script>
 /* ───────── реестр тренажёров ─────────
    каждый тренажёр описан один раз, здесь; чтобы добавить новый — добавь запись сюда,
@@ -286,8 +394,29 @@ const NAV = [
   ]},
 ];
 
+// ── полный сброс прогресса: все тренажёры хранят решённые примеры, медали
+// и историю в localStorage под ключами вида 'ogeProg:<файл>:...' — все эти
+// файлы открыты с одного домена/источника, поэтому localStorage у них общий,
+// и достаточно одной кнопки здесь, чтобы стереть прогресс сразу везде. Это
+// не трогает тему оформления и то, какая вкладка была открыта в этом меню.
+document.getElementById('resetProgressBtn').onclick = () => {
+  let keys = [];
+  try { keys = Object.keys(localStorage).filter(k => k.startsWith('ogeProg:')); } catch(e){}
+  if (keys.length === 0) { alert('Прогресс уже пуст — сбрасывать нечего.'); return; }
+  const ok = confirm(
+    `Стереть весь сохранённый прогресс, медали и историю по всем тренажёрам (${keys.length} записей)?\n` +
+    `Пригодится перед занятием с новым учеником. Отменить это действие нельзя.`
+  );
+  if (!ok) return;
+  try { keys.forEach(k => localStorage.removeItem(k)); } catch(e){}
+  alert('Готово — прогресс по всем тренажёрам сброшен.');
+};
+
 const NAV_STATE_KEY = 'ogeNav:state';
 let curTabId = null, curSubtabId = null;
+// «Подборка» — платформенная функция, не часть предметной навигации,
+// поэтому у неё свой флаг, а не место среди вкладок NAV (см. .basket-toggle)
+let basketOpen = false;
 (function restoreNavState(){
   try {
     const saved = JSON.parse(localStorage.getItem(NAV_STATE_KEY) || 'null');
@@ -335,15 +464,26 @@ function getActiveDef(){
   return tab.subtabs ? getCurSubtab() : tab;
 }
 
+function updateBasketToggle(){
+  const btn = document.getElementById('basketToggle');
+  const badge = document.getElementById('basketBadge');
+  if (!btn) return;
+  const n = Basket.count();
+  btn.classList.toggle('active', basketOpen);
+  if (n > 0) { badge.style.display = 'flex'; badge.textContent = n > 99 ? '99+' : String(n); }
+  else { badge.style.display = 'none'; }
+}
+
 function renderNav(){
   const mainEl = document.getElementById('mainTabs');
   mainEl.innerHTML = NAV.map(t => {
     const n = t.subtabs ? t.subtabs.reduce((s,st)=>s+groupsCount(st.groups),0) : groupsCount(t.groups);
-    return `<button class="nav-tab${t.id===curTabId?' active':''}" data-id="${t.id}">${t.title}<span class="tcount"> · ${n}</span></button>`;
+    return `<button class="nav-tab${(!basketOpen && t.id===curTabId)?' active':''}" data-id="${t.id}">${t.title}<span class="tcount"> · ${n}</span></button>`;
   }).join('');
   mainEl.querySelectorAll('.nav-tab').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       curTabId = btn.dataset.id;
+      basketOpen = false;
       const tab = getCurTab();
       curSubtabId = tab.subtabs ? tab.subtabs[0].id : null;
       saveNavState();
@@ -351,6 +491,7 @@ function renderNav(){
       renderContent();
     });
   });
+  updateBasketToggle();
 
   const subEl = document.getElementById('subTabs');
   const tab = getCurTab();
@@ -364,6 +505,7 @@ function renderNav(){
     subEl.querySelectorAll('.nav-subtab').forEach(btn=>{
       btn.addEventListener('click', ()=>{
         curSubtabId = btn.dataset.id;
+        basketOpen = false;
         saveNavState();
         renderNav();
         renderContent();
@@ -377,6 +519,7 @@ function renderNav(){
 
 function renderContent(){
   const el = document.getElementById('topics');
+  if (basketOpen) { renderBasketView(); return; }
   const def = getActiveDef();
   if (!def || def.soon || !(def.groups||[]).length) {
     el.innerHTML = `<div class="topic"><div class="coming-soon-tab">🚧 Здесь пока нет тренажёров — они появятся в числе первых, когда будут готовы.</div></div>`;
@@ -394,6 +537,68 @@ function renderContent(){
     `;
   }).join('');
 }
+
+/* ───────── подборка ─────────
+   собирается кнопкой «📥 В подборку» на страницах тренажёров (см. basket-core.js),
+   здесь только просмотр/удаление/печать. Без seed/PDF/ключа ответов — это
+   первая, простая версия. */
+function escapeHtml(s){
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function basketItemHTML(it){
+  const trainer = TRAINERS[it.trainerId];
+  const base = trainer ? trainer.name : (it.trainerTitle || it.file || '');
+  const src = (it.modeTitle && it.modeTitle !== base) ? (base + ' · ' + it.modeTitle) : base;
+  return `
+    <div class="basket-item">
+      <div class="basket-item-head">
+        <span class="basket-item-src">${escapeHtml(src)}</span>
+        <button class="rm" data-id="${it.id}" title="Убрать">×</button>
+      </div>
+      <div class="basket-item-text">${it.html ? it.html : escapeHtml(it.text)}</div>
+    </div>
+  `;
+}
+let basketSortDir = 'desc'; // 'desc' = сначала новые (по умолчанию), 'asc' = сначала первые добавленные
+function renderBasketView(){
+  const el = document.getElementById('topics');
+  const all = Basket.all().slice(); // Basket.all() отдаёт в порядке добавления, от первого к последнему
+  const items = basketSortDir === 'desc' ? all.reverse() : all;
+  if (!items.length) {
+    el.innerHTML = `<div class="topic"><div class="coming-soon-tab">Пока пусто. Открой любой тренажёр, реши или просто сгенерируй задание и нажми «📥 В подборку» под ним — оно появится здесь.</div></div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div class="topic basket-toolbar">
+      <div class="basket-toolbar-row">
+        <button class="basket-btn" id="basketPrintBtn">🖨 Печать</button>
+        <button class="basket-btn quiet" id="basketSortBtn">${basketSortDir === 'desc' ? '⬇️ Сначала новые' : '⬆️ Сначала старые'}</button>
+        <button class="basket-btn quiet" id="basketClearBtn">Очистить всё</button>
+      </div>
+    </div>
+    <div class="topic basket-list" id="basketList">
+      ${items.map(basketItemHTML).join('')}
+    </div>
+  `;
+  document.getElementById('basketPrintBtn').onclick = () => window.print();
+  document.getElementById('basketSortBtn').onclick = () => {
+    basketSortDir = basketSortDir === 'desc' ? 'asc' : 'desc';
+    renderBasketView();
+  };
+  document.getElementById('basketClearBtn').onclick = () => {
+    if (!confirm('Убрать все задания из подборки? Это нельзя отменить.')) return;
+    Basket.clear(); renderNav(); renderContent();
+  };
+  el.querySelectorAll('.basket-item .rm').forEach(btn => {
+    btn.onclick = () => { Basket.remove(btn.dataset.id); renderNav(); renderContent(); };
+  });
+}
+
+document.getElementById('basketToggle').addEventListener('click', () => {
+  basketOpen = !basketOpen;
+  renderNav();
+  renderContent();
+});
 
 renderNav();
 renderContent();

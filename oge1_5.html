@@ -279,6 +279,10 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .refresh-btn{width:28px;height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}
 .refresh-btn:hover{border-color:var(--ink);transform:rotate(80deg)}
 .refresh-btn:active{transform:scale(.9)}
+.basket-add-btn{width:28px;height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:13px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .15s, border-color .12s, background .2s, color .2s;}
+.basket-add-btn:hover{border-color:var(--ink)}
+.basket-add-btn:active{transform:scale(.9)}
+.basket-add-btn.ok{background:var(--ok, #34c759);border-color:var(--ok, #34c759);color:#fff;}
 
 /* ─── навигация по заданиям внутри темы ─── */
 .taskset-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
@@ -303,6 +307,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
 /* ─── теория (сворачиваемый блок) ─── */
 .theory-block{padding:14px 16px;}
+.theory-block-head{display:flex;gap:8px;align-items:center;}
+.theory-block-head .theory-toggle{flex:1;}
 .theory-toggle{
   width:100%;text-align:left;font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--ink);
   background:var(--hl-10);border:1px solid var(--glass-border);border-radius:14px;padding:11px 16px;cursor:pointer;transition:transform .15s;}
@@ -577,6 +583,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       <div class="corner">
         <div class="task-title" id="taskTitle"></div>
         <span class="medal-badge-row" id="medalBadgeRow"></span>
+        <button class="basket-add-btn" id="basketAddBtn" title="В подборку">📥</button>
         <button class="refresh-btn" id="refreshBtn" title="Обновить задание">⟳</button>
       </div>
     </div>
@@ -594,7 +601,11 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
     </div>
 
     <div class="panel theory-block" id="theoryBlock" style="display:none">
-      <button class="theory-toggle" id="theoryToggleBtn">📖 Показать теорию</button>
+      <div class="theory-block-head">
+        <button class="theory-toggle" id="theoryToggleBtn">📖 Показать теорию</button>
+        <button class="taskset-nav-btn" id="newTireBtn" style="display:none" title="Выбрать новую заводскую шину и начать «Шину 1» заново — прогресс по всем 5 её заданиям сбросится">🔄 Новая шина</button>
+        <button class="basket-add-btn" id="theoryBasketAddBtn" style="display:none" title="Теорию в подборку">📥</button>
+      </div>
       <div class="theory-content" id="theoryContent" style="display:none"></div>
     </div>
 
@@ -669,6 +680,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
   <div class="keypad" id="keypadButtons"></div>
 </div>
 
+<script src="basket-core.js"></script>
 <script>
 /* ═══════════════ утилиты ═══════════════ */
 const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -750,6 +762,24 @@ const FACTORY_TIRE_POOL = [
 ];
 function pickFactoryTire(){ return pick(FACTORY_TIRE_POOL); }
 function ensureFactoryTire(){ if (!curFactoryTire) curFactoryTire = pickFactoryTire(); return curFactoryTire; }
+
+// ── заводская шина переживает перезагрузку страницы (раньше выбиралась заново
+// при КАЖДОМ входе в «Шина 1», из-за чего теория показывала одну шину, а
+// восстановленное задание было посчитано под другую — числа расходились).
+// Теперь шина хранится в localStorage и меняется только если её ещё не было
+// или все 5 заданий этой темы уже отмечены решёнными — либо явно, кнопкой
+// «Новая шина» ──
+const FACTORY_TIRE_KEY = 'ogeProg:oge1_5:factoryTire'; // тот же префикс, что и у PROGRESS_NS ниже — задан явной строкой, т.к. этот блок стоит выше её объявления
+function loadFactoryTire(){
+  try { const raw = localStorage.getItem(FACTORY_TIRE_KEY); return raw ? JSON.parse(raw) : null; }
+  catch (e) { return null; }
+}
+function saveFactoryTire(tire){
+  try { localStorage.setItem(FACTORY_TIRE_KEY, JSON.stringify(tire)); } catch (e) {}
+}
+function allTireTasksAnswered(tasksetMode){
+  return tasksetMode.tasks.every(t => { const p = loadProg(t.id); return !!(p && p.answered); });
+}
 
 /* пул "новых" шин для заданий 4 и 5 — заметно отличается от заводского набора
    (реальная замена шин обычно меняет и ширину, и профиль, и диаметр диска, а не
@@ -993,6 +1023,16 @@ const ALL_MODES = GROUPS.flatMap(g => g.modes.flatMap(m => m.kind === 'taskset' 
 /* ═══════════════ управление ═══════════════ */
 let totalSolved = 0, streak = 0, totalErrors = 0;
 let curMode = null, curTask = null, taskAnswered = false, optionsLocked = false, hadWrongPick = false, solutionShown = false;
+// смена curMode всегда идёт через эту обёртку: перед тем, как переключиться на
+// другой прототип, сохраняет записи с листа доски для ТЕКУЩЕГО (уходящего)
+// режима — чтобы при возврате к нему (например, стрелкой "предыдущее задание")
+// записи вернулись на место, а не потерялись/не расползлись по новому контенту
+function setCurMode(newId){
+  if (curMode && curMode !== 'random' && curMode !== newId && window.saveInkForMode) {
+    window.saveInkForMode(curMode);
+  }
+  curMode = newId;
+}
 let curTasksetRef = null;   // taskset-объект, внутри которого сейчас находимся (для навигации/кнопки "назад")
 let curTasksetTheory = null; // HTML теории текущего задания (если пришли из taskset)
 
@@ -1015,6 +1055,8 @@ const els = {
   theoryBlock: document.getElementById('theoryBlock'),
   theoryContent: document.getElementById('theoryContent'),
   theoryToggleBtn: document.getElementById('theoryToggleBtn'),
+  newTireBtn: document.getElementById('newTireBtn'),
+  theoryBasketAddBtn: document.getElementById('theoryBasketAddBtn'),
   comingSoonPanel: document.getElementById('comingSoonPanel'),
   questionPanel: document.getElementById('questionPanel'),
   questionPromptText: document.getElementById('questionPromptText'),
@@ -1055,6 +1097,9 @@ function loadProg(key) {
 }
 function saveProg(key, data) {
   try { data.lastActiveAt = Date.now(); localStorage.setItem(PROGRESS_NS + key, JSON.stringify(data)); } catch (e) {}
+}
+function clearProg(key) {
+  try { localStorage.removeItem(PROGRESS_NS + key); } catch (e) {}
 }
 function freshProg() {
   return { task: null, answered: false, hadWrongPick: false, pickedIndex: null,
@@ -1216,7 +1261,7 @@ function renderPicker() {
       if (rawMode && rawMode.kind === 'taskset') {
         enterTaskset(rawMode);
       } else {
-        curMode = id;
+        setCurMode(id);
         curTasksetRef = null;
         curTasksetTheory = null;
         curSubMode = 'exam';
@@ -1226,20 +1271,68 @@ function renderPicker() {
   });
 }
 
-/* открыть taskset сразу с первого задания — заводская шина фиксируется заново.
-   Прогресс/медали/история каждого отдельного задания внутри Шины при этом не
-   трогаются — они хранятся и резюмируются по собственному id, независимо от того,
-   что заводская шина для НОВОГО прохода перевыбирается случайно. */
+/* открыть taskset сразу с первого задания. Заводская шина берётся из
+   localStorage и переиспользуется, пока не решены все 5 заданий темы —
+   раньше она перевыбиралась при КАЖДОМ входе (даже без перезагрузки страницы),
+   и тогда теория показывала одну шину, а восстановленное задание было
+   посчитано под другую. Прогресс/медали/история каждого отдельного задания
+   внутри Шины хранятся и резюмируются по собственному id. */
 function enterTaskset(tasksetMode) {
-  curFactoryTire = pickFactoryTire();
   curTasksetRef = tasksetMode;
-  curTasksetTheory = buildTireTheoryHTML(curFactoryTire);
-  curMode = tasksetMode.tasks[0].id;
+  if (tasksetMode.id === 'tire_set1') {
+    const saved = loadFactoryTire();
+    if (saved && !allTireTasksAnswered(tasksetMode)) {
+      curFactoryTire = saved;
+    } else {
+      // шины ещё не было, либо все 5 заданий уже решены под старую — берём
+      // новую и сразу чистим сохранённые задания: под старую шину их числа
+      // больше не подходят, иначе resumeOrNewTask() покажет старый пример
+      curFactoryTire = pickFactoryTire();
+      saveFactoryTire(curFactoryTire);
+      tasksetMode.tasks.forEach(t => clearProg(t.id));
+    }
+    curTasksetTheory = buildTireTheoryHTML(curFactoryTire);
+  }
+  setCurMode(tasksetMode.tasks[0].id);
   curSubMode = 'exam';
   openTask();
 }
+/* явный сброс: новая случайная шина + прогресс всех 5 заданий этой темы —
+   для тех случаев, когда автоматика (см. enterTaskset) не подходит: например,
+   учитель хочет начать тему с нуля, не дожидаясь, пока ученик решит все 5 */
+function rerollFactoryTire() {
+  if (!curTasksetRef || curTasksetRef.id !== 'tire_set1') return;
+  if (!confirm('Выбрать новую заводскую шину и начать «Шину 1» заново?\nПрогресс по всем 5 заданиям этой темы будет сброшен.')) return;
+  curFactoryTire = pickFactoryTire();
+  saveFactoryTire(curFactoryTire);
+  curTasksetTheory = buildTireTheoryHTML(curFactoryTire);
+  curTasksetRef.tasks.forEach(t => clearProg(t.id));
+  setCurMode(curTasksetRef.tasks[0].id);
+  curSubMode = 'exam';
+  openTask();
+}
+els.newTireBtn.onclick = rerollFactoryTire;
+
+els.theoryBasketAddBtn.onclick = () => {
+  if (!window.Basket) return;
+  // теория может быть свёрнута (display:none) — на время снимка
+  // ненадолго раскрываем блок, чтобы контент был виден для захвата
+  const wasHidden = els.theoryContent.style.display === 'none';
+  if (wasHidden) els.theoryContent.style.display = 'block';
+  const rich = window.Basket.extractFromSelectorsRich(['#theoryContent']);
+  if (wasHidden) els.theoryContent.style.display = 'none';
+  if (!rich.text && !rich.html) return;
+  window.Basket.add({
+    trainerId: 'oge1_5',
+    modeTitle: (curTasksetRef ? curTasksetRef.title : els.taskTitle.textContent) + ' — теория',
+    text: rich.text, html: rich.html
+  });
+  els.theoryBasketAddBtn.classList.add('ok');
+  els.theoryBasketAddBtn.textContent = '✓';
+  setTimeout(() => { els.theoryBasketAddBtn.classList.remove('ok'); els.theoryBasketAddBtn.textContent = '📥'; }, 900);
+};
 document.querySelector('.mode-card.random').onclick = () => {
-  curMode = 'random';
+  setCurMode('random');
   curTasksetRef = null;
   curTasksetTheory = null;
   curSubMode = 'exam';
@@ -1278,8 +1371,12 @@ function openTask() {
     els.theoryContent.innerHTML = curTasksetTheory;
     els.theoryContent.style.display = 'none';
     els.theoryToggleBtn.textContent = '📖 Показать теорию';
+    els.newTireBtn.style.display = (curTasksetRef && curTasksetRef.id === 'tire_set1') ? 'inline-flex' : 'none';
+    els.theoryBasketAddBtn.style.display = 'inline-flex';
   } else {
     els.theoryBlock.style.display = 'none';
+    els.newTireBtn.style.display = 'none';
+    els.theoryBasketAddBtn.style.display = 'none';
   }
 
   updateTasksetNav();
@@ -1301,6 +1398,15 @@ els.backBtn.onclick = () => {
 };
 els.refreshBtn.onclick = () => { if (curSubMode === 'exam' || curSubMode === 'practice') newTask(); };
 
+els.basketAddBtn = document.getElementById('basketAddBtn');
+els.basketAddBtn.onclick = () => {
+  const rich = window.Basket ? window.Basket.extractFromSelectorsRich(['#questionPanel']) : null;
+  if (!rich || !rich.text) return;
+  window.Basket.add({ trainerId: 'oge1_5', modeTitle: els.taskTitle.textContent, text: rich.text, html: rich.html });
+  els.basketAddBtn.classList.add('ok');
+  els.basketAddBtn.textContent = '✓';
+  setTimeout(() => { els.basketAddBtn.classList.remove('ok'); els.basketAddBtn.textContent = '📥'; }, 900);
+};
 function updateTasksetNav() {
   if (!curTasksetRef) { els.tasksetNav.style.display = 'none'; return; }
   const idx = curTasksetRef.tasks.findIndex(t => t.id === curMode);
@@ -1314,7 +1420,7 @@ function navigateTaskset(delta) {
   const idx = curTasksetRef.tasks.findIndex(t => t.id === curMode);
   const newIdx = idx + delta;
   if (newIdx < 0 || newIdx >= curTasksetRef.tasks.length) return;
-  curMode = curTasksetRef.tasks[newIdx].id;
+  setCurMode(curTasksetRef.tasks[newIdx].id);
   openTask(); // теория и заводская шина не пересчитываются — сохраняются на весь сеанс
 }
 els.prevTaskBtn.onclick = () => navigateTaskset(-1);
@@ -1343,7 +1449,7 @@ function navigateType(delta) {
   if (target.kind === 'taskset') {
     enterTaskset(target);
   } else {
-    curMode = target.id;
+    setCurMode(target.id);
     openTask();
   }
 }
@@ -1438,6 +1544,11 @@ function newTask() {
   els.comingSoonPanel.style.display = 'none';
   els.refreshBtn.style.display = 'inline-flex';
 
+  // новый пример — новое содержимое листа: старые записи (если были) к нему уже
+  // не относятся, поэтому лист очищается (и вместе с ним — сохранённая для этого
+  // режима копия, чтобы при возврате сюда позже не подставились чужие заметки)
+  if (window.clearInkForMode) window.clearInkForMode(curMode);
+
   const m = curMode === 'random' ? pick(ALL_MODES) : ALL_MODES.find(x => x.id === curMode);
   curTask = m.gen();
   taskAnswered = false;
@@ -1473,6 +1584,10 @@ function resumeOrNewTask(){
     els.comingSoonPanel.style.display = 'none';
     els.refreshBtn.style.display = 'inline-flex';
     renderCurrentTask();
+
+    // тот же самый пример показывается снова — вернуть и записи с листа, если
+    // они остались с прошлого визита в этот режим (см. setCurMode)
+    if (window.loadInkForMode) window.loadInkForMode(curMode);
 
     if (curTask.type === 'input') {
       if (taskAnswered) {
@@ -2004,7 +2119,7 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     // холстом ниже и в этот выбор не входит
     const sheets = [...document.querySelectorAll('.sheet')];
     for (const el of sheets) if (el.offsetParent !== null) return el;
-    const fallbacks = [document.getElementById('mainPanel'), document.getElementById('taskArea'), document.querySelector('.panel')];
+    const fallbacks = [document.getElementById('taskArea'), document.querySelector('.panel')];
     for (const el of fallbacks) if (el && el.offsetParent !== null) return el;
     return null;
   }
@@ -2142,6 +2257,42 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     redrawBg();
   }
 
+  // ── если перед началом рисования фокус оставался в текстовом поле (например,
+  // пользователь только что напечатал ответ и, не кликнув мимо, сразу начал
+  // писать на доске), это поле продолжает считаться "активным" — и следующее
+  // Ctrl+Z/⌘+Z уходит в системную отмену ввода текста, а не в отмену штриха.
+  // Снимаем фокус в момент начала взаимодействия с доской, чтобы Ctrl+Z всегда
+  // попадал в undo() доски ──
+  function blurActiveFormField(){
+    const el = document.activeElement;
+    if (el && el !== document.body) {
+      const tag = (el.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || el.isContentEditable) el.blur();
+    }
+  }
+
+  // ── записи листа (не фона) привязаны к конкретному заданию: карта в памяти
+  // (сбрасывается при перезагрузке страницы — это не долговременное хранилище,
+  // а просто «помню, что было на листе, пока не ушёл со страницы») хранит
+  // штрихи per curMode. setCurMode() сохраняет их при уходе с задания,
+  // resumeOrNewTask() возвращает при повторном входе в то же задание, а
+  // newTask() (генерация НОВОГО примера) стирает — старые записи к новому
+  // содержимому уже не относятся ──
+  const inkByMode = new Map();
+  window.saveInkForMode = function(modeId){
+    if (!modeId) return;
+    inkByMode.set(modeId, strokes.slice());
+  };
+  window.loadInkForMode = function(modeId){
+    strokes = (modeId && inkByMode.has(modeId)) ? inkByMode.get(modeId).slice() : [];
+    redraw();
+  };
+  window.clearInkForMode = function(modeId){
+    if (modeId) inkByMode.delete(modeId);
+    strokes = [];
+    redraw();
+  };
+
   // ── панорамирование: средняя ИЛИ правая кнопка мыши, ИЛИ инструмент «рука» + левая кнопка ──
   let panning = false;
   let panStartClientX = 0, panStartClientY = 0, panStartPanX = 0, panStartPanY = 0;
@@ -2162,6 +2313,7 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
 
   canvas.addEventListener('contextmenu', e=> e.preventDefault()); // правая кнопка теперь двигает доску, а не открывает системное меню
   canvas.addEventListener('pointerdown', e=>{
+    blurActiveFormField();
     if (e.button === 1 || e.button === 2) { startPan(e); e.preventDefault(); return; } // средняя ИЛИ правая кнопка — панорамирование
     if (tool === 'hand') {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -2329,6 +2481,7 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
 
   canvasBg.addEventListener('contextmenu', e=> e.preventDefault());
   canvasBg.addEventListener('pointerdown', e=>{
+    blurActiveFormField();
     if (e.button === 1 || e.button === 2) { startBgPan(e); e.preventDefault(); return; }
     if (tool === 'hand') {
       if (e.pointerType === 'mouse' && e.button !== 0) return;

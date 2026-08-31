@@ -1,0 +1,847 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Доски — Тренажёры</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font-ui:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Sora','Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,-apple-system,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#EEF1F7;
+  --blob-1:rgba(120,150,255,.16);
+  --blob-2:rgba(190,150,230,.14);
+  --card:rgba(255,255,255,.8);
+  --glass:rgba(255,255,255,.55);
+  --glass-strong:rgba(255,255,255,.72);
+  --glass-border:rgba(255,255,255,.85);
+  --glass-inset:rgba(255,255,255,.55);
+  --hl:var(--hl-14);
+  --hover-1:var(--hl-06);
+  --hover-2:var(--hl-10);
+  --muted-1:#8E8E93; --muted-2:#6E6E73; --muted-3:#48484A; --muted-6:#8E8E93;
+  --paper:#FDFCF7;
+  --grid:#DCE4F0;
+  --ink:#004C99; --ink-active:#003A75;
+  --pencil:#1D1D1F;
+  --teacher:#FF3B30;
+  --ok:#248A3D;
+  --moved:#5AC8FA;
+  --folder:#FF9F0A;
+  --shadow:0 10px 34px rgba(20,30,60,.08);
+  --hl-06:rgba(0,76,153,.06); --hl-10:rgba(0,76,153,.10); --hl-14:var(--hl);
+  --gold-accent:#D9A94A;
+}
+html[data-theme="dark"]{
+  --bg:#0B0E1A; --blob-1:rgba(90,110,255,.22); --blob-2:rgba(150,90,220,.18);
+  --paper:#151A2C; --card:rgba(30,37,64,.82); --glass:rgba(40,46,74,.5);
+  --glass-strong:rgba(46,53,84,.65); --glass-border:rgba(255,255,255,.12); --glass-inset:rgba(255,255,255,.07);
+  --hl:rgba(40,110,214,.26); --grid:#232A44;
+  --ink:#2E7DE0; --ink-active:#4A93F0; --pencil:#F2F3F5; --teacher:#FF6961; --ok:#3E8E5B; --moved:#64D2FF;
+  --folder:#FFB143;
+  --shadow:0 10px 40px rgba(0,0,0,.55);
+  --hl-06:rgba(46,125,224,.1); --hl-10:rgba(46,125,224,.16); --hl-14:var(--hl);
+  --muted-1:#9A9AA2; --muted-2:#9A9AA2; --muted-3:#AEAEB4; --muted-6:#9A9AA2;
+  --hover-1:rgba(127,160,255,.08); --hover-2:rgba(127,160,255,.14);
+  --gold-accent:#E7C167;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    var(--bg);
+  font-family:var(--font-ui); color:var(--pencil); min-height:100vh;
+  /* это интерфейс инструмента, а не текст для чтения — весь UI (кнопки,
+     подписи, проценты зума и т.п.) не должен случайно выделяться курсором
+     как текст. Поля ввода (название доски, поиск, радиус) не затронуты —
+     у них свой, независимый от этого свойства механизм выделения текста */
+  -webkit-user-select:none; -moz-user-select:none; user-select:none;
+}
+button,input{font-family:var(--font-ui);}
+input,textarea{-webkit-user-select:text; -moz-user-select:text; user-select:text;}
+
+/* ═══════════════ переключатель темы — тот же квадрат, что и везде в приложении ═══════════════ */
+.theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:500;transition:transform .15s, border-color .12s;}
+.theme-toggle:hover{border-color:var(--ink)}
+.theme-toggle:active{transform:scale(.92)}
+
+/* ═══════════════ экран 1 — список досок ═══════════════ */
+#screenList{display:flex;min-height:100vh;}
+.bl-sidebar{width:230px;flex:0 0 auto;padding:20px 12px;display:flex;flex-direction:column;gap:14px;}
+.bl-search{display:flex;align-items:center;gap:8px;background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:9px 12px;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);}
+.bl-search svg{width:15px;height:15px;color:var(--muted-2);flex:none;}
+.bl-search input{border:none;background:none;outline:none;font-size:14px;color:var(--pencil);width:100%;}
+.bl-nav{display:flex;flex-direction:column;gap:2px;}
+.bl-nav-item{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:10px;border:none;background:none;cursor:pointer;text-align:left;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--muted-3);transition:background .12s,color .12s;}
+.bl-nav-item:hover{background:var(--hover-1);color:var(--pencil);}
+.bl-nav-item.active{background:var(--hl-14);color:var(--ink);}
+.bl-nav-item svg{width:16px;height:16px;flex:none;}
+.bl-nav-item .cnt{margin-left:auto;font-weight:500;color:var(--muted-1);font-size:12.5px;}
+.bl-folders{display:flex;flex-direction:column;gap:1px;margin-top:2px;}
+.bl-folder-item{padding-left:30px;}
+.bl-main{flex:1 1 auto;padding:22px 26px 60px;min-width:0;}
+.bl-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px;}
+.bl-title{font-family:var(--font-ui);font-weight:700;font-size:20px;color:var(--pencil);display:flex;align-items:center;gap:8px;}
+.bl-title svg{width:18px;height:18px;color:var(--muted-2);}
+.bl-head-actions{display:flex;gap:8px;margin-left:auto;margin-right:44px;flex-wrap:wrap;}
+.bl-btn{display:inline-flex;align-items:center;gap:6px;font-weight:600;font-size:13.5px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:11px;padding:9px 13px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s,border-color .12s;}
+.bl-btn:hover{border-color:var(--ink)}
+.bl-btn:active{transform:scale(.96)}
+.bl-btn.primary{background:var(--ink);color:#fff;border-color:var(--ink);}
+.bl-btn svg{width:14px;height:14px;}
+.bl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:16px;}
+.bl-card{position:relative;background:var(--glass);border:1px solid var(--glass-border);border-radius:18px;overflow:hidden;cursor:pointer;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);transition:transform .15s,border-color .12s;}
+.bl-card:hover{border-color:var(--ink);transform:translateY(-2px);}
+.bl-card-icon{height:110px;display:flex;align-items:center;justify-content:center;background:var(--hl-06);}
+.bl-card.folder .bl-card-icon{background:color-mix(in srgb, var(--folder) 16%, transparent);}
+.bl-card-icon svg{width:38px;height:38px;color:var(--muted-2);}
+.bl-card.folder .bl-card-icon svg{color:var(--folder);}
+.bl-card-body{padding:11px 13px 13px;}
+.bl-card-name{font-weight:700;font-size:14px;color:var(--pencil);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.bl-card-meta{font-size:11.5px;color:var(--muted-1);margin-top:3px;}
+.bl-card-menu{position:absolute;top:8px;right:8px;width:24px;height:24px;border-radius:8px;border:none;background:rgba(0,0,0,.06);color:var(--muted-2);display:flex;align-items:center;justify-content:center;cursor:pointer;font-weight:900;font-size:14px;line-height:1;}
+.bl-card-menu:hover{background:rgba(0,0,0,.14);}
+html[data-theme="dark"] .bl-card-menu{background:rgba(255,255,255,.1);}
+html[data-theme="dark"] .bl-card-menu:hover{background:rgba(255,255,255,.18);}
+.bl-menu-pop{position:absolute;z-index:400;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:12px;box-shadow:var(--shadow);padding:5px;min-width:150px;display:flex;flex-direction:column;}
+.bl-menu-pop button{display:block;width:100%;text-align:left;background:none;border:none;padding:8px 10px;border-radius:8px;font-size:13.5px;color:var(--pencil);cursor:pointer;}
+.bl-menu-pop button:hover{background:var(--hover-1);}
+.bl-menu-pop button.danger{color:var(--teacher);}
+.bl-empty{padding:60px 20px;text-align:center;color:var(--muted-2);font-size:15px;}
+.bl-sort{position:relative;}
+.bl-sort-pop{position:absolute;top:calc(100% + 6px);right:0;z-index:300;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:12px;box-shadow:var(--shadow);padding:5px;min-width:170px;display:none;flex-direction:column;}
+.bl-sort-pop.open{display:flex;}
+.bl-sort-pop button{display:block;width:100%;text-align:left;background:none;border:none;padding:8px 10px;border-radius:8px;font-size:13.5px;color:var(--pencil);cursor:pointer;}
+.bl-sort-pop button:hover{background:var(--hover-1);}
+.bl-sort-pop button.active{color:var(--ink);font-weight:700;}
+@media (max-width:640px){ .bl-sidebar{display:none;} .bl-main{padding:18px 14px 50px;} }
+
+/* ═══════════════ экран 2 — сама доска ═══════════════ */
+#screenBoard{display:none;position:fixed;inset:0;overflow:hidden;background:var(--bg);}
+#boardCv{position:absolute;inset:0;touch-action:none;}
+.bd-topbar{position:fixed;top:0;left:0;right:0;z-index:300;display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border-bottom:1px solid var(--glass-border);}
+.bd-back{display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:var(--ink);font-weight:600;font-size:14px;cursor:pointer;padding:6px 8px;border-radius:8px;}
+.bd-back:hover{background:var(--hover-1);}
+.bd-back svg{width:15px;height:15px;}
+.bd-name{flex:0 1 auto;font-weight:700;font-size:15px;color:var(--pencil);background:none;border:none;outline:none;text-align:center;min-width:60px;max-width:40vw;border-radius:8px;padding:5px 8px;}
+.bd-name:hover,.bd-name:focus{background:var(--hover-1);}
+.bd-gear{width:32px;height:32px;border-radius:10px;border:1px solid var(--glass-border);background:var(--glass);color:var(--muted-2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none;}
+.bd-gear:hover{border-color:var(--ink);color:var(--ink);}
+.bd-gear svg{width:15px;height:15px;}
+.bd-topbar-spacer{margin-left:auto;}
+.bd-settings-pop{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:400;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;box-shadow:var(--shadow);padding:16px;width:250px;display:none;flex-direction:column;gap:12px;}
+.bd-settings-pop.open{display:flex;}
+.bd-set-row{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+.bd-set-row label{font-size:13px;font-weight:600;color:var(--muted-3);}
+.bd-stepper{display:flex;align-items:center;gap:6px;}
+.bd-stepper button{width:24px;height:24px;border-radius:7px;border:1px solid var(--glass-border);background:var(--glass);color:var(--pencil);cursor:pointer;font-weight:700;}
+.bd-stepper button:hover{border-color:var(--ink)}
+.bd-stepper span{min-width:32px;text-align:center;font-family:var(--font-mono);font-size:13px;}
+.bd-set-btnrow{display:flex;gap:6px;}
+.bd-set-btnrow button{flex:1;font-size:12.5px;font-weight:600;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:9px;padding:7px 4px;cursor:pointer;}
+.bd-set-btnrow button.active{background:var(--ink);color:#fff;}
+.bd-set-note{font-size:11.5px;line-height:1.4;color:var(--muted-2);padding-top:2px;border-top:1px solid var(--glass-border);}
+.bd-set-row-wrap{align-items:flex-start;}
+.bd-grid-swatches{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end;max-width:150px;}
+.bd-grid-swatch{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;padding:0;background-size:cover;}
+.bd-grid-swatch.active{border-color:var(--ink);}
+.bd-grid-swatch:hover{transform:scale(1.08);}
+
+/* ── левая/верхняя плавающая колонка: экспорт/зум/фуллскрин — переезжает
+   наверх (горизонтально), когда сама панель инструментов встаёт слева,
+   чтобы они не накладывались друг на друга ── */
+.bd-rail{position:fixed;z-index:250;display:flex;gap:6px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:16px;padding:6px;box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.5);}
+.bd-rail.pos-left{left:14px;top:70px;flex-direction:column;}
+/* когда рейл уезжает наверх (см. applyDockLayout — это происходит только
+   когда сама панель инструментов встаёт слева), он садится прямо в строку
+   верхней панели — на уровень названия доски, а не отдельной плашкой под
+   ней — чтобы не отъедать место у рабочей зоны холста. Прижат к правому
+   краю верхней панели, перед кнопкой темы. */
+.bd-rail.pos-top{left:auto;right:64px;top:9px;transform:none;flex-direction:row;z-index:310;}
+.bd-rail.pos-top .bd-rail-sep{width:1px;height:auto;align-self:stretch;margin:4px 2px;}
+.bd-rail-btn{width:34px;height:34px;border-radius:11px;border:none;background:none;color:var(--pencil);cursor:pointer;display:flex;align-items:center;justify-content:center;font-family:var(--font-ui);font-weight:700;font-size:12px;flex:none;}
+.bd-rail-btn:hover{background:var(--hover-1);}
+.bd-rail-btn svg{width:16px;height:16px;}
+.bd-rail-sep{height:1px;background:var(--glass-border);margin:2px 4px;}
+html[data-theme="dark"] .bd-rail{box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.08);}
+
+/* ── плавающий тулбар с инструментами — по умолчанию снизу, но можно
+   перетащить целиком к левому или правому краю экрана (см. #bdDockGrip),
+   а размер иконок тянется за отдельную ручку-границу, как у Dock в
+   macOS (см. #bdDockResize). «Жидкое стекло»: сильнее блюр/сатурация,
+   мягкий блик по внутреннему верхнему краю и тонкое свечение по контуру ── */
+.bd-dock{
+  position:fixed; z-index:250;
+  background:var(--glass-strong);
+  backdrop-filter:blur(26px) saturate(190%);
+  -webkit-backdrop-filter:blur(26px) saturate(190%);
+  border:1px solid var(--glass-border); border-radius:20px; padding:7px;
+  box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.55), inset 0 0 0 .5px rgba(255,255,255,.3);
+  /* overflow остаётся «честным» visible на обеих осях, чтобы ручки
+     перемещения/размера (см. .bd-dock-grip/.bd-dock-resize ниже), которые
+     торчат за пределы рамки дока, не обрезались и оставались кликабельными —
+     скролл самих инструментов вынесен во внутренний .bd-dock-tools */
+}
+html[data-theme="dark"] .bd-dock{box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.10), inset 0 0 0 .5px rgba(255,255,255,.07);}
+.bd-dock-tools{display:flex; align-items:center; gap:4px;}
+.bd-dock.pos-bottom{left:calc(50% + var(--dock-offset,0px));bottom:16px;top:auto;right:auto;transform:translateX(-50%);max-width:calc(100vw - 20px);padding-left:18px;}
+.bd-dock.pos-bottom .bd-dock-tools{flex-direction:row;max-width:calc(100vw - 38px);overflow-x:auto;overflow-y:visible;}
+.bd-dock.pos-left{left:14px;top:50%;bottom:auto;right:auto;transform:translateY(-50%);max-height:calc(100vh - 90px);padding-top:18px;}
+.bd-dock.pos-left .bd-dock-tools{flex-direction:column;max-height:calc(100vh - 108px);overflow-y:auto;overflow-x:visible;}
+.bd-dock.pos-right{right:14px;top:50%;bottom:auto;left:auto;transform:translateY(-50%);max-height:calc(100vh - 90px);padding-top:18px;}
+.bd-dock.pos-right .bd-dock-tools{flex-direction:column;max-height:calc(100vh - 108px);overflow-y:auto;overflow-x:visible;}
+.bd-tool{width:calc(34px*var(--dock-scale,1));height:calc(34px*var(--dock-scale,1));flex:0 0 auto;border-radius:calc(12px*var(--dock-scale,1));border:none;background:none;color:var(--pencil);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .12s,background .12s;}
+.bd-tool svg{width:calc(18px*var(--dock-scale,1));height:calc(18px*var(--dock-scale,1));stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
+.bd-tool:hover{background:var(--hover-1);}
+.bd-tool.active{background:var(--ink);color:#fff;}
+.bd-tool:active{transform:scale(.92);}
+/* «золотой» акцент-штрих в духе паркеровской ручки — маленькая деталь на
+   каждой иконке; остаётся золотым в любой теме и при любом состоянии
+   кнопки (обычном/наведении/активном), не завися от currentColor */
+.bd-tool svg .ac,.bd-rail-btn svg .ac,.bd-gear svg .ac,.bd-toggle svg .ac{fill:var(--gold-accent);stroke:none;}
+.bd-tool svg .ac-line,.bd-rail-btn svg .ac-line,.bd-toggle svg .ac-line{stroke:var(--gold-accent);}
+.bd-tool.active svg .ac,.bd-tool.active svg .ac-line{filter:brightness(1.25);}
+.bd-dock-sep{width:1px;align-self:stretch;background:var(--glass-border);margin:3px 2px;flex:none;}
+.bd-dock.pos-left .bd-dock-sep,.bd-dock.pos-right .bd-dock-sep{width:auto;height:1px;align-self:stretch;margin:3px 4px;}
+
+/* ручка перемещения панели целиком (низ/лево/право) */
+.bd-dock-grip{position:absolute;z-index:2;display:flex;align-items:center;justify-content:center;gap:2px;cursor:grab;color:var(--muted-2);opacity:.5;transition:opacity .15s;touch-action:none;}
+.bd-dock-grip:hover{opacity:1;}
+.bd-dock-grip:active{cursor:grabbing;}
+.bd-dock-grip span{display:block;border-radius:2px;background:currentColor;width:3px;height:3px;}
+.bd-dock.pos-bottom .bd-dock-grip{top:3px;left:5px;bottom:3px;width:9px;flex-direction:column;}
+.bd-dock.pos-left .bd-dock-grip,.bd-dock.pos-right .bd-dock-grip{top:5px;left:3px;right:3px;height:9px;flex-direction:row;}
+
+/* ручка изменения размера — тянешь границу панели, как Dock в macOS */
+.bd-dock-resize{position:absolute;z-index:2;background:transparent;touch-action:none;}
+.bd-dock-resize::after{content:'';position:absolute;inset:0;margin:auto;background:var(--glass-border);border-radius:3px;transition:background .12s;}
+.bd-dock-resize:hover::after{background:var(--ink);}
+.bd-dock.pos-bottom .bd-dock-resize{left:50%;top:-10px;width:44px;height:10px;transform:translateX(-50%);cursor:ns-resize;}
+.bd-dock.pos-bottom .bd-dock-resize::after{width:28px;height:4px;}
+.bd-dock.pos-left .bd-dock-resize{right:-10px;top:50%;width:10px;height:44px;transform:translateY(-50%);cursor:ew-resize;}
+.bd-dock.pos-left .bd-dock-resize::after{width:4px;height:28px;}
+.bd-dock.pos-right .bd-dock-resize{left:-10px;top:50%;width:10px;height:44px;transform:translateY(-50%);cursor:ew-resize;}
+.bd-dock.pos-right .bd-dock-resize::after{width:4px;height:28px;}
+
+/* ── справочные материалы: кнопка-переключатель в правом нижнем углу доски
+   и плавающая панель с картинкой/текстом, которая всегда под рукой и не
+   мешает работать с холстом. Тоже в духе «жидкого стекла». ── */
+.bd-ref-toggle{
+  position:fixed; right:16px; bottom:16px; z-index:260;
+  width:44px; height:44px; border-radius:50%; border:none; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; color:var(--pencil);
+  background:var(--glass-strong);
+  backdrop-filter:blur(26px) saturate(190%); -webkit-backdrop-filter:blur(26px) saturate(190%);
+  border:1px solid var(--glass-border);
+  box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.55), inset 0 0 0 .5px rgba(255,255,255,.3);
+  transition:transform .12s, background .12s;
+}
+html[data-theme="dark"] .bd-ref-toggle{box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.10), inset 0 0 0 .5px rgba(255,255,255,.07);}
+.bd-ref-toggle svg{width:20px;height:20px;}
+.bd-ref-toggle:hover{background:var(--hover-1);}
+.bd-ref-toggle:active{transform:scale(.92);}
+.bd-ref-toggle.active{background:var(--ink);color:#fff;}
+
+.bd-ref-panel{
+  position:fixed; right:16px; bottom:68px; z-index:255;
+  width:var(--ref-w, calc(50vw - 24px)); height:var(--ref-h, calc(50vh - 92px));
+  min-width:220px; min-height:170px; max-width:calc(100vw - 32px); max-height:calc(100vh - 100px);
+  display:none; flex-direction:column; overflow:hidden;
+  background:var(--glass-strong);
+  backdrop-filter:blur(26px) saturate(190%); -webkit-backdrop-filter:blur(26px) saturate(190%);
+  border:1px solid var(--glass-border); border-radius:18px;
+  box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.55), inset 0 0 0 .5px rgba(255,255,255,.3);
+}
+html[data-theme="dark"] .bd-ref-panel{box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.10), inset 0 0 0 .5px rgba(255,255,255,.07);}
+.bd-ref-panel.open{display:flex;}
+.bd-ref-resize{position:absolute;top:-6px;left:-6px;width:22px;height:22px;z-index:3;cursor:nwse-resize;touch-action:none;}
+.bd-ref-resize::after{content:'';position:absolute;top:7px;left:7px;width:9px;height:9px;border-top:2px solid var(--glass-border);border-left:2px solid var(--glass-border);border-radius:3px 0 0 0;transition:border-color .12s;}
+.bd-ref-resize:hover::after{border-color:var(--ink);}
+.bd-ref-resize-n{position:absolute;top:-6px;left:16px;right:16px;height:12px;z-index:2;cursor:ns-resize;touch-action:none;border-radius:6px;}
+.bd-ref-resize-w{position:absolute;top:16px;bottom:16px;left:-6px;width:12px;z-index:2;cursor:ew-resize;touch-action:none;border-radius:6px;}
+.bd-ref-resize-n:hover,.bd-ref-resize-w:hover{background:var(--hover-1);}
+.bd-ref-head{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:8px 8px 6px 12px;flex:none;}
+.bd-ref-tabs{display:flex;gap:3px;background:var(--hover-1);border-radius:10px;padding:3px;}
+.bd-ref-tab{border:none;background:none;padding:5px 10px;border-radius:8px;font-family:var(--font-ui);font-size:12px;font-weight:600;color:var(--muted-2);cursor:pointer;}
+.bd-ref-tab.active{background:var(--card);color:var(--pencil);box-shadow:0 1px 3px rgba(0,0,0,.12);}
+.bd-ref-close{width:26px;height:26px;border-radius:50%;border:none;background:none;color:var(--muted-2);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none;}
+.bd-ref-close:hover{background:var(--hover-1);color:var(--pencil);}
+.bd-ref-body{flex:1 1 auto;min-height:0;padding:0 10px 10px;display:flex;}
+.bd-ref-image-mode{flex:1 1 auto;min-width:0;display:none;flex-direction:column;}
+.bd-ref-panel[data-mode="image"] .bd-ref-image-mode{display:flex;}
+.bd-ref-text-mode-wrap{flex:1 1 auto;min-width:0;min-height:0;display:none;flex-direction:column;gap:6px;}
+.bd-ref-panel[data-mode="text"] .bd-ref-text-mode-wrap{display:flex;}
+.bd-ref-subtabs{display:flex;gap:3px;background:var(--hover-1);border-radius:10px;padding:3px;flex:none;align-self:flex-start;}
+.bd-ref-subtab{border:none;background:none;padding:4px 9px;border-radius:8px;font-family:var(--font-ui);font-size:11.5px;font-weight:600;color:var(--muted-2);cursor:pointer;}
+.bd-ref-subtab.active{background:var(--card);color:var(--pencil);box-shadow:0 1px 3px rgba(0,0,0,.12);}
+.bd-ref-draw-host{display:none;position:relative;flex:1 1 auto;min-height:0;border-radius:10px;overflow:hidden;background:var(--hover-1);touch-action:none;}
+.bd-ref-text-mode-wrap[data-textmode="draw"] .bd-ref-draw-host{display:block;}
+.bd-ref-image-empty{flex:1 1 auto;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;border:1.5px dashed var(--glass-border);border-radius:12px;padding:14px;color:var(--muted-2);transition:border-color .12s,background .12s;}
+.bd-ref-panel[data-mode="image"].bd-ref-empty .bd-ref-image-empty{display:flex;}
+.bd-ref-image-mode.bd-ref-drag-over .bd-ref-image-empty{border-color:var(--ink);background:var(--hover-1);}
+.bd-ref-image-mode.bd-ref-drag-over .bd-ref-image-fill img{outline:1.5px dashed var(--ink);outline-offset:-1.5px;}
+.bd-ref-image-empty svg{width:30px;height:30px;opacity:.6;}
+.bd-ref-image-empty span{font-size:12px;max-width:220px;line-height:1.4;}
+.bd-ref-image-empty button,.bd-ref-image-tools button{font-family:var(--font-ui);font-size:12px;font-weight:600;border:none;border-radius:9px;padding:6px 12px;cursor:pointer;background:var(--ink);color:#fff;}
+.bd-ref-image-empty button:hover,.bd-ref-image-tools button:hover{opacity:.88;}
+.bd-ref-image-fill{flex:1 1 auto;min-height:0;display:none;flex-direction:column;gap:6px;}
+.bd-ref-panel[data-mode="image"]:not(.bd-ref-empty) .bd-ref-image-fill{display:flex;}
+.bd-ref-image-fill img{flex:1 1 auto;min-height:0;width:100%;height:100%;object-fit:contain;border-radius:10px;background:var(--hover-1);}
+.bd-ref-image-tools{display:flex;gap:6px;flex:none;}
+.bd-ref-image-tools button{flex:1;background:var(--hover-1);color:var(--pencil);}
+.bd-ref-image-tools #bdRefRemoveBtn{color:var(--teacher);}
+.bd-ref-text-mode{display:none;flex:1 1 auto;min-height:0;width:100%;resize:none;border:none;outline:none;background:transparent;color:var(--pencil);font-family:var(--font-ui);font-size:13px;line-height:1.5;padding:6px;}
+.bd-ref-text-mode-wrap[data-textmode="type"] .bd-ref-text-mode{display:block;}
+.bd-ref-text-mode::placeholder{color:var(--muted-2);}
+@media print{ .bd-ref-toggle,.bd-ref-panel{display:none!important;} }
+
+/* ── всплывающая панель цвета/толщины/стиля над доком ── */
+.bd-optbar{position:fixed;left:50%;bottom:66px;transform:translateX(-50%);z-index:250;display:none;align-items:center;gap:calc(10px*var(--dock-scale,1));background:var(--glass-strong);backdrop-filter:blur(26px) saturate(190%);-webkit-backdrop-filter:blur(26px) saturate(190%);border:1px solid var(--glass-border);border-radius:calc(18px*var(--dock-scale,1));padding:calc(9px*var(--dock-scale,1)) calc(12px*var(--dock-scale,1));box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.5);flex-wrap:wrap;max-width:calc(100vw - 20px);}
+.bd-optbar.open{display:flex;}
+/* когда панель инструментов уезжает влево/вправо (вертикально), эта
+   всплывающая панель тоже должна стать узкой колонкой, а не оставаться
+   широкой строкой — иначе рядом с тонким вертикальным доком она смотрится
+   непропорционально широкой. Кружки цвета при этом выстраиваются в одну
+   вертикальную линию (не сеткой), а сама панель — примерно вдвое уже
+   прежнего варианта, элементы (шаг толщины, переключатели, радиус) тоже
+   уменьшаются и складываются друг под другом. */
+.bd-optbar.side{flex-direction:column;flex-wrap:nowrap;width:calc(52px*var(--dock-scale,1));padding:calc(8px*var(--dock-scale,1)) calc(5px*var(--dock-scale,1));max-width:none;max-height:calc(100vh - 40px);overflow-y:auto;overflow-x:hidden;bottom:auto;}
+.bd-optbar.side .bd-optsep{width:auto;height:1px;align-self:stretch;}
+html[data-theme="dark"] .bd-optbar{box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.08);}
+.bd-swatch-row{display:flex;align-items:center;gap:calc(6px*var(--dock-scale,1));}
+.bd-optbar.side .bd-swatch-row{flex-direction:column;width:100%;gap:calc(5px*var(--dock-scale,1));}
+.bd-swatches{display:flex;gap:calc(6px*var(--dock-scale,1));align-items:center;}
+.bd-optbar.side .bd-swatches{flex-direction:column;gap:calc(5px*var(--dock-scale,1));}
+.bd-swatch{position:relative;width:calc(26px*var(--dock-scale,1));height:calc(26px*var(--dock-scale,1));border-radius:50%;border:2px solid transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.bd-optbar.side .bd-swatch{width:calc(22px*var(--dock-scale,1));height:calc(22px*var(--dock-scale,1));}
+.bd-swatch.active{border-color:var(--pencil);}
+.bd-swatch .badge{position:absolute;bottom:-4px;right:-4px;min-width:13px;height:13px;padding:0 3px;border-radius:7px;background:var(--card);color:var(--muted-3);font-size:8.5px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px var(--glass-border);}
+.bd-swatch-x{position:absolute;top:-5px;left:-5px;width:12px;height:12px;border-radius:50%;background:var(--teacher);color:#fff;font-size:9px;line-height:1;display:none;align-items:center;justify-content:center;}
+.bd-swatch:hover .bd-swatch-x{display:flex;}
+.bd-swatch-add{width:calc(26px*var(--dock-scale,1));height:calc(26px*var(--dock-scale,1));border-radius:50%;border:1.5px dashed var(--glass-border);background:none;color:var(--muted-2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:calc(14px*var(--dock-scale,1));}
+.bd-optbar.side .bd-swatch-add{width:calc(22px*var(--dock-scale,1));height:calc(22px*var(--dock-scale,1));font-size:calc(12px*var(--dock-scale,1));}
+.bd-swatch-add:hover{border-color:var(--ink);color:var(--ink);}
+.bd-optsep{width:1px;align-self:stretch;background:var(--glass-border);}
+.bd-width{display:flex;align-items:center;gap:calc(5px*var(--dock-scale,1));}
+.bd-optbar.side .bd-width{flex-direction:column;gap:calc(4px*var(--dock-scale,1));}
+.bd-width button{width:calc(22px*var(--dock-scale,1));height:calc(22px*var(--dock-scale,1));border-radius:7px;border:1px solid var(--glass-border);background:var(--glass);color:var(--pencil);cursor:pointer;font-weight:700;font-size:calc(13px*var(--dock-scale,1));}
+.bd-optbar.side .bd-width button{width:calc(24px*var(--dock-scale,1));height:calc(20px*var(--dock-scale,1));font-size:calc(12px*var(--dock-scale,1));}
+.bd-width span{min-width:16px;text-align:center;font-family:var(--font-mono);font-size:calc(12px*var(--dock-scale,1));}
+.bd-toggle{width:calc(30px*var(--dock-scale,1));height:calc(30px*var(--dock-scale,1));border-radius:10px;border:1px solid var(--glass-border);background:var(--glass);color:var(--muted-2);cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.bd-optbar.side .bd-toggle{width:calc(24px*var(--dock-scale,1));height:calc(24px*var(--dock-scale,1));border-radius:8px;}
+.bd-toggle svg{width:calc(15px*var(--dock-scale,1));height:calc(15px*var(--dock-scale,1));stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;}
+.bd-optbar.side .bd-toggle svg{width:calc(12px*var(--dock-scale,1));height:calc(12px*var(--dock-scale,1));}
+.bd-toggle.on{background:var(--ink);color:#fff;border-color:var(--ink);}
+.bd-radius-field{display:flex;align-items:center;gap:calc(5px*var(--dock-scale,1));}
+.bd-optbar.side .bd-radius-field{flex-direction:column;gap:calc(2px*var(--dock-scale,1));}
+.bd-radius-field input{width:calc(42px*var(--dock-scale,1));border:1px solid var(--glass-border);background:var(--glass);border-radius:8px;padding:calc(4px*var(--dock-scale,1)) calc(5px*var(--dock-scale,1));font-family:var(--font-mono);font-size:calc(12px*var(--dock-scale,1));text-align:center;color:var(--pencil);}
+.bd-optbar.side .bd-radius-field input{width:calc(34px*var(--dock-scale,1));padding:calc(3px*var(--dock-scale,1)) calc(4px*var(--dock-scale,1));}
+.bd-radius-field label{font-size:11px;color:var(--muted-2);}
+
+/* нативный color-input прячем визуально, но держим кликабельным */
+.bd-hidden-color{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;}
+
+/* ── всплывающий выбор источника изображения (кнопка «Вставить изображение») ── */
+.bd-imgsrc-pop{position:fixed;z-index:400;display:none;flex-direction:column;gap:2px;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:12px;box-shadow:var(--shadow);padding:5px;min-width:216px;}
+.bd-imgsrc-pop.open{display:flex;}
+.bd-imgsrc-pop button{display:block;width:100%;text-align:left;background:none;border:none;padding:9px 10px;border-radius:8px;font-size:13.5px;color:var(--pencil);cursor:pointer;}
+.bd-imgsrc-pop button:hover{background:var(--hover-1);}
+
+/* ── расширенное меню выделенного объекта(ов) — появляется и сразу после
+   построения фигуры, и при повторном выделении уже существующей ── */
+.bd-ctx-menu{position:fixed;z-index:260;display:none;flex-direction:column;gap:2px;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:14px;box-shadow:var(--shadow);padding:8px;min-width:200px;}
+.bd-ctx-menu.open{display:flex;}
+.bd-ctx-menu button{display:block;width:100%;text-align:left;background:none;border:none;padding:8px 10px;border-radius:9px;font-size:13px;font-weight:600;color:var(--pencil);cursor:pointer;}
+.bd-ctx-menu button:hover:not(:disabled){background:var(--hover-1);}
+.bd-ctx-menu button:disabled{opacity:.4;cursor:default;}
+.bd-ctx-zoom{display:flex;align-items:center;justify-content:space-between;gap:4px;padding-top:8px;margin-top:4px;border-top:1px solid var(--glass-border);}
+.bd-ctx-zoom button{width:26px;height:26px;flex:none;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);font-weight:700;cursor:pointer;color:var(--pencil);}
+.bd-ctx-zoom span{font-family:var(--font-mono);font-size:12px;color:var(--muted-2);}
+
+/* ── оверлей при перетаскивании изображения на доску ── */
+.bd-drop-overlay{position:fixed;inset:0;z-index:600;display:none;align-items:center;justify-content:center;background:var(--hl-14);border:3px dashed var(--ink);font-family:var(--font-ui);font-weight:700;font-size:20px;color:var(--ink);pointer-events:none;}
+.bd-drop-overlay.show{display:flex;}
+
+/* ── модалка вставки изображения ── */
+.bd-modal-backdrop{position:fixed;inset:0;z-index:700;display:none;align-items:center;justify-content:center;background:rgba(10,14,26,.45);backdrop-filter:blur(4px);}
+.bd-modal-backdrop.open{display:flex;}
+.bd-modal{width:min(680px,94vw);max-height:88vh;overflow:auto;background:var(--card);border:1px solid var(--glass-border);border-radius:20px;box-shadow:var(--shadow);}
+.bd-modal-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--glass-border);}
+.bd-modal-title{font-family:var(--font-ui);font-weight:700;font-size:17px;color:var(--pencil);}
+.bd-modal-close{width:30px;height:30px;border-radius:10px;border:none;background:var(--glass);color:var(--muted-2);cursor:pointer;font-size:14px;}
+.bd-modal-close:hover{background:var(--hover-2);}
+.bd-modal-body{display:flex;gap:18px;padding:20px;flex-wrap:wrap;}
+.bd-modal-preview{flex:1 1 300px;min-height:220px;border-radius:14px;background:var(--paper);border:1px solid var(--glass-border);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.bd-modal-preview img{max-width:100%;max-height:320px;display:block;}
+.bd-modal-side{flex:1 1 240px;display:flex;flex-direction:column;gap:12px;}
+.bd-modal-toggle-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;cursor:pointer;}
+.bd-modal-toggle-row span{display:flex;flex-direction:column;gap:2px;}
+.bd-modal-toggle-row b{font-family:var(--font-ui);font-weight:600;font-size:13.5px;color:var(--pencil);}
+.bd-modal-toggle-row small{font-family:var(--font-ui);font-size:11.5px;color:var(--muted-2);line-height:1.35;}
+.bd-modal-toggle-row input{margin-top:3px;width:34px;height:20px;flex:none;accent-color:var(--ink);}
+.bd-modal-lib{padding:0 20px 20px;}
+.bd-modal-lib-title{font-family:var(--font-ui);font-weight:700;font-size:12.5px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px;}
+.bd-modal-lib-row{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;}
+.bd-modal-lib-row img{width:64px;height:64px;object-fit:cover;border-radius:10px;border:1px solid var(--glass-border);cursor:pointer;flex:none;}
+.bd-modal-lib-row img:hover{border-color:var(--ink);}
+.bd-modal-pdf{width:min(520px,94vw);}
+.bd-modal-note{margin:16px 20px 0;padding:10px 12px;border-radius:12px;background:var(--hl-bg,var(--glass));border:1px solid var(--glass-border);font-family:var(--font-ui);font-size:12.5px;color:var(--muted-2);line-height:1.4;}
+.bd-modal-pageorder-row{margin:14px 20px 0;}
+.bd-modal-pdf-page{padding:16px 20px 0;}
+.bd-modal-pdf-pageinfo{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--pencil);margin-bottom:8px;}
+.bd-modal-pdf-preview-wrap{display:flex;align-items:center;gap:8px;}
+.bd-modal-pdf-preview{flex:1;min-height:220px;border-radius:14px;background:var(--paper);border:1px solid var(--glass-border);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.bd-modal-pdf-preview img{max-width:100%;max-height:280px;display:block;}
+.bd-modal-pdf-preview canvas{max-width:100%;max-height:280px;display:block;}
+.bd-modal-pdf-nav{width:32px;height:32px;flex:none;border-radius:10px;border:1px solid var(--glass-border);background:var(--glass);color:var(--pencil);font-size:16px;cursor:pointer;}
+.bd-modal-pdf-nav:hover{background:var(--hover-1);}
+.bd-modal-pdf-nav:disabled{opacity:.35;cursor:default;}
+.bd-modal-pdf-empty{padding:16px 20px 0;font-family:var(--font-ui);font-size:13px;color:var(--muted-2);}
+.bd-modal-foot{display:flex;gap:10px;padding:18px 20px 20px;}
+
+/* ── модалка «Добавить из Подборки» — список карточек, вёрстка/классы
+   заданий (дроби, таблицы, числовая прямая, варианты ответа) один в один
+   скопированы со страницы index.html, чтобы задание выглядело так же, как
+   там, где его собирали ── */
+.bd-modal-basket{width:min(620px,94vw);}
+.bd-basket-list{padding:4px 20px 20px;max-height:60vh;overflow:auto;}
+.bd-basket-empty{padding:30px 4px 10px;text-align:center;color:var(--muted-2);font-size:14px;line-height:1.5;}
+.basket-item{border-bottom:1px solid var(--glass-border);padding:14px 0;}
+.basket-item:last-child{border-bottom:none;}
+.basket-item-head{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
+.basket-item-src{font-family:var(--font-ui);font-weight:600;font-size:12.5px;color:var(--muted-2);}
+.basket-item-text{font-family:var(--font-ui);font-size:15px;color:var(--pencil);line-height:1.5;white-space:pre-line;}
+.basket-item-add{flex:none;font-family:var(--font-ui);font-weight:600;font-size:12.5px;color:#fff;background:var(--ink);border:none;border-radius:9px;padding:7px 12px;cursor:pointer;}
+.basket-item-add:hover{background:var(--ink-active);}
+.basket-item-add:disabled{opacity:.55;cursor:default;}
+.basket-frac{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;vertical-align:middle;margin:0 4px;line-height:1.2;font-variant-numeric:tabular-nums;position:relative;top:.12em;white-space:nowrap;}
+.bf-n, .bf-d{padding:0 2px;}
+.bf-bar{display:block;width:100%;border-top:1.5px solid currentColor;margin:2px 0;}
+.basket-frac .basket-frac{font-size:.82em;margin:0 3px;}
+.basket-opt-list{margin-top:8px;display:flex;flex-direction:column;gap:5px;}
+.basket-opt-list-inline{flex-direction:row;flex-wrap:wrap;gap:8px 26px;justify-content:center;}
+.basket-opt{padding:1px 0;}
+.basket-block{margin:4px 0;}
+.basket-block:first-child{margin-top:0;}
+.basket-block:last-child{margin-bottom:0;}
+.basket-img{display:inline-block;width:160px;max-width:42%;height:auto;margin:6px 10px 6px 0;vertical-align:top;border-radius:4px;}
+.basket-fig-row{margin-bottom:8px;}
+.basket-table{border-collapse:collapse;margin:10px 0;font-family:var(--font-ui);font-size:14px;}
+.basket-table td, .basket-table th{border:1px solid currentColor;padding:6px 10px;text-align:center;}
+.basket-table th{font-weight:700;}
+.basket-numline-row{margin:14px 0;text-align:center;}
+.basket-numline{position:relative;display:inline-block;vertical-align:middle;width:220px;max-width:80%;height:44px;margin:8px 6px;}
+.bnl-line{position:absolute;left:2px;right:2px;top:22px;height:2px;background:currentColor;}
+.bnl-tick{position:absolute;top:14px;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;}
+.bnl-tickmark{width:2px;height:16px;background:currentColor;}
+.bnl-ticklabel{font-size:13px;margin-top:2px;white-space:nowrap;}
+.bnl-point{position:absolute;top:23px;transform:translate(-50%,-50%);}
+.bnl-dot{display:block;width:9px;height:9px;border-radius:50%;background:currentColor;}
+.bnl-plabel{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);margin-bottom:5px;font-size:13px;font-weight:700;white-space:nowrap;}
+
+/* кнопка возврата в индекс-файл (на главную с тренажёрами) — встроена в
+   строку заголовка списка досок, перед названием раздела, тем же стилем,
+   что и «Создать доску»/«Создать папку», чтобы не занимать отдельное
+   плавающее место и не перекрывать контент на узких экранах телефона */
+.bl-to-index{text-decoration:none;flex:none;}
+
+@media print{ .theme-toggle,.bd-topbar,.bd-rail,.bd-dock,.bd-optbar,.bd-drop-overlay{display:none!important;} }
+</style>
+</head>
+<body>
+<button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<script>(function(){
+  var btn=document.getElementById('themeToggle');
+  function apply(t,persist){
+    document.documentElement.setAttribute('data-theme',t);
+    btn.textContent = t==='dark' ? '☀️' : '🌙';
+    if(persist){ try{ localStorage.setItem('theme', t); }catch(e){} }
+    // курсор пера читает цвет чернил из CSS-переменных — при смене темы их
+    // значения меняются, курсор нужно перерисовать
+    if (typeof updateCursor === 'function') updateCursor();
+    // сам холст рисуется императивно (canvas), а не CSS — его цвета (бумага,
+    // сетка, чернила) читаются из тех же переменных только в момент отрисовки.
+    // Без явного перезапроса кадра полотно оставалось в старой теме до первого
+    // взаимодействия (панорамы/рисования), пока что-то ещё не попросит кадр
+    if (typeof scheduleRedraw === 'function') scheduleRedraw();
+  }
+  apply(document.documentElement.getAttribute('data-theme'), false);
+  btn.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme')==='dark' ? 'light' : 'dark';
+    apply(cur, true);
+  });
+  if (window.matchMedia){
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onSystemChange = function(e){
+      var explicit=false; try{ explicit=!!localStorage.getItem('theme'); }catch(err){}
+      if (explicit) return;
+      apply(e.matches?'dark':'light', false);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
+    else if (mq.addListener) mq.addListener(onSystemChange);
+  }
+})();</script>
+
+<!-- ═══════════════ экран 1: список папок и досок ═══════════════ -->
+<div id="screenList">
+  <div class="bl-sidebar">
+    <div class="bl-search">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" fill="none"/><line x1="21" y1="21" x2="16.6" y2="16.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      <input id="blSearch" placeholder="Поиск по названию">
+    </div>
+    <div class="bl-nav" id="blNav"></div>
+  </div>
+  <div class="bl-main">
+    <div class="bl-head">
+      <a class="bl-btn bl-to-index" id="blToIndex" href="index.html" title="К тренажёрам">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        К тренажёрам
+      </a>
+      <div class="bl-title" id="blTitle"></div>
+      <div class="bl-head-actions">
+        <button class="bl-btn primary" id="blCreateBoard">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          Создать доску
+        </button>
+        <button class="bl-btn" id="blCreateFolder">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="1.8"/></svg>
+          Создать папку
+        </button>
+        <div class="bl-sort">
+          <button class="bl-btn" id="blSortBtn">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l3-3M17 20l-3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span id="blSortLabel">Сначала новые</span>
+          </button>
+          <div class="bl-sort-pop" id="blSortPop">
+            <button data-sort="new">Сначала новые</button>
+            <button data-sort="old">Сначала старые</button>
+            <button data-sort="az">По названию (А—Я)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="bl-grid" id="blGrid"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ экран 2: сама доска ═══════════════ -->
+<div id="screenBoard">
+  <canvas id="boardCv"></canvas>
+
+  <div class="bd-topbar">
+    <button class="bd-back" id="bdBack">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Назад к доскам
+    </button>
+    <div class="bd-topbar-spacer"></div>
+    <input class="bd-name" id="bdName" spellcheck="false">
+    <button class="bd-gear" id="bdBasketBtn" title="Добавить задание из Подборки">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M3 9l2-5h14l2 5M3 9v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9M3 9h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 13a3 3 0 0 0 6 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+    <button class="bd-gear" id="bdGear" title="Настройки листа">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" class="ac"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V19.5a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H4.5a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H10a1.7 1.7 0 0 0 1-1.55V4.5a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V10a1.7 1.7 0 0 0 1.55 1h.09a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z" stroke="currentColor" stroke-width="1.4"/></svg>
+    </button>
+    <div class="bd-topbar-spacer"></div>
+  </div>
+
+  <div class="bd-settings-pop" id="bdSettingsPop">
+    <div class="bd-set-row">
+      <label>Размер клетки</label>
+      <div class="bd-stepper">
+        <button id="cellMinus">−</button><span id="cellVal">24</span><button id="cellPlus">+</button>
+      </div>
+    </div>
+    <div class="bd-set-row">
+      <label>Формат листа</label>
+      <div class="bd-set-btnrow">
+        <button id="fmtLandscape" class="active">Альбомная</button>
+        <button id="fmtPortrait">Портретная</button>
+      </div>
+    </div>
+    <div class="bd-set-row bd-set-row-wrap">
+      <label>Цвет клетки</label>
+      <div class="bd-grid-swatches" id="bdGridSwatches"></div>
+    </div>
+    <input type="color" id="bdGridColorInput" class="bd-hidden-color">
+    <div class="bd-set-note">Доска — сплошное полотно на 200×200 листов; страницы — лишь условная разметка, а не отдельные карточки.</div>
+  </div>
+
+  <div class="bd-rail pos-left" id="bdRail">
+    <button class="bd-rail-btn" id="railExport" title="Скачать доску как PNG">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="13" r="3.2" class="ac"/></svg>
+    </button>
+    <div class="bd-rail-sep"></div>
+    <button class="bd-rail-btn" id="railZoomIn">+</button>
+    <button class="bd-rail-btn" id="railZoomLabel">100%</button>
+    <button class="bd-rail-btn" id="railZoomOut">−</button>
+    <div class="bd-rail-sep"></div>
+    <button class="bd-rail-btn" id="railPdf" title="Сохранить в PDF">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.6"/><polygon class="ac" points="14,2 20,8 14,8"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><text x="12" y="17.5" font-size="7" font-family="var(--font-ui),sans-serif" text-anchor="middle" fill="currentColor" stroke="none">PDF</text></svg>
+    </button>
+    <button class="bd-rail-btn" id="railFullscreen" title="Во весь экран">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M3 9V5a2 2 0 0 1 2-2h4M15 3h4a2 2 0 0 1 2 2v4M21 15v4a2 2 0 0 1-2 2h-4M9 21H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle class="ac" cx="12" cy="12" r="1.3"/></svg>
+    </button>
+  </div>
+
+  <div class="bd-optbar" id="bdOptbar">
+    <div class="bd-swatch-row">
+      <div class="bd-swatches" id="bdSwatches"></div>
+      <button class="bd-swatch-add" id="bdSwatchAdd" title="Свой цвет">+</button>
+      <input type="color" id="bdColorInput" class="bd-hidden-color">
+    </div>
+    <div class="bd-optsep"></div>
+    <div class="bd-width">
+      <button id="widthMinus">−</button><span id="widthVal">2</span><button id="widthPlus">+</button>
+    </div>
+    <div class="bd-radius-field" id="bdRadiusField" style="display:none">
+      <label>R</label><input type="number" id="bdRadiusInput" min="0" placeholder="авто">
+    </div>
+    <div class="bd-optsep"></div>
+    <button class="bd-toggle" id="toggleDash" title="Пунктир">
+      <svg viewBox="0 0 24 24"><line x1="2" y1="12" x2="6" y2="12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><line x1="10" y1="12" x2="14" y2="12" class="ac-line" stroke-width="2.2" stroke-linecap="round"/><line x1="18" y1="12" x2="22" y2="12" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+    </button>
+    <button class="bd-toggle" id="toggleFill" title="Заливка">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" class="ac"/><rect x="13" y="3" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="13" width="8" height="8" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="13" width="8" height="8" fill="currentColor"/></svg>
+    </button>
+    <button class="bd-toggle" id="toggleSnap" title="Прилипание к клеткам">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="5" cy="5" r="2" class="ac"/><circle cx="19" cy="5" r="2" fill="currentColor"/><circle cx="5" cy="19" r="2" fill="currentColor"/><circle cx="19" cy="19" r="2" fill="currentColor"/><path d="M5 7v10M19 7v10M7 5h10M7 19h10" stroke="currentColor" stroke-width="1.4"/></svg>
+    </button>
+  </div>
+
+  <div class="bd-dock pos-bottom" id="bdDock">
+    <div class="bd-dock-grip" id="bdDockGrip" title="Перетащите — переместить панель (вниз/влево/вправо)"><span></span><span></span><span></span></div>
+    <div class="bd-dock-resize" id="bdDockResize" title="Потяните — изменить размер панели"></div>
+    <div class="bd-dock-tools" id="bdDockTools">
+    <button class="bd-tool" data-tool="hand" title="Рука (1) — панорама">
+      <svg viewBox="0 0 24 24"><path d="M8 11V6a1.5 1.5 0 0 1 3 0v4M11 10.5V4.5a1.5 1.5 0 0 1 3 0v6M14 10.5V6a1.5 1.5 0 0 1 3 0v7M8 11l-1.3-1.2a1.4 1.4 0 0 0-2 2L8.5 15.5C9.5 17 10 19 10 20h7c0-2 .5-3.3 1.5-4.5.8-1 1.5-2 1.5-3.5v-2"/><circle class="ac" cx="12.5" cy="16.2" r="1"/></svg>
+    </button>
+    <button class="bd-tool" data-tool="select" title="Выделение (2)">
+      <svg viewBox="0 0 24 24"><path d="M5 3l6 15 2.2-6.3L19.5 9.5 5 3Z" fill="currentColor" stroke="none"/><circle class="ac" cx="14.6" cy="12.4" r="1.3"/></svg>
+    </button>
+    <div class="bd-dock-sep"></div>
+    <button class="bd-tool active" data-tool="pen" title="Ручка (3)">
+      <svg viewBox="0 0 24 24" fill="none">
+        <g transform="rotate(40 12 12)">
+          <rect x="9.9" y="1.3" width="4.2" height="14.5" rx="2.1" fill="currentColor" stroke="none"/>
+          <rect class="ac" x="9.9" y="12.4" width="4.2" height="1.8" stroke="none"/>
+          <polygon points="9.9,15.8 14.1,15.8 12,22.6" fill="currentColor" stroke="none"/>
+          <polygon class="ac" points="14.1,2.5 16,3.4 16,9.3 14.1,10.1" stroke="none"/>
+        </g>
+      </svg>
+    </button>
+    <button class="bd-tool" data-tool="eraser" title="Ластик (4)">
+      <svg viewBox="0 0 24 24" fill="none">
+        <g transform="rotate(-25 12 12)">
+          <rect x="4" y="7.5" width="16" height="11" rx="2.8" fill="currentColor" stroke="none"/>
+          <rect class="ac" x="4" y="7.5" width="16" height="3.6" rx="1.6" stroke="none"/>
+        </g>
+      </svg>
+    </button>
+    <div class="bd-dock-sep"></div>
+    <button class="bd-tool" data-tool="line" title="Прямая (5)">
+      <svg viewBox="0 0 24 24"><line x1="5" y1="19" x2="19" y2="5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle class="ac" cx="5" cy="19" r="1.6"/><circle class="ac" cx="19" cy="5" r="1.6"/></svg>
+    </button>
+    <button class="bd-tool" data-tool="curve" title="Кривая (6)">
+      <svg viewBox="0 0 24 24"><path d="M4 18C8 10 12 6 20 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle class="ac" cx="4" cy="18" r="1.5"/><circle class="ac" cx="20" cy="6" r="1.5"/></svg>
+    </button>
+    <button class="bd-tool" data-tool="quad" title="Четырёхугольник (7)">
+      <svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><circle class="ac" cx="4" cy="5" r="1.6"/></svg>
+    </button>
+    <button class="bd-tool" data-tool="poly" title="Многоугольник (8)">
+      <svg viewBox="0 0 24 24"><path d="M12 3L21 19H3Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><circle class="ac" cx="12" cy="3" r="1.6"/></svg>
+    </button>
+    <button class="bd-tool" data-tool="ellipse" title="Эллипс (9)">
+      <svg viewBox="0 0 24 24"><ellipse cx="12" cy="12" rx="9" ry="6" fill="none" stroke="currentColor" stroke-width="1.7"/><circle class="ac" cx="17.3" cy="12" r="1.5"/></svg>
+    </button>
+    <button class="bd-tool" data-tool="circle" title="Циркуль — окружность заданного радиуса (0)">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.4" fill="none" stroke="currentColor" stroke-width="1.7"/><line x1="12" y1="2.4" x2="12" y2="4.7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><circle class="ac" cx="12" cy="12" r="1.7"/></svg>
+    </button>
+    <button class="bd-tool" data-tool="angle" title="Угол">
+      <svg viewBox="0 0 24 24"><path d="M4 4v16h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 20a12 12 0 0 1 12-12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="1 4"/><circle class="ac" cx="4" cy="4" r="1.6"/></svg>
+    </button>
+    <div class="bd-dock-sep"></div>
+    <button class="bd-tool" id="imageBtn" title="Вставить изображение — файл, буфер обмена (Ctrl+V) или перетащить">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2.6" fill="none" stroke="currentColor" stroke-width="1.6"/><circle class="ac" cx="8.3" cy="8.3" r="1.9"/><path d="M21 15.3l-5.1-4.9-8.9 8.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="bd-tool" id="unlockBtn" title="Открепить изображение" style="display:none">
+      <svg viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 11V7a4 4 0 0 1 7.2-2.4" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle class="ac" cx="12" cy="16" r="1.6"/></svg>
+    </button>
+    <div class="bd-dock-sep"></div>
+    <button class="bd-tool" id="undoBtn" title="Отменить (Ctrl+Z)">
+      <svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle class="ac" cx="4" cy="9" r="1.4"/></svg>
+    </button>
+    <button class="bd-tool" id="redoBtn" title="Повторить (Ctrl+Shift+Z)">
+      <svg viewBox="0 0 24 24"><path d="M15 14l5-5-5-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle class="ac" cx="20" cy="9" r="1.4"/></svg>
+    </button>
+    <button class="bd-tool" id="deleteBtn" title="Удалить выделенное (Backspace)">
+      <svg viewBox="0 0 24 24"><path d="M3 6h18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" fill="none" stroke="currentColor" stroke-width="1.8"/><rect class="ac" x="8" y="10" width="2" height="7" rx="1" stroke="none"/></svg>
+    </button>
+    </div>
+  </div>
+
+  <input type="file" id="imageFileInput" accept="image/*" class="bd-hidden-color">
+  <div class="bd-drop-overlay" id="bdDropOverlay">Отпустите, чтобы вставить изображение</div>
+
+  <div class="bd-imgsrc-pop" id="bdImgSrcPop">
+    <button data-src="clipboard">Вставить из буфера обмена</button>
+    <button data-src="file">Выбрать на устройстве</button>
+  </div>
+
+  <!-- ── справочные материалы: плавающая панель в углу доски — формула/шпаргалка,
+       которая всегда «под рукой», не мешая работать с самой доской. Открыта —
+       содержит картинку или свой текст (переключается вкладками), размер
+       панели можно тянуть за ручку в её левом верхнем углу. Хранится в самой
+       доске (B.refPanel), поэтому у каждой доски — свой набор материалов ── -->
+  <button class="bd-ref-toggle" id="bdRefToggle" title="Справочные материалы — формулы, подсказки">
+    <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5" stroke="currentColor" stroke-width="1.6"/><path d="M7.5 8.5h9M7.5 12h9M7.5 15.5h5.5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+  </button>
+  <div class="bd-ref-panel" id="bdRefPanel">
+    <div class="bd-ref-resize" id="bdRefResize" title="Потяните — изменить размер панели"></div>
+    <div class="bd-ref-resize-n" id="bdRefResizeN" title="Потяните — изменить высоту"></div>
+    <div class="bd-ref-resize-w" id="bdRefResizeW" title="Потяните — изменить ширину"></div>
+    <div class="bd-ref-head">
+      <div class="bd-ref-tabs">
+        <button class="bd-ref-tab" data-mode="image" id="bdRefTabImage">Изображение</button>
+        <button class="bd-ref-tab" data-mode="text" id="bdRefTabText">Текст</button>
+      </div>
+      <button class="bd-ref-close" id="bdRefClose" title="Свернуть">✕</button>
+    </div>
+    <div class="bd-ref-body">
+      <div class="bd-ref-image-mode" id="bdRefImageMode">
+        <div class="bd-ref-image-empty" id="bdRefImageEmpty">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2.6" stroke="currentColor" stroke-width="1.5"/><circle cx="8.3" cy="8.3" r="1.7" fill="currentColor"/><path d="M21 15.3l-5.1-4.9-8.9 8.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Добавьте изображение — формулу, шпаргалку, что угодно</span>
+          <button id="bdRefUploadBtn">Загрузить изображение</button>
+        </div>
+        <div class="bd-ref-image-fill" id="bdRefImageFill">
+          <img id="bdRefImg" alt="Справочные материалы">
+          <div class="bd-ref-image-tools">
+            <button id="bdRefReplaceBtn" title="Заменить изображение">Заменить</button>
+            <button id="bdRefRemoveBtn" title="Удалить изображение">Удалить</button>
+          </div>
+        </div>
+      </div>
+      <div class="bd-ref-text-mode-wrap" id="bdRefTextWrap">
+        <div class="bd-ref-subtabs">
+          <button class="bd-ref-subtab" data-textmode="type" id="bdRefSubType">Печатать</button>
+          <button class="bd-ref-subtab" data-textmode="draw" id="bdRefSubDraw">Рисовать</button>
+        </div>
+        <textarea class="bd-ref-text-mode" id="bdRefTextarea" placeholder="Впишите формулы или подсказки, которые нужны под рукой на этой доске…"></textarea>
+        <div class="bd-ref-draw-host" id="bdRefDrawHost"></div>
+      </div>
+    </div>
+  </div>
+  <input type="file" id="bdRefFileInput" accept="image/*" class="bd-hidden-color">
+
+  <div class="bd-ctx-menu" id="bdCtxMenu">
+    <button data-act="move">Переместить</button>
+    <button data-act="delete">Удалить</button>
+    <button data-act="copy">Скопировать</button>
+    <button data-act="paste">Вставить</button>
+    <button data-act="savelib" id="bdCtxSaveLib">Сохранить в библиотеку</button>
+    <button data-act="group" id="bdCtxGroup">Объединить в группу</button>
+    <button data-act="pin" id="bdCtxPin">Закрепить</button>
+    <div class="bd-ctx-zoom">
+      <button id="bdCtxZoomOut">−</button>
+      <span id="bdCtxZoomLabel">100%</span>
+      <button id="bdCtxZoomIn">+</button>
+    </div>
+  </div>
+
+  <div class="bd-modal-backdrop" id="imgModalBackdrop">
+    <div class="bd-modal" id="imgModal">
+      <div class="bd-modal-head">
+        <div class="bd-modal-title">Загрузить изображение</div>
+        <button class="bd-modal-close" id="imgModalClose">✕</button>
+      </div>
+      <div class="bd-modal-body">
+        <div class="bd-modal-preview" id="imgModalPreview"></div>
+        <div class="bd-modal-side">
+          <label class="bd-modal-toggle-row">
+            <span>
+              <b>Закрепить изображение на доске</b>
+              <small>Не даст случайно стереть ластиком или изменить размер. Перемещать по доске можно и в закреплённом виде.</small>
+            </span>
+            <input type="checkbox" id="imgOptLock">
+          </label>
+          <label class="bd-modal-toggle-row">
+            <span>
+              <b>Привязка к сетке</b>
+              <small>Поставит картинку по ближайшим линиям клетки.</small>
+            </span>
+            <input type="checkbox" id="imgOptSnap">
+          </label>
+          <label class="bd-modal-toggle-row">
+            <span>
+              <b>Сохранить в библиотеку</b>
+              <small>Изображение останется под рукой для других досок.</small>
+            </span>
+            <input type="checkbox" id="imgOptLib">
+          </label>
+          <button class="bl-btn primary" id="imgModalInsert" style="width:100%;justify-content:center;margin-top:auto;">Вставить</button>
+        </div>
+      </div>
+      <div class="bd-modal-lib" id="imgModalLib" style="display:none">
+        <div class="bd-modal-lib-title">Из библиотеки</div>
+        <div class="bd-modal-lib-row" id="imgModalLibRow"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="bd-modal-backdrop" id="basketModalBackdrop">
+    <div class="bd-modal bd-modal-basket" id="basketModal">
+      <div class="bd-modal-head">
+        <div class="bd-modal-title">Добавить из Подборки</div>
+        <button class="bd-modal-close" id="basketModalClose">✕</button>
+      </div>
+      <div class="bd-modal-note">Задания, которые собраны кнопкой «В подборку» на страницах тренажёров. Выбранное добавится на доску отдельной картинкой — её можно подвинуть, растянуть и подписать поверх. Само задание останется в Подборке, его можно добавить ещё раз или на другую доску.</div>
+      <div class="bd-basket-list" id="basketModalList"></div>
+    </div>
+  </div>
+
+  <div class="bd-modal-backdrop" id="pdfModalBackdrop">
+    <div class="bd-modal bd-modal-pdf" id="pdfModal">
+      <div class="bd-modal-head">
+        <div class="bd-modal-title">Сохранение конспекта</div>
+        <button class="bd-modal-close" id="pdfModalClose">✕</button>
+      </div>
+      <div class="bd-modal-note" id="pdfModalNote">Сохраняются только листы, на которых есть рисунки или изображения — пустые в конспект не попадают.</div>
+      <div class="bd-set-row bd-modal-pageorder-row">
+        <label>Порядок страниц</label>
+        <div class="bd-set-btnrow">
+          <button id="pageOrderH" class="active" title="Слева направо, ряд за рядом">По ширине</button>
+          <button id="pageOrderV" title="Сверху вниз, бесконечной лентой">По высоте</button>
+        </div>
+      </div>
+      <div class="bd-modal-pdf-page">
+        <div class="bd-modal-pdf-pageinfo" id="pdfPageInfo">Страница 1 из 1</div>
+        <label class="bd-modal-toggle-row" style="border:none;padding:2px 0 10px;">
+          <span><b>Включить страницу в конспект</b></span>
+          <input type="checkbox" id="pdfPageInclude" checked>
+        </label>
+        <div class="bd-modal-pdf-preview-wrap">
+          <button class="bd-modal-pdf-nav" id="pdfPagePrev">‹</button>
+          <div class="bd-modal-pdf-preview" id="pdfPagePreview"></div>
+          <button class="bd-modal-pdf-nav" id="pdfPageNext">›</button>
+        </div>
+      </div>
+      <div class="bd-modal-pdf-empty" id="pdfEmptyMsg" style="display:none">На доске пока нет ни одного листа с содержимым — сохранять пока нечего.</div>
+      <div class="bd-modal-foot">
+        <button class="bl-btn primary" id="pdfDownloadBtn">Скачать конспект</button>
+        <button class="bl-btn" id="pdfCloseBtn">Закрыть</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="basket-core.js"></script>
+<script src="boards-core.js"></script>
+</body>
+</html>

@@ -1223,7 +1223,7 @@ setupAutoHeightAnimation(document.getElementById('mainSheet'));
     // холстом ниже и в этот выбор не входит
     const sheets = [...document.querySelectorAll('.sheet')];
     for (const el of sheets) if (el.offsetParent !== null) return el;
-    const fallbacks = [document.getElementById('mainPanel'), document.getElementById('taskArea'), document.querySelector('.panel')];
+    const fallbacks = [document.getElementById('taskArea'), document.querySelector('.panel')];
     for (const el of fallbacks) if (el && el.offsetParent !== null) return el;
     return null;
   }
@@ -1361,6 +1361,20 @@ setupAutoHeightAnimation(document.getElementById('mainSheet'));
     redrawBg();
   }
 
+  // ── если перед началом рисования фокус оставался в текстовом поле (например,
+  // пользователь только что напечатал ответ и, не кликнув мимо, сразу начал
+  // писать на доске), это поле продолжает считаться "активным" — и следующее
+  // Ctrl+Z/⌘+Z уходит в системную отмену ввода текста, а не в отмену штриха.
+  // Снимаем фокус в момент начала взаимодействия с доской, чтобы Ctrl+Z всегда
+  // попадал в undo() доски ──
+  function blurActiveFormField(){
+    const el = document.activeElement;
+    if (el && el !== document.body) {
+      const tag = (el.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || el.isContentEditable) el.blur();
+    }
+  }
+
   // ── панорамирование: средняя ИЛИ правая кнопка мыши, ИЛИ инструмент «рука» + левая кнопка ──
   let panning = false;
   let panStartClientX = 0, panStartClientY = 0, panStartPanX = 0, panStartPanY = 0;
@@ -1381,6 +1395,7 @@ setupAutoHeightAnimation(document.getElementById('mainSheet'));
 
   canvas.addEventListener('contextmenu', e=> e.preventDefault()); // правая кнопка теперь двигает доску, а не открывает системное меню
   canvas.addEventListener('pointerdown', e=>{
+    blurActiveFormField();
     if (e.button === 1 || e.button === 2) { startPan(e); e.preventDefault(); return; } // средняя ИЛИ правая кнопка — панорамирование
     if (tool === 'hand') {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
@@ -1548,6 +1563,7 @@ setupAutoHeightAnimation(document.getElementById('mainSheet'));
 
   canvasBg.addEventListener('contextmenu', e=> e.preventDefault());
   canvasBg.addEventListener('pointerdown', e=>{
+    blurActiveFormField();
     if (e.button === 1 || e.button === 2) { startBgPan(e); e.preventDefault(); return; }
     if (tool === 'hand') {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
