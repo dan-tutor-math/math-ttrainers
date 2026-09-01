@@ -279,27 +279,42 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 @keyframes revealUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
 #mainPanel.reveal{animation:revealUp .38s cubic-bezier(.22,.9,.35,1) both;}
 @keyframes correctPop{0%{transform:scale(.94);}55%{transform:scale(1.025);}100%{transform:scale(1);}}
-.mcq-btn.correct{animation:correctPop .32s ease;}
 .prompt{font-family:var(--font-ui);font-weight:500;font-size:clamp(16px,3vw,19px);color:var(--muted-5);margin-bottom:14px;line-height:1.5;}
 .data-table{width:100%;border-collapse:collapse;margin:10px 0 4px;font-family:var(--font-mono);font-size:14px;}
 .data-table th,.data-table td{border:1px solid var(--glass-border);padding:6px 10px;text-align:center;}
 .data-table th{background:var(--glass);font-family:var(--font-ui);font-weight:600;color:var(--muted-3);}
-.mcq-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3);margin-bottom:10px;}
-.mcq-options{display:flex;flex-direction:column;gap:8px;}
-.change-answer-btn{display:none;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--teacher);background:none;border:none;padding:10px 2px 0;cursor:pointer;text-decoration:underline;animation:revealUp .3s ease both;transition:opacity .15s;}
-.change-answer-btn:active{opacity:.6}
-.mcq-btn{
-  display:flex;align-items:center;gap:10px;text-align:left;
-  font-family:var(--font-mono);font-size:16px;color:var(--pencil);
+/* ─── ввод числового ответа ─── */
+.input-answer-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.answer-input{
+  font-family:var(--font-mono);font-size:19px;color:var(--ink);
   background:var(--card);border:1.5px solid var(--glass-border);border-radius:14px;
-  padding:12px 16px;cursor:pointer;transition:transform .15s, border-color .12s, background .12s;
+  padding:11px 14px;width:130px;
 }
-.mcq-btn:active{transform:scale(.96)}
-.mcq-btn .mlabel{font-family:var(--font-ui);font-weight:700;color:var(--muted-1);flex:0 0 auto;}
-.mcq-btn:hover:not(.disabled){border-color:var(--ink)}
-.mcq-btn.correct{border-color:var(--ok);background:var(--ok-tint);color:var(--ok);}
-.mcq-btn.wrong{border-color:var(--teacher);background:rgba(255,59,48,.1);color:var(--teacher);}
-.mcq-btn.disabled{cursor:default}
+.answer-input:focus{outline:none;border-color:var(--ink)}
+.answer-input.good{border-color:var(--ok);background:var(--ok-tint);color:var(--ok);}
+.answer-input.bad{border-color:var(--teacher);background:rgba(255,59,48,.1);color:var(--teacher);}
+@keyframes shakeInput{20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.answer-input.shake{animation:shakeInput .35s;}
+.check-btn{font-family:var(--font-ui);font-weight:600;font-size:15px;background:var(--ink);color:#fff;border:none;border-radius:14px;padding:11px 22px;cursor:pointer;transition:transform .15s;}
+.check-btn:active{transform:scale(.98)}
+.check-btn:disabled{opacity:.5;cursor:default}
+
+/* ─── плавающая клавиатура ─── */
+.keypad{display:grid;grid-template-columns:repeat(3, 44px);gap:6px}
+.keypad button{width:44px;height:40px;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-mono);font-size:18px;cursor:pointer;touch-action:manipulation}
+.keypad button:active{background:var(--hl)}
+.keypad button.kp-minus{color:var(--teacher);font-weight:700}
+.keypad button.kp-comma{color:var(--ink);font-weight:700}
+.keypad button.kp-back{grid-column:span 3;width:auto;height:36px;font-size:15px;color:var(--muted-6);}
+.keypad button.kp-enter{grid-column:span 3;width:auto;height:38px;font-family:var(--font-ui);font-weight:600;font-size:14px;background:var(--ink);color:#fff;border-color:var(--ink);}
+.keypad button.kp-enter:active{background:var(--ink-active);}
+.keypad-float{position:fixed;top:160px;right:16px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:50}
+.keypad-close{position:absolute;top:-11px;right:-11px;width:26px;height:26px;border-radius:50%;background:var(--teacher);color:#fff;border:2px solid #fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s;}
+.keypad-close:active{transform:scale(.9)}
+.keypad-drag-handle{position:absolute;top:-11px;left:-11px;width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;border:2px solid #fff;font-size:12px;line-height:1;cursor:grab;display:flex;align-items:center;justify-content:center;touch-action:none;}
+.keypad-toggle{position:fixed;top:160px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50;transition:transform .15s;}
+.keypad-toggle:active{transform:scale(.92)}
+@media(max-width:720px){.keypad-float,.keypad-toggle{top:auto;bottom:16px;right:16px}}
 .explain{font-family:var(--font-ui);font-size:15px;color:var(--muted-4);line-height:1.55;}
 .explain b{color:var(--ink)}
 .next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:14px;box-shadow:0 6px 18px var(--ok-shadow);transition:transform .15s;}
@@ -482,9 +497,10 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
     <div class="panel" id="questionPanel" style="display:none">
       <div class="prompt" id="questionPromptText"></div>
-      <div class="mcq-title">Варианты ответа:</div>
-      <div class="mcq-options" id="mcqOptions"></div>
-      <button class="change-answer-btn" id="changeAnswerBtn" style="display:none">✎ Изменить ответ</button>
+      <div class="input-answer-row" id="inputAnswerArea">
+        <input type="text" inputmode="decimal" class="answer-input" id="answerInput" placeholder="?" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+        <button class="check-btn" id="checkAnswerBtn">Проверить</button>
+      </div>
     </div>
 
     <div class="panel" id="mainPanel" style="display:none">
@@ -535,6 +551,13 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <div class="medal-tray" id="medalTray" aria-hidden="true"></div>
   <div id="boardSpace" aria-hidden="true"></div></div>
 
+<button class="keypad-toggle" id="kpToggle" title="Показать клавиатуру" style="display:none">⌨</button>
+<div class="keypad-float" id="keypadFloat" style="display:none">
+  <button class="keypad-drag-handle" id="kpDragHandle" title="Перетащить клавиатуру" aria-label="Переместить клавиатуру">✋</button>
+  <button class="keypad-close" id="kpClose" title="Скрыть клавиатуру">✕</button>
+  <div class="keypad" id="keypadButtons"></div>
+</div>
+
 <script src="basket-core.js"></script>
 <script>
 /* ═══════════════ утилиты ═══════════════ */
@@ -561,6 +584,14 @@ function fmtFrac(num, den){
   const sign = num < 0 ? '−' : '';
   return `${sign}${Math.abs(num)}/${den}`;
 }
+function ruPlural(n, one, few, many){
+  n = Math.abs(Math.round(n)) % 100;
+  const n1 = n % 10;
+  if (n >= 11 && n <= 14) return many;
+  if (n1 === 1) return one;
+  if (n1 >= 2 && n1 <= 4) return few;
+  return many;
+}
 function buildOptions(correct, candidates, fallbackGen) {
   const seen = new Set([correct]);
   const picked = [];
@@ -582,52 +613,147 @@ function tableHTML(headers, rows) {
 }
 
 
-function gen_arith_nth(){
-  const a1 = ri(-10,10);
-  const d = pick([-4,-3,-2,-1,1,2,3,4]);
-  const n = ri(5,15);
+/* ═══════════════ 10 прототипов задания 14 ОГЭ (по материалам загруженного набора задач) ═══════════════ */
+
+function gen_t1_amphi_row(){
+  const R = ri(12,20);
+  const a1 = ri(15,30);
+  const d = ri(1,4);
+  const n = ri(5, R-3);
   const correct = a1 + (n-1)*d;
-  const wrong1 = a1 + n*d;
-  const wrong2 = a1 + (n-2)*d;
-  const wrong3 = correct + pick([-2*d,-d,d,2*d]);
-  const options = buildOptions(String(correct), shuffleArr([wrong1,wrong2,wrong3]).map(String), k=>String(correct+(k%2?1:-1)*Math.abs(d)*k));
   return {
-    prompt: `Арифметическая прогрессия задана: a₁ = ${a1}, d = ${d}. Найдите a<sub>${n}</sub>.`,
-    options, correctIndex: options.indexOf(String(correct)),
-    explain: `aₙ = a₁ + (n−1)d = ${a1} + (${n}−1)·${d} = ${a1} + ${(n-1)*d} = ${correct}.`
+    prompt: `В амфитеатре ${R} ${ruPlural(R,'ряд','ряда','рядов')}. В первом ряду ${a1} ${ruPlural(a1,'место','места','мест')}, а в каждом следующем на ${d} ${ruPlural(d,'место','места','мест')} больше, чем в предыдущем. Сколько мест в ${n}-м ряду амфитеатра?`,
+    correctValue: correct,
+    explain: `aₙ = a₁ + (n−1)d = ${a1} + (${n}−1)·${d} = ${a1} + ${(n-1)*d} = ${correct} мест.`
   };
 }
 
-function gen_arith_sum(){
-  const a1 = ri(-5,10);
-  const d = pick([-3,-2,-1,1,2,3]);
-  const n = ri(4,10);
-  const an = a1+(n-1)*d;
-  const correct = Math.round((a1+an)*n/2);
-  const wrong1 = (a1+an)*n;
-  const wrong2 = a1*n + d;
-  const wrong3 = correct + pick([-n,-2*Math.abs(d),Math.abs(d),n]);
-  const options = buildOptions(String(correct), shuffleArr([wrong1,wrong2,wrong3]).map(String), k=>String(correct+(k%2?1:-1)*n*k));
+function gen_t2_amphi_total(){
+  const R = ri(10,18);
+  const a1 = ri(12,25);
+  const d = ri(1,4);
+  const aR = a1 + (R-1)*d;
+  const correct = Math.round((a1+aR)*R/2);
   return {
-    prompt: `Арифметическая прогрессия: a₁ = ${a1}, d = ${d}. Найдите сумму первых ${n} членов S<sub>${n}</sub>.`,
-    options, correctIndex: options.indexOf(String(correct)),
-    explain: `aₙ = a₁+(n−1)d = ${an}. Sₙ = (a₁+aₙ)·n/2 = (${a1}+${an})·${n}/2 = ${correct}.`
+    prompt: `В амфитеатре ${R} ${ruPlural(R,'ряд','ряда','рядов')}. В первом ряду ${a1} ${ruPlural(a1,'место','места','мест')}, а в каждом следующем на ${d} ${ruPlural(d,'место','места','мест')} больше, чем в предыдущем. Сколько всего мест в амфитеатре?`,
+    correctValue: correct,
+    explain: `a₁ = ${a1}, d = ${d}. Последний, ${R}-й ряд: a<sub>${R}</sub> = a₁+(${R}−1)d = ${a1}+${(R-1)*d} = ${aR}. Sₙ = (a₁+a<sub>${R}</sub>)·${R}/2 = (${a1}+${aR})·${R}/2 = ${correct} мест.`
   };
 }
 
-function gen_geom_nth(){
-  const b1 = pick([1,2,3,4,5]);
-  const q = pick([2,3,-2,-3]);
-  const n = ri(3,6);
-  const correct = b1 * Math.pow(q, n-1);
-  const wrong1 = b1 * Math.pow(q, n);
-  const wrong2 = b1 * q * n;
-  const wrong3 = correct + pick([-Math.abs(q)*2,-Math.abs(q),Math.abs(q),Math.abs(q)*2]);
-  const options = buildOptions(String(correct), shuffleArr([wrong1,wrong2,wrong3]).map(String), k=>String(correct+(k%2?1:-1)*Math.abs(q)*k));
+function gen_t3_amphi_two_rows(){
+  const i = ri(2,5);
+  const gap1 = ri(2,5);
+  const j = i + gap1;
+  const d = pick([1,2,3,4,5]);
+  const ai = ri(15,35);
+  const aj = ai + gap1*d;
+  const gap2 = ri(3,7);
+  const R = j + gap2;
+  const correct = aj + gap2*d;
   return {
-    prompt: `Геометрическая прогрессия: b₁ = ${b1}, q = ${q}. Найдите b<sub>${n}</sub>.`,
-    options, correctIndex: options.indexOf(String(correct)),
-    explain: `bₙ = b₁ · q^(n−1) = ${b1} · ${q}^${n-1} = ${correct}.`
+    prompt: `В амфитеатре ${R} ${ruPlural(R,'ряд','ряда','рядов')}, причём в каждом следующем ряду на одно и то же число мест больше, чем в предыдущем. В ${i}-м ряду ${ai} ${ruPlural(ai,'место','места','мест')}, а в ${j}-м ряду ${aj} ${ruPlural(aj,'место','места','мест')}. Сколько мест в последнем ряду амфитеатра?`,
+    correctValue: correct,
+    explain: `d = (a<sub>${j}</sub> − a<sub>${i}</sub>)/(${j}−${i}) = (${aj}−${ai})/${gap1} = ${d}. Последний ряд — ${R}-й: a<sub>${R}</sub> = a<sub>${j}</sub> + (${R}−${j})·d = ${aj} + ${gap2}·${d} = ${correct} мест.`
+  };
+}
+
+function gen_t4_cooling(){
+  const D = ri(8,12);
+  const r = ri(2,6);
+  const t = ri(2, D-2);
+  const start = ri(-10,10);
+  const correct = start - r*t;
+  return {
+    prompt: `При проведении опыта вещество равномерно охлаждали в течение ${D} ${ruPlural(D,'минуту','минуты','минут')}. При этом каждую минуту его температура уменьшалась на ${r}°C. Найдите температуру вещества в градусах Цельсия через ${t} ${ruPlural(t,'минуту','минуты','минут')} после начала опыта, если начальная температура вещества составляла ${fmtNum(start)}°C.`,
+    correctValue: correct,
+    explain: `Через k минут температура равна a₀ − r·k = ${fmtNum(start)} − ${r}·${t} = ${fmtNum(correct)}°C.`
+  };
+}
+
+function gen_t5_braking_sum(){
+  const d = ri(2,6);
+  const N = ri(3,6);
+  const minTerm = ri(1,10);
+  const a1 = minTerm + (N-1)*d;
+  const aN = a1 - (N-1)*d;
+  const correct = Math.round((a1+aN)*N/2);
+  return {
+    prompt: `Водитель автомобиля начал торможение. За секунду после начала торможения автомобиль проехал ${a1} м, а за каждую следующую секунду он проезжал на ${d} м меньше, чем за предыдущую. Сколько метров автомобиль прошёл за первые ${N} ${ruPlural(N,'секунду','секунды','секунд')} торможения?`,
+    correctValue: correct,
+    explain: `aₙ = a₁−(n−1)d. a<sub>${N}</sub> = ${a1}−(${N}−1)·${d} = ${aN}. Путь = (a₁+a<sub>${N}</sub>)·${N}/2 = (${a1}+${aN})·${N}/2 = ${correct} м.`
+  };
+}
+
+function gen_t6_braking_stop(){
+  const d = ri(2,8);
+  const k = ri(3,7);
+  const a1 = k*d;
+  const correct = Math.round(d*k*(k+1)/2);
+  return {
+    prompt: `Водитель автомобиля начал торможение. За секунду после начала торможения автомобиль проехал ${a1} м, а за каждую следующую секунду он проезжал на ${d} м меньше, чем за предыдущую. Сколько метров автомобиль прошёл до полной остановки?`,
+    correctValue: correct,
+    explain: `Автомобиль останавливается, когда очередной «секундный» отрезок пути становится равным 0: a₁−(n−1)d=0 при a₁=${a1}, d=${d} даёт n=${k+1} — то есть движение продолжалось ${k} целых секунд. Путь = ${a1}+${a1-d}+…+${d} = сумма первых ${k} членов = ${correct} м.`
+  };
+}
+
+function gen_t7_train(){
+  const A1 = ri(3,12);
+  const D = ri(1,4);
+  const N = ri(5,9);
+  const a1 = A1/10, d = D/10;
+  const aN = (A1 + (N-1)*D)/10;
+  const sumTenths = N*A1 + D*N*(N-1)/2;
+  const correct = Math.round(sumTenths)/10;
+  return {
+    prompt: `Поезд начал движение от станции. За первую секунду состав сдвинулся на ${fmtNum(a1)} м, а за каждую следующую секунду он проходил на ${fmtNum(d)} м больше, чем за предыдущую. Сколько метров состав прошёл за первые ${N} ${ruPlural(N,'секунду','секунды','секунд')} движения?`,
+    correctValue: correct,
+    explain: `aₙ = a₁+(n−1)d. a<sub>${N}</sub> = ${fmtNum(a1)}+(${N}−1)·${fmtNum(d)} = ${fmtNum(aN)}. Путь = (a₁+a<sub>${N}</sub>)·${N}/2 = (${fmtNum(a1)}+${fmtNum(aN)})·${N}/2 = ${fmtNum(correct)} м.`
+  };
+}
+
+function gen_t8_bacteria(){
+  const P = pick([10,15,20,30]);
+  const q = pick([2,3]);
+  const k = ri(2,4);
+  const T = P*k;
+  const m0 = ri(1,9);
+  const correct = m0 * Math.pow(q,k);
+  return {
+    prompt: `В ходе биологического эксперимента в чашку Петри с питательной средой поместили колонию микроорганизмов массой ${m0} мг. За каждые ${P} ${ruPlural(P,'минуту','минуты','минут')} масса колонии увеличивается в ${q} раза. Найдите массу колонии микроорганизмов через ${T} ${ruPlural(T,'минуту','минуты','минут')} после начала эксперимента. Ответ дайте в миллиграммах.`,
+    correctValue: correct,
+    explain: `Каждые ${P} минут масса умножается на ${q}. За ${T} минут это произошло ${k} ${ruPlural(k,'раз','раза','раз')} подряд. Масса = ${m0}·${q}<sup>${k}</sup> = ${correct} мг.`
+  };
+}
+
+function gen_t9_isotope(){
+  const P = pick([5,8,10,15,20]);
+  const k = ri(2,4);
+  const T = P*k;
+  const pow = Math.pow(2,k);
+  const halfStep = Math.random() < 0.4;
+  const ansUnits = ri(2,40);
+  const correct = halfStep ? ansUnits + 0.5 : ansUnits;
+  const m0 = halfStep ? ansUnits*pow + pow/2 : ansUnits*pow;
+  return {
+    prompt: `В ходе распада радиоактивного изотопа его масса уменьшается вдвое каждые ${P} ${ruPlural(P,'минуту','минуты','минут')}. В начальный момент масса изотопа составляла ${m0} мг. Найдите массу изотопа через ${T} ${ruPlural(T,'минуту','минуты','минут')}. Ответ дайте в миллиграммах.`,
+    correctValue: correct,
+    explain: `За ${T} минут прошло ${k} ${ruPlural(k,'период','периода','периодов')} полураспада (по ${P} минут). Масса = ${m0} : 2<sup>${k}</sup> = ${m0} : ${pow} = ${fmtNum(correct)} мг.`
+  };
+}
+
+function gen_t10_ball(){
+  const q = pick([2,2,2,3]);
+  const n = q===3 ? ri(3,4) : ri(4,6);
+  const thresholdCm = pick([5,10,20]);
+  const C = ri(thresholdCm, thresholdCm*q - 1);
+  const h1Cm = C * Math.pow(q, n-2);
+  const h1M = h1Cm/100;
+  const qWord = q===2 ? 'два' : 'три';
+  return {
+    prompt: `Каучуковый мячик с силой бросили на асфальт. Отскочив, мячик подпрыгнул на ${fmtNum(h1M)} м, а при каждом следующем прыжке он поднимался на высоту в ${qWord} раза меньше предыдущей. При каком по счёту прыжке мячик в первый раз не достигнет высоты ${thresholdCm} см?`,
+    correctValue: n,
+    explain: `Высота каждого следующего прыжка в ${q} раза меньше предыдущей, поэтому высота ${n-1}-го прыжка равна ${C} см — это ещё не меньше ${thresholdCm} см. Высота ${n}-го прыжка равна ${C}:${q} см; так как ${C} < ${thresholdCm}·${q} = ${thresholdCm*q}, эта высота уже меньше ${thresholdCm} см. Значит, мячик впервые не достигнет высоты ${thresholdCm} см на ${n}-м прыжке.`
   };
 }
 
@@ -635,10 +761,19 @@ function gen_geom_nth(){
 /* ═══════════════ реестр типов ═══════════════ */
 
 const GROUPS = [
-  { title: 'Прогрессии', modes: [
-    { id: 'arithn', title: 'Арифметическая прогрессия — n-й член', gen: gen_arith_nth },
-    { id: 'arithsum', title: 'Арифметическая прогрессия — сумма', gen: gen_arith_sum },
-    { id: 'geomn', title: 'Геометрическая прогрессия — n-й член', gen: gen_geom_nth },
+  { title: 'Арифметическая прогрессия — контекстные задачи', modes: [
+    { id: 't1', title: '№1. Амфитеатр — место в ряду', gen: gen_t1_amphi_row },
+    { id: 't2', title: '№2. Амфитеатр — всего мест', gen: gen_t2_amphi_total },
+    { id: 't3', title: '№3. Амфитеатр — по двум рядам', gen: gen_t3_amphi_two_rows },
+    { id: 't4', title: '№4. Охлаждение вещества', gen: gen_t4_cooling },
+    { id: 't5', title: '№5. Торможение — путь за секунды', gen: gen_t5_braking_sum },
+    { id: 't6', title: '№6. Торможение — путь до остановки', gen: gen_t6_braking_stop },
+    { id: 't7', title: '№7. Поезд — путь за секунды', gen: gen_t7_train },
+  ]},
+  { title: 'Геометрическая прогрессия — контекстные задачи', modes: [
+    { id: 't8', title: '№8. Рост колонии микроорганизмов', gen: gen_t8_bacteria },
+    { id: 't9', title: '№9. Распад изотопа', gen: gen_t9_isotope },
+    { id: 't10', title: '№10. Прыжки мячика', gen: gen_t10_ball },
   ]},
 ];
 const ALL_MODES = GROUPS.flatMap(g => g.modes);
@@ -662,8 +797,9 @@ const els = {
   comingSoonPanel: document.getElementById('comingSoonPanel'),
   questionPanel: document.getElementById('questionPanel'),
   questionPromptText: document.getElementById('questionPromptText'),
-  mcqOptions: document.getElementById('mcqOptions'),
-  changeAnswerBtn: document.getElementById('changeAnswerBtn'),
+  inputAnswerArea: document.getElementById('inputAnswerArea'),
+  answerInput: document.getElementById('answerInput'),
+  checkAnswerBtn: document.getElementById('checkAnswerBtn'),
   mainPanel: document.getElementById('mainPanel'),
   explainBox: document.getElementById('explainBox'),
   nextBtn: document.getElementById('nextBtn'),
@@ -789,8 +925,10 @@ function playMedalAnimation(tier) {
 }
 
 function recordSolve() {
-  const gotItRight = curProg.pickedIndex === curTask.correctIndex;
-  curProg.history.unshift({ prompt: curTask.prompt, correct: gotItRight, hadError: !!curProg.hadWrongPick, answer: curTask.options[curTask.correctIndex] });
+  // ввод текстом всегда завершается показом верного значения (даже после ошибок) —
+  // "верно"/"неверно" тут не различаем, только было ли по пути 🟡-исправление (hadError)
+  const gotItRight = true;
+  curProg.history.unshift({ prompt: curTask.prompt, correct: gotItRight, hadError: !!curProg.hadWrongPick, answer: String(curTask.correctValue) });
   curProg.history = curProg.history.slice(0, 5);
   curProg.solvedInBatch = (curProg.solvedInBatch || 0) + 1;
 
@@ -901,35 +1039,34 @@ els.tabPractice.onclick = () => switchSubMode('practice');
 els.tabExam.onclick = () => switchSubMode('exam');
 
 function renderCurrentTask() {
+  window.scrollTo(0, 0);
   els.questionPanel.style.display = 'block';
   els.questionPromptText.innerHTML = curTask.prompt;
 
-  els.mcqOptions.innerHTML = curTask.options.map((opt, i) =>
-    `<button class="mcq-btn" data-i="${i}"><span class="mlabel">${i + 1})</span><span>${opt}</span></button>`
-  ).join('');
-  els.changeAnswerBtn.style.display = 'none';
-  attachMCQHandlers();
+  els.answerInput.value = '';
+  els.answerInput.classList.remove('good', 'bad', 'shake');
+  els.answerInput.disabled = false;
+  els.checkAnswerBtn.disabled = false;
+  setTimeout(() => els.answerInput.focus(), 30);
 
   els.mainPanel.style.display = 'none';
   els.explainBox.style.display = 'none';
   els.nextBtn.style.display = 'none';
+  syncKeypadVisibility();
 }
 
 function newTask() {
   const m = curMode === 'random' ? pick(ALL_MODES) : ALL_MODES.find(x => x.id === curMode);
   curTask = m.gen();
   taskAnswered = false;
-  optionsLocked = false;
   hadWrongPick = false;
 
-  window.scrollTo(0, 0);
   renderCurrentTask();
 
   if (curMode !== 'random') {
     curProg.task = curTask;
     curProg.answered = false;
     curProg.hadWrongPick = false;
-    curProg.pickedIndex = null;
     saveProg(curMode, curProg);
   }
 }
@@ -940,76 +1077,73 @@ function resumeOrNewTask() {
     curTask = curProg.task;
     taskAnswered = !!curProg.answered;
     hadWrongPick = !!curProg.hadWrongPick;
-    optionsLocked = taskAnswered;
 
-    window.scrollTo(0, 0);
     renderCurrentTask();
 
-    const btns = [...els.mcqOptions.querySelectorAll('.mcq-btn')];
     if (taskAnswered) {
-      btns.forEach(b => { b.onclick = null; b.classList.add('disabled'); });
-      if (typeof curProg.pickedIndex === 'number' && curProg.pickedIndex !== curTask.correctIndex && btns[curProg.pickedIndex]) {
-        btns[curProg.pickedIndex].classList.add('wrong');
-      }
-      if (btns[curTask.correctIndex]) btns[curTask.correctIndex].classList.add('correct');
+      els.answerInput.value = String(curTask.correctValue);
+      els.answerInput.classList.add('good');
+      els.answerInput.disabled = true;
+      els.checkAnswerBtn.disabled = true;
+      syncKeypadVisibility();
       finishTask(false);
-    } else if (hadWrongPick && typeof curProg.pickedIndex === 'number') {
-      optionsLocked = true;
-      if (btns[curProg.pickedIndex]) btns[curProg.pickedIndex].classList.add('wrong');
-      els.changeAnswerBtn.style.display = 'block';
+    } else if (hadWrongPick) {
+      els.answerInput.classList.add('bad');
     }
   } else {
     newTask();
   }
 }
 
-function attachMCQHandlers() {
-  const btns = [...els.mcqOptions.querySelectorAll('.mcq-btn')];
-  btns.forEach(b => {
-    b.onclick = () => {
-      if (optionsLocked || taskAnswered) return;
-      optionsLocked = true;
-      els.changeAnswerBtn.style.display = 'none';
-      const i = Number(b.dataset.i);
-      btns.forEach(x => { x.onclick = null; x.classList.add('disabled'); });
-      if (i === curTask.correctIndex) {
-        b.classList.add('correct');
-        streak++; totalSolved++;
-        els.stSolved.textContent = totalSolved;
-        els.stStreak.textContent = streak;
-        taskAnswered = true;
-        if (curMode !== 'random') { curProg.answered = true; curProg.pickedIndex = i; saveProg(curMode, curProg); }
-        finishTask();
-      } else if (hadWrongPick) {
-        b.classList.add('wrong');
-        btns[curTask.correctIndex].classList.add('correct');
-        streak = 0; totalErrors++;
-        els.stErrors.textContent = totalErrors;
-        els.stStreak.textContent = streak;
-        taskAnswered = true;
-        if (curMode !== 'random') { curProg.answered = true; curProg.pickedIndex = i; curProg.errorsInBatch = (curProg.errorsInBatch || 0) + 1; saveProg(curMode, curProg); }
-        finishTask();
-      } else {
-        b.classList.add('wrong');
-        hadWrongPick = true;
-        streak = 0; totalErrors++;
-        els.stErrors.textContent = totalErrors;
-        els.stStreak.textContent = streak;
-        els.changeAnswerBtn.style.display = 'block';
-        if (curMode !== 'random') { curProg.hadWrongPick = true; curProg.pickedIndex = i; curProg.errorsInBatch = (curProg.errorsInBatch || 0) + 1; saveProg(curMode, curProg); }
-      }
-    };
-  });
-}
-
-els.changeAnswerBtn.onclick = () => {
+function submitInputAnswer() {
   if (taskAnswered) return;
-  optionsLocked = false;
-  const btns = [...els.mcqOptions.querySelectorAll('.mcq-btn')];
-  btns.forEach(b => b.classList.remove('wrong', 'correct', 'disabled'));
-  els.changeAnswerBtn.style.display = 'none';
-  attachMCQHandlers();
-};
+  const raw = els.answerInput.value.trim().replace(',', '.');
+  if (raw === '') return;
+  const val = parseFloat(raw);
+  const isCorrect = Number.isFinite(val) && Math.abs(val - curTask.correctValue) < 1e-9;
+
+  if (isCorrect) {
+    els.answerInput.classList.remove('bad');
+    els.answerInput.classList.add('good');
+    els.answerInput.disabled = true;
+    els.checkAnswerBtn.disabled = true;
+    streak++; totalSolved++;
+    els.stSolved.textContent = totalSolved;
+    els.stStreak.textContent = streak;
+    taskAnswered = true;
+    syncKeypadVisibility();
+    if (curMode !== 'random') { curProg.answered = true; saveProg(curMode, curProg); }
+    finishTask(true);
+  } else if (hadWrongPick) {
+    els.answerInput.value = String(curTask.correctValue);
+    els.answerInput.classList.remove('bad');
+    els.answerInput.classList.add('good');
+    els.answerInput.disabled = true;
+    els.checkAnswerBtn.disabled = true;
+    streak = 0; totalErrors++;
+    els.stErrors.textContent = totalErrors;
+    els.stStreak.textContent = streak;
+    taskAnswered = true;
+    syncKeypadVisibility();
+    if (curMode !== 'random') { curProg.answered = true; saveProg(curMode, curProg); }
+    finishTask(true);
+  } else {
+    hadWrongPick = true;
+    streak = 0; totalErrors++;
+    els.stErrors.textContent = totalErrors;
+    els.stStreak.textContent = streak;
+    els.answerInput.classList.remove('shake');
+    void els.answerInput.offsetWidth;
+    els.answerInput.classList.add('bad', 'shake');
+    if (curMode !== 'random') {
+      if (!curProg.hadWrongPick) curProg.errorsInBatch = (curProg.errorsInBatch || 0) + 1;
+      curProg.hadWrongPick = true;
+      saveProg(curMode, curProg);
+    }
+  }
+}
+els.checkAnswerBtn.onclick = submitInputAnswer;
+els.answerInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitInputAnswer(); });
 
 function finishTask(isFreshSolve) {
   if (isFreshSolve === undefined) isFreshSolve = true;
@@ -1024,6 +1158,87 @@ function finishTask(isFreshSolve) {
   if (isFreshSolve && curMode !== 'random') recordSolve();
 }
 els.nextBtn.onclick = newTask;
+
+/* ───────── плавающая клавиатура ───────── */
+let keypadOpen = true;
+function setupFloatingKeypad(){
+  const keys = ['7','8','9','4','5','6','1','2','3',',','0','−'];
+  document.getElementById('keypadButtons').innerHTML = keys.map(k=>{
+    const cls = k==='−' ? 'kp-minus' : (k===',' ? 'kp-comma' : '');
+    // на кнопке — красивый минус «−», но в поле вставляем обычный ASCII-дефис,
+    // иначе parseFloat при проверке ответа его не распознает
+    const val = k==='−' ? '-' : k;
+    return `<button type="button" class="${cls}" data-key="${val}">${k}</button>`;
+  }).join('') +
+    `<button type="button" class="kp-back" data-key="back">⌫ Стереть</button>` +
+    `<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>`;
+  document.querySelectorAll('#keypadButtons button').forEach(btn=>{
+    btn.onclick = ()=>keypadPress(btn.dataset.key);
+  });
+  document.getElementById('kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(); };
+  document.getElementById('kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(); };
+  makeKeypadDraggable(document.getElementById('keypadFloat'), document.getElementById('kpDragHandle'));
+}
+function makeKeypadDraggable(floatEl, handleEl){
+  if(!floatEl || !handleEl || floatEl._dragReady) return;
+  floatEl._dragReady = true;
+  let dragging = false, offsetX = 0, offsetY = 0;
+  function clamp(x, y){
+    const w = floatEl.offsetWidth, h = floatEl.offsetHeight;
+    const maxX = Math.max(4, window.innerWidth - w - 4);
+    const maxY = Math.max(4, window.innerHeight - h - 4);
+    return { x: Math.min(Math.max(x, 4), maxX), y: Math.min(Math.max(y, 4), maxY) };
+  }
+  function onPointerDown(e){
+    dragging = true;
+    const rect = floatEl.getBoundingClientRect();
+    floatEl.style.left = rect.left + 'px';
+    floatEl.style.top = rect.top + 'px';
+    floatEl.style.right = 'auto';
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    try{ handleEl.setPointerCapture(e.pointerId); }catch(err){}
+    e.preventDefault();
+  }
+  function onPointerMove(e){
+    if(!dragging) return;
+    const pos = clamp(e.clientX - offsetX, e.clientY - offsetY);
+    floatEl.style.left = pos.x + 'px';
+    floatEl.style.top = pos.y + 'px';
+  }
+  function onPointerUp(e){
+    dragging = false;
+    try{ handleEl.releasePointerCapture(e.pointerId); }catch(err){}
+  }
+  handleEl.addEventListener('pointerdown', onPointerDown);
+  handleEl.addEventListener('pointermove', onPointerMove);
+  handleEl.addEventListener('pointerup', onPointerUp);
+  handleEl.addEventListener('pointercancel', onPointerUp);
+  window.addEventListener('resize', ()=>{
+    if(floatEl.style.left && floatEl.style.left!=='auto'){
+      const rect = floatEl.getBoundingClientRect();
+      const pos = clamp(rect.left, rect.top);
+      floatEl.style.left = pos.x + 'px';
+      floatEl.style.top = pos.y + 'px';
+    }
+  });
+}
+function keypadPress(ch){
+  const inp = els.answerInput;
+  if(!inp || inp.disabled) return;
+  if(ch==='enter'){ submitInputAnswer(); return; }
+  if(ch==='back') inp.value = inp.value.slice(0,-1);
+  else inp.value = (inp.value||'') + ch;
+  inp.focus();
+}
+function syncKeypadVisibility(){
+  const needsInput = els.taskArea.style.display !== 'none' &&
+    els.questionPanel.style.display !== 'none' &&
+    !els.answerInput.disabled;
+  document.getElementById('keypadFloat').style.display = (needsInput && keypadOpen) ? 'block' : 'none';
+  document.getElementById('kpToggle').style.display = (needsInput && !keypadOpen) ? 'flex' : 'none';
+}
+setupFloatingKeypad();
 
 renderPicker();
 </script>
