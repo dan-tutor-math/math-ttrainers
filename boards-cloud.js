@@ -38,7 +38,14 @@
     .ag-link{background:none !important;color:var(--ink) !important;font-weight:500 !important;
       padding:6px 0 !important;text-decoration:underline;}
     .ag-error{margin-top:10px;font-size:13px;color:var(--teacher);line-height:1.4;}
-    .ag-user-pill{position:fixed;top:16px;left:16px;z-index:400;display:flex;align-items:center;gap:8px;
+    /* Внизу слева — единственный угол экрана, свободный и на доске (там
+       слева наверху «Назад к доскам», справа наверху шестерёнка/шеринг,
+       справа внизу — круглая кнопка справочной панели), и на списке досок
+       (там слева наверху «К тренажёрам», справа наверху — переключатель
+       темы). Раньше плашка стояла в top:16px;left:16px поверх «Назад» и
+       «К тренажёрам» (у неё z-index выше, а те кнопки — в обычном потоке
+       документа, поэтому плашка их полностью перекрывала и блокировала клик) */
+    .ag-user-pill{position:fixed;bottom:16px;left:16px;z-index:400;display:flex;align-items:center;gap:8px;
       padding:7px 12px;border-radius:12px;background:var(--glass-strong);border:1px solid var(--glass-border);
       backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
       box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);font-size:12.5px;color:var(--muted-2);}
@@ -61,6 +68,19 @@
           <button id="agResend" class="ag-link">Ввести другой email</button>
         </div>
         <div id="agLoading" hidden><p class="ag-hint">Входим…</p></div>
+        <!-- Показывается вместо пустой формы «введите email», когда на ЭТОМ
+             устройстве уже есть сохранённый вход (человек когда-то прошёл по
+             ссылке из письма), но прямо сейчас не получилось связаться с
+             сервером (сеть моргнула, сервер на секунду недоступен и т.п.).
+             Без этого экрана человек в такой ситуации видел просто пустую
+             форму входа — и заново отправлял себе письмо, хотя оно совершенно
+             не нужно: сам вход на устройстве никуда не делся, достаточно
+             просто повторить попытку, когда соединение восстановится */ -->
+        <div id="agReconnect" hidden>
+          <p class="ag-hint">Не получилось подключиться к серверу — но вы уже входили на этом устройстве. Проверьте интернет-соединение и повторите попытку; письмо для этого не нужно.</p>
+          <button id="agRetryConnect">Повторить попытку</button>
+          <button id="agUseOtherEmail" class="ag-link">Войти под другой почтой</button>
+        </div>
         <div id="agError" class="ag-error" hidden></div>
       </div>
     </div>
@@ -73,6 +93,7 @@
   const step1 = document.getElementById('agStep1');
   const step2 = document.getElementById('agStep2');
   const loading = document.getElementById('agLoading');
+  const reconnectBox = document.getElementById('agReconnect');
   const errBox = document.getElementById('agError');
   const pill = document.getElementById('authUserPill');
 
@@ -80,7 +101,16 @@
     step1.hidden = stage !== 'form';
     step2.hidden = stage !== 'sent';
     loading.hidden = stage !== 'loading';
+    reconnectBox.hidden = stage !== 'reconnect';
     if (msg) { errBox.hidden = false; errBox.textContent = msg; } else { errBox.hidden = true; }
+  }
+  // есть ли на этом устройстве сохранённый с прошлого раза вход — используем
+  // только для того, чтобы решить, ЧТО показать при сбое связи (см. выше);
+  // сам ключ (sb-<project-ref>-auth-token) — деталь реализации supabase-js,
+  // поэтому проверяем мягко, по префиксу/суффиксу, а не по точному имени
+  function hasCachedSessionOnThisDevice() {
+    try { return Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token')); }
+    catch (e) { return false; }
   }
   function showGate() {
     gate.style.display = 'flex';
@@ -112,10 +142,42 @@
 
   showGate();
   setStage('loading');
+  let authSettled = false;
   // подстраховка: если по какой-то причине onAuthStateChange не сработает
-  // быстро (например, сеть подвисла на первом запросе к Supabase),
-  // не оставляем пользователя навсегда смотреть на «Входим…»
-  const loadingFallback = setTimeout(() => { if (!loading.hidden) setStage('form'); }, 6000);
+  // быстро (например, сеть подвисла на первом запросе к Supabase), не
+  // оставляем пользователя навсегда смотреть на «Входим…». Раньше в этом
+  // случае всегда показывали пустую форму «введите email» — из-за чего
+  // человек, уже когда-то входивший на этом устройстве, при обычном сетевом
+  // сбое сам себе заново отправлял письмо, хотя сессия никуда не делась и
+  // достаточно было просто повторить попытку (см. hasCachedSessionOnThisDevice
+  // и agReconnect выше) — здесь просто РАЗДЕЛЯЕМ эти два случая
+  const loadingFallback = setTimeout(() => {
+    if (authSettled) return;
+    if (hasCachedSessionOnThisDevice()) { setStage('reconnect'); startAutoReconnect(); }
+    else setStage('form');
+  }, 8000);
+
+  // несколько тихих попыток само собой переподключиться, пока человек ещё
+  // ничего не нажал — большинство коротких сетевых сбоев успевают пройти
+  // сами за эти секунды, и тогда человек даже не заметит экран agReconnect
+  let autoReconnectTimer = null, autoReconnectTries = 0;
+  function startAutoReconnect() {
+    if (autoReconnectTimer) return;
+    autoReconnectTimer = setInterval(async () => {
+      if (authSettled || autoReconnectTries >= 4) { clearInterval(autoReconnectTimer); autoReconnectTimer = null; return; }
+      autoReconnectTries++;
+      try { await sb.auth.getSession(); } catch (e) { /* следующая попытка через интервал */ }
+    }, 4000);
+  }
+  document.getElementById('agRetryConnect').addEventListener('click', async () => {
+    setStage('loading');
+    try { await sb.auth.getSession(); } catch (e) { /* ниже подстраховка вернёт на agReconnect */ }
+    setTimeout(() => { if (!authSettled) setStage('reconnect'); }, 5000);
+  });
+  document.getElementById('agUseOtherEmail').addEventListener('click', () => {
+    if (autoReconnectTimer) { clearInterval(autoReconnectTimer); autoReconnectTimer = null; }
+    setStage('form');
+  });
 
   document.getElementById('agSend').addEventListener('click', async () => {
     const email = document.getElementById('agEmail').value.trim();
@@ -137,8 +199,10 @@
   document.getElementById('agSignOut').addEventListener('click', () => { sb.auth.signOut(); });
 
   sb.auth.onAuthStateChange((event, session) => {
-    clearTimeout(loadingFallback);
     if (session && session.user) {
+      authSettled = true;
+      clearTimeout(loadingFallback);
+      if (autoReconnectTimer) { clearInterval(autoReconnectTimer); autoReconnectTimer = null; }
       window.CURRENT_USER = session.user;
       document.getElementById('agCurrentEmail').textContent = session.user.email || '';
       pill.style.display = 'flex';
@@ -149,8 +213,25 @@
       if (window.cloudImportSharedBoards) window.cloudImportSharedBoards();
     } else {
       window.CURRENT_USER = null;
-      showGate();
-      setStage('form');
+      // сессии сейчас нет — но если на устройстве всё ещё лежит сохранённый
+      // токен, это почти наверняка просто сбой сети при попытке его обновить,
+      // а не настоящий выход: когда сервер ДЕЙСТВИТЕЛЬНО признаёт вход
+      // недействительным (или человек сам нажал «Выйти»), supabase-js сам
+      // стирает токен из хранилища — вот тогда и покажем обычную форму входа.
+      // Пока токен на месте — не дёргаем человека письмом, а даём кнопке
+      // «Повторить»/тихому авто-повтору ещё шанс
+      if (hasCachedSessionOnThisDevice()) {
+        clearTimeout(loadingFallback);
+        showGate();
+        setStage('reconnect');
+        startAutoReconnect();
+      } else {
+        authSettled = true;
+        clearTimeout(loadingFallback);
+        if (autoReconnectTimer) { clearInterval(autoReconnectTimer); autoReconnectTimer = null; }
+        showGate();
+        setStage('form');
+      }
     }
   });
 })();

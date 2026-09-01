@@ -272,31 +272,41 @@ html[data-theme="dark"] .bd-ref-panel{box-shadow:var(--shadow), inset 0 1px 0 rg
 .bd-ref-tab.active{background:var(--card);color:var(--pencil);box-shadow:0 1px 3px rgba(0,0,0,.12);}
 .bd-ref-close{width:26px;height:26px;border-radius:50%;border:none;background:none;color:var(--muted-2);cursor:pointer;font-size:13px;display:flex;align-items:center;justify-content:center;flex:none;}
 .bd-ref-close:hover{background:var(--hover-1);color:var(--pencil);}
-.bd-ref-body{flex:1 1 auto;min-height:0;padding:0 10px 10px;display:flex;}
-.bd-ref-image-mode{flex:1 1 auto;min-width:0;display:none;flex-direction:column;}
-.bd-ref-panel[data-mode="image"] .bd-ref-image-mode{display:flex;}
+.bd-ref-body{flex:1 1 auto;min-height:0;padding:0 10px 10px;display:flex;position:relative;}
+/* вкладка «Изображение» — теперь просто обёртка-оверлей поверх общего холста
+   заметок (#bdRefDrawHost, см. ниже): сама она pointer-events:none и ничего
+   не рисует, только показывает поверх холста либо приглашение вставить первую
+   картинку (пока картинок нет), либо маленькую плавающую кнопку «+ Изображение»
+   в углу (когда хотя бы одна уже есть) — сквозь остальную площадь клики
+   проходят прямо на холст, к самим картинкам-объектам и инструментам рисования */
+.bd-ref-image-mode{position:absolute;inset:0;display:none;pointer-events:none;z-index:1;}
+.bd-ref-panel[data-mode="image"] .bd-ref-image-mode{display:block;}
 .bd-ref-text-mode-wrap{flex:1 1 auto;min-width:0;min-height:0;display:none;flex-direction:column;gap:6px;}
 .bd-ref-panel[data-mode="text"] .bd-ref-text-mode-wrap{display:flex;}
 .bd-ref-subtabs{display:flex;gap:3px;background:var(--hover-1);border-radius:10px;padding:3px;flex:none;align-self:flex-start;}
 .bd-ref-subtab{border:none;background:none;padding:4px 9px;border-radius:8px;font-family:var(--font-ui);font-size:11.5px;font-weight:600;color:var(--muted-2);cursor:pointer;}
 .bd-ref-subtab.active{background:var(--card);color:var(--pencil);box-shadow:0 1px 3px rgba(0,0,0,.12);}
-.bd-ref-draw-host{display:none;position:relative;flex:1 1 auto;min-height:0;border-radius:10px;overflow:hidden;background:var(--hover-1);touch-action:none;}
-.bd-ref-text-mode-wrap[data-textmode="draw"] .bd-ref-draw-host{display:block;}
+/* один и тот же холст заметок обслуживает и вкладку «Изображение» (картинки —
+   обычные объекты, как на самой доске, можно вставлять сразу несколько и
+   рисовать поверх них), и подвкладку «Текст → Рисовать» — какой именно набор
+   объектов сейчас на нём отображается, решает JS (см. rfObjects() в
+   boards-core.js), сам холст всегда один и тот же элемент */
+.bd-ref-draw-host{display:none;position:absolute;inset:0;border-radius:10px;overflow:hidden;background:var(--hover-1);touch-action:none;}
+.bd-ref-panel[data-mode="image"] .bd-ref-draw-host{display:block;}
+.bd-ref-panel[data-mode="text"][data-textmode="draw"] .bd-ref-draw-host{display:block;}
 #bdRefDrawCanvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;}
-.bd-ref-image-empty{flex:1 1 auto;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;border:1.5px dashed var(--glass-border);border-radius:12px;padding:14px;color:var(--muted-2);transition:border-color .12s,background .12s;}
+.bd-ref-image-empty{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;border:1.5px dashed var(--glass-border);border-radius:12px;padding:14px;margin:0;color:var(--muted-2);background:var(--bg);transition:border-color .12s,background .12s;pointer-events:auto;}
 .bd-ref-panel[data-mode="image"].bd-ref-empty .bd-ref-image-empty{display:flex;}
 .bd-ref-image-mode.bd-ref-drag-over .bd-ref-image-empty{border-color:var(--ink);background:var(--hover-1);}
-.bd-ref-image-mode.bd-ref-drag-over .bd-ref-image-fill img{outline:1.5px dashed var(--ink);outline-offset:-1.5px;}
+.bd-ref-image-mode.bd-ref-drag-over{outline:1.5px dashed var(--ink);outline-offset:-1.5px;border-radius:10px;}
 .bd-ref-image-empty svg{width:30px;height:30px;opacity:.6;}
 .bd-ref-image-empty span{font-size:12px;max-width:220px;line-height:1.4;}
 .bd-ref-image-empty button,.bd-ref-image-tools button{font-family:var(--font-ui);font-size:12px;font-weight:600;border:none;border-radius:9px;padding:6px 12px;cursor:pointer;background:var(--ink);color:#fff;}
 .bd-ref-image-empty button:hover,.bd-ref-image-tools button:hover{opacity:.88;}
-.bd-ref-image-fill{flex:1 1 auto;min-height:0;display:none;flex-direction:column;gap:6px;}
+.bd-ref-image-fill{position:absolute;top:8px;right:8px;display:none;gap:6px;pointer-events:auto;}
 .bd-ref-panel[data-mode="image"]:not(.bd-ref-empty) .bd-ref-image-fill{display:flex;}
-.bd-ref-image-fill img{flex:1 1 auto;min-height:0;width:100%;height:100%;object-fit:contain;border-radius:10px;background:var(--hover-1);}
 .bd-ref-image-tools{display:flex;gap:6px;flex:none;}
-.bd-ref-image-tools button{flex:1;background:var(--hover-1);color:var(--pencil);}
-.bd-ref-image-tools #bdRefRemoveBtn{color:var(--teacher);}
+.bd-ref-image-tools button{background:var(--card);color:var(--pencil);box-shadow:0 2px 6px rgba(0,0,0,.18);}
 .bd-ref-text-mode{display:none;flex:1 1 auto;min-height:0;width:100%;resize:none;border:none;outline:none;background:transparent;color:var(--pencil);font-family:var(--font-ui);font-size:13px;line-height:1.5;padding:6px;}
 .bd-ref-text-mode-wrap[data-textmode="type"] .bd-ref-text-mode{display:block;}
 .bd-ref-text-mode::placeholder{color:var(--muted-2);}
@@ -717,14 +727,12 @@ html[data-theme="dark"] .bd-optbar{box-shadow:var(--shadow), inset 0 1px 0 rgba(
       <div class="bd-ref-image-mode" id="bdRefImageMode">
         <div class="bd-ref-image-empty" id="bdRefImageEmpty">
           <svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="18" height="18" rx="2.6" stroke="currentColor" stroke-width="1.5"/><circle cx="8.3" cy="8.3" r="1.7" fill="currentColor"/><path d="M21 15.3l-5.1-4.9-8.9 8.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span>Добавьте изображение — формулу, шпаргалку, что угодно</span>
+          <span>Добавьте изображение — формулу, шпаргалку, что угодно. Можно вставить несколько подряд, двигать, менять размер каждого и рисовать поверх.</span>
           <button id="bdRefUploadBtn">Загрузить изображение</button>
         </div>
         <div class="bd-ref-image-fill" id="bdRefImageFill">
-          <img id="bdRefImg" alt="Справочные материалы">
           <div class="bd-ref-image-tools">
-            <button id="bdRefReplaceBtn" title="Заменить изображение">Заменить</button>
-            <button id="bdRefRemoveBtn" title="Удалить изображение">Удалить</button>
+            <button id="bdRefAddImageBtn" title="Добавить ещё одно изображение">+ Изображение</button>
           </div>
         </div>
       </div>
@@ -734,8 +742,8 @@ html[data-theme="dark"] .bd-optbar{box-shadow:var(--shadow), inset 0 1px 0 rgba(
           <button class="bd-ref-subtab" data-textmode="draw" id="bdRefSubDraw">Рисовать</button>
         </div>
         <textarea class="bd-ref-text-mode" id="bdRefTextarea" placeholder="Впишите формулы или подсказки, которые нужны под рукой на этой доске…"></textarea>
-        <div class="bd-ref-draw-host" id="bdRefDrawHost"><canvas id="bdRefDrawCanvas"></canvas></div>
       </div>
+      <div class="bd-ref-draw-host" id="bdRefDrawHost"><canvas id="bdRefDrawCanvas"></canvas></div>
     </div>
   </div>
   <input type="file" id="bdRefFileInput" accept="image/*" class="bd-hidden-color">

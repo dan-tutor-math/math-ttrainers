@@ -419,6 +419,28 @@ function openBoard(id){
   B.imageLib = B.imageLib || [];
   if (B.gridColor === undefined) B.gridColor = null; // null = цвет по теме (авто)
   B.refPanel = Object.assign(defaultRefPanel(), B.refPanel || {});
+  B.refPanel.imageObjects = B.refPanel.imageObjects || [];
+  if (B.refPanel.imageSrc){
+    // миграция со старых досок: раньше вкладка «Изображение» держала ровно
+    // одну картинку строкой (B.refPanel.imageSrc). Теперь картинки — обычные
+    // объекты, как на самой доске (B.refPanel.imageObjects), их можно вставить
+    // сразу несколько, независимо двигать/масштабировать и рисовать поверх —
+    // превращаем старую единственную картинку в такой объект один раз, при
+    // первом открытии доски после обновления
+    const legacySrc = B.refPanel.imageSrc;
+    delete B.refPanel.imageSrc;
+    if (!B.refPanel.imageObjects.some(o => o.src === legacySrc)){
+      const legacyObj = { id: uid(), type: 'image', src: legacySrc, points: [{x:20,y:20}], w:240, h:180 };
+      B.refPanel.imageObjects.push(legacyObj);
+      loadImageSize(legacySrc).then(size => {
+        if (!B.refPanel.imageObjects.includes(legacyObj)) return; // доску успели закрыть/картинку удалить, пока грузился размер
+        const maxDim = 240; let w = size.w, h = size.h;
+        if (w > maxDim || h > maxDim){ const s = maxDim / Math.max(w,h); w *= s; h *= s; }
+        legacyObj.w = w; legacyObj.h = h; legacyObj.natW = size.w; legacyObj.natH = size.h;
+        saveDB(); if (rfVisible()) rfScheduleRedraw();
+      });
+    }
+  }
   saveDB();
   // необязательный хук для boards-cloud.js (общая доска с учеником) — сам
   // движок доски ничего не знает про облако, просто сообщает, какая доска
@@ -441,9 +463,7 @@ function openBoard(id){
   // «заметки» справочной панели — отдельный, независимый холст (см. блок
   // rf* ниже); у каждой доски свой набор объектов в B.refPanel.drawObjects,
   // поэтому его состояние тоже сбрасываем при открытии другой доски
-  rfUndoStack.length = 0; rfRedoStack.length = 0; rfSelectedId = null; rfMultiSelectIds = [];
-  rfDraft = null; rfCurvePts = null; rfCircleState = null; rfPolyState = null; rfPenStroke = null;
-  rfArmedHandId = null; rfClearEditLock(); rfDragMode = null;
+  rfResetTransient();
   rfCam.x = 0; rfCam.y = 0; rfCam.zoom = 1;
   rfUpdateCursor();
   applyRefPanel();
@@ -1644,7 +1664,6 @@ const refResizeHandle = document.getElementById('bdRefResize');
 const refResizeHandleN = document.getElementById('bdRefResizeN');
 const refResizeHandleW = document.getElementById('bdRefResizeW');
 const refFileInput = document.getElementById('bdRefFileInput');
-const refImg = document.getElementById('bdRefImg');
 const refTextarea = document.getElementById('bdRefTextarea');
 const refImageMode = document.getElementById('bdRefImageMode');
 const refTextWrap = document.getElementById('bdRefTextWrap');
@@ -1657,7 +1676,7 @@ const refSubDraw = document.getElementById('bdRefSubDraw');
 // layoutRefPanel(), которому они нужны
 applyDockLayout();
 
-function defaultRefPanel(){ return { open:false, mode:'image', textMode:'type', text:'', imageSrc:null, drawObjects:[], w:null, h:null }; }
+function defaultRefPanel(){ return { open:false, mode:'image', textMode:'type', text:'', drawObjects:[], imageObjects:[], w:null, h:null }; }
 
 /* когда док внизу и рядом с ним раскрыта панель цвета/толщины (оптбар в
    горизонтальном виде, а не «узкой колонкой» сбоку), она может занимать
@@ -1683,10 +1702,14 @@ function applyRefPanel(){
   if (!rp.open) return;
   layoutRefPanel();
   refPanelEl.dataset.mode = rp.mode;
-  refPanelEl.classList.toggle('bd-ref-empty', rp.mode==='image' && !rp.imageSrc);
+  // data-textmode нужен и панели целиком (CSS-селектор общего холста
+  // #bdRefDrawHost, который теперь стоит вне .bd-ref-text-mode-wrap — см.
+  // rfVisible ниже), и самой .bd-ref-text-mode-wrap (переключение
+  // textarea/подсказки внутри неё) — дублируем на обоих элементах
+  refPanelEl.dataset.textmode = rp.textMode;
+  refPanelEl.classList.toggle('bd-ref-empty', rp.mode==='image' && !(rp.imageObjects && rp.imageObjects.length));
   document.getElementById('bdRefTabImage').classList.toggle('active', rp.mode==='image');
   document.getElementById('bdRefTabText').classList.toggle('active', rp.mode==='text');
-  refImg.src = rp.imageSrc || '';
   if (refTextarea.value !== (rp.text||'')) refTextarea.value = rp.text || '';
   refTextWrap.dataset.textmode = rp.textMode;
   refSubType.classList.toggle('active', rp.textMode==='type');
@@ -1695,11 +1718,13 @@ function applyRefPanel(){
   if (rp.h) refPanelEl.style.setProperty('--ref-h', rp.h + 'px'); else refPanelEl.style.removeProperty('--ref-h');
 }
 
-/* видна ли сейчас вкладка «Текст» → «Рисовать» справочной панели — от этого
-   зависит, нужно ли холсту заметок (#bdRefDrawCanvas, см. блок rf* ниже)
-   реагировать на размеры/события прямо сейчас */
+/* виден ли сейчас общий холст заметок (#bdRefDrawCanvas, см. блок rf* ниже) —
+   от этого зависит, нужно ли ему реагировать на размеры/события прямо сейчас.
+   Он общий для двух мест: вкладки «Изображение» целиком (там на нём и
+   рисуют, и держат сами картинки-объекты) и подвкладки «Текст» → «Рисовать» —
+   какой именно набор объектов при этом отображается, решает rfObjects() ниже */
 function rfVisible(){
-  return !!(B && B.refPanel.open && B.refPanel.mode === 'text' && B.refPanel.textMode === 'draw');
+  return !!(B && B.refPanel.open && (B.refPanel.mode === 'image' || (B.refPanel.mode === 'text' && B.refPanel.textMode === 'draw')));
 }
 
 refToggleBtn.addEventListener('click', () => {
@@ -1719,6 +1744,10 @@ document.querySelectorAll('.bd-ref-tab').forEach(btn => {
   btn.addEventListener('click', () => {
     if (!B) return;
     B.refPanel.mode = btn.dataset.mode;
+    // у вкладки «Изображение» и подвкладки «Текст→Рисовать» разные наборы
+    // объектов (см. rfObjects() ниже) — выделение/черновик/история отмены
+    // от одного набора не должны переживать переключение на другой
+    rfResetTransient();
     applyRefPanel();
     if (rfVisible()){ rfResizeCanvas(); rfScheduleRedraw(); }
     saveDB();
@@ -1735,20 +1764,13 @@ document.querySelectorAll('.bd-ref-subtab').forEach(btn => {
 });
 function openRefFilePicker(){ refFileInput.click(); }
 document.getElementById('bdRefUploadBtn').addEventListener('click', openRefFilePicker);
-document.getElementById('bdRefReplaceBtn').addEventListener('click', openRefFilePicker);
-document.getElementById('bdRefRemoveBtn').addEventListener('click', () => {
-  if (!B) return;
-  B.refPanel.imageSrc = null;
-  applyRefPanel();
-  saveDB();
-});
+document.getElementById('bdRefAddImageBtn').addEventListener('click', openRefFilePicker);
 refFileInput.addEventListener('change', async (e) => {
   const file = e.target.files && e.target.files[0];
   e.target.value = '';
   if (!file || !file.type.startsWith('image/') || !B) return;
-  B.refPanel.imageSrc = await fileToDataUrl(file);
-  applyRefPanel();
-  saveDB();
+  const src = await fileToDataUrl(file);
+  rfAddImageFromSrc(src);
 });
 refTextarea.addEventListener('input', () => {
   if (!B) return;
@@ -1770,10 +1792,8 @@ refImageMode.addEventListener('drop', async (e) => {
   refDragDepth = 0; refImageMode.classList.remove('bd-ref-drag-over');
   const files = e.dataTransfer && e.dataTransfer.files;
   if (files && files.length && files[0].type.startsWith('image/')){
-    B.refPanel.imageSrc = await fileToDataUrl(files[0]);
-    B.refPanel.mode = 'image';
-    applyRefPanel();
-    saveDB();
+    const src = await fileToDataUrl(files[0]);
+    rfAddImageFromSrc(src);
     return;
   }
   let url = e.dataTransfer && (e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain'));
@@ -1783,16 +1803,15 @@ refImageMode.addEventListener('drop', async (e) => {
     if (m) url = m[1];
   }
   if (!url) return;
+  let src;
   try {
     const resp = await fetch(url, { mode: 'cors' });
     if (!resp.ok) throw new Error('fetch failed');
-    B.refPanel.imageSrc = await fileToDataUrl(await resp.blob());
+    src = await fileToDataUrl(await resp.blob());
   } catch(err){
-    B.refPanel.imageSrc = url;
+    src = url;
   }
-  B.refPanel.mode = 'image';
-  applyRefPanel();
-  saveDB();
+  rfAddImageFromSrc(src);
 });
 
 /* ручки изменения размера панели — как у окон приложений на macOS: угол
@@ -1870,11 +1889,27 @@ let rfPanStart = null, rfCamStart = null;
 let rfDraft = null, rfCurvePts = null, rfCircleState = null, rfPolyState = null, rfPenStroke = null;
 
 const rfUndoStack = [], rfRedoStack = [];
-// B.refPanel.drawObjects читаем каждый раз заново через геттер, а не
-// кешируем ссылку на массив — doUndo/doRedo подменяют саму ссылку целиком
-// (B.refPanel.drawObjects = JSON.parse(...)), закешированная переменная
-// после этого указывала бы на устаревший массив
-function rfObjects(){ return B.refPanel.drawObjects; }
+// Какой именно массив объектов сейчас «на холсте», зависит от вкладки:
+// у «Изображения» — B.refPanel.imageObjects (картинки + рисование поверх
+// них), у «Текст→Рисовать» — B.refPanel.drawObjects (как и раньше). Это
+// два независимых блокнота с общим движком, а не общий список — поэтому
+// читаем/подменяем ссылку на массив через геттер/сеттер, а не напрямую:
+// doUndo/doRedo подменяют саму ссылку целиком (rfSetObjects(JSON.parse(...))),
+// закешированная переменная после этого указывала бы на устаревший массив
+function rfObjects(){ return B.refPanel.mode === 'image' ? B.refPanel.imageObjects : B.refPanel.drawObjects; }
+function rfSetObjects(arr){
+  if (B.refPanel.mode === 'image') B.refPanel.imageObjects = arr; else B.refPanel.drawObjects = arr;
+}
+// сбрасывает всё «сиюминутное» состояние холста заметок (выделение, черновики
+// незаконченных фигур, историю отмены) — нужно и при открытии другой доски, и
+// при переключении между вкладками «Изображение»/«Текст→Рисовать», потому что
+// у них разные наборы объектов (см. rfObjects() выше), и история/выделение от
+// одного набора не должны применяться к другому
+function rfResetTransient(){
+  rfUndoStack.length = 0; rfRedoStack.length = 0; rfSelectedId = null; rfMultiSelectIds = [];
+  rfDraft = null; rfCurvePts = null; rfCircleState = null; rfPolyState = null; rfPenStroke = null;
+  rfArmedHandId = null; rfClearEditLock(); rfDragMode = null;
+}
 function rfPushUndo(){
   rfUndoStack.push(JSON.stringify(rfObjects()));
   if (rfUndoStack.length > UNDO_LIMIT) rfUndoStack.shift();
@@ -1883,16 +1918,41 @@ function rfPushUndo(){
 function rfDoUndo(){
   if (!rfUndoStack.length) return;
   rfRedoStack.push(JSON.stringify(rfObjects()));
-  B.refPanel.drawObjects = JSON.parse(rfUndoStack.pop());
+  rfSetObjects(JSON.parse(rfUndoStack.pop()));
   rfSelectedId = null; rfMultiSelectIds = []; rfClearEditLock();
   rfScheduleRedraw(); saveDB();
 }
 function rfDoRedo(){
   if (!rfRedoStack.length) return;
   rfUndoStack.push(JSON.stringify(rfObjects()));
-  B.refPanel.drawObjects = JSON.parse(rfRedoStack.pop());
+  rfSetObjects(JSON.parse(rfRedoStack.pop()));
   rfSelectedId = null; rfMultiSelectIds = []; rfClearEditLock();
   rfScheduleRedraw(); saveDB();
+}
+/* добавляет новую картинку-объект во вкладку «Изображение» — как
+   openImageModal() на самой доске, но без модалки: панель заметок задумана
+   маленькой и быстрой, поэтому картинка сразу встаёт на холст (чуть по
+   диагонали от предыдущей, чтобы несколько подряд не легли ровно друг на
+   друга) и сразу же выделена — можно тут же подвинуть/растянуть за угол */
+function rfAddImageFromSrc(src){
+  if (!B) return;
+  B.refPanel.mode = 'image';
+  applyRefPanel();
+  if (rfVisible()) rfResizeCanvas();
+  loadImageSize(src).then(size => {
+    if (!B || !B.refPanel.imageObjects) return;
+    let w = size.w, h = size.h;
+    const maxDim = 220;
+    if (w > maxDim || h > maxDim){ const s = maxDim / Math.max(w, h); w *= s; h *= s; }
+    const n = B.refPanel.imageObjects.length;
+    const pt = rfScreenToWorld(24 + (n % 5) * 22, 24 + (n % 5) * 22);
+    const obj = { id: uid(), type: 'image', src, points: [pt], w, h, natW: size.w, natH: size.h };
+    rfPushUndo();
+    B.refPanel.imageObjects.push(obj);
+    rfEnterEditLock(obj, 'image');
+    applyRefPanel();
+    saveDB(); rfScheduleRedraw();
+  });
 }
 
 function rfResizeCanvas(){
@@ -2096,7 +2156,7 @@ function rfDeleteSelected(){
   if (!sel.length) return;
   const ids = sel.map(o=>o.id);
   rfPushUndo();
-  B.refPanel.drawObjects = rfObjects().filter(o => !ids.includes(o.id));
+  rfSetObjects(rfObjects().filter(o => !ids.includes(o.id)));
   if (rfArmedHandId && ids.includes(rfArmedHandId)) rfArmedHandId=null;
   if (rfEditLockId && ids.includes(rfEditLockId)) rfClearEditLock();
   rfSelectedId = null; rfMultiSelectIds = [];
