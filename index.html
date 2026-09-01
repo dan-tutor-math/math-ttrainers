@@ -12,10 +12,10 @@
 <title>Тренажёры — Школа репетиторов</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
 <style>
 :root{
-  --font-ui:-apple-system,BlinkMacSystemFont,'SF Pro Text','SF Pro Display','Sora','Helvetica Neue',Arial,sans-serif;
+  --font-ui:'Onest',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
   --font-mono:ui-monospace,-apple-system,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
   --bg:#EEF1F7;
   --blob-1:rgba(120,150,255,.16);
@@ -152,13 +152,6 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .topic-item:hover{background:var(--hover-2)}
 .item-num{font-family:var(--font-mono);font-size:13px;color:var(--muted-1);min-width:22px;}
 .item-name{font-size:17px}
-.item-eq{margin-left:auto;font-family:var(--font-mono);font-size:14px;color:var(--muted-1);white-space:nowrap;}
-.item-arrow{
-  color:var(--grid);
-  font-size:18px;
-  flex:0 0 auto;
-}
-.topic-item:hover .item-arrow{color:var(--ink)}
 .topic-item.soon{opacity:.5;cursor:default;pointer-events:none;}
 .item-soon{margin-left:auto;font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-1);white-space:nowrap;}
 .group{margin:2px 4px 6px;border-radius:14px;background:var(--hover-1);overflow:hidden;}
@@ -447,8 +440,6 @@ function itemHTML(it, ii){
     <a class="topic-item" href="${it.href}">
       <span class="item-num">${String(ii+1).padStart(2,'0')}</span>
       <span class="item-name">${it.name}</span>
-      <span class="item-eq">${it.eq}</span>
-      <span class="item-arrow">→</span>
     </a>
   `;
 }
