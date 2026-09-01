@@ -51,6 +51,7 @@
       box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);font-size:12.5px;color:var(--muted-2);}
     .ag-user-pill b{color:var(--pencil);font-weight:600;}
     .ag-user-pill a{color:var(--ink);cursor:pointer;text-decoration:underline;margin-left:2px;}
+    .ag-user-pill .ag-edit-name{opacity:.7;font-size:11.5px;}
   `;
   document.head.appendChild(style);
 
@@ -85,7 +86,9 @@
       </div>
     </div>
     <div id="authUserPill" class="ag-user-pill" style="display:none">
-      <span>Вы вошли как <b id="agCurrentEmail"></b></span><a id="agSignOut">Выйти</a>
+      <span>Вы вошли как <b id="agCurrentEmail"></b></span>
+      <a id="agEditName" class="ag-edit-name" title="Задать имя, которое увидит собеседник рядом со своим курсором">изменить имя</a>
+      <a id="agSignOut">Выйти</a>
     </div>
   `);
 
@@ -112,6 +115,15 @@
     try { return Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token')); }
     catch (e) { return false; }
   }
+  // имя, которое человек сам себе задал (см. agEditName ниже) — хранится в
+  // user_metadata самого пользователя в Supabase Auth (обновляется через
+  // auth.updateUser, без какой-либо отдельной таблицы/миграции), поэтому
+  // доступно сразу же, как только известен session.user. Если имя ещё не
+  // задано — показываем email, как и раньше.
+  function displayNameOf(user) {
+    return (user && user.user_metadata && user.user_metadata.display_name) || (user && user.email) || '';
+  }
+  window.displayNameOf = displayNameOf; // используется вторым блоком файла (живой курсор)
   function showGate() {
     gate.style.display = 'flex';
     pill.style.display = 'none';
@@ -197,6 +209,25 @@
   });
   document.getElementById('agResend').addEventListener('click', () => setStage('form'));
   document.getElementById('agSignOut').addEventListener('click', () => { sb.auth.signOut(); });
+  // «изменить имя» — доступно в любой момент, не только при регистрации:
+  // это имя (не email) увидит собеседник на общей доске рядом со своим
+  // курсором (см. второй блок файла — «живой курсор»)
+  document.getElementById('agEditName').addEventListener('click', async () => {
+    const current = displayNameOf(window.CURRENT_USER) === (window.CURRENT_USER && window.CURRENT_USER.email)
+      ? '' // имя ещё не задавали — в поле подсказки email не подставляем
+      : displayNameOf(window.CURRENT_USER);
+    const name = prompt('Как вас называть на доске? Это имя увидит ученик/учитель рядом с вашим курсором.', current);
+    if (name === null) return; // отменили
+    const trimmed = name.trim();
+    try {
+      const { data, error } = await sb.auth.updateUser({ data: { display_name: trimmed } });
+      if (error) { alert('Не получилось сохранить имя: ' + error.message); return; }
+      if (data && data.user) window.CURRENT_USER = data.user;
+      document.getElementById('agCurrentEmail').textContent = displayNameOf(window.CURRENT_USER);
+    } catch (e) {
+      alert('Не получилось сохранить имя: ' + (e && e.message ? e.message : e));
+    }
+  });
 
   sb.auth.onAuthStateChange((event, session) => {
     if (session && session.user) {
@@ -204,7 +235,7 @@
       clearTimeout(loadingFallback);
       if (autoReconnectTimer) { clearInterval(autoReconnectTimer); autoReconnectTimer = null; }
       window.CURRENT_USER = session.user;
-      document.getElementById('agCurrentEmail').textContent = session.user.email || '';
+      document.getElementById('agCurrentEmail').textContent = displayNameOf(session.user);
       pill.style.display = 'flex';
       hideGate();
       if (window.boardsAppBoot) window.boardsAppBoot();
@@ -279,6 +310,26 @@
     .bd-share-make:hover{background:var(--ink-active);}
     .bd-share-msg{font-size:12px;color:var(--muted-2);}
     .bd-share-msg.err{color:var(--teacher);}
+
+    /* Курсоры других участников совместной доски — см. блок «живой курсор»
+       ниже. Слой на весь экран, сам не ловит клики (pointer-events:none),
+       чтобы не мешать работе с холстом под ним; каждый курсор — просто
+       иконка пера (тот же силуэт, что и у собственного курсора-пера при
+       рисовании, см. penCursorCSS() в boards-core.js), но в инвертированных
+       цветах (filter:invert), плюс подпись с почтой рядом — как и обычная
+       плашка "Вы вошли как …" в этом же файле, тот же стиль стеклянной
+       таблички. z-index ниже, чем у всплывающих панелей (400), но выше
+       холста, чтобы курсор не терялся под содержимым доски. */
+    #bdCursorLayer{position:fixed;inset:0;z-index:250;pointer-events:none;overflow:hidden;}
+    .bd-remote-cursor{position:absolute;left:0;top:0;pointer-events:none;will-change:transform;}
+    .bd-remote-cursor-icon{display:block;width:24px;height:24px;filter:invert(1);
+      transform:translate(-3px,-3px);transition:filter .15s;}
+    .bd-remote-cursor.is-drawing .bd-remote-cursor-icon{filter:invert(1) drop-shadow(0 0 4px rgba(0,0,0,.35));}
+    .bd-remote-cursor-label{position:absolute;left:19px;top:16px;white-space:nowrap;font-size:11px;
+      font-weight:600;padding:3px 8px;border-radius:8px;background:var(--glass-strong);
+      border:1px solid var(--glass-border);color:var(--pencil);
+      backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);
+      box-shadow:var(--shadow);}
   `;
   document.head.appendChild(style);
 
@@ -296,6 +347,10 @@
   sharePop.className = 'bd-share-pop';
   sharePop.id = 'bdSharePop';
   document.body.appendChild(sharePop);
+
+  const cursorLayer = document.createElement('div');
+  cursorLayer.id = 'bdCursorLayer';
+  document.body.appendChild(cursorLayer);
 
   shareBtn.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -329,6 +384,129 @@
   let cloudUndoStack = [];
   let cloudRedoStack = [];
   let cloudFlushTimer = null;
+
+  // ------------------------------------------------------------------
+  // живой курсор — где сейчас указывает мышь у другого участника этой же
+  // общей доски, обновляется на КАЖДОЕ движение мыши (не только когда
+  // что-то рисуют), чтобы можно было просто найти друг друга на доске
+  // или обвести что-то, не рисуя ни одной линии. Передаётся через
+  // realtime-broadcast на том же канале, что и сами объекты доски, но
+  // НИКУДА не сохраняется в базу — это чисто эфемерные данные "прямо
+  // сейчас", в отличие от board_objects.
+  // ------------------------------------------------------------------
+  let remoteCursors = new Map(); // uid -> {email, x, y, drawing, lastSeen, el}
+  let myPointerDown = false;
+  let cursorAnimHandle = null;
+  let cursorSendPending = null;
+  let cursorSendTimer = null;
+  let cursorLastSentAt = 0;
+
+  function remoteCursorIconSVG() {
+    // тот же силуэт «паркера», что и у penCursorCSS() в boards-core.js —
+    // тёмный лаковый корпус с золотым ободком, белый ореол для читаемости;
+    // цвета инвертируются CSS-фильтром (.bd-remote-cursor-icon{filter:invert(1)})
+    // прямо на элементе, поэтому здесь рисуем как обычно, "неинвертированно"
+    return `<svg class="bd-remote-cursor-icon" viewBox="0 0 34 34" xmlns="http://www.w3.org/2000/svg">
+      <g transform="rotate(40 17 18)">
+        <rect x="15.3" y="5" width="3.4" height="17" rx="1.7" fill="white" stroke="white" stroke-width="4"/>
+        <polygon points="15.3,22 18.7,22 17,31" fill="white" stroke="white" stroke-width="4" stroke-linejoin="round"/>
+        <polygon points="18.7,6.2 20.3,7 20.3,12.6 18.7,13.2" fill="white" stroke="white" stroke-width="3"/>
+        <rect x="15.3" y="5" width="3.4" height="17" rx="1.7" fill="#22222a" stroke="#0c0c10" stroke-width="1"/>
+        <rect x="15.3" y="19" width="3.4" height="1.5" fill="#dcb24a" stroke="#a9821f" stroke-width=".3"/>
+        <polygon points="18.7,6.2 20.3,7 20.3,12.6 18.7,13.2" fill="#3c3c44" stroke="#0c0c10" stroke-width="0.8"/>
+        <polygon points="15.3,22 18.7,22 17,31" fill="#6b6b74" stroke="#0c0c10" stroke-width="1" stroke-linejoin="round"/>
+      </g>
+    </svg>`;
+  }
+  function makeCursorEl(uid) {
+    const el = document.createElement('div');
+    el.className = 'bd-remote-cursor';
+    el.dataset.uid = uid;
+    el.innerHTML = remoteCursorIconSVG() + '<div class="bd-remote-cursor-label"></div>';
+    cursorLayer.appendChild(el);
+    return el;
+  }
+  function removeCursorEntry(uid) {
+    const entry = remoteCursors.get(uid);
+    if (entry && entry.el && entry.el.parentNode) entry.el.parentNode.removeChild(entry.el);
+    remoteCursors.delete(uid);
+  }
+  function clearAllCursors() {
+    remoteCursors.forEach(entry => { if (entry.el && entry.el.parentNode) entry.el.parentNode.removeChild(entry.el); });
+    remoteCursors.clear();
+  }
+
+  function cloudHandleRemoteCursor(payload) {
+    if (!payload || !cloudBoardId || !payload.uid) return;
+    if (window.CURRENT_USER && payload.uid === window.CURRENT_USER.id) return; // на всякий случай, своё эхо
+    if (payload.leave) { removeCursorEntry(payload.uid); return; }
+    if (typeof payload.x !== 'number' || typeof payload.y !== 'number') return;
+    let entry = remoteCursors.get(payload.uid);
+    if (!entry) { entry = { el: makeCursorEl(payload.uid) }; remoteCursors.set(payload.uid, entry); }
+    // name — то, что человек сам себе задал (см. agEditName и displayNameOf
+    // в первом блоке файла); email — старое поле, оставлено на всякий
+    // случай (если по какой-то причине имя не задано и не пришло)
+    entry.name = payload.name || payload.email || '';
+    entry.x = payload.x; entry.y = payload.y;
+    entry.drawing = !!payload.drawing;
+    entry.lastSeen = Date.now();
+    entry.el.classList.toggle('is-drawing', entry.drawing);
+    const labelEl = entry.el.querySelector('.bd-remote-cursor-label');
+    if (labelEl && labelEl.textContent !== entry.name) labelEl.textContent = entry.name;
+    startCursorAnim();
+  }
+
+  // курсоры других участников рисуем каждый кадр, а не только когда пришло
+  // новое сообщение по сети: иначе при панораме/масштабировании СВОЕГО
+  // вида их экранное положение не обновлялось бы (их мировые координаты не
+  // менялись, а вот перевод мир→экран — да)
+  function cursorAnimTick() {
+    if (!cloudBoardId) { cursorAnimHandle = null; return; }
+    if (remoteCursors.size && window.worldToScreen) {
+      const canvasEl = document.getElementById('boardCv');
+      const rect = canvasEl ? canvasEl.getBoundingClientRect() : { left: 0, top: 0 };
+      remoteCursors.forEach(entry => {
+        const s = window.worldToScreen({ x: entry.x, y: entry.y });
+        entry.el.style.transform = `translate(${Math.round(rect.left + s.x)}px, ${Math.round(rect.top + s.y)}px)`;
+      });
+    }
+    cursorAnimHandle = requestAnimationFrame(cursorAnimTick);
+  }
+  function startCursorAnim() { if (!cursorAnimHandle) cursorAnimHandle = requestAnimationFrame(cursorAnimTick); }
+  function stopCursorAnim() { if (cursorAnimHandle) { cancelAnimationFrame(cursorAnimHandle); cursorAnimHandle = null; } }
+
+  // подчищаем курсоры, для которых давно не было сообщений (человек закрыл
+  // вкладку без события pointerleave/beforeunload — например, у него просто
+  // разрядился ноутбук) — иначе значок навсегда "застынет" на месте
+  setInterval(() => {
+    if (!remoteCursors.size) return;
+    const now = Date.now();
+    remoteCursors.forEach((entry, uid) => { if (now - entry.lastSeen > 6000) removeCursorEntry(uid); });
+  }, 3000);
+
+  function flushCursorSend() {
+    cursorSendTimer = null;
+    const pending = cursorSendPending; cursorSendPending = null;
+    if (!pending || !cloudChannel || !cloudBoardId || !window.CURRENT_USER) return;
+    cursorLastSentAt = Date.now();
+    const payload = pending.leave
+      ? { uid: window.CURRENT_USER.id, leave: true }
+      : { uid: window.CURRENT_USER.id, name: window.displayNameOf(window.CURRENT_USER), x: pending.x, y: pending.y, drawing: !!pending.drawing };
+    // курсор — вспомогательная штука поверх основной синхронизации; сбой
+    // отправки (сеть моргнула, канал ещё не до конца подключился сразу
+    // после открытия доски) не должен ронять ничего в приложении
+    try { cloudChannel.send({ type: 'broadcast', event: 'cursor', payload }); } catch (e) {}
+  }
+  // не чаще ~15 раз в секунду — этого более чем достаточно для плавности
+  // "живого" курсора и не перегружает канал; событие "ушёл с холста"/"скрыл
+  // вкладку" отправляем сразу, без троттлинга
+  function scheduleCursorSend(x, y, drawing, leave) {
+    cursorSendPending = leave ? { leave: true } : { x, y, drawing };
+    if (leave) { clearTimeout(cursorSendTimer); cursorSendTimer = null; flushCursorSend(); return; }
+    if (cursorSendTimer) return;
+    const wait = Math.max(0, 65 - (Date.now() - cursorLastSentAt));
+    cursorSendTimer = setTimeout(flushCursorSend, wait);
+  }
 
   function computeDiff(beforeArr, afterArr) {
     const beforeMap = new Map(beforeArr.map(o => [o.id, o]));
@@ -492,10 +670,22 @@
     }
     cloudChannel = window.SB.channel('board_objects:' + boardId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'board_objects', filter: 'board_id=eq.' + boardId }, cloudHandleRemoteChange)
+      // курсоры — тем же каналом, но отдельным типом сообщений: broadcast
+      // ничего не пишет в базу (в отличие от postgres_changes выше), это
+      // ровно то, что нужно для эфемерного "где сейчас мышь"
+      .on('broadcast', { event: 'cursor' }, ({ payload }) => cloudHandleRemoteCursor(payload))
       .subscribe();
   }
   function cloudTeardownSubscription() {
-    if (cloudChannel) { window.SB.removeChannel(cloudChannel); cloudChannel = null; }
+    if (cloudChannel) {
+      // по-хорошему сообщаем остальным, что нас больше нет — на случай
+      // сбоя всё равно есть подстраховка по таймауту (setInterval выше)
+      try { cloudChannel.send({ type: 'broadcast', event: 'cursor', payload: { uid: window.CURRENT_USER ? window.CURRENT_USER.id : null, leave: true } }); } catch (e) {}
+      window.SB.removeChannel(cloudChannel);
+      cloudChannel = null;
+    }
+    stopCursorAnim();
+    clearAllCursors();
   }
 
   window.onBoardOpened = function (board) {
@@ -503,7 +693,7 @@
     cloudUndoStack = []; cloudRedoStack = []; cloudGestureBefore = null;
     cloudBoardId = board.cloudBoardId || null;
     cloudRole = board.cloudRole || null;
-    if (cloudBoardId) cloudSetupSubscription(cloudBoardId, board);
+    if (cloudBoardId) { cloudSetupSubscription(cloudBoardId, board); startCursorAnim(); }
   };
   window.onBoardClosed = function () {
     cloudTeardownSubscription();
@@ -607,6 +797,29 @@
       inviteToBoard(email, role);
     });
   }
+
+  // ------------------------------------------------------------------
+  // отправка СВОЕГО курсора остальным участникам общей доски — на любое
+  // движение мыши над холстом, независимо от инструмента: можно просто
+  // водить курсором (или обвести им что-то) без единого штриха, и другой
+  // участник это увидит; собственно рисование при этом продолжает
+  // работать как и раньше, это отдельный, самостоятельный поток данных
+  // ------------------------------------------------------------------
+  const boardCanvasEl = document.getElementById('boardCv');
+  if (boardCanvasEl) {
+    boardCanvasEl.addEventListener('pointermove', (e) => {
+      if (!cloudBoardId || !window.eventWorld) return;
+      const pt = window.eventWorld(e);
+      scheduleCursorSend(pt.x, pt.y, myPointerDown);
+    });
+    boardCanvasEl.addEventListener('pointerdown', () => { myPointerDown = true; });
+    boardCanvasEl.addEventListener('pointerleave', () => { if (cloudBoardId) scheduleCursorSend(0, 0, false, true); });
+  }
+  window.addEventListener('pointerup', () => { myPointerDown = false; });
+  window.addEventListener('pointercancel', () => { myPointerDown = false; });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden && cloudBoardId) scheduleCursorSend(0, 0, false, true);
+  });
 
   // ------------------------------------------------------------------
   // подтягиваем в локальный список доски, которыми поделились с этим
