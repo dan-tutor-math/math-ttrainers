@@ -282,6 +282,7 @@ html[data-theme="dark"] .bd-ref-panel{box-shadow:var(--shadow), inset 0 1px 0 rg
 .bd-ref-subtab.active{background:var(--card);color:var(--pencil);box-shadow:0 1px 3px rgba(0,0,0,.12);}
 .bd-ref-draw-host{display:none;position:relative;flex:1 1 auto;min-height:0;border-radius:10px;overflow:hidden;background:var(--hover-1);touch-action:none;}
 .bd-ref-text-mode-wrap[data-textmode="draw"] .bd-ref-draw-host{display:block;}
+#bdRefDrawCanvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;}
 .bd-ref-image-empty{flex:1 1 auto;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;border:1.5px dashed var(--glass-border);border-radius:12px;padding:14px;color:var(--muted-2);transition:border-color .12s,background .12s;}
 .bd-ref-panel[data-mode="image"].bd-ref-empty .bd-ref-image-empty{display:flex;}
 .bd-ref-image-mode.bd-ref-drag-over .bd-ref-image-empty{border-color:var(--ink);background:var(--hover-1);}
@@ -733,7 +734,7 @@ html[data-theme="dark"] .bd-optbar{box-shadow:var(--shadow), inset 0 1px 0 rgba(
           <button class="bd-ref-subtab" data-textmode="draw" id="bdRefSubDraw">Рисовать</button>
         </div>
         <textarea class="bd-ref-text-mode" id="bdRefTextarea" placeholder="Впишите формулы или подсказки, которые нужны под рукой на этой доске…"></textarea>
-        <div class="bd-ref-draw-host" id="bdRefDrawHost"></div>
+        <div class="bd-ref-draw-host" id="bdRefDrawHost"><canvas id="bdRefDrawCanvas"></canvas></div>
       </div>
     </div>
   </div>
@@ -842,6 +843,19 @@ html[data-theme="dark"] .bd-optbar{box-shadow:var(--shadow), inset 0 1px 0 rgba(
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="basket-core.js"></script>
+<!-- этот маркер должен выполниться ДО boards-core.js — говорит ему не
+     запускать приложение самому, а подождать, пока boards-cloud.js (ниже)
+     не подтвердит вход по email -->
+<script>window.__hasCloudGate = true;</script>
 <script src="boards-core.js"></script>
+<!-- вход и общая доска с учеником — необязательный слой поверх обычного
+     локального приложения; если supabase-config.js не заполнен, ниже
+     покажется понятная подсказка вместо тихой поломки. Библиотека
+     supabase-js лежит локальным файлом рядом с приложением (а не грузится
+     со стороннего CDN на лету), чтобы вход не зависел от доступности
+     этого CDN у конкретного провайдера/региона -->
+<script src="supabase-js.umd.js"></script>
+<script src="supabase-config.js"></script>
+<script src="boards-cloud.js"></script>
 </body>
 </html>

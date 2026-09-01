@@ -19,12 +19,6 @@ function loadDB(){
 }
 let saveTimer = null;
 function saveDB(){
-  // пока рисуем в справочной панели (surface==='notes'), B.objects временно
-  // указывает на B.refPanel.drawObjects — но undo/redo подменяют саму
-  // ссылку на массив (B.objects = JSON.parse(...)), поэтому синхронизируем
-  // явно перед каждым сохранением, а не полагаемся на то, что это один и
-  // тот же массив в памяти
-  if (B && surface === 'notes') B.refPanel.drawObjects = B.objects;
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); } catch(e){}
@@ -316,9 +310,6 @@ function totalW(){ return sheetWpx() * SHEET_COLS; }
 function totalH(){ return sheetHpx() * SHEET_ROWS; }
 function clampCam(){
   if (!B || !cssW || !cssH) return;
-  // заметки (surface==='notes') — небольшой отдельный холст без «листов»,
-  // панораму на нём ничем не ограничиваем
-  if (surface === 'notes') return;
   const tw = totalW(), th = totalH();
   const viewW = cssW / cam.zoom, viewH = cssH / cam.zoom;
   if (viewW >= tw + PAN_MARGIN*2) cam.x = (tw - viewW) / 2;
@@ -330,18 +321,11 @@ function clampCam(){
 const cam = { x: 0, y: 0, zoom: 1 };
 const ZOOM_MIN = 0.1, ZOOM_MAX = 4;
 
-/* «поверхность», на которой сейчас рисует общий холст #boardCv: обычно это
-   сама доска, но пока открыта вкладка «Текст» → «Рисовать» справочной
-   панели, тот же холст (тот же canvas-элемент, тот же движок инструментов —
-   именно поэтому набор инструментов ровно тот же, что и на доске) временно
-   переносится внутрь неё и рисует в свой собственный, отдельный список
-   объектов (B.refPanel.drawObjects), не трогая содержимое самой доски.
-   surface переключается в syncDrawSurface() ── */
-let surface = 'board'; // 'board' | 'notes'
-let boardObjectsSnap = null;
-let boardCamSnap = null, notesCamSnap = { x: 0, y: 0, zoom: 1 };
-let boardUndoSnap = [], boardRedoSnap = [];
-let notesUndoSnap = [], notesRedoSnap = [];
+// какой из двух холстов (сама доска или заметки справочной панели, см.
+// блок rf* ниже) последним получал жест мыши/пера — по нему решаем, куда
+// направить общие «отменить/повторить/удалить» (кнопки и горячие клавиши),
+// когда оба холста видны и доступны для рисования одновременно
+let lastActiveSurface = 'board'; // 'board' | 'notes'
 
 let tool = 'pen';
 let curColorTok = '--pencil';
@@ -419,12 +403,6 @@ function openBoard(id){
   const b = DB.boards.find(x => x.id === id);
   if (!b) return;
   b.lastOpenedAt = nowTs();
-  // если предыдущая доска была закрыта прямо во время рисования в справочной
-  // панели — общий холст всё ещё физически лежит внутри неё; возвращаем его
-  // на место доски, прежде чем открывать новую (у самой новой доски свой,
-  // отдельный набор B.refPanel.drawObjects — «заметки» каждой доски свои)
-  if (surface === 'notes' && screenBoard.firstChild !== canvas) screenBoard.insertBefore(canvas, screenBoard.firstChild);
-  surface = 'board';
   B = b;
   B.objects = B.objects || [];
   B.recentColors = B.recentColors && B.recentColors.length ? B.recentColors : PALETTE.map(p => p.tok);
@@ -442,6 +420,10 @@ function openBoard(id){
   if (B.gridColor === undefined) B.gridColor = null; // null = цвет по теме (авто)
   B.refPanel = Object.assign(defaultRefPanel(), B.refPanel || {});
   saveDB();
+  // необязательный хук для boards-cloud.js (общая доска с учеником) — сам
+  // движок доски ничего не знает про облако, просто сообщает, какая доска
+  // открылась, если такой слушатель вообще подключён
+  if (window.onBoardOpened) window.onBoardOpened(B);
 
   screenList.style.display = 'none';
   screenBoard.style.display = 'block';
@@ -456,6 +438,14 @@ function openBoard(id){
   document.getElementById('bdCtxMenu')?.classList.remove('open');
   document.getElementById('bdImgSrcPop')?.classList.remove('open');
   updateCursor();
+  // «заметки» справочной панели — отдельный, независимый холст (см. блок
+  // rf* ниже); у каждой доски свой набор объектов в B.refPanel.drawObjects,
+  // поэтому его состояние тоже сбрасываем при открытии другой доски
+  rfUndoStack.length = 0; rfRedoStack.length = 0; rfSelectedId = null; rfMultiSelectIds = [];
+  rfDraft = null; rfCurvePts = null; rfCircleState = null; rfPolyState = null; rfPenStroke = null;
+  rfArmedHandId = null; rfClearEditLock(); rfDragMode = null;
+  rfCam.x = 0; rfCam.y = 0; rfCam.zoom = 1;
+  rfUpdateCursor();
   applyRefPanel();
 
   requestAnimationFrame(() => {
@@ -476,12 +466,9 @@ function openBoard(id){
     updateSettingsUI();
     renderSwatches();
     scheduleRedraw();
-    // теперь, когда камера самой доски уже отцентрована, можно безопасно
-    // восстановить сохранённое состояние справочной панели (если у неё
-    // была открыта вкладка «Текст» → «Рисовать» — раньше это делать было
-    // нельзя: камера заметок временно заняла бы место cam ещё до того, как
-    // её отцентровали для доски, и центрирование сбило бы вид заметок)
-    syncDrawSurface();
+    // если у справочной панели сохранена открытая вкладка «Текст» →
+    // «Рисовать» — сразу подогнать размер её собственного холста
+    if (rfVisible()){ rfResizeCanvas(); rfScheduleRedraw(); }
   });
 }
 
@@ -492,6 +479,7 @@ function backToList(){
   location.hash = '';
   saveDB();
   renderList();
+  if (window.onBoardClosed) window.onBoardClosed();
 }
 document.getElementById('bdBack').addEventListener('click', backToList);
 document.getElementById('bdName').addEventListener('input', (e) => {
@@ -504,12 +492,7 @@ document.getElementById('bdName').addEventListener('input', (e) => {
 /* ── подгонка размера холста под окно ── */
 function resizeCanvas(){
   dpr = Math.max(1, window.devicePixelRatio || 1);
-  if (surface === 'notes' && refDrawHost){
-    const r = refDrawHost.getBoundingClientRect();
-    cssW = Math.max(1, Math.round(r.width)); cssH = Math.max(1, Math.round(r.height));
-  } else {
-    cssW = window.innerWidth; cssH = window.innerHeight;
-  }
+  cssW = window.innerWidth; cssH = window.innerHeight;
   canvas.width = Math.round(cssW * dpr);
   canvas.height = Math.round(cssH * dpr);
   canvas.style.width = cssW + 'px';
@@ -517,7 +500,7 @@ function resizeCanvas(){
   clampCam();
   scheduleRedraw();
 }
-window.addEventListener('resize', () => { if (boardActive) resizeCanvas(); });
+window.addEventListener('resize', () => { if (boardActive) resizeCanvas(); if (rfVisible()) rfResizeCanvas(); });
 
 /* ── камера: мир ↔ экран ──
    activeCam — камера, с которой сейчас идёт отрисовка: обычно это просто
@@ -1196,9 +1179,13 @@ function deleteSelected(){
   updateContextMenu();
   saveDB(); scheduleRedraw();
 }
-document.getElementById('deleteBtn').addEventListener('click', deleteSelected);
-document.getElementById('undoBtn').addEventListener('click', doUndo);
-document.getElementById('redoBtn').addEventListener('click', doRedo);
+// доска и заметки справочной панели — два независимых, одновременно видимых
+// холста с общей нижней панелью инструментов; «отменить/повторить/удалить»
+// применяем к тому из них, где было последнее действие мышью/пером (см.
+// lastActiveSurface, обновляется в pointerdown каждого холста)
+document.getElementById('deleteBtn').addEventListener('click', () => { if (lastActiveSurface === 'notes') rfDeleteSelected(); else deleteSelected(); });
+document.getElementById('undoBtn').addEventListener('click', () => { if (lastActiveSurface === 'notes') rfDoUndo(); else doUndo(); });
+document.getElementById('redoBtn').addEventListener('click', () => { if (lastActiveSurface === 'notes') rfDoRedo(); else doRedo(); });
 
 /* ═══════════════════════════════════════════════════════════════════════
    УКАЗАТЕЛЬ (pointer events)
@@ -1207,6 +1194,7 @@ canvas.addEventListener('contextmenu', e => e.preventDefault());
 
 canvas.addEventListener('pointerdown', (e) => {
   if (!boardActive) return;
+  lastActiveSurface = 'board';
   canvas.setPointerCapture(e.pointerId);
   const pt = eventWorld(e);
 
@@ -1517,9 +1505,17 @@ document.querySelectorAll('.bd-tool[data-tool]').forEach(btn => {
     } else if (tool === 'poly' && btn.dataset.tool === 'poly' && polyState && polyState.pts.length >= 3){
       finishPoly();
     }
+    // тот же повторный клик может завершать и незаконченную фигуру в
+    // заметках справочной панели — набор инструментов общий на оба холста
+    if (tool === 'curve' && btn.dataset.tool === 'curve' && rfCurvePts && rfCurvePts.pts.length >= 2){
+      rfFinishCurve();
+    } else if (tool === 'poly' && btn.dataset.tool === 'poly' && rfPolyState && rfPolyState.pts.length >= 3){
+      rfFinishPoly();
+    }
     tool = btn.dataset.tool;
-    cancelDrafts(); // уже снимает editLock/черновики
-    if (tool !== 'select' && tool !== 'hand'){ selectedId = null; multiSelectIds = []; }
+    cancelDrafts(); // уже снимает editLock/черновики доски
+    rfCancelDrafts(); // и черновики заметок — оба холста используют один и тот же инструмент
+    if (tool !== 'select' && tool !== 'hand'){ selectedId = null; multiSelectIds = []; rfSelectedId = null; rfMultiSelectIds = []; }
     updateContextMenu(); // синхронно, не дожидаясь кадра — иначе меню на миг перехватывает клик по холсту под ним
     document.querySelectorAll('.bd-tool[data-tool]').forEach(b=>b.classList.toggle('active', b===btn));
     optbar.classList.toggle('open', TOOLS_WITH_OPTS.includes(tool));
@@ -1527,6 +1523,7 @@ document.querySelectorAll('.bd-tool[data-tool]').forEach(btn => {
     layoutRefPanel();
     document.getElementById('bdRadiusField').style.display = (tool==='circle') ? 'flex' : 'none';
     updateCursor();
+    rfUpdateCursor();
   });
 });
 
@@ -1652,6 +1649,7 @@ const refTextarea = document.getElementById('bdRefTextarea');
 const refImageMode = document.getElementById('bdRefImageMode');
 const refTextWrap = document.getElementById('bdRefTextWrap');
 const refDrawHost = document.getElementById('bdRefDrawHost');
+const refDrawCanvas = document.getElementById('bdRefDrawCanvas');
 const refSubType = document.getElementById('bdRefSubType');
 const refSubDraw = document.getElementById('bdRefSubDraw');
 // применяем сохранённое положение/размер дока только теперь, когда элементы
@@ -1697,69 +1695,24 @@ function applyRefPanel(){
   if (rp.h) refPanelEl.style.setProperty('--ref-h', rp.h + 'px'); else refPanelEl.style.removeProperty('--ref-h');
 }
 
-/* какой поверхности сейчас «хочет» текущее состояние справочной панели —
-   ей соответствует общий холст #boardCv, пока не изменится сама панель */
-function desiredSurface(){
-  if (!B || !B.refPanel.open) return 'board';
-  if (B.refPanel.mode !== 'text') return 'board';
-  if (B.refPanel.textMode !== 'draw') return 'board';
-  return 'notes';
-}
-function enterNotesSurface(){
-  if (surface === 'notes' || !B) return;
-  boardObjectsSnap = B.objects;
-  boardCamSnap = { x: cam.x, y: cam.y, zoom: cam.zoom };
-  boardUndoSnap = undoStack.slice(); boardRedoSnap = redoStack.slice();
-  surface = 'notes';
-  selectedId = null; multiSelectIds = []; clearEditLock();
-  draft = null; curvePts = null; circleState = null; polyState = null; penStroke = null;
-  armedHandId = null; dragMode = null;
-  B.refPanel.drawObjects = B.refPanel.drawObjects || [];
-  B.objects = B.refPanel.drawObjects;
-  cam.x = notesCamSnap.x; cam.y = notesCamSnap.y; cam.zoom = notesCamSnap.zoom;
-  undoStack.length = 0; redoStack.length = 0;
-  notesUndoSnap.forEach(s => undoStack.push(s)); notesRedoSnap.forEach(s => redoStack.push(s));
-  refDrawHost.appendChild(canvas);
-  resizeCanvas();
-  updateCursor();
-  updateContextMenu();
-}
-function exitNotesSurface(){
-  if (surface === 'board' || !B) return;
-  B.refPanel.drawObjects = B.objects;
-  notesCamSnap = { x: cam.x, y: cam.y, zoom: cam.zoom };
-  notesUndoSnap = undoStack.slice(); notesRedoSnap = redoStack.slice();
-  surface = 'board';
-  selectedId = null; multiSelectIds = []; clearEditLock();
-  draft = null; curvePts = null; circleState = null; polyState = null; penStroke = null;
-  armedHandId = null; dragMode = null;
-  B.objects = boardObjectsSnap || [];
-  if (boardCamSnap){ cam.x = boardCamSnap.x; cam.y = boardCamSnap.y; cam.zoom = boardCamSnap.zoom; }
-  undoStack.length = 0; redoStack.length = 0;
-  boardUndoSnap.forEach(s => undoStack.push(s)); boardRedoSnap.forEach(s => redoStack.push(s));
-  if (screenBoard.firstChild !== canvas) screenBoard.insertBefore(canvas, screenBoard.firstChild);
-  resizeCanvas();
-  updateCursor();
-  updateContextMenu();
-}
-function syncDrawSurface(){
-  const want = desiredSurface();
-  if (want === surface){ if (surface === 'notes') resizeCanvas(); return; }
-  if (want === 'notes') enterNotesSurface(); else exitNotesSurface();
+/* видна ли сейчас вкладка «Текст» → «Рисовать» справочной панели — от этого
+   зависит, нужно ли холсту заметок (#bdRefDrawCanvas, см. блок rf* ниже)
+   реагировать на размеры/события прямо сейчас */
+function rfVisible(){
+  return !!(B && B.refPanel.open && B.refPanel.mode === 'text' && B.refPanel.textMode === 'draw');
 }
 
 refToggleBtn.addEventListener('click', () => {
   if (!B) return;
   B.refPanel.open = !B.refPanel.open;
   applyRefPanel();
-  syncDrawSurface();
+  if (rfVisible()){ rfResizeCanvas(); rfScheduleRedraw(); }
   saveDB();
 });
 document.getElementById('bdRefClose').addEventListener('click', () => {
   if (!B) return;
   B.refPanel.open = false;
   applyRefPanel();
-  syncDrawSurface();
   saveDB();
 });
 document.querySelectorAll('.bd-ref-tab').forEach(btn => {
@@ -1767,7 +1720,7 @@ document.querySelectorAll('.bd-ref-tab').forEach(btn => {
     if (!B) return;
     B.refPanel.mode = btn.dataset.mode;
     applyRefPanel();
-    syncDrawSurface();
+    if (rfVisible()){ rfResizeCanvas(); rfScheduleRedraw(); }
     saveDB();
   });
 });
@@ -1776,7 +1729,7 @@ document.querySelectorAll('.bd-ref-subtab').forEach(btn => {
     if (!B) return;
     B.refPanel.textMode = btn.dataset.textmode;
     applyRefPanel();
-    syncDrawSurface();
+    if (rfVisible()){ rfResizeCanvas(); rfScheduleRedraw(); }
     saveDB();
   });
 });
@@ -1870,10 +1823,10 @@ function setupRefResize(handleEl, mode){
       B.refPanel.h = h;
       refPanelEl.style.setProperty('--ref-h', h + 'px');
     }
-    // пока идёт рисование в панели — холст должен подстраивать разрешение
-    // под новый размер контейнера прямо во время перетаскивания, а не
-    // только после того, как ручку отпустят
-    if (surface === 'notes') resizeCanvas();
+    // пока открыта вкладка «Рисовать» — её холст должен подстраивать
+    // разрешение под новый размер контейнера прямо во время перетаскивания,
+    // а не только после того, как ручку отпустят
+    if (rfVisible()) rfResizeCanvas();
   });
   function end(){ if (start){ start = null; saveDB(); } }
   handleEl.addEventListener('pointerup', end);
@@ -1882,6 +1835,437 @@ function setupRefResize(handleEl, mode){
 setupRefResize(refResizeHandle, 'nw');
 setupRefResize(refResizeHandleN, 'n');
 setupRefResize(refResizeHandleW, 'w');
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ХОЛСТ ЗАМЕТОК СПРАВОЧНОЙ ПАНЕЛИ (#bdRefDrawCanvas, вкладка «Текст» →
+   «Рисовать»). Это ОТДЕЛЬНЫЙ, независимый от самой доски <canvas> — тот же
+   набор инструментов (общая нижняя панель: те же tool/curColorTok/curWidth/
+   curDash/curFill/curSnap, что и у доски), но свой список фигур
+   (B.refPanel.drawObjects), своя камера и своя история отмены. Специально
+   НЕ переиспользуем холст доски и не «переносим» его сюда — тогда бы сама
+   доска пропадала из виду, пока открыты заметки, а нужно, чтобы оба были
+   видны и доступны для рисования одновременно.
+   Сознательно упрощено по сравнению с самой доской: нет рамки группового
+   выделения (marquee), объединения фигур в группы и расширенного
+   контекстного меню «Переместить/Скопировать» — для небольшого блокнота
+   заметок это не нужно; один объект по-прежнему можно выделить кликом,
+   подвинуть и потянуть за угловые ручки как обычно.
+   ═══════════════════════════════════════════════════════════════════════ */
+const rfCtx = refDrawCanvas.getContext('2d');
+const rfCam = { x: 0, y: 0, zoom: 1 };
+let rfCssW = 0, rfCssH = 0, rfDpr = 1;
+let rfRedrawScheduled = false;
+
+let rfSelectedId = null;
+let rfMultiSelectIds = [];
+let rfArmedHandId = null;
+let rfEditLockId = null, rfEditLockTool = null;
+function rfEnterEditLock(obj, viaTool){ rfEditLockId = obj.id; rfEditLockTool = viaTool; rfSelectedId = obj.id; rfMultiSelectIds = []; }
+function rfClearEditLock(){ rfEditLockId = null; rfEditLockTool = null; }
+
+let rfDragMode = null; // null | 'move' | 'handle' | 'pan' | 'erase'
+let rfDragHandleRole = null, rfDragObjId = null, rfDragStart = null, rfDragOrig = null;
+let rfPanStart = null, rfCamStart = null;
+
+let rfDraft = null, rfCurvePts = null, rfCircleState = null, rfPolyState = null, rfPenStroke = null;
+
+const rfUndoStack = [], rfRedoStack = [];
+// B.refPanel.drawObjects читаем каждый раз заново через геттер, а не
+// кешируем ссылку на массив — doUndo/doRedo подменяют саму ссылку целиком
+// (B.refPanel.drawObjects = JSON.parse(...)), закешированная переменная
+// после этого указывала бы на устаревший массив
+function rfObjects(){ return B.refPanel.drawObjects; }
+function rfPushUndo(){
+  rfUndoStack.push(JSON.stringify(rfObjects()));
+  if (rfUndoStack.length > UNDO_LIMIT) rfUndoStack.shift();
+  rfRedoStack.length = 0;
+}
+function rfDoUndo(){
+  if (!rfUndoStack.length) return;
+  rfRedoStack.push(JSON.stringify(rfObjects()));
+  B.refPanel.drawObjects = JSON.parse(rfUndoStack.pop());
+  rfSelectedId = null; rfMultiSelectIds = []; rfClearEditLock();
+  rfScheduleRedraw(); saveDB();
+}
+function rfDoRedo(){
+  if (!rfRedoStack.length) return;
+  rfUndoStack.push(JSON.stringify(rfObjects()));
+  B.refPanel.drawObjects = JSON.parse(rfRedoStack.pop());
+  rfSelectedId = null; rfMultiSelectIds = []; rfClearEditLock();
+  rfScheduleRedraw(); saveDB();
+}
+
+function rfResizeCanvas(){
+  rfDpr = Math.max(1, window.devicePixelRatio || 1);
+  const r = refDrawHost.getBoundingClientRect();
+  rfCssW = Math.max(1, Math.round(r.width)); rfCssH = Math.max(1, Math.round(r.height));
+  refDrawCanvas.width = Math.round(rfCssW * rfDpr);
+  refDrawCanvas.height = Math.round(rfCssH * rfDpr);
+  refDrawCanvas.style.width = rfCssW + 'px';
+  refDrawCanvas.style.height = rfCssH + 'px';
+  rfScheduleRedraw();
+}
+function rfScheduleRedraw(){
+  if (rfRedrawScheduled) return;
+  rfRedrawScheduled = true;
+  requestAnimationFrame(() => { rfRedrawScheduled = false; if (rfVisible()) rfRender(); });
+}
+function rfWorldToScreen(p){ return { x: (p.x - rfCam.x) * rfCam.zoom, y: (p.y - rfCam.y) * rfCam.zoom }; }
+function rfScreenToWorld(sx, sy){ return { x: sx / rfCam.zoom + rfCam.x, y: sy / rfCam.zoom + rfCam.y }; }
+function rfEventWorld(e){
+  const r = refDrawCanvas.getBoundingClientRect();
+  return rfScreenToWorld(e.clientX - r.left, e.clientY - r.top);
+}
+
+function rfRender(){
+  const c = rfCtx, w = rfCssW, h = rfCssH;
+  // общие функции рисования (renderObject, drawSelection, ...) переводят
+  // мировые координаты в экранные через worldToScreen(), а та берёт камеру
+  // из общей переменной activeCam — поэтому на время отрисовки заметок
+  // временно указываем её на rfCam (доска делает то же самое в своём render())
+  activeCam = rfCam;
+  c.save();
+  c.setTransform(rfDpr,0,0,rfDpr,0,0);
+  c.clearRect(0,0,w,h);
+  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  c.fillStyle = bg; c.fillRect(0,0,w,h);
+  c.restore();
+
+  c.save();
+  c.setTransform(rfDpr,0,0,rfDpr,0,0);
+  drawSheetsAndGrid(c, rfCam, w, h);
+  rfObjects().forEach(o => renderObject(c, o, rfCam));
+  rfDrawDraftPreview(c);
+  if (rfSelectedId){
+    const obj = rfObjects().find(o=>o.id===rfSelectedId);
+    if (obj) drawSelection(c, obj, rfCam);
+  }
+  c.restore();
+}
+function rfDrawDraftPreview(c){
+  c.save();
+  c.strokeStyle = resolveColor(curColorTok);
+  c.fillStyle = resolveColor(curColorTok);
+  c.lineWidth = Math.max(0.5, curWidth) * rfCam.zoom;
+  c.lineCap='round'; c.lineJoin='round';
+  c.setLineDash(curDash ? [curWidth*3.4*rfCam.zoom, curWidth*2.4*rfCam.zoom] : []);
+
+  if (rfDraft && rfDraft.pts.length){
+    const pts = rfDraft.pts.slice();
+    if (rfDraft.preview) pts.push(rfDraft.preview);
+    const wp = pts.map(p=>rfWorldToScreen(p));
+    c.beginPath(); c.moveTo(wp[0].x, wp[0].y);
+    for (let i=1;i<wp.length;i++) c.lineTo(wp[i].x, wp[i].y);
+    if (rfDraft.type === 'quad' && pts.length >= 3) c.closePath();
+    c.stroke();
+    if (rfDraft.type === 'angle' && rfDraft.pts.length === 2 && rfDraft.preview){
+      drawAngleArcAndLabel(c, wp[1], wp[0], wp[2], rfCam, curWidth);
+    }
+  }
+  if (rfCurvePts && rfCurvePts.pts.length){
+    const pts = rfCurvePts.pts.slice();
+    if (rfCurvePts.preview) pts.push(rfCurvePts.preview);
+    strokeSmoothThroughPoints(c, pts.map(p=>rfWorldToScreen(p)));
+    pts.slice(0, rfCurvePts.pts.length).forEach(p => {
+      const s = rfWorldToScreen(p);
+      c.beginPath(); c.arc(s.x, s.y, 2.5, 0, Math.PI*2); c.fill();
+    });
+  }
+  if (rfCircleState){
+    const cxy = rfWorldToScreen(rfCircleState.center);
+    const r = (rfCircleState.r != null ? rfCircleState.r : (rfCircleState.previewR||0)) * rfCam.zoom;
+    c.beginPath(); c.arc(cxy.x, cxy.y, Math.max(1,r), 0, Math.PI*2); c.stroke();
+    c.beginPath(); c.arc(cxy.x, cxy.y, 2, 0, Math.PI*2); c.fill();
+  }
+  if (rfPolyState && rfPolyState.pts.length){
+    const pts = rfPolyState.pts.slice();
+    if (rfPolyState.preview) pts.push(rfPolyState.preview);
+    const wp = pts.map(p=>rfWorldToScreen(p));
+    c.beginPath(); c.moveTo(wp[0].x, wp[0].y);
+    for (let i=1;i<wp.length;i++) c.lineTo(wp[i].x, wp[i].y);
+    c.stroke();
+  }
+  if (rfPenStroke){
+    strokePolyline(c, rfPenStroke.points.map(p=>rfWorldToScreen(p)), true);
+  }
+  c.restore();
+}
+
+function rfCommitObject(obj){
+  rfPushUndo();
+  rfObjects().push(obj);
+  bumpColorUsage(obj.color);
+  saveDB(); rfScheduleRedraw();
+}
+function rfShapeClick(kind, pt){
+  pt = maybeSnap(pt);
+  if (!rfDraft || rfDraft.type !== kind) rfDraft = { type: kind, pts: [] };
+  rfDraft.pts.push(pt);
+  const need = FIXED_COUNT[kind];
+  if (rfDraft.pts.length >= need){
+    const obj = newBase(kind);
+    if (kind === 'ellipse'){
+      const [a,b] = rfDraft.pts;
+      obj.points = [{x:(a.x+b.x)/2, y:(a.y+b.y)/2}];
+      obj.rx = Math.max(4, Math.abs(a.x-b.x)/2);
+      obj.ry = Math.max(4, Math.abs(a.y-b.y)/2);
+    } else {
+      obj.points = rfDraft.pts.slice();
+    }
+    rfDraft = null;
+    rfCommitObject(obj);
+    rfEnterEditLock(obj, kind);
+  }
+  rfScheduleRedraw();
+}
+function rfCurvePointClick(pt){
+  pt = maybeSnap(pt);
+  if (!rfCurvePts){ rfCurvePts = { pts: [pt] }; return; }
+  rfCurvePts.pts.push(pt);
+}
+function rfFinishCurve(){
+  if (!rfCurvePts || rfCurvePts.pts.length < 2){ rfCurvePts = null; rfScheduleRedraw(); return; }
+  const obj = newBase('curve'); obj.points = rfCurvePts.pts.slice();
+  rfCurvePts = null;
+  rfCommitObject(obj); rfEnterEditLock(obj, 'curve');
+}
+function rfCircleClick(pt){
+  pt = maybeSnap(pt);
+  if (!rfCircleState){
+    rfCircleState = { center: pt, r: (radiusSetting>0 ? radiusSetting : null), previewR: 0 };
+    if (rfCircleState.r != null){
+      const obj = newBase('circle'); obj.points=[pt]; obj.r=rfCircleState.r;
+      rfCircleState = null; rfCommitObject(obj); rfEnterEditLock(obj, 'circle');
+    }
+    return;
+  }
+  const r = dist(rfCircleState.center, pt);
+  const obj = newBase('circle'); obj.points=[rfCircleState.center]; obj.r = Math.max(4,r);
+  rfCircleState = null;
+  rfCommitObject(obj); rfEnterEditLock(obj, 'circle');
+  const input = document.getElementById('bdRadiusInput');
+  if (input) input.value = Math.round(obj.r);
+}
+function rfPolyClick(pt){
+  pt = maybeSnap(pt);
+  if (!rfPolyState){ rfPolyState = { pts: [pt] }; return; }
+  if (rfPolyState.pts.length >= 3 && dist(pt, rfPolyState.pts[0]) < 14/rfCam.zoom){ rfFinishPoly(); return; }
+  rfPolyState.pts.push(pt);
+}
+function rfFinishPoly(){
+  if (!rfPolyState || rfPolyState.pts.length < 3){ rfPolyState = null; rfScheduleRedraw(); return; }
+  const obj = newBase('poly'); obj.points = rfPolyState.pts.slice();
+  rfPolyState = null;
+  rfCommitObject(obj); rfEnterEditLock(obj, 'poly');
+}
+function rfCancelDrafts(){
+  rfDraft=null; rfCurvePts=null; rfCircleState=null; rfPolyState=null; rfPenStroke=null; rfArmedHandId=null;
+  rfClearEditLock();
+  rfScheduleRedraw();
+}
+function rfHitTestHandles(obj, pt){
+  const tol = 8/rfCam.zoom;
+  const handles = getHandles(obj);
+  for (const h of handles) if (dist(pt,h)<=tol) return h.role;
+  return null;
+}
+function rfEraseAt(pt){
+  const tol = 14/rfCam.zoom;
+  const objs = rfObjects();
+  for (let i=objs.length-1;i>=0;i--){
+    if (objs[i].locked) continue;
+    if (hitTestObject(objs[i], pt, tol)){
+      rfPushUndo();
+      const goneId = objs[i].id;
+      if (rfSelectedId===goneId) rfSelectedId=null;
+      rfMultiSelectIds = rfMultiSelectIds.filter(id=>id!==goneId);
+      if (rfArmedHandId===goneId) rfArmedHandId=null;
+      if (rfEditLockId===goneId) rfClearEditLock();
+      objs.splice(i,1);
+      saveDB(); rfScheduleRedraw();
+      return;
+    }
+  }
+}
+function rfGetSelectedObjects(){
+  if (rfSelectedId){ const o = rfObjects().find(x=>x.id===rfSelectedId); return o ? [o] : []; }
+  return [];
+}
+function rfDeleteSelected(){
+  const sel = rfGetSelectedObjects();
+  if (!sel.length) return;
+  const ids = sel.map(o=>o.id);
+  rfPushUndo();
+  B.refPanel.drawObjects = rfObjects().filter(o => !ids.includes(o.id));
+  if (rfArmedHandId && ids.includes(rfArmedHandId)) rfArmedHandId=null;
+  if (rfEditLockId && ids.includes(rfEditLockId)) rfClearEditLock();
+  rfSelectedId = null; rfMultiSelectIds = [];
+  saveDB(); rfScheduleRedraw();
+}
+function rfUpdateCursor(){
+  if (!refDrawCanvas) return;
+  if (tool === 'pen') refDrawCanvas.style.cursor = penCursorCSS();
+  else if (tool === 'eraser') refDrawCanvas.style.cursor = eraserCursorCSS();
+  else if (tool === 'hand') refDrawCanvas.style.cursor = 'grab';
+  else if (tool === 'select') refDrawCanvas.style.cursor = 'default';
+  else refDrawCanvas.style.cursor = 'crosshair';
+}
+
+refDrawCanvas.addEventListener('contextmenu', e => e.preventDefault());
+refDrawCanvas.addEventListener('pointerdown', (e) => {
+  if (!B) return;
+  lastActiveSurface = 'notes';
+  refDrawCanvas.setPointerCapture(e.pointerId);
+  const pt = rfEventWorld(e);
+
+  if (e.button === 2 || e.button === 1 || (e.button===0 && e.altKey)){
+    e.preventDefault(); rfDragMode='pan'; rfPanStart={x:e.clientX,y:e.clientY}; rfCamStart={x:rfCam.x,y:rfCam.y}; refDrawCanvas.style.cursor='grabbing'; return;
+  }
+
+  if (rfEditLockId){
+    const obj = rfObjects().find(o=>o.id===rfEditLockId);
+    if (!obj){ rfClearEditLock(); }
+    else {
+      const role = rfHitTestHandles(obj, pt);
+      if (role){ rfPushUndo(); rfDragMode='handle'; rfDragHandleRole=role; rfDragObjId=obj.id; return; }
+      if (hitTestObject(obj, pt, 8/rfCam.zoom)){
+        rfPushUndo(); rfDragMode='move'; rfDragObjId=obj.id; rfDragStart=pt; rfDragOrig=clonePts(obj); return;
+      }
+      if (rfEditLockTool === tool) return;
+    }
+  }
+
+  if (tool === 'hand'){
+    if (rfArmedHandId){
+      const obj = rfObjects().find(o=>o.id===rfArmedHandId);
+      if (obj){
+        const role = rfHitTestHandles(obj, pt);
+        if (role){ rfPushUndo(); rfDragMode='handle'; rfDragHandleRole=role; rfDragObjId=obj.id; return; }
+        if (hitTestObject(obj, pt, 8/rfCam.zoom)){
+          rfPushUndo(); rfDragMode='move'; rfDragObjId=obj.id; rfDragStart=pt; rfDragOrig=clonePts(obj); return;
+        }
+      }
+    }
+    rfDragMode='pan'; rfPanStart={x:e.clientX,y:e.clientY}; rfCamStart={x:rfCam.x,y:rfCam.y}; refDrawCanvas.style.cursor='grabbing'; return;
+  }
+
+  if (tool === 'select'){
+    if (rfSelectedId){
+      const obj = rfObjects().find(o=>o.id===rfSelectedId);
+      if (obj){
+        const role = rfHitTestHandles(obj, pt);
+        if (role){ rfPushUndo(); rfDragMode='handle'; rfDragHandleRole=role; rfDragObjId=obj.id; return; }
+      }
+    }
+    for (let i=rfObjects().length-1;i>=0;i--){
+      if (hitTestObject(rfObjects()[i], pt, 8/rfCam.zoom)){
+        const obj = rfObjects()[i];
+        rfSelectedId = obj.id; rfMultiSelectIds = [];
+        rfPushUndo();
+        rfDragMode='move'; rfDragObjId=rfSelectedId; rfDragStart=pt; rfDragOrig=clonePts(obj);
+        rfScheduleRedraw();
+        return;
+      }
+    }
+    rfSelectedId = null; rfMultiSelectIds = [];
+    rfScheduleRedraw();
+    return;
+  }
+
+  if (tool === 'pen'){
+    rfPushUndo();
+    rfPenStroke = { id: uid(), type:'pen', color:curColorTok, width:curWidth, dash:curDash, points:[pt] };
+    return;
+  }
+  if (tool === 'eraser'){ rfDragMode='erase'; rfEraseAt(pt); return; }
+
+  if (tool === 'curve'){ rfCurvePointClick(pt); rfScheduleRedraw(); return; }
+  if (tool === 'circle'){ rfCircleClick(pt); rfScheduleRedraw(); return; }
+  if (tool === 'poly'){ rfPolyClick(pt); rfScheduleRedraw(); return; }
+  if (FIXED_COUNT[tool]){ rfShapeClick(tool, pt); return; }
+});
+
+refDrawCanvas.addEventListener('pointermove', (e) => {
+  if (!B) return;
+  const pt = rfEventWorld(e);
+
+  if (rfDragMode === 'pan'){
+    const dx = (e.clientX-rfPanStart.x)/rfCam.zoom, dy=(e.clientY-rfPanStart.y)/rfCam.zoom;
+    rfCam.x = rfCamStart.x - dx; rfCam.y = rfCamStart.y - dy;
+    rfScheduleRedraw(); return;
+  }
+  if (rfDragMode === 'erase'){ rfEraseAt(pt); return; }
+  if (rfDragMode === 'move'){
+    const dx = pt.x-rfDragStart.x, dy = pt.y-rfDragStart.y;
+    const obj = rfObjects().find(o=>o.id===rfDragObjId);
+    if (obj){
+      obj.points = rfDragOrig.points.map(p=>({x:p.x+dx,y:p.y+dy}));
+      if (rfDragOrig.ctrl) obj.ctrl = {x:rfDragOrig.ctrl.x+dx, y:rfDragOrig.ctrl.y+dy};
+      rfScheduleRedraw();
+    }
+    return;
+  }
+  if (rfDragMode === 'handle'){
+    const obj = rfObjects().find(o=>o.id===rfDragObjId);
+    if (obj){ applyHandle(obj, rfDragHandleRole, pt); rfScheduleRedraw(); }
+    return;
+  }
+  if (rfPenStroke){
+    const evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    evs.forEach(ev => {
+      const r = refDrawCanvas.getBoundingClientRect();
+      rfPenStroke.points.push(rfScreenToWorld(ev.clientX-r.left, ev.clientY-r.top));
+    });
+    rfScheduleRedraw(); return;
+  }
+  if (rfDraft){ rfDraft.preview = maybeSnap(pt); rfScheduleRedraw(); return; }
+  if (rfCurvePts){ rfCurvePts.preview = maybeSnap(pt); rfScheduleRedraw(); return; }
+  if (rfCircleState && rfCircleState.r==null){ rfCircleState.previewR = dist(rfCircleState.center, pt); rfScheduleRedraw(); return; }
+  if (rfPolyState){ rfPolyState.preview = maybeSnap(pt); rfScheduleRedraw(); return; }
+});
+
+refDrawCanvas.addEventListener('pointerup', (e) => {
+  if (!B) return;
+  if (rfDragMode === 'move' || rfDragMode === 'handle'){ saveDB(); }
+  if (rfDragMode === 'pan') rfUpdateCursor();
+  rfDragMode = null; rfDragHandleRole=null; rfDragObjId=null;
+  if (rfPenStroke){
+    if (rfPenStroke.points.length >= 2) rfObjects().push(rfPenStroke);
+    if (rfPenStroke.points.length >= 1) bumpColorUsage(rfPenStroke.color);
+    rfPenStroke = null; saveDB(); rfScheduleRedraw();
+  }
+});
+refDrawCanvas.addEventListener('pointercancel', () => {
+  if (rfDragMode==='pan') rfUpdateCursor();
+  rfDragMode=null;
+  if (rfPenStroke){ rfPenStroke=null; rfScheduleRedraw(); }
+});
+refDrawCanvas.addEventListener('dblclick', (e) => {
+  if (tool === 'poly' && rfPolyState){ if (rfPolyState.pts.length) rfPolyState.pts.pop(); rfFinishPoly(); return; }
+  if (tool === 'curve' && rfCurvePts){ if (rfCurvePts.pts.length) rfCurvePts.pts.pop(); rfFinishCurve(); return; }
+  if (tool === 'hand'){
+    const pt = rfEventWorld(e);
+    let hit = null;
+    for (let i=rfObjects().length-1;i>=0;i--){ if (hitTestObject(rfObjects()[i], pt, 8/rfCam.zoom)){ hit=rfObjects()[i]; break; } }
+    rfArmedHandId = hit ? hit.id : null;
+    rfSelectedId = rfArmedHandId;
+    rfScheduleRedraw();
+  }
+});
+refDrawCanvas.addEventListener('wheel', (e) => {
+  if (!B) return;
+  e.preventDefault();
+  const r = refDrawCanvas.getBoundingClientRect();
+  const sx = e.clientX-r.left, sy=e.clientY-r.top;
+  if (e.ctrlKey || e.metaKey){
+    const w = rfScreenToWorld(sx,sy);
+    const z = clamp(rfCam.zoom * Math.exp(-e.deltaY*0.0016), ZOOM_MIN, ZOOM_MAX);
+    rfCam.zoom = z; rfCam.x = w.x - sx/z; rfCam.y = w.y - sy/z;
+    rfScheduleRedraw();
+    return;
+  }
+  rfCam.x += e.deltaX/rfCam.zoom; rfCam.y += e.deltaY/rfCam.zoom; rfScheduleRedraw();
+}, { passive:false });
 
 function renderSwatches(){
   const wrap = document.getElementById('bdSwatches');
@@ -2549,12 +2933,24 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && document.getElementById('pdfModalBackdrop').classList.contains('open')){ closePdfModal(); return; }
   const tag = (document.activeElement && document.activeElement.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-  if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z'){ e.preventDefault(); if (e.shiftKey) doRedo(); else doUndo(); return; }
-  if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='y'){ e.preventDefault(); doRedo(); return; }
-  if (e.key === 'Escape'){ cancelDrafts(); selectedId=null; multiSelectIds=[]; updateContextMenu(); scheduleRedraw(); return; }
-  if (e.key === 'Enter' && tool==='poly'){ finishPoly(); return; }
-  if (e.key === 'Enter' && tool==='curve'){ finishCurve(); return; }
-  if ((e.key==='Backspace' || e.key==='Delete') && selectedId){ deleteSelected(); return; }
+  if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z'){
+    e.preventDefault();
+    if (lastActiveSurface === 'notes'){ if (e.shiftKey) rfDoRedo(); else rfDoUndo(); }
+    else { if (e.shiftKey) doRedo(); else doUndo(); }
+    return;
+  }
+  if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='y'){ e.preventDefault(); if (lastActiveSurface === 'notes') rfDoRedo(); else doRedo(); return; }
+  if (e.key === 'Escape'){
+    cancelDrafts(); selectedId=null; multiSelectIds=[]; updateContextMenu(); scheduleRedraw();
+    rfCancelDrafts(); rfSelectedId=null; rfMultiSelectIds=[]; rfScheduleRedraw();
+    return;
+  }
+  if (e.key === 'Enter' && tool==='poly'){ if (polyState) finishPoly(); if (rfPolyState) rfFinishPoly(); return; }
+  if (e.key === 'Enter' && tool==='curve'){ if (curvePts) finishCurve(); if (rfCurvePts) rfFinishCurve(); return; }
+  if ((e.key==='Backspace' || e.key==='Delete')){
+    if (lastActiveSurface === 'notes' && rfSelectedId){ rfDeleteSelected(); return; }
+    if (selectedId){ deleteSelected(); return; }
+  }
   const t = KEY_TOOL[e.key.toLowerCase()];
   if (t){ const btn = document.querySelector(`.bd-tool[data-tool="${t}"]`); if (btn) btn.click(); }
 });
@@ -2667,12 +3063,32 @@ document.getElementById('bdCtxZoomIn').addEventListener('click', () => setZoom(c
 document.getElementById('bdCtxZoomOut').addEventListener('click', () => setZoom(cam.zoom/1.25, cam.x+cssW/2/cam.zoom, cam.y+cssH/2/cam.zoom, cssW/2, cssH/2));
 
 /* ═══════════════════════════════════════════════════════════════════════
+   Небольшой набор точек входа для boards-cloud.js (общая доска с учеником).
+   B и DB — обычные `let`-переменные этого файла, снаружи (из другого
+   <script>) недоступны напрямую, поэтому даём наружу только эти несколько
+   функций-геттеров/помощников. Сам движок доски ничего не знает про
+   облако — если boards-cloud.js не подключён, ничего этого не вызывается.
+   ═══════════════════════════════════════════════════════════════════════ */
+window.getDB = function(){ return DB; };
+window.getCurrentBoard = function(){ return B; };
+window.boardsRedraw = function(){ scheduleRedraw(); updateContextMenu(); };
+window.boardsClearSelection = function(){ selectedId = null; multiSelectIds = []; clearEditLock(); };
+
+/* ═══════════════════════════════════════════════════════════════════════
    СТАРТ
    ═══════════════════════════════════════════════════════════════════════ */
-renderList();
-(function routeFromHash(){
+// точка входа приложения. Если подключён boards-cloud.js (вход по email
+// для общей доски с учеником) — он сам вызовет boardsAppBoot() после
+// подтверждения входа; если boards-cloud.js на странице нет вообще —
+// вызываем сразу же, как и раньше, чтобы обычная локальная работа никак
+// не зависела от облака.
+window.boardsAppBoot = function(){
+  if (window.__boardsBooted) return;
+  window.__boardsBooted = true;
+  renderList();
   const m = /board=([^&]+)/.exec(location.hash);
   if (m && DB.boards.some(b=>b.id===m[1])) openBoard(m[1]);
-})();
+};
+if (!window.__hasCloudGate) window.boardsAppBoot();
 window.addEventListener('beforeunload', () => { if (B) { try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }catch(e){} } });
 document.addEventListener('visibilitychange', () => { if (document.hidden && B) { try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }catch(e){} } });
