@@ -60,9 +60,11 @@
       <div class="ag-card">
         <div class="ag-logo">Тренажёры</div>
         <div id="agStep1">
-          <p class="ag-hint">Войдите по email, чтобы открыть доски.</p>
+          <p class="ag-hint">Войдите по email. Если уже задавали пароль — введите его, вход будет сразу, без письма. Если ещё нет — оставьте поле пароля пустым.</p>
           <input id="agEmail" type="email" placeholder="you@example.com" autocomplete="email">
-          <button id="agSend">Отправить ссылку для входа</button>
+          <input id="agPassword" type="password" placeholder="Пароль (если уже задан)" autocomplete="current-password">
+          <button id="agSend">Войти</button>
+          <button id="agSendLink" class="ag-link">Прислать ссылку на почту вместо пароля</button>
         </div>
         <div id="agStep2" hidden>
           <p class="ag-hint">Письмо отправлено на <b id="agSentEmail"></b>. Откройте его на этом же устройстве и перейдите по ссылке — страница обновится сама.</p>
@@ -82,12 +84,22 @@
           <button id="agRetryConnect">Повторить попытку</button>
           <button id="agUseOtherEmail" class="ag-link">Войти под другой почтой</button>
         </div>
+        <!-- Ссылка-приглашение из URL (?invite=...) устарела, уже использована
+             кем-то другим, или её отозвали — регистрация по ней закрыта
+             специально (см. sendMagicLink/shouldCreateUser ниже), чтобы
+             посторонний человек не мог сам себе завести вход на сайт -->
+        <div id="agInviteInvalid" hidden>
+          <p class="ag-hint">Эта ссылка-приглашение уже использована или недействительна. Попросите новую у того, кто её прислал.</p>
+          <button id="agInviteGoNormal" class="ag-link">У меня уже есть аккаунт — войти обычно</button>
+        </div>
         <div id="agError" class="ag-error" hidden></div>
       </div>
     </div>
     <div id="authUserPill" class="ag-user-pill" style="display:none">
       <span>Вы вошли как <b id="agCurrentEmail"></b></span>
       <a id="agEditName" class="ag-edit-name" title="Задать имя, которое увидит собеседник рядом со своим курсором">изменить имя</a>
+      <a id="agSetPassword" class="ag-edit-name" title="Задать или сменить пароль для входа без письма">задать пароль</a>
+      <a id="agCreateInvite" class="ag-edit-name" style="display:none" title="Создать одноразовую ссылку-приглашение для нового человека">пригласить</a>
       <a id="agSignOut">Выйти</a>
     </div>
   `);
@@ -99,14 +111,25 @@
   const reconnectBox = document.getElementById('agReconnect');
   const errBox = document.getElementById('agError');
   const pill = document.getElementById('authUserPill');
+  const inviteInvalidBox = document.getElementById('agInviteInvalid');
 
   function setStage(stage, msg) {
     step1.hidden = stage !== 'form';
     step2.hidden = stage !== 'sent';
     loading.hidden = stage !== 'loading';
     reconnectBox.hidden = stage !== 'reconnect';
+    inviteInvalidBox.hidden = stage !== 'invite-invalid';
     if (msg) { errBox.hidden = false; errBox.textContent = msg; } else { errBox.hidden = true; }
   }
+
+  // ── Закрытая регистрация по ссылке-приглашению (?invite=<id>): без
+  //    валидного приглашения новый аккаунт создать нельзя (см. sendMagicLink
+  //    -> shouldCreateUser ниже) — так посторонний человек с адресом сайта
+  //    не сможет сам себе завести вход, а сможет только тот, кому дали
+  //    одноразовую ссылку. У кого уже ЕСТЬ аккаунт — вход как обычно,
+  //    приглашение вообще не требуется. ──
+  let inviteId = new URLSearchParams(location.search).get('invite');
+  let inviteInfo = { valid: !inviteId, label: '' };
   // есть ли на этом устройстве сохранённый с прошлого раза вход — используем
   // только для того, чтобы решить, ЧТО показать при сбое связи (см. выше);
   // сам ключ (sb-<project-ref>-auth-token) — деталь реализации supabase-js,
@@ -146,11 +169,45 @@
     setStage('form', 'Не настроен доступ к серверу: заполните supabase-config.js своими Project URL и anon key из Supabase (Project Settings → API), затем перезагрузите страницу.');
     document.getElementById('agSend').disabled = true;
     document.getElementById('agEmail').disabled = true;
+    document.getElementById('agPassword').disabled = true;
+    document.getElementById('agSendLink').disabled = true;
     return;
   }
 
   const sb = window.supabase.createClient(cfg.url, cfg.anonKey);
   window.SB = sb; // остальным модулям (совместное редактирование, шаринг) — тот же клиент
+
+  // Проверяем ссылку СРАЗУ (пока идёт остальная загрузка), но ничего не
+  // помечаем использованной здесь — только смотрим, действительна ли она.
+  // Погашение (redeem_invite) происходит позже, только в момент реальной
+  // отправки письма (sendMagicLink) — чтобы просто открыть ссылку и уйти
+  // не сжигало её впустую.
+  const inviteCheckPromise = inviteId
+    ? sb.rpc('check_invite', { p_id: inviteId }).then(({ data, error }) => {
+        const row = Array.isArray(data) ? data[0] : data;
+        inviteInfo = (!error && row && row.valid) ? { valid: true, label: row.label || '' } : { valid: false };
+      }).catch(() => { inviteInfo = { valid: false }; })
+    : Promise.resolve();
+
+  // Момент «показать форму входа с нуля» — либо обычная форма (email/
+  // пароль), либо та же форма с другой подсказкой (пришли по действующему
+  // приглашению), либо экран «ссылка недействительна»
+  async function presentForm() {
+    await inviteCheckPromise;
+    if (inviteId && !inviteInfo.valid) { setStage('invite-invalid'); return; }
+    document.querySelector('#agStep1 .ag-hint').textContent = (inviteId && inviteInfo.valid)
+      ? 'Вас пригласили' + (inviteInfo.label ? ` (${inviteInfo.label})` : '') + '. Введите свою почту — придёт письмо со ссылкой для входа.'
+      : 'Войдите по email. Если уже задавали пароль — введите его, вход будет сразу, без письма. Если ещё нет — оставьте поле пароля пустым.';
+    setStage('form');
+  }
+  document.getElementById('agInviteGoNormal').addEventListener('click', () => {
+    // ссылка оказалась чужой/старой, но у человека уже есть свой аккаунт —
+    // даём войти обычным способом, просто убираем ?invite= из адресной строки
+    history.replaceState(null, '', location.pathname);
+    inviteId = null;
+    inviteInfo = { valid: true, label: '' };
+    presentForm();
+  });
 
   showGate();
   setStage('loading');
@@ -166,7 +223,7 @@
   const loadingFallback = setTimeout(() => {
     if (authSettled) return;
     if (hasCachedSessionOnThisDevice()) { setStage('reconnect'); startAutoReconnect(); }
-    else setStage('form');
+    else presentForm();
   }, 8000);
 
   // несколько тихих попыток само собой переподключиться, пока человек ещё
@@ -191,21 +248,68 @@
     setStage('form');
   });
 
-  document.getElementById('agSend').addEventListener('click', async () => {
-    const email = document.getElementById('agEmail').value.trim();
-    if (!email) { setStage('form', 'Введите email.'); return; }
+  async function sendMagicLink(email) {
     setStage('loading');
     try {
+      // Разрешаем создать НОВЫЙ аккаунт только если пришли по ещё не
+      // погашенной ссылке-приглашению — redeem_invite атомарно помечает её
+      // использованной и возвращает true только ПЕРВОМУ, кто успел. Без
+      // приглашения (или если оно уже использовано кем-то другим) —
+      // shouldCreateUser:false: у СУЩЕСТВУЮЩИХ пользователей вход при этом
+      // работает как обычно, это ограничивает только СОЗДАНИЕ новых аккаунтов.
+      let allowCreate = false;
+      if (inviteId && inviteInfo.valid) {
+        const { data: redeemed, error: redeemErr } = await sb.rpc('redeem_invite', { p_id: inviteId, p_email: email });
+        if (redeemErr) { setStage('form', 'Не получилось проверить приглашение: ' + redeemErr.message); return; }
+        if (!redeemed) { setStage('invite-invalid'); return; }
+        allowCreate = true;
+      }
       const { error } = await sb.auth.signInWithOtp({
         email,
-        options: { emailRedirectTo: location.origin + location.pathname }
+        options: { emailRedirectTo: location.origin + location.pathname, shouldCreateUser: allowCreate }
       });
-      if (error) { setStage('form', 'Не получилось отправить письмо: ' + error.message); return; }
+      if (error) {
+        const notAllowed = /signup|not allowed/i.test(error.message || '');
+        setStage('form', notAllowed
+          ? 'Эта почта ещё не зарегистрирована, а свободная регистрация закрыта — нужна ссылка-приглашение от владельца платформы.'
+          : 'Не получилось отправить письмо: ' + error.message);
+        return;
+      }
       document.getElementById('agSentEmail').textContent = email;
       setStage('sent');
     } catch (e) {
       setStage('form', 'Не получилось отправить письмо: ' + (e && e.message ? e.message : e));
     }
+  }
+  document.getElementById('agSend').addEventListener('click', async () => {
+    const email = document.getElementById('agEmail').value.trim();
+    const password = document.getElementById('agPassword').value;
+    if (!email) { setStage('form', 'Введите email.'); return; }
+    if (password) {
+      setStage('loading');
+      try {
+        const { error } = await sb.auth.signInWithPassword({ email, password });
+        if (!error) return; // дальше всё делает onAuthStateChange — письмо не отправлялось
+        // намеренно НЕ отправляем письмо сами в этой ветке — только предлагаем
+        // явную кнопку ниже, чтобы не слать письма молча на опечатку в пароле
+        setStage('form', 'Не подошёл пароль (или он ещё не задан для этой почты). Проверьте пароль или нажмите «Прислать ссылку на почту».');
+      } catch (e) {
+        setStage('form', 'Не получилось войти: ' + (e && e.message ? e.message : e));
+      }
+      return;
+    }
+    await sendMagicLink(email);
+  });
+  document.getElementById('agSendLink').addEventListener('click', () => {
+    const email = document.getElementById('agEmail').value.trim();
+    if (!email) { setStage('form', 'Введите email.'); return; }
+    sendMagicLink(email);
+  });
+  // Enter в любом из полей формы входа — как нажатие «Войти»
+  ['agEmail', 'agPassword'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => {
+      if (e.key === 'Enter') document.getElementById('agSend').click();
+    });
   });
   document.getElementById('agResend').addEventListener('click', () => setStage('form'));
   document.getElementById('agSignOut').addEventListener('click', () => { sb.auth.signOut(); });
@@ -229,6 +333,65 @@
     }
   });
 
+  function hasPassword(user) {
+    return !!(user && user.user_metadata && user.user_metadata.has_password);
+  }
+  function updateSetPasswordLabel(user) {
+    const el = document.getElementById('agSetPassword');
+    if (el) el.textContent = hasPassword(user) ? 'сменить пароль' : 'задать пароль';
+  }
+  // is_owner специально хранится в app_metadata (а не в user_metadata, как
+  // has_password/display_name) — user_metadata человек может менять сам
+  // себе через updateUser(), а app_metadata правится только вручную в
+  // дашборде Supabase самим владельцем проекта. Так рядовой аккаунт не
+  // сможет сам себе выдать право создавать приглашения.
+  function isOwner(user) {
+    return !!(user && user.app_metadata && user.app_metadata.is_owner);
+  }
+  function updateOwnerUI(user) {
+    const el = document.getElementById('agCreateInvite');
+    if (el) el.style.display = isOwner(user) ? '' : 'none';
+  }
+  async function offerSetPassword() {
+    const already = hasPassword(window.CURRENT_USER);
+    const msg = already
+      ? 'Новый пароль для входа без письма (не короче 6 символов). Оставьте пустым, чтобы отменить.'
+      : 'Задать пароль, чтобы в следующий раз входить сразу, без письма? Не короче 6 символов. Оставьте пустым, если не хотите — предложим позже, кнопкой «задать пароль» рядом с вашим email.';
+    const pw = prompt(msg);
+    if (pw === null) return; // отменили
+    const trimmed = pw.trim();
+    if (!trimmed) return; // оставили пустым — не настаиваем
+    if (trimmed.length < 6) { alert('Пароль должен быть не короче 6 символов. Можно задать его позже.'); return; }
+    try {
+      const { data, error } = await sb.auth.updateUser({ password: trimmed, data: { has_password: true } });
+      if (error) { alert('Не получилось сохранить пароль: ' + error.message); return; }
+      if (data && data.user) { window.CURRENT_USER = data.user; updateSetPasswordLabel(data.user); }
+    } catch (e) {
+      alert('Не получилось сохранить пароль: ' + (e && e.message ? e.message : e));
+    }
+  }
+  document.getElementById('agSetPassword').addEventListener('click', () => offerSetPassword());
+  document.getElementById('agCreateInvite').addEventListener('click', async () => {
+    const label = (prompt('Для кого эта ссылка? (необязательно, просто чтобы не забыть, кому давали)') || '').trim();
+    try {
+      const { data, error } = await sb.from('invites')
+        .insert({ created_by: window.CURRENT_USER.id, label: label || null })
+        .select('id').single();
+      if (error || !data) { alert('Не получилось создать приглашение: ' + (error ? error.message : 'нет ответа')); return; }
+      const link = location.origin + location.pathname + '?invite=' + data.id;
+      const note = '\n\nОна одноразовая: сработает только у первого, кто по ней зарегистрируется.';
+      try {
+        await navigator.clipboard.writeText(link);
+        alert('Ссылка-приглашение скопирована в буфер обмена:\n\n' + link + note);
+      } catch (e) {
+        alert('Ссылка-приглашение (скопируйте вручную):\n\n' + link + note);
+      }
+    } catch (e) {
+      alert('Не получилось создать приглашение: ' + (e && e.message ? e.message : e));
+    }
+  });
+  let passwordPromptShown = false;
+
   sb.auth.onAuthStateChange((event, session) => {
     if (session && session.user) {
       authSettled = true;
@@ -236,12 +399,22 @@
       if (autoReconnectTimer) { clearInterval(autoReconnectTimer); autoReconnectTimer = null; }
       window.CURRENT_USER = session.user;
       document.getElementById('agCurrentEmail').textContent = displayNameOf(session.user);
+      updateSetPasswordLabel(session.user);
+      updateOwnerUI(session.user);
       pill.style.display = 'flex';
       hideGate();
       if (window.boardsAppBoot) window.boardsAppBoot();
       // подтягиваем в локальный список доски, которыми с этим пользователем
       // поделились (см. второй блок ниже — cloudImportSharedBoards)
       if (window.cloudImportSharedBoards) window.cloudImportSharedBoards();
+      // event==='SIGNED_IN' — именно свежий вход в этой вкладке (по ссылке из
+      // письма или по паролю), а не тихое восстановление уже существующей
+      // сессии при обычной перезагрузке страницы (иначе предложение задать
+      // пароль всплывало бы при каждом открытии приложения)
+      if (event === 'SIGNED_IN' && !passwordPromptShown && !hasPassword(session.user)) {
+        passwordPromptShown = true;
+        offerSetPassword();
+      }
     } else {
       window.CURRENT_USER = null;
       // сессии сейчас нет — но если на устройстве всё ещё лежит сохранённый
@@ -261,7 +434,7 @@
         clearTimeout(loadingFallback);
         if (autoReconnectTimer) { clearInterval(autoReconnectTimer); autoReconnectTimer = null; }
         showGate();
-        setStage('form');
+        presentForm();
       }
     }
   });
