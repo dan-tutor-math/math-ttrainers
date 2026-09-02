@@ -2767,6 +2767,7 @@ function renderBasketPicker(){
       </div>
     `;
   }).join('');
+  if (typeof resolveBasketTex === 'function') resolveBasketTex(list);
   list.querySelectorAll('.basket-item-add').forEach(btn => {
     btn.addEventListener('click', async () => {
       const it = items.find(x => x.id === btn.dataset.id);
@@ -2790,7 +2791,11 @@ function renderBasketPicker(){
    <style>, а не берутся из подключённых на странице стилей */
 function rasterizeBasketItem(item){
   return new Promise((resolve, reject) => {
-    const html = item.html ? item.html : escapeHtmlBd(item.text || '');
+    const rawHtml = item.html ? item.html : escapeHtmlBd(item.text || '');
+    // формулы KaTeX ещё не отрисованы (basket-core.js откладывает их до показа) —
+    // дорисовываем их в настоящую разметку до замера высоты и до сборки SVG,
+    // иначе на картинке доски вместо формулы окажется пустое место
+    const html = (typeof resolveBasketTexInHtml === 'function') ? resolveBasketTexInHtml(rawHtml) : rawHtml;
     const W = 480;
     // высоту сначала меряем в настоящем DOM страницы (там уже действуют
     // все её стили) — сам foreignObject без явной высоты не разложится
@@ -2806,7 +2811,9 @@ function rasterizeBasketItem(item){
     const pencil = cs.getPropertyValue('--pencil').trim() || '#1D1D1F';
     const paper = cs.getPropertyValue('--paper').trim() || '#FDFCF7';
 
-    const embeddedCss = `
+    const katexCssText = (document.getElementById('katexCssBlock') || {}).textContent || '';
+    const embeddedCss = katexCssText + `
+      .katex{visibility:visible;}
       .basket-item-text{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',Arial,sans-serif;font-size:15px;line-height:1.5;white-space:pre-line;color:${pencil};}
       .basket-frac{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;vertical-align:middle;margin:0 4px;line-height:1.2;position:relative;top:.12em;white-space:nowrap;}
       .bf-n,.bf-d{padding:0 2px;}

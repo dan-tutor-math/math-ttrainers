@@ -54,6 +54,14 @@
   // дроби» в oge7.html/oge10.html (fracStr()); без этого алиаса такая
   // дробь не распознавалась как дробь вообще, и числитель со знаменателем
   // склеивались в одну строку без разделителя (напр. «104» + «16» → «10416»)
+  // формулы, отрисованные KaTeX (oge7.html/oge8.html) — у них своя, сложная
+  // внутренняя вёрстка (вложенные абсолютно спозиционированные span'ы), её
+  // не разобрать теми же эвристиками, что обычные дроби/степени. Вместо
+  // этого достаём исходную LaTeX-формулу из скрытой mathml-аннотации
+  // (KaTeX кладёт её туда сама при output:'htmlAndMathml') и откладываем
+  // её отрисовку на потом — до страницы «Подборка»/«Доска», где эта же
+  // формула будет заново отрисована тем же KaTeX уже там.
+  const TEX_SELECTORS = ['.katex'];
   const FRAC_SELECTORS = ['.frac', '.fraction', '.vfrac'];
   const NUM_SELECTORS = ['.n', '.num', '.fnum', '.vnum'];
   const DEN_SELECTORS = ['.d', '.den', '.fden', '.vden'];
@@ -189,12 +197,27 @@
     return { text: '', html: '<img class="basket-img" src="' + escapeHtml(src) + '" alt="' + escapeHtml(alt) + '">' };
   }
 
+  // достаёт LaTeX-исходник из mathml-аннотации внутри узла .katex и
+  // оборачивает его в «отложенный» плейсхолдер — сам текст формулы в HTML
+  // ещё не появится, его дорисует KaTeX на странице показа/печати/доски
+  function texFromKatexNode(node){
+    const ann = node.querySelector('annotation[encoding="application/x-tex"]');
+    const latex = ann ? ann.textContent : '';
+    if (!latex) return { text: '', html: '' };
+    return {
+      text: latex,
+      html: '<span class="basket-tex" data-tex="' + escapeHtml(latex) + '"></span>'
+    };
+  }
+
   function walk(node){
     if (node.nodeType === 3) { // текстовый узел
       const t = node.textContent;
       return { text: t, html: escapeHtml(t) };
     }
     if (node.nodeType !== 1) return { text: '', html: '' };
+
+    if (matchesAny(node, TEX_SELECTORS)) return texFromKatexNode(node);
 
     if (matchesAny(node, STRIP_SELECTORS) || matchesAny(node, GRAPHIC_STRIP_SELECTORS)) {
       return { text: '', html: '' };
