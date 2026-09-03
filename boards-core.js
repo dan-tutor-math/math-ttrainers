@@ -338,6 +338,7 @@ let curArrowBoth = false;  // «Двухсторонняя стрелка» — 
 let curOpacity = false;    // «Полупрозрачность» — общий тумблер для любого инструмента рисования
 const SEMI_OPACITY = 0.45; // сама степень прозрачности при включённом тумблере
 let radiusSetting = null;   // «заданный радиус» циркуля; null = определять кликом
+let curFontSize = 22;       // текущий размер шрифта инструмента «Текст» (в мировых единицах, как ширина линии)
 
 let selectedId = null;
 let multiSelectIds = [];     // групповое выделение рамкой (marquee) или по общему groupId
@@ -748,7 +749,7 @@ function renderObject(c, obj, camv, opts){
   const color = resolveColor(obj.color);
   c.save();
   c.strokeStyle = color; c.fillStyle = color;
-  c.lineWidth = Math.max(0.5, obj.width) * camv.zoom;
+  c.lineWidth = Math.max(0.5, obj.width || 1) * camv.zoom;
   c.lineCap = 'round'; c.lineJoin = 'round';
   if (obj.opacity != null) c.globalAlpha = obj.opacity;
   c.setLineDash(obj.dash ? [obj.width*3.4*camv.zoom, obj.width*2.4*camv.zoom] : []);
@@ -796,6 +797,14 @@ function renderObject(c, obj, camv, opts){
     c.beginPath(); c.moveTo(v.x, v.y); c.lineTo(a.x, a.y); c.stroke();
     c.beginPath(); c.moveTo(v.x, v.y); c.lineTo(b.x, b.y); c.stroke();
     drawAngleArcAndLabel(c, v, a, b, camv, obj.width);
+  } else if (obj.type === 'text'){
+    const p = wp[0];
+    const fs = Math.max(1, (obj.fontSize || 22) * camv.zoom);
+    c.setLineDash([]);
+    c.font = fs + 'px var(--font-ui), sans-serif';
+    c.textAlign = 'left'; c.textBaseline = 'top';
+    const lineH = fs * 1.25;
+    (obj.content || '').split('\n').forEach((line, i) => { c.fillText(line, p.x, p.y + i*lineH); });
   }
   c.restore();
 }
@@ -1049,6 +1058,118 @@ function bumpColorUsage(tok){
   saveDB(); renderSwatches();
 }
 
+/* ── инструмент «Текст» ──────────────────────────────────────────────────
+   Клик по доске открывает всплывающее поле ввода прямо на месте клика;
+   галочка (или потеря фокуса полем) фиксирует текст, крестик (или Escape)
+   отменяет без изменений. Готовый объект хранит свои w/h (как картинка),
+   пересчитываемые в measureTextObj — этим же прямоугольником пользуются
+   попадание курсора (hitTestObject) и рамка выделения (objectBBox). ── */
+let textEditSession = null; // { objId, isNew, worldPt, textarea, wrap } — пока открыто ровно одно поле редактирования
+
+function measureTextObj(obj){
+  const fs = obj.fontSize || 22;
+  const lines = (obj.content || '').split('\n');
+  ctx.save();
+  ctx.font = fs + 'px var(--font-ui), sans-serif';
+  let maxW = 0;
+  lines.forEach(l => { const w = ctx.measureText(l).width; if (w > maxW) maxW = w; });
+  ctx.restore();
+  const lineH = fs * 1.25;
+  obj.w = Math.max(4, maxW);
+  obj.h = Math.max(lineH, lines.length * lineH);
+}
+
+function openTextEditor(existingObj, worldPt){
+  // уже редактируем что-то другое — сначала фиксируем его (как клик мимо)
+  if (textEditSession) confirmTextEditor();
+  const isNew = !existingObj;
+  const p = existingObj ? existingObj.points[0] : worldPt;
+  const scr = worldToScreen(p);
+  const r = canvas.getBoundingClientRect();
+
+  const wrap = document.createElement('div');
+  wrap.className = 'bd-text-editor';
+  wrap.style.left = Math.round(r.left + scr.x) + 'px';
+  wrap.style.top = Math.round(r.top + scr.y) + 'px';
+
+  const ta = document.createElement('textarea');
+  ta.className = 'bd-text-editor-input';
+  ta.value = existingObj ? existingObj.content : '';
+  ta.placeholder = 'Текст…';
+  ta.style.color = resolveColor(existingObj ? existingObj.color : curColorTok);
+  const fs = (existingObj ? existingObj.fontSize : curFontSize) || 22;
+  ta.style.fontSize = Math.max(10, fs * cam.zoom) + 'px';
+
+  const btns = document.createElement('div');
+  btns.className = 'bd-text-editor-btns';
+  const okBtn = document.createElement('button');
+  okBtn.type = 'button'; okBtn.className = 'bd-text-editor-ok'; okBtn.title = 'Подтвердить'; okBtn.textContent = '\u2713';
+  const cancelBtn = document.createElement('button');
+  cancelBtn.type = 'button'; cancelBtn.className = 'bd-text-editor-cancel'; cancelBtn.title = 'Отмена'; cancelBtn.textContent = '\u2715';
+  btns.appendChild(okBtn); btns.appendChild(cancelBtn);
+
+  wrap.appendChild(ta); wrap.appendChild(btns);
+  document.body.appendChild(wrap);
+
+  textEditSession = { objId: existingObj ? existingObj.id : null, isNew, worldPt: p, textarea: ta, wrap };
+
+  // клик по самим кнопкам не должен раньше времени увести фокус с textarea
+  // (иначе сработал бы blur ниже и вызвал confirm ещё до клика по кнопке)
+  okBtn.addEventListener('mousedown', (e) => e.preventDefault());
+  cancelBtn.addEventListener('mousedown', (e) => e.preventDefault());
+  okBtn.addEventListener('click', () => confirmTextEditor());
+  cancelBtn.addEventListener('click', () => cancelTextEditor());
+  // клик куда угодно ещё (по доске, по панели инструментов...) — считаем
+  // подтверждением, как только поле теряет фокус
+  ta.addEventListener('blur', () => { if (textEditSession) confirmTextEditor(); });
+  ta.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape'){ e.preventDefault(); cancelTextEditor(); }
+    else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)){ e.preventDefault(); confirmTextEditor(); }
+  });
+  ta.addEventListener('pointerdown', (e) => e.stopPropagation());
+
+  // фокус — со следующего тика: клик по доске (сам canvas не фокусируемый)
+  // сам по себе, как часть родного поведения mousedown, снял бы фокус с
+  // только что созданного поля, если вызвать focus() прямо тут синхронно —
+  // textarea мгновенно получала бы blur и поле закрывалось бы, не успев
+  // открыться (blur-обработчик выше принял бы это за подтверждение)
+  setTimeout(() => { ta.focus(); if (existingObj) ta.select(); }, 0);
+}
+
+function confirmTextEditor(){
+  if (!textEditSession) return;
+  const { objId, isNew, worldPt, textarea, wrap } = textEditSession;
+  // снимаем сессию ДО удаления поля из DOM — удаление сфокусированного
+  // textarea может само по себе синхронно вызвать 'blur' (см. обработчик
+  // выше), и без этого confirmTextEditor() вызвался бы повторно, вложенно
+  textEditSession = null;
+  const value = textarea.value;
+  wrap.remove();
+  if (!value || !value.trim()) return; // пустой текст — ничего не создаём и не сохраняем
+  if (isNew){
+    const obj = { id: uid(), type:'text', color: curColorTok, fontSize: curFontSize, points:[worldPt], content: value };
+    if (curOpacity) obj.opacity = SEMI_OPACITY;
+    measureTextObj(obj);
+    commitObject(obj);
+  } else {
+    const obj = B.objects.find(o=>o.id===objId);
+    if (obj){
+      pushUndo();
+      obj.content = value;
+      measureTextObj(obj);
+      saveDB(); scheduleRedraw();
+    }
+  }
+}
+
+function cancelTextEditor(){
+  if (!textEditSession) return;
+  const { wrap } = textEditSession;
+  textEditSession = null; // тот же порядок, что и в confirmTextEditor — на случай синхронного blur при remove()
+  wrap.remove();
+  scheduleRedraw();
+}
+
 function shapeClick(kind, pt){
   pt = maybeSnap(pt);
   if (!draft || draft.type !== kind) draft = { type: kind, pts: [] };
@@ -1129,8 +1250,16 @@ canvas.addEventListener('dblclick', (e) => {
     const pt = eventWorld(e);
     let hit = null;
     for (let i=B.objects.length-1;i>=0;i--){ if (hitTestObject(B.objects[i], pt, 8/cam.zoom)){ hit=B.objects[i]; break; } }
-    armedHandId = hit ? hit.id : null;
-    selectedId = armedHandId;
+    if (hit && hit.type === 'text'){
+      armedHandId = null; selectedId = hit.id;
+      openTextEditor(hit, null);
+    } else if (hit && hit.type === 'image' && hit.locked){
+      armedHandId = hit.id; selectedId = hit.id;
+    } else if (hit){
+      armedHandId = null; selectedId = hit.id;
+    } else {
+      armedHandId = null; selectedId = null;
+    }
     scheduleRedraw();
   }
 });
@@ -1209,6 +1338,10 @@ function hitTestObject(obj, pt, tol){
   if (obj.type==='angle'){
     // вершина — points[1]; лучи идут к points[0] и points[2]
     return distToSeg(pt,obj.points[1],obj.points[0])<=tol || distToSeg(pt,obj.points[1],obj.points[2])<=tol;
+  }
+  if (obj.type==='text'){
+    const p=obj.points[0];
+    return pt.x>=p.x-tol && pt.x<=p.x+(obj.w||10)+tol && pt.y>=p.y-tol && pt.y<=p.y+(obj.h||20)+tol;
   }
   if (obj.type==='image'){
     const p=obj.points[0];
@@ -1316,18 +1449,54 @@ canvas.addEventListener('pointerdown', (e) => {
   }
 
   if (tool === 'hand'){
+    // закреплённые изображения — единственное исключение из новой модели:
+    // пока не «взведены» двойным кликом, одиночный клик их не двигает
     if (armedHandId){
       const obj = B.objects.find(o=>o.id===armedHandId);
+      if (obj && obj.locked){
+        const role = hitTestHandles(obj, pt);
+        if (role){ pushUndo(); dragMode='handle'; dragHandleRole=role; dragObjId=obj.id; return; }
+        if (hitTestObject(obj, pt, 8/cam.zoom)){
+          pushUndo(); dragMode='move'; dragObjId=obj.id; dragStart=pt; dragOrig=clonePts(obj); return;
+        }
+        // клик мимо взведённой картинки — снимаем взвод, обрабатываем клик как обычный ниже
+      }
+      armedHandId = null;
+    }
+
+    // объект в режиме «редактирования» (вошли двойным кликом) — сначала
+    // ручки (изменение формы/размера), затем тело (просто подвинуть, не
+    // выходя из режима редактирования)
+    if (selectedId){
+      const obj = B.objects.find(o=>o.id===selectedId);
       if (obj){
-        // закреплённое изображение: менять размер нельзя (getHandles не отдаёт ручку),
-        // но перемещать по доске — можно
         const role = hitTestHandles(obj, pt);
         if (role){ pushUndo(); dragMode='handle'; dragHandleRole=role; dragObjId=obj.id; return; }
         if (hitTestObject(obj, pt, 8/cam.zoom)){
           pushUndo(); dragMode='move'; dragObjId=obj.id; dragStart=pt; dragOrig=clonePts(obj); return;
         }
       }
+      // клик мимо объекта редактирования — выходим из режима, обрабатываем клик как обычный ниже
+      selectedId = null;
     }
+
+    // любой другой объект под курсором — одиночный клик+протяжка двигает
+    // его сразу, без взвода (кроме закреплённых изображений — им взвод нужен)
+    for (let i=B.objects.length-1;i>=0;i--){
+      const obj = B.objects[i];
+      if (hitTestObject(obj, pt, 8/cam.zoom)){
+        if (obj.type === 'image' && obj.locked){
+          armedHandId = obj.id; selectedId = obj.id;
+          scheduleRedraw();
+          return;
+        }
+        pushUndo(); dragMode='move'; dragObjId=obj.id; dragStart=pt; dragOrig=clonePts(obj);
+        return;
+      }
+    }
+
+    // мимо всех объектов — панорамирование, как и раньше
+    scheduleRedraw();
     dragMode='pan'; panStart={x:e.clientX,y:e.clientY}; camStart={x:cam.x,y:cam.y}; canvas.style.cursor='grabbing'; return;
   }
 
@@ -1383,6 +1552,12 @@ canvas.addEventListener('pointerdown', (e) => {
     updateContextMenu();
     dragMode = 'marquee'; marqueeStart = pt; marqueeCur = pt;
     scheduleRedraw();
+    return;
+  }
+
+  if (tool === 'text'){
+    if (textEditSession) return; // поле уже открыто — этот клик его закроет через blur, сам по себе новый текст не начинает
+    openTextEditor(null, maybeSnap(pt));
     return;
   }
 
@@ -1584,6 +1759,7 @@ function updateCursor(){
   else if (tool === 'eraser') canvas.style.cursor = eraserCursorCSS();
   else if (tool === 'hand') canvas.style.cursor = 'grab';
   else if (tool === 'select') canvas.style.cursor = 'default';
+  else if (tool === 'text') canvas.style.cursor = 'text';
   else canvas.style.cursor = 'crosshair';
 }
 
@@ -1591,7 +1767,7 @@ function updateCursor(){
    ПАНЕЛЬ ИНСТРУМЕНТОВ
    ═══════════════════════════════════════════════════════════════════════ */
 const optbar = document.getElementById('bdOptbar');
-const TOOLS_WITH_OPTS = ['pen','line','curve','quad','poly','ellipse','circle','angle'];
+const TOOLS_WITH_OPTS = ['pen','line','curve','quad','poly','ellipse','circle','angle','text'];
 document.querySelectorAll('.bd-tool[data-tool]').forEach(btn => {
   btn.addEventListener('click', () => {
     // если сейчас рисуется незавершённая кривая (или многоугольник) и
@@ -1622,6 +1798,12 @@ document.querySelectorAll('.bd-tool[data-tool]').forEach(btn => {
     const arrowDisplay = (tool==='line') ? 'flex' : 'none';
     document.getElementById('toggleArrowEnd').style.display = arrowDisplay;
     document.getElementById('toggleArrowBoth').style.display = arrowDisplay;
+    const isTextTool = (tool === 'text');
+    document.getElementById('bdFontSizeField').style.display = isTextTool ? 'flex' : 'none';
+    document.querySelector('.bd-width').style.display = isTextTool ? 'none' : 'flex';
+    document.getElementById('toggleDash').style.display = isTextTool ? 'none' : '';
+    document.getElementById('toggleFill').style.display = isTextTool ? 'none' : '';
+    if (textEditSession) confirmTextEditor(); // смена инструмента во время редактирования текста — подтверждаем, как и при клике мимо
     updateCursor();
     rfUpdateCursor();
   });
@@ -2442,6 +2624,8 @@ document.getElementById('bdColorInput').addEventListener('input', (e) => {
 
 document.getElementById('widthMinus').addEventListener('click', () => { curWidth=clamp(curWidth-1,1,20); document.getElementById('widthVal').textContent=curWidth; });
 document.getElementById('widthPlus').addEventListener('click', () => { curWidth=clamp(curWidth+1,1,20); document.getElementById('widthVal').textContent=curWidth; });
+document.getElementById('fontSizeMinus').addEventListener('click', () => { curFontSize=clamp(curFontSize-2,8,96); document.getElementById('fontSizeVal').textContent=curFontSize; });
+document.getElementById('fontSizePlus').addEventListener('click', () => { curFontSize=clamp(curFontSize+2,8,96); document.getElementById('fontSizeVal').textContent=curFontSize; });
 document.getElementById('toggleDash').addEventListener('click', (e) => { curDash=!curDash; e.currentTarget.classList.toggle('on',curDash); });
 document.getElementById('toggleFill').addEventListener('click', (e) => { curFill=!curFill; e.currentTarget.classList.toggle('on',curFill); });
 document.getElementById('toggleSnap').addEventListener('click', (e) => { curSnap=!curSnap; e.currentTarget.classList.toggle('on',curSnap); });
@@ -2552,6 +2736,10 @@ document.getElementById('railExport').addEventListener('click', () => {
 
 /* ── экспорт в PDF («конспект») — только те листы, где есть хоть что-то нарисованное ── */
 function objectBBox(obj){
+  if (obj.type === 'text'){
+    const p = obj.points[0];
+    return { minX:p.x, minY:p.y, maxX:p.x+(obj.w||10), maxY:p.y+(obj.h||20) };
+  }
   if (obj.type === 'image'){
     const p = obj.points[0];
     return { minX:p.x, minY:p.y, maxX:p.x+obj.w, maxY:p.y+obj.h };
