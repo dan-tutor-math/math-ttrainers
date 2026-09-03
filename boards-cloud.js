@@ -52,6 +52,16 @@
     .ag-user-pill b{color:var(--pencil);font-weight:600;}
     .ag-user-pill a{color:var(--ink);cursor:pointer;text-decoration:underline;margin-left:2px;}
     .ag-user-pill .ag-edit-name{opacity:.7;font-size:11.5px;}
+    .ag-user-pill .ag-pill-collapse{margin-left:2px;opacity:.5;text-decoration:none;cursor:pointer;font-size:13px;padding:0 2px;}
+    .ag-user-pill .ag-pill-collapse:hover{opacity:1;}
+    /* маленький кружок вместо плашки, когда её свернули — та же позиция
+       (левый нижний угол), чтобы легко найти и вернуть обратно */
+    .ag-pill-handle{position:fixed;bottom:16px;left:16px;z-index:400;width:28px;height:28px;border-radius:50%;
+      display:flex;align-items:center;justify-content:center;cursor:pointer;
+      background:var(--glass-strong);border:1px solid var(--glass-border);
+      backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+      box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);color:var(--muted-2);font-size:14px;}
+    .ag-pill-handle:hover{color:var(--pencil);}
   `;
   document.head.appendChild(style);
 
@@ -101,7 +111,9 @@
       <a id="agSetPassword" class="ag-edit-name" title="Задать или сменить пароль для входа без письма">задать пароль</a>
       <a id="agCreateInvite" class="ag-edit-name" style="display:none" title="Создать одноразовую ссылку-приглашение для нового человека">пригласить</a>
       <a id="agSignOut">Выйти</a>
+      <a id="agPillCollapse" class="ag-pill-collapse" title="Свернуть эту панель">✕</a>
     </div>
+    <div id="agPillHandle" class="ag-pill-handle" style="display:none" title="Показать данные входа">⋯</div>
   `);
 
   const gate = document.getElementById('authGate');
@@ -111,7 +123,30 @@
   const reconnectBox = document.getElementById('agReconnect');
   const errBox = document.getElementById('agError');
   const pill = document.getElementById('authUserPill');
+  const pillHandle = document.getElementById('agPillHandle');
+  const pillCollapseBtn = document.getElementById('agPillCollapse');
   const inviteInvalidBox = document.getElementById('agInviteInvalid');
+  let pillCollapsed = false;
+  try { pillCollapsed = localStorage.getItem('ag-pill-collapsed') === '1'; } catch (e) {}
+  // что из плашки/кружка видно, зависит от двух вещей: вошёл ли человек
+  // (signedIn) и свернул ли он сам плашку (pillCollapsed) — второе
+  // запоминается в localStorage на этом устройстве, чтобы не сворачивать
+  // заново на каждой доске/при каждой перезагрузке
+  function syncPillVisibility() {
+    const signedIn = !!window.CURRENT_USER;
+    pill.style.display = (signedIn && !pillCollapsed) ? 'flex' : 'none';
+    pillHandle.style.display = (signedIn && pillCollapsed) ? 'flex' : 'none';
+  }
+  pillCollapseBtn.addEventListener('click', () => {
+    pillCollapsed = true;
+    try { localStorage.setItem('ag-pill-collapsed', '1'); } catch (e) {}
+    syncPillVisibility();
+  });
+  pillHandle.addEventListener('click', () => {
+    pillCollapsed = false;
+    try { localStorage.setItem('ag-pill-collapsed', '0'); } catch (e) {}
+    syncPillVisibility();
+  });
 
   function setStage(stage, msg) {
     step1.hidden = stage !== 'form';
@@ -150,6 +185,7 @@
   function showGate() {
     gate.style.display = 'flex';
     pill.style.display = 'none';
+    pillHandle.style.display = 'none';
     const sl = document.getElementById('screenList'), sb2 = document.getElementById('screenBoard');
     if (sl) sl.style.display = 'none';
     if (sb2) sb2.style.display = 'none';
@@ -401,7 +437,7 @@
       document.getElementById('agCurrentEmail').textContent = displayNameOf(session.user);
       updateSetPasswordLabel(session.user);
       updateOwnerUI(session.user);
-      pill.style.display = 'flex';
+      syncPillVisibility();
       hideGate();
       if (window.boardsAppBoot) window.boardsAppBoot();
       // подтягиваем в локальный список доски, которыми с этим пользователем
@@ -710,6 +746,12 @@
   }
 
   async function pushDiffToSupabase(boardId, diff) {
+    // отправляем немедленно, синхронно, до первого await ниже — так
+    // остальные участники видят изменение сразу, не дожидаясь ни ответа
+    // сервера на запись, ни тем более цикла репликации postgres_changes
+    if (cloudChannel) {
+      try { cloudChannel.send({ type: 'broadcast', event: 'board_diff', payload: { diff, uid: window.CURRENT_USER ? window.CURRENT_USER.id : null } }); } catch (e) {}
+    }
     const rows = diff.added.concat(diff.updated.map(u => u.after)).map(obj => ({
       board_id: boardId, obj_id: obj.id, data: obj,
       updated_by: window.CURRENT_USER ? window.CURRENT_USER.id : null,
@@ -830,6 +872,28 @@
     window.boardsRedraw();
   }
 
+  function cloudHandleRemoteDiff(payload) {
+    const board = window.getCurrentBoard();
+    if (!board || !cloudBoardId || !payload || !payload.diff) return;
+    // моё же сообщение возвращается мне тем же broadcast-каналом (эхо) —
+    // я его уже применил локально в момент рисования, применять второй раз
+    // не нужно (см. тот же приём у курсоров, cloudHandleRemoteCursor)
+    if (payload.uid && window.CURRENT_USER && payload.uid === window.CURRENT_USER.id) return;
+    cloudApplyingRemote = true;
+    applyDiffLocally(board, payload.diff);
+    cloudApplyingRemote = false;
+    // если у меня прямо сейчас идёт свой незавершённый жест — обновляем и
+    // его «снимок до», чтобы чужое изменение не попало в diff как моё
+    // собственное, когда мой жест зафиксируется (тот же приём, что и в
+    // cloudHandleRemoteChange для postgres_changes)
+    if (cloudGestureBefore !== null) {
+      const tmp = { objects: JSON.parse(cloudGestureBefore) };
+      applyDiffLocally(tmp, payload.diff);
+      cloudGestureBefore = JSON.stringify(tmp.objects);
+    }
+    window.boardsRedraw();
+  }
+
   async function cloudSetupSubscription(boardId, board) {
     const { data: rows, error } = await window.SB.from('board_objects').select('obj_id, data').eq('board_id', boardId);
     if (!error && rows) {
@@ -847,6 +911,9 @@
       // ничего не пишет в базу (в отличие от postgres_changes выше), это
       // ровно то, что нужно для эфемерного "где сейчас мышь"
       .on('broadcast', { event: 'cursor' }, ({ payload }) => cloudHandleRemoteCursor(payload))
+      // быстрый путь для самих объектов доски — см. pushDiffToSupabase выше;
+      // postgres_changes (обработчик над этим) остаётся как подстраховка
+      .on('broadcast', { event: 'board_diff' }, ({ payload }) => cloudHandleRemoteDiff(payload))
       .subscribe();
   }
   function cloudTeardownSubscription() {
