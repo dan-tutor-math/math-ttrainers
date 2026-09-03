@@ -610,6 +610,12 @@
   let cursorSendTimer = null;
   let cursorLastSentAt = 0;
 
+  // те же координаты кончика пера, что и в penCursorCSS() (boards-core.js:
+  // `svgCursorUrl(svg, 9, 28, ...)`), пересчитанные из родного размера
+  // иконки там (34px) в размер здесь (24px, см. .bd-remote-cursor-icon)
+  const CURSOR_TIP_X = 9 / 34 * 24;
+  const CURSOR_TIP_Y = 28 / 34 * 24;
+
   function remoteCursorIconSVG() {
     // тот же силуэт «паркера», что и у penCursorCSS() в boards-core.js —
     // тёмный лаковый корпус с золотым ободком, белый ореол для читаемости;
@@ -676,7 +682,9 @@
       const rect = canvasEl ? canvasEl.getBoundingClientRect() : { left: 0, top: 0 };
       remoteCursors.forEach(entry => {
         const s = window.worldToScreen({ x: entry.x, y: entry.y });
-        entry.el.style.transform = `translate(${Math.round(rect.left + s.x)}px, ${Math.round(rect.top + s.y)}px)`;
+        // сдвигаем на "хотспот" пера в обратную сторону, чтобы его кончик
+        // (а не угол невидимого квадрата иконки) указывал точно в (x,y)
+        entry.el.style.transform = `translate(${Math.round(rect.left + s.x - CURSOR_TIP_X)}px, ${Math.round(rect.top + s.y - CURSOR_TIP_Y)}px)`;
       });
     }
     cursorAnimHandle = requestAnimationFrame(cursorAnimTick);
