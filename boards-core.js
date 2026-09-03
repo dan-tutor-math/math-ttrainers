@@ -2118,6 +2118,309 @@ setupRefResize(refResizeHandleN, 'n');
 setupRefResize(refResizeHandleW, 'w');
 
 /* ═══════════════════════════════════════════════════════════════════════
+   ТРЕНАЖЁРЫ ПРЯМО НА ДОСКЕ (#bdTrainersPanel в разметке) — список всех
+   действующих тренажёров, открывается в боковой (растягиваемой) панели, не
+   покидая доску. Выбранный тренажёр загружается как обычная страница в
+   iframe (тот же домен — доска свободно достаёт iframe.contentDocument;
+   ни один файл тренажёра при этом не меняется и не дублируется). Кнопка
+   «Добавить на доску» поверх iframe снимает текущее задание — рисует его
+   реальную DOM-вёрстку в PNG через html2canvas (нужно рендерить именно
+   вёрстку, а не текст: формулы KaTeX, дроби столбиком, таблицы, числовые
+   прямые) — и кладёт результат на доску отдельным объектом-картинкой, как
+   при обычной вставке изображения (см. openImageModal/imgModalInsert выше).
+   Пакет из нескольких заданий (кнопки «+1..+10» на ОГЭ №8) — каждое своей
+   отдельной картинкой, так же, как каждое задание — отдельная запись в
+   «Подборке» (см. addAllTasksToBasket в oge8.html). ── */
+
+// какой(ие) DOM-узел(ы) внутри тренажёра считать «текущим заданием» — карта
+// собрана по уже существующим кнопкам «В подборку» в каждом тренажёре (см.
+// Basket.extractFromSelectorsRich в их коде), без единого изменения в их
+// файлах. gateBtn — id кнопки, которая видна только когда соответствующий
+// вариант сейчас актуален (несколько типов заданий на одной странице — ОГЭ
+// №9 (мкв/линейные/квадратные), либо необязательная теория — №1–5); без
+// gateBtn запись берётся всегда. selAll вместо sel — узлов может быть
+// несколько сразу (доп. добавленные задания на ОГЭ №8), берём все на странице.
+const TRAINER_CAPTURE = {
+  oge1_5:    [ { sel:'#questionPanel' }, { sel:'#theoryContent', gateBtn:'theoryBasketAddBtn', unhide:true } ],
+  oge6:      [ { sel:'#questionPanel' } ],
+  oge7:      [ { sel:'#questionPanel' } ],
+  oge8:      [ { sel:'#questionPanel' }, { selAll:'.added-task-card .added-card-question' } ],
+  oge9:      [ { sel:'#questionPanel', gateBtn:'mcqBasketAddBtn' }, { sel:'#live', gateBtn:'linBasketAddBtn' }, { sel:'#eqLine', gateBtn:'quadBasketAddBtn' } ],
+  oge10:     [ { sel:'#questionPanel' } ],
+  oge11:     [ { sel:'#questionPanel' } ],
+  oge12:     [ { sel:'#questionPanel' } ],
+  oge13:     [ { sel:'#questionPanel' } ],
+  oge14:     [ { sel:'#questionPanel' } ],
+  oge15_18:  [ { sel:'#questionPanel' } ],
+  oge19:     [ { sel:'#questionPanel' } ],
+  add_col:   [ { sel:'#board' } ],
+  sub_col:   [ { sel:'#board' } ],
+  mul_col:   [ { sel:'#board' } ],
+  div_col:   [ { sel:'#prompt' } ],
+  linear:    [ { sel:'#live' } ],
+  quadratic: [ { sel:'#eqLine' } ],
+  frac_mul:  [ { sel:'#board' } ],
+  frac_div:  [ { sel:'#board' } ],
+};
+
+// список тренажёров для панели — те же названия/файлы, что и в реестре
+// TRAINERS на главной странице (index.html), сгруппированы так же просто,
+// как раздел «Основа» там: отдельно все номера ОГЭ, отдельно всё остальное —
+// без повторов одного тренажёра в нескольких разделах (это на главной
+// странице оправдано навигацией по классам, а тут только мешало бы искать)
+const TRAINERS_PANEL_GROUPS = [
+  { title: 'ОГЭ', items: [
+    { id:'oge1_5',   name:'№1–5. Практические задачи',    href:'oge1_5.html',            eq:'шины, тарифы…' },
+    { id:'oge6',     name:'№6. Числа и вычисления',       href:'oge6.html',              eq:'1/10 + 29/20' },
+    { id:'oge7',     name:'№7. Сравнение и оценка чисел', href:'oge7.html',              eq:'5 < √27 < 6' },
+    { id:'oge8',     name:'№8. Выражения и формулы',      href:'oge8.html',              eq:'a²−b²' },
+    { id:'oge9',     name:'№9. Уравнения и неравенства',  href:'oge9.html',              eq:'3x²−7x+2=0' },
+    { id:'oge10',    name:'№10. Теория вероятности',      href:'oge10.html',             eq:'P(A)=5⁄20' },
+    { id:'oge11',    name:'№11. Графики функций',         href:'oge11.html',             eq:'y=kx+b' },
+    { id:'oge12',    name:'№12. Вычисления по формулам',  href:'oge12.html',             eq:'v=v₀+at' },
+    { id:'oge13',    name:'№13. Неравенства',             href:'oge13.html',             eq:'x²−9≤0' },
+    { id:'oge14',    name:'№14. Прогрессии',              href:'oge14.html',             eq:'aₙ=a₁+(n−1)d' },
+    { id:'oge15_18', name:'№15–18. Геометрия',            href:'oge15_18.html',          eq:'S, P, Пифагор' },
+    { id:'oge19',    name:'№19. Верные утверждения',      href:'oge19.html',             eq:'верно/неверно' },
+  ]},
+  { title: 'Основа', items: [
+    { id:'add_col',   name:'Сложение в столбик',      href:'addition.html',          eq:'999+1' },
+    { id:'sub_col',   name:'Вычитание в столбик',     href:'subtraction.html',       eq:'700−458' },
+    { id:'mul_col',   name:'Умножение в столбик',     href:'multiplication.html',    eq:'347×26' },
+    { id:'div_col',   name:'Деление в столбик',       href:'division.html',          eq:'4826:7' },
+    { id:'linear',    name:'Линейные уравнения',      href:'linear.html',            eq:'3(2x−5)+x' },
+    { id:'quadratic', name:'Квадратные уравнения',    href:'quadratic.html',         eq:'2x²−7x+3=0' },
+    { id:'frac_mul',  name:'Умножение дробей',        href:'fraction_multiply.html', eq:'4⁄9×3⁄8' },
+    { id:'frac_div',  name:'Деление дробей',          href:'fraction_divide.html',   eq:'2⁄3÷4⁄5' },
+  ]},
+];
+
+const trainersToggleBtn = document.getElementById('bdTrainersToggle');
+const trainersPanelEl = document.getElementById('bdTrainersPanel');
+const trainersResizeHandleW = document.getElementById('bdTrainersResizeW');
+const trainersBackBtn = document.getElementById('bdTrainersBack');
+const trainersCloseBtn = document.getElementById('bdTrainersClose');
+const trainersTitleEl = document.getElementById('bdTrainersTitle');
+const trainersSearchEl = document.getElementById('bdTrainersSearch');
+const trainersGroupsEl = document.getElementById('bdTrainersGroups');
+const trainersIframe = document.getElementById('bdTrainersIframe');
+const trainersAddBtn = document.getElementById('bdTrainersAddBtn');
+const trainersToastEl = document.getElementById('bdTrainersToast');
+let trainersOpenId = null;     // id открытого сейчас тренажёра (null — список)
+let trainersInsertOffset = 0;  // лёгкий каскад для нескольких добавленных подряд картинок
+
+// ширина панели — предпочтение зрителя (как масштаб/тема), не часть
+// содержимого доски, поэтому хранится не в B, а в localStorage
+const TRAINERS_PANEL_W_KEY = 'bdTrainersPanel:w';
+(function restoreTrainersPanelWidth(){
+  try {
+    const w = parseFloat(localStorage.getItem(TRAINERS_PANEL_W_KEY));
+    if (w) trainersPanelEl.style.setProperty('--tp-w', w + 'px');
+  } catch(e){}
+})();
+
+function renderTrainersList(filterText){
+  const q = (filterText || '').trim().toLowerCase();
+  const html = TRAINERS_PANEL_GROUPS.map(g => {
+    const items = g.items.filter(it => !q || it.name.toLowerCase().includes(q));
+    if (!items.length) return '';
+    return `
+      <div>
+        <div class="bd-trainers-group-title">${g.title}</div>
+        ${items.map((it, ii) => `
+          <button class="bd-trainers-item" data-id="${it.id}" data-href="${it.href}" data-name="${it.name.replace(/"/g,'&quot;')}">
+            <span class="bd-trainers-item-num">${String(ii+1).padStart(2,'0')}</span>
+            <span class="bd-trainers-item-name">${it.name}</span>
+            <span class="bd-trainers-item-eq">${it.eq}</span>
+          </button>`).join('')}
+      </div>`;
+  }).join('');
+  trainersGroupsEl.innerHTML = html || `<div class="bd-trainers-empty">Ничего не нашлось</div>`;
+  trainersGroupsEl.querySelectorAll('.bd-trainers-item').forEach(btn => {
+    btn.addEventListener('click', () => openTrainerInPanel(btn.dataset.id, btn.dataset.href, btn.dataset.name));
+  });
+}
+renderTrainersList('');
+trainersSearchEl.addEventListener('input', () => renderTrainersList(trainersSearchEl.value));
+
+function openTrainerInPanel(id, href, name){
+  trainersOpenId = id;
+  trainersInsertOffset = 0;
+  trainersTitleEl.textContent = name;
+  trainersBackBtn.style.display = '';
+  trainersPanelEl.classList.add('bd-trainers-in-frame');
+  trainersIframe.src = href;
+  hideTrainersToast();
+}
+function closeTrainerFrame(){
+  trainersOpenId = null;
+  trainersTitleEl.textContent = 'Тренажёры';
+  trainersBackBtn.style.display = 'none';
+  trainersPanelEl.classList.remove('bd-trainers-in-frame');
+  trainersIframe.src = 'about:blank';
+}
+trainersBackBtn.addEventListener('click', closeTrainerFrame);
+
+trainersToggleBtn.addEventListener('click', () => {
+  const opening = !trainersPanelEl.classList.contains('open');
+  trainersPanelEl.classList.toggle('open', opening);
+  trainersToggleBtn.classList.toggle('active', opening);
+});
+// крестик сворачивает панель, но не сбрасывает открытый тренажёр — как и
+// у справочной панели, повторное открытие возвращает туда же, где остановились
+trainersCloseBtn.addEventListener('click', () => {
+  trainersPanelEl.classList.remove('open');
+  trainersToggleBtn.classList.remove('active');
+});
+
+// ручка изменения ширины — тянем правый край панели (левый зафиксирован у
+// края экрана), тот же приём, что и у справочной панели (см. setupRefResize)
+(function setupTrainersResize(){
+  let start = null; // {x, w}
+  trainersResizeHandleW.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    trainersResizeHandleW.setPointerCapture(e.pointerId);
+    const r = trainersPanelEl.getBoundingClientRect();
+    start = { x: e.clientX, w: r.width };
+  });
+  trainersResizeHandleW.addEventListener('pointermove', (e) => {
+    if (!start) return;
+    const dx = e.clientX - start.x; // тянем вправо — панель растёт
+    const maxW = window.innerWidth - 80;
+    const w = clamp(start.w + dx, 300, maxW);
+    trainersPanelEl.style.setProperty('--tp-w', w + 'px');
+  });
+  function end(){
+    if (!start) return;
+    start = null;
+    try {
+      const w = parseFloat(getComputedStyle(trainersPanelEl).width);
+      localStorage.setItem(TRAINERS_PANEL_W_KEY, String(w));
+    } catch(e){}
+  }
+  trainersResizeHandleW.addEventListener('pointerup', end);
+  trainersResizeHandleW.addEventListener('pointercancel', end);
+})();
+
+function showTrainersToast(msg){
+  trainersToastEl.textContent = msg;
+  trainersToastEl.classList.add('show');
+  clearTimeout(showTrainersToast._t);
+  showTrainersToast._t = setTimeout(hideTrainersToast, 2200);
+}
+function hideTrainersToast(){ trainersToastEl.classList.remove('show'); }
+
+// снимок одного DOM-узла тренажёра в PNG (data:) — вёрстка внутри iframe
+// рендерится по-настоящему (шрифты, KaTeX, таблицы), а не просто копируется
+// как текст, поэтому нужен html2canvas, а не Basket (тот отдаёт HTML/текст
+// для живого повторного показа, не растровую картинку)
+async function captureTrainerNode(el){
+  if (typeof html2canvas !== 'function') throw new Error('html2canvas not loaded');
+  const doc = el.ownerDocument;
+  const win = doc.defaultView;
+  const bg = win ? win.getComputedStyle(doc.body).backgroundColor : '';
+  // html2canvas старается разобрать все стили страницы, в том числе внешние
+  // (шрифты с Google Fonts и т.п.) — если у ученика/учителя в этот момент
+  // плохая сеть, разбор может надолго зависнуть; ограничиваем снимок по
+  // времени, чтобы кнопка не осталась «залипшей», а показывалась понятная
+  // ошибка и можно было попробовать ещё раз
+  const canvasPromise = html2canvas(el, {
+    backgroundColor: (bg && bg !== 'rgba(0, 0, 0, 0)') ? bg : '#ffffff',
+    scale: Math.min(2, window.devicePixelRatio || 1),
+    useCORS: true,
+  });
+  const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('capture timeout')), 20000));
+  const canvas = await Promise.race([canvasPromise, timeoutPromise]);
+  return canvas.toDataURL('image/png');
+}
+
+// собрать список узлов текущего задания по TRAINER_CAPTURE — см. комментарий
+// у самой карты выше про gateBtn/unhide/selAll
+function collectTrainerCaptureNodes(doc, trainerId){
+  const cfg = TRAINER_CAPTURE[trainerId];
+  if (!cfg) return [];
+  const out = [];
+  cfg.forEach(entry => {
+    if (entry.gateBtn){
+      const btn = doc.getElementById(entry.gateBtn);
+      if (!btn || btn.offsetParent === null) return; // этот вариант сейчас не активен на странице
+    }
+    if (entry.selAll){
+      doc.querySelectorAll(entry.selAll).forEach(el => { if (el.offsetParent !== null) out.push({ el, restore:null }); });
+      return;
+    }
+    const el = doc.querySelector(entry.sel);
+    if (!el) return;
+    let restore = null;
+    if (entry.unhide && getComputedStyle(el).display === 'none'){
+      const prevDisplay = el.style.display;
+      el.style.display = 'block';
+      restore = () => { el.style.display = prevDisplay; };
+    }
+    if (el.offsetParent !== null || entry.unhide) out.push({ el, restore });
+  });
+  return out;
+}
+
+// центр видимой области доски с поправкой на открытую панель тренажёров
+// (пристыкована к левому краю) — иначе новая картинка ляжет ровно там, где
+// сейчас сама панель, и её не будет видно, пока панель не свернут
+function trainersAwareCenterWorld(){
+  const panelOpen = trainersPanelEl.classList.contains('open');
+  const panelW = panelOpen ? trainersPanelEl.getBoundingClientRect().width : 0;
+  const screenCenterX = (Math.max(cssW, panelW + 160) + panelW) / 2; // центр свободной (правой) части экрана
+  return { x: cam.x + screenCenterX/cam.zoom, y: cam.y + cssH/2/cam.zoom };
+}
+
+// вставка одной готовой картинки задания на доску — тот же формат объекта,
+// что и у обычной вставленной картинки (см. imgModalInsert выше), только
+// предел размера крупнее: это не иллюстрация для справки, а само задание —
+// его нужно будет читать и решать прямо на доске
+async function insertTaskImage(dataUrl){
+  const size = await loadImageSize(dataUrl);
+  const maxDim = 520;
+  let w = size.w, h = size.h;
+  if (w > maxDim || h > maxDim){ const s = maxDim / Math.max(w, h); w *= s; h *= s; }
+  const center = trainersAwareCenterWorld();
+  const pt = { x: center.x - w/2 + trainersInsertOffset, y: center.y - h/2 + trainersInsertOffset };
+  trainersInsertOffset += 28;
+  const obj = { id: uid(), type:'image', src: dataUrl, points:[pt], w, h, natW: size.w, natH: size.h };
+  pushUndo();
+  B.objects.push(obj);
+}
+
+trainersAddBtn.addEventListener('click', async () => {
+  if (!trainersOpenId || !B) return;
+  let doc;
+  try { doc = trainersIframe.contentDocument; } catch(e){ doc = null; }
+  if (!doc){ showTrainersToast('Не удалось получить доступ к тренажёру'); return; }
+  const nodes = collectTrainerCaptureNodes(doc, trainersOpenId);
+  if (!nodes.length){ showTrainersToast('Не нашли текущее задание — попробуйте сгенерировать заново'); return; }
+  trainersAddBtn.disabled = true;
+  let added = 0;
+  try {
+    for (const { el, restore } of nodes){
+      try {
+        const dataUrl = await captureTrainerNode(el);
+        await insertTaskImage(dataUrl);
+        added++;
+      } finally {
+        if (restore) restore();
+      }
+    }
+  } catch(err){
+    console.error('[trainers panel] capture failed', err);
+  }
+  trainersAddBtn.disabled = false;
+  if (added){
+    saveDB(); scheduleRedraw();
+    showTrainersToast(added === 1 ? 'Добавлено на доску' : `Добавлено на доску: ${added}`);
+  } else {
+    showTrainersToast('Не получилось добавить задание');
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
    ХОЛСТ ЗАМЕТОК СПРАВОЧНОЙ ПАНЕЛИ (#bdRefDrawCanvas, вкладка «Текст» →
    «Рисовать»). Это ОТДЕЛЬНЫЙ, независимый от самой доски <canvas> — тот же
    набор инструментов (общая нижняя панель: те же tool/curColorTok/curWidth/

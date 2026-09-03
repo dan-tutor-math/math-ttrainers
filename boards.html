@@ -140,6 +140,7 @@ html[data-theme="dark"] .bl-card-menu:hover{background:rgba(255,255,255,.18);}
 .bd-name:hover,.bd-name:focus{background:var(--hover-1);}
 .bd-gear{width:32px;height:32px;border-radius:10px;border:1px solid var(--glass-border);background:var(--glass);color:var(--muted-2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none;}
 .bd-gear:hover{border-color:var(--ink);color:var(--ink);}
+.bd-gear.active{background:var(--ink);color:#fff;border-color:var(--ink);}
 .bd-gear svg{width:15px;height:15px;}
 .bd-topbar-spacer{margin-left:auto;}
 .bd-settings-pop{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:400;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;box-shadow:var(--shadow);padding:16px;width:250px;display:none;flex-direction:column;gap:12px;}
@@ -318,6 +319,47 @@ html[data-theme="dark"] .bd-ref-panel{box-shadow:var(--shadow), inset 0 1px 0 rg
 .bd-ref-text-mode-wrap[data-textmode="type"] .bd-ref-text-mode{display:block;}
 .bd-ref-text-mode::placeholder{color:var(--muted-2);}
 @media print{ .bd-ref-toggle,.bd-ref-panel{display:none!important;} }
+
+/* ── тренажёры на доске (см. #bdTrainersPanel в разметке выше; кнопка
+     переключения — #bdTrainersToggle, обычная .bd-gear в верхней панели) ── */
+.bd-trainers-panel{
+  position:fixed; top:53px; left:0; height:calc(100vh - 53px); z-index:255;
+  width:var(--tp-w, 420px); min-width:300px; max-width:calc(100vw - 80px);
+  display:none; flex-direction:column; overflow:hidden;
+  background:var(--glass-strong);
+  backdrop-filter:blur(26px) saturate(190%); -webkit-backdrop-filter:blur(26px) saturate(190%);
+  border-right:1px solid var(--glass-border);
+  box-shadow:var(--shadow);
+}
+.bd-trainers-panel.open{display:flex;}
+.bd-trainers-resize-w{position:absolute;top:0;bottom:0;right:0;left:auto;width:10px;z-index:3;cursor:ew-resize;touch-action:none;}
+.bd-trainers-resize-w:hover{background:var(--hover-1);}
+.bd-trainers-head{display:flex;align-items:center;gap:8px;padding:12px 12px 10px;flex:none;border-bottom:1px solid var(--glass-border);}
+.bd-trainers-title{font-family:var(--font-ui);font-weight:700;font-size:14px;color:var(--pencil);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bd-trainers-back,.bd-trainers-close{width:26px;height:26px;border-radius:50%;border:none;background:none;color:var(--muted-2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none;}
+.bd-trainers-back svg{width:16px;height:16px;}
+.bd-trainers-back:hover,.bd-trainers-close:hover{background:var(--hover-1);color:var(--pencil);}
+.bd-trainers-list{flex:1 1 auto;min-height:0;display:none;flex-direction:column;padding:10px 12px 12px;gap:8px;}
+.bd-trainers-panel:not(.bd-trainers-in-frame) .bd-trainers-list{display:flex;}
+.bd-trainers-search{border:1px solid var(--glass-border);border-radius:9px;background:var(--card);padding:7px 10px;font-family:var(--font-ui);font-size:13px;color:var(--pencil);outline:none;flex:none;}
+.bd-trainers-search::placeholder{color:var(--muted-2);}
+.bd-trainers-groups{flex:1 1 auto;overflow-y:auto;display:flex;flex-direction:column;gap:12px;}
+.bd-trainers-group-title{font-family:var(--font-ui);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted-2);padding:0 2px 4px;}
+.bd-trainers-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:none;background:none;padding:7px 8px;border-radius:9px;cursor:pointer;color:var(--pencil);font-family:var(--font-ui);font-size:12.5px;}
+.bd-trainers-item:hover{background:var(--hover-1);}
+.bd-trainers-item-num{flex:none;width:20px;height:20px;border-radius:6px;background:var(--hover-1);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--muted-2);}
+.bd-trainers-item-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bd-trainers-item-eq{flex:none;font-family:var(--font-mono);font-size:10.5px;color:var(--muted-2);max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bd-trainers-empty{padding:10px 4px;color:var(--muted-2);font-family:var(--font-ui);font-size:12.5px;}
+.bd-trainers-frame-wrap{flex:1 1 auto;min-height:0;position:relative;display:none;}
+.bd-trainers-panel.bd-trainers-in-frame .bd-trainers-frame-wrap{display:flex;}
+.bd-trainers-iframe{flex:1;width:100%;height:100%;border:none;background:var(--card);}
+.bd-trainers-add{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:3;border:none;border-radius:12px;padding:10px 16px;font-family:var(--font-ui);font-size:13px;font-weight:700;background:var(--ink);color:#fff;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.28);}
+.bd-trainers-add:hover{opacity:.9;}
+.bd-trainers-add:disabled{opacity:.6;cursor:default;}
+.bd-trainers-toast{position:absolute;left:50%;bottom:62px;transform:translateX(-50%);z-index:3;background:var(--ink);color:#fff;padding:6px 12px;border-radius:9px;font-family:var(--font-ui);font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s;}
+.bd-trainers-toast.show{opacity:1;}
+@media print{ .bd-trainers-panel{display:none!important;} }
 
 /* ── всплывающая панель цвета/толщины/стиля над доком ── */
 .bd-optbar{position:fixed;left:50%;bottom:66px;transform:translateX(-50%);z-index:250;display:none;align-items:center;gap:calc(10px*var(--dock-scale,1));background:var(--glass-strong);backdrop-filter:blur(26px) saturate(190%);-webkit-backdrop-filter:blur(26px) saturate(190%);border:1px solid var(--glass-border);border-radius:calc(18px*var(--dock-scale,1));padding:calc(9px*var(--dock-scale,1)) calc(12px*var(--dock-scale,1));box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.5);flex-wrap:wrap;max-width:calc(100vw - 20px);}
@@ -625,6 +667,9 @@ function resolveBasketTexInHtml(html){
     <button class="bd-gear" id="bdBasketBtn" title="Добавить задание из Подборки">
       <svg viewBox="0 0 24 24" fill="none"><path d="M3 9l2-5h14l2 5M3 9v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9M3 9h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 13a3 3 0 0 0 6 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
     </button>
+    <button class="bd-gear" id="bdTrainersToggle" title="Тренажёры — добавить готовое задание прямо на доску">
+      <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="4" width="7.5" height="7.5" rx="1.8" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="4" width="7.5" height="7.5" rx="1.8" stroke="currentColor" stroke-width="1.6"/><rect x="3.5" y="13.5" width="7.5" height="6.5" rx="1.8" stroke="currentColor" stroke-width="1.6"/><rect x="13" y="13.5" width="7.5" height="6.5" rx="1.8" stroke="currentColor" stroke-width="1.6"/></svg>
+    </button>
     <button class="bd-gear" id="bdGear" title="Настройки листа">
       <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3" class="ac"/><path d="M19.4 13.5a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V19.5a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H4.5a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34H10a1.7 1.7 0 0 0 1-1.55V4.5a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87V10a1.7 1.7 0 0 0 1.55 1h.09a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z" stroke="currentColor" stroke-width="1.4"/></svg>
     </button>
@@ -837,6 +882,26 @@ function resolveBasketTexInHtml(html){
   </div>
   <input type="file" id="bdRefFileInput" accept="image/*" class="bd-hidden-color">
 
+  <div class="bd-trainers-panel" id="bdTrainersPanel">
+    <div class="bd-trainers-resize-w" id="bdTrainersResizeW" title="Потяните — изменить ширину панели"></div>
+    <div class="bd-trainers-head">
+      <button class="bd-trainers-back" id="bdTrainersBack" title="К списку тренажёров" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="bd-trainers-title" id="bdTrainersTitle">Тренажёры</div>
+      <button class="bd-trainers-close" id="bdTrainersClose" title="Свернуть">✕</button>
+    </div>
+    <div class="bd-trainers-list" id="bdTrainersList">
+      <input type="text" class="bd-trainers-search" id="bdTrainersSearch" placeholder="Поиск тренажёра…">
+      <div class="bd-trainers-groups" id="bdTrainersGroups"></div>
+    </div>
+    <div class="bd-trainers-frame-wrap" id="bdTrainersFrameWrap">
+      <iframe class="bd-trainers-iframe" id="bdTrainersIframe"></iframe>
+      <button class="bd-trainers-add" id="bdTrainersAddBtn">📥 Добавить на доску</button>
+      <div class="bd-trainers-toast" id="bdTrainersToast"></div>
+    </div>
+  </div>
+
   <div class="bd-ctx-menu" id="bdCtxMenu">
     <button data-act="move">Переместить</button>
     <button data-act="delete">Удалить</button>
@@ -939,6 +1004,7 @@ function resolveBasketTexInHtml(html){
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="basket-core.js"></script>
 <!-- этот маркер должен выполниться ДО boards-core.js — говорит ему не
      запускать приложение самому, а подождать, пока boards-cloud.js (ниже)
