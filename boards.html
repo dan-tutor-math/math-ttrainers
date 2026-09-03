@@ -345,6 +345,7 @@ html[data-theme="dark"] .bd-optbar{box-shadow:var(--shadow), inset 0 1px 0 rgba(
 .bd-swatch-add{width:calc(26px*var(--dock-scale,1));height:calc(26px*var(--dock-scale,1));border-radius:50%;border:1.5px dashed var(--glass-border);background:none;color:var(--muted-2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:calc(14px*var(--dock-scale,1));}
 .bd-optbar.side .bd-swatch-add{width:calc(22px*var(--dock-scale,1));height:calc(22px*var(--dock-scale,1));font-size:calc(12px*var(--dock-scale,1));}
 .bd-swatch-add:hover{border-color:var(--ink);color:var(--ink);}
+.bd-swatch-add.active{border-style:solid;border-color:var(--ink);}
 .bd-optsep{width:1px;align-self:stretch;background:var(--glass-border);}
 .bd-width{display:flex;align-items:center;gap:calc(5px*var(--dock-scale,1));}
 .bd-optbar.side .bd-width{flex-direction:column;gap:calc(4px*var(--dock-scale,1));}
@@ -639,7 +640,11 @@ function resolveBasketTexInHtml(html){
       <div class="bd-grid-swatches" id="bdGridSwatches"></div>
     </div>
     <input type="color" id="bdGridColorInput" class="bd-hidden-color">
-    <div class="bd-set-note">Доска — сплошное полотно на 200×200 листов; страницы — лишь условная разметка, а не отдельные карточки.</div>
+    <label class="bd-modal-toggle-row bd-set-pagenum-row">
+      <span><b>Нумерация страниц</b></span>
+      <input type="checkbox" id="bdPageNumbersToggle">
+    </label>
+    <div class="bd-set-note">Доска — сплошное полотно на 200×200 листов; страницы — лишь условная разметка, а не отдельные карточки. Средний лист, с которого всё начинается, — координата 0,0; вправо и вверх — числа растут, влево и вниз — уменьшаются.</div>
   </div>
 
   <div class="bd-rail pos-left" id="bdRail">
@@ -681,6 +686,15 @@ function resolveBasketTexInHtml(html){
     </button>
     <button class="bd-toggle" id="toggleSnap" title="Прилипание к клеткам">
       <svg viewBox="0 0 24 24" fill="none"><circle cx="5" cy="5" r="2" class="ac"/><circle cx="19" cy="5" r="2" fill="currentColor"/><circle cx="5" cy="19" r="2" fill="currentColor"/><circle cx="19" cy="19" r="2" fill="currentColor"/><path d="M5 7v10M19 7v10M7 5h10M7 19h10" stroke="currentColor" stroke-width="1.4"/></svg>
+    </button>
+    <button class="bd-toggle" id="toggleArrowEnd" title="Стрелка">
+      <svg viewBox="0 0 24 24" fill="none"><line x1="4" y1="20" x2="17" y2="7" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><path d="M10 7h7v7" class="ac-line" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="bd-toggle" id="toggleArrowBoth" title="Двухсторонняя стрелка">
+      <svg viewBox="0 0 24 24" fill="none"><line x1="6" y1="18" x2="18" y2="6" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><path d="M11 6h7v7" class="ac-line" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 18H6v-7" class="ac-line" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="bd-toggle" id="toggleOpacity" title="Полупрозрачность">
+      <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="1.6"/></svg>
     </button>
   </div>
 

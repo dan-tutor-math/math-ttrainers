@@ -333,6 +333,10 @@ let curWidth = 2;
 let curDash = false;
 let curFill = false;
 let curSnap = true;
+let curArrowEnd = false;   // «Стрелка» — только для инструмента «Прямая»
+let curArrowBoth = false;  // «Двухсторонняя стрелка» — тоже только для «Прямой»
+let curOpacity = false;    // «Полупрозрачность» — общий тумблер для любого инструмента рисования
+const SEMI_OPACITY = 0.45; // сама степень прозрачности при включённом тумблере
 let radiusSetting = null;   // «заданный радиус» циркуля; null = определять кликом
 
 let selectedId = null;
@@ -418,6 +422,7 @@ function openBoard(id){
   B.pageOrder = B.pageOrder || 'h';
   B.imageLib = B.imageLib || [];
   if (B.gridColor === undefined) B.gridColor = null; // null = цвет по теме (авто)
+  if (B.showPageNumbers === undefined) B.showPageNumbers = false;
   B.refPanel = Object.assign(defaultRefPanel(), B.refPanel || {});
   B.refPanel.imageObjects = B.refPanel.imageObjects || [];
   if (B.refPanel.imageSrc){
@@ -616,6 +621,33 @@ function drawSheetsAndGrid(c, camv, w, h){
     const sy = worldToScreen({ x: 0, y }).y;
     c.beginPath(); c.moveTo(p0.x, Math.round(sy)+0.5); c.lineTo(p1.x, Math.round(sy)+0.5); c.stroke();
   }
+
+  if (B.showPageNumbers){
+    // координаты листов считаем от среднего листа полотна (200×200,
+    // индексы 0..199) — та же точка, что openBoard() открывает по
+    // умолчанию, поэтому "средняя (стартовая) страница" всегда 0,0
+    const midCol = Math.floor(SHEET_COLS/2), midRow = Math.floor(SHEET_ROWS/2);
+    const colFrom = Math.floor(worldLeft / sw), colTo = Math.floor(worldRight / sw);
+    const rowFrom = Math.floor(worldTop / sh), rowTo = Math.floor(worldBottom / sh);
+    c.save();
+    c.setLineDash([]);
+    c.fillStyle = gridColor;
+    c.globalAlpha = 0.55;
+    // размер шрифта — не больше одной клетки (в мировых единицах), но и не
+    // мельче читаемого минимума на маленьком масштабе
+    c.font = Math.max(8, Math.min(B.cellSize*0.6, B.cellSize) * camv.zoom) + 'px var(--font-ui), sans-serif';
+    c.textAlign = 'left'; c.textBaseline = 'top';
+    const pad = 3 * camv.zoom;
+    for (let row = rowFrom; row <= rowTo; row++){
+      for (let col = colFrom; col <= colTo; col++){
+        const pageX = col - midCol, pageY = midRow - row;
+        const corner = worldToScreen({ x: col*sw, y: row*sh });
+        c.fillText(pageX + ',' + pageY, corner.x + pad, corner.y + pad);
+      }
+    }
+    c.restore();
+  }
+
   c.restore();
 }
 function roundRectPath(c, x, y, w, h, rad){
@@ -629,6 +661,16 @@ function roundRectPath(c, x, y, w, h, rad){
   c.closePath();
 }
 
+function drawArrowHead(c, from, to, lenPx){
+  const angle = Math.atan2(to.y-from.y, to.x-from.x);
+  const headLen = Math.max(9, lenPx*3.2);
+  const spread = Math.PI/7;
+  c.beginPath();
+  c.moveTo(to.x - headLen*Math.cos(angle-spread), to.y - headLen*Math.sin(angle-spread));
+  c.lineTo(to.x, to.y);
+  c.lineTo(to.x - headLen*Math.cos(angle+spread), to.y - headLen*Math.sin(angle+spread));
+  c.stroke();
+}
 function strokePolyline(c, pts, smooth){
   if (!pts.length) return;
   c.beginPath();
@@ -708,6 +750,7 @@ function renderObject(c, obj, camv, opts){
   c.strokeStyle = color; c.fillStyle = color;
   c.lineWidth = Math.max(0.5, obj.width) * camv.zoom;
   c.lineCap = 'round'; c.lineJoin = 'round';
+  if (obj.opacity != null) c.globalAlpha = obj.opacity;
   c.setLineDash(obj.dash ? [obj.width*3.4*camv.zoom, obj.width*2.4*camv.zoom] : []);
   const wp = obj.points.map(p => worldToScreen(p));
 
@@ -715,6 +758,12 @@ function renderObject(c, obj, camv, opts){
     strokePolyline(c, wp, true);
   } else if (obj.type === 'line'){
     strokePolyline(c, wp, false);
+    if (obj.arrowEnd || obj.arrowStart){
+      c.save(); c.setLineDash([]);
+      if (obj.arrowEnd) drawArrowHead(c, wp[0], wp[1], c.lineWidth);
+      if (obj.arrowStart) drawArrowHead(c, wp[1], wp[0], c.lineWidth);
+      c.restore();
+    }
   } else if (obj.type === 'curve'){
     if (obj.ctrl){
       // старый формат (2 точки + управляющая) — квадратичная безье, оставлена для совместимости
@@ -727,17 +776,17 @@ function renderObject(c, obj, camv, opts){
     c.beginPath(); c.moveTo(wp[0].x, wp[0].y);
     for (let i=1;i<wp.length;i++) c.lineTo(wp[i].x, wp[i].y);
     c.closePath();
-    if (obj.fill){ c.globalAlpha = 0.16; c.fill(); c.globalAlpha = 1; }
+    if (obj.fill){ c.globalAlpha = 0.16; c.fill(); c.globalAlpha = obj.opacity != null ? obj.opacity : 1; }
     c.stroke();
   } else if (obj.type === 'ellipse'){
     const cxy = worldToScreen(obj.points[0]);
     c.beginPath(); c.ellipse(cxy.x, cxy.y, Math.max(1,obj.rx*camv.zoom), Math.max(1,obj.ry*camv.zoom), 0, 0, Math.PI*2);
-    if (obj.fill){ c.globalAlpha = 0.16; c.fill(); c.globalAlpha = 1; }
+    if (obj.fill){ c.globalAlpha = 0.16; c.fill(); c.globalAlpha = obj.opacity != null ? obj.opacity : 1; }
     c.stroke();
   } else if (obj.type === 'circle'){
     const cxy = worldToScreen(obj.points[0]);
     c.beginPath(); c.arc(cxy.x, cxy.y, Math.max(1,obj.r*camv.zoom), 0, Math.PI*2);
-    if (obj.fill){ c.globalAlpha = 0.16; c.fill(); c.globalAlpha = 1; }
+    if (obj.fill){ c.globalAlpha = 0.16; c.fill(); c.globalAlpha = obj.opacity != null ? obj.opacity : 1; }
     c.stroke();
     c.beginPath(); c.arc(cxy.x, cxy.y, 2, 0, Math.PI*2); c.fill();
   } else if (obj.type === 'angle'){
@@ -867,6 +916,7 @@ function drawDraftPreview(c, camv){
   c.lineWidth = Math.max(0.5, curWidth) * camv.zoom;
   c.lineCap='round'; c.lineJoin='round';
   c.setLineDash(curDash ? [curWidth*3.4*camv.zoom, curWidth*2.4*camv.zoom] : []);
+  if (curOpacity) c.globalAlpha = SEMI_OPACITY;
 
   if (draft && draft.pts.length){
     const pts = draft.pts.slice();
@@ -876,6 +926,12 @@ function drawDraftPreview(c, camv){
     for (let i=1;i<wp.length;i++) c.lineTo(wp[i].x, wp[i].y);
     if (draft.type === 'quad' && pts.length >= 3) c.closePath();
     c.stroke();
+    if (draft.type === 'line' && wp.length === 2 && (curArrowEnd || curArrowBoth)){
+      c.save(); c.setLineDash([]);
+      drawArrowHead(c, wp[0], wp[1], c.lineWidth);
+      if (curArrowBoth) drawArrowHead(c, wp[1], wp[0], c.lineWidth);
+      c.restore();
+    }
     // угол: вершина — вторая поставленная точка. Пока наводим третью точку
     // (после второго клика, ещё без третьего) — первые два отрезка уже видны
     // выше как обычная ломаная (draft.pts[0]→draft.pts[1]→preview), а здесь
@@ -978,7 +1034,13 @@ function commitObject(obj){
   saveDB(); scheduleRedraw();
 }
 function newBase(type){
-  return { id: uid(), type, color: curColorTok, width: curWidth, dash: curDash, fill: curFill };
+  const obj = { id: uid(), type, color: curColorTok, width: curWidth, dash: curDash, fill: curFill };
+  if (curOpacity) obj.opacity = SEMI_OPACITY;
+  if (type === 'line'){
+    if (curArrowBoth){ obj.arrowStart = true; obj.arrowEnd = true; }
+    else if (curArrowEnd){ obj.arrowEnd = true; }
+  }
+  return obj;
 }
 function bumpColorUsage(tok){
   // счётчик использований больше нигде не показываем (сбивал с толку) —
@@ -1327,6 +1389,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (tool === 'pen'){
     pushUndo();
     penStroke = { id: uid(), type:'pen', color:curColorTok, width:curWidth, dash:curDash, points:[pt] };
+    if (curOpacity) penStroke.opacity = SEMI_OPACITY;
     return;
   }
   if (tool === 'eraser'){ dragMode='erase'; eraseAt(pt); return; }
@@ -1392,6 +1455,20 @@ canvas.addEventListener('pointermove', (e) => {
 
 canvas.addEventListener('pointerup', (e) => {
   if (!boardActive) return;
+  // «Прямая»: одно движение — зажал (первая точка уже легла в draft через
+  // shapeClick при pointerdown), потянул (превью уже рисуется), отпустил —
+  // вторая точка берётся прямо отсюда, без второго отдельного клика.
+  // Нарочно НЕ enterEditLock() — иначе сразу после отпускания рядом
+  // появлялось бы меню выделения, а нужно уметь тут же, без лишних
+  // кликов, зажимать и вести следующую прямую
+  if (tool === 'line' && draft && draft.type === 'line' && draft.pts.length === 1){
+    const endPt = maybeSnap(eventWorld(e));
+    const obj = newBase('line');
+    obj.points = [draft.pts[0], endPt];
+    draft = null;
+    commitObject(obj);
+    scheduleRedraw();
+  }
   if (dragMode === 'move' || dragMode === 'handle' || dragMode === 'multimove'){ saveDB(); }
   if (dragMode === 'pan') updateCursor(); // вернуть «раскрытую руку» или курсор текущего инструмента
   if (dragMode === 'marquee'){
@@ -1542,6 +1619,9 @@ document.querySelectorAll('.bd-tool[data-tool]').forEach(btn => {
     layoutOptbar();
     layoutRefPanel();
     document.getElementById('bdRadiusField').style.display = (tool==='circle') ? 'flex' : 'none';
+    const arrowDisplay = (tool==='line') ? 'flex' : 'none';
+    document.getElementById('toggleArrowEnd').style.display = arrowDisplay;
+    document.getElementById('toggleArrowBoth').style.display = arrowDisplay;
     updateCursor();
     rfUpdateCursor();
   });
@@ -2235,6 +2315,7 @@ refDrawCanvas.addEventListener('pointerdown', (e) => {
   if (tool === 'pen'){
     rfPushUndo();
     rfPenStroke = { id: uid(), type:'pen', color:curColorTok, width:curWidth, dash:curDash, points:[pt] };
+    if (curOpacity) rfPenStroke.opacity = SEMI_OPACITY;
     return;
   }
   if (tool === 'eraser'){ rfDragMode='erase'; rfEraseAt(pt); return; }
@@ -2365,6 +2446,9 @@ document.getElementById('toggleDash').addEventListener('click', (e) => { curDash
 document.getElementById('toggleFill').addEventListener('click', (e) => { curFill=!curFill; e.currentTarget.classList.toggle('on',curFill); });
 document.getElementById('toggleSnap').addEventListener('click', (e) => { curSnap=!curSnap; e.currentTarget.classList.toggle('on',curSnap); });
 document.getElementById('toggleSnap').classList.add('on');
+document.getElementById('toggleArrowEnd').addEventListener('click', (e) => { curArrowEnd=!curArrowEnd; e.currentTarget.classList.toggle('on',curArrowEnd); });
+document.getElementById('toggleArrowBoth').addEventListener('click', (e) => { curArrowBoth=!curArrowBoth; e.currentTarget.classList.toggle('on',curArrowBoth); });
+document.getElementById('toggleOpacity').addEventListener('click', (e) => { curOpacity=!curOpacity; e.currentTarget.classList.toggle('on',curOpacity); });
 document.getElementById('bdRadiusInput').addEventListener('input', (e) => {
   const v = parseFloat(e.target.value);
   radiusSetting = (v>0) ? v : null;
@@ -2376,6 +2460,7 @@ document.getElementById('bdGear').addEventListener('click', (e) => { e.stopPropa
 document.addEventListener('click', (e) => { if (!e.target.closest('.bd-settings-pop') && !e.target.closest('#bdGear')) settingsPop.classList.remove('open'); });
 function updateSettingsUI(){
   document.getElementById('cellVal').textContent = B.cellSize;
+  document.getElementById('bdPageNumbersToggle').checked = !!B.showPageNumbers;
   const landscape = B.sheetCols >= B.sheetRows;
   document.getElementById('fmtLandscape').classList.toggle('active', landscape);
   document.getElementById('fmtPortrait').classList.toggle('active', !landscape);
@@ -2385,20 +2470,20 @@ function updateSettingsUI(){
    иначе — свой цвет, сохранённый прямо в доске ── */
 const GRID_PALETTE = [
   { tok: null,      name: 'По теме (авто)' },
-  { tok: '#AAB6CC', name: 'Холодный серый' },
-  { tok: '#C9AE7C', name: 'Тёплая сепия' },
-  { tok: '#9BC9AE', name: 'Мятный' },
-  { tok: '#D2A0BE', name: 'Розовый' },
-  { tok: '#5B6472', name: 'Графит' },
 ];
 function renderGridSwatches(){
   const wrap = document.getElementById('bdGridSwatches');
   if (!wrap || !B) return;
   const cur = B.gridColor || null;
+  // свой цвет (не входящий в пресеты, т.е. не "по теме") — есть, если
+  // B.gridColor вообще задан: показываем его прямо на кнопке палитры
+  const customTok = GRID_PALETTE.some(p => p.tok === cur) ? null : cur;
   wrap.innerHTML = GRID_PALETTE.map(p => {
     const bg = p.tok ? p.tok : 'linear-gradient(135deg, #fdfcf7 50%, #232a44 50%)';
     return `<button class="bd-grid-swatch${cur===p.tok?' active':''}" data-tok="${p.tok?escHtml(p.tok):''}" title="${escHtml(p.name)}" style="background:${bg}"></button>`;
-  }).join('') + `<button class="bd-swatch-add" id="bdGridSwatchAdd" title="Свой цвет">+</button>`;
+  }).join('') + `<button class="bd-swatch-add${customTok?' active':''}" id="bdGridSwatchAdd" title="Свой цвет — выбрать из палитры"` +
+    (customTok ? ` style="background:${resolveColor(customTok)};color:transparent;"` : '') +
+    `>${customTok ? '' : '+'}</button>`;
   wrap.querySelectorAll('.bd-grid-swatch').forEach(sw => {
     sw.addEventListener('click', () => {
       B.gridColor = sw.dataset.tok || null;
@@ -2411,6 +2496,11 @@ document.getElementById('bdGridColorInput').addEventListener('input', (e) => {
   if (!B) return;
   B.gridColor = e.target.value;
   saveDB(); renderGridSwatches(); scheduleRedraw();
+});
+document.getElementById('bdPageNumbersToggle').addEventListener('change', (e) => {
+  if (!B) return;
+  B.showPageNumbers = e.target.checked;
+  saveDB(); scheduleRedraw();
 });
 document.getElementById('cellMinus').addEventListener('click', () => { B.cellSize=clamp(B.cellSize-4,12,64); updateSettingsUI(); saveDB(); scheduleRedraw(); });
 document.getElementById('cellPlus').addEventListener('click', () => { B.cellSize=clamp(B.cellSize+4,12,64); updateSettingsUI(); saveDB(); scheduleRedraw(); });
