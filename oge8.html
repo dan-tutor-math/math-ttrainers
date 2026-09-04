@@ -126,7 +126,7 @@ body{
 .calc-history-empty{font-family:var(--font-ui);font-size:14px;color:var(--muted-6);text-align:center;padding:16px 0;}
 
 /* ─── интерактивная доска на фоне вокруг примера ─── */
-#boardCanvas{position:fixed;top:0;left:0;z-index:2;touch-action:none;cursor:crosshair;border-radius:20px;}
+#boardCanvas{position:fixed;top:0;left:0;z-index:2;touch-action:none;cursor:crosshair;border-radius:20px;pointer-events:none;}
 #boardCanvasBg{position:fixed;top:0;left:0;z-index:0;touch-action:none;cursor:crosshair;}
 #boardSpace{height:0;pointer-events:none;transition:height .2s ease;}
 .board-toolbar{position:fixed;right:18px;bottom:18px;z-index:50;display:flex;gap:8px;align-items:center;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;padding:9px 11px;box-shadow:var(--shadow);}
@@ -339,6 +339,10 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .add-qty-btn:hover{border-color:var(--ink)}
 .add-qty-btn:active{transform:scale(.92)}
 .tasks-columns{display:grid;grid-auto-flow:column;gap:14px;align-items:start;}
+.work-zone{position:relative;left:50%;transform:translateX(-50%);width:var(--work-w, 100%);max-width:calc(100vw - 24px);}
+.work-resize-handle{position:absolute;top:0;bottom:0;width:10px;cursor:ew-resize;touch-action:none;z-index:5;}
+.work-resize-handle.left{left:0;}
+.work-resize-handle.right{right:0;}
 .add-extra-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .icon-btn{width:32px;height:32px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:14px;line-height:1;cursor:pointer;padding:0;display:inline-flex;align-items:center;justify-content:center;transition:transform .15s, border-color .12s, background .2s, color .2s;}
 .icon-btn:hover{border-color:var(--ink)}
@@ -597,6 +601,9 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
     <div class="panel coming-soon" id="comingSoonPanel" style="display:none"></div>
 
+    <div class="work-zone" id="workZone">
+      <div class="work-resize-handle left" id="workResizeLeft" title="Потяните — расширить рабочую зону"></div>
+      <div class="work-resize-handle right" id="workResizeRight" title="Потяните — расширить рабочую зону"></div>
     <div class="tasks-columns" id="tasksColumnsWrap">
       <div id="card1Wrapper">
         <div class="panel" id="questionPanel" style="display:none">
@@ -608,6 +615,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
           <div class="card-btn-row" id="card1BtnRow" style="display:none">
             <button class="refresh-inline-btn" id="refreshInlineBtn">⟳ Обновить пример</button>
             <button class="refresh-inline-btn" id="basketInlineBtn">📥 В подборку</button>
+            <button class="refresh-inline-btn" id="showSolutionBtn" style="display:none">Показать решение и ответ</button>
           </div>
         </div>
 
@@ -656,6 +664,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       <div class="calc-panel-title">Последние примеры этого типа</div>
       <div class="example-history-list" id="exampleHistoryList"></div>
       <div class="example-history-empty" id="exampleHistoryEmpty">Пока пусто — реши что-нибудь.</div>
+    </div>
     </div>
   </div>
 <div class="medal-tray" id="medalTray" aria-hidden="true"></div>
@@ -1306,6 +1315,7 @@ const els = {
   stStreak: document.getElementById('stStreak'),
   refreshInlineBtn: document.getElementById('refreshInlineBtn'),
   basketInlineBtn: document.getElementById('basketInlineBtn'),
+  showSolutionBtn: document.getElementById('showSolutionBtn'),
   card1BtnRow: document.getElementById('card1BtnRow'),
   addControlsPanel: document.getElementById('addControlsPanel'),
   addExtraControls: document.getElementById('addExtraControls'),
@@ -1315,6 +1325,9 @@ const els = {
   addNextBatchBtn: document.getElementById('addNextBatchBtn'),
   addHidePanelBtn: document.getElementById('addHidePanelBtn'),
   tasksColumnsWrap: document.getElementById('tasksColumnsWrap'),
+  workZone: document.getElementById('workZone'),
+  workResizeLeft: document.getElementById('workResizeLeft'),
+  workResizeRight: document.getElementById('workResizeRight'),
   addTaskRow: document.getElementById('addTaskRow'),
   addTaskBtn: document.getElementById('addTaskBtn'),
   addQtyFlyout: document.getElementById('addQtyFlyout'),
@@ -1567,9 +1580,11 @@ function switchSubMode(mode) {
     resumeOrNewTask();
     applyColumns();
     updateAddUI();
+    syncAddedSolutionUI();
   } else {
     els.questionPanel.style.display = 'none';
     els.mainPanel.style.display = 'none';
+    els.showSolutionBtn.style.display = 'none';
     els.refreshBtn.style.display = 'none';
     els.tasksColumnsWrap.style.display = 'none';
     els.addControlsPanel.style.display = 'none';
@@ -1597,6 +1612,8 @@ function renderCurrentTask() {
   els.mainPanel.style.display = 'none';
   els.explainBox.style.display = 'none';
   els.nextBtn.style.display = 'none';
+  els.showSolutionBtn.style.display = (curSubMode === 'practice') ? 'inline-flex' : 'none';
+  els.showSolutionBtn.textContent = 'Показать решение и ответ';
   syncKeypadVisibility();
 }
 
@@ -1693,6 +1710,7 @@ els.answerInput.addEventListener('keydown', e => { if (e.key === 'Enter') submit
 
 function finishTask(isFreshSolve) {
   if (isFreshSolve === undefined) isFreshSolve = true;
+  els.showSolutionBtn.style.display = 'none';
   els.mainPanel.style.display = 'block';
   els.explainBox.style.display = 'block';
   els.explainBox.innerHTML = `<b>Решение:</b> ${curTask.explain}`;
@@ -1705,6 +1723,30 @@ function finishTask(isFreshSolve) {
 }
 els.nextBtn.onclick = newTask;
 
+let solutionShown = false;
+function revealSolution() {
+  solutionShown = true;
+  els.showSolutionBtn.textContent = 'Скрыть решение и ответ';
+  els.mainPanel.style.display = 'block';
+  els.explainBox.style.display = 'block';
+  els.explainBox.innerHTML = `<b>Решение:</b> ${curTask.explain}`;
+  els.nextBtn.style.display = 'block';
+  els.mainPanel.classList.remove('reveal');
+  void els.mainPanel.offsetWidth;
+  els.mainPanel.classList.add('reveal');
+}
+function hideSolution() {
+  solutionShown = false;
+  els.showSolutionBtn.textContent = 'Показать решение и ответ';
+  els.mainPanel.style.display = 'none';
+  els.explainBox.style.display = 'none';
+  els.nextBtn.style.display = 'none';
+}
+els.showSolutionBtn.onclick = () => {
+  if (taskAnswered) return;
+  if (solutionShown) hideSolution(); else revealSolution();
+};
+
 /* ═══════════════ «+» — добавление ещё нескольких заданий того же типа ═══════════════
    Встроено прямо в «Экзамен»/«Тренировку», без отдельной вкладки. Первое (исходное) задание —
    это по-прежнему curTask/#questionPanel, как и раньше, без изменений. Всё, что добавлено
@@ -1714,12 +1756,35 @@ els.nextBtn.onclick = newTask;
    списка, не трогая уже существующие — набранный, но ещё не проверенный текст в них не теряется.
    Удаление (в т.ч. «Очистить») делает полную перерисовку списка — так проще и безопаснее
    переиндексировать оставшиеся карточки, чем аккуратно сдвигать DOM вручную. */
-let addedTasks = []; // [{task, answered, hadWrongPick}]
+let addedTasks = []; // [{task, answered, hadWrongPick, solutionRevealed}]
+
+function addedSolutionBtnDisplay(bt){
+  return (curSubMode === 'practice' && !bt.answered) ? 'inline-flex' : 'none';
+}
+// переключение вкладок не пересоздаёт добавленные карточки — синхронизируем
+// видимость и текст их кнопок отдельно, и на всякий случай прячем решение,
+// если оно было раскрыто вручную, при уходе из «Тренировки»
+function syncAddedSolutionUI(){
+  document.querySelectorAll('.added-task-card').forEach((card, i) => {
+    const bt = addedTasks[i];
+    if (!bt) return;
+    if (curSubMode !== 'practice' && !bt.answered && bt.solutionRevealed) {
+      bt.solutionRevealed = false;
+      const ex = card.querySelector('.added-explain');
+      if (ex) { ex.style.display = 'none'; ex.innerHTML = ''; }
+    }
+    const btn = card.querySelector('.added-solution-btn');
+    if (btn) {
+      btn.style.display = addedSolutionBtnDisplay(bt);
+      btn.textContent = bt.solutionRevealed ? 'Скрыть решение и ответ' : 'Показать решение и ответ';
+    }
+  });
+}
 let addPanelManuallyHidden = false;
 
 function genAddedTask(){
   const m = curMode === 'random' ? pick(ALL_MODES) : ALL_MODES.find(x => x.id === curMode);
-  return { task: m.gen(), answered: false, hadWrongPick: false };
+  return { task: m.gen(), answered: false, hadWrongPick: false, solutionRevealed: false };
 }
 // «В подборку» работает на трёх уровнях: личная кнопка у КАЖДОЙ карточки (включая первую) —
 // добавляет только её; общая 📥 в шапке и иконка 📥 в панели добавления — обе разом добавляют
@@ -1790,9 +1855,10 @@ function addedCardInnerHTML(bt){
     <div class="card-btn-row">
       <button class="refresh-inline-btn added-refresh-btn">⟳ Обновить пример</button>
       <button class="refresh-inline-btn added-basket-btn">📥 В подборку</button>
+      <button class="refresh-inline-btn added-solution-btn" style="display:${addedSolutionBtnDisplay(bt)}">${bt.solutionRevealed ? 'Скрыть решение и ответ' : 'Показать решение и ответ'}</button>
       <button class="added-remove-btn">− Убрать</button>
     </div>
-    <div class="explain added-explain" style="display:${bt.answered ? 'block' : 'none'}">${bt.answered ? '<b>Решение:</b> ' + t.explain : ''}</div>`;
+    <div class="explain added-explain" style="display:${(bt.answered || bt.solutionRevealed) ? 'block' : 'none'}">${(bt.answered || bt.solutionRevealed) ? '<b>Решение:</b> ' + t.explain : ''}</div>`;
 }
 function makeAddedCardEl(bt, idx){
   const div = document.createElement('div');
@@ -1805,6 +1871,21 @@ function makeAddedCardEl(bt, idx){
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
   div.querySelector('.added-refresh-btn').onclick = () => refreshAddedTask(+div.dataset.idx);
   div.querySelector('.added-remove-btn').onclick = () => removeAddedTask(+div.dataset.idx);
+  const solutionBtn = div.querySelector('.added-solution-btn');
+  solutionBtn.onclick = () => {
+    const cur = addedTasks[+div.dataset.idx];
+    if (!cur || cur.answered) return;
+    cur.solutionRevealed = !cur.solutionRevealed;
+    const ex = div.querySelector('.added-explain');
+    if (cur.solutionRevealed) {
+      ex.innerHTML = '<b>Решение:</b> ' + cur.task.explain;
+      ex.style.display = 'block';
+      solutionBtn.textContent = 'Скрыть решение и ответ';
+    } else {
+      ex.style.display = 'none';
+      solutionBtn.textContent = 'Показать решение и ответ';
+    }
+  };
   const basketBtn = div.querySelector('.added-basket-btn');
   basketBtn.onclick = () => {
     if (!addSingleTaskToBasket(`.added-task-card[data-idx="${div.dataset.idx}"] .added-card-question`)) return;
@@ -1866,7 +1947,9 @@ function updateAddUI(){
   // исходной карточки тоже появляются личные кнопки, как у всех остальных
   els.addControlsPanel.style.display = has ? 'flex' : 'none';
   els.addTaskBtnCompact.style.display = has ? 'none' : 'inline-flex';
-  els.card1BtnRow.style.display = has ? 'flex' : 'none';
+  els.card1BtnRow.style.display = (has || curSubMode === 'practice') ? 'flex' : 'none';
+  els.refreshInlineBtn.style.display = has ? 'inline-flex' : 'none';
+  els.basketInlineBtn.style.display = has ? 'inline-flex' : 'none';
   els.addQtyFlyout.style.display = has ? 'flex' : 'none';
   els.addExtraControls.style.display = (has && !addPanelManuallyHidden) ? 'flex' : 'none';
 }
@@ -1892,6 +1975,9 @@ function submitAddedAnswer(idx){
     els.stSolved.textContent = totalSolved;
     els.stErrors.textContent = totalErrors;
     els.stStreak.textContent = streak;
+    bt.solutionRevealed = false;
+    const solBtn = card.querySelector('.added-solution-btn');
+    if (solBtn) solBtn.style.display = 'none';
     const explainEl = card.querySelector('.added-explain');
     explainEl.innerHTML = '<b>Решение:</b> ' + bt.task.explain;
     explainEl.style.display = 'block';
@@ -1922,6 +2008,61 @@ els.addToBasketAllBtn.onclick = () => {
   els.addToBasketAllBtn.textContent = '✓';
   setTimeout(() => { els.addToBasketAllBtn.classList.remove('ok'); els.addToBasketAllBtn.textContent = '📥'; }, 900);
 };
+
+/* ═══ растягиваемая рабочая зона — центральная область с карточками заданий
+   тянется вручную за любой край и расширяется симметрично с обеих сторон;
+   доступна всегда, независимо от того, сколько заданий сейчас на доске
+   (пригодится в первую очередь при 7+ заданиях в три колонки, но не только) ── */
+const WORK_W_KEY = 'oge8:workZoneW';
+function clampWorkW(w){
+  const min = 380;
+  let max = window.innerWidth - 24;
+  try {
+    const kp = document.getElementById('keypadFloat');
+    if (kp && getComputedStyle(kp).display !== 'none') {
+      const kpLeft = kp.getBoundingClientRect().left;
+      const gap = 16; // запас, чтобы край рабочей зоны не касался клавиатуры
+      const maxByKeypad = 2 * (kpLeft - gap - window.innerWidth / 2);
+      if (maxByKeypad > 0) max = Math.min(max, maxByKeypad);
+    }
+  } catch(e){}
+  max = Math.max(min, max);
+  return Math.min(max, Math.max(min, w));
+}
+(function restoreWorkZoneWidth(){
+  try {
+    const w = parseFloat(localStorage.getItem(WORK_W_KEY));
+    if (w) els.workZone.style.setProperty('--work-w', clampWorkW(w) + 'px');
+  } catch(e){}
+})();
+function setupWorkZoneResize(handleEl, side){
+  let start = null; // {x, w}
+  handleEl.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    handleEl.setPointerCapture(e.pointerId);
+    handleEl.classList.add('dragging');
+    start = { x: e.clientX, w: els.workZone.getBoundingClientRect().width };
+  });
+  handleEl.addEventListener('pointermove', (e) => {
+    if (!start) return;
+    const dx = (side === 'right') ? (e.clientX - start.x) : (start.x - e.clientX);
+    const w = clampWorkW(start.w + dx * 2);
+    els.workZone.style.setProperty('--work-w', w + 'px');
+  });
+  function end(){
+    if (!start) return;
+    start = null;
+    handleEl.classList.remove('dragging');
+    try {
+      const w = parseFloat(getComputedStyle(els.workZone).width);
+      localStorage.setItem(WORK_W_KEY, String(w));
+    } catch(e){}
+  }
+  handleEl.addEventListener('pointerup', end);
+  handleEl.addEventListener('pointercancel', end);
+}
+setupWorkZoneResize(els.workResizeLeft, 'left');
+setupWorkZoneResize(els.workResizeRight, 'right');
 
 /* ───────── плавающая клавиатура ───────── */
 let keypadOpen = true;
@@ -2115,7 +2256,7 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     // холстом ниже и в этот выбор не входит
     const sheets = [...document.querySelectorAll('.sheet')];
     for (const el of sheets) if (el.offsetParent !== null) return el;
-    const fallbacks = [document.getElementById('taskArea'), document.querySelector('.panel')];
+    const fallbacks = [document.getElementById('workZone'), document.getElementById('taskArea'), document.querySelector('.panel')];
     for (const el of fallbacks) if (el && el.offsetParent !== null) return el;
     return null;
   }
@@ -2285,8 +2426,10 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
 
   let drawing = false;
 
-  canvas.addEventListener('contextmenu', e=> e.preventDefault()); // правая кнопка теперь двигает доску, а не открывает системное меню
-  canvas.addEventListener('pointerdown', e=>{
+  // ── у холста нет pointer-events (см. CSS выше), поэтому сам он больше не
+  //    получает pointerdown естественным образом — запускаем рисование сами
+  //    из document-обработчика ниже, вызывая эту функцию напрямую ──
+  function onCanvasPointerDown(e){
     blurActiveFormField();
     if (e.button === 1 || e.button === 2) { startPan(e); e.preventDefault(); return; } // средняя ИЛИ правая кнопка — панорамирование
     if (tool === 'hand') {
@@ -2308,7 +2451,29 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     }
     redraw();
     e.preventDefault();
+  }
+
+  // ── клики по реальным кнопкам/полям/ручкам растягивания должны работать,
+  //    даже когда доска включена — рисуем только там, где под пальцем нет
+  //    ничего кликабельного ──
+  const BOARD_INTERACTIVE_SEL = 'button, a[href], input, select, textarea, label, [role="button"], [contenteditable="true"], .work-resize-handle';
+  function isBoardInteractiveTarget(el){
+    return !!(el && el.closest && el.closest(BOARD_INTERACTIVE_SEL));
+  }
+  function pointInRect(clientX, clientY, rect){
+    return !!rect && clientX >= rect.left && clientX <= rect.right && clientY >= rect.top && clientY <= rect.bottom;
+  }
+  document.addEventListener('contextmenu', e=>{
+    if (document.documentElement.getAttribute('data-board') !== 'on') return;
+    if (isBoardInteractiveTarget(e.target)) return;
+    if (pointInRect(e.clientX, e.clientY, boardTarget && boardTarget.getBoundingClientRect())) e.preventDefault(); // правая кнопка двигает доску, а не открывает системное меню
   });
+  document.addEventListener('pointerdown', e=>{
+    if (document.documentElement.getAttribute('data-board') !== 'on') return;
+    if (isBoardInteractiveTarget(e.target)) return; // клик по кнопке/полю/ручке — пропускаем как обычно, не рисуем
+    if (!pointInRect(e.clientX, e.clientY, boardTarget && boardTarget.getBoundingClientRect())) return;
+    onCanvasPointerDown(e);
+  }, true);
 
   canvas.addEventListener('pointermove', e=>{
     if (panning) {
