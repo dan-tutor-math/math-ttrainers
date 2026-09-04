@@ -2471,7 +2471,20 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     redrawScheduled = true;
     requestAnimationFrame(()=>{
       redrawScheduled = false;
-      if (!boardTarget) return;
+      // Промпт №22: раньше здесь стояло "if (!boardTarget) return;" — если ровно
+      // в момент срабатывания отложенного (через rAF) перерисовывания boardTarget
+      // оказывался временно null (лист/рабочая зона на миг пропадали из DOM —
+      // например, между переключением экранов), вся перерисовка целиком
+      // пропускалась, включая ctx.clearRect() основного видимого холста. Экран
+      // застревал на СТАРОМ кадре до следующего "удачного" вызова — из-за этого
+      // только что дорисованный штрих мог не появиться (штрих уже есть в массиве
+      // strokes и корректно уходит собеседнику через push(), а вот отрисовка
+      // именно на своём экране откладывалась на неопределённый срок), а нажатие
+      // "Стереть всё" могло точно так же не долететь до экрана — данные уже
+      // очищены (strokes = []), но кадр на экране всё ещё старый. Сама
+      // перерисовка не использует boardTarget напрямую (только viewScale/pan/dpr),
+      // так что убираем этот ранний выход — теперь редрав всегда честно
+      // синхронизирует то, что нарисовано на холсте, с текущим состоянием strokes.
       const m = worldToScreenTransform();
 
       // чернила рисуются на отдельном слое (чтобы ластик стирал только их),
@@ -2513,6 +2526,15 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     strokes = [];
     pushUndo('bg');
     bgStrokes = [];
+    // Промпт №22: "Стереть всё" должно чистить ВООБЩЕ всё, включая то, что
+    // технически не входит в strokes/bgStrokes — незавершённый штрих (свой,
+    // если что-то помешало штатному pointerup/pointercancel завершить его —
+    // см. комментарий у setPointerCapture) и незавершённые штрихи собеседника,
+    // которые ещё рисуются "вживую" и не долетели финальным событием 'end'
+    currentStroke = null; currentStrokeSid = null;
+    bgCurrentStroke = null; bgCurrentStrokeSid = null;
+    remoteStrokes.clear();
+    bgRemoteStrokes.clear();
     redraw();
     redrawBg();
     TS.push();
@@ -2723,6 +2745,19 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
   }
   canvas.addEventListener('pointerup', endStroke);
   canvas.addEventListener('pointercancel', endStroke);
+  // Промпт №22 — подстраховка: у canvas стоит pointer-events:none, и рисование
+  // держится на setPointerCapture(), перенаправляющем последующие pointer-события
+  // именно на canvas. Если это перенаправление по какой-то причине не сработало
+  // (redraw()/re-layout ровно в момент pointerdown, отклонённый браузером запрос
+  // capture и т.п.) — pointerup/pointercancel на canvas просто не придёт, а
+  // currentStroke так и останется "незавершённым" навсегда: будет рисоваться как
+  // живой штрих бесконечно и переживёт даже "Стереть всё" (см. clearBoard()).
+  // Этот же pointerup в любом случае всплывает и до document — ловим его тут как
+  // запасной путь; endStroke()/endBgStroke() сами по себе идемпотентны (ранний
+  // выход по !drawing/!bgDrawing), так что двойной вызов на обычном пути ничего
+  // не портит.
+  document.addEventListener('pointerup', (e)=>{ if (drawing) endStroke(e); if (bgDrawing) endBgStroke(e); });
+  document.addEventListener('pointercancel', (e)=>{ if (drawing) endStroke(e); if (bgDrawing) endBgStroke(e); });
 
   /* ─────────────── вторая зона доски: фон (вся страница) ───────────────
      координаты «мировые» — как обычная прокрутка страницы, — поэтому

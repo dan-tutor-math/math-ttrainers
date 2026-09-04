@@ -53,7 +53,7 @@
   const cfg = window.SUPABASE_CONFIG || {};
   if (!cfg.url || !cfg.anonKey || !window.supabase) {
     console.warn('[session-share] SUPABASE_CONFIG или supabase-js не подключены — совместный доступ недоступен на этой странице.');
-    window.TrainerSession = { init: async () => {}, push(){}, registerField(){}, unregisterField(){}, unregisterFieldsWithPrefix(){}, mountShareButton(){}, broadcastEvent(){}, onEvent(){}, getCode(){ return null; }, getShareUrl(){ return ''; }, resetSession: async () => {}, joinByCode: async () => ({ ok: false, reason: 'unavailable' }) };
+    window.TrainerSession = { init: async () => {}, push(){}, registerField(){}, unregisterField(){}, unregisterFieldsWithPrefix(){}, mountShareButton(){}, broadcastEvent(){}, onEvent(){}, getCode(){ return null; }, getShareUrl(){ return ''; }, resetSession: async () => {}, joinByCode: async () => ({ ok: false, reason: 'unavailable' }), isLeader(){ return true; } };
     return;
   }
   const SB = window.supabase.createClient(cfg.url, cfg.anonKey);
@@ -155,7 +155,7 @@
     return (Date.now() - (entry.lastLocalInputAt || 0)) < LOCAL_EDIT_GRACE_MS;
   }
 
-  function subscribeChannel(c) {
+  function subscribeChannel(c, onSubscribed) {
     if (channel) { try { SB.removeChannel(channel); } catch (e) {} channel = null; }
     channel = SB.channel('trainer_session:' + c)
       .on('broadcast', { event: 'state' }, ({ payload }) => {
@@ -174,7 +174,19 @@
         const set = eventListeners.get(payload.name);
         if (set) set.forEach(cb => { try { cb(payload.data); } catch (e) { console.error('[session-share] onEvent callback error:', e); } });
       })
-      .subscribe();
+      // Промпт №21: кто-то только что подключился (по ссылке/коду) и просит
+      // актуальное состояние — отвечаем немедленным push() СВОЕГО текущего
+      // состояния. Это подстраховка сверх снимка, который присоединившийся
+      // и так получает через fetchRow() при заходе: снимок в БД мог ещё не
+      // долететь (сохранение debounce-нное, см. scheduleSave), а вот прямая
+      // просьба "пришли, что у тебя сейчас" всегда бьёт по актуальному —
+      // отвечает КАЖДЫЙ, у кого уже есть код (не только явно назначенный
+      // «главный»), так это работает и при 3+ участниках
+      .on('broadcast', { event: 'sync_request' }, ({ payload }) => {
+        if (!payload || payload.uid === CLIENT_ID) return;
+        push();
+      })
+      .subscribe((status) => { if (status === 'SUBSCRIBED' && onSubscribed) onSubscribed(); });
   }
 
   function scheduleSave() {
@@ -194,10 +206,20 @@
     scheduleSave();
   }
 
+  // Промпт №21: тот, кто НЕ переходил по чужой ссылке/коду (т.е. сам открыл
+  // тренажёр и сам создал/переиспользовал свой код) — «главный» (Учитель).
+  // Это не столько отдельная привилегия, сколько объяснение того, ПОЧЕМУ
+  // при подключении по ссылке синхронизация идёт именно к его текущему
+  // заданию — обычный флаг для UI («Вы — главный» в панели), см. mountShareButton.
+  let isLeaderFlag = true;
+  function isLeader() { return isLeaderFlag; }
+
   async function activate(c, opts) {
     opts = opts || {};
     code = c;
-    subscribeChannel(c);
+    let resolveSubscribed;
+    const subscribed = new Promise((res) => { resolveSubscribed = res; });
+    subscribeChannel(c, resolveSubscribed);
     let row = await fetchRow(c);
     if (!row) {
       if (opts.createIfMissing) {
@@ -210,6 +232,15 @@
     }
     storeCode(trainerSlug, c);
     notifyUi();
+    if (opts.requestSyncFromLeader) {
+      // догоняем то, что снимок из БД мог не успеть отразить (см. комментарий
+      // у обработчика 'sync_request' в subscribeChannel) — как только канал
+      // реально подписан, просим текущих участников прислать актуальное
+      // состояние ещё раз, напрямую
+      subscribed.then(() => {
+        try { channel && channel.send({ type: 'broadcast', event: 'sync_request', payload: { uid: CLIENT_ID } }); } catch (e) {}
+      });
+    }
     return { ok: true };
   }
 
@@ -220,10 +251,12 @@
 
     const joinCode = urlJoinCode();
     if (joinCode) {
-      const res = await activate(joinCode.toUpperCase(), { createIfMissing: false });
+      isLeaderFlag = false;
+      const res = await activate(joinCode.toUpperCase(), { createIfMissing: false, requestSyncFromLeader: true });
       if (res.ok) return;
       // ссылка устарела/битая — просто продолжаем со своей обычной сессией,
       // без всплывающих ошибок при обычном заходе на страницу
+      isLeaderFlag = true;
     }
     const stored = readStoredCode(trainerSlug);
     const own = stored || generateCode();
@@ -269,13 +302,16 @@
     // тренажёр захочет как-то отреагировать на «пустую» сессию — у oge8.html
     // это осознанно no-op (см. проверку typeof state.picker в tsApplyState).
     const c = generateCode();
+    isLeaderFlag = true; // новая своя сессия — снова главный в ней
     await activate(c, { createIfMissing: true });
     applyIncomingState({});
   }
   async function joinByCode(rawCode) {
     const c = (rawCode || '').trim().toUpperCase().replace(/\s+/g, '');
     if (!c) return { ok: false, reason: 'empty' };
-    const res = await activate(c, { createIfMissing: false });
+    isLeaderFlag = false; // подключаемся к чужому коду — дальше синхронизируемся к нему
+    const res = await activate(c, { createIfMissing: false, requestSyncFromLeader: true });
+    if (!res.ok) isLeaderFlag = true; // код не найден — остаёмся при своей сессии
     return res;
   }
   // ── лёгкие «эфемерные» события: не сохраняются, не входят в getState —
@@ -304,6 +340,9 @@
     if (!uiEls) return;
     uiEls.codeEl.textContent = code || '—';
     uiEls.linkEl.value = code ? getShareUrl() : '';
+    uiEls.roleEl.textContent = isLeaderFlag
+      ? 'Вы — главный (Учитель): к вашему заданию подключаются присоединившиеся.'
+      : 'Вы подключены к чужой сессии — задания синхронизируются с главным.';
   }
   function mountShareButton() {
     if (uiEls) return;
@@ -349,6 +388,7 @@
     pop.innerHTML = `
       <div class="ts-share-title">Совместный доступ</div>
       <div class="ts-share-hint">Поделитесь кодом или ссылкой — тот, кто откроет её, увидит те же задания и ввод, что и вы, в реальном времени.</div>
+      <div class="ts-share-hint" id="tsRole" style="font-weight:600;"></div>
       <div class="ts-share-code" id="tsCode">—</div>
       <div class="ts-share-row">
         <input id="tsLink" type="text" readonly>
@@ -371,6 +411,7 @@
       linkEl: pop.querySelector('#tsLink'),
       msgEl: pop.querySelector('#tsMsg'),
       joinInput: pop.querySelector('#tsJoinInput'),
+      roleEl: pop.querySelector('#tsRole'),
     };
 
     btn.addEventListener('click', (e) => {
@@ -403,6 +444,6 @@
   window.TrainerSession = {
     init, push, registerField, unregisterField, unregisterFieldsWithPrefix,
     getCode, getShareUrl, resetSession, joinByCode, mountShareButton,
-    broadcastEvent, onEvent,
+    broadcastEvent, onEvent, isLeader,
   };
 })();
