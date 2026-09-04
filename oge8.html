@@ -2057,12 +2057,35 @@ function setupWorkZoneResize(handleEl, side){
       const w = parseFloat(getComputedStyle(els.workZone).width);
       localStorage.setItem(WORK_W_KEY, String(w));
     } catch(e){}
+    // после завершения растягивания форсируем перерисовку — не дожидаясь скролла
+    setTimeout(forceRepaintWorkArea, 30);
   }
   handleEl.addEventListener('pointerup', end);
   handleEl.addEventListener('pointercancel', end);
 }
 setupWorkZoneResize(els.workResizeLeft, 'left');
 setupWorkZoneResize(els.workResizeRight, 'right');
+
+// ── принудительная перерисовка после растягивания рабочей зоны и после скролла ──
+// (см. комментарий выше setupWorkZoneResize) — лечит «призрачные» полупрозрачные
+// прямоугольники и смещённую плавающую клавиатуру, которые иногда остаются на экране
+// после сочетания «растянуть рабочую зону» + «прокрутить вниз, в ранее невидимую область»
+function forceRepaint(el){
+  if (!el) return;
+  const prev = el.style.opacity;
+  el.style.opacity = '0.999999';
+  requestAnimationFrame(() => { el.style.opacity = prev; });
+}
+function forceRepaintWorkArea(){
+  forceRepaint(els.workZone);
+  const kp = document.getElementById('keypadFloat');
+  if (kp) forceRepaint(kp);
+}
+let workAreaRepaintTimer = null;
+window.addEventListener('scroll', () => {
+  clearTimeout(workAreaRepaintTimer);
+  workAreaRepaintTimer = setTimeout(forceRepaintWorkArea, 120);
+}, { passive: true });
 
 /* ───────── плавающая клавиатура ───────── */
 let keypadOpen = true;
