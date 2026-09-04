@@ -507,7 +507,15 @@ function backToList(){
   renderList();
   if (window.onBoardClosed) window.onBoardClosed();
 }
-document.getElementById('bdBack').addEventListener('click', backToList);
+document.getElementById('bdBack').addEventListener('click', (e) => {
+  // средняя кнопка (колёсико), Ctrl/⌘+клик, Shift+клик — стандартные способы
+  // открыть ссылку в новой вкладке/окне; здесь их не перехватываем и отдаём
+  // браузеру. Только обычный левый клик без модификаторов остаётся быстрым
+  // переходом внутри приложения, без перезагрузки страницы
+  if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  e.preventDefault();
+  backToList();
+});
 document.getElementById('bdName').addEventListener('input', (e) => {
   if (!B) return;
   B.name = e.target.value || 'Доска без названия';
@@ -564,7 +572,25 @@ let redrawScheduled = false;
 function scheduleRedraw(){
   if (redrawScheduled) return;
   redrawScheduled = true;
-  requestAnimationFrame(() => { redrawScheduled = false; if (boardActive) render(ctx, cssW, cssH, cam, true); });
+  requestAnimationFrame(() => {
+    redrawScheduled = false;
+    if (!boardActive) return;
+    render(ctx, cssW, cssH, cam, true);
+    syncTextEditorToCam();
+  });
+}
+// открытое поле редактирования текста «приклеено» к своей мировой точке —
+// пересчитываем его экранные координаты и размер шрифта на каждый кадр,
+// пока камера (панорамирование/зум/ресайз окна) двигается
+function syncTextEditorToCam(){
+  if (!textEditSession) return;
+  const { wrap, textarea, worldPt, fontSize } = textEditSession;
+  const scr = worldToScreen(worldPt);
+  const r = canvas.getBoundingClientRect();
+  wrap.style.left = Math.round(r.left + scr.x) + 'px';
+  wrap.style.top = Math.round(r.top + scr.y) + 'px';
+  const fs = fontSize || curFontSize || 22;
+  textarea.style.fontSize = Math.max(10, fs * cam.zoom) + 'px';
 }
 
 /* доска — сплошное полотно: одна заливка «бумаги» на весь мир (0..totalW,
@@ -1108,10 +1134,54 @@ function openTextEditor(existingObj, worldPt){
   cancelBtn.type = 'button'; cancelBtn.className = 'bd-text-editor-cancel'; cancelBtn.title = 'Отмена'; cancelBtn.textContent = '\u2715';
   btns.appendChild(okBtn); btns.appendChild(cancelBtn);
 
-  wrap.appendChild(ta); wrap.appendChild(btns);
+  // ── строка с размером шрифта — «Aa», редактируемое число, стрелочки
+  //    вверх/вниз; меняет размер ИМЕННО этого (открытого прямо сейчас)
+  //    текста, с живым предпросмотром, и заодно становится новым размером
+  //    по умолчанию для следующего текста (как и цвет/толщина линии) ──
+  const sizeRow = document.createElement('div');
+  sizeRow.className = 'bd-text-editor-sizerow';
+  const sizeLabel = document.createElement('span');
+  sizeLabel.className = 'bd-text-editor-size-label';
+  sizeLabel.textContent = 'Aa';
+  const sizeVal = document.createElement('input');
+  sizeVal.type = 'number'; sizeVal.className = 'bd-text-editor-size-val';
+  sizeVal.min = '8'; sizeVal.max = '96'; sizeVal.step = '1'; sizeVal.title = 'Размер шрифта';
+  sizeVal.value = fs;
+  const sizeStepper = document.createElement('div');
+  sizeStepper.className = 'bd-text-editor-size-stepper';
+  const sizeUpBtn = document.createElement('button');
+  sizeUpBtn.type = 'button'; sizeUpBtn.className = 'bd-text-editor-size-up'; sizeUpBtn.title = 'Крупнее';
+  sizeUpBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M4 15l8-8 8 8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  const sizeDownBtn = document.createElement('button');
+  sizeDownBtn.type = 'button'; sizeDownBtn.className = 'bd-text-editor-size-down'; sizeDownBtn.title = 'Мельче';
+  sizeDownBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M4 9l8 8 8-8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  sizeStepper.appendChild(sizeUpBtn); sizeStepper.appendChild(sizeDownBtn);
+  sizeRow.appendChild(sizeLabel); sizeRow.appendChild(sizeVal); sizeRow.appendChild(sizeStepper);
+
+  wrap.appendChild(ta); wrap.appendChild(sizeRow); wrap.appendChild(btns);
   document.body.appendChild(wrap);
 
-  textEditSession = { objId: existingObj ? existingObj.id : null, isNew, worldPt: p, textarea: ta, wrap };
+  textEditSession = { objId: existingObj ? existingObj.id : null, isNew, worldPt: p, textarea: ta, wrap, fontSize: fs, sizeInput: sizeVal };
+
+  // клики/фокус на строке размера не должны уводить фокус с textarea раньше
+  // времени (иначе сработал бы blur и поле подтвердилось бы неожиданно)
+  sizeUpBtn.addEventListener('mousedown', (e) => e.preventDefault());
+  sizeDownBtn.addEventListener('mousedown', (e) => e.preventDefault());
+  sizeVal.addEventListener('pointerdown', (e) => e.stopPropagation());
+  sizeUpBtn.addEventListener('click', () => setCurFontSize((textEditSession.fontSize || curFontSize) + 2));
+  sizeDownBtn.addEventListener('click', () => setCurFontSize((textEditSession.fontSize || curFontSize) - 2));
+  // пока печатают число вручную — сразу показываем предпросмотр на холсте
+  // (без округления/ограничений диапазона, чтобы не мешать вводу), а
+  // фиксируем (округляем, ограничиваем 8..96, запоминаем как размер по
+  // умолчанию) уже по Enter/потере фокуса поля
+  sizeVal.addEventListener('input', () => {
+    const v = parseFloat(sizeVal.value);
+    if (isFinite(v) && v > 0) ta.style.fontSize = Math.max(4, v * cam.zoom) + 'px';
+  });
+  sizeVal.addEventListener('change', () => setCurFontSize(parseFloat(sizeVal.value) || curFontSize));
+  sizeVal.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter'){ e.preventDefault(); sizeVal.blur(); ta.focus(); }
+  });
 
   // клик по самим кнопкам не должен раньше времени увести фокус с textarea
   // (иначе сработал бы blur ниже и вызвал confirm ещё до клика по кнопке)
@@ -1121,7 +1191,12 @@ function openTextEditor(existingObj, worldPt){
   cancelBtn.addEventListener('click', () => cancelTextEditor());
   // клик куда угодно ещё (по доске, по панели инструментов...) — считаем
   // подтверждением, как только поле теряет фокус
-  ta.addEventListener('blur', () => { if (textEditSession) confirmTextEditor(); });
+  function confirmOnBlurUnlessWithinPopup(e){
+    if (e.relatedTarget && wrap.contains(e.relatedTarget)) return; // фокус ушёл на другой элемент этого же попапа (например, поле размера) — не подтверждаем
+    if (textEditSession) confirmTextEditor();
+  }
+  ta.addEventListener('blur', confirmOnBlurUnlessWithinPopup);
+  sizeVal.addEventListener('blur', confirmOnBlurUnlessWithinPopup);
   ta.addEventListener('keydown', (e) => {
     if (e.key === 'Escape'){ e.preventDefault(); cancelTextEditor(); }
     else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)){ e.preventDefault(); confirmTextEditor(); }
@@ -1138,7 +1213,7 @@ function openTextEditor(existingObj, worldPt){
 
 function confirmTextEditor(){
   if (!textEditSession) return;
-  const { objId, isNew, worldPt, textarea, wrap } = textEditSession;
+  const { objId, isNew, worldPt, textarea, wrap, fontSize } = textEditSession;
   // снимаем сессию ДО удаления поля из DOM — удаление сфокусированного
   // textarea может само по себе синхронно вызвать 'blur' (см. обработчик
   // выше), и без этого confirmTextEditor() вызвался бы повторно, вложенно
@@ -1146,8 +1221,9 @@ function confirmTextEditor(){
   const value = textarea.value;
   wrap.remove();
   if (!value || !value.trim()) return; // пустой текст — ничего не создаём и не сохраняем
+  const fs = fontSize || curFontSize || 22;
   if (isNew){
-    const obj = { id: uid(), type:'text', color: curColorTok, fontSize: curFontSize, points:[worldPt], content: value };
+    const obj = { id: uid(), type:'text', color: curColorTok, fontSize: fs, points:[worldPt], content: value };
     if (curOpacity) obj.opacity = SEMI_OPACITY;
     measureTextObj(obj);
     commitObject(obj);
@@ -1156,6 +1232,7 @@ function confirmTextEditor(){
     if (obj){
       pushUndo();
       obj.content = value;
+      obj.fontSize = fs;
       measureTextObj(obj);
       saveDB(); scheduleRedraw();
     }
@@ -2927,8 +3004,19 @@ document.getElementById('bdColorInput').addEventListener('input', (e) => {
 
 document.getElementById('widthMinus').addEventListener('click', () => { curWidth=clamp(curWidth-1,1,20); document.getElementById('widthVal').textContent=curWidth; });
 document.getElementById('widthPlus').addEventListener('click', () => { curWidth=clamp(curWidth+1,1,20); document.getElementById('widthVal').textContent=curWidth; });
-document.getElementById('fontSizeMinus').addEventListener('click', () => { curFontSize=clamp(curFontSize-2,8,96); document.getElementById('fontSizeVal').textContent=curFontSize; });
-document.getElementById('fontSizePlus').addEventListener('click', () => { curFontSize=clamp(curFontSize+2,8,96); document.getElementById('fontSizeVal').textContent=curFontSize; });
+function setCurFontSize(v){
+  v = clamp(Math.round(v), 8, 96);
+  curFontSize = v;
+  document.getElementById('fontSizeVal').textContent = v;
+  if (textEditSession){
+    textEditSession.fontSize = v;
+    if (textEditSession.sizeInput) textEditSession.sizeInput.value = v;
+    textEditSession.textarea.style.fontSize = Math.max(10, v * cam.zoom) + 'px';
+  }
+  return v;
+}
+document.getElementById('fontSizeMinus').addEventListener('click', () => setCurFontSize(curFontSize-2));
+document.getElementById('fontSizePlus').addEventListener('click', () => setCurFontSize(curFontSize+2));
 document.getElementById('toggleDash').addEventListener('click', (e) => { curDash=!curDash; e.currentTarget.classList.toggle('on',curDash); });
 document.getElementById('toggleFill').addEventListener('click', (e) => { curFill=!curFill; e.currentTarget.classList.toggle('on',curFill); });
 document.getElementById('toggleSnap').addEventListener('click', (e) => { curSnap=!curSnap; e.currentTarget.classList.toggle('on',curSnap); });
@@ -3004,6 +3092,13 @@ document.getElementById('pageOrderH')?.addEventListener('click', () => { B.pageO
 document.getElementById('pageOrderV')?.addEventListener('click', () => { B.pageOrder='v'; updatePageOrderUI(); saveDB(); refreshPdfPagesOrder(); });
 
 /* ── левая колонка: зум / масштаб / полноэкранный режим / экспорт ── */
+// mousedown preventDefault здесь — чтобы клик по кнопкам зума не «крал»
+// фокус у активного текстового редактора на доске (иначе blur сразу же
+// подтверждал/закрывал попап редактирования текста при зуме колёсиком —
+// см. syncTextEditorToCam(): попап должен просто следовать за камерой,
+// оставаясь открытым, а не закрываться из-за смены зума)
+document.getElementById('railZoomIn').addEventListener('mousedown', (e) => e.preventDefault());
+document.getElementById('railZoomOut').addEventListener('mousedown', (e) => e.preventDefault());
 document.getElementById('railZoomIn').addEventListener('click', () => setZoom(cam.zoom*1.25, cam.x+cssW/2/cam.zoom, cam.y+cssH/2/cam.zoom, cssW/2, cssH/2));
 document.getElementById('railZoomOut').addEventListener('click', () => setZoom(cam.zoom/1.25, cam.x+cssW/2/cam.zoom, cam.y+cssH/2/cam.zoom, cssW/2, cssH/2));
 document.getElementById('railZoomLabel').addEventListener('click', () => setZoom(1, cam.x+cssW/2/cam.zoom, cam.y+cssH/2/cam.zoom, cssW/2, cssH/2));

@@ -133,7 +133,7 @@ html[data-theme="dark"] .bl-card-menu:hover{background:rgba(255,255,255,.18);}
 #screenBoard{display:none;position:fixed;inset:0;overflow:hidden;background:var(--bg);}
 #boardCv{position:absolute;inset:0;touch-action:none;}
 .bd-topbar{position:fixed;top:0;left:0;right:0;z-index:300;display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border-bottom:1px solid var(--glass-border);}
-.bd-back{display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:var(--ink);font-weight:600;font-size:14px;cursor:pointer;padding:6px 8px;border-radius:8px;}
+.bd-back{display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:var(--ink);font-weight:600;font-size:14px;cursor:pointer;padding:6px 8px;border-radius:8px;text-decoration:none;}
 .bd-back:hover{background:var(--hover-1);}
 .bd-back svg{width:15px;height:15px;}
 .bd-name{flex:0 1 auto;font-weight:700;font-size:15px;color:var(--pencil);background:none;border:none;outline:none;text-align:center;min-width:60px;max-width:40vw;border-radius:8px;padding:5px 8px;}
@@ -423,6 +423,15 @@ html[data-theme="dark"] .bd-optbar{box-shadow:var(--shadow), inset 0 1px 0 rgba(
 .bd-text-editor-btns button:hover{background:var(--hover-1);}
 .bd-text-editor-ok{color:#2a8f52;}
 .bd-text-editor-cancel{color:var(--teacher);}
+.bd-text-editor-sizerow{display:flex;align-items:center;gap:6px;}
+.bd-text-editor-size-label{font-family:var(--font-ui),sans-serif;font-size:12px;font-weight:700;color:var(--muted-2);user-select:none;}
+.bd-text-editor-size-val{width:36px;border:1px solid var(--glass-border);border-radius:6px;background:var(--card);text-align:center;font-family:var(--font-ui),sans-serif;font-size:12.5px;color:var(--pencil);padding:3px 2px;outline:none;-moz-appearance:textfield;}
+.bd-text-editor-size-val::-webkit-outer-spin-button,.bd-text-editor-size-val::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.bd-text-editor-size-stepper{display:flex;flex-direction:column;border:1px solid var(--glass-border);border-radius:6px;overflow:hidden;flex:none;}
+.bd-text-editor-size-stepper button{width:18px;height:13px;border:none;background:var(--glass);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;color:var(--muted-2);}
+.bd-text-editor-size-stepper button:hover{background:var(--hover-1);color:var(--pencil);}
+.bd-text-editor-size-up{border-bottom:1px solid var(--glass-border);}
+.bd-text-editor-size-stepper svg{width:9px;height:9px;}
 
 /* ── расширенное меню выделенного объекта(ов) — появляется и сразу после
    построения фигуры, и при повторном выделении уже существующей ── */
@@ -658,10 +667,10 @@ function resolveBasketTexInHtml(html){
   <canvas id="boardCv"></canvas>
 
   <div class="bd-topbar">
-    <button class="bd-back" id="bdBack">
+    <a class="bd-back" id="bdBack" href="boards.html">
       <svg viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Назад к доскам
-    </button>
+    </a>
     <div class="bd-topbar-spacer"></div>
     <input class="bd-name" id="bdName" spellcheck="false">
     <button class="bd-gear" id="bdBasketBtn" title="Добавить задание из Подборки">
