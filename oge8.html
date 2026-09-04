@@ -678,6 +678,9 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 </div>
 
 <script src="basket-core.js"></script>
+<script src="supabase-config.js"></script>
+<script src="supabase-js.umd.js"></script>
+<script src="session-share.js"></script>
 <script>
 /* ═══════════════ утилиты ═══════════════ */
 const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -1540,6 +1543,7 @@ els.backBtn.onclick = () => {
   els.taskArea.style.display = 'none';
   els.picker.style.display = 'block';
   renderPicker();
+  if (window.TrainerSession) window.TrainerSession.push();
 };
 function navigateType(delta){
   const idx = ALL_MODES.findIndex(x=>x.id===curMode);
@@ -1592,6 +1596,7 @@ function switchSubMode(mode) {
     els.comingSoonPanel.textContent = COMING_SOON_TEXT[mode];
     els.comingSoonPanel.style.display = 'block';
   }
+  if (window.TrainerSession) window.TrainerSession.push();
 }
 els.tabLearn.onclick = () => switchSubMode('learn');
 els.tabPractice.onclick = () => switchSubMode('practice');
@@ -1632,6 +1637,7 @@ function newTask() {
     curProg.taskRenderVersion = TASK_RENDER_VERSION;
     saveProg(curMode, curProg);
   }
+  if (window.TrainerSession) window.TrainerSession.push();
 }
 
 // при входе в прототип — восстановить последний пример (если есть), а не выдавать новый
@@ -1704,6 +1710,7 @@ function submitInputAnswer() {
       saveProg(curMode, curProg);
     }
   }
+  if (window.TrainerSession) window.TrainerSession.push();
 }
 els.checkAnswerBtn.onclick = submitInputAnswer;
 els.answerInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitInputAnswer(); });
@@ -1866,6 +1873,7 @@ function makeAddedCardEl(bt, idx){
   div.dataset.idx = String(idx);
   div.innerHTML = addedCardInnerHTML(bt);
   const inp = div.querySelector('.added-answer-input');
+  if (window.TrainerSession) window.TrainerSession.registerField('added-' + idx, inp);
   const submit = () => submitAddedAnswer(+div.dataset.idx);
   div.querySelector('.added-check-btn').onclick = submit;
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
@@ -1899,10 +1907,12 @@ function makeAddedCardEl(bt, idx){
 function renderAddedList(){
   // #card1Wrapper — не трогаем: он живёт внутри tasksColumnsWrap постоянно, в нём —
   // рабочие DOM-узлы questionPanel/mainPanel, на которые уже указывают ссылки в els
+  if (window.TrainerSession) window.TrainerSession.unregisterFieldsWithPrefix('added-');
   els.tasksColumnsWrap.querySelectorAll('.added-task-card').forEach(el => el.remove());
   addedTasks.forEach((bt, i) => els.tasksColumnsWrap.appendChild(makeAddedCardEl(bt, i)));
   applyColumns();
   updateAddUI();
+  if (window.TrainerSession) window.TrainerSession.push();
 }
 function appendAddedTasks(n){
   for (let i = 0; i < n; i++){
@@ -1913,6 +1923,7 @@ function appendAddedTasks(n){
   addPanelManuallyHidden = false; // «+»/плашка количества всегда возвращают панель, если её скрывали кнопкой «Скрыть»
   applyColumns();
   updateAddUI();
+  if (window.TrainerSession) window.TrainerSession.push();
 }
 function removeAddedTask(idx){
   addedTasks.splice(idx, 1);
@@ -1929,6 +1940,7 @@ function refreshAddedTask(idx){
   const card = els.tasksColumnsWrap.querySelector(`.added-task-card[data-idx="${idx}"]`);
   if (card) card.replaceWith(makeAddedCardEl(addedTasks[idx], idx));
   else renderAddedList();
+  if (window.TrainerSession) window.TrainerSession.push();
 }
 function nextBatchAll(){
   // «Следующий пример» в панели — вся текущая партия (первая карточка + все добавленные)
@@ -1992,6 +2004,7 @@ function submitAddedAnswer(idx){
     void inp.offsetWidth;
     inp.classList.add('bad', 'shake');
   }
+  if (window.TrainerSession) window.TrainerSession.push();
 }
 els.addTaskBtn.onclick = () => appendAddedTasks(1);
 els.addTaskBtnCompact.onclick = () => appendAddedTasks(1);
@@ -2169,6 +2182,81 @@ function syncKeypadVisibility(){
 setupFloatingKeypad();
 
 renderPicker();
+
+/* ═══ Промпт №19: совместный доступ — синхронизация состояния тренажёра ═══
+   Синхронизируем «что мы вместе сейчас решаем»: экран выбора типа/сам тип,
+   вкладку режима, текущее основное задание и его статус, весь список
+   добавленных заданий. Личный прогресс (streak/решено/ошибки, медали,
+   история примеров) — НЕ синхронизируется: это персональная статистика
+   каждого, а не общая задача. Посимвольный ввод в поля ответа
+   синхронизируется отдельно, через TrainerSession.registerField(). */
+function tsGetState(){
+  const base = {
+    picker: els.taskArea.style.display === 'none',
+    curMode, curSubMode,
+    curTask, taskAnswered: !!taskAnswered, hadWrongPick: !!hadWrongPick,
+    addedTasks: addedTasks.map(bt => ({
+      task: bt.task, answered: !!bt.answered, hadWrongPick: !!bt.hadWrongPick, solutionRevealed: !!bt.solutionRevealed,
+    })),
+  };
+  // доска (инструмент рисования поверх тренажёра) — своё, отдельно управляемое
+  // подмодулем поле; подмешиваем его снимок сюда же, чтобы штрихи попадали в
+  // ту же общую сохраняемую/рассылаемую «полную» синхронизацию состояния,
+  // не заводя для этого отдельную таблицу/канал
+  if (window.__boardGetState) Object.assign(base, window.__boardGetState());
+  return base;
+}
+function tsApplyState(state){
+  if (!state || typeof state.picker === 'undefined') return; // пустой снимок — сессией ещё никто не пользовался
+  // применяем штрихи доски ДО развилки по picker/задаче — доска видна и
+  // доступна независимо от того, какой сейчас экран у тренажёра
+  if (window.__boardApplyState) window.__boardApplyState(state);
+  if (state.picker) {
+    if (els.taskArea.style.display !== 'none') { els.taskArea.style.display = 'none'; els.picker.style.display = 'block'; renderPicker(); }
+    return;
+  }
+  if (els.picker.style.display !== 'none' || curMode !== state.curMode) {
+    curMode = state.curMode;
+    openTask(); // сама переключит экран, тип, вызовет switchSubMode('exam') и т.д.
+  }
+  if (curSubMode !== state.curSubMode) switchSubMode(state.curSubMode);
+
+  // state.curTask временно бывает null: сам openTask() выше — многошаговый
+  // (генерирует список добавленных заданий РАНЬШЕ, чем основное задание через
+  // switchSubMode -> newTask), и промежуточный push() успевает уйти в сеть
+  // до того, как curTask на отправляющей стороне вообще появился. Просто
+  // пропускаем обновление основной панели в этот момент — у нас уже есть
+  // временная (своя) задача от локального openTask() выше, а через мгновение
+  // придёт следующий, уже полный снимок и всё равно всё перерисует.
+  if (state.curTask) {
+    curTask = state.curTask;
+    taskAnswered = !!state.taskAnswered;
+    hadWrongPick = !!state.hadWrongPick;
+    renderCurrentTask();
+    if (taskAnswered) {
+      els.answerInput.value = String(curTask.correctValue);
+      els.answerInput.classList.remove('bad');
+      els.answerInput.classList.add('good');
+      els.answerInput.disabled = true;
+      els.checkAnswerBtn.disabled = true;
+      syncKeypadVisibility();
+      finishTask(false);
+    } else if (hadWrongPick) {
+      els.answerInput.classList.add('bad');
+    }
+  }
+
+  addedTasks = (state.addedTasks || []).filter(x => x && x.task).map(x => ({
+    task: x.task, answered: !!x.answered, hadWrongPick: !!x.hadWrongPick, solutionRevealed: !!x.solutionRevealed,
+  }));
+  renderAddedList();
+  syncAddedSolutionUI();
+}
+if (window.TrainerSession) {
+  window.TrainerSession.init({ trainer: 'oge8', getState: tsGetState, applyState: tsApplyState });
+  window.TrainerSession.registerField('main', els.answerInput);
+  window.TrainerSession.mountShareButton();
+}
 </script>
 
 
@@ -2226,6 +2314,14 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
 <script>
 /* ═══════════════ интерактивная доска на фоне ═══════════════ */
 (function(){
+  // Промпт №19: живая посимвольная (пожалуй, точнее — «по точкам») трансляция
+  // рисования на доске поверх тренажёра собеседнику в совместной сессии.
+  // Лёгкие события о том, что рисуется ПРЯМО СЕЙЧАС, идут через отдельный
+  // «эфемерный» канал (TS.broadcastEvent/onEvent) — они не сохраняются и не
+  // входят в getState; а уже готовый, законченный штрих попадает в обычный
+  // getState()/applyState() тренажёра (см. tsGetState/tsApplyState выше) —
+  // так он переживёт перезагрузку страницы и достаётся тем, кто подключится позже.
+  const TS = window.TrainerSession || { onEvent(){}, broadcastEvent(){}, push(){} };
   const canvas = document.getElementById('boardCanvas');
   const ctx = canvas.getContext('2d');
   // отдельный оффскрин-слой только для чернил: ластик (destination-out) стирает
@@ -2261,6 +2357,8 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
 
   let strokes = [];          // завершённые штрихи: {tool,color,width,points:[{x,y}...]}
   let currentStroke = null;  // штрих, который рисуется прямо сейчас (для живого превью)
+  let currentStrokeSid = null; // id текущего штриха — чтобы собеседник мог отличать несколько одновременных линий
+  const remoteStrokes = new Map(); // sid -> штрих собеседника, который он рисует прямо сейчас (ещё не завершён)
   const UNDO_LIMIT = 60;
   const undoStack = [];      // снимки массива strokes (лёгкие — это просто точки, не пиксели)
 
@@ -2387,6 +2485,7 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
       inkCtx.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
       for (const s of strokes) drawStroke(inkCtx, s);
       if (currentStroke) drawStroke(inkCtx, currentStroke);
+      remoteStrokes.forEach(s => drawStroke(inkCtx, s));
 
       ctx.save();
       ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -2407,6 +2506,7 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     const entry = undoStack.pop();
     if (entry.surface === 'bg') { bgStrokes = entry.data; redrawBg(); }
     else { strokes = entry.data; redraw(); }
+    TS.push(); // отмена — структурное изменение, рассылаем и сохраняем как обычно
   }
   function clearBoard(){
     pushUndo('sheet');
@@ -2415,6 +2515,7 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     bgStrokes = [];
     redraw();
     redrawBg();
+    TS.push();
   }
 
   // ── если перед началом рисования фокус оставался в текстовом поле (например,
@@ -2449,6 +2550,68 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
 
   let drawing = false;
 
+  function makeStrokeId(){ return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+
+  // ── троттлинг живой трансляции точек: не чаще, чем раз в THROTTLE_MS,
+  // копим точки в буфере и шлём их одной пачкой — собеседник всё равно видит
+  // линию «живьём», но канал не заваливается сообщением на каждый pixel ──
+  const BOARD_THROTTLE_MS = 45;
+  function makeLiveSender(surface){
+    let pending = []; let replaceLast = false; let timer = null; let sid = null; let lastSentAt = 0;
+    function flush(){
+      timer = null;
+      if (!sid || (pending.length === 0 && !replaceLast)) return;
+      TS.broadcastEvent('board_stroke', { surface, sid, phase: 'move', points: pending, replace: replaceLast });
+      pending = []; replaceLast = false; lastSentAt = Date.now();
+    }
+    return {
+      start(newSid, stroke){
+        sid = newSid; pending = []; replaceLast = false; lastSentAt = 0;
+        TS.broadcastEvent('board_stroke', { surface, sid, phase: 'start', tool: stroke.tool, color: stroke.color, width: stroke.width, points: stroke.points.slice() });
+      },
+      point(p){ pending.push(p); schedule(); },
+      replacePoint(p){ pending = [p]; replaceLast = true; schedule(); },
+      end(finalPoint){
+        clearTimeout(timer); timer = null;
+        if (!sid) return;
+        TS.broadcastEvent('board_stroke', { surface, sid, phase: 'end', point: finalPoint || null });
+        sid = null; pending = []; replaceLast = false;
+      },
+    };
+    function schedule(){
+      if (timer) return;
+      const wait = Math.max(0, BOARD_THROTTLE_MS - (Date.now() - lastSentAt));
+      timer = setTimeout(flush, wait);
+    }
+  }
+  const sheetLiveSender = makeLiveSender('sheet');
+  const bgLiveSender = makeLiveSender('bg');
+
+  // ── приём живых точек от собеседника: рисуем их как временный «чужой»
+  // штрих (remoteStrokes/bgRemoteStrokes), пока не придёт финальный снимок
+  // состояния, который заменит strokes/bgStrokes целиком, — см. tsApplyState ──
+  TS.onEvent('board_stroke', (data) => {
+    if (!data || !data.sid) return;
+    const map = data.surface === 'bg' ? bgRemoteStrokes : remoteStrokes;
+    const doRedraw = data.surface === 'bg' ? redrawBg : redraw;
+    if (data.phase === 'start') {
+      map.set(data.sid, { tool: data.tool, color: data.color, width: data.width, points: (data.points || []).slice() });
+    } else if (data.phase === 'move') {
+      const s = map.get(data.sid);
+      if (!s) return; // старт мог не дойти (переподключение и т.п.) — просто игнорируем хвост
+      if (data.replace) { if (s.points.length) s.points[s.points.length - 1] = data.points[0]; else s.points.push(data.points[0]); }
+      else (data.points || []).forEach(p => s.points.push(p));
+    } else if (data.phase === 'end') {
+      const s = map.get(data.sid);
+      if (s) {
+        if (data.point) s.points.push(data.point);
+        (data.surface === 'bg' ? bgStrokes : strokes).push(s);
+      }
+      map.delete(data.sid);
+    }
+    doRedraw();
+  });
+
   // ── у холста нет pointer-events (см. CSS выше), поэтому сам он больше не
   //    получает pointerdown естественным образом — запускаем рисование сами
   //    из document-обработчика ниже, вызывая эту функцию напрямую ──
@@ -2472,6 +2635,8 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     } else {
       currentStroke = { tool: 'pen', color: penColor, width: penWidth, points: [p] };
     }
+    currentStrokeSid = makeStrokeId();
+    sheetLiveSender.start(currentStrokeSid, currentStroke);
     redraw();
     e.preventDefault();
   }
@@ -2510,6 +2675,7 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     if (tool === 'line') {
       const p = screenToWorld(e.clientX, e.clientY);
       currentStroke.points[1] = p; // линия — всегда ровно 2 точки: старт и текущая
+      sheetLiveSender.replacePoint(p);
     } else {
       // getCoalescedEvents() восстанавливает промежуточные точки, которые браузер
       // «схлопнул» при быстром движении мыши/пера — это повышает эффективную
@@ -2520,6 +2686,7 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
       for (const ev of list) {
         const p = screenToWorld(ev.clientX, ev.clientY);
         currentStroke.points.push(p);
+        sheetLiveSender.point(p);
       }
     }
     redraw();
@@ -2538,14 +2705,19 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     if (currentStroke) {
       // на случай, если pointerup пришёл без предшествующего pointermove
       // ровно в этой точке — досчитываем финальную позицию по самому событию
+      let finalPoint = null;
       if (typeof e.clientX === 'number') {
         const p = screenToWorld(e.clientX, e.clientY);
+        finalPoint = p;
         if (tool === 'line') currentStroke.points[1] = p;
         else currentStroke.points.push(p);
       }
       strokes.push(currentStroke);
       currentStroke = null;
+      sheetLiveSender.end(finalPoint);
+      TS.push(); // законченный штрих — сохраняем и рассылаем как обычное структурное состояние
     }
+    currentStrokeSid = null;
     try { canvas.releasePointerCapture(e.pointerId); } catch(_){}
     redraw();
   }
@@ -2559,6 +2731,8 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
 
   let bgStrokes = [];
   let bgCurrentStroke = null;
+  let bgCurrentStrokeSid = null;
+  const bgRemoteStrokes = new Map(); // sid -> штрих собеседника на фоновом холсте, ещё не завершённый
   let bgViewScale = 1, bgPanX = 0, bgPanY = 0;
   const BG_GRID = 24; // px — совпадает с шагом клетки основного дизайна (--grid)
 
@@ -2617,6 +2791,7 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
       inkCtxBg.setTransform(m[0], m[1], m[2], m[3], m[4], m[5]);
       for (const s of bgStrokes) drawStroke(inkCtxBg, s);
       if (bgCurrentStroke) drawStroke(inkCtxBg, bgCurrentStroke);
+      bgRemoteStrokes.forEach(s => drawStroke(inkCtxBg, s));
 
       ctxBg.setTransform(1, 0, 0, 1, 0, 0);
       ctxBg.clearRect(0, 0, canvasBg.width, canvasBg.height);
@@ -2662,6 +2837,8 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     } else {
       bgCurrentStroke = { tool: 'pen', color: penColor, width: penWidth, points: [p] };
     }
+    bgCurrentStrokeSid = makeStrokeId();
+    bgLiveSender.start(bgCurrentStrokeSid, bgCurrentStroke);
     redrawBg();
     e.preventDefault();
   });
@@ -2678,12 +2855,14 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     if (tool === 'line') {
       const p = bgScreenToWorld(e.clientX, e.clientY);
       bgCurrentStroke.points[1] = p;
+      bgLiveSender.replacePoint(p);
     } else {
       const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
       const list = events.length ? events : [e];
       for (const ev of list) {
         const p = bgScreenToWorld(ev.clientX, ev.clientY);
         bgCurrentStroke.points.push(p);
+        bgLiveSender.point(p);
       }
     }
     redrawBg();
@@ -2700,14 +2879,19 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     if (!bgDrawing) return;
     bgDrawing = false;
     if (bgCurrentStroke) {
+      let finalPoint = null;
       if (typeof e.clientX === 'number') {
         const p = bgScreenToWorld(e.clientX, e.clientY);
+        finalPoint = p;
         if (tool === 'line') bgCurrentStroke.points[1] = p;
         else bgCurrentStroke.points.push(p);
       }
       bgStrokes.push(bgCurrentStroke);
       bgCurrentStroke = null;
+      bgLiveSender.end(finalPoint);
+      TS.push();
     }
+    bgCurrentStrokeSid = null;
     try { canvasBg.releasePointerCapture(e.pointerId); } catch(_){}
     redrawBg();
   }
@@ -3006,6 +3190,20 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
   resizeCanvas();
   resizeBgCanvas();
   updateCursor();
+
+  // ── мост к общей синхронизации состояния тренажёра (см. tsGetState/
+  // tsApplyState в предыдущем <script>): классические <script>-теги не делят
+  // между собой let/const верхнего уровня, поэтому единственный способ
+  // дотянуться сюда снаружи — функции на window (они, в отличие от let/const,
+  // общие для всех тегов на странице) ──
+  window.__boardGetState = function(){
+    return { strokes: strokes, bgStrokes: bgStrokes };
+  };
+  window.__boardApplyState = function(state){
+    if (!state) return;
+    if (Array.isArray(state.strokes)) { strokes = state.strokes; redraw(); }
+    if (Array.isArray(state.bgStrokes)) { bgStrokes = state.bgStrokes; redrawBg(); }
+  };
 })();
 </script>
 <script>
