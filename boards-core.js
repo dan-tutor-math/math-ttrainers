@@ -41,6 +41,16 @@ function resolveColor(tok){
   }
   return tok || '#000';
 }
+// canvas 2D context НЕ умеет резолвить CSS-переменные внутри строки font
+// (в отличие от обычных DOM-элементов) — присвоение вида
+// `ctx.font = fs+'px ' + UI_FONT_FAMILY` целиком отклоняется как
+// невалидное и молча откатывается к дефолту canvas (`10px sans-serif`),
+// из-за чего ЛЮБОЙ текст на канвасе (подписи листов, надписи углов,
+// «Загрузка…» у картинок и, главное, сам инструмент «Текст») всегда
+// рисовался и измерялся крошечным 10px шрифтом независимо от заданного
+// размера. Резолвим переменную один раз здесь и везде подставляем уже
+// готовое значение семейства шрифтов, а не саму переменную
+const UI_FONT_FAMILY = getComputedStyle(document.documentElement).getPropertyValue('--font-ui').trim() || 'sans-serif';
 
 /* ═══════════════════════════════════════════════════════════════════════
    ЭКРАН 1 — список папок и досок
@@ -339,6 +349,8 @@ let curOpacity = false;    // «Полупрозрачность» — общи�
 const SEMI_OPACITY = 0.45; // сама степень прозрачности при включённом тумблере
 let radiusSetting = null;   // «заданный радиус» циркуля; null = определять кликом
 let curFontSize = 22;       // текущий размер шрифта инструмента «Текст» (в мировых единицах, как ширина линии)
+let curBold = false, curItalic = false, curUnderline = false, curStrike = false; // форматирование по умолчанию для следующего текста
+let curBgTok = null;        // цвет фона по умолчанию для следующего текста (null — без фона)
 
 let selectedId = null;
 let multiSelectIds = [];     // групповое выделение рамкой (marquee) или по общему groupId
@@ -584,13 +596,46 @@ function scheduleRedraw(){
 // пока камера (панорамирование/зум/ресайз окна) двигается
 function syncTextEditorToCam(){
   if (!textEditSession) return;
-  const { wrap, textarea, worldPt, fontSize } = textEditSession;
+  const { wrap, worldPt } = textEditSession;
   const scr = worldToScreen(worldPt);
   const r = canvas.getBoundingClientRect();
   wrap.style.left = Math.round(r.left + scr.x) + 'px';
   wrap.style.top = Math.round(r.top + scr.y) + 'px';
-  const fs = fontSize || curFontSize || 22;
-  textarea.style.fontSize = Math.max(10, fs * cam.zoom) + 'px';
+  applyTextEditorLiveStyle();
+}
+// растягивает textarea точно по содержимому (ширина и высота), без переноса
+// строк — canvas ниже тоже никогда не переносит текст сам, только по явным
+// «\n»; если разрешить textarea переноситься по своей ширине, то, что видно
+// при наборе (несколько коротких визуальных строк), разойдётся с финальным
+// рендером на доске (одна длинная строка) — из-за этого итоговый текст и
+// выглядел «не тем, что было при редактировании»
+function autoGrowTextarea(ta){
+  ta.style.width = '0px';
+  ta.style.height = '0px';
+  const sw = ta.scrollWidth, sh = ta.scrollHeight;
+  ta.style.width = Math.max(24, sw) + 'px';
+  ta.style.height = Math.max(20, sh) + 'px';
+}
+// единая точка, где живые данные редактируемого текста (размер, цвет, фон,
+// начертание) превращаются в то, что видно в textarea — используется и при
+// открытии поля, и при каждом изменении в панели инструментов, и на каждом
+// кадре синхронизации с камерой (syncTextEditorToCam), поэтому то, что
+// видно во время редактирования, ВСЕГДА совпадает с тем, что будет
+// сохранено в объект при подтверждении (WYSIWYG)
+function applyTextEditorLiveStyle(){
+  if (!textEditSession) return;
+  const s = textEditSession;
+  const fs = s.fontSize || curFontSize || 22;
+  s.textarea.style.fontSize = Math.max(4, fs * cam.zoom) + 'px';
+  s.textarea.style.fontWeight = s.bold ? '700' : '400';
+  s.textarea.style.fontStyle = s.italic ? 'italic' : 'normal';
+  const deco = [];
+  if (s.underline) deco.push('underline');
+  if (s.strike) deco.push('line-through');
+  s.textarea.style.textDecoration = deco.length ? deco.join(' ') : 'none';
+  s.textarea.style.color = resolveColor(s.color);
+  s.textarea.style.background = s.bg ? resolveColor(s.bg) : '';
+  autoGrowTextarea(s.textarea);
 }
 
 /* доска — сплошное полотно: одна заливка «бумаги» на весь мир (0..totalW,
@@ -662,7 +707,7 @@ function drawSheetsAndGrid(c, camv, w, h){
     c.globalAlpha = 0.55;
     // размер шрифта — не больше одной клетки (в мировых единицах), но и не
     // мельче читаемого минимума на маленьком масштабе
-    c.font = Math.max(8, Math.min(B.cellSize*0.6, B.cellSize) * camv.zoom) + 'px var(--font-ui), sans-serif';
+    c.font = Math.max(8, Math.min(B.cellSize*0.6, B.cellSize) * camv.zoom) + 'px ' + UI_FONT_FAMILY;
     c.textAlign = 'left'; c.textBaseline = 'top';
     const pad = 3 * camv.zoom;
     for (let row = rowFrom; row <= rowTo; row++){
@@ -763,7 +808,7 @@ function renderImageObject(c, obj, camv){
     roundRectPath(c, p0.x, p0.y, w, h, 8);
     c.fill();
     c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted-2').trim() || '#888';
-    c.font = '13px var(--font-ui), sans-serif'; c.textAlign='center'; c.textBaseline='middle';
+    c.font = '13px ' + UI_FONT_FAMILY; c.textAlign='center'; c.textBaseline='middle';
     c.fillText('Загрузка…', p0.x + w/2, p0.y + h/2);
   }
   c.restore();
@@ -827,10 +872,29 @@ function renderObject(c, obj, camv, opts){
     const p = wp[0];
     const fs = Math.max(1, (obj.fontSize || 22) * camv.zoom);
     c.setLineDash([]);
-    c.font = fs + 'px var(--font-ui), sans-serif';
+    c.font = (obj.italic?'italic ':'') + (obj.bold?'700 ':'') + fs + 'px ' + UI_FONT_FAMILY;
     c.textAlign = 'left'; c.textBaseline = 'top';
     const lineH = fs * 1.25;
-    (obj.content || '').split('\n').forEach((line, i) => { c.fillText(line, p.x, p.y + i*lineH); });
+    if (obj.bg){
+      c.save();
+      c.fillStyle = resolveColor(obj.bg);
+      c.fillRect(p.x, p.y, (obj.w||0)*camv.zoom, (obj.h||0)*camv.zoom);
+      c.restore();
+    }
+    c.fillStyle = color;
+    (obj.content || '').split('\n').forEach((line, i) => {
+      const ly = p.y + i*lineH;
+      c.fillText(line, p.x, ly);
+      if (obj.underline || obj.strike){
+        const lw = c.measureText(line).width;
+        c.save();
+        c.strokeStyle = color;
+        c.lineWidth = Math.max(1, fs*0.06);
+        if (obj.underline){ const uy = ly + fs*0.92; c.beginPath(); c.moveTo(p.x, uy); c.lineTo(p.x+lw, uy); c.stroke(); }
+        if (obj.strike){ const sy = ly + fs*0.55; c.beginPath(); c.moveTo(p.x, sy); c.lineTo(p.x+lw, sy); c.stroke(); }
+        c.restore();
+      }
+    });
   }
   c.restore();
 }
@@ -850,7 +914,7 @@ function drawAngleArcAndLabel(c, v, a, b, camv, width){
   const midAng = ang1 + (ang2-ang1)/2;
   const lx = v.x + Math.cos(midAng)*(arcR+16*camv.zoom), ly = v.y + Math.sin(midAng)*(arcR+16*camv.zoom);
   c.save();
-  c.font = (13*Math.max(0.7,Math.min(1.4,camv.zoom))) + 'px var(--font-ui), sans-serif';
+  c.font = (13*Math.max(0.7,Math.min(1.4,camv.zoom))) + 'px ' + UI_FONT_FAMILY;
   c.textAlign='center'; c.textBaseline='middle'; c.setLineDash([]);
   c.fillText(Math.round(deg) + '°', lx, ly);
   c.restore();
@@ -1096,7 +1160,7 @@ function measureTextObj(obj){
   const fs = obj.fontSize || 22;
   const lines = (obj.content || '').split('\n');
   ctx.save();
-  ctx.font = fs + 'px var(--font-ui), sans-serif';
+  ctx.font = (obj.italic?'italic ':'') + (obj.bold?'700 ':'') + fs + 'px ' + UI_FONT_FAMILY;
   let maxW = 0;
   lines.forEach(l => { const w = ctx.measureText(l).width; if (w > maxW) maxW = w; });
   ctx.restore();
@@ -1110,21 +1174,16 @@ function openTextEditor(existingObj, worldPt){
   if (textEditSession) confirmTextEditor();
   const isNew = !existingObj;
   const p = existingObj ? existingObj.points[0] : worldPt;
-  const scr = worldToScreen(p);
-  const r = canvas.getBoundingClientRect();
 
   const wrap = document.createElement('div');
   wrap.className = 'bd-text-editor';
-  wrap.style.left = Math.round(r.left + scr.x) + 'px';
-  wrap.style.top = Math.round(r.top + scr.y) + 'px';
 
   const ta = document.createElement('textarea');
   ta.className = 'bd-text-editor-input';
   ta.value = existingObj ? existingObj.content : '';
   ta.placeholder = 'Текст…';
-  ta.style.color = resolveColor(existingObj ? existingObj.color : curColorTok);
-  const fs = (existingObj ? existingObj.fontSize : curFontSize) || 22;
-  ta.style.fontSize = Math.max(10, fs * cam.zoom) + 'px';
+  ta.setAttribute('wrap', 'off'); // без авто-переноса — canvas тоже не переносит текст сам, только по «\n» (см. autoGrowTextarea)
+  ta.spellcheck = false;
 
   const btns = document.createElement('div');
   btns.className = 'bd-text-editor-btns';
@@ -1134,54 +1193,26 @@ function openTextEditor(existingObj, worldPt){
   cancelBtn.type = 'button'; cancelBtn.className = 'bd-text-editor-cancel'; cancelBtn.title = 'Отмена'; cancelBtn.textContent = '\u2715';
   btns.appendChild(okBtn); btns.appendChild(cancelBtn);
 
-  // ── строка с размером шрифта — «Aa», редактируемое число, стрелочки
-  //    вверх/вниз; меняет размер ИМЕННО этого (открытого прямо сейчас)
-  //    текста, с живым предпросмотром, и заодно становится новым размером
-  //    по умолчанию для следующего текста (как и цвет/толщина линии) ──
-  const sizeRow = document.createElement('div');
-  sizeRow.className = 'bd-text-editor-sizerow';
-  const sizeLabel = document.createElement('span');
-  sizeLabel.className = 'bd-text-editor-size-label';
-  sizeLabel.textContent = 'Aa';
-  const sizeVal = document.createElement('input');
-  sizeVal.type = 'number'; sizeVal.className = 'bd-text-editor-size-val';
-  sizeVal.min = '8'; sizeVal.max = '96'; sizeVal.step = '1'; sizeVal.title = 'Размер шрифта';
-  sizeVal.value = fs;
-  const sizeStepper = document.createElement('div');
-  sizeStepper.className = 'bd-text-editor-size-stepper';
-  const sizeUpBtn = document.createElement('button');
-  sizeUpBtn.type = 'button'; sizeUpBtn.className = 'bd-text-editor-size-up'; sizeUpBtn.title = 'Крупнее';
-  sizeUpBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M4 15l8-8 8 8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  const sizeDownBtn = document.createElement('button');
-  sizeDownBtn.type = 'button'; sizeDownBtn.className = 'bd-text-editor-size-down'; sizeDownBtn.title = 'Мельче';
-  sizeDownBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M4 9l8 8 8-8" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
-  sizeStepper.appendChild(sizeUpBtn); sizeStepper.appendChild(sizeDownBtn);
-  sizeRow.appendChild(sizeLabel); sizeRow.appendChild(sizeVal); sizeRow.appendChild(sizeStepper);
-
-  wrap.appendChild(ta); wrap.appendChild(sizeRow); wrap.appendChild(btns);
+  wrap.appendChild(ta); wrap.appendChild(btns);
   document.body.appendChild(wrap);
 
-  textEditSession = { objId: existingObj ? existingObj.id : null, isNew, worldPt: p, textarea: ta, wrap, fontSize: fs, sizeInput: sizeVal };
+  textEditSession = {
+    objId: existingObj ? existingObj.id : null, isNew, worldPt: p, textarea: ta, wrap,
+    fontSize: (existingObj ? existingObj.fontSize : curFontSize) || 22,
+    bold: existingObj ? !!existingObj.bold : curBold,
+    italic: existingObj ? !!existingObj.italic : curItalic,
+    underline: existingObj ? !!existingObj.underline : curUnderline,
+    strike: existingObj ? !!existingObj.strike : curStrike,
+    color: existingObj ? existingObj.color : curColorTok,
+    bg: existingObj ? (existingObj.bg || null) : curBgTok,
+    locked: existingObj ? !!existingObj.locked : false,
+  };
 
-  // клики/фокус на строке размера не должны уводить фокус с textarea раньше
-  // времени (иначе сработал бы blur и поле подтвердилось бы неожиданно)
-  sizeUpBtn.addEventListener('mousedown', (e) => e.preventDefault());
-  sizeDownBtn.addEventListener('mousedown', (e) => e.preventDefault());
-  sizeVal.addEventListener('pointerdown', (e) => e.stopPropagation());
-  sizeUpBtn.addEventListener('click', () => setCurFontSize((textEditSession.fontSize || curFontSize) + 2));
-  sizeDownBtn.addEventListener('click', () => setCurFontSize((textEditSession.fontSize || curFontSize) - 2));
-  // пока печатают число вручную — сразу показываем предпросмотр на холсте
-  // (без округления/ограничений диапазона, чтобы не мешать вводу), а
-  // фиксируем (округляем, ограничиваем 8..96, запоминаем как размер по
-  // умолчанию) уже по Enter/потере фокуса поля
-  sizeVal.addEventListener('input', () => {
-    const v = parseFloat(sizeVal.value);
-    if (isFinite(v) && v > 0) ta.style.fontSize = Math.max(4, v * cam.zoom) + 'px';
-  });
-  sizeVal.addEventListener('change', () => setCurFontSize(parseFloat(sizeVal.value) || curFontSize));
-  sizeVal.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter'){ e.preventDefault(); sizeVal.blur(); ta.focus(); }
-  });
+  // позиционируем и применяем начальный вид (размер/начертание/цвет/фон) —
+  // тем же кодом, который потом синхронизирует поле на каждом кадре, пока
+  // двигается камера, так что расхождений между «во время» и «после» нет
+  syncTextEditorToCam();
+  openTextEditToolbar();
 
   // клик по самим кнопкам не должен раньше времени увести фокус с textarea
   // (иначе сработал бы blur ниже и вызвал confirm ещё до клика по кнопке)
@@ -1190,13 +1221,12 @@ function openTextEditor(existingObj, worldPt){
   okBtn.addEventListener('click', () => confirmTextEditor());
   cancelBtn.addEventListener('click', () => cancelTextEditor());
   // клик куда угодно ещё (по доске, по панели инструментов...) — считаем
-  // подтверждением, как только поле теряет фокус
-  function confirmOnBlurUnlessWithinPopup(e){
-    if (e.relatedTarget && wrap.contains(e.relatedTarget)) return; // фокус ушёл на другой элемент этого же попапа (например, поле размера) — не подтверждаем
-    if (textEditSession) confirmTextEditor();
-  }
-  ta.addEventListener('blur', confirmOnBlurUnlessWithinPopup);
-  sizeVal.addEventListener('blur', confirmOnBlurUnlessWithinPopup);
+  // подтверждением, как только поле теряет фокус. Кнопки новой панели
+  // редактирования (над доком) гасят mousedown централизованно (см. optbar
+  // ниже) и поэтому фокус не отнимают — сюда «естественный» blur прилетает
+  // только от кликов ПО-НАСТОЯЩЕМУ мимо (холст, другой инструмент и т.п.)
+  ta.addEventListener('blur', () => { if (textEditSession) confirmTextEditor(); });
+  ta.addEventListener('input', () => autoGrowTextarea(ta));
   ta.addEventListener('keydown', (e) => {
     if (e.key === 'Escape'){ e.preventDefault(); cancelTextEditor(); }
     else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)){ e.preventDefault(); confirmTextEditor(); }
@@ -1213,26 +1243,27 @@ function openTextEditor(existingObj, worldPt){
 
 function confirmTextEditor(){
   if (!textEditSession) return;
-  const { objId, isNew, worldPt, textarea, wrap, fontSize } = textEditSession;
+  const s = textEditSession;
   // снимаем сессию ДО удаления поля из DOM — удаление сфокусированного
   // textarea может само по себе синхронно вызвать 'blur' (см. обработчик
   // выше), и без этого confirmTextEditor() вызвался бы повторно, вложенно
   textEditSession = null;
-  const value = textarea.value;
-  wrap.remove();
+  closeTextEditToolbar();
+  const value = s.textarea.value;
+  s.wrap.remove();
   if (!value || !value.trim()) return; // пустой текст — ничего не создаём и не сохраняем
-  const fs = fontSize || curFontSize || 22;
-  if (isNew){
-    const obj = { id: uid(), type:'text', color: curColorTok, fontSize: fs, points:[worldPt], content: value };
+  const fields = { color: s.color, fontSize: s.fontSize, bold: s.bold, italic: s.italic, underline: s.underline, strike: s.strike, bg: s.bg, locked: s.locked };
+  if (s.isNew){
+    const obj = Object.assign({ id: uid(), type:'text', points:[s.worldPt], content: value }, fields);
     if (curOpacity) obj.opacity = SEMI_OPACITY;
     measureTextObj(obj);
     commitObject(obj);
   } else {
-    const obj = B.objects.find(o=>o.id===objId);
+    const obj = B.objects.find(o=>o.id===s.objId);
     if (obj){
       pushUndo();
       obj.content = value;
-      obj.fontSize = fs;
+      Object.assign(obj, fields);
       measureTextObj(obj);
       saveDB(); scheduleRedraw();
     }
@@ -1243,6 +1274,7 @@ function cancelTextEditor(){
   if (!textEditSession) return;
   const { wrap } = textEditSession;
   textEditSession = null; // тот же порядок, что и в confirmTextEditor — на случай синхронного blur при remove()
+  closeTextEditToolbar();
   wrap.remove();
   scheduleRedraw();
 }
@@ -1330,6 +1362,9 @@ canvas.addEventListener('dblclick', (e) => {
     if (hit && hit.type === 'text'){
       armedHandId = null; selectedId = hit.id;
       openTextEditor(hit, null);
+    } else if (hit && hit.type === 'image' && hit.isFormula){
+      armedHandId = null; selectedId = hit.id;
+      openFormulaEditor(hit);
     } else if (hit && hit.type === 'image' && hit.locked){
       armedHandId = hit.id; selectedId = hit.id;
     } else if (hit){
@@ -1634,7 +1669,12 @@ canvas.addEventListener('pointerdown', (e) => {
 
   if (tool === 'text'){
     if (textEditSession) return; // поле уже открыто — этот клик его закроет через blur, сам по себе новый текст не начинает
-    openTextEditor(null, maybeSnap(pt));
+    let hitText = null;
+    for (let i=B.objects.length-1;i>=0;i--){
+      if (B.objects[i].type === 'text' && hitTestObject(B.objects[i], pt, 8/cam.zoom)){ hitText = B.objects[i]; break; }
+    }
+    if (hitText){ selectedId = hitText.id; openTextEditor(hitText, null); }
+    else openTextEditor(null, maybeSnap(pt));
     return;
   }
 
@@ -1844,6 +1884,7 @@ function updateCursor(){
    ПАНЕЛЬ ИНСТРУМЕНТОВ
    ═══════════════════════════════════════════════════════════════════════ */
 const optbar = document.getElementById('bdOptbar');
+optbar.addEventListener('mousedown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
 const TOOLS_WITH_OPTS = ['pen','line','curve','quad','poly','ellipse','circle','angle','text'];
 document.querySelectorAll('.bd-tool[data-tool]').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -1868,23 +1909,55 @@ document.querySelectorAll('.bd-tool[data-tool]').forEach(btn => {
     if (tool !== 'select' && tool !== 'hand'){ selectedId = null; multiSelectIds = []; rfSelectedId = null; rfMultiSelectIds = []; }
     updateContextMenu(); // синхронно, не дожидаясь кадра — иначе меню на миг перехватывает клик по холсту под ним
     document.querySelectorAll('.bd-tool[data-tool]').forEach(b=>b.classList.toggle('active', b===btn));
-    optbar.classList.toggle('open', TOOLS_WITH_OPTS.includes(tool));
-    layoutOptbar();
-    layoutRefPanel();
-    document.getElementById('bdRadiusField').style.display = (tool==='circle') ? 'flex' : 'none';
-    const arrowDisplay = (tool==='line') ? 'flex' : 'none';
-    document.getElementById('toggleArrowEnd').style.display = arrowDisplay;
-    document.getElementById('toggleArrowBoth').style.display = arrowDisplay;
-    const isTextTool = (tool === 'text');
-    document.getElementById('bdFontSizeField').style.display = isTextTool ? 'flex' : 'none';
-    document.querySelector('.bd-width').style.display = isTextTool ? 'none' : 'flex';
-    document.getElementById('toggleDash').style.display = isTextTool ? 'none' : '';
-    document.getElementById('toggleFill').style.display = isTextTool ? 'none' : '';
-    if (textEditSession) confirmTextEditor(); // смена инструмента во время редактирования текста — подтверждаем, как и при клике мимо
+    if (textEditSession) confirmTextEditor(); // смена инструмента во время редактирования текста — подтверждаем, как и при клике мимо (уже восстановит панель через closeTextEditToolbar)
+    applyOptbarForTool();
     updateCursor();
     rfUpdateCursor();
   });
 });
+// обычное состояние доп. панели инструментов — набор полей/переключателей
+// зависит от выбранного ИНСТРУМЕНТА. Вынесено отдельной функцией, чтобы её
+// же можно было позвать при ЗАКРЫТИИ панели редактирования текста (та
+// показывается не по инструменту, а по факту открытой сессии редактирования
+// — см. openTextEditToolbar/closeTextEditToolbar ниже)
+function applyOptbarForTool(){
+  optbar.classList.toggle('open', TOOLS_WITH_OPTS.includes(tool));
+  optbar.classList.remove('text-editing');
+  layoutOptbar();
+  layoutRefPanel();
+  document.getElementById('bdRadiusField').style.display = (tool==='circle') ? 'flex' : 'none';
+  const arrowDisplay = (tool==='line') ? 'flex' : 'none';
+  document.getElementById('toggleArrowEnd').style.display = arrowDisplay;
+  document.getElementById('toggleArrowBoth').style.display = arrowDisplay;
+  const isTextTool = (tool === 'text');
+  document.getElementById('bdFontSizeField').style.display = isTextTool ? 'flex' : 'none';
+  document.querySelector('.bd-width').style.display = isTextTool ? 'none' : 'flex';
+  document.getElementById('toggleDash').style.display = isTextTool ? 'none' : '';
+  document.getElementById('toggleFill').style.display = isTextTool ? 'none' : '';
+}
+// состояние доп. панели ПОКА АКТИВНА сессия редактирования текста — полная
+// панель форматирования (f(x), Ж/К/Ч/З, Aa+размер, цвет текста/фона,
+// замок), НАД основным доком, независимо от того, каким инструментом
+// («рука» через двойной клик или «текст») редактирование было открыто
+function openTextEditToolbar(){
+  optbar.classList.add('open');
+  optbar.classList.add('text-editing');
+  document.getElementById('bdFontSizeField').style.display = 'flex';
+  document.querySelector('.bd-width').style.display = 'none';
+  document.getElementById('toggleDash').style.display = 'none';
+  document.getElementById('toggleFill').style.display = 'none';
+  document.getElementById('bdRadiusField').style.display = 'none';
+  document.getElementById('toggleArrowEnd').style.display = 'none';
+  document.getElementById('toggleArrowBoth').style.display = 'none';
+  document.getElementById('fontSizeVal').textContent = (textEditSession && textEditSession.fontSize) || curFontSize;
+  layoutOptbar();
+  layoutRefPanel();
+  renderBgSwatches();
+  updateTextFmtButtons();
+}
+function closeTextEditToolbar(){
+  applyOptbarForTool();
+}
 
 /* ═══════════════════════════════════════════════════════════════════════
    ПОЛОЖЕНИЕ И РАЗМЕР ПАНЕЛИ ИНСТРУМЕНТОВ — можно перетащить целиком к
@@ -2988,6 +3061,7 @@ function renderSwatches(){
         return;
       }
       curColorTok = sw.dataset.tok;
+      if (textEditSession){ textEditSession.color = curColorTok; applyTextEditorLiveStyle(); }
       renderSwatches();
     });
   });
@@ -2998,6 +3072,7 @@ document.getElementById('bdSwatchAdd').addEventListener('click', () => document.
 document.getElementById('bdColorInput').addEventListener('input', (e) => {
   const hex = e.target.value;
   curColorTok = hex;
+  if (textEditSession){ textEditSession.color = curColorTok; applyTextEditorLiveStyle(); }
   B.recentColors = [hex].concat(B.recentColors.filter(t=>t!==hex)).slice(0,8);
   saveDB(); renderSwatches();
 });
@@ -3010,13 +3085,85 @@ function setCurFontSize(v){
   document.getElementById('fontSizeVal').textContent = v;
   if (textEditSession){
     textEditSession.fontSize = v;
-    if (textEditSession.sizeInput) textEditSession.sizeInput.value = v;
-    textEditSession.textarea.style.fontSize = Math.max(10, v * cam.zoom) + 'px';
+    applyTextEditorLiveStyle();
   }
   return v;
 }
-document.getElementById('fontSizeMinus').addEventListener('click', () => setCurFontSize(curFontSize-2));
-document.getElementById('fontSizePlus').addEventListener('click', () => setCurFontSize(curFontSize+2));
+document.getElementById('fontSizeMinus').addEventListener('click', () => setCurFontSize((textEditSession ? textEditSession.fontSize : curFontSize) - 2));
+document.getElementById('fontSizePlus').addEventListener('click', () => setCurFontSize((textEditSession ? textEditSession.fontSize : curFontSize) + 2));
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ПАНЕЛЬ РЕДАКТИРОВАНИЯ ТЕКСТА — форматирование (Ж/К/Ч/З), цвет фона,
+   замок. Кнопки живут в #bdOptbar постоянно (см. openTextEditToolbar);
+   слушатели вешаются один раз здесь и читают/пишут textEditSession.
+   ═══════════════════════════════════════════════════════════════════════ */
+function updateTextFmtButtons(){
+  const s = textEditSession;
+  document.getElementById('bdTextBold').classList.toggle('on', !!(s && s.bold));
+  document.getElementById('bdTextItalic').classList.toggle('on', !!(s && s.italic));
+  document.getElementById('bdTextUnderline').classList.toggle('on', !!(s && s.underline));
+  document.getElementById('bdTextStrike').classList.toggle('on', !!(s && s.strike));
+  document.getElementById('bdTextLockBtn').classList.toggle('on', !!(s && s.locked));
+}
+document.getElementById('bdTextBold').addEventListener('click', () => {
+  if (!textEditSession) return;
+  textEditSession.bold = curBold = !textEditSession.bold;
+  applyTextEditorLiveStyle(); updateTextFmtButtons();
+});
+document.getElementById('bdTextItalic').addEventListener('click', () => {
+  if (!textEditSession) return;
+  textEditSession.italic = curItalic = !textEditSession.italic;
+  applyTextEditorLiveStyle(); updateTextFmtButtons();
+});
+document.getElementById('bdTextUnderline').addEventListener('click', () => {
+  if (!textEditSession) return;
+  textEditSession.underline = curUnderline = !textEditSession.underline;
+  applyTextEditorLiveStyle(); updateTextFmtButtons();
+});
+document.getElementById('bdTextStrike').addEventListener('click', () => {
+  if (!textEditSession) return;
+  textEditSession.strike = curStrike = !textEditSession.strike;
+  applyTextEditorLiveStyle(); updateTextFmtButtons();
+});
+// замок текста — как и у закреплённых картинок, защищает ТОЛЬКО от ластика
+// (см. eraseAt/rfEraseAt: они дженерик и пропускают любой obj.locked), а не
+// от перемещения — та строгая «взвод двойным кликом» логика в pointerdown
+// завязана именно на type==='image', текста не касается
+document.getElementById('bdTextLockBtn').addEventListener('click', () => {
+  if (!textEditSession) return;
+  textEditSession.locked = !textEditSession.locked;
+  updateTextFmtButtons();
+});
+
+const BG_SWATCH_PALETTE = ['#FFF59D', '#A5D6A7', '#90CAF9', '#F8BBD0', '#FFCC80', '#CE93D8'];
+function renderBgSwatches(){
+  const wrap = document.getElementById('bdBgSwatches');
+  if (!wrap) return;
+  const curBg = textEditSession ? textEditSession.bg : curBgTok;
+  const items = [null].concat(BG_SWATCH_PALETTE);
+  wrap.innerHTML = items.map(tok => {
+    const active = (tok === curBg) ? ' active' : '';
+    if (tok === null) return `<button class="bd-swatch bd-swatch-none${active}" data-tok="" title="Без фона"></button>`;
+    return `<button class="bd-swatch${active}" data-tok="${escHtml(tok)}" style="background:${tok}"></button>`;
+  }).join('');
+  wrap.querySelectorAll('.bd-swatch').forEach(sw => {
+    sw.addEventListener('click', () => {
+      const tok = sw.dataset.tok || null;
+      curBgTok = tok;
+      if (textEditSession) textEditSession.bg = tok;
+      renderBgSwatches();
+      applyTextEditorLiveStyle();
+    });
+  });
+}
+document.getElementById('bdBgSwatchAdd').addEventListener('click', () => document.getElementById('bdBgColorInput').click());
+document.getElementById('bdBgColorInput').addEventListener('input', (e) => {
+  const hex = e.target.value;
+  curBgTok = hex;
+  if (textEditSession) textEditSession.bg = hex;
+  renderBgSwatches();
+  applyTextEditorLiveStyle();
+});
 document.getElementById('toggleDash').addEventListener('click', (e) => { curDash=!curDash; e.currentTarget.classList.toggle('on',curDash); });
 document.getElementById('toggleFill').addEventListener('click', (e) => { curFill=!curFill; e.currentTarget.classList.toggle('on',curFill); });
 document.getElementById('toggleSnap').addEventListener('click', (e) => { curSnap=!curSnap; e.currentTarget.classList.toggle('on',curSnap); });
@@ -3542,6 +3689,121 @@ function rasterizeBasketItem(item){
     im.src = svgUrl;
   });
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ФОРМУЛЫ (f(x)) — тот же приём, что и rasterizeBasketItem() выше: LaTeX
+   рисуется движком KaTeX, уже встроенным в страницу (см. tex() в
+   boards.html), в SVG <foreignObject>, а тот перерисовывается в PNG через
+   canvas — получается обычная картинка на доске (type:'image'), поэтому
+   перетаскивание/ресайз/ластик/замок/выделение достаются бесплатно от уже
+   существующей инфраструктуры картинок; своё у формулы — только пометка
+   isFormula:true и исходный latex (для повторного редактирования).
+   ═══════════════════════════════════════════════════════════════════════ */
+function rasterizeFormula(latex, fontSizePx){
+  return new Promise((resolve, reject) => {
+    let html;
+    try { html = tex(latex); } catch(e){ html = escapeHtmlBd(latex); }
+    const measure = document.createElement('div');
+    measure.style.cssText = `position:fixed;left:-99999px;top:0;display:inline-block;font-size:${fontSizePx}px;line-height:1.25;`;
+    measure.innerHTML = html;
+    document.body.appendChild(measure);
+    const w = Math.max(10, Math.ceil(measure.getBoundingClientRect().width));
+    const h = Math.max(10, Math.ceil(measure.getBoundingClientRect().height));
+    document.body.removeChild(measure);
+
+    const pad = Math.max(2, Math.round(fontSizePx * 0.15));
+    const W = w + pad*2, H = h + pad*2;
+    const cs = getComputedStyle(document.documentElement);
+    const pencil = cs.getPropertyValue('--pencil').trim() || '#1D1D1F';
+    const katexCssText = (document.getElementById('katexCssBlock') || {}).textContent || '';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
+      <foreignObject width="100%" height="100%">
+        <div xmlns="http://www.w3.org/1999/xhtml" style="width:${W}px;height:${H}px;box-sizing:border-box;padding:${pad}px;font-size:${fontSizePx}px;line-height:1.25;color:${pencil};">
+          <style>${katexCssText}.katex{visibility:visible;}</style>
+          ${html}
+        </div>
+      </foreignObject>
+    </svg>`;
+    const svgUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+    const im = new Image();
+    im.onload = () => {
+      const scale = 2; // повыше плотность пикселей — иначе формула размывается при увеличении на доске
+      const c = document.createElement('canvas');
+      c.width = W * scale; c.height = H * scale;
+      const cx = c.getContext('2d');
+      cx.scale(scale, scale);
+      cx.drawImage(im, 0, 0, W, H); // фон намеренно НЕ заливаем — формула, как и текст, должна быть прозрачной поверх доски
+      try { resolve({ dataUrl: c.toDataURL('image/png'), w: W, h: H }); }
+      catch(err){ reject(err); }
+    };
+    im.onerror = reject;
+    im.src = svgUrl;
+  });
+}
+
+let formulaEditState = null; // { objId, anchor, fontPx } — id редактируемого объекта-формулы (либо null для новой), точка вставки и размер шрифта — снимаются СРАЗУ при открытии, а не при подтверждении
+function openFormulaEditor(existingObj){
+  const editor = document.getElementById('bdFormulaEditor');
+  const input = document.getElementById('bdFormulaInput');
+  input.value = existingObj ? (existingObj.latex || '') : '';
+  const fontPx = (textEditSession ? textEditSession.fontSize : curFontSize) || 22;
+  // якорь для НОВОЙ формулы снимаем прямо сейчас, пока сессия редактирования
+  // текста ещё точно жива — фокус вот-вот уйдёт в поле формулы, и это само
+  // закроет/подтвердит открытый текст (как и смена инструмента), обнулив
+  // textEditSession ещё до нажатия «подтвердить» в попапе формулы
+  const anchor = (!existingObj && textEditSession)
+    ? { x: textEditSession.worldPt.x, y: textEditSession.worldPt.y + fontPx*1.6 }
+    : null;
+  formulaEditState = { objId: existingObj ? existingObj.id : null, anchor, fontPx };
+  editor.style.display = 'flex';
+  updateFormulaPreview();
+  setTimeout(() => { input.focus(); input.select(); }, 0);
+}
+function closeFormulaEditor(){
+  document.getElementById('bdFormulaEditor').style.display = 'none';
+  formulaEditState = null;
+}
+function updateFormulaPreview(){
+  const input = document.getElementById('bdFormulaInput');
+  const prev = document.getElementById('bdFormulaPreview');
+  const v = input.value.trim();
+  if (!v){ prev.innerHTML = ''; return; }
+  try { prev.innerHTML = tex(input.value); } catch(e){ prev.textContent = input.value; }
+}
+function confirmFormulaEditor(){
+  const state = formulaEditState;
+  const input = document.getElementById('bdFormulaInput');
+  const latex = input.value.trim();
+  if (!latex || !state){ closeFormulaEditor(); return; }
+  rasterizeFormula(latex, state.fontPx).then(({dataUrl, w, h}) => {
+    if (state.objId){
+      const obj = B.objects.find(o=>o.id===state.objId);
+      if (obj){
+        pushUndo();
+        obj.src = dataUrl; obj.w = w; obj.h = h; obj.natW = w; obj.natH = h; obj.latex = latex;
+        saveDB(); scheduleRedraw();
+      }
+    } else {
+      // новая формула — рядом с текстом, который редактировался в момент
+      // открытия попапа (якорь снят заранее в openFormulaEditor); если его
+      // не было — просто в центре видимой области доски
+      const pt = state.anchor || (() => { const c = screenToWorld(cssW/2, cssH/2); return { x: c.x - w/2, y: c.y - h/2 }; })();
+      const obj = { id: uid(), type:'image', src: dataUrl, points:[pt], w, h, natW:w, natH:h, isFormula:true, latex };
+      commitObject(obj);
+    }
+    closeFormulaEditor();
+  }).catch(() => { closeFormulaEditor(); });
+}
+document.getElementById('bdFxBtn').addEventListener('click', () => openFormulaEditor(null));
+document.getElementById('bdFormulaInput').addEventListener('input', updateFormulaPreview);
+document.getElementById('bdFormulaOk').addEventListener('mousedown', (e) => e.preventDefault());
+document.getElementById('bdFormulaCancel').addEventListener('mousedown', (e) => e.preventDefault());
+document.getElementById('bdFormulaOk').addEventListener('click', () => confirmFormulaEditor());
+document.getElementById('bdFormulaCancel').addEventListener('click', () => closeFormulaEditor());
+document.getElementById('bdFormulaInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Escape'){ e.preventDefault(); closeFormulaEditor(); }
+  else if (e.key === 'Enter'){ e.preventDefault(); confirmFormulaEditor(); }
+});
 
 function openBasketModal(){
   renderBasketPicker();

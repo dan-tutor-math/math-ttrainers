@@ -415,23 +415,37 @@ html[data-theme="dark"] .bd-optbar{box-shadow:var(--shadow), inset 0 1px 0 rgba(
 .bd-imgsrc-pop button:hover{background:var(--hover-1);}
 
 /* ── инструмент «Текст»: всплывающее поле ввода прямо на месте клика по
-   доске — подтверждение галочкой, отмена крестиком (см. ТЗ) ── */
+   доске — только сама подложка с текстом и две компактные прозрачные
+   кнопки (подтвердить/отменить); всё форматирование — в отдельной панели
+   над основным доком, см. .bd-text-edit-extra ниже ── */
 .bd-text-editor{position:fixed;z-index:280;display:flex;flex-direction:column;gap:6px;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:12px;box-shadow:var(--shadow);padding:8px;}
-.bd-text-editor-input{min-width:140px;min-height:1.4em;resize:both;border:1px solid var(--glass-border);border-radius:8px;background:var(--card);padding:5px 7px;font-family:var(--font-ui),sans-serif;line-height:1.25;outline:none;}
+.bd-text-editor-input{box-sizing:border-box;min-width:24px;min-height:1.4em;resize:none;border:1px solid var(--glass-border);border-radius:8px;background:var(--card);padding:5px 7px;font-family:var(--font-ui),sans-serif;line-height:1.25;outline:none;overflow:hidden;white-space:pre;}
 .bd-text-editor-btns{display:flex;justify-content:flex-end;gap:6px;}
-.bd-text-editor-btns button{width:26px;height:26px;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);cursor:pointer;font-size:13px;line-height:1;}
-.bd-text-editor-btns button:hover{background:var(--hover-1);}
+.bd-text-editor-btns button{width:24px;height:24px;border-radius:7px;border:1px solid transparent;background:transparent;cursor:pointer;font-size:13px;line-height:1;}
+.bd-text-editor-btns button:hover{background:var(--hover-1);border-color:var(--glass-border);}
 .bd-text-editor-ok{color:#2a8f52;}
 .bd-text-editor-cancel{color:var(--teacher);}
-.bd-text-editor-sizerow{display:flex;align-items:center;gap:6px;}
-.bd-text-editor-size-label{font-family:var(--font-ui),sans-serif;font-size:12px;font-weight:700;color:var(--muted-2);user-select:none;}
-.bd-text-editor-size-val{width:36px;border:1px solid var(--glass-border);border-radius:6px;background:var(--card);text-align:center;font-family:var(--font-ui),sans-serif;font-size:12.5px;color:var(--pencil);padding:3px 2px;outline:none;-moz-appearance:textfield;}
-.bd-text-editor-size-val::-webkit-outer-spin-button,.bd-text-editor-size-val::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
-.bd-text-editor-size-stepper{display:flex;flex-direction:column;border:1px solid var(--glass-border);border-radius:6px;overflow:hidden;flex:none;}
-.bd-text-editor-size-stepper button{width:18px;height:13px;border:none;background:var(--glass);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;color:var(--muted-2);}
-.bd-text-editor-size-stepper button:hover{background:var(--hover-1);color:var(--pencil);}
-.bd-text-editor-size-up{border-bottom:1px solid var(--glass-border);}
-.bd-text-editor-size-stepper svg{width:9px;height:9px;}
+
+/* ── панель редактирования текста (f(x), Ж/К/Ч/З, Aa+размер уже в
+   #bdFontSizeField, цвет фона, замок) — доп. блок внутри #bdOptbar,
+   показывается вместо обычных полей инструмента, пока открыта сессия
+   редактирования текста (openTextEditToolbar/closeTextEditToolbar);
+   display:contents — чтобы дети раскладывались как прямые элементы самого
+   #bdOptbar (тот уже flex), а не как вложенная под-панель ── */
+.bd-text-edit-extra{display:none;}
+.bd-optbar.text-editing .bd-text-edit-extra{display:contents;}
+.bd-fx-btn{width:auto;min-width:calc(30px*var(--dock-scale,1));padding:0 8px;font-family:var(--font-mono,'SF Mono','Courier New',monospace);font-style:italic;font-weight:700;font-size:12px;}
+.bd-optbar.side .bd-fx-btn{width:calc(24px*var(--dock-scale,1));min-width:0;padding:0;font-size:10px;}
+.bd-fmt-toggle b,.bd-fmt-toggle i,.bd-fmt-toggle u,.bd-fmt-toggle s{font-family:var(--font-ui),sans-serif;font-size:13px;pointer-events:none;}
+.bd-swatch-none{position:relative;background:repeating-linear-gradient(45deg, var(--card), var(--card) 3px, transparent 3px, transparent 6px);}
+.bd-swatch-none::after{content:'';position:absolute;left:8%;right:8%;top:50%;height:1.6px;background:#e5484d;transform:rotate(-45deg);}
+
+/* ── попап вставки формулы (f(x)) — компактный ввод LaTeX с живым
+   KaTeX-предпросмотром, тот же визуальный язык, что и у .bd-text-editor ── */
+.bd-formula-editor{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);z-index:290;display:none;flex-direction:column;gap:8px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:14px;box-shadow:var(--shadow);padding:12px;width:min(360px,86vw);}
+.bd-formula-input{box-sizing:border-box;width:100%;border:1px solid var(--glass-border);border-radius:8px;background:var(--card);padding:7px 9px;font-family:var(--font-mono,'SF Mono','Courier New',monospace);font-size:14px;color:var(--pencil);outline:none;}
+.bd-formula-preview{min-height:28px;padding:4px 2px;color:var(--pencil);overflow-x:auto;}
+.bd-formula-hint{font-family:var(--font-ui),sans-serif;font-size:11.5px;color:var(--muted-2);}
 
 /* ── расширенное меню выделенного объекта(ов) — появляется и сразу после
    построения фигуры, и при повторном выделении уже существующей ── */
@@ -763,6 +777,35 @@ function resolveBasketTexInHtml(html){
     <button class="bd-toggle" id="toggleOpacity" title="Полупрозрачность">
       <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="1.6"/></svg>
     </button>
+    <div class="bd-text-edit-extra" id="bdTextEditExtra">
+      <div class="bd-optsep"></div>
+      <button class="bd-toggle bd-fx-btn" id="bdFxBtn" title="Вставить формулу (LaTeX)">f(x)</button>
+      <div class="bd-optsep"></div>
+      <button class="bd-toggle bd-fmt-toggle" id="bdTextBold" title="Жирный"><b>Ж</b></button>
+      <button class="bd-toggle bd-fmt-toggle" id="bdTextItalic" title="Курсив"><i>К</i></button>
+      <button class="bd-toggle bd-fmt-toggle" id="bdTextUnderline" title="Подчёркнутый"><u>Ч</u></button>
+      <button class="bd-toggle bd-fmt-toggle" id="bdTextStrike" title="Зачёркнутый"><s>З</s></button>
+      <div class="bd-optsep"></div>
+      <div class="bd-swatch-row">
+        <div class="bd-swatches" id="bdBgSwatches"></div>
+        <button class="bd-swatch-add" id="bdBgSwatchAdd" title="Свой цвет фона">+</button>
+        <input type="color" id="bdBgColorInput" class="bd-hidden-color">
+      </div>
+      <div class="bd-optsep"></div>
+      <button class="bd-toggle" id="bdTextLockBtn" title="Закрепить — защитить от случайного удаления ластиком (перемещать можно всегда)">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="11" width="16" height="10" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle class="ac" cx="12" cy="16" r="1.6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="bd-formula-editor" id="bdFormulaEditor">
+    <input type="text" id="bdFormulaInput" class="bd-formula-input" placeholder="Например: x^2 + \frac{1}{2}" autocomplete="off" spellcheck="false">
+    <div class="bd-formula-preview" id="bdFormulaPreview"></div>
+    <div class="bd-formula-hint">Enter — вставить, Esc — отмена</div>
+    <div class="bd-text-editor-btns">
+      <button type="button" class="bd-text-editor-ok" id="bdFormulaOk" title="Вставить">&#10003;</button>
+      <button type="button" class="bd-text-editor-cancel" id="bdFormulaCancel" title="Отмена">&#10005;</button>
+    </div>
   </div>
 
   <div class="bd-dock pos-bottom" id="bdDock">
