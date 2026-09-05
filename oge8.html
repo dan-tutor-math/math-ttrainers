@@ -176,9 +176,12 @@ body{
 .board-tool-btn.hand-tool{font-size:16px;}
 .board-tool-btn.clear-btn{font-size:15px;}
 
-/* ─── доска изначально выключена — включается отдельной кнопкой под переключателем темы ─── */
-html:not([data-board="on"]) #boardCanvas,
-html:not([data-board="on"]) #boardCanvasBg,
+/* ─── Промпт №23: сами записи на доске (холсты) видны ВСЕГДА, независимо от
+   того, включён ли у ЭТОГО участника инструмент рисования — если записи
+   оставил учитель (или собеседник вообще), ученик должен видеть их поверх
+   тренажёра постоянно. Скрываем при data-board!="on" только интерактивные
+   панели инструментов (перо/ластик/зум и т.п.) — их незачем показывать,
+   пока рисование не включено именно на этом устройстве. ─── */
 html:not([data-board="on"]) .board-toolbar,
 html:not([data-board="on"]) .board-view-toolbar{display:none;}
 html[data-board="on"] #boardSpace{height:72vh;transition:height .32s ease;}
@@ -433,6 +436,11 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
   btn.addEventListener('click', function(){
     var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
     apply(cur, true);
+    // Промпт №23: своя смена темы должна долететь до собеседника — session-share.js
+    // и так подмешивает текущую тему в каждый снимок состояния (__theme), но нужен
+    // ещё явный push() именно в момент переключения, а не только при следующем
+    // структурном действии в тренажёре
+    if (window.TrainerSession) window.TrainerSession.push();
   });
   if (window.matchMedia) {
     var mq = window.matchMedia('(prefers-color-scheme: dark)');
@@ -455,6 +463,9 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
   }
   apply(false); // доска изначально выключена
   btn.addEventListener('click', function(){
+    // Промпт №23: учитель мог отдельной кнопкой отключить ученику доступ к доске —
+    // window.__boardAccessAllowed регистрируется ниже, в IIFE самой доски
+    if (window.__boardAccessAllowed && !window.__boardAccessAllowed()) return;
     apply(document.documentElement.getAttribute('data-board') !== 'on');
   });
 })();</script>
@@ -681,6 +692,9 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="html2canvas.min.js"></script>
+<script src="jspdf.umd.min.js"></script>
+<script src="lesson-history.js"></script>
 <script>
 /* ═══════════════ утилиты ═══════════════ */
 const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -1497,6 +1511,61 @@ function recordSolve() {
   recordSolveFor(curTask, curProg.hadWrongPick);
 }
 
+/* ═══ Промпт №23: права ученика (управляются учителем через панель
+   «Совместный доступ») — учителя (главного в сессии) эти ограничения
+   никогда не касаются; ввод ответа и рисование на доске всегда разрешены
+   ученику независимо от остальных прав (доска ограничивается отдельно,
+   см. permissions.board в board-IIFE, а не здесь). ═══ */
+function studentRestricted(action){
+  if (!window.TrainerSession || window.TrainerSession.isLeader()) return false;
+  const perms = window.TrainerSession.getPermissions ? window.TrainerSession.getPermissions() : null;
+  return !!perms && perms[action] === false;
+}
+let restrictedHintTimer = null;
+function flashRestrictedHint(){
+  let el = document.getElementById('restrictedHint');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'restrictedHint';
+    el.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:500;'
+      + 'background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);'
+      + 'border:1px solid var(--glass-border);border-radius:12px;padding:9px 16px;font-size:12.5px;'
+      + 'color:var(--pencil);box-shadow:var(--shadow);opacity:0;transition:opacity .2s;pointer-events:none;';
+    el.textContent = 'Учитель ограничил это действие';
+    document.body.appendChild(el);
+  }
+  clearTimeout(restrictedHintTimer);
+  el.style.opacity = '1';
+  restrictedHintTimer = setTimeout(() => { el.style.opacity = '0'; }, 1400);
+}
+// оборачивает обработчик клика: если действие ограничено для присоединившегося —
+// просто показываем подсказку и ничего не делаем; иначе выполняем как обычно
+function guardStudentAction(action, fn){
+  return function(...args){
+    if (studentRestricted(action)) { flashRestrictedHint(); return; }
+    return fn.apply(this, args);
+  };
+}
+
+/* ═══ Промпт №23: «История/конспект урока» — перед тем, как задание(я)
+   заменяются и доска над ними очищается, сохраняем снимок «как есть»
+   (если включён переключатель автосохранения) — картинку задания вместе
+   со всеми заметками поверх, в масштабе решения. targetEl — DOM-узел ровно
+   той области, которая заменяется: #card1Wrapper для одного (исходного)
+   задания, конкретная .added-task-card для одной добавленной карточки,
+   #tasksColumnsWrap целиком — когда меняется вся страница разом (смена
+   типа, общая кнопка «Обновить», очистка всех добавленных). Сама очистка
+   заметок происходит ВСЕГДА (это базовое исправление поведения доски из
+   Промпта №23), снимок — только когда включено автосохранение. ═══ */
+function snapshotAndClear(scope, targetEl){
+  if (!targetEl) return;
+  const rect = targetEl.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return; // область сейчас не видна — снимать нечего
+  const finish = () => { if (window.__boardClearInScreenRect) window.__boardClearInScreenRect(rect); };
+  if (window.LessonHistory) window.LessonHistory.captureIfEnabled(scope, targetEl).then(finish);
+  else finish();
+}
+
 function renderPicker() {
   els.modesGrid.innerHTML = GROUPS.map(g => `
     <div class="group-title">${g.title}</div>
@@ -1510,12 +1579,12 @@ function renderPicker() {
     </div>
   `).join('');
   els.modesGrid.querySelectorAll('.mode-card').forEach(card => {
-    card.onclick = () => { curMode = card.dataset.id; openTask(); };
+    card.onclick = guardStudentAction('switchTask', () => { curMode = card.dataset.id; openTask(); });
   });
   // карточка «🎲 Случайно» живёт вне #modesGrid статично в разметке — её нужно
   // привязывать отдельно (раньше эта кнопка была нерабочей)
   const randomCard = document.querySelector('.mode-card.random[data-id]');
-  if (randomCard) randomCard.onclick = () => { curMode = randomCard.dataset.id; openTask(); };
+  if (randomCard) randomCard.onclick = guardStudentAction('switchTask', () => { curMode = randomCard.dataset.id; openTask(); });
 }
 
 const COMING_SOON_TEXT = {
@@ -1539,15 +1608,16 @@ function openTask() {
   regenerateAddedTasksForNewType();
   switchSubMode('exam');
 }
-els.backBtn.onclick = () => {
+els.backBtn.onclick = guardStudentAction('switchTask', () => {
   els.taskArea.style.display = 'none';
   els.picker.style.display = 'block';
   renderPicker();
   if (window.TrainerSession) window.TrainerSession.push();
-};
+});
 function navigateType(delta){
   const idx = ALL_MODES.findIndex(x=>x.id===curMode);
   if(idx===-1) return; // в «случайно» стрелки скрыты
+  snapshotAndClear('whole', els.tasksColumnsWrap);
   const newIdx = (idx + delta + ALL_MODES.length) % ALL_MODES.length;
   curMode = ALL_MODES[newIdx].id;
   els.taskTitle.textContent = ALL_MODES[newIdx].title;
@@ -1557,9 +1627,9 @@ function navigateType(delta){
   regenerateAddedTasksForNewType();
   resumeOrNewTask();
 }
-els.prevTypeBtn.onclick = ()=>navigateType(-1);
-els.nextTypeBtn.onclick = ()=>navigateType(1);
-els.refreshBtn.onclick = () => { if (curSubMode === 'exam' || curSubMode === 'practice') nextBatchAll(); };
+els.prevTypeBtn.onclick = guardStudentAction('switchTask', ()=>navigateType(-1));
+els.nextTypeBtn.onclick = guardStudentAction('switchTask', ()=>navigateType(1));
+els.refreshBtn.onclick = guardStudentAction('refreshAll', () => { if (curSubMode === 'exam' || curSubMode === 'practice') nextBatchAll(); });
 
 els.basketAddBtn = document.getElementById('basketAddBtn');
 els.basketAddBtn.onclick = () => {
@@ -1601,7 +1671,7 @@ function switchSubMode(mode) {
 els.tabLearn.onclick = () => switchSubMode('learn');
 els.tabPractice.onclick = () => switchSubMode('practice');
 els.tabExam.onclick = () => switchSubMode('exam');
-els.refreshInlineBtn.onclick = newTask;
+els.refreshInlineBtn.onclick = guardStudentAction('refreshOne', newTask);
 
 function renderCurrentTask() {
   window.scrollTo(0, 0);
@@ -1622,7 +1692,12 @@ function renderCurrentTask() {
   syncKeypadVisibility();
 }
 
-function newTask() {
+function newTask(opts) {
+  opts = opts || {};
+  // skipSnapshot: true — используется внутренними вызовами (resumeOrNewTask при
+  // первом входе в тип, nextBatchAll после своего собственного снимка всей
+  // страницы), чтобы не задваивать снимок/очистку одного и того же задания
+  if (!opts.skipSnapshot) snapshotAndClear('single', document.getElementById('card1Wrapper'));
   const m = curMode === 'random' ? pick(ALL_MODES) : ALL_MODES.find(x => x.id === curMode);
   curTask = m.gen();
   taskAnswered = false;
@@ -1660,7 +1735,7 @@ function resumeOrNewTask() {
       els.answerInput.classList.add('bad');
     }
   } else {
-    newTask();
+    newTask({ skipSnapshot: true }); // это не «замена» видимого задания — задание ещё не отображалось
   }
 }
 
@@ -1749,10 +1824,10 @@ function hideSolution() {
   els.explainBox.style.display = 'none';
   els.nextBtn.style.display = 'none';
 }
-els.showSolutionBtn.onclick = () => {
+els.showSolutionBtn.onclick = guardStudentAction('showSolution', () => {
   if (taskAnswered) return;
   if (solutionShown) hideSolution(); else revealSolution();
-};
+});
 
 /* ═══════════════ «+» — добавление ещё нескольких заданий того же типа ═══════════════
    Встроено прямо в «Экзамен»/«Тренировку», без отдельной вкладки. Первое (исходное) задание —
@@ -1772,7 +1847,11 @@ function addedSolutionBtnDisplay(bt){
 // видимость и текст их кнопок отдельно, и на всякий случай прячем решение,
 // если оно было раскрыто вручную, при уходе из «Тренировки»
 function syncAddedSolutionUI(){
-  document.querySelectorAll('.added-task-card').forEach((card, i) => {
+  // строго внутри tasksColumnsWrap, а не document целиком: пока идёт снимок для
+  // «Истории урока» (Промпт №23), в document какое-то время висит offscreen-клон
+  // с теми же классами (см. lesson-history.js) — document-wide селектор мог бы
+  // случайно подцепить и его
+  els.tasksColumnsWrap.querySelectorAll('.added-task-card').forEach((card, i) => {
     const bt = addedTasks[i];
     if (!bt) return;
     if (curSubMode !== 'practice' && !bt.answered && bt.solutionRevealed) {
@@ -1877,10 +1956,10 @@ function makeAddedCardEl(bt, idx){
   const submit = () => submitAddedAnswer(+div.dataset.idx);
   div.querySelector('.added-check-btn').onclick = submit;
   inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
-  div.querySelector('.added-refresh-btn').onclick = () => refreshAddedTask(+div.dataset.idx);
-  div.querySelector('.added-remove-btn').onclick = () => removeAddedTask(+div.dataset.idx);
+  div.querySelector('.added-refresh-btn').onclick = guardStudentAction('refreshOne', () => refreshAddedTask(+div.dataset.idx));
+  div.querySelector('.added-remove-btn').onclick = guardStudentAction('deleteTask', () => removeAddedTask(+div.dataset.idx));
   const solutionBtn = div.querySelector('.added-solution-btn');
-  solutionBtn.onclick = () => {
+  solutionBtn.onclick = guardStudentAction('showSolution', () => {
     const cur = addedTasks[+div.dataset.idx];
     if (!cur || cur.answered) return;
     cur.solutionRevealed = !cur.solutionRevealed;
@@ -1893,7 +1972,7 @@ function makeAddedCardEl(bt, idx){
       ex.style.display = 'none';
       solutionBtn.textContent = 'Показать решение и ответ';
     }
-  };
+  });
   const basketBtn = div.querySelector('.added-basket-btn');
   basketBtn.onclick = () => {
     if (!addSingleTaskToBasket(`.added-task-card[data-idx="${div.dataset.idx}"] .added-card-question`)) return;
@@ -1926,26 +2005,32 @@ function appendAddedTasks(n){
   if (window.TrainerSession) window.TrainerSession.push();
 }
 function removeAddedTask(idx){
+  const card = els.tasksColumnsWrap.querySelector(`.added-task-card[data-idx="${idx}"]`);
+  snapshotAndClear('single', card);
   addedTasks.splice(idx, 1);
   renderAddedList();
 }
 function clearAddedTasks(){
+  snapshotAndClear('whole', els.tasksColumnsWrap);
   addedTasks = [];
   renderAddedList();
 }
 function refreshAddedTask(idx){
   const bt = addedTasks[idx];
   if (!bt) return;
-  addedTasks[idx] = genAddedTask();
   const card = els.tasksColumnsWrap.querySelector(`.added-task-card[data-idx="${idx}"]`);
-  if (card) card.replaceWith(makeAddedCardEl(addedTasks[idx], idx));
+  snapshotAndClear('single', card);
+  addedTasks[idx] = genAddedTask();
+  const card2 = els.tasksColumnsWrap.querySelector(`.added-task-card[data-idx="${idx}"]`);
+  if (card2) card2.replaceWith(makeAddedCardEl(addedTasks[idx], idx));
   else renderAddedList();
   if (window.TrainerSession) window.TrainerSession.push();
 }
 function nextBatchAll(){
   // «Следующий пример» в панели — вся текущая партия (первая карточка + все добавленные)
   // заменяется свежей, того же типа и того же размера, независимо от того, что уже решено
-  newTask();
+  snapshotAndClear('whole', els.tasksColumnsWrap);
+  newTask({ skipSnapshot: true }); // снимок всей страницы уже сделан строкой выше — не задваиваем
   addedTasks = addedTasks.map(() => genAddedTask());
   renderAddedList();
 }
@@ -2011,8 +2096,8 @@ els.addTaskBtnCompact.onclick = () => appendAddedTasks(1);
 els.addQtyFlyout.querySelectorAll('.add-qty-btn').forEach(btn => {
   btn.onclick = () => appendAddedTasks(+btn.dataset.n);
 });
-els.addClearBtn.onclick = clearAddedTasks;
-els.addNextBatchBtn.onclick = nextBatchAll;
+els.addClearBtn.onclick = guardStudentAction('deleteTask', clearAddedTasks);
+els.addNextBatchBtn.onclick = guardStudentAction('refreshAll', nextBatchAll);
 els.addHidePanelBtn.onclick = () => { addPanelManuallyHidden = true; updateAddUI(); };
 els.addToBasketAllBtn.onclick = () => {
   if (!window.Basket) return;
@@ -2072,6 +2157,10 @@ function setupWorkZoneResize(handleEl, side){
     } catch(e){}
     // после завершения растягивания форсируем перерисовку — не дожидаясь скролла
     setTimeout(forceRepaintWorkArea, 30);
+    // Промпт №23: растянутая ширина рабочей зоны должна долететь до собеседника —
+    // сама ширина уже читается в tsGetState() при любом push(), но нужен ещё явный
+    // push() именно в момент завершения растягивания
+    if (window.TrainerSession) window.TrainerSession.push();
   }
   handleEl.addEventListener('pointerup', end);
   handleEl.addEventListener('pointercancel', end);
@@ -2198,6 +2287,9 @@ function tsGetState(){
     addedTasks: addedTasks.map(bt => ({
       task: bt.task, answered: !!bt.answered, hadWrongPick: !!bt.hadWrongPick, solutionRevealed: !!bt.solutionRevealed,
     })),
+    // Промпт №23: ширина растянутой рабочей зоны — чтобы у обоих участников
+    // задания и заметки поверх них были видны в одном и том же масштабе
+    workW: parseFloat(getComputedStyle(els.workZone).width) || null,
   };
   // доска (инструмент рисования поверх тренажёра) — своё, отдельно управляемое
   // подмодулем поле; подмешиваем его снимок сюда же, чтобы штрихи попадали в
@@ -2211,6 +2303,17 @@ function tsApplyState(state){
   // применяем штрихи доски ДО развилки по picker/задаче — доска видна и
   // доступна независимо от того, какой сейчас экран у тренажёра
   if (window.__boardApplyState) window.__boardApplyState(state);
+  // ширина рабочей зоны — тоже независимо от picker/задачи: применяем сразу,
+  // если она реально отличается (иначе на каждый push() дёргали бы CSS зря)
+  if (state.workW) {
+    const curW = parseFloat(getComputedStyle(els.workZone).width);
+    if (Math.abs(curW - state.workW) > 1) {
+      const clamped = clampWorkW(state.workW);
+      els.workZone.style.setProperty('--work-w', clamped + 'px');
+      try { localStorage.setItem(WORK_W_KEY, String(clamped)); } catch(e){}
+      setTimeout(forceRepaintWorkArea, 30);
+    }
+  }
   if (state.picker) {
     if (els.taskArea.style.display !== 'none') { els.taskArea.style.display = 'none'; els.picker.style.display = 'block'; renderPicker(); }
     return;
@@ -2256,6 +2359,12 @@ if (window.TrainerSession) {
   window.TrainerSession.init({ trainer: 'oge8', getState: tsGetState, applyState: tsApplyState });
   window.TrainerSession.registerField('main', els.answerInput);
   window.TrainerSession.mountShareButton();
+  if (window.LessonHistory) {
+    window.TrainerSession.registerHistoryUI({
+      getCount: window.LessonHistory.getCount,
+      onDownload: window.LessonHistory.downloadPdf,
+    });
+  }
 }
 </script>
 
@@ -2322,6 +2431,43 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
   // getState()/applyState() тренажёра (см. tsGetState/tsApplyState выше) —
   // так он переживёт перезагрузку страницы и достаётся тем, кто подключится позже.
   const TS = window.TrainerSession || { onEvent(){}, broadcastEvent(){}, push(){} };
+
+  // Промпт №23: отдельная кнопка учителя, полностью отключающая ученику доступ
+  // к рисованию на доске (независимо от остальных пяти прав) — permissions.board
+  const boardVisBtn = document.getElementById('boardVisibilityToggle');
+  function boardAccessAllowed(){
+    if (!TS.isLeader || TS.isLeader()) return true; // учителя это ограничение никогда не касается
+    const perms = TS.getPermissions ? TS.getPermissions() : null;
+    return !perms || perms.board !== false;
+  }
+  function applyBoardAccessToUI(){
+    const allowed = boardAccessAllowed();
+    if (boardVisBtn) {
+      boardVisBtn.disabled = !allowed;
+      boardVisBtn.style.opacity = allowed ? '' : '.4';
+      boardVisBtn.style.cursor = allowed ? '' : 'not-allowed';
+      if (!allowed) boardVisBtn.title = 'Учитель отключил доступ к доске';
+    }
+    if (!allowed && document.documentElement.getAttribute('data-board') === 'on') {
+      document.documentElement.setAttribute('data-board', 'off');
+      if (boardVisBtn) { boardVisBtn.classList.remove('active'); boardVisBtn.title = 'Учитель отключил доступ к доске'; }
+    }
+  }
+  window.__boardAccessAllowed = boardAccessAllowed;
+  if (TS.onPermissionsChange) TS.onPermissionsChange(applyBoardAccessToUI);
+  applyBoardAccessToUI();
+
+  // Промпт №23: мост для lesson-history.js — доступ к «чернильным» (без сетки/фона)
+  // слоям обоих холстов доски и к их текущему прямоугольнику на экране (viewport,
+  // те же координаты, что и getBoundingClientRect() у любого DOM-узла страницы),
+  // чтобы можно было аккуратно наложить обрезанный фрагмент поверх снимка задания
+  window.__boardCanvasEl = function () {
+    return {
+      sheet: { inkCanvas: inkCanvas, rect: () => canvas.getBoundingClientRect() },
+      bg: { inkCanvas: inkCanvasBg, rect: () => canvasBg.getBoundingClientRect() },
+    };
+  };
+
   const canvas = document.getElementById('boardCanvas');
   const ctx = canvas.getContext('2d');
   // отдельный оффскрин-слой только для чернил: ластик (destination-out) стирает
@@ -2521,6 +2667,35 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
     else { strokes = entry.data; redraw(); }
     TS.push(); // отмена — структурное изменение, рассылаем и сохраняем как обычно
   }
+  // Промпт №23: точечная очистка заметок «листа» строго в границах экранного
+  // прямоугольника (используется при смене/обновлении задания — чистит только
+  // штрихи над ЗАМЕНЯЕМЫМ заданием, не трогая соседние карточки на той же
+  // странице). Штрих считается «принадлежащим» области, если его геометрический
+  // центр (среднее всех точек) попадает внутрь неё — простой и предсказуемый
+  // критерий. Фоновый (общий, на всю страницу) слой сюда не входит — он общее рабочее
+  // пространство поверх всей страницы, а не привязан к конкретному заданию.
+  function clearBoardInScreenRect(rect){
+    if (!rect || rect.width <= 0 || rect.height <= 0) return false;
+    const p1 = screenToWorld(rect.left, rect.top);
+    const p2 = screenToWorld(rect.left + rect.width, rect.top + rect.height);
+    const x1 = Math.min(p1.x, p2.x), x2 = Math.max(p1.x, p2.x);
+    const y1 = Math.min(p1.y, p2.y), y2 = Math.max(p1.y, p2.y);
+    const inRect = (s) => {
+      if (!s.points || !s.points.length) return false;
+      let sx = 0, sy = 0;
+      for (const p of s.points) { sx += p.x; sy += p.y; }
+      const cx = sx / s.points.length, cy = sy / s.points.length;
+      return cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2;
+    };
+    if (!strokes.some(inRect)) return false; // нечего чистить — не трогаем стек отмен
+    pushUndo('sheet');
+    strokes = strokes.filter(s => !inRect(s));
+    redraw();
+    TS.push();
+    return true;
+  }
+  window.__boardClearInScreenRect = clearBoardInScreenRect;
+
   function clearBoard(){
     pushUndo('sheet');
     strokes = [];
@@ -2680,6 +2855,7 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
   });
   document.addEventListener('pointerdown', e=>{
     if (document.documentElement.getAttribute('data-board') !== 'on') return;
+    if (!boardAccessAllowed()) return; // Промпт №23: учитель мог отключить доступ к доске ученику
     if (isBoardInteractiveTarget(e.target)) return; // клик по кнопке/полю/ручке — пропускаем как обычно, не рисуем
     if (!pointInRect(e.clientX, e.clientY, boardTarget && boardTarget.getBoundingClientRect())) return;
     onCanvasPointerDown(e);
@@ -2851,8 +3027,15 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
 
   let bgDrawing = false;
 
-  canvasBg.addEventListener('contextmenu', e=> e.preventDefault());
+  canvasBg.addEventListener('contextmenu', e=>{
+    if (document.documentElement.getAttribute('data-board') === 'on') e.preventDefault();
+  });
   canvasBg.addEventListener('pointerdown', e=>{
+    // Промпт №23: холст фона теперь виден ВСЕГДА (чтобы были видны чужие записи),
+    // а не только когда data-board="on" — но рисовать/панорамировать по нему
+    // по-прежнему можно только при явно включённом инструменте доски у СЕБЯ
+    if (document.documentElement.getAttribute('data-board') !== 'on') return;
+    if (!boardAccessAllowed()) return; // учитель мог отключить доступ к доске ученику
     blurActiveFormField();
     if (e.button === 1 || e.button === 2) { startBgPan(e); e.preventDefault(); return; }
     if (tool === 'hand') {
@@ -3201,25 +3384,22 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
 
   window.addEventListener('resize', ()=>{ resizeCanvas(); resizeBgCanvas(); });
 
-  // ── доска активна, только пока data-board="on": как только атрибут
-  // появляется, запускаем цикл, который каждый кадр подгоняет лист под текущий
-  // прямоугольник .sheet и перерисовывает фон с учётом прокрутки страницы —
-  // а как только доску выключают, цикл сам останавливается ──
+  // Промпт №23: раньше цикл крутился, только пока data-board="on" (сама
+  // доска включена локально) — но записи, оставленные учителем/собеседником,
+  // должны быть видны поверх тренажёра ВСЕГДА, даже если у этого участника
+  // инструмент рисования выключен и он сам ничего не пишет. Поэтому цикл
+  // теперь работает постоянно, с момента загрузки страницы, и от data-board
+  // больше не зависит — а вот интерактивность (рисование, тулбар) по-прежнему
+  // включается только явно, см. isBoardInteractiveTarget/CSS выше.
   let rafHandle = null;
   function boardLoop(){
-    if (document.documentElement.getAttribute('data-board') !== 'on') { rafHandle = null; return; }
     syncBoardTarget();
     redraw();
     redrawBg();
     rafHandle = requestAnimationFrame(boardLoop);
   }
   function ensureLoopRunning(){
-    if (rafHandle == null && document.documentElement.getAttribute('data-board') === 'on') {
-      rafHandle = requestAnimationFrame(boardLoop);
-    }
-  }
-  if (window.MutationObserver) {
-    new MutationObserver(ensureLoopRunning).observe(document.documentElement, { attributes: true, attributeFilter: ['data-board'] });
+    if (rafHandle == null) rafHandle = requestAnimationFrame(boardLoop);
   }
   ensureLoopRunning();
   resizeCanvas();

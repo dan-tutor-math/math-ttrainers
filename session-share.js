@@ -53,7 +53,15 @@
   const cfg = window.SUPABASE_CONFIG || {};
   if (!cfg.url || !cfg.anonKey || !window.supabase) {
     console.warn('[session-share] SUPABASE_CONFIG или supabase-js не подключены — совместный доступ недоступен на этой странице.');
-    window.TrainerSession = { init: async () => {}, push(){}, registerField(){}, unregisterField(){}, unregisterFieldsWithPrefix(){}, mountShareButton(){}, broadcastEvent(){}, onEvent(){}, getCode(){ return null; }, getShareUrl(){ return ''; }, resetSession: async () => {}, joinByCode: async () => ({ ok: false, reason: 'unavailable' }), isLeader(){ return true; } };
+    window.TrainerSession = {
+      init: async () => {}, push(){}, registerField(){}, unregisterField(){}, unregisterFieldsWithPrefix(){}, mountShareButton(){},
+      broadcastEvent(){}, onEvent(){}, getCode(){ return null; }, getShareUrl(){ return ''; },
+      resetSession: async () => {}, joinByCode: async () => ({ ok: false, reason: 'unavailable' }), isLeader(){ return true; },
+      getPermissions(){ return { switchTask: true, refreshOne: true, refreshAll: true, showSolution: true, deleteTask: true, board: true }; },
+      setPermission(){}, onPermissionsChange(){},
+      getAutosaveHistory(){ return true; }, setAutosaveHistory(){}, onAutosaveHistoryChange(){},
+      registerHistoryUI(){}, notifyHistoryChanged(){},
+    };
     return;
   }
   const SB = window.supabase.createClient(cfg.url, cfg.anonKey);
@@ -85,6 +93,63 @@
   const fields = new Map(); // fieldId -> {el, onInput}
   const eventListeners = new Map(); // name -> Set<cb>
   const CLIENT_ID = myClientId();
+
+  // ── Промпт №23: права ученика и переключатель автосохранения истории —
+  // общие для ЛЮБОГО тренажёра (не завязаны на конкретную структуру getState
+  // тренажёра), поэтому живут прямо здесь и всегда входят в fullState() под
+  // отдельными ключами __permissions/__autosaveHistory, независимо от того,
+  // умеет ли конкретный tsGetState() что-то о них знать
+  const DEFAULT_PERMISSIONS = { switchTask: true, refreshOne: true, refreshAll: true, showSolution: true, deleteTask: true, board: true };
+  let permissions = Object.assign({}, DEFAULT_PERMISSIONS);
+  let permissionsChangeCb = null;
+  let autosaveHistory = true; // по умолчанию включено — история пишется, пока явно не выключат
+  let autosaveChangeCb = null;
+
+  function getPermissions() { return Object.assign({}, permissions); }
+  function setPermission(key, val) {
+    // менять права может только «главный» (Учитель) — у присоединившегося
+    // эта функция просто не должна вызываться из UI (см. mountShareButton),
+    // но на всякий случай подстраховываемся и здесь
+    if (!isLeaderFlag) return;
+    permissions = Object.assign({}, permissions, { [key]: !!val });
+    if (permissionsChangeCb) { try { permissionsChangeCb(getPermissions()); } catch (e) {} }
+    push();
+  }
+  function onPermissionsChange(cb) { permissionsChangeCb = cb; }
+
+  function getAutosaveHistory() { return autosaveHistory; }
+  function setAutosaveHistory(val) {
+    autosaveHistory = !!val;
+    if (autosaveChangeCb) { try { autosaveChangeCb(autosaveHistory); } catch (e) {} }
+    push();
+  }
+  function onAutosaveHistoryChange(cb) { autosaveChangeCb = cb; }
+
+  // ── «История/конспект урока» сама по себе устроена по-разному в каждом
+  // тренажёре (нужно знать структуру его DOM, чтобы делать снимки) — поэтому
+  // здесь только слот регистрации: конкретный тренажёр (см. lesson-history.js)
+  // подставляет сюда getCount()/onDownload(), а панель «Совместный доступ»
+  // просто их вызывает, не зная деталей ──
+  let historyUI = null; // { getCount(), onDownload() }
+  function registerHistoryUI(api) { historyUI = api; if (uiEls) renderPanel(); }
+  // вызывается снаружи (lesson-history.js) при каждом новом снимке — обновляет
+  // счётчик «История: N снимков» в уже открытой панели, не дожидаясь её
+  // повторного открытия
+  function notifyHistoryChanged() { if (uiEls) renderPanel(); }
+
+  // ── тема оформления сайта — тоже общая для любого тренажёра вещь: сама
+  // применяем data-theme/localStorage, не дожидаясь, пока конкретный
+  // tsApplyState() тренажёра об этом узнает ──
+  function applyRemoteTheme(theme) {
+    if (!theme) return;
+    try {
+      if (document.documentElement.getAttribute('data-theme') === theme) return;
+      document.documentElement.setAttribute('data-theme', theme);
+      localStorage.setItem('theme', theme);
+      const btn = document.getElementById('themeToggle');
+      if (btn) btn.textContent = theme === 'dark' ? '☀️' : '🌙';
+    } catch (e) {}
+  }
 
   function storageKey(trainer) { return 'trainerSession:' + trainer; }
 
@@ -121,11 +186,31 @@
     const s = getStateCb() || {};
     const fieldValues = {};
     fields.forEach((entry, id) => { fieldValues[id] = entry.el.value; });
-    return Object.assign({}, s, { __fields: fieldValues });
+    let theme = 'light';
+    try { theme = document.documentElement.getAttribute('data-theme') || 'light'; } catch (e) {}
+    return Object.assign({}, s, {
+      __fields: fieldValues,
+      __permissions: permissions,
+      __autosaveHistory: autosaveHistory,
+      __theme: theme,
+    });
   }
 
   function applyIncomingState(state) {
     if (!state) return;
+    // права/автосохранение/тема — общие для любого тренажёра, применяем их
+    // ДО вызова applyStateCb и независимо от того, что тренажёр сам решит
+    // делать с остальной частью снимка (см. комментарий у DEFAULT_PERMISSIONS)
+    if (state.__permissions) {
+      permissions = Object.assign({}, DEFAULT_PERMISSIONS, state.__permissions);
+      if (permissionsChangeCb) { try { permissionsChangeCb(getPermissions()); } catch (e) {} }
+    }
+    if (typeof state.__autosaveHistory === 'boolean' && state.__autosaveHistory !== autosaveHistory) {
+      autosaveHistory = state.__autosaveHistory;
+      if (autosaveChangeCb) { try { autosaveChangeCb(autosaveHistory); } catch (e) {} }
+    }
+    if (state.__theme) applyRemoteTheme(state.__theme);
+
     applyingRemote = true;
     try {
       applyStateCb(state);
@@ -343,6 +428,31 @@
     uiEls.roleEl.textContent = isLeaderFlag
       ? 'Вы — главный (Учитель): к вашему заданию подключаются присоединившиеся.'
       : 'Вы подключены к чужой сессии — задания синхронизируются с главным.';
+
+    // права ученика редактирует только «главный» — присоединившийся видит
+    // только сам факт (через применённые ограничения в интерфейсе тренажёра),
+    // а не эту панель управления
+    const showPerm = isLeaderFlag;
+    uiEls.permSep.style.display = showPerm ? '' : 'none';
+    uiEls.permSection.style.display = showPerm ? '' : 'none';
+    if (showPerm) {
+      const perms = getPermissions();
+      uiEls.permList.querySelectorAll('input[data-perm]').forEach(input => {
+        input.checked = perms[input.dataset.perm] !== false;
+      });
+    }
+
+    uiEls.autosaveToggle.checked = getAutosaveHistory();
+
+    const count = historyUI && historyUI.getCount ? historyUI.getCount() : 0;
+    uiEls.historyCountEl.textContent = count > 0 ? `История: ${count} ` + pluralSnapshots(count) : 'История: пока пусто';
+    uiEls.historyDownloadBtn.disabled = count === 0;
+  }
+  function pluralSnapshots(n) {
+    const n10 = n % 10, n100 = n % 100;
+    if (n10 === 1 && n100 !== 11) return 'снимок';
+    if (n10 >= 2 && n10 <= 4 && (n100 < 10 || n100 >= 20)) return 'снимка';
+    return 'снимков';
   }
   function mountShareButton() {
     if (uiEls) return;
@@ -374,6 +484,20 @@
         text-decoration:underline;padding:0;align-self:flex-start;}
       .ts-share-msg{font-size:11.5px;color:var(--muted-2);min-height:14px;}
       .ts-share-msg.err{color:var(--teacher);}
+      .ts-section-title{font-size:12px;font-weight:700;color:var(--pencil);}
+      .ts-perm-list{display:flex;flex-direction:column;gap:8px;}
+      .ts-perm-row{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px;color:var(--pencil);}
+      .ts-perm-row span{line-height:1.3;}
+      .ts-switch{position:relative;display:inline-block;width:36px;height:21px;flex:0 0 auto;}
+      .ts-switch input{opacity:0;width:0;height:0;position:absolute;}
+      .ts-switch .slider{position:absolute;inset:0;background:var(--glass-border);transition:background .15s;border-radius:20px;cursor:pointer;}
+      .ts-switch .slider:before{position:absolute;content:"";height:17px;width:17px;left:2px;top:2px;background:#fff;transition:transform .15s;border-radius:50%;box-shadow:0 1px 2px rgba(0,0,0,.3);}
+      .ts-switch input:checked + .slider{background:var(--ink);}
+      .ts-switch input:checked + .slider:before{transform:translateX(15px);}
+      .ts-history-row button{font-size:12px;font-weight:600;padding:6px 10px;border-radius:9px;border:none;
+        background:var(--ink);color:#fff;cursor:pointer;white-space:nowrap;}
+      .ts-history-row button:disabled{opacity:.45;cursor:default;}
+      .ts-history-row button:not(:disabled):hover{background:var(--ink-active);}
     `;
     document.head.appendChild(style);
 
@@ -402,6 +526,20 @@
         <button id="tsJoin">Подключиться</button>
       </div>
       <div class="ts-share-msg" id="tsMsg"></div>
+      <div class="ts-share-sep" id="tsPermSep" style="display:none"></div>
+      <div id="tsPermSection" style="display:none">
+        <div class="ts-section-title">Права ученика</div>
+        <div class="ts-perm-list" id="tsPermList"></div>
+      </div>
+      <div class="ts-share-sep"></div>
+      <div class="ts-perm-row">
+        <span>Сохранять обновлённые задания в историю</span>
+        <label class="ts-switch"><input type="checkbox" id="tsAutosaveToggle"><span class="slider"></span></label>
+      </div>
+      <div class="ts-perm-row ts-history-row">
+        <span id="tsHistoryCount">История: 0 снимков</span>
+        <button id="tsHistoryDownload" disabled>Скачать PDF</button>
+      </div>
     `;
     document.body.appendChild(pop);
 
@@ -412,7 +550,39 @@
       msgEl: pop.querySelector('#tsMsg'),
       joinInput: pop.querySelector('#tsJoinInput'),
       roleEl: pop.querySelector('#tsRole'),
+      permSep: pop.querySelector('#tsPermSep'),
+      permSection: pop.querySelector('#tsPermSection'),
+      permList: pop.querySelector('#tsPermList'),
+      autosaveToggle: pop.querySelector('#tsAutosaveToggle'),
+      historyCountEl: pop.querySelector('#tsHistoryCount'),
+      historyDownloadBtn: pop.querySelector('#tsHistoryDownload'),
     };
+
+    const PERMISSION_LABELS = [
+      ['switchTask', 'Переключать задание/тип'],
+      ['refreshOne', 'Обновлять один пример'],
+      ['refreshAll', 'Обновлять все задания разом'],
+      ['showSolution', 'Открывать решение и ответ'],
+      ['deleteTask', 'Удалять пример'],
+      ['board', 'Доступ к доске'],
+    ];
+    PERMISSION_LABELS.forEach(([key, label]) => {
+      const row = document.createElement('div');
+      row.className = 'ts-perm-row';
+      row.innerHTML = `<span>${label}</span><label class="ts-switch"><input type="checkbox" data-perm="${key}"><span class="slider"></span></label>`;
+      const input = row.querySelector('input');
+      input.addEventListener('change', () => setPermission(key, input.checked));
+      uiEls.permList.appendChild(row);
+    });
+
+    uiEls.autosaveToggle.addEventListener('change', () => {
+      setAutosaveHistory(uiEls.autosaveToggle.checked);
+    });
+    uiEls.historyDownloadBtn.addEventListener('click', () => {
+      if (historyUI && historyUI.onDownload) historyUI.onDownload();
+    });
+    onPermissionsChange(() => renderPanel());
+    onAutosaveHistoryChange(() => renderPanel());
 
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -445,5 +615,8 @@
     init, push, registerField, unregisterField, unregisterFieldsWithPrefix,
     getCode, getShareUrl, resetSession, joinByCode, mountShareButton,
     broadcastEvent, onEvent, isLeader,
+    getPermissions, setPermission, onPermissionsChange,
+    getAutosaveHistory, setAutosaveHistory, onAutosaveHistoryChange,
+    registerHistoryUI, notifyHistoryChanged,
   };
 })();
