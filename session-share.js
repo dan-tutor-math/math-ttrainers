@@ -299,17 +299,46 @@
   let isLeaderFlag = true;
   function isLeader() { return isLeaderFlag; }
 
+  // Промпт №25: сколько раз и с какой паузой перепроверять существование
+  // кода, прежде чем окончательно признать "такой сессии нет" — реальная
+  // сеть иногда чуть отстаёт от факта (запись учителя уже видна ЕМУ самому
+  // в панели, но первый select у подключающегося может её ещё не увидеть).
+  // Один быстрый повтор почти всегда всё решает; дальше — на случай совсем
+  // медленной сети.
+  const JOIN_RETRY_DELAYS_MS = [300, 700, 1200];
+
   async function activate(c, opts) {
     opts = opts || {};
+    const prevCode = code; // на случай отката, если c не найдётся (см. ниже)
     code = c;
     let resolveSubscribed;
     const subscribed = new Promise((res) => { resolveSubscribed = res; });
     subscribeChannel(c, resolveSubscribed);
     let row = await fetchRow(c);
+    if (!row && !opts.createIfMissing) {
+      // это попытка ПОДКЛЮЧИТЬСЯ к чужому коду (не создать свой) — прежде чем
+      // сообщать "не найдено", даём сети ещё несколько шансов досогласоваться
+      for (const delay of JOIN_RETRY_DELAYS_MS) {
+        await new Promise(r => setTimeout(r, delay));
+        row = await fetchRow(c);
+        if (row) break;
+      }
+    }
     if (!row) {
       if (opts.createIfMissing) {
         await insertRow(c, trainerSlug, fullState());
       } else {
+        // код так и не нашёлся — откатываемся к тому, что было ДО попытки
+        // подключения, а не остаёмся "подвешенными" на несуществующем коде:
+        // subscribeChannel() выше уже отписал от прежнего канала, поэтому
+        // для настоящего отката его нужно переподписать заново
+        if (prevCode) {
+          await new Promise(resolve => subscribeChannel(prevCode, resolve));
+          code = prevCode;
+        } else {
+          code = null;
+        }
+        notifyUi();
         return { ok: false, reason: 'not_found' };
       }
     } else if (row.state && Object.keys(row.state).length) {
@@ -558,8 +587,11 @@
       historyDownloadBtn: pop.querySelector('#tsHistoryDownload'),
     };
 
+    // Промпт №25: «Переключать задание/тип» здесь больше не показываем —
+    // выход из текущего типа заданий (и переключение на другой) теперь
+    // ВСЕГДА только у учителя, без исключений (см. studentRestricted() в
+    // тренажёре) — переключатель для этого действия был бы просто нерабочим
     const PERMISSION_LABELS = [
-      ['switchTask', 'Переключать задание/тип'],
       ['refreshOne', 'Обновлять один пример'],
       ['refreshAll', 'Обновлять все задания разом'],
       ['showSolution', 'Открывать решение и ответ'],
