@@ -126,7 +126,19 @@ body{
 .calc-history-empty{font-family:var(--font-ui);font-size:14px;color:var(--muted-6);text-align:center;padding:16px 0;}
 
 /* ─── интерактивная доска на фоне вокруг примера ─── */
-#boardCanvas{position:fixed;top:0;left:0;z-index:2;touch-action:none;cursor:crosshair;border-radius:20px;pointer-events:none;}
+/* Промпт №26: раньше был position:fixed (координаты холста — от вьюпорта,
+   и на каждый кадр JS сам подгонял left/top под текущий скролл через
+   getBoundingClientRect). При быстрой/инерционной прокрутке браузер иногда
+   успевает закомпозитить несколько кадров скролла раньше, чем JS-цикл
+   (requestAnimationFrame) успевает пересчитать позицию — от этого записи на
+   слое доски визуально "плавали"/дрожали относительно листа под ними.
+   position:absolute с координатами в системе ДОКУМЕНТА (см. syncBoardTarget:
+   rect.left/top + window.scrollX/scrollY) решает это архитектурно: холст
+   становится обычным элементом страницы и скроллится браузером вместе со
+   всем остальным контентом БЕЗ участия JS на каждый кадр — синхронизация
+   через JS остаётся нужна только на реальное изменение (ресайз окна, рост
+   листа и т.п.), а не на сам факт прокрутки. */
+#boardCanvas{position:absolute;top:0;left:0;z-index:2;touch-action:none;cursor:crosshair;border-radius:20px;pointer-events:none;}
 #boardCanvasBg{position:fixed;top:0;left:0;z-index:0;touch-action:none;cursor:crosshair;}
 #boardSpace{height:0;pointer-events:none;transition:height .2s ease;}
 .board-toolbar{position:fixed;right:18px;bottom:18px;z-index:50;display:flex;gap:8px;align-items:center;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;padding:9px 11px;box-shadow:var(--shadow);}
@@ -342,7 +354,17 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .add-qty-btn:hover{border-color:var(--ink)}
 .add-qty-btn:active{transform:scale(.92)}
 .tasks-columns{display:grid;grid-auto-flow:column;gap:14px;align-items:start;}
-.work-zone{position:relative;left:50%;transform:translateX(-50%);width:var(--work-w, 100%);max-width:calc(100vw - 24px);}
+/* Промпт №28: раньше здесь стоял max-width:calc(100vw - 24px) — на узком
+   окне он просто СЖИМАЛ .work-zone до другой физической ширины, из-за чего
+   сетка карточек перестраивалась в другое число колонок и у собеседника с
+   более узким окном раскладка переставала совпадать с той, что видит
+   учитель (часть содержимого/заметок оказывалась за пределами видимого).
+   Теперь ширина всегда равна «задуманной» --work-w как есть (без обрезки
+   под текущий вьюпорт), а вписывание в реальный узкий экран делает
+   --work-scale (см. applyWorkScale в JS) через масштабирующий transform —
+   раскладка внутри остаётся идентичной у всех участников, просто видна в
+   уменьшенном размере целиком, а не частично в перестроенном виде. */
+.work-zone{position:relative;left:50%;transform:translateX(-50%) scale(var(--work-scale, 1));transform-origin:top center;width:var(--work-w, 100%);}
 .work-resize-handle{position:absolute;top:0;bottom:0;width:10px;cursor:ew-resize;touch-action:none;z-index:5;}
 .work-resize-handle.left{left:0;}
 .work-resize-handle.right{right:0;}
@@ -612,6 +634,16 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
     <div class="panel coming-soon" id="comingSoonPanel" style="display:none"></div>
 
+    <!-- Промпт №28: #workStage — обёртка только для того, чтобы у документа было
+         куда «зарезервировать» ровно столько высоты, сколько реально занимает
+         .work-zone ПОСЛЕ визуального масштабирования (см. applyWorkScale) —
+         сама .work-zone продолжает вычислять раскладку (колонки карточек и
+         т.п.) на полную «задуманную» ширину --work-w, чтобы у всех участников
+         совместной сессии сетка выглядела ОДИНАКОВО, а не перестраивалась
+         из-за того, что чьё-то окно уже. overflow-x:hidden — просто подстраховка
+         от горизонтальной полосы прокрутки на долю кадра, пока JS ещё не
+         успел применить масштаб (например, сразу после ресайза окна) -->
+    <div id="workStage" style="overflow-x:hidden;">
     <div class="work-zone" id="workZone">
       <div class="work-resize-handle left" id="workResizeLeft" title="Потяните — расширить рабочую зону"></div>
       <div class="work-resize-handle right" id="workResizeRight" title="Потяните — расширить рабочую зону"></div>
@@ -675,6 +707,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       <div class="calc-panel-title">Последние примеры этого типа</div>
       <div class="example-history-list" id="exampleHistoryList"></div>
       <div class="example-history-empty" id="exampleHistoryEmpty">Пока пусто — реши что-нибудь.</div>
+    </div>
     </div>
     </div>
   </div>
@@ -1343,6 +1376,7 @@ const els = {
   addHidePanelBtn: document.getElementById('addHidePanelBtn'),
   tasksColumnsWrap: document.getElementById('tasksColumnsWrap'),
   workZone: document.getElementById('workZone'),
+  workStage: document.getElementById('workStage'), // Промпт №28: см. applyWorkScale
   workResizeLeft: document.getElementById('workResizeLeft'),
   workResizeRight: document.getElementById('workResizeRight'),
   addTaskRow: document.getElementById('addTaskRow'),
@@ -1518,6 +1552,13 @@ function recordSolve() {
    см. permissions.board в board-IIFE, а не здесь). ═══ */
 function studentRestricted(action){
   if (!window.TrainerSession || window.TrainerSession.isLeader()) return false;
+  // Промпт №25: выход из текущего типа заданий/переход на другой (кнопка
+  // "назад" к каталогу типов, ◀/▶ смена типа, выбор карточки на каталоге) —
+  // ВСЕГДА только у учителя, без исключений и без переключателя в панели:
+  // раньше это регулировалось правом switchTask (по умолчанию разрешено),
+  // из-за чего присоединившийся мог сам уйти из текущего типа и сбить
+  // синхронизацию сессии — теперь это жёсткое правило
+  if (action === 'switchTask') return true;
   const perms = window.TrainerSession.getPermissions ? window.TrainerSession.getPermissions() : null;
   return !!perms && perms[action] === false;
 }
@@ -1734,6 +1775,13 @@ function resumeOrNewTask() {
     } else if (hadWrongPick) {
       els.answerInput.classList.add('bad');
     }
+    // Промпт №27: раньше эта ветка (возврат к уже сохранённому для этого типа
+    // заданию — обычный случай при повторном заходе в ранее открытый тип)
+    // ничего не рассылала: newTask() в ветке else рассылает сама, а тут
+    // рассылки не было вообще — из-за этого при смене типа у ученика первая
+    // (исходная) карточка «застревала» на предыдущем типе, хотя добавленные
+    // задания обновлялись (их рассылает renderAddedList() отдельно)
+    if (window.TrainerSession) window.TrainerSession.push();
   } else {
     newTask({ skipSnapshot: true }); // это не «замена» видимого задания — задание ещё не отображалось
   }
@@ -1901,7 +1949,10 @@ els.basketInlineBtn.onclick = () => {
 // total, что был до переключения
 function regenerateAddedTasksForNewType(){
   addedTasks = addedTasks.map(() => genAddedTask());
-  if (els.tasksColumnsWrap) renderAddedList();
+  // не рассылаем здесь: и openTask(), и navigateType() гарантированно вызывают
+  // resumeOrNewTask()/switchSubMode() сразу после — вот они и разошлют уже
+  // полностью согласованное состояние (см. renderAddedList)
+  if (els.tasksColumnsWrap) renderAddedList(true);
 }
 // пороги по ОБЩЕМУ числу заданий на доске (исходное + добавленные): 1–3 → 1 колонка,
 // 4–6 → 2 колонки, 7 и далее → 3 колонки (дальше рост идёт только вниз внутри них)
@@ -1914,8 +1965,18 @@ function applyColumns(){
   if (!els.tasksColumnsWrap) return;
   const total = 1 + addedTasks.length;
   let cols = desiredColsForTotal(total);
-  if (window.innerWidth < 560) cols = Math.min(cols, 1);
-  else if (window.innerWidth < 820) cols = Math.min(cols, 2);
+  // Промпт №28: раньше здесь мерили физическое окно (window.innerWidth) — но
+  // --work-w (ширина самой рабочей зоны) теперь может быть значительно шире
+  // окна и просто визуально уменьшаться ЦЕЛИКОМ (см. applyWorkScale), сохраняя
+  // раскладку как есть. «Сколько реально помещается колонок» нужно мерить по
+  // ширине самой рабочей зоны в её собственной, немасштабированной системе
+  // координат — иначе сетка у собеседника с другим (физическим) окном
+  // перестраивалась бы в другое число колонок, хотя --work-w у обоих одна и
+  // та же. Для обычного (нерастянутого, --work-w:100%) случая на телефоне
+  // это даёт практически то же значение, что и раньше.
+  const intendedW = parseFloat(getComputedStyle(els.workZone).width) || window.innerWidth;
+  if (intendedW < 560) cols = Math.min(cols, 1);
+  else if (intendedW < 820) cols = Math.min(cols, 2);
   const rows = Math.max(1, Math.ceil(total / cols));
   els.tasksColumnsWrap.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   els.tasksColumnsWrap.style.gridTemplateRows = `repeat(${rows}, auto)`;
@@ -1983,7 +2044,7 @@ function makeAddedCardEl(bt, idx){
   };
   return div;
 }
-function renderAddedList(){
+function renderAddedList(skipPush){
   // #card1Wrapper — не трогаем: он живёт внутри tasksColumnsWrap постоянно, в нём —
   // рабочие DOM-узлы questionPanel/mainPanel, на которые уже указывают ссылки в els
   if (window.TrainerSession) window.TrainerSession.unregisterFieldsWithPrefix('added-');
@@ -1991,7 +2052,12 @@ function renderAddedList(){
   addedTasks.forEach((bt, i) => els.tasksColumnsWrap.appendChild(makeAddedCardEl(bt, i)));
   applyColumns();
   updateAddUI();
-  if (window.TrainerSession) window.TrainerSession.push();
+  // skipPush: true — используется при смене типа задания (см. regenerateAddedTasksForNewType):
+  // в этот момент основное задание (curTask) ещё не обновлено на новый тип, и немедленная
+  // рассылка состояния отправила бы ученику рассинхронизированный снимок (новые добавленные
+  // задания + СТАРОЕ основное) — вызывающий код (openTask/navigateType) сам гарантированно
+  // разошлёт полное и уже согласованное состояние сразу вслед за этим (Промпт №27)
+  if (!skipPush && window.TrainerSession) window.TrainerSession.push();
 }
 function appendAddedTasks(n){
   for (let i = 0; i < n; i++){
@@ -2133,6 +2199,47 @@ function clampWorkW(w){
     if (w) els.workZone.style.setProperty('--work-w', clampWorkW(w) + 'px');
   } catch(e){}
 })();
+
+/* ═══ Промпт №28: масштаб рабочего поля между учителем и учеником ═══
+   Раньше «задуманная» ширина (--work-w), пришедшая от собеседника, сразу
+   обрезалась под СВОЙ локальный вьюпорт (clampWorkW), из-за чего у более
+   узкого участника сетка карточек перестраивалась в другое число колонок —
+   часть содержимого/заметок оказывалась не там, где у учителя, либо вовсе
+   за пределами видимого. Теперь --work-w всегда хранит ширину как есть, а
+   applyWorkScale() отдельно решает, нужно ли её визуально уменьшить
+   (transform: scale — та же раскладка целиком, просто мельче), чтобы она
+   поместилась в РЕАЛЬНОЕ окно. Если реальное окно, наоборот, шире
+   задуманного — ничего не растягиваем, --work-w и так уже ровно нужного
+   размера, а пустое место по бокам — обычный фон страницы, там и раньше не
+   было ничего интерактивного. Этим же путём наконец получает масштабирование
+   и мобильная/планшетная версия — раньше оно там вообще не считалось. */
+const MIN_WORK_SCALE = 0.5; // не уменьшаем до нечитаемого размера
+let currentWorkScale = 1;
+function syncWorkStageHeight(){
+  // сам transform:scale() не влияет на высоту, которую .work-zone резервирует
+  // в потоке документа — без явного пересчёта высоты обёртки #workStage под
+  // уменьшенным полем осталась бы пустая «дыра» (или наоборот, всё съезжало
+  // бы вверх при увеличении). Вызывается и при смене масштаба, и (через
+  // ResizeObserver ниже) при любом изменении содержимого сетки — новая
+  // карточка, разбор ответа и т.п. — независимо от того, что именно длину
+  // изменило.
+  if (!els.workStage) return;
+  els.workStage.style.height = (els.workZone.offsetHeight * currentWorkScale) + 'px';
+}
+function applyWorkScale(){
+  if (!els.workZone) return;
+  const intendedW = parseFloat(getComputedStyle(els.workZone).width);
+  if (!intendedW) return;
+  const availW = window.innerWidth - 24;
+  currentWorkScale = (intendedW <= availW) ? 1 : Math.max(MIN_WORK_SCALE, availW / intendedW);
+  els.workZone.style.setProperty('--work-scale', String(currentWorkScale));
+  syncWorkStageHeight();
+}
+if (els.workStage && typeof ResizeObserver !== 'undefined') {
+  new ResizeObserver(syncWorkStageHeight).observe(els.workZone);
+}
+applyWorkScale();
+window.addEventListener('resize', applyWorkScale);
 function setupWorkZoneResize(handleEl, side){
   let start = null; // {x, w}
   handleEl.addEventListener('pointerdown', (e) => {
@@ -2155,6 +2262,7 @@ function setupWorkZoneResize(handleEl, side){
       const w = parseFloat(getComputedStyle(els.workZone).width);
       localStorage.setItem(WORK_W_KEY, String(w));
     } catch(e){}
+    applyWorkScale(); // Промпт №28: своя ширина всегда самосогласована со своим окном (см. clampWorkW), поэтому обычно даёт scale=1 — но пересчитать не лишнее
     // после завершения растягивания форсируем перерисовку — не дожидаясь скролла
     setTimeout(forceRepaintWorkArea, 30);
     // Промпт №23: растянутая ширина рабочей зоны должна долететь до собеседника —
@@ -2290,6 +2398,9 @@ function tsGetState(){
     // Промпт №23: ширина растянутой рабочей зоны — чтобы у обоих участников
     // задания и заметки поверх них были видны в одном и том же масштабе
     workW: parseFloat(getComputedStyle(els.workZone).width) || null,
+    // Промпт №25: статистика (решено/серия/ошибки) — учитель должен видеть
+    // актуальные показатели ученика в реальном времени, а не только у себя
+    totalSolved, streak, totalErrors,
   };
   // доска (инструмент рисования поверх тренажёра) — своё, отдельно управляемое
   // подмодулем поле; подмешиваем его снимок сюда же, чтобы штрихи попадали в
@@ -2303,14 +2414,32 @@ function tsApplyState(state){
   // применяем штрихи доски ДО развилки по picker/задаче — доска видна и
   // доступна независимо от того, какой сейчас экран у тренажёра
   if (window.__boardApplyState) window.__boardApplyState(state);
+  // Промпт №25: статистика — тоже независимо от picker/задачи, и всегда,
+  // когда пришедший снимок её содержит (не только когда числа отличаются:
+  // достаточно дёшево, а лишних перерисовок DOM тут не будет — textContent
+  // и так не трогает layout, если значение совпадает)
+  if (typeof state.totalSolved === 'number') {
+    totalSolved = state.totalSolved; streak = state.streak; totalErrors = state.totalErrors;
+    els.stSolved.textContent = totalSolved;
+    els.stStreak.textContent = streak;
+    els.stErrors.textContent = totalErrors;
+  }
   // ширина рабочей зоны — тоже независимо от picker/задачи: применяем сразу,
   // если она реально отличается (иначе на каждый push() дёргали бы CSS зря)
   if (state.workW) {
     const curW = parseFloat(getComputedStyle(els.workZone).width);
     if (Math.abs(curW - state.workW) > 1) {
-      const clamped = clampWorkW(state.workW);
-      els.workZone.style.setProperty('--work-w', clamped + 'px');
-      try { localStorage.setItem(WORK_W_KEY, String(clamped)); } catch(e){}
+      // Промпт №28: раньше тут стоял clampWorkW(state.workW) — «задуманная»
+      // ширина собеседника обрезалась под СВОЙ локальный вьюпорт ещё до
+      // применения, из-за чего сетка карточек перестраивалась в другое число
+      // колонок и переставала совпадать с тем, что видит собеседник (часть
+      // содержимого/заметок оказывалась не там или вовсе не видна). Теперь
+      // --work-w всегда хранит ширину как пришла, а applyWorkScale() отдельно
+      // решает, нужно ли вписать её в реальное окно масштабированием — сама
+      // раскладка при этом у всех участников остаётся идентичной.
+      els.workZone.style.setProperty('--work-w', state.workW + 'px');
+      try { localStorage.setItem(WORK_W_KEY, String(state.workW)); } catch(e){}
+      applyWorkScale();
       setTimeout(forceRepaintWorkArea, 30);
     }
   }
@@ -2529,14 +2658,26 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
   }
 
   function worldToScreenTransform(){
+    // ВНУТРЕННЯЯ трансформация холста (мировые координаты -> пиксели битмапа
+    // холста) — targetVisualScale сюда сознательно НЕ подмешивается: сам
+    // битмап всегда рисуется в «задуманном» (немасштабированном) размере
+    // листа, а видимое уменьшение/увеличение делает CSS-transform холста
+    // целиком (см. syncBoardTarget) — dpr тут ровно тот же смысл, что и раньше.
     const s = viewScale * dpr;
     return [s, 0, 0, s, -panX * s, -panY * s];
   }
+  // Промпт №28: экранные (client*) координаты клика/касания приходят в
+  // ВИЗУАЛЬНЫХ пикселях страницы — если у листа сейчас применён локальный
+  // масштаб (targetVisualScale ≠ 1), тот же самый клик соответствует МЕНЬШЕМУ
+  // смещению в «внутренней» (немасштабированной) системе координат холста,
+  // где хранятся мировые координаты. Без учёта targetVisualScale рисование
+  // при уменьшенном масштабе съезжало бы относительно курсора/пальца.
   function screenToWorld(clientX, clientY){
     const rect = canvas.getBoundingClientRect();
+    const s = viewScale * targetVisualScale;
     return {
-      x: (clientX - rect.left) / viewScale + panX,
-      y: (clientY - rect.top) / viewScale + panY,
+      x: (clientX - rect.left) / s + panX,
+      y: (clientY - rect.top) / s + panY,
     };
   }
 
@@ -2547,22 +2688,65 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
   }
 
   // ── синхронизирует размер/положение холста с текущим прямоугольником
-  // листа; вызывается каждый кадр, пока доска включена, — так холст сам
-  // следует за прокруткой страницы, ресайзом окна и ростом листа (например,
-  // когда в столбик дописывается новая строка) ──
+  // листа; вызывается каждый кадр — так холст сам следует за ресайзом окна и
+  // ростом листа (например, когда в столбик дописывается новая строка).
+  // Промпт №26: саму прокрутку страницы теперь отрабатывает браузер сам —
+  // холст position:absolute и координаты ниже переведены в систему ДОКУМЕНТА
+  // (+ window.scrollX/scrollY), а не вьюпорта, поэтому при обычном скролле
+  // left/top ниже не меняются вообще и лишний раз не перезаписываются.
+  //
+  // Промпт №28: у листа (.sheet/#workZone) теперь может быть свой визуальный
+  // масштаб (--work-scale — см. applyWorkScale в предыдущем <script>), СВОЙ
+  // у каждого участника совместной сессии (зависит от ширины ЕГО окна). Раньше
+  // холст брал именно ВИЗУАЛЬНЫЙ (уже уменьшенный) размер листа и для CSS-
+  // размера, и для внутреннего разрешения — а значит и для системы координат,
+  // в которой хранятся сами штрихи (мазки). У разных участников с разным
+  // локальным масштабом эта система координат оказывалась РАЗНОГО размера,
+  // и один и тот же (расшаренный, общий на всех) штрих лёг бы не на то же
+  // самое место листа. Чтобы штрихи оставались в ОДНОЙ системе координат
+  // независимо от локального масштаба, холст теперь всегда физически рисует
+  // в НЕМАСШТАБИРОВАННОМ ("задуманном", offsetWidth/offsetHeight) размере
+  // листа, а видимым уменьшением/увеличением занимается тот же самый
+  // transform:scale(), что и у самого листа (targetVisualScale ниже) — так
+  // холст остаётся идеально наложен на лист при любом локальном масштабе, а
+  // мазки — переносимы между участниками с разными масштабами один в один.
+  let lastSyncLeft = null, lastSyncTop = null, lastSyncW = null, lastSyncH = null, lastSyncScale = null;
+  let targetVisualScale = 1; // используется screenToWorld/worldToScreenTransform ниже
   function syncBoardTarget(){
     const el = resolveBoardTarget();
     boardTarget = el;
-    if (!el) { canvas.style.display = 'none'; return false; }
-    const rect = el.getBoundingClientRect();
-    if (rect.width <= 0 || rect.height <= 0) { canvas.style.display = 'none'; return false; }
+    if (!el) { canvas.style.display = 'none'; lastSyncLeft = lastSyncTop = lastSyncW = lastSyncH = lastSyncScale = null; return false; }
+    const rect = el.getBoundingClientRect(); // визуальный (после любых transform) прямоугольник — для ПОЗИЦИИ и масштаба
+    if (rect.width <= 0 || rect.height <= 0) { canvas.style.display = 'none'; lastSyncLeft = lastSyncTop = lastSyncW = lastSyncH = lastSyncScale = null; return false; }
     canvas.style.display = '';
-    canvas.style.left = rect.left + 'px';
-    canvas.style.top = rect.top + 'px';
-    const w = Math.round(rect.width), h = Math.round(rect.height);
-    canvas.style.width = w + 'px';
-    canvas.style.height = h + 'px';
-    const pw = Math.round(w * dpr), ph = Math.round(h * dpr);
+    const docLeft = Math.round(rect.left + window.scrollX);
+    const docTop = Math.round(rect.top + window.scrollY);
+    // «задуманный» (немасштабированный) размер листа — offsetWidth/Height НЕ
+    // зависят от transform, в отличие от getBoundingClientRect()
+    const intendedW = Math.round(el.offsetWidth) || Math.round(rect.width);
+    const intendedH = Math.round(el.offsetHeight) || Math.round(rect.height);
+    targetVisualScale = rect.width / (intendedW || 1);
+    // пишем в style только когда что-то реально изменилось — раньше эти
+    // присваивания шли на КАЖДЫЙ кадр безусловно, даже когда лист стоял на
+    // месте, что зря гоняло стили/layout параллельно со скроллом страницы
+    if (docLeft !== lastSyncLeft || docTop !== lastSyncTop) {
+      canvas.style.left = docLeft + 'px';
+      canvas.style.top = docTop + 'px';
+      lastSyncLeft = docLeft; lastSyncTop = docTop;
+    }
+    if (intendedW !== lastSyncW || intendedH !== lastSyncH) {
+      canvas.style.width = intendedW + 'px';
+      canvas.style.height = intendedH + 'px';
+      lastSyncW = intendedW; lastSyncH = intendedH;
+    }
+    if (targetVisualScale !== lastSyncScale) {
+      // top left — верхний левый угол холста уже точно на месте (left/top
+      // выше), масштабируем «от него», не сдвигая
+      canvas.style.transformOrigin = 'top left';
+      canvas.style.transform = (Math.abs(targetVisualScale - 1) < 0.001) ? '' : `scale(${targetVisualScale})`;
+      lastSyncScale = targetVisualScale;
+    }
+    const pw = Math.round(intendedW * dpr), ph = Math.round(intendedH * dpr);
     if (canvas.width !== pw || canvas.height !== ph) {
       canvas.width = pw;
       canvas.height = ph;
@@ -2863,8 +3047,11 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
 
   canvas.addEventListener('pointermove', e=>{
     if (panning) {
-      panX = panStartPanX - (e.clientX - panStartClientX) / viewScale;
-      panY = panStartPanY - (e.clientY - panStartClientY) / viewScale;
+      // Промпт №28: см. screenToWorld — тот же учёт targetVisualScale, иначе
+      // панорамирование при уменьшенном локальном масштабе ехало бы быстрее/
+      // медленнее самого курсора
+      panX = panStartPanX - (e.clientX - panStartClientX) / (viewScale * targetVisualScale);
+      panY = panStartPanY - (e.clientY - panStartClientY) / (viewScale * targetVisualScale);
       redraw();
       e.preventDefault();
       return;
