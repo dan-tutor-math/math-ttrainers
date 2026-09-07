@@ -237,7 +237,7 @@ html[data-focus="on"] #pickerArea{display:none!important;}
 
 /* ─── медали за пять решённых примеров подряд в этом прототипе ─── */
 .mode-medals{font-family:var(--font-ui);font-size:12px;margin-top:4px;opacity:.85;}
-.medal-badge-row{display:inline-flex;gap:3px;margin-left:8px;font-size:15px;vertical-align:middle;}
+.medal-badge-row{display:inline-flex;flex-wrap:wrap;row-gap:3px;gap:3px;margin-left:8px;font-size:15px;vertical-align:middle;}
 .medal-tray{position:fixed;left:0;right:0;bottom:0;z-index:150;display:none;gap:7px;align-items:center;padding:8px 16px;overflow-x:auto;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border-top:1px solid var(--glass-border);}
 .medal-tray.show{display:flex;}
 .medal-tray-icon{font-size:20px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.2));animation:medalPop .45s cubic-bezier(.34,1.56,.64,1) both;flex:none;}
@@ -276,8 +276,16 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .mode-card.soon{opacity:.55;cursor:default;}
 .mode-card.soon:hover{border-color:var(--glass-border);transform:none;}
 .soon-badge{font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-1);background:var(--glass);border-radius:8px;padding:3px 8px;}
-.task-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
-.type-nav{display:flex;align-items:center;gap:8px;}
+/* flex-wrap:wrap здесь и ниже (.type-nav, .corner, .medal-badge-row) — защита
+   от горизонтальной обрезки страницы: кнопки шапки задания (.type-nav-btn,
+   .refresh-btn, .basket-add-btn) — flex:0 0 auto (не сжимаются), а на узком
+   экране/телефоне их суммарная ширина легко превышает ширину окна; без wrap
+   это раньше просто вылезало за пределы .wrap (overflow:visible) и растягивало
+   document.documentElement.scrollWidth — отсюда обрезанный по обоим краям текст
+   и горизонтальная прокрутка. С wrap лишние кнопки просто переносятся на
+   следующую строку вместо того, чтобы вылезать за край. */
+.task-head{display:flex;flex-wrap:wrap;row-gap:8px;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.type-nav{display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;gap:8px;}
 .type-nav-btn{height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-ui);font-weight:600;font-size:12px;line-height:1;cursor:pointer;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;transition:transform .12s, border-color .12s;}
 .type-nav-btn:hover{border-color:var(--ink)}
 .type-nav-btn:active{transform:scale(.9)}
@@ -295,7 +303,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .back-btn:active{transform:scale(.96)}
 .back-btn:hover{border-color:var(--ink)}
 .task-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3)}
-.corner{font-family:var(--font-ui);font-weight:500;display:flex;align-items:center;gap:10px;}
+.corner{font-family:var(--font-ui);font-weight:500;display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;gap:10px;}
 .refresh-btn{width:28px;height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}
 .refresh-btn:hover{border-color:var(--ink);transform:rotate(80deg)}
 .refresh-btn:active{transform:scale(.9)}
@@ -354,17 +362,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .add-qty-btn:hover{border-color:var(--ink)}
 .add-qty-btn:active{transform:scale(.92)}
 .tasks-columns{display:grid;grid-auto-flow:column;gap:14px;align-items:start;}
-/* Промпт №28: раньше здесь стоял max-width:calc(100vw - 24px) — на узком
-   окне он просто СЖИМАЛ .work-zone до другой физической ширины, из-за чего
-   сетка карточек перестраивалась в другое число колонок и у собеседника с
-   более узким окном раскладка переставала совпадать с той, что видит
-   учитель (часть содержимого/заметок оказывалась за пределами видимого).
-   Теперь ширина всегда равна «задуманной» --work-w как есть (без обрезки
-   под текущий вьюпорт), а вписывание в реальный узкий экран делает
-   --work-scale (см. applyWorkScale в JS) через масштабирующий transform —
-   раскладка внутри остаётся идентичной у всех участников, просто видна в
-   уменьшенном размере целиком, а не частично в перестроенном виде. */
-.work-zone{position:relative;left:50%;transform:translateX(-50%) scale(var(--work-scale, 1));transform-origin:top center;width:var(--work-w, 100%);}
+.work-zone{position:relative;left:50%;transform:translateX(-50%);max-width:calc(100vw - 24px);width:var(--work-w, 100%);}
 .work-resize-handle{position:absolute;top:0;bottom:0;width:10px;cursor:ew-resize;touch-action:none;z-index:5;}
 .work-resize-handle.left{left:0;}
 .work-resize-handle.right{right:0;}
@@ -379,6 +377,12 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
   .add-controls-panel{gap:6px;}
   .add-extra-controls{gap:6px;}
   .add-task-row{gap:8px;}
+  /* защита от горизонтальной обрезки на очень узких телефонах: три вкладки +
+     некликабельно-несжимаемая круглая кнопка "+" (flex:0 0 auto) иначе на
+     ширине около 320px не помещаются на одну строку буквально на несколько px */
+  .submode-row{gap:6px;}
+  .submode-tabs{gap:4px;}
+  .submode-tab{padding:10px 2px;}
 }
 
 /* ─── плавающая клавиатура ─── */
@@ -634,16 +638,6 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
     <div class="panel coming-soon" id="comingSoonPanel" style="display:none"></div>
 
-    <!-- Промпт №28: #workStage — обёртка только для того, чтобы у документа было
-         куда «зарезервировать» ровно столько высоты, сколько реально занимает
-         .work-zone ПОСЛЕ визуального масштабирования (см. applyWorkScale) —
-         сама .work-zone продолжает вычислять раскладку (колонки карточек и
-         т.п.) на полную «задуманную» ширину --work-w, чтобы у всех участников
-         совместной сессии сетка выглядела ОДИНАКОВО, а не перестраивалась
-         из-за того, что чьё-то окно уже. overflow-x:hidden — просто подстраховка
-         от горизонтальной полосы прокрутки на долю кадра, пока JS ещё не
-         успел применить масштаб (например, сразу после ресайза окна) -->
-    <div id="workStage" style="overflow-x:hidden;">
     <div class="work-zone" id="workZone">
       <div class="work-resize-handle left" id="workResizeLeft" title="Потяните — расширить рабочую зону"></div>
       <div class="work-resize-handle right" id="workResizeRight" title="Потяните — расширить рабочую зону"></div>
@@ -707,7 +701,6 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       <div class="calc-panel-title">Последние примеры этого типа</div>
       <div class="example-history-list" id="exampleHistoryList"></div>
       <div class="example-history-empty" id="exampleHistoryEmpty">Пока пусто — реши что-нибудь.</div>
-    </div>
     </div>
     </div>
   </div>
@@ -1376,7 +1369,6 @@ const els = {
   addHidePanelBtn: document.getElementById('addHidePanelBtn'),
   tasksColumnsWrap: document.getElementById('tasksColumnsWrap'),
   workZone: document.getElementById('workZone'),
-  workStage: document.getElementById('workStage'), // Промпт №28: см. applyWorkScale
   workResizeLeft: document.getElementById('workResizeLeft'),
   workResizeRight: document.getElementById('workResizeRight'),
   addTaskRow: document.getElementById('addTaskRow'),
@@ -1965,18 +1957,8 @@ function applyColumns(){
   if (!els.tasksColumnsWrap) return;
   const total = 1 + addedTasks.length;
   let cols = desiredColsForTotal(total);
-  // Промпт №28: раньше здесь мерили физическое окно (window.innerWidth) — но
-  // --work-w (ширина самой рабочей зоны) теперь может быть значительно шире
-  // окна и просто визуально уменьшаться ЦЕЛИКОМ (см. applyWorkScale), сохраняя
-  // раскладку как есть. «Сколько реально помещается колонок» нужно мерить по
-  // ширине самой рабочей зоны в её собственной, немасштабированной системе
-  // координат — иначе сетка у собеседника с другим (физическим) окном
-  // перестраивалась бы в другое число колонок, хотя --work-w у обоих одна и
-  // та же. Для обычного (нерастянутого, --work-w:100%) случая на телефоне
-  // это даёт практически то же значение, что и раньше.
-  const intendedW = parseFloat(getComputedStyle(els.workZone).width) || window.innerWidth;
-  if (intendedW < 560) cols = Math.min(cols, 1);
-  else if (intendedW < 820) cols = Math.min(cols, 2);
+  if (window.innerWidth < 560) cols = Math.min(cols, 1);
+  else if (window.innerWidth < 820) cols = Math.min(cols, 2);
   const rows = Math.max(1, Math.ceil(total / cols));
   els.tasksColumnsWrap.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
   els.tasksColumnsWrap.style.gridTemplateRows = `repeat(${rows}, auto)`;
@@ -2200,46 +2182,6 @@ function clampWorkW(w){
   } catch(e){}
 })();
 
-/* ═══ Промпт №28: масштаб рабочего поля между учителем и учеником ═══
-   Раньше «задуманная» ширина (--work-w), пришедшая от собеседника, сразу
-   обрезалась под СВОЙ локальный вьюпорт (clampWorkW), из-за чего у более
-   узкого участника сетка карточек перестраивалась в другое число колонок —
-   часть содержимого/заметок оказывалась не там, где у учителя, либо вовсе
-   за пределами видимого. Теперь --work-w всегда хранит ширину как есть, а
-   applyWorkScale() отдельно решает, нужно ли её визуально уменьшить
-   (transform: scale — та же раскладка целиком, просто мельче), чтобы она
-   поместилась в РЕАЛЬНОЕ окно. Если реальное окно, наоборот, шире
-   задуманного — ничего не растягиваем, --work-w и так уже ровно нужного
-   размера, а пустое место по бокам — обычный фон страницы, там и раньше не
-   было ничего интерактивного. Этим же путём наконец получает масштабирование
-   и мобильная/планшетная версия — раньше оно там вообще не считалось. */
-const MIN_WORK_SCALE = 0.5; // не уменьшаем до нечитаемого размера
-let currentWorkScale = 1;
-function syncWorkStageHeight(){
-  // сам transform:scale() не влияет на высоту, которую .work-zone резервирует
-  // в потоке документа — без явного пересчёта высоты обёртки #workStage под
-  // уменьшенным полем осталась бы пустая «дыра» (или наоборот, всё съезжало
-  // бы вверх при увеличении). Вызывается и при смене масштаба, и (через
-  // ResizeObserver ниже) при любом изменении содержимого сетки — новая
-  // карточка, разбор ответа и т.п. — независимо от того, что именно длину
-  // изменило.
-  if (!els.workStage) return;
-  els.workStage.style.height = (els.workZone.offsetHeight * currentWorkScale) + 'px';
-}
-function applyWorkScale(){
-  if (!els.workZone) return;
-  const intendedW = parseFloat(getComputedStyle(els.workZone).width);
-  if (!intendedW) return;
-  const availW = window.innerWidth - 24;
-  currentWorkScale = (intendedW <= availW) ? 1 : Math.max(MIN_WORK_SCALE, availW / intendedW);
-  els.workZone.style.setProperty('--work-scale', String(currentWorkScale));
-  syncWorkStageHeight();
-}
-if (els.workStage && typeof ResizeObserver !== 'undefined') {
-  new ResizeObserver(syncWorkStageHeight).observe(els.workZone);
-}
-applyWorkScale();
-window.addEventListener('resize', applyWorkScale);
 function setupWorkZoneResize(handleEl, side){
   let start = null; // {x, w}
   handleEl.addEventListener('pointerdown', (e) => {
@@ -2262,7 +2204,6 @@ function setupWorkZoneResize(handleEl, side){
       const w = parseFloat(getComputedStyle(els.workZone).width);
       localStorage.setItem(WORK_W_KEY, String(w));
     } catch(e){}
-    applyWorkScale(); // Промпт №28: своя ширина всегда самосогласована со своим окном (см. clampWorkW), поэтому обычно даёт scale=1 — но пересчитать не лишнее
     // после завершения растягивания форсируем перерисовку — не дожидаясь скролла
     setTimeout(forceRepaintWorkArea, 30);
     // Промпт №23: растянутая ширина рабочей зоны должна долететь до собеседника —
@@ -2429,17 +2370,9 @@ function tsApplyState(state){
   if (state.workW) {
     const curW = parseFloat(getComputedStyle(els.workZone).width);
     if (Math.abs(curW - state.workW) > 1) {
-      // Промпт №28: раньше тут стоял clampWorkW(state.workW) — «задуманная»
-      // ширина собеседника обрезалась под СВОЙ локальный вьюпорт ещё до
-      // применения, из-за чего сетка карточек перестраивалась в другое число
-      // колонок и переставала совпадать с тем, что видит собеседник (часть
-      // содержимого/заметок оказывалась не там или вовсе не видна). Теперь
-      // --work-w всегда хранит ширину как пришла, а applyWorkScale() отдельно
-      // решает, нужно ли вписать её в реальное окно масштабированием — сама
-      // раскладка при этом у всех участников остаётся идентичной.
-      els.workZone.style.setProperty('--work-w', state.workW + 'px');
-      try { localStorage.setItem(WORK_W_KEY, String(state.workW)); } catch(e){}
-      applyWorkScale();
+      const w = clampWorkW(state.workW);
+      els.workZone.style.setProperty('--work-w', w + 'px');
+      try { localStorage.setItem(WORK_W_KEY, String(w)); } catch(e){}
       setTimeout(forceRepaintWorkArea, 30);
     }
   }
@@ -2658,26 +2591,14 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
   }
 
   function worldToScreenTransform(){
-    // ВНУТРЕННЯЯ трансформация холста (мировые координаты -> пиксели битмапа
-    // холста) — targetVisualScale сюда сознательно НЕ подмешивается: сам
-    // битмап всегда рисуется в «задуманном» (немасштабированном) размере
-    // листа, а видимое уменьшение/увеличение делает CSS-transform холста
-    // целиком (см. syncBoardTarget) — dpr тут ровно тот же смысл, что и раньше.
     const s = viewScale * dpr;
     return [s, 0, 0, s, -panX * s, -panY * s];
   }
-  // Промпт №28: экранные (client*) координаты клика/касания приходят в
-  // ВИЗУАЛЬНЫХ пикселях страницы — если у листа сейчас применён локальный
-  // масштаб (targetVisualScale ≠ 1), тот же самый клик соответствует МЕНЬШЕМУ
-  // смещению в «внутренней» (немасштабированной) системе координат холста,
-  // где хранятся мировые координаты. Без учёта targetVisualScale рисование
-  // при уменьшенном масштабе съезжало бы относительно курсора/пальца.
   function screenToWorld(clientX, clientY){
     const rect = canvas.getBoundingClientRect();
-    const s = viewScale * targetVisualScale;
     return {
-      x: (clientX - rect.left) / s + panX,
-      y: (clientY - rect.top) / s + panY,
+      x: (clientX - rect.left) / viewScale + panX,
+      y: (clientY - rect.top) / viewScale + panY,
     };
   }
 
@@ -2694,38 +2615,17 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
   // холст position:absolute и координаты ниже переведены в систему ДОКУМЕНТА
   // (+ window.scrollX/scrollY), а не вьюпорта, поэтому при обычном скролле
   // left/top ниже не меняются вообще и лишний раз не перезаписываются.
-  //
-  // Промпт №28: у листа (.sheet/#workZone) теперь может быть свой визуальный
-  // масштаб (--work-scale — см. applyWorkScale в предыдущем <script>), СВОЙ
-  // у каждого участника совместной сессии (зависит от ширины ЕГО окна). Раньше
-  // холст брал именно ВИЗУАЛЬНЫЙ (уже уменьшенный) размер листа и для CSS-
-  // размера, и для внутреннего разрешения — а значит и для системы координат,
-  // в которой хранятся сами штрихи (мазки). У разных участников с разным
-  // локальным масштабом эта система координат оказывалась РАЗНОГО размера,
-  // и один и тот же (расшаренный, общий на всех) штрих лёг бы не на то же
-  // самое место листа. Чтобы штрихи оставались в ОДНОЙ системе координат
-  // независимо от локального масштаба, холст теперь всегда физически рисует
-  // в НЕМАСШТАБИРОВАННОМ ("задуманном", offsetWidth/offsetHeight) размере
-  // листа, а видимым уменьшением/увеличением занимается тот же самый
-  // transform:scale(), что и у самого листа (targetVisualScale ниже) — так
-  // холст остаётся идеально наложен на лист при любом локальном масштабе, а
-  // мазки — переносимы между участниками с разными масштабами один в один.
-  let lastSyncLeft = null, lastSyncTop = null, lastSyncW = null, lastSyncH = null, lastSyncScale = null;
-  let targetVisualScale = 1; // используется screenToWorld/worldToScreenTransform ниже
+  let lastSyncLeft = null, lastSyncTop = null, lastSyncW = null, lastSyncH = null;
   function syncBoardTarget(){
     const el = resolveBoardTarget();
     boardTarget = el;
-    if (!el) { canvas.style.display = 'none'; lastSyncLeft = lastSyncTop = lastSyncW = lastSyncH = lastSyncScale = null; return false; }
-    const rect = el.getBoundingClientRect(); // визуальный (после любых transform) прямоугольник — для ПОЗИЦИИ и масштаба
-    if (rect.width <= 0 || rect.height <= 0) { canvas.style.display = 'none'; lastSyncLeft = lastSyncTop = lastSyncW = lastSyncH = lastSyncScale = null; return false; }
+    if (!el) { canvas.style.display = 'none'; lastSyncLeft = lastSyncTop = lastSyncW = lastSyncH = null; return false; }
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) { canvas.style.display = 'none'; lastSyncLeft = lastSyncTop = lastSyncW = lastSyncH = null; return false; }
     canvas.style.display = '';
     const docLeft = Math.round(rect.left + window.scrollX);
     const docTop = Math.round(rect.top + window.scrollY);
-    // «задуманный» (немасштабированный) размер листа — offsetWidth/Height НЕ
-    // зависят от transform, в отличие от getBoundingClientRect()
-    const intendedW = Math.round(el.offsetWidth) || Math.round(rect.width);
-    const intendedH = Math.round(el.offsetHeight) || Math.round(rect.height);
-    targetVisualScale = rect.width / (intendedW || 1);
+    const w = Math.round(rect.width), h = Math.round(rect.height);
     // пишем в style только когда что-то реально изменилось — раньше эти
     // присваивания шли на КАЖДЫЙ кадр безусловно, даже когда лист стоял на
     // месте, что зря гоняло стили/layout параллельно со скроллом страницы
@@ -2734,19 +2634,12 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
       canvas.style.top = docTop + 'px';
       lastSyncLeft = docLeft; lastSyncTop = docTop;
     }
-    if (intendedW !== lastSyncW || intendedH !== lastSyncH) {
-      canvas.style.width = intendedW + 'px';
-      canvas.style.height = intendedH + 'px';
-      lastSyncW = intendedW; lastSyncH = intendedH;
+    if (w !== lastSyncW || h !== lastSyncH) {
+      canvas.style.width = w + 'px';
+      canvas.style.height = h + 'px';
+      lastSyncW = w; lastSyncH = h;
     }
-    if (targetVisualScale !== lastSyncScale) {
-      // top left — верхний левый угол холста уже точно на месте (left/top
-      // выше), масштабируем «от него», не сдвигая
-      canvas.style.transformOrigin = 'top left';
-      canvas.style.transform = (Math.abs(targetVisualScale - 1) < 0.001) ? '' : `scale(${targetVisualScale})`;
-      lastSyncScale = targetVisualScale;
-    }
-    const pw = Math.round(intendedW * dpr), ph = Math.round(intendedH * dpr);
+    const pw = Math.round(w * dpr), ph = Math.round(h * dpr);
     if (canvas.width !== pw || canvas.height !== ph) {
       canvas.width = pw;
       canvas.height = ph;
@@ -3047,11 +2940,8 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
 
   canvas.addEventListener('pointermove', e=>{
     if (panning) {
-      // Промпт №28: см. screenToWorld — тот же учёт targetVisualScale, иначе
-      // панорамирование при уменьшенном локальном масштабе ехало бы быстрее/
-      // медленнее самого курсора
-      panX = panStartPanX - (e.clientX - panStartClientX) / (viewScale * targetVisualScale);
-      panY = panStartPanY - (e.clientY - panStartClientY) / (viewScale * targetVisualScale);
+      panX = panStartPanX - (e.clientX - panStartClientX) / viewScale;
+      panY = panStartPanY - (e.clientY - panStartClientY) / viewScale;
       redraw();
       e.preventDefault();
       return;
