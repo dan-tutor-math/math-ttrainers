@@ -18,13 +18,93 @@ function loadDB(){
   try { const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); if (raw && raw.boards) DB = raw; } catch(e){}
 }
 let saveTimer = null;
+// ── раньше ошибка сохранения (например, кончилось место в localStorage —
+// лимит на весь сайт около 5–10 МБ, а тут в ОДНОМ ключе лежат вообще все
+// доски со всеми картинками) проглатывалась молча: работа в моменте
+// выглядела нормально, но по факту с этого момента вообще ничего не
+// сохранялось, и пропажа обнаруживалась только через день-два, когда было
+// уже поздно. Теперь неудачное сохранение сразу показывает предупреждение
+// на весь экран — один раз, пока не появится успешное сохранение снова, —
+// вместо того чтобы молчать. ──
+let saveFailedWarned = false;
+function showSaveFailedWarning(){
+  if (saveFailedWarned) return;
+  saveFailedWarned = true;
+  try {
+    const bar = document.createElement('div');
+    bar.id = 'saveFailBanner';
+    bar.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#c0392b;color:#fff;'
+      + 'font-family:system-ui,sans-serif;font-size:14px;line-height:1.4;padding:10px 16px;text-align:center;'
+      + 'box-shadow:0 2px 10px rgba(0,0,0,.35);';
+    bar.textContent = '⚠️ Не удалось сохранить изменения на доске — вероятно, кончилось место в хранилище браузера. '
+      + 'Срочно экспортируйте важные доски в файл (⋯ у доски → «Экспортировать в файл»), пока изменения не потеряны.';
+    document.body.appendChild(bar);
+  } catch (e) {}
+}
+function clearSaveFailedWarning(){
+  saveFailedWarned = false;
+  const bar = document.getElementById('saveFailBanner');
+  if (bar) bar.remove();
+}
 function saveDB(){
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); } catch(e){}
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); clearSaveFailedWarning(); }
+    catch (e) { showSaveFailedWarning(); }
   }, 300);
 }
 loadDB();
+
+/* ───────── экспорт/импорт отдельной доски файлом ─────────
+   Доски хранятся только локально в этом браузере (localStorage) — сервера
+   у них нет. Это даёт ручной, но надёжный способ не потерять конкретную
+   доску (сохранить файл себе на диск/в облако как резервную копию) и
+   перенести её на другое устройство: экспортировать на одном, загрузить
+   файл на другом через кнопку «Загрузить доску из файла». */
+function exportBoardToFile(board){
+  const payload = {
+    __app: 'oge-boards', __kind: 'board-export', __version: 1,
+    exportedAt: nowTs(),
+    board: JSON.parse(JSON.stringify(board)),
+  };
+  const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (board.name || 'доска').replace(/[\\/:*?"<>|]/g, '_') + '.board.json';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+function importBoardFromFile(file){
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const payload = JSON.parse(reader.result);
+      const src = (payload && payload.__kind === 'board-export' && payload.board) ? payload.board : null;
+      if (!src || !Array.isArray(src.objects)) throw new Error('bad format');
+      // новый id всегда, независимо от исходного — чтобы не перезаписать
+      // существующую доску с таким же id и чтобы один и тот же файл можно
+      // было безопасно загрузить хоть на нескольких устройствах, хоть
+      // повторно на одном и том же (например, для восстановления после
+      // случайного удаления)
+      const folderStillExists = src.folderId && DB.folders.some(f => f.id === src.folderId);
+      const b = Object.assign({}, src, {
+        id: uid(),
+        folderId: folderStillExists ? src.folderId : null,
+        createdAt: nowTs(), updatedAt: nowTs(), lastOpenedAt: null,
+      });
+      DB.boards.push(b);
+      saveDB();
+      renderList();
+      alert(`Доска «${b.name}» загружена.`);
+    } catch (err) {
+      alert('Не удалось прочитать файл — это не файл экспортированной доски (⋯ → «Экспортировать в файл»).');
+    }
+  };
+  reader.readAsText(file);
+}
 
 /* ───────── палитра — привязана к переменным темы, поэтому чернила
    остаются читаемыми что на светлой, что на тёмной бумаге ───────── */
@@ -215,6 +295,7 @@ function openCardMenu(btn){
   pop.innerHTML = `
     <button data-act="rename">Переименовать</button>
     ${kind==='board' ? `<button data-act="move">Переместить…</button>` : ''}
+    ${kind==='board' ? `<button data-act="export">Экспортировать в файл</button>` : ''}
     <button data-act="delete" class="danger">Удалить</button>
   `;
   document.body.appendChild(pop);
@@ -241,6 +322,9 @@ function openCardMenu(btn){
         DB.boards = DB.boards.filter(b => b.id !== id);
       }
       saveDB(); renderList();
+    } else if (act === 'export'){
+      const b = DB.boards.find(x => x.id === id);
+      if (b) exportBoardToFile(b);
     } else if (act === 'move'){
       const b = DB.boards.find(x => x.id === id);
       const names = ['(без папки)'].concat(DB.folders.map(f => f.name));
@@ -277,6 +361,15 @@ document.getElementById('blCreateFolder').addEventListener('click', () => {
   if (!name || !name.trim()) return;
   DB.folders.push({ id: uid(), name: name.trim(), createdAt: nowTs() });
   saveDB(); renderList();
+});
+document.getElementById('blImportBoard').addEventListener('click', () => {
+  const input = document.getElementById('blImportFile');
+  input.value = ''; // сброс — иначе повторный выбор ТОГО ЖЕ файла не даст событие change
+  input.click();
+});
+document.getElementById('blImportFile').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  if (file) importBoardFromFile(file);
 });
 const sortLabels = { new: 'Сначала новые', old: 'Сначала старые', az: 'По названию (А—Я)' };
 document.getElementById('blSortBtn').addEventListener('click', (e) => {
@@ -4095,5 +4188,5 @@ window.boardsAppBoot = function(){
   if (m && DB.boards.some(b=>b.id===m[1])) openBoard(m[1]);
 };
 if (!window.__hasCloudGate) window.boardsAppBoot();
-window.addEventListener('beforeunload', () => { if (B) { try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }catch(e){} } });
-document.addEventListener('visibilitychange', () => { if (document.hidden && B) { try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }catch(e){} } });
+window.addEventListener('beforeunload', () => { if (B) { try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); clearSaveFailedWarning(); }catch(e){ showSaveFailedWarning(); } } });
+document.addEventListener('visibilitychange', () => { if (document.hidden && B) { try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); clearSaveFailedWarning(); }catch(e){ showSaveFailedWarning(); } } });

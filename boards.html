@@ -659,6 +659,15 @@ function resolveBasketTexInHtml(html){
           <svg viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="1.8"/></svg>
           Создать папку
         </button>
+        <!-- доски хранятся только локально в этом браузере (см. boards-core.js,
+             STORAGE_KEY) — эта кнопка даёт способ вручную вернуть доску,
+             сохранённую файлом через «Экспортировать в файл» в меню доски
+             (⋯), например с другого устройства или как резервную копию -->
+        <button class="bl-btn" id="blImportBoard">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+          Загрузить доску из файла
+        </button>
+        <input type="file" id="blImportFile" accept=".json,application/json" style="display:none">
         <div class="bl-sort">
           <button class="bl-btn" id="blSortBtn">
             <svg viewBox="0 0 24 24" fill="none"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l3-3M17 20l-3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
