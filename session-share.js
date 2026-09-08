@@ -59,6 +59,7 @@
       resetSession: async () => {}, joinByCode: async () => ({ ok: false, reason: 'unavailable' }), isLeader(){ return true; },
       navigateTo: async (urlOrSlug) => { try { location.href = /^[a-z0-9_]+$/i.test(urlOrSlug) && !urlOrSlug.includes('.') ? urlOrSlug + '.html' : urlOrSlug; } catch (e) {} },
       guardStudentAction(action, fn){ return fn; }, studentRestricted(){ return false; }, flashRestrictedHint(){},
+      getConnState(){ return 'online'; },
       getPermissions(){ return { switchTask: true, refreshOne: true, refreshAll: true, showSolution: true, deleteTask: true, board: true }; },
       setPermission(){}, onPermissionsChange(){},
       getAutosaveHistory(){ return true; }, setAutosaveHistory(){}, onAutosaveHistoryChange(){},
@@ -138,7 +139,10 @@
      синхронизацию всей группы. */
   function studentRestricted(action) {
     if (isLeaderFlag) return false;
-    if (action === 'switchTask' || action === 'navigate') return true;
+    // Промпт №31: 'boardPan' — перемещение/масштаб доски и прокрутка
+    // страницы. Тоже всегда только у главного: если ученик уедет по доске
+    // сам, учитель будет писать в одном месте, а ученик смотреть в другое.
+    if (action === 'switchTask' || action === 'navigate' || action === 'boardPan') return true;
     return !!permissions && permissions[action] === false;
   }
   let restrictedHintTimer = null;
@@ -307,6 +311,19 @@
 
   function applyIncomingState(state) {
     if (!state) return;
+    // Промпт №31: отправитель мог выкинуть из рассылки тяжёлые поля (см.
+    // trimForBroadcast). Их отсутствие означает «не менялось / прислать не
+    // смогли», а НЕ «стало пустым», поэтому подставляем на их место то, что
+    // сейчас есть у нас: иначе доска или список добавленных заданий
+    // очистились бы сами собой на принимающей стороне.
+    if (Array.isArray(state.__trimmed) && state.__trimmed.length) {
+      let localNow = {};
+      try { localNow = getStateCb() || {}; } catch (e) {}
+      state = Object.assign({}, state);
+      state.__trimmed.forEach(k => {
+        if (typeof localNow[k] !== 'undefined') state[k] = localNow[k];
+      });
+    }
     // права/автосохранение/тема — общие для ВСЕЙ платформы (не завязаны на
     // конкретный тренажёр), применяем их всегда, независимо от того, с какой
     // страницы пришло состояние — Промпт №30 (переход между тренажёрами) не
@@ -360,11 +377,103 @@
     return (Date.now() - (entry.lastLocalInputAt || 0)) < LOCAL_EDIT_GRACE_MS;
   }
 
+  /* ═══ Промпт №31: живучесть соединения ═══
+     Раньше подписка обрабатывала ровно один статус — SUBSCRIBED, — а
+     CHANNEL_ERROR / TIMED_OUT / CLOSED не ловились вообще. Любой обрыв
+     вебсокета (моргнула сеть, вкладка/ноутбук ушли в сон, Supabase закрыл
+     простаивающее соединение) означал, что сессия ТИХО умирала: код в
+     панели на месте, всё выглядит рабочим, а на самом деле ни штрихи, ни
+     задания больше никуда не летят. Именно так и выглядело «синхронизация
+     слетела сама по себе, без перезагрузок».
+     Теперь: ловим все статусы, переподключаемся с нарастающей паузой,
+     дополнительно проверяем канал по таймеру (бывает, что он умирает
+     совсем молча, без единого статуса), реагируем на возврат сети и на
+     возврат к вкладке — и после КАЖДОГО восстановления просим у остальных
+     участников актуальное состояние, чтобы догнать всё пропущенное. */
+  const CONN = { ONLINE: 'online', RECONNECTING: 'reconnecting', OFFLINE: 'offline' };
+  let connState = CONN.RECONNECTING;
+  let reconnectAttempt = 0;
+  let reconnectTimer = null;
+  let keepaliveTimer = null;
+  let everSubscribed = false;      // был ли хоть один успешный SUBSCRIBED на этом коде
+  let resubscribing = false;       // защита от гонки переподписок
+  const RECONNECT_DELAYS_MS = [700, 1500, 3000, 5000, 8000, 12000];
+  const KEEPALIVE_EVERY_MS = 10000;
+
+  function setConnState(s) {
+    if (connState === s) return;
+    connState = s;
+    notifyUi();
+  }
+  function getConnState() { return connState; }
+
+  // канал жив? у RealtimeChannel есть .state: joined | joining | closed | errored | leaving
+  function channelLooksAlive() {
+    if (!channel) return false;
+    const st = channel.state;
+    if (typeof st !== 'string') return true; // неизвестная реализация (в т.ч. тестовая заглушка) — не мешаем
+    return st === 'joined' || st === 'joining';
+  }
+
+  function scheduleReconnect() {
+    if (!code || reconnectTimer) return;
+    const delay = RECONNECT_DELAYS_MS[Math.min(reconnectAttempt, RECONNECT_DELAYS_MS.length - 1)];
+    reconnectAttempt++;
+    setConnState(reconnectAttempt > 3 ? CONN.OFFLINE : CONN.RECONNECTING);
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      if (!code) return;
+      resubscribing = true;
+      try { subscribeChannel(code); } catch (e) { scheduleReconnect(); }
+      resubscribing = false;
+    }, delay);
+  }
+
+  // немедленная попытка (сеть вернулась / вкладка снова активна) — не ждём
+  // очередную паузу backoff'а, но и не запускаем вторую параллельную попытку
+  function reconnectNow() {
+    if (!code) return;
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    reconnectAttempt = 0;
+    try { subscribeChannel(code); } catch (e) { scheduleReconnect(); }
+  }
+
+  function startKeepalive() {
+    if (keepaliveTimer) return;
+    keepaliveTimer = setInterval(() => {
+      if (!code || resubscribing || reconnectTimer) return;
+      if (!channelLooksAlive()) {
+        // канал отвалился молча — статуса не было, но и живым он уже не выглядит
+        setConnState(CONN.RECONNECTING);
+        reconnectNow();
+      }
+    }, KEEPALIVE_EVERY_MS);
+  }
+
+  function bindConnectionWatchers() {
+    try {
+      window.addEventListener('online', () => { if (code) reconnectNow(); });
+      window.addEventListener('offline', () => setConnState(CONN.OFFLINE));
+      document.addEventListener('visibilitychange', () => {
+        // возврат к вкладке — самый частый момент, когда обнаруживается, что
+        // соединение давно умерло (ноутбук закрывали, вкладка спала)
+        if (document.visibilityState === 'visible' && code && !channelLooksAlive()) reconnectNow();
+      });
+    } catch (e) {}
+  }
+
+  // попросить участников прислать актуальное состояние (после переподключения
+  // мы могли пропустить и штрихи, и смену задания — снимок всё это чинит)
+  function requestSyncFromPeers() {
+    try { channel && channel.send({ type: 'broadcast', event: 'sync_request', payload: { uid: CLIENT_ID } }); } catch (e) {}
+  }
+
   function subscribeChannel(c, onSubscribed) {
     if (channel) { try { SB.removeChannel(channel); } catch (e) {} channel = null; }
     channel = SB.channel('trainer_session:' + c)
       .on('broadcast', { event: 'state' }, ({ payload }) => {
         if (!payload || payload.uid === CLIENT_ID) return;
+        incomingStateCount++; // Промпт №31 — признак «на этом коде кто-то живой есть»
         applyIncomingState(payload.state);
       })
       .on('broadcast', { event: 'field' }, ({ payload }) => {
@@ -389,9 +498,30 @@
       // «главный»), так это работает и при 3+ участниках
       .on('broadcast', { event: 'sync_request' }, ({ payload }) => {
         if (!payload || payload.uid === CLIENT_ID) return;
-        push();
+        // именно ПОЛНЫЙ снимок, без диеты: у просящего может не быть вообще
+        // ничего (только подключился) либо он мог пропустить часть штрихов,
+        // пока связи не было — здесь как раз тот случай, когда доску нужно
+        // передать целиком (см. trimForBroadcast)
+        pushFull();
       })
-      .subscribe((status) => { if (status === 'SUBSCRIBED' && onSubscribed) onSubscribed(); });
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          const wasBroken = everSubscribed && connState !== CONN.ONLINE;
+          everSubscribed = true;
+          reconnectAttempt = 0;
+          setConnState(CONN.ONLINE);
+          startKeepalive();
+          if (onSubscribed) onSubscribed();
+          // это переподключение, а не первый вход: пока связи не было, мы
+          // могли пропустить и штрихи, и смену задания — просим у остальных
+          // участников актуальный снимок, чтобы догнать всё разом
+          if (wasBroken) requestSyncFromPeers();
+          return;
+        }
+        if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          if (!resubscribing) scheduleReconnect();
+        }
+      });
   }
 
   function scheduleSave() {
@@ -402,13 +532,70 @@
     }, 400);
   }
 
+  /* ═══ Промпт №31: диета рассылаемого снимка ═══
+     Замер на живом тренажёре: снимок состояния тащит в себе ВСЮ доску
+     целиком, и весит он 9.7 КБ уже на пяти штрихах, 57 КБ на шестидесяти —
+     дальше линейно, примерно 48 байт на точку. За урок с полноценным
+     разбором это уверенно уходит за лимит Supabase Realtime (256 КБ на
+     сообщение): рассылка начинает молча не доходить, и связь «умирает»
+     ровно в тот момент, когда на доске активно пишут.
+     Поэтому: если снимок раздулся, выкидываем из РАССЫЛКИ самые тяжёлые
+     массивы (это и есть штрихи доски) — их содержимое собеседник и так
+     получает живьём, отдельными лёгкими событиями board_stroke. В БД при
+     этом продолжает уходить полный снимок, а любой присоединившийся или
+     переподключившийся получает полную картину через sync_request. */
+  const MAX_BROADCAST_BYTES = 60 * 1024;
+  let trimWarned = false;
+
+  function trimForBroadcast(state) {
+    let json;
+    try { json = JSON.stringify(state); } catch (e) { return state; }
+    if (!json || json.length <= MAX_BROADCAST_BYTES) return state;
+
+    // ищем самые тяжёлые массивы верхнего уровня и убираем их по убыванию
+    // веса, пока снимок не влезет в бюджет
+    const weights = Object.keys(state)
+      .filter(k => Array.isArray(state[k]))
+      .map(k => { let w = 0; try { w = JSON.stringify(state[k]).length; } catch (e) {} return { k, w }; })
+      .sort((a, b) => b.w - a.w);
+
+    const light = Object.assign({}, state);
+    let size = json.length;
+    const dropped = [];
+    for (const { k, w } of weights) {
+      if (size <= MAX_BROADCAST_BYTES) break;
+      delete light[k];
+      dropped.push(k);
+      size -= w;
+    }
+    if (dropped.length) {
+      // получатель по этой метке понимает: отсутствие поля означает «не
+      // прислали», а не «стало пустым» (важно, чтобы доска не «стёрлась»
+      // сама собой на той стороне)
+      light.__trimmed = dropped;
+      if (!trimWarned) {
+        trimWarned = true;
+        console.info('[session-share] снимок велик (' + Math.round(json.length / 1024) + ' КБ) — тяжёлые поля идут только в БД и по запросу синхронизации:', dropped.join(', '));
+      }
+    }
+    return light;
+  }
+
   function push() {
     if (applyingRemote || !code) return;
     const state = fullState();
     if (channel) {
-      try { channel.send({ type: 'broadcast', event: 'state', payload: { uid: CLIENT_ID, state } }); } catch (e) {}
+      const payloadState = trimForBroadcast(state);
+      try { channel.send({ type: 'broadcast', event: 'state', payload: { uid: CLIENT_ID, state: payloadState } }); } catch (e) {}
     }
     scheduleSave();
+  }
+
+  // полный снимок, без диеты — только в ответ на прямую просьбу
+  // «пришлите, что у вас сейчас» (подключение/переподключение)
+  function pushFull() {
+    if (applyingRemote || !code || !channel) return;
+    try { channel.send({ type: 'broadcast', event: 'state', payload: { uid: CLIENT_ID, state: fullState() } }); } catch (e) {}
   }
 
   // Промпт №21: тот, кто НЕ переходил по чужой ссылке/коду (т.е. сам открыл
@@ -426,6 +613,29 @@
   // Один быстрый повтор почти всегда всё решает; дальше — на случай совсем
   // медленной сети.
   const JOIN_RETRY_DELAYS_MS = [300, 700, 1200];
+
+  /* ═══ Промпт №31: «сессия не найдена» при живой сессии ═══
+     Существование сессии проверялось ИСКЛЮЧИТЕЛЬНО по строке в таблице. Но
+     строка — не единственная правда: она пишется с задержкой (scheduleSave
+     debounce-нут), может не записаться вовсе (сеть/права), а сама сессия при
+     этом прекрасно живёт в realtime-канале. В таком случае подключение
+     фактически проходило — снимки от учителя приходили, — а панель всё равно
+     писала «Сессия с таким кодом не найдена».
+     Поэтому, если строки нет, спрашиваем у самого канала: есть ли тут
+     кто-нибудь живой? Любой ответивший снимок означает, что сессия
+     существует и мы в неё попали. */
+  let incomingStateCount = 0;
+  const LIVE_PROBE_MS = 1500;
+
+  async function probeLiveSession() {
+    const before = incomingStateCount;
+    requestSyncFromPeers();
+    for (let waited = 0; waited < LIVE_PROBE_MS; waited += 100) {
+      await new Promise(r => setTimeout(r, 100));
+      if (incomingStateCount > before) return true;
+    }
+    return incomingStateCount > before;
+  }
 
   // Промпт №30: если код найден, но его 'trainer' не совпадает с текущей
   // страницей — прежде чем считать, что группа реально в другом месте, и
@@ -469,7 +679,19 @@
       if (opts.createIfMissing) {
         await insertRow(c, trainerSlug, fullState());
       } else {
-        // код так и не нашёлся — откатываемся к тому, что было ДО попытки
+        // Промпт №31: строки нет — но, возможно, сессия всё равно живая
+        // (см. комментарий у probeLiveSession). Спрашиваем у канала.
+        await Promise.race([subscribed, new Promise(r => setTimeout(r, 1200))]);
+        const alive = await probeLiveSession();
+        if (alive) {
+          storeCode(c);
+          notifyUi();
+          // снимок в БД восстановит ближайшее сохранение любого участника —
+          // отдельно писать его отсюда не нужно (и не надо: наше состояние
+          // сейчас пустое, мы только что подключились)
+          return { ok: true, viaLiveProbe: true };
+        }
+        // сессии действительно нет — откатываемся к тому, что было ДО попытки
         // подключения, а не остаёмся "подвешенными" на несуществующем коде:
         // subscribeChannel() выше уже отписал от прежнего канала, поэтому
         // для настоящего отката его нужно переподписать заново
@@ -477,6 +699,11 @@
           await new Promise(resolve => subscribeChannel(prevCode, resolve));
           code = prevCode;
         } else {
+          // прежнего кода не было вовсе — тогда и подписка на чужой канал
+          // здесь лишняя: без этого мы оставались бы слушать код, в котором
+          // формально «не состоим» (code = null), и получалась бы половинчатая
+          // синхронизация — снимки приходят, свои не уходят
+          if (channel) { try { SB.removeChannel(channel); } catch (e) {} channel = null; }
           code = null;
         }
         notifyUi();
@@ -544,6 +771,7 @@
     trainerSlug = opts.trainer;
     getStateCb = opts.getState || (() => ({}));
     applyStateCb = opts.applyState || (() => {});
+    bindConnectionWatchers(); // Промпт №31 — следим за сетью/возвратом вкладки
 
     const joinCode = urlJoinCode();
     if (joinCode) {
@@ -698,6 +926,23 @@
     uiEls.roleEl.textContent = isLeaderFlag
       ? 'Вы — главный (Учитель): к вашему заданию подключаются присоединившиеся.'
       : 'Вы подключены к чужой сессии — задания синхронизируются с главным.';
+
+    // Промпт №31: реальное состояние связи. Раньше при обрыве панель
+    // выглядела совершенно обычно — код на месте, и понять, что ничего уже
+    // не синхронизируется, было невозможно до тех пор, пока не заметишь,
+    // что собеседник не видит написанного.
+    if (uiEls.connEl) {
+      const label = connState === CONN.ONLINE ? 'На связи'
+        : connState === CONN.RECONNECTING ? 'Связь потеряна — восстанавливаю…'
+        : 'Нет связи — пробую переподключиться';
+      uiEls.connEl.textContent = label;
+      uiEls.connEl.className = 'ts-conn ts-conn-' + connState;
+    }
+    if (uiEls.btn) {
+      uiEls.btn.classList.toggle('ts-offline', connState !== CONN.ONLINE);
+      uiEls.btn.title = connState === CONN.ONLINE
+        ? 'Совместный доступ' : 'Совместный доступ — связь восстанавливается';
+    }
     // Промпт №30: если поле подключения сейчас пустое (например, панель
     // только что открыли, или подключение отвалилось после перезагрузки) —
     // подставляем туда последний использованный код, чтобы «подключиться
@@ -739,6 +984,19 @@
         color:var(--ink);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
         box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s;}
       .ts-share-btn:active{transform:scale(.92)}
+      /* Промпт №31: обрыв связи виден прямо на кнопке — не нужно открывать
+         панель, чтобы заметить, что синхронизация встала */
+      .ts-share-btn.ts-offline{border-color:#e0a03a;color:#e0a03a;}
+      .ts-share-btn.ts-offline::after{content:'';position:absolute;top:-2px;right:-2px;
+        width:10px;height:10px;border-radius:50%;background:#e0a03a;
+        box-shadow:0 0 0 2px var(--glass-strong);animation:tsPulse 1.2s ease-in-out infinite;}
+      @keyframes tsPulse{0%,100%{opacity:1}50%{opacity:.35}}
+      .ts-conn{font-family:var(--font-ui,inherit);font-size:12px;font-weight:600;
+        padding:6px 10px;border-radius:10px;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+      .ts-conn::before{content:'';width:8px;height:8px;border-radius:50%;background:currentColor;flex:0 0 auto;}
+      .ts-conn-online{color:#2e9e5b;background:rgba(46,158,91,.10);}
+      .ts-conn-reconnecting{color:#e0a03a;background:rgba(224,160,58,.12);}
+      .ts-conn-offline{color:#d9534f;background:rgba(217,83,79,.12);}
       .ts-share-pop{position:fixed;top:60px;right:16px;z-index:400;background:var(--glass-strong);
         backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
         border:1px solid var(--glass-border);border-radius:16px;box-shadow:var(--shadow);
@@ -788,6 +1046,7 @@
       <div class="ts-share-title">Совместный доступ</div>
       <div class="ts-share-hint">Поделитесь кодом или ссылкой — тот, кто откроет её, увидит те же задания и ввод, что и вы, в реальном времени.</div>
       <div class="ts-share-hint" id="tsRole" style="font-weight:600;"></div>
+      <div class="ts-conn ts-conn-reconnecting" id="tsConn">На связи</div>
       <div class="ts-share-code" id="tsCode">—</div>
       <div class="ts-share-row">
         <input id="tsLink" type="text" readonly>
@@ -825,6 +1084,7 @@
       msgEl: pop.querySelector('#tsMsg'),
       joinInput: pop.querySelector('#tsJoinInput'),
       roleEl: pop.querySelector('#tsRole'),
+      connEl: pop.querySelector('#tsConn'),
       permSep: pop.querySelector('#tsPermSep'),
       permSection: pop.querySelector('#tsPermSection'),
       permList: pop.querySelector('#tsPermList'),
@@ -865,7 +1125,16 @@
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       pop.classList.toggle('open');
-      if (pop.classList.contains('open')) renderPanel();
+      if (pop.classList.contains('open')) {
+        // Промпт №31: не показываем прошлую ошибку подключения при новом
+        // открытии панели — иначе «Сессия не найдена» висит и после того,
+        // как подключение давно прошло успешно
+        if (uiEls && uiEls.msgEl && uiEls.msgEl.classList.contains('err')) {
+          uiEls.msgEl.textContent = '';
+          uiEls.msgEl.classList.remove('err');
+        }
+        renderPanel();
+      }
     });
     document.addEventListener('click', (e) => {
       const path = e.composedPath ? e.composedPath() : [];
@@ -894,6 +1163,7 @@
     getCode, getShareUrl, resetSession, joinByCode, mountShareButton,
     broadcastEvent, onEvent, isLeader, navigateTo,
     guardStudentAction, studentRestricted, flashRestrictedHint,
+    getConnState,
     getPermissions, setPermission, onPermissionsChange,
     getAutosaveHistory, setAutosaveHistory, onAutosaveHistoryChange,
     registerHistoryUI, notifyHistoryChanged,

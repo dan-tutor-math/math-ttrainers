@@ -27,18 +27,99 @@ let saveTimer = null;
 // на весь экран — один раз, пока не появится успешное сохранение снова, —
 // вместо того чтобы молчать. ──
 let saveFailedWarned = false;
-function showSaveFailedWarning(){
+
+/* ── сколько места занято и сколько всего доступно ──
+   Раньше сообщение о сбое сохранения было гаданием: «вероятно, кончилось
+   место» — а понять, так это или нет, было нечем. Теперь считаем реальные
+   цифры: вес самих досок и оценку браузера по всему origin. */
+function fmtMB(bytes){
+  if (!isFinite(bytes) || bytes < 0) return '?';
+  const mb = bytes / (1024 * 1024);
+  return (mb < 10 ? mb.toFixed(1) : Math.round(mb)) + ' МБ';
+}
+function boardsPayloadBytes(){
+  try { return JSON.stringify(DB).length; } catch (e) { return -1; }
+}
+function isQuotaError(e){
+  if (!e) return false;
+  const name = e.name || '';
+  return name === 'QuotaExceededError'
+      || name === 'NS_ERROR_DOM_QUOTA_REACHED'
+      || e.code === 22 || e.code === 1014;
+}
+// оценка браузера приходит асинхронно — как только придёт, дополняем текст
+async function storageEstimateText(){
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      const est = await navigator.storage.estimate();
+      if (est && est.quota) return ' Браузер отводит на этот сайт около ' + fmtMB(est.quota)
+        + ', занято примерно ' + fmtMB(est.usage || 0) + '.';
+    }
+  } catch (e) {}
+  return '';
+}
+window.boardsStorageInfo = async function(){
+  const used = boardsPayloadBytes();
+  let quota = null, usage = null;
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      const est = await navigator.storage.estimate();
+      quota = est && est.quota || null;
+      usage = est && est.usage || null;
+    }
+  } catch (e) {}
+  return { boardsBytes: used, quota, usage };
+};
+
+function showSaveFailedWarning(err){
   if (saveFailedWarned) return;
   saveFailedWarned = true;
   try {
+    const quotaLike = isQuotaError(err);
     const bar = document.createElement('div');
     bar.id = 'saveFailBanner';
     bar.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;background:#c0392b;color:#fff;'
-      + 'font-family:system-ui,sans-serif;font-size:14px;line-height:1.4;padding:10px 16px;text-align:center;'
-      + 'box-shadow:0 2px 10px rgba(0,0,0,.35);';
-    bar.textContent = '⚠️ Не удалось сохранить изменения на доске — вероятно, кончилось место в хранилище браузера. '
-      + 'Срочно экспортируйте важные доски в файл (⋯ у доски → «Экспортировать в файл»), пока изменения не потеряны.';
+      + 'font-family:system-ui,sans-serif;font-size:14px;line-height:1.45;padding:10px 16px;text-align:center;'
+      + 'box-shadow:0 2px 10px rgba(0,0,0,.35);display:flex;gap:12px;align-items:center;justify-content:center;'
+      + 'flex-wrap:wrap;';
+
+    const text = document.createElement('span');
+    text.id = 'saveFailText';
+    text.textContent = quotaLike
+      ? '⚠️ Доска не сохраняется: в браузере кончилось место. Все доски вместе весят '
+        + fmtMB(boardsPayloadBytes()) + '.'
+      : '⚠️ Доска не сохраняется (' + ((err && (err.name || err.message)) || 'причина неизвестна')
+        + '). Все доски вместе весят ' + fmtMB(boardsPayloadBytes()) + '.';
+
+    // кнопка спасения прямо здесь: не нужно выходить из доски, чтобы
+    // сохранить работу файлом — именно в этот момент выходить и опаснее всего
+    const save = document.createElement('button');
+    save.textContent = 'Выгрузить в файл';
+    save.style.cssText = 'background:#fff;color:#c0392b;border:0;border-radius:8px;padding:6px 12px;'
+      + 'font:inherit;font-weight:700;cursor:pointer;';
+    save.addEventListener('click', () => {
+      try {
+        if (typeof B !== 'undefined' && B) exportBoardToFile(B);
+        else exportAllBoardsToFile();
+      } catch (e) { alert('Не удалось выгрузить: ' + (e && e.message || e)); }
+    });
+
+    const hide = document.createElement('button');
+    hide.textContent = 'Скрыть';
+    hide.style.cssText = 'background:transparent;color:#fff;border:1px solid rgba(255,255,255,.6);'
+      + 'border-radius:8px;padding:6px 12px;font:inherit;cursor:pointer;';
+    hide.addEventListener('click', () => bar.remove());
+
+    bar.appendChild(text); bar.appendChild(save); bar.appendChild(hide);
     document.body.appendChild(bar);
+
+    // дополняем оценкой браузера, когда она посчитается
+    storageEstimateText().then(extra => {
+      if (extra && document.getElementById('saveFailText')) {
+        document.getElementById('saveFailText').textContent += extra
+          + ' Освободить место: выгрузите доски в файлы и удалите ненужные, либо вставляйте картинки поменьше.';
+      }
+    });
   } catch (e) {}
 }
 function clearSaveFailedWarning(){
@@ -50,7 +131,7 @@ function saveDB(){
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); clearSaveFailedWarning(); }
-    catch (e) { showSaveFailedWarning(); }
+    catch (e) { console.error('[boards] сохранение не прошло:', e); showSaveFailedWarning(e); }
   }, 300);
 }
 loadDB();
@@ -61,6 +142,15 @@ loadDB();
    доску (сохранить файл себе на диск/в облако как резервную копию) и
    перенести её на другое устройство: экспортировать на одном, загрузить
    файл на другом через кнопку «Загрузить доску из файла». */
+function exportAllBoardsToFile(){
+  // аварийная выгрузка всего сразу — когда конкретная доска не открыта
+  const blob = new Blob([JSON.stringify(DB)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'все-доски-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
 function exportBoardToFile(board){
   const payload = {
     __app: 'oge-boards', __kind: 'board-export', __version: 1,
@@ -3342,6 +3432,16 @@ document.getElementById('railZoomOut').addEventListener('mousedown', (e) => e.pr
 document.getElementById('railZoomIn').addEventListener('click', () => setZoom(cam.zoom*1.25, cam.x+cssW/2/cam.zoom, cam.y+cssH/2/cam.zoom, cssW/2, cssH/2));
 document.getElementById('railZoomOut').addEventListener('click', () => setZoom(cam.zoom/1.25, cam.x+cssW/2/cam.zoom, cam.y+cssH/2/cam.zoom, cssW/2, cssH/2));
 document.getElementById('railZoomLabel').addEventListener('click', () => setZoom(1, cam.x+cssW/2/cam.zoom, cam.y+cssH/2/cam.zoom, cssW/2, cssH/2));
+/* Выгрузка открытой доски в файл — прямо отсюда, не выходя из доски.
+   Раньше это жило только в меню «⋯» у доски в списке: чтобы спасти работу,
+   надо было сначала выйти из доски — а именно в момент сбоя сохранения
+   выходить опаснее всего, несохранённое просто терялось. */
+document.getElementById('railBackup').addEventListener('click', () => {
+  try {
+    if (typeof B !== 'undefined' && B) exportBoardToFile(B);
+    else exportAllBoardsToFile();
+  } catch (e) { alert('Не удалось выгрузить доску: ' + (e && e.message || e)); }
+});
 document.getElementById('railFullscreen').addEventListener('click', () => {
   if (!document.fullscreenElement) document.documentElement.requestFullscreen?.();
   else document.exitFullscreen?.();
@@ -3569,7 +3669,34 @@ function loadImageSize(src){
 }
 function viewportCenterWorld(){ return { x: cam.x + cssW/2/cam.zoom, y: cam.y + cssH/2/cam.zoom }; }
 
+/* Проверка места ДО вставки: раньше о том, что картинка не влезла, можно
+   было узнать только постфактум — по красному баннеру «не сохранилось»,
+   когда работа уже была под угрозой. Теперь, если файл явно не помещается
+   в оставшееся место, спрашиваем заранее и показываем конкретные цифры. */
+async function imageFitsStorage(src){
+  try {
+    const imgBytes = (src && src.length) || 0;
+    const info = await window.boardsStorageInfo();
+    const quota = info.quota;
+    if (!quota) return { ok: true };            // браузер оценку не дал — не мешаем
+    const used = (info.usage != null ? info.usage : info.boardsBytes) || 0;
+    const free = quota - used;
+    if (imgBytes < free * 0.8) return { ok: true };
+    return { ok: false, imgBytes, free, quota };
+  } catch (e) { return { ok: true }; }
+}
+
 async function openImageModal(src, worldPt){
+  const fit = await imageFitsStorage(src);
+  if (!fit.ok) {
+    const go = confirm('Этот файл весит ' + fmtMB(fit.imgBytes)
+      + ', а свободного места в браузере осталось примерно ' + fmtMB(fit.free)
+      + ' (всего около ' + fmtMB(fit.quota) + ').\n\n'
+      + 'Скорее всего, доска после вставки перестанет сохраняться. Лучше сначала '
+      + 'выгрузить доски в файлы (кнопка ⤓ слева) и удалить ненужные, либо вставить '
+      + 'картинку поменьше.\n\nВсё равно вставить?');
+    if (!go) return;
+  }
   const size = await loadImageSize(src);
   pendingImage = { src, natW: size.w, natH: size.h, worldPt: worldPt || viewportCenterWorld() };
   document.getElementById('imgModalPreview').innerHTML = `<img src="${src}" alt="">`;
