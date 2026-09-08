@@ -383,7 +383,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 </style>
 </head>
 <body>
-<a class="home-btn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
+<a class="home-btn" id="homeBtn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
 <button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
 <button class="theme-toggle board-visibility-toggle" id="boardVisibilityToggle" title="Показать доску" aria-label="Показать/скрыть доску">🖊️</button>
 <script>(function(){
@@ -606,6 +606,9 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 </div>
 
 <script src="basket-core.js"></script>
+<script src="supabase-config.js"></script>
+<script src="supabase-js.umd.js"></script>
+<script src="session-share.js"></script>
 <script>
 /* ═══════════════ утилиты ═══════════════ */
 const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -2253,4 +2256,24 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
 })();
 </script>
 
+<script>
+/* Промпт №30: совместная сессия (подключение по коду, синхронный переход
+   между тренажёрами, блокировка самостоятельного выхода ученика) —
+   реализована один раз в session-share.js, здесь только подключение.
+   Собственное состояние задания этого тренажёра пока не расшаривается
+   (getState/applyState — заглушки), расшаривается сама сессия/навигация. */
+if (window.TrainerSession) {
+  window.TrainerSession.init({ trainer: 'oge6', getState: () => ({}), applyState: () => {} });
+  window.TrainerSession.mountShareButton();
+}
+document.getElementById('homeBtn').addEventListener('click', function (e) {
+  e.preventDefault();
+  var go = function () {
+    if (window.TrainerSession && window.TrainerSession.navigateTo) window.TrainerSession.navigateTo('index');
+    else location.href = 'index.html';
+  };
+  if (window.TrainerSession && window.TrainerSession.guardStudentAction) window.TrainerSession.guardStudentAction('navigate', go)();
+  else go();
+});
+</script>
 </body></html>

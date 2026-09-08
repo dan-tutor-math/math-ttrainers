@@ -57,6 +57,8 @@
       init: async () => {}, push(){}, registerField(){}, unregisterField(){}, unregisterFieldsWithPrefix(){}, mountShareButton(){},
       broadcastEvent(){}, onEvent(){}, getCode(){ return null; }, getShareUrl(){ return ''; },
       resetSession: async () => {}, joinByCode: async () => ({ ok: false, reason: 'unavailable' }), isLeader(){ return true; },
+      navigateTo: async (urlOrSlug) => { try { location.href = /^[a-z0-9_]+$/i.test(urlOrSlug) && !urlOrSlug.includes('.') ? urlOrSlug + '.html' : urlOrSlug; } catch (e) {} },
+      guardStudentAction(action, fn){ return fn; }, studentRestricted(){ return false; }, flashRestrictedHint(){},
       getPermissions(){ return { switchTask: true, refreshOne: true, refreshAll: true, showSolution: true, deleteTask: true, board: true }; },
       setPermission(){}, onPermissionsChange(){},
       getAutosaveHistory(){ return true; }, setAutosaveHistory(){}, onAutosaveHistoryChange(){},
@@ -125,6 +127,63 @@
   }
   function onAutosaveHistoryChange(cb) { autosaveChangeCb = cb; }
 
+  /* ═══ Промпт №25/№30: права присоединившегося — общая проверка для ЛЮБОЙ
+     страницы платформы (раньше это жило отдельной копией внутри каждого
+     тренажёра — oge8.html, oge12.html; теперь одна реализация здесь, чтобы
+     работало одинаково и на index.html, и на любом тренажёре без интеграции
+     вручную). 'switchTask' — переключение типа/задания внутри тренажёра,
+     'navigate' — уход со страницы вообще (на другой тренажёр или на
+     главную): оба всегда только у «главного» (Учителя), без исключений и
+     без переключателя в панели — иначе присоединившийся может сам сбить
+     синхронизацию всей группы. */
+  function studentRestricted(action) {
+    if (isLeaderFlag) return false;
+    if (action === 'switchTask' || action === 'navigate') return true;
+    return !!permissions && permissions[action] === false;
+  }
+  let restrictedHintTimer = null;
+  let restrictedHintStyleInjected = false;
+  function ensureRestrictedHintStyle() {
+    if (restrictedHintStyleInjected) return;
+    restrictedHintStyleInjected = true;
+    try {
+      const style = document.createElement('style');
+      style.textContent = `#tsRestrictedHint{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);
+        z-index:9999;background:var(--glass-strong,rgba(30,30,30,.85));backdrop-filter:blur(20px) saturate(160%);
+        -webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border,rgba(255,255,255,.2));
+        border-radius:12px;padding:9px 16px;font-size:12.5px;color:var(--pencil,#fff);
+        box-shadow:var(--shadow,0 4px 20px rgba(0,0,0,.35));opacity:0;transition:opacity .2s;pointer-events:none;
+        font-family:system-ui,-apple-system,sans-serif;}`;
+      document.head.appendChild(style);
+    } catch (e) {}
+  }
+  function flashRestrictedHint() {
+    try {
+      ensureRestrictedHintStyle();
+      let el = document.getElementById('tsRestrictedHint');
+      if (!el) {
+        el = document.createElement('div');
+        el.id = 'tsRestrictedHint';
+        el.textContent = 'Учитель ограничил это действие';
+        document.body.appendChild(el);
+      }
+      clearTimeout(restrictedHintTimer);
+      el.style.opacity = '1';
+      restrictedHintTimer = setTimeout(() => { el.style.opacity = '0'; }, 1400);
+    } catch (e) {}
+  }
+  // оборачивает обработчик клика: если действие ограничено для
+  // присоединившегося — просто показываем подсказку и ничего не делаем;
+  // иначе выполняем как обычно. Используется как для внутритренажёрных
+  // действий ('switchTask'), так и для любых ссылок/кнопок перехода между
+  // страницами платформы ('navigate') — на index.html в том числе.
+  function guardStudentAction(action, fn) {
+    return function (...args) {
+      if (studentRestricted(action)) { flashRestrictedHint(); return; }
+      return fn.apply(this, args);
+    };
+  }
+
   // ── «История/конспект урока» сама по себе устроена по-разному в каждом
   // тренажёре (нужно знать структуру его DOM, чтобы делать снимки) — поэтому
   // здесь только слот регистрации: конкретный тренажёр (см. lesson-history.js)
@@ -151,14 +210,59 @@
     } catch (e) {}
   }
 
-  function storageKey(trainer) { return 'trainerSession:' + trainer; }
+  // Промпт №30: раньше код сессии хранился ОТДЕЛЬНО под каждый тренажёр
+  // ('trainerSession:oge8', 'trainerSession:oge12', ...) — из-за этого переход
+  // на другой тренажёр незаметно заводил учителю совсем другой, новый код, и
+  // сессия «терялась». Теперь код один на всю платформу, под общим ключом —
+  // переход между тренажёрами (и обычная перезагрузка страницы) больше не
+  // сбрасывает его. Старые ключи ниже читаются один раз как аварийный
+  // источник (чтобы уже открытая сессия не потерялась при обновлении сайта).
+  const GLOBAL_CODE_KEY = 'trainerSession:global';
+  function storageKey() { return GLOBAL_CODE_KEY; }
 
-  function readStoredCode(trainer) {
-    try { return localStorage.getItem(storageKey(trainer)) || null; } catch (e) { return null; }
+  function readStoredCode() {
+    try {
+      const own = localStorage.getItem(GLOBAL_CODE_KEY);
+      if (own) return own;
+      // миграция со старой, посттренажёрной схемы хранения — берём первый
+      // найденный код от старой версии платформы, если общий ещё не заведён
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.indexOf('trainerSession:') === 0 && k !== GLOBAL_CODE_KEY) {
+          const v = localStorage.getItem(k);
+          if (v) return v;
+        }
+      }
+      return null;
+    } catch (e) { return null; }
   }
-  function storeCode(trainer, c) {
-    try { localStorage.setItem(storageKey(trainer), c); } catch (e) {}
+  function storeCode(c) {
+    try { localStorage.setItem(GLOBAL_CODE_KEY, c); } catch (e) {}
   }
+  // последний код, который вводили в поле «Подключиться по коду» — не сам
+  // код активной сессии (он в GLOBAL_CODE_KEY), а просто чтобы после
+  // перезагрузки/потери связи не пришлось вспоминать код заново: как
+  // договорились, в худшем случае достаточно нажать «Подключиться» ещё раз
+  // с тем же кодом — а он уже будет стоять в поле.
+  const LAST_JOIN_KEY = 'trainerSession:lastJoinCode';
+  function readLastJoinCode() { try { return localStorage.getItem(LAST_JOIN_KEY) || ''; } catch (e) { return ''; } }
+  function storeLastJoinCode(c) { try { localStorage.setItem(LAST_JOIN_KEY, c); } catch (e) {} }
+
+  // Промпт №30: код теперь один на всю платформу и переживает переход между
+  // тренажёрами и перезагрузку — но роль («главный»/«присоединившийся») тоже
+  // нужно помнить отдельно от кода. Без этого ученик, чей браузер просто
+  // открыл какую-то страницу платформы БЕЗ ?s= в адресе (например, вручную
+  // набрал адрес, или вернулся на главную не по ссылке учителя), был бы по
+  // старой логике объявлен «главным» для уже сохранённого у него общего
+  // кода — и мог бы своей перезаписью строки в БД увести всю группу «туда,
+  // где сейчас он», хотя реально сессией управляет учитель на другом
+  // устройстве. Роль фиксируется один раз — при создании своего кода
+  // («главный») или при подключении по чужому коду/ссылке
+  // («присоединившийся») — и дальше читается на каждой обычной загрузке
+  // страницы без ?s=, вместо того чтобы каждый раз считать себя главным.
+  const ROLE_KEY = 'trainerSession:global:role';
+  function readStoredRole() { try { return localStorage.getItem(ROLE_KEY); } catch (e) { return null; } }
+  function storeRole(role) { try { localStorage.setItem(ROLE_KEY, role); } catch (e) {} }
 
   function urlJoinCode() {
     try {
@@ -168,7 +272,11 @@
   }
 
   async function fetchRow(c) {
-    const { data, error } = await SB.from('trainer_sessions').select('code, state').eq('code', c).maybeSingle();
+    // 'trainer' здесь читается не только «для метки записи» (как раньше), а
+    // как «на какой странице сейчас находится группа» — Промпт №30 использует
+    // это, чтобы новый/переподключившийся участник автоматически попадал на
+    // ТОТ ЖЕ тренажёр, что и остальные, а не оставался на своей исходной странице.
+    const { data, error } = await SB.from('trainer_sessions').select('code, state, trainer').eq('code', c).maybeSingle();
     if (error) { console.error('[session-share] ошибка чтения сессии:', error.message); return null; }
     return data;
   }
@@ -193,14 +301,16 @@
       __permissions: permissions,
       __autosaveHistory: autosaveHistory,
       __theme: theme,
+      __trainer: trainerSlug, // Промпт №30 — какая страница прислала этот снимок
     });
   }
 
   function applyIncomingState(state) {
     if (!state) return;
-    // права/автосохранение/тема — общие для любого тренажёра, применяем их
-    // ДО вызова applyStateCb и независимо от того, что тренажёр сам решит
-    // делать с остальной частью снимка (см. комментарий у DEFAULT_PERMISSIONS)
+    // права/автосохранение/тема — общие для ВСЕЙ платформы (не завязаны на
+    // конкретный тренажёр), применяем их всегда, независимо от того, с какой
+    // страницы пришло состояние — Промпт №30 (переход между тренажёрами) не
+    // должен сбрасывать эти общие настройки
     if (state.__permissions) {
       permissions = Object.assign({}, DEFAULT_PERMISSIONS, state.__permissions);
       if (permissionsChangeCb) { try { permissionsChangeCb(getPermissions()); } catch (e) {} }
@@ -210,6 +320,16 @@
       if (autosaveChangeCb) { try { autosaveChangeCb(autosaveHistory); } catch (e) {} }
     }
     if (state.__theme) applyRemoteTheme(state.__theme);
+
+    // а вот СТРУКТУРНУЮ часть состояния (задания, режимы и т.п.) применяем
+    // только если она реально принадлежит ЭТОЙ странице — иначе, в момент
+    // перехода между тренажёрами, можно на долю секунды получить чужое
+    // состояние (например, снимок oge8 попадёт в applyState тренажёра oge12,
+    // структуры не совпадают) и либо сломать разметку, либо просто намусорить.
+    // Если метки нет вовсе (старый снимок/другая версия) — применяем как
+    // раньше, по умолчанию считая её «своей».
+    const belongsHere = !state.__trainer || state.__trainer === trainerSlug;
+    if (!belongsHere) return;
 
     applyingRemote = true;
     try {
@@ -307,6 +427,27 @@
   // медленной сети.
   const JOIN_RETRY_DELAYS_MS = [300, 700, 1200];
 
+  // Промпт №30: если код найден, но его 'trainer' не совпадает с текущей
+  // страницей — прежде чем считать, что группа реально в другом месте, и
+  // уводить туда, даём короткое окно на то, что запись в БД просто ещё не
+  // успела подтянуться. Типичная причина — ведущий только что сам
+  // переключился сюда через navigateTo(): рассылка 'navigate' уходит
+  // подписчикам раньше, чем у ведущего успевает прогрузиться новая
+  // страница и обновить строку в БД (см. фикс ниже в activate()), поэтому
+  // присоединившегося, идущего следом за той же рассылкой, иначе уводило
+  // обратно туда, откуда он только что синхронно пришёл.
+  const MISMATCH_RECHECK_DELAYS_MS = [200, 400, 800];
+
+  // Промпт №30: адрес другой страницы тренажёра по её слагу — слаг всегда
+  // совпадает с именем файла без расширения (тот же слаг, что передаётся в
+  // TrainerSession.init({trainer: ...}) на каждой странице), поэтому
+  // отдельная таблица соответствий не нужна.
+  function urlForTrainer(slug, c) {
+    const u = new URL(slug + '.html', location.href);
+    if (c) u.searchParams.set('s', c);
+    return u.toString();
+  }
+
   async function activate(c, opts) {
     opts = opts || {};
     const prevCode = code; // на случай отката, если c не найдётся (см. ниже)
@@ -341,10 +482,51 @@
         notifyUi();
         return { ok: false, reason: 'not_found' };
       }
-    } else if (row.state && Object.keys(row.state).length) {
-      applyIncomingState(row.state);
+    } else {
+      // Промпт №30: код нашёлся — но группа может сейчас быть НЕ на этой
+      // странице (учитель уже переключил тренажёр где-то ещё). Подключение
+      // «к чужому коду» (не создание своего) — а также обычная загрузка
+      // страницы БЕЗ ?s= у того, кто по сохранённой РОЛИ является
+      // присоединившимся (opts.followerFallback, см. init()) — в этом
+      // случае не остаётся здесь — переходим на актуальную страницу, унося
+      // код в ?s= с собой, и не трогаем applyIncomingState здесь: она всё
+      // равно относится к другому тренажёру и там будет применена заново
+      // после перехода.
+      const treatAsFollower = !opts.createIfMissing || opts.followerFallback;
+      if (treatAsFollower && row.trainer && row.trainer !== trainerSlug) {
+        // прежде чем окончательно решить "группа сейчас не здесь" — даём
+        // БД короткое окно догнать реальность (см. комментарий у
+        // MISMATCH_RECHECK_DELAYS_MS выше)
+        let mismatchRow = row;
+        for (const delay of MISMATCH_RECHECK_DELAYS_MS) {
+          if (!mismatchRow.trainer || mismatchRow.trainer === trainerSlug) break;
+          await new Promise(r => setTimeout(r, delay));
+          const fresh = await fetchRow(c);
+          if (fresh) mismatchRow = fresh;
+        }
+        if (mismatchRow.trainer && mismatchRow.trainer !== trainerSlug) {
+          storeCode(c);
+          location.href = urlForTrainer(mismatchRow.trainer, c);
+          return { ok: true, redirecting: true };
+        }
+        row = mismatchRow;
+      } else if (!treatAsFollower && row.trainer && row.trainer !== trainerSlug) {
+        // Промпт №30: сюда попадает только настоящий «главный» (по
+        // сохранённой роли, см. init()) — сам оказался здесь с уже
+        // существующим (глобальным) кодом, но БД ещё помнит группу на
+        // другой странице; типичный случай: «главный» только что
+        // переключился сюда через navigateTo(). Актуализируем trainer в
+        // БД СРАЗУ, не дожидаясь обычного дебаунса scheduleSave() (400мс) —
+        // иначе те, кто подключается прямо сейчас вслед за той же
+        // рассылкой 'navigate', ещё какое-то время видели бы здесь старую
+        // страницу и ошибочно уводились бы обратно.
+        try { await upsertState(c, trainerSlug, fullState()); } catch (e) {}
+      }
+      if (row.state && Object.keys(row.state).length) {
+        applyIncomingState(row.state);
+      }
     }
-    storeCode(trainerSlug, c);
+    storeCode(c);
     notifyUi();
     if (opts.requestSyncFromLeader) {
       // догоняем то, что снимок из БД мог не успеть отразить (см. комментарий
@@ -367,14 +549,30 @@
     if (joinCode) {
       isLeaderFlag = false;
       const res = await activate(joinCode.toUpperCase(), { createIfMissing: false, requestSyncFromLeader: true });
-      if (res.ok) return;
+      if (res.ok) { storeRole('follower'); return; }
       // ссылка устарела/битая — просто продолжаем со своей обычной сессией,
       // без всплывающих ошибок при обычном заходе на страницу
       isLeaderFlag = true;
     }
-    const stored = readStoredCode(trainerSlug);
+    const stored = readStoredCode();
+    const storedRole = readStoredRole();
+    if (stored && storedRole === 'follower') {
+      // Промпт №30: этот браузер и раньше был присоединившимся к этому же
+      // общему коду — обычная загрузка страницы БЕЗ ?s= в адресе (вручную
+      // набранный адрес, возврат на главную и т.п.) не должна вдруг сделать
+      // его «главным» и не должна перезаписывать в БД, где сейчас реально
+      // находится группа. Ведём себя так же, как при подключении по
+      // ссылке — если группа сейчас на другой странице, activate() сам
+      // уведёт куда нужно (followerFallback).
+      isLeaderFlag = false;
+      const res = await activate(stored, { createIfMissing: true, followerFallback: true, requestSyncFromLeader: true });
+      if (res.ok) return;
+      isLeaderFlag = true;
+    }
     const own = stored || generateCode();
+    isLeaderFlag = true;
     await activate(own, { createIfMissing: true });
+    storeRole('leader');
   }
 
   function registerField(fieldId, el) {
@@ -418,14 +616,17 @@
     const c = generateCode();
     isLeaderFlag = true; // новая своя сессия — снова главный в ней
     await activate(c, { createIfMissing: true });
+    storeRole('leader');
     applyIncomingState({});
   }
   async function joinByCode(rawCode) {
     const c = (rawCode || '').trim().toUpperCase().replace(/\s+/g, '');
     if (!c) return { ok: false, reason: 'empty' };
+    storeLastJoinCode(c);
     isLeaderFlag = false; // подключаемся к чужому коду — дальше синхронизируемся к нему
     const res = await activate(c, { createIfMissing: false, requestSyncFromLeader: true });
-    if (!res.ok) isLeaderFlag = true; // код не найден — остаёмся при своей сессии
+    if (res.ok) storeRole('follower');
+    else isLeaderFlag = true; // код не найден — остаёмся при своей сессии
     return res;
   }
   // ── лёгкие «эфемерные» события: не сохраняются, не входят в getState —
@@ -447,6 +648,46 @@
     return u.toString();
   }
 
+  /* ═══ Промпт №30: переход между тренажёрами внутри сессии ═══
+     Учитель вызывает это вместо обычной навигации (там, где иначе стоял бы
+     <a href> или location.href) — так все присоединившиеся ученики
+     переходят синхронно вслед за ним, включая переход на главную (index.html,
+     слаг 'index'). Присоединившийся вызвать это не может — соответствующие
+     кнопки/ссылки должны быть обёрнуты в guardStudentAction('navigate', ...),
+     который для него всегда запрещён (см. studentRestricted). */
+  async function navigateTo(urlOrSlug) {
+    if (isLeaderFlag === false) return; // подстраховка — переход всегда только у главного
+    const isBareSlug = /^[a-z0-9_]+$/i.test(urlOrSlug) && !urlOrSlug.includes('.');
+    const bareUrl = isBareSlug ? new URL(urlOrSlug + '.html', location.href).toString() : new URL(urlOrSlug, location.href).toString();
+    // ВАЖНО: сам «главный» переходит БЕЗ ?s= в адресе — свой код он и так
+    // получит на новой странице через общий (глобальный) localStorage, а
+    // код в URL означает «я не создатель, а присоединившийся» (см. init()) —
+    // если приклеить его и себе, «главный» на новой странице сам себе
+    // покажется учеником. Код в ?s= добавляется только в рассылку — её
+    // получают ТОЛЬКО присоединившиеся (см. onEvent('navigate', ...) ниже),
+    // и именно им он и нужен, чтобы попасть в ту же сессию.
+    const followerUrl = (() => {
+      const u = new URL(bareUrl);
+      if (code) u.searchParams.set('s', code);
+      return u.toString();
+    })();
+    broadcastEvent('navigate', { url: followerUrl });
+    // короткая пауза перед уходом со страницы — иначе бывает, что вкладка
+    // начинает закрываться/перегружаться раньше, чем сокет успел отправить
+    // последний пакет с этим событием, и присоединившиеся его не увидят
+    await new Promise(r => setTimeout(r, 150));
+    location.href = bareUrl;
+  }
+  // присоединившийся сам к себе это событие не шлёт (его собственные события
+  // отфильтровываются по uid ещё в subscribeChannel), поэтому здесь не нужно
+  // отдельно проверять isLeaderFlag у ОТПРАВИТЕЛЯ — только у получателя: если
+  // «главный» вдруг тоже получит такое событие (не должен, но на всякий
+  // случай) — он сам управляет своей навигацией и никуда «телепортироваться» не должен
+  onEvent('navigate', (data) => {
+    if (isLeaderFlag) return;
+    if (data && data.url) { try { location.href = data.url; } catch (e) {} }
+  });
+
   // ── стандартная плавающая кнопка + панель (одинаковая на всех тренажёрах) ──
   let uiEls = null;
   function notifyUi() { if (uiEls) renderPanel(); }
@@ -457,6 +698,11 @@
     uiEls.roleEl.textContent = isLeaderFlag
       ? 'Вы — главный (Учитель): к вашему заданию подключаются присоединившиеся.'
       : 'Вы подключены к чужой сессии — задания синхронизируются с главным.';
+    // Промпт №30: если поле подключения сейчас пустое (например, панель
+    // только что открыли, или подключение отвалилось после перезагрузки) —
+    // подставляем туда последний использованный код, чтобы «подключиться
+    // заново» было одним кликом, а не набором кода по памяти
+    try { if (!uiEls.joinInput.value) uiEls.joinInput.value = readLastJoinCode(); } catch (e) {}
 
     // права ученика редактирует только «главный» — присоединившийся видит
     // только сам факт (через применённые ограничения в интерфейсе тренажёра),
@@ -646,7 +892,8 @@
   window.TrainerSession = {
     init, push, registerField, unregisterField, unregisterFieldsWithPrefix,
     getCode, getShareUrl, resetSession, joinByCode, mountShareButton,
-    broadcastEvent, onEvent, isLeader,
+    broadcastEvent, onEvent, isLeader, navigateTo,
+    guardStudentAction, studentRestricted, flashRestrictedHint,
     getPermissions, setPermission, onPermissionsChange,
     getAutosaveHistory, setAutosaveHistory, onAutosaveHistoryChange,
     registerHistoryUI, notifyHistoryChanged,

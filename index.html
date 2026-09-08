@@ -354,6 +354,9 @@ footer{text-align:center;font-family:var(--font-ui);font-weight:500;color:var(--
 </div>
 
 <script src="basket-core.js"></script>
+<script src="supabase-config.js"></script>
+<script src="supabase-js.umd.js"></script>
+<script src="session-share.js"></script>
 <script>
 /* формулы, отложенные Подборкой (basket-core.js) — сама Подборка не рисует
    их сразу (у неё нет доступа к KaTeX), а просто кладёт исходный LaTeX в
@@ -644,6 +647,32 @@ document.getElementById('basketToggle').addEventListener('click', () => {
 
 renderNav();
 renderContent();
+
+/* ═══ Промпт №30: совместный доступ на главной странице — сессию теперь
+   можно запускать не только из отдельного тренажёра, но и отсюда, а
+   переход по карточке тренажёра во время активной сессии синхронный:
+   у присоединившегося (не главного) он всегда заблокирован (перейти может
+   только учитель — см. studentRestricted('navigate') в session-share.js),
+   а у главного уводит с собой всех подключённых учеников. У главной
+   страницы нет собственного «состояния задания», поэтому getState/applyState
+   здесь пустые — session-share нужен только ради кода сессии, кнопки
+   «Совместный доступ» и синхронной навигации. ═══ */
+if (window.TrainerSession) {
+  window.TrainerSession.init({ trainer: 'index', getState: () => ({}), applyState: () => {} });
+  window.TrainerSession.mountShareButton();
+}
+// делегирование на контейнер, а не на каждую карточку по отдельности —
+// список тренажёров перерисовывается заново при каждом renderContent()
+document.getElementById('topics').addEventListener('click', function (e) {
+  if (!window.TrainerSession) return; // модуль не загрузился — обычная ссылка сработает сама
+  const a = e.target.closest('a.topic-item[href]');
+  if (!a) return;
+  e.preventDefault();
+  const href = a.getAttribute('href');
+  window.TrainerSession.guardStudentAction('navigate', function () {
+    window.TrainerSession.navigateTo(href);
+  })();
+});
 </script>
 </body>
 </html>

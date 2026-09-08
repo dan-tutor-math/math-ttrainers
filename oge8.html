@@ -448,7 +448,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
   }
 })();
 </script>
-<a class="home-btn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
+<a class="home-btn" id="homeBtn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
 <button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
 <button class="theme-toggle board-visibility-toggle" id="boardVisibilityToggle" title="Показать доску" aria-label="Показать/скрыть доску">🖊️</button>
 <script>(function(){
@@ -1537,47 +1537,19 @@ function recordSolve() {
   recordSolveFor(curTask, curProg.hadWrongPick);
 }
 
-/* ═══ Промпт №23: права ученика (управляются учителем через панель
-   «Совместный доступ») — учителя (главного в сессии) эти ограничения
-   никогда не касаются; ввод ответа и рисование на доске всегда разрешены
-   ученику независимо от остальных прав (доска ограничивается отдельно,
-   см. permissions.board в board-IIFE, а не здесь). ═══ */
+/* ═══ Промпт №30: права ученика теперь реализованы один раз в session-share.js
+   (studentRestricted/guardStudentAction/flashRestrictedHint) — общие для всей
+   платформы, а не только для этого тренажёра. Здесь оставлены только тонкие
+   обёртки с прежними именами, чтобы не переписывать все места вызова. ═══ */
 function studentRestricted(action){
-  if (!window.TrainerSession || window.TrainerSession.isLeader()) return false;
-  // Промпт №25: выход из текущего типа заданий/переход на другой (кнопка
-  // "назад" к каталогу типов, ◀/▶ смена типа, выбор карточки на каталоге) —
-  // ВСЕГДА только у учителя, без исключений и без переключателя в панели:
-  // раньше это регулировалось правом switchTask (по умолчанию разрешено),
-  // из-за чего присоединившийся мог сам уйти из текущего типа и сбить
-  // синхронизацию сессии — теперь это жёсткое правило
-  if (action === 'switchTask') return true;
-  const perms = window.TrainerSession.getPermissions ? window.TrainerSession.getPermissions() : null;
-  return !!perms && perms[action] === false;
+  return window.TrainerSession && window.TrainerSession.studentRestricted ? window.TrainerSession.studentRestricted(action) : false;
 }
-let restrictedHintTimer = null;
 function flashRestrictedHint(){
-  let el = document.getElementById('restrictedHint');
-  if (!el) {
-    el = document.createElement('div');
-    el.id = 'restrictedHint';
-    el.style.cssText = 'position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:500;'
-      + 'background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);'
-      + 'border:1px solid var(--glass-border);border-radius:12px;padding:9px 16px;font-size:12.5px;'
-      + 'color:var(--pencil);box-shadow:var(--shadow);opacity:0;transition:opacity .2s;pointer-events:none;';
-    el.textContent = 'Учитель ограничил это действие';
-    document.body.appendChild(el);
-  }
-  clearTimeout(restrictedHintTimer);
-  el.style.opacity = '1';
-  restrictedHintTimer = setTimeout(() => { el.style.opacity = '0'; }, 1400);
+  if (window.TrainerSession && window.TrainerSession.flashRestrictedHint) window.TrainerSession.flashRestrictedHint();
 }
-// оборачивает обработчик клика: если действие ограничено для присоединившегося —
-// просто показываем подсказку и ничего не делаем; иначе выполняем как обычно
 function guardStudentAction(action, fn){
-  return function(...args){
-    if (studentRestricted(action)) { flashRestrictedHint(); return; }
-    return fn.apply(this, args);
-  };
+  if (window.TrainerSession && window.TrainerSession.guardStudentAction) return window.TrainerSession.guardStudentAction(action, fn);
+  return fn;
 }
 
 /* ═══ Промпт №23: «История/конспект урока» — перед тем, как задание(я)
@@ -2428,6 +2400,18 @@ if (window.TrainerSession) {
     });
   }
 }
+
+// Промпт №30: переход «на главную» — синхронный для всей сессии. У
+// присоединившегося (не главного) он всегда заблокирован (см.
+// studentRestricted('navigate') в session-share.js); у главного —
+// уводит с собой всех подключённых учеников (см. TrainerSession.navigateTo).
+document.getElementById('homeBtn').addEventListener('click', function(e){
+  e.preventDefault();
+  guardStudentAction('navigate', function(){
+    if (window.TrainerSession && window.TrainerSession.navigateTo) window.TrainerSession.navigateTo('index');
+    else location.href = 'index.html';
+  })();
+});
 </script>
 
 
