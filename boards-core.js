@@ -12,10 +12,78 @@ function clamp(v, lo, hi){ return Math.max(lo, Math.min(hi, v)); }
 function dist(a, b){ return Math.hypot(a.x - b.x, a.y - b.y); }
 function clonePts(obj){ return { points: obj.points.map(p => ({ x: p.x, y: p.y })), ctrl: obj.ctrl ? { x: obj.ctrl.x, y: obj.ctrl.y } : null }; }
 
-/* ───────── хранилище ───────── */
+/* ───────── хранилище ─────────
+   Раньше ВСЕ доски со всеми картинками лежали в одном ключе localStorage.
+   У localStorage потолок около 5 МБ на весь сайт — одна вставленная в доску
+   картинка со скриншотом съедала его целиком, и с этого момента доски просто
+   переставали сохраняться. Теперь доски живут в IndexedDB: там браузер даёт
+   не мегабайты, а сотни мегабайт (обычно доли свободного места на диске).
+   localStorage остаётся только как аварийный запасной вариант — и как
+   источник для одноразового переезда старых досок. */
 let DB = { folders: [], boards: [] };
+
+const IDB_NAME = 'ogeBoardsDB';
+const IDB_STORE = 'state';
+let idbPromise = null;
+function idbOpen(){
+  if (idbPromise) return idbPromise;
+  idbPromise = new Promise((resolve, reject) => {
+    if (!window.indexedDB) { reject(new Error('IndexedDB недоступен')); return; }
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  }).catch(err => { idbPromise = null; throw err; });
+  return idbPromise;
+}
+function idbGet(key){
+  return idbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  }));
+}
+function idbPut(key, value){
+  return idbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(value, key);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('запись прервана'));
+  }));
+}
+
+// синхронное чтение старого хранилища — нужно и для переезда, и на случай,
+// если IndexedDB почему-то недоступен (например, приватное окно)
 function loadDB(){
   try { const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); if (raw && raw.boards) DB = raw; } catch(e){}
+}
+
+/* Загрузка из IndexedDB. Если там пусто, а в localStorage лежат старые
+   доски — переносим их и только ПОСЛЕ успешной записи освобождаем старый
+   ключ: до этого момента ничего удалять нельзя, иначе при сбое переезда
+   доски пропали бы совсем. */
+function idbLoadDB(){
+  return idbGet('db').then(saved => {
+    if (saved && saved.boards) { DB = saved; return true; }
+    loadDB();
+    if (DB && DB.boards && DB.boards.length) {
+      return idbPut('db', DB).then(() => {
+        try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+        console.info('[boards] доски перенесены из localStorage в IndexedDB — место больше не кончится');
+        return true;
+      });
+    }
+    return true;
+  }).catch(err => {
+    console.warn('[boards] IndexedDB недоступен, работаем на localStorage:', err && err.message);
+    loadDB();
+    return false;
+  });
 }
 let saveTimer = null;
 // ── раньше ошибка сохранения (например, кончилось место в localStorage —
@@ -85,8 +153,12 @@ function showSaveFailedWarning(err){
 
     const text = document.createElement('span');
     text.id = 'saveFailText';
+    // после переезда на IndexedDB упереться в место почти невозможно, поэтому
+    // формулировка больше не утверждает «кончилось место» как единственную
+    // причину: браузер может отказать в записи и в приватном окне, и при
+    // переполненном диске
     text.textContent = quotaLike
-      ? '⚠️ Доска не сохраняется: в браузере кончилось место. Все доски вместе весят '
+      ? '⚠️ Доска не сохраняется: браузер отказал в записи, похоже, из-за нехватки места. Все доски вместе весят '
         + fmtMB(boardsPayloadBytes()) + '.'
       : '⚠️ Доска не сохраняется (' + ((err && (err.name || err.message)) || 'причина неизвестна')
         + '). Все доски вместе весят ' + fmtMB(boardsPayloadBytes()) + '.';
@@ -117,7 +189,7 @@ function showSaveFailedWarning(err){
     storageEstimateText().then(extra => {
       if (extra && document.getElementById('saveFailText')) {
         document.getElementById('saveFailText').textContent += extra
-          + ' Освободить место: выгрузите доски в файлы и удалите ненужные, либо вставляйте картинки поменьше.';
+          + ' Сначала выгрузите эту доску в файл кнопкой ниже — так работа точно не потеряется.';
       }
     });
   } catch (e) {}
@@ -127,12 +199,18 @@ function clearSaveFailedWarning(){
   const bar = document.getElementById('saveFailBanner');
   if (bar) bar.remove();
 }
+function idbSaveDB(){
+  return idbPut('db', DB).then(() => { clearSaveFailedWarning(); return true; })
+    .catch(err => {
+      // IndexedDB не сработал — пробуем хотя бы старым способом, чтобы
+      // работа не потерялась совсем
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); clearSaveFailedWarning(); return true; }
+      catch (e) { console.error('[boards] сохранение не прошло:', err || e); showSaveFailedWarning(err || e); return false; }
+    });
+}
 function saveDB(){
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); clearSaveFailedWarning(); }
-    catch (e) { console.error('[boards] сохранение не прошло:', e); showSaveFailedWarning(e); }
-  }, 300);
+  saveTimer = setTimeout(idbSaveDB, 300);
 }
 loadDB();
 
@@ -3651,10 +3729,57 @@ document.getElementById('unlockBtn').addEventListener('click', () => {
 });
 
 let pendingImage = null; // {src, natW, natH, worldPt}
+/* ── сжатие картинки при вставке ──
+   Скриншот с экрана ноутбука — это несколько мегабайт: в доске он хранится
+   строкой прямо в данных, и десяток таких вставок раздувает всё хранилище.
+   Для доски столько подробностей не нужно: ужимаем до разумного размера по
+   длинной стороне и пережимаем. Прозрачность (PNG со скриншотом окна,
+   логотип) сохраняем — такие картинки оставляем PNG, остальное уводим в
+   JPEG, он для фотографий и скриншотов в разы легче. */
+const IMG_MAX_SIDE = 1800;      // px по длинной стороне
+const IMG_SIZE_LIMIT = 300 * 1024; // меньше этого не трогаем вообще
+
+function loadImageEl(src){
+  return new Promise((resolve, reject) => {
+    const im = new Image();
+    im.onload = () => resolve(im);
+    im.onerror = reject;
+    im.src = src;
+  });
+}
+function hasTransparency(canvas, ctx){
+  try {
+    const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    // выборочно: проверять каждый пиксель большого изображения незачем
+    const step = Math.max(4, Math.floor(d.length / 4 / 40000) * 4);
+    for (let i = 3; i < d.length; i += step) if (d[i] < 250) return true;
+    return false;
+  } catch (e) { return true; }
+}
+async function shrinkImageDataUrl(src){
+  try {
+    if (typeof src !== 'string' || src.indexOf('data:image') !== 0) return src;
+    if (src.length < IMG_SIZE_LIMIT) return src;          // и так небольшая
+    if (src.indexOf('data:image/gif') === 0) return src;  // анимацию не трогаем
+    const im = await loadImageEl(src);
+    const w = im.naturalWidth || im.width, h = im.naturalHeight || im.height;
+    if (!w || !h) return src;
+    const k = Math.min(1, IMG_MAX_SIDE / Math.max(w, h));
+    const cw = Math.max(1, Math.round(w * k)), ch = Math.max(1, Math.round(h * k));
+    const cv = document.createElement('canvas');
+    cv.width = cw; cv.height = ch;
+    const cx = cv.getContext('2d');
+    cx.drawImage(im, 0, 0, cw, ch);
+    const out = hasTransparency(cv, cx) ? cv.toDataURL('image/png') : cv.toDataURL('image/jpeg', 0.85);
+    // если «сжатие» вдруг вышло тяжелее оригинала — оставляем оригинал
+    return out.length < src.length ? out : src;
+  } catch (e) { return src; }
+}
+
 function fileToDataUrl(fileOrBlob){
   return new Promise((resolve, reject) => {
     const fr = new FileReader();
-    fr.onload = () => resolve(fr.result);
+    fr.onload = () => resolve(shrinkImageDataUrl(fr.result));
     fr.onerror = reject;
     fr.readAsDataURL(fileOrBlob);
   });
@@ -4310,10 +4435,18 @@ window.boardsClearSelection = function(){ selectedId = null; multiSelectIds = []
 window.boardsAppBoot = function(){
   if (window.__boardsBooted) return;
   window.__boardsBooted = true;
-  renderList();
-  const m = /board=([^&]+)/.exec(location.hash);
-  if (m && DB.boards.some(b=>b.id===m[1])) openBoard(m[1]);
+  // сначала дочитываем доски из IndexedDB (и, если надо, переносим туда
+  // старые), и только потом рисуем список — иначе на экране мелькнул бы
+  // пустой список или устаревшее содержимое
+  idbLoadDB().then(() => {
+    renderList();
+    const m = /board=([^&]+)/.exec(location.hash);
+    if (m && DB.boards.some(b=>b.id===m[1])) openBoard(m[1]);
+  });
 };
 if (!window.__hasCloudGate) window.boardsAppBoot();
-window.addEventListener('beforeunload', () => { if (B) { try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); clearSaveFailedWarning(); }catch(e){ showSaveFailedWarning(); } } });
-document.addEventListener('visibilitychange', () => { if (document.hidden && B) { try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); clearSaveFailedWarning(); }catch(e){ showSaveFailedWarning(); } } });
+// сохранение «на всякий случай» при уходе со страницы и при сворачивании
+// вкладки — теперь тоже в IndexedDB (обычное сохранение и так идёт на каждое
+// изменение, это лишь подстраховка)
+window.addEventListener('beforeunload', () => { if (B) idbSaveDB(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && B) idbSaveDB(); });
