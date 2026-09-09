@@ -208,7 +208,17 @@ function idbSaveDB(){
       catch (e) { console.error('[boards] сохранение не прошло:', err || e); showSaveFailedWarning(err || e); return false; }
     });
 }
+/* Отметка времени правки. Раньше updatedAt записывалось один раз при
+   создании доски и дальше не менялось никогда — то есть узнать, какая из
+   двух версий доски свежее, было в принципе невозможно. Сохранение идёт
+   через одну точку (saveDB вызывается из полусотни мест), поэтому здесь же
+   и штампуем открытую доску: любое изменение внутри неё проходит тут. */
+function touchBoard(board){
+  const b = board || (typeof B !== 'undefined' ? B : null);
+  if (b) b.updatedAt = nowTs();
+}
 function saveDB(){
+  touchBoard();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(idbSaveDB, 300);
 }
@@ -244,6 +254,232 @@ function exportBoardToFile(board){
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Перенос всех досок между устройствами файлом
+
+   Сценарий: дома выгрузил всё одной кнопкой, увёз файл на ноутбук, там
+   загрузил одной кнопкой, поработал, выгрузил обратно, дома загрузил —
+   и всё на месте и в свежем виде.
+
+   Почему не «заменить всё целиком»: доска, созданная дома уже ПОСЛЕ
+   отъезда, в ноутбучном файле отсутствует — замена стёрла бы её. Поэтому
+   слияние: стороны складываются, а по каждой доске отдельно решается,
+   чья версия новее.
+
+   Опознаются доски по внутреннему id, а не по имени: переименовал на
+   ноутбуке — дома обновится та же самая доска, а не появится вторая.
+
+   Одного времени правки мало: по нему не отличить «правил только там» от
+   «правил и там, и тут». Поэтому у доски есть вторая отметка — syncedAt,
+   время последнего обмена. Спорной считается доска, изменённая после этой
+   точки с обеих сторон; только про такие и спрашиваем.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+function workedAt(b){ return Math.max(b.lastOpenedAt || 0, b.updatedAt || 0, b.createdAt || 0); }
+
+function fmtWhen(ts){
+  if (!ts) return 'неизвестно';
+  const d = new Date(ts);
+  const dd = String(d.getDate()).padStart(2,'0'), mm = String(d.getMonth()+1).padStart(2,'0');
+  const hh = String(d.getHours()).padStart(2,'0'), mi = String(d.getMinutes()).padStart(2,'0');
+  return `${dd}.${mm}.${d.getFullYear()} ${hh}:${mi}`;
+}
+function boardWeight(b){
+  try { return Math.round(JSON.stringify(b).length / 1024); } catch (e) { return 0; }
+}
+
+function exportAllBoardsArchive(){
+  const stamp = nowTs();
+  const payload = {
+    __app: 'oge-boards', __kind: 'boards-archive', __version: 1,
+    exportedAt: stamp,
+    sortMode: DB.sortMode || sortMode,
+    folders: JSON.parse(JSON.stringify(DB.folders || [])),
+    boards: JSON.parse(JSON.stringify(DB.boards || [])),
+  };
+  const blob = new Blob([JSON.stringify(payload)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  const d = new Date(stamp);
+  a.download = 'доски-' + d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0') + '.boards.json';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+
+  // точка расхождения: с этого момента считаем, что стороны выровнены
+  (DB.boards || []).forEach(b => { b.syncedAt = stamp; });
+  saveDB();
+}
+
+/* ── окно выбора версии для спорной доски ─────────────────────────────
+   Показываем по одной: что за доска, чем версии отличаются (когда над
+   каждой работали, сколько весит), и галочку «так же для остальных» —
+   чтобы не отвечать на каждую по отдельности. */
+function askWhichVersion(mine, theirs, restCount){
+  return new Promise(resolve => {
+    const wrap = document.createElement('div');
+    wrap.className = 'bl-conflict-back';
+    wrap.innerHTML = `
+      <div class="bl-conflict">
+        <div class="bl-conflict-title">Доска «${escHtml(mine.name || theirs.name)}» изменена в двух местах</div>
+        <div class="bl-conflict-sub">Соединить их автоматически нельзя — выберите, какую версию оставить.</div>
+        <div class="bl-conflict-cols">
+          <label class="bl-conflict-opt">
+            <input type="radio" name="blConflictPick" value="mine" checked>
+            <span class="bl-conflict-h">Эта версия (здесь)</span>
+            <span class="bl-conflict-m">работали: ${fmtWhen(workedAt(mine))}</span>
+            <span class="bl-conflict-m">объектов: ${(mine.objects||[]).length} · ${boardWeight(mine)} КБ</span>
+          </label>
+          <label class="bl-conflict-opt">
+            <input type="radio" name="blConflictPick" value="theirs">
+            <span class="bl-conflict-h">Версия из файла</span>
+            <span class="bl-conflict-m">работали: ${fmtWhen(workedAt(theirs))}</span>
+            <span class="bl-conflict-m">объектов: ${(theirs.objects||[]).length} · ${boardWeight(theirs)} КБ</span>
+          </label>
+          <label class="bl-conflict-opt">
+            <input type="radio" name="blConflictPick" value="both">
+            <span class="bl-conflict-h">Оставить обе</span>
+            <span class="bl-conflict-m">версия из файла ляжет рядом отдельной доской</span>
+          </label>
+        </div>
+        <label class="bl-conflict-all${restCount > 0 ? '' : ' hidden'}">
+          <input type="checkbox" id="blConflictAll"> Так же для остальных спорных досок (ещё ${restCount})
+        </label>
+        <div class="bl-conflict-btns"><button id="blConflictOk">Применить</button></div>
+      </div>`;
+    document.body.appendChild(wrap);
+    wrap.querySelector('#blConflictOk').addEventListener('click', () => {
+      const pick = wrap.querySelector('input[name="blConflictPick"]:checked').value;
+      const all = wrap.querySelector('#blConflictAll').checked;
+      wrap.remove();
+      resolve({ pick, all });
+    });
+  });
+}
+
+/* ── слияние архива ───────────────────────────────────────────────── */
+async function mergeArchive(payload){
+  const stamp = nowTs();
+  const theirBoards = Array.isArray(payload.boards) ? payload.boards : [];
+  const theirFolders = Array.isArray(payload.folders) ? payload.folders : [];
+
+  // папки: по id, недостающие добавляем, имя берём у более свежей стороны
+  theirFolders.forEach(tf => {
+    const mine = DB.folders.find(f => f.id === tf.id);
+    if (!mine) DB.folders.push(JSON.parse(JSON.stringify(tf)));
+    else if ((tf.updatedAt || 0) > (mine.updatedAt || 0)) mine.name = tf.name;
+  });
+
+  const stats = { added: 0, updated: 0, kept: 0, both: 0, marked: 0 };
+  const theirIds = new Set(theirBoards.map(b => b.id));
+  let blanket = null;   // выбор, применяемый к остальным спорным доскам
+
+  // сначала считаем спорные — чтобы в окне честно писать, сколько осталось
+  const conflicts = theirBoards.filter(tb => {
+    const mine = DB.boards.find(b => b.id === tb.id);
+    if (!mine) return false;
+    const base = Math.max(mine.syncedAt || 0, tb.syncedAt || 0);
+    return (mine.updatedAt || 0) > base && (tb.updatedAt || 0) > base;
+  }).map(b => b.id);
+  let conflictsLeft = conflicts.length;
+
+  for (const tb of theirBoards){
+    const idx = DB.boards.findIndex(b => b.id === tb.id);
+    if (idx < 0){
+      const copy = JSON.parse(JSON.stringify(tb));
+      copy.syncedAt = stamp;
+      copy.pairMissing = false;
+      DB.boards.push(copy);
+      stats.added++;
+      continue;
+    }
+    const mine = DB.boards[idx];
+    mine.pairMissing = false;
+
+    if (conflicts.indexOf(tb.id) >= 0){
+      conflictsLeft--;
+      let choice = blanket;
+      if (!choice){
+        const res = await askWhichVersion(mine, tb, conflictsLeft);
+        choice = res.pick;
+        if (res.all) blanket = res.pick;
+      }
+      if (choice === 'theirs'){
+        const copy = JSON.parse(JSON.stringify(tb));
+        copy.syncedAt = stamp; copy.pairMissing = false;
+        DB.boards[idx] = copy; stats.updated++;
+      } else if (choice === 'both'){
+        const copy = JSON.parse(JSON.stringify(tb));
+        copy.id = uid();
+        copy.name = (tb.name || 'Доска') + ' (версия из файла)';
+        copy.syncedAt = stamp; copy.pairMissing = false;
+        DB.boards.push(copy);
+        mine.syncedAt = stamp;
+        stats.both++;
+      } else {
+        mine.syncedAt = stamp; stats.kept++;
+      }
+      continue;
+    }
+
+    // спора нет — просто берём ту версию, над которой работали позже
+    if ((tb.updatedAt || 0) > (mine.updatedAt || 0)){
+      const copy = JSON.parse(JSON.stringify(tb));
+      copy.syncedAt = stamp; copy.pairMissing = false;
+      DB.boards[idx] = copy; stats.updated++;
+    } else {
+      mine.syncedAt = stamp; stats.kept++;
+    }
+  }
+
+  // доски, которых в файле не оказалось: может быть, их удалили на другом
+  // устройстве, а может быть — создали только здесь. Не гадаем и ничего не
+  // трогаем, просто помечаем точкой, чтобы это было видно с первого взгляда
+  DB.boards.forEach(b => {
+    if (!theirIds.has(b.id) && (b.syncedAt || 0) < stamp){
+      b.pairMissing = true;
+      stats.marked++;
+    }
+  });
+
+  saveDB();
+  renderList();
+  const parts = [];
+  if (stats.added) parts.push('добавлено: ' + stats.added);
+  if (stats.updated) parts.push('обновлено: ' + stats.updated);
+  if (stats.kept) parts.push('оставлено своих: ' + stats.kept);
+  if (stats.both) parts.push('сохранено обеих версий: ' + stats.both);
+  if (stats.marked) parts.push('без пары (помечены точкой): ' + stats.marked);
+  alert('Доски перенесены.\n' + (parts.join('\n') || 'изменений нет'));
+  return stats;
+}
+
+function importAnyBoardsFile(file){
+  const reader = new FileReader();
+  reader.onload = async () => {
+    let payload = null;
+    try { payload = JSON.parse(reader.result); } catch (e) {}
+    if (payload && payload.__kind === 'boards-archive'){ await mergeArchive(payload); return; }
+    if (payload && payload.__kind === 'board-export' && payload.board){ importBoardPayload(payload.board); return; }
+    alert('Не удалось прочитать файл — это не файл досок.');
+  };
+  reader.readAsText(file);
+}
+
+function importBoardPayload(src){
+  if (!src || !Array.isArray(src.objects)){ alert('Файл доски испорчен.'); return; }
+  const folderStillExists = src.folderId && DB.folders.some(f => f.id === src.folderId);
+  const b = Object.assign({}, src, {
+    id: uid(),
+    folderId: folderStillExists ? src.folderId : null,
+    createdAt: nowTs(), updatedAt: nowTs(), lastOpenedAt: null,
+  });
+  DB.boards.push(b);
+  saveDB();
+  renderList();
+  alert(`Доска «${b.name}» загружена.`);
 }
 function importBoardFromFile(file){
   const reader = new FileReader();
@@ -306,7 +542,10 @@ const UI_FONT_FAMILY = getComputedStyle(document.documentElement).getPropertyVal
 const screenList = document.getElementById('screenList');
 const screenBoard = document.getElementById('screenBoard');
 let curFolderId = null;   // null = «Все доски» (корень), '__recent' = «Недавние», иначе id папки
-let sortMode = 'new';     // 'new' | 'old' | 'az'
+let sortMode = 'new';     // 'my' | 'new' | 'old' | 'az'
+// 'my' — порядок, который пользователь выставил сам, перетаскивая карточки.
+// Это просто порядок элементов в самих массивах DB.folders/DB.boards, поэтому
+// он переживает перезагрузку вместе с досками и не требует отдельных полей.
 let searchQuery = '';
 
 function folderIcon(){
@@ -344,6 +583,7 @@ function renderNav(){
   document.getElementById('blNav').innerHTML = html;
   document.querySelectorAll('.bl-nav-item').forEach(btn => {
     btn.addEventListener('click', () => {
+      if (blSuppressClick) return;
       const v = btn.dataset.nav;
       curFolderId = v === '__root' ? null : v === '__recent' ? '__recent' : v;
       searchQuery = '';
@@ -374,10 +614,222 @@ function currentBoardsAndFolders(){
 
 function sortBoards(list){
   const arr = list.slice();
-  if (sortMode === 'new') arr.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
+  if (sortMode === 'my') return arr;   // как расставил пользователь — не трогаем
+  // «по дате работы» — когда доску последний раз открывали или правили;
+  // для повседневной работы это куда полезнее даты создания
+  if (sortMode === 'work') arr.sort((a,b) => workedAt(b) - workedAt(a));
+  else if (sortMode === 'new') arr.sort((a,b) => (b.createdAt||0) - (a.createdAt||0));
   else if (sortMode === 'old') arr.sort((a,b) => (a.createdAt||0) - (b.createdAt||0));
   else arr.sort((a,b) => a.name.localeCompare(b.name, 'ru'));
   return arr;
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Перетаскивание карточек в списке досок
+
+   Как в проводнике: тянешь карточку левой кнопкой — она едет за курсором;
+   бросаешь между двумя другими — встаёт туда; бросаешь доску на папку —
+   попадает внутрь неё. Папки переставляются между папками, доски — между
+   досками. Работает и пальцем на планшете: события указателя общие.
+
+   Порядок хранится не отдельным полем, а самим порядком элементов в
+   DB.folders / DB.boards, поэтому он сохраняется вместе с досками.
+   ═══════════════════════════════════════════════════════════════════════ */
+let blDragState = null;
+let blSuppressClick = false;
+const BL_DRAG_THRESHOLD = 5;   // px — меньше этого считаем обычным кликом
+
+function ensureDragStyle(){
+  if (document.getElementById('blDragStyle')) return;
+  const st = document.createElement('style');
+  st.id = 'blDragStyle';
+  st.textContent = `
+    .bl-card{ touch-action: manipulation; }
+    .bl-card.bl-dragging{ opacity:.35; }
+    .bl-drag-ghost{ position:fixed; z-index:9999; pointer-events:none; opacity:.92;
+      transform:translate(-50%,-50%) rotate(-1.5deg); box-shadow:0 18px 40px rgba(0,0,0,.28);
+      border-radius:16px; overflow:hidden; }
+    .bl-card.bl-drop-into{ outline:2px solid var(--ink,#1b3b6f); outline-offset:2px;
+      background:var(--hl-10, rgba(27,59,111,.10)); }
+    .bl-nav-item.bl-drop-into{ outline:2px solid var(--ink,#1b3b6f); outline-offset:-2px; border-radius:10px; }
+    .bl-drop-line{ position:fixed; z-index:9998; width:3px; border-radius:2px;
+      background:var(--ink,#1b3b6f); pointer-events:none; }
+  `;
+  document.head.appendChild(st);
+}
+
+function blDropLine(){
+  let el = document.getElementById('blDropLine');
+  if (!el){
+    el = document.createElement('div');
+    el.id = 'blDropLine';
+    el.className = 'bl-drop-line';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+function hideDropMarks(){
+  const l = document.getElementById('blDropLine');
+  if (l) l.style.display = 'none';
+  document.querySelectorAll('.bl-drop-into').forEach(el => el.classList.remove('bl-drop-into'));
+}
+
+function blCardKind(card){ return card.dataset.folder ? 'folder' : 'board'; }
+
+// куда именно упадёт карточка, если отпустить прямо сейчас
+function resolveDropTarget(x, y){
+  const el = document.elementFromPoint(x, y);
+  if (!el) return null;
+
+  // папка в левом списке разделов — «положить доску в эту папку»
+  const nav = el.closest('.bl-nav-item');
+  if (nav && blDragState.kind === 'board'){
+    const v = nav.dataset.nav;
+    if (v === '__recent') return null;
+    return { type: 'into', folderId: v === '__root' ? null : v, el: nav };
+  }
+
+  const card = el.closest('.bl-card');
+  if (!card || card === blDragState.card) return null;
+  const kind = blCardKind(card);
+
+  // доска на папку — внутрь папки
+  if (blDragState.kind === 'board' && kind === 'folder'){
+    return { type: 'into', folderId: card.dataset.folder, el: card };
+  }
+  // переставлять можно только среди своих: папки с папками, доски с досками
+  if (kind !== blDragState.kind) return null;
+  const r = card.getBoundingClientRect();
+  const after = x > r.left + r.width / 2;
+  return { type: 'reorder', card, after, rect: r };
+}
+
+function showDropTarget(t){
+  hideDropMarks();
+  if (!t) return;
+  if (t.type === 'into'){ t.el.classList.add('bl-drop-into'); return; }
+  const line = blDropLine();
+  line.style.display = 'block';
+  line.style.height = t.rect.height + 'px';
+  line.style.top = t.rect.top + 'px';
+  line.style.left = (t.after ? t.rect.right + 3 : t.rect.left - 6) + 'px';
+}
+
+// переставляем элемент в исходном массиве: видимый список может быть
+// отфильтрован (папка, поиск), но порядок хранится в самом DB
+function moveInArray(arr, id, targetId, after){
+  const from = arr.findIndex(x => x.id === id);
+  if (from < 0) return false;
+  const [item] = arr.splice(from, 1);
+  let to = arr.findIndex(x => x.id === targetId);
+  if (to < 0) { arr.splice(from, 0, item); return false; }
+  if (after) to += 1;
+  arr.splice(to, 0, item);
+  return true;
+}
+
+// состояние перетаскивания передаём явно: к моменту применения броска
+// blDragState уже сброшен (перетаскивание закончилось), и брать данные
+// оттуда нельзя — именно на этом сначала и споткнулись
+function applyDrop(st, t){
+  if (!t || !st) return false;
+  const { id, kind } = st;
+  if (t.type === 'into'){
+    if (kind !== 'board') return false;
+    const b = DB.boards.find(x => x.id === id);
+    if (!b) return false;
+    if ((b.folderId || null) === (t.folderId || null)) return false;
+    b.folderId = t.folderId || null;
+    touchBoard(b);
+    return true;
+  }
+  const arr = kind === 'folder' ? DB.folders : DB.boards;
+  const targetId = kind === 'folder' ? t.card.dataset.folder : t.card.dataset.board;
+  if (!moveInArray(arr, id, targetId, t.after)) return false;
+  // ручная расстановка имеет смысл только в своём порядке — переключаемся,
+  // иначе список тут же пересортировался бы по дате и перестановка пропала
+  if (sortMode !== 'my'){
+    sortMode = 'my';
+    DB.sortMode = 'my';
+    const lbl = document.getElementById('blSortLabel');
+    if (lbl && typeof sortLabels === 'object') lbl.textContent = sortLabels['my'] || 'Мой порядок';
+  }
+  return true;
+}
+
+function onCardPointerDown(e){
+  if (e.button !== undefined && e.button !== 0) return;      // только левая кнопка
+  if (e.target.closest('.bl-card-menu')) return;             // меню «⋯» — не перетаскивание
+  const card = e.currentTarget;
+  ensureDragStyle();
+  blDragState = {
+    card,
+    kind: blCardKind(card),
+    id: card.dataset.folder || card.dataset.board,
+    startX: e.clientX, startY: e.clientY,
+    moved: false, ghost: null, target: null,
+    pointerId: e.pointerId,
+  };
+  try { card.setPointerCapture(e.pointerId); } catch (err) {}
+  card.addEventListener('pointermove', onCardPointerMove);
+  card.addEventListener('pointerup', onCardPointerUp);
+  card.addEventListener('pointercancel', onCardPointerUp);
+}
+
+function onCardPointerMove(e){
+  if (!blDragState || e.pointerId !== blDragState.pointerId) return;
+  const dx = e.clientX - blDragState.startX, dy = e.clientY - blDragState.startY;
+  if (!blDragState.moved){
+    if (Math.hypot(dx, dy) < BL_DRAG_THRESHOLD) return;      // ещё не перетаскивание
+    blDragState.moved = true;
+    const card = blDragState.card;
+    const r = card.getBoundingClientRect();
+    const ghost = card.cloneNode(true);
+    ghost.className = 'bl-card bl-drag-ghost';
+    ghost.style.width = r.width + 'px';
+    ghost.style.height = r.height + 'px';
+    document.body.appendChild(ghost);
+    blDragState.ghost = ghost;
+    card.classList.add('bl-dragging');
+    document.body.style.userSelect = 'none';
+  }
+  const g = blDragState.ghost;
+  if (g){ g.style.left = e.clientX + 'px'; g.style.top = e.clientY + 'px'; }
+  blDragState.target = resolveDropTarget(e.clientX, e.clientY);
+  showDropTarget(blDragState.target);
+  e.preventDefault();
+}
+
+function onCardPointerUp(e){
+  if (!blDragState || e.pointerId !== blDragState.pointerId) return;
+  const st = blDragState;
+  const card = st.card;
+  card.removeEventListener('pointermove', onCardPointerMove);
+  card.removeEventListener('pointerup', onCardPointerUp);
+  card.removeEventListener('pointercancel', onCardPointerUp);
+  try { card.releasePointerCapture(st.pointerId); } catch (err) {}
+  card.classList.remove('bl-dragging');
+  if (st.ghost) st.ghost.remove();
+  hideDropMarks();
+  document.body.style.userSelect = '';
+  blDragState = null;
+
+  if (!st.moved) return;                 // это был обычный клик — пусть откроется
+  // после перетаскивания click всё равно прилетит — гасим его, иначе доска
+  // открылась бы сразу после того, как её просто переставили
+  blSuppressClick = true;
+  setTimeout(() => { blSuppressClick = false; }, 0);
+
+  if (e.type === 'pointercancel') return;
+  if (applyDrop(st, st.target)){ saveDB(); renderList(); }
+}
+
+function initCardDnd(grid){
+  ensureDragStyle();
+  grid.querySelectorAll('.bl-card').forEach(card => {
+    card.addEventListener('pointerdown', onCardPointerDown);
+  });
 }
 
 function renderList(){
@@ -421,6 +873,7 @@ function renderList(){
   sortedBoards.forEach(b => {
     html += `
       <div class="bl-card" data-board="${b.id}">
+        ${b.pairMissing ? `<span class="bl-pair-dot" title="При последнем переносе пары для этой доски не нашлось — возможно, её удалили на другом устройстве или она создана только здесь"></span>` : ''}
         <button class="bl-card-menu" data-menu="board:${b.id}">⋯</button>
         <div class="bl-card-icon">${boardIcon()}</div>
         <div class="bl-card-body">
@@ -431,8 +884,11 @@ function renderList(){
   });
   grid.innerHTML = html;
 
+  initCardDnd(grid);   // перетаскивание карточек мышью
+
   grid.querySelectorAll('.bl-card[data-folder]').forEach(card => {
     card.addEventListener('click', (e) => {
+      if (blSuppressClick) return;
       if (e.target.closest('.bl-card-menu')) return;
       curFolderId = card.dataset.folder;
       searchQuery = ''; document.getElementById('blSearch').value = '';
@@ -441,6 +897,7 @@ function renderList(){
   });
   grid.querySelectorAll('.bl-card[data-board]').forEach(card => {
     card.addEventListener('click', (e) => {
+      if (blSuppressClick) return;
       if (e.target.closest('.bl-card-menu')) return;
       openBoard(card.dataset.board);
     });
@@ -478,7 +935,7 @@ function openCardMenu(btn){
       const list = kind === 'folder' ? DB.folders : DB.boards;
       const item = list.find(x => x.id === id);
       const name = prompt('Новое название:', item.name);
-      if (name && name.trim()){ item.name = name.trim(); saveDB(); renderList(); }
+      if (name && name.trim()){ item.name = name.trim(); touchBoard(item); saveDB(); renderList(); }
     } else if (act === 'delete'){
       if (kind === 'folder'){
         const n = DB.boards.filter(b => b.folderId === id).length;
@@ -530,6 +987,7 @@ document.getElementById('blCreateFolder').addEventListener('click', () => {
   DB.folders.push({ id: uid(), name: name.trim(), createdAt: nowTs() });
   saveDB(); renderList();
 });
+document.getElementById('blExportAll').addEventListener('click', exportAllBoardsArchive);
 document.getElementById('blImportBoard').addEventListener('click', () => {
   const input = document.getElementById('blImportFile');
   input.value = ''; // сброс — иначе повторный выбор ТОГО ЖЕ файла не даст событие change
@@ -537,9 +995,11 @@ document.getElementById('blImportBoard').addEventListener('click', () => {
 });
 document.getElementById('blImportFile').addEventListener('change', (e) => {
   const file = e.target.files && e.target.files[0];
-  if (file) importBoardFromFile(file);
+  // одна кнопка на оба случая: и архив со всеми досками, и старый файл
+  // одной доски — разбираемся по содержимому, а не по названию
+  if (file) importAnyBoardsFile(file);
 });
-const sortLabels = { new: 'Сначала новые', old: 'Сначала старые', az: 'По названию (А—Я)' };
+const sortLabels = { my: 'Мой порядок', work: 'По дате работы', new: 'Сначала новые', old: 'Сначала старые', az: 'По названию (А—Я)' };
 document.getElementById('blSortBtn').addEventListener('click', (e) => {
   e.stopPropagation();
   document.getElementById('blSortPop').classList.toggle('open');
@@ -548,6 +1008,7 @@ document.getElementById('blSortPop').addEventListener('click', (e) => {
   const s = e.target.dataset.sort;
   if (!s) return;
   sortMode = s;
+  DB.sortMode = s; saveDB();          // выбор порядка тоже запоминаем
   document.getElementById('blSortLabel').textContent = sortLabels[s];
   document.getElementById('blSortPop').classList.remove('open');
   renderList();
@@ -4439,6 +4900,11 @@ window.boardsAppBoot = function(){
   // старые), и только потом рисуем список — иначе на экране мелькнул бы
   // пустой список или устаревшее содержимое
   idbLoadDB().then(() => {
+    if (DB.sortMode && sortLabels[DB.sortMode]){
+      sortMode = DB.sortMode;
+      const lbl = document.getElementById('blSortLabel');
+      if (lbl) lbl.textContent = sortLabels[sortMode];
+    }
     renderList();
     const m = /board=([^&]+)/.exec(location.hash);
     if (m && DB.boards.some(b=>b.id===m[1])) openBoard(m[1]);
