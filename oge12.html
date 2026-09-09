@@ -383,7 +383,9 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .added-remove-btn{font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--teacher);background:rgba(255,59,48,.08);border:1px solid rgba(255,59,48,.25);border-radius:10px;padding:7px 12px;cursor:pointer;transition:transform .12s, background .12s;}
 .added-remove-btn:hover{background:rgba(255,59,48,.16)}
 .added-remove-btn:active{transform:scale(.95)}
-.added-task-card .explain{margin-top:10px;border-top:1px dashed var(--glass-border);padding-top:10px;}
+.added-task-card .explain,#questionPanel .explain{margin-top:10px;border-top:1px dashed var(--glass-border);padding-top:10px;}
+/* Промпт №35: чисто значковые кнопки — подпись живёт в title */
+.refresh-inline-btn.icon-only{font-size:15px;line-height:1;padding:6px 10px;}
 .add-task-row{display:flex;align-items:flex-start;gap:12px;margin:14px 0;flex-wrap:wrap;}
 .add-task-btn{width:44px;height:44px;flex:0 0 auto;border:none;border-radius:50%;background:var(--ink);color:#fff;font-size:24px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 6px 18px var(--hl-35);transition:transform .15s;}
 .add-task-btn:hover{transform:scale(1.06)}
@@ -679,21 +681,25 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
     <div class="tasks-columns" id="tasksColumnsWrap">
       <div id="card1Wrapper">
         <div class="panel" id="questionPanel" style="display:none">
+          <!-- Промпт №35: .added-card-question — тот же контейнер, что и у добавленных
+               карточек: только условие и поле ввода. Это и то, что забирает «В подборку»,
+               и граница, ниже которой начинается общая с добавленными часть плитки. -->
+          <div class="added-card-question" id="card1Question">
           <div class="prompt" id="questionPromptText"></div>
           <div class="input-answer-row" id="inputAnswerArea">
             <input type="text" inputmode="decimal" class="answer-input" id="answerInput" placeholder="?" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
             <button class="check-btn" id="checkAnswerBtn">Проверить</button>
           </div>
+          </div>
           <div class="card-btn-row" id="card1BtnRow" style="display:none">
-            <button class="refresh-inline-btn" id="refreshInlineBtn">⟳ Обновить пример</button>
-            <button class="refresh-inline-btn" id="basketInlineBtn">📥 В подборку</button>
+            <button class="refresh-inline-btn icon-only" id="refreshInlineBtn" title="Обновить пример">⟳</button>
+            <button class="refresh-inline-btn icon-only" id="basketInlineBtn" title="В подборку">📥</button>
             <button class="refresh-inline-btn" id="showSolutionBtn" style="display:none">Показать решение и ответ</button>
           </div>
-        </div>
-
-        <div class="panel" id="mainPanel" style="display:none">
-          <div class="explain" id="explainBox" style="display:none"></div>
-          <button class="next-btn" id="nextBtn" style="display:none">Следующий пример →</button>
+          <div id="mainPanel" style="display:none">
+            <div class="explain" id="explainBox" style="display:none"></div>
+            <button class="next-btn" id="nextBtn" style="display:none">Следующий пример →</button>
+          </div>
         </div>
       </div>
     </div>
@@ -1546,14 +1552,14 @@ function addSingleTaskToBasket(selector){
 }
 function addAllTasksToBasket(){
   if (!window.Basket) return;
-  addSingleTaskToBasket('#questionPanel');
+  addSingleTaskToBasket('#card1Question');
   addedTasks.forEach((bt, i) => addSingleTaskToBasket(`.added-task-card[data-idx="${i}"] .added-card-question`));
 }
 els.basketInlineBtn.onclick = () => {
-  if (!addSingleTaskToBasket('#questionPanel')) return;
+  if (!addSingleTaskToBasket('#card1Question')) return;
   const orig = els.basketInlineBtn.textContent;
   els.basketInlineBtn.classList.add('ok');
-  els.basketInlineBtn.textContent = '✓ Добавлено';
+  els.basketInlineBtn.textContent = '✓';
   setTimeout(() => { els.basketInlineBtn.classList.remove('ok'); els.basketInlineBtn.textContent = orig; }, 900);
 };
 // при смене типа задания (открытие нового типа, навигация ◀▶) количество заданий на доске
@@ -1604,8 +1610,8 @@ function addedCardInnerHTML(bt){
       </div>
     </div>
     <div class="card-btn-row">
-      <button class="refresh-inline-btn added-refresh-btn">⟳ Обновить пример</button>
-      <button class="refresh-inline-btn added-basket-btn">📥 В подборку</button>
+      <button class="refresh-inline-btn icon-only added-refresh-btn" title="Обновить пример">⟳</button>
+      <button class="refresh-inline-btn icon-only added-basket-btn" title="В подборку">📥</button>
       <button class="refresh-inline-btn added-solution-btn" style="display:${addedSolutionBtnDisplay(bt)}">${bt.solutionRevealed ? 'Скрыть решение и ответ' : 'Показать решение и ответ'}</button>
       <button class="added-remove-btn">− Убрать</button>
     </div>
@@ -1643,7 +1649,7 @@ function makeAddedCardEl(bt, idx){
     if (!addSingleTaskToBasket(`.added-task-card[data-idx="${div.dataset.idx}"] .added-card-question`)) return;
     const orig = basketBtn.textContent;
     basketBtn.classList.add('ok');
-    basketBtn.textContent = '✓ Добавлено';
+    basketBtn.textContent = '✓';
     setTimeout(() => { basketBtn.classList.remove('ok'); basketBtn.textContent = orig; }, 900);
   };
   return div;
