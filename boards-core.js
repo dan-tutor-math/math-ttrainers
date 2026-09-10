@@ -1040,6 +1040,20 @@ function sheetWpx(){ return B.sheetCols * B.cellSize; }
 function sheetHpx(){ return B.sheetRows * B.cellSize; }
 function totalW(){ return sheetWpx() * SHEET_COLS; }
 function totalH(){ return sheetHpx() * SHEET_ROWS; }
+/* ═══ Промпт №39: доска открывается там, где её закрыли ═══
+   Раньше каждое открытие начиналось с центрального листа, и после занятия
+   приходилось заново искать место, где работали. Теперь у доски есть
+   запомненный вид (положение и масштаб). Сохраняем его отдельно от обычного
+   saveDB(): тот отмечает доску как ИЗМЕНЁННУЮ, а прокрутка — не правка, и
+   из-за неё не должны появляться расхождения при переносе досок между
+   компьютерами и скакать сортировка «по дате работы». */
+let viewSaveTimer = null;
+function rememberView(){
+  if (!B || !boardActive || !cssW || !cssH) return;
+  B.view = { x: cam.x, y: cam.y, zoom: cam.zoom };
+  clearTimeout(viewSaveTimer);
+  viewSaveTimer = setTimeout(() => { idbSaveDB().catch(() => {}); }, 700);
+}
 function clampCam(){
   if (!B || !cssW || !cssH) return;
   const tw = totalW(), th = totalH();
@@ -1225,7 +1239,10 @@ function openBoard(id){
       });
     }
   }
-  saveDB();
+  // Промпт №39: открытие доски запоминает время последнего захода, но правкой
+  // не является — пишем напрямую, минуя saveDB() с его отметкой «изменено»
+  clearTimeout(saveTimer); saveTimer = null;
+  idbSaveDB().catch(() => {});
   // необязательный хук для boards-cloud.js (общая доска с учеником) — сам
   // движок доски ничего не знает про облако, просто сообщает, какая доска
   // открылась, если такой слушатель вообще подключён
@@ -1254,17 +1271,27 @@ function openBoard(id){
 
   requestAnimationFrame(() => {
     resizeCanvas();
-    cam.zoom = 1;
-    // центрируем ровно на середину ОДНОГО конкретного центрального листа, а не
-    // на геометрический центр всего полотна — при чётном числе листов (200×200)
-    // тот центр приходится точно на стык границ четырёх соседних листов, и
-    // доска открывалась «на крестовине». Средний лист (индексы 100,100 из
-    // 0..199) даёт целую страницу ровно посередине экрана.
-    const midCol = Math.floor(SHEET_COLS/2), midRow = Math.floor(SHEET_ROWS/2);
-    const sheetCenterX = (midCol + 0.5) * sheetWpx();
-    const sheetCenterY = (midRow + 0.5) * sheetHpx();
-    cam.x = sheetCenterX - cssW/2/cam.zoom;
-    cam.y = sheetCenterY - cssH/2/cam.zoom;
+    // Промпт №39: если доска уже открывалась — возвращаемся ровно туда, где
+    // работали в прошлый раз; проверяем числа на вменяемость, чтобы испорченная
+    // запись не выкинула доску в пустоту (тогда просто открываем как раньше)
+    const v = B.view;
+    const sane = v && [v.x, v.y, v.zoom].every(n => typeof n === 'number' && isFinite(n))
+                 && v.zoom >= ZOOM_MIN && v.zoom <= ZOOM_MAX;
+    if (sane) {
+      cam.zoom = v.zoom; cam.x = v.x; cam.y = v.y;
+    } else {
+      cam.zoom = 1;
+      // центрируем ровно на середину ОДНОГО конкретного центрального листа, а не
+      // на геометрический центр всего полотна — при чётном числе листов (200×200)
+      // тот центр приходится точно на стык границ четырёх соседних листов, и
+      // доска открывалась «на крестовине». Средний лист (индексы 100,100 из
+      // 0..199) даёт целую страницу ровно посередине экрана.
+      const midCol = Math.floor(SHEET_COLS/2), midRow = Math.floor(SHEET_ROWS/2);
+      const sheetCenterX = (midCol + 0.5) * sheetWpx();
+      const sheetCenterY = (midRow + 0.5) * sheetHpx();
+      cam.x = sheetCenterX - cssW/2/cam.zoom;
+      cam.y = sheetCenterY - cssH/2/cam.zoom;
+    }
     clampCam();
     updateZoomLabel();
     updateSettingsUI();
@@ -1277,11 +1304,18 @@ function openBoard(id){
 }
 
 function backToList(){
+  rememberView();
+  clearTimeout(viewSaveTimer); viewSaveTimer = null;
   boardActive = false;
   screenBoard.style.display = 'none';
   screenList.style.display = 'flex';
   location.hash = '';
-  saveDB();
+  // Промпт №39: записываем сразу, но НЕ через saveDB() — он отмечает доску как
+  // изменённую, а просто «зашёл и вышел» правкой не является: иначе при
+  // переносе досок между компьютерами каждая открытая доска выглядела бы
+  // спорной. Настоящие правки свою отметку уже поставили в момент правки.
+  clearTimeout(saveTimer); saveTimer = null;
+  idbSaveDB().catch(() => {});
   renderList();
   if (window.onBoardClosed) window.onBoardClosed();
 }
@@ -1334,6 +1368,7 @@ function setZoom(z, wx, wy, sx, sy){
   clampCam();
   updateZoomLabel();
   scheduleRedraw();
+  rememberView();
 }
 function updateZoomLabel(){ document.getElementById('railZoomLabel').textContent = Math.round(cam.zoom * 100) + '%'; }
 
@@ -2466,7 +2501,7 @@ canvas.addEventListener('pointermove', (e) => {
     const dx = (e.clientX-panStart.x)/cam.zoom, dy=(e.clientY-panStart.y)/cam.zoom;
     cam.x = camStart.x - dx; cam.y = camStart.y - dy;
     clampCam();
-    scheduleRedraw(); return;
+    scheduleRedraw(); rememberView(); return;
   }
   if (dragMode === 'erase'){ eraseAt(pt); return; }
   if (dragMode === 'marquee'){ marqueeCur = pt; scheduleRedraw(); return; }
@@ -4977,5 +5012,5 @@ if (!window.__hasCloudGate) window.boardsAppBoot();
 // сохранение «на всякий случай» при уходе со страницы и при сворачивании
 // вкладки — теперь тоже в IndexedDB (обычное сохранение и так идёт на каждое
 // изменение, это лишь подстраховка)
-window.addEventListener('beforeunload', () => { if (B) idbSaveDB(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden && B) idbSaveDB(); });
+window.addEventListener('beforeunload', () => { if (B) { rememberView(); idbSaveDB(); } });
+document.addEventListener('visibilitychange', () => { if (document.hidden && B) { rememberView(); idbSaveDB(); } });
