@@ -775,6 +775,10 @@ function resolveBasketTexInHtml(html){
     <button class="bd-rail-btn" id="railPdf" title="Сохранить в PDF">
       <svg viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" stroke-width="1.6"/><polygon class="ac" points="14,2 20,8 14,8"/><path d="M14 2v6h6" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><text x="12" y="17.5" font-size="7" font-family="var(--font-ui),sans-serif" text-anchor="middle" fill="currentColor" stroke="none">PDF</text></svg>
     </button>
+    <button class="bd-rail-btn" id="railPaste" style="display:none" title="Вставить">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M9 4h6a1 1 0 0 1 1 1v1H8V5a1 1 0 0 1 1-1z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8 6H6a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M16 6h2a2 2 0 0 1 2 2v3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><rect class="ac" x="13" y="13" width="8" height="8" rx="1.6" stroke="currentColor" stroke-width="1.6"/></svg>
+    </button>
+    <div class="bd-rail-sep"></div>
     <button class="bd-rail-btn" id="railBackup" title="Выгрузить доску в файл (резервная копия)">
       <svg viewBox="0 0 24 24" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M12 3v12" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><polyline class="ac" points="7,10 12,15 17,10" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
@@ -999,6 +1003,7 @@ function resolveBasketTexInHtml(html){
     <button data-act="move">Переместить</button>
     <button data-act="delete">Удалить</button>
     <button data-act="copy">Скопировать</button>
+    <button data-act="cut">Вырезать</button>
     <button data-act="paste">Вставить</button>
     <button data-act="savelib" id="bdCtxSaveLib">Сохранить в библиотеку</button>
     <button data-act="group" id="bdCtxGroup">Объединить в группу</button>

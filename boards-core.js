@@ -1076,7 +1076,51 @@ let curBgTok = null;        // цвет фона по умолчанию для 
 
 let selectedId = null;
 let multiSelectIds = [];     // групповое выделение рамкой (marquee) или по общему groupId
-let clipboardObjs = null;    // «Скопировать»/«Вставить» из расширенного меню выделения
+/* ═══ Промпт №38: буфер обмена, общий для ВСЕХ досок ═══
+   Раньше «Скопировать»/«Вставить» жили в обычной переменной: закрыл вкладку —
+   и скопированного больше нет, а «Вставить» вообще нельзя было нажать на
+   пустой доске, потому что меню появляется только у выделения. Теперь буфер
+   лежит в том же хранилище, что и сами доски: скопировал на одной доске —
+   вставил на любой другой, хоть завтра, хоть в соседней вкладке. */
+let clipboardObjs = null;    // что скопировано (в памяти — для мгновенной вставки)
+let clipboardFrom = '';      // с какой доски скопировано — показываем в подсказке
+const CLIP_KEY = 'clipboard';               // ключ в IndexedDB
+const CLIP_PING = 'boardsClipboardPing';    // как соседние вкладки узнают об изменении
+
+function updatePasteUI(){
+  const btn = document.getElementById('railPaste');
+  if (!btn) return;
+  const n = clipboardObjs ? clipboardObjs.length : 0;
+  btn.style.display = n ? '' : 'none';
+  const tail = n % 10, hund = n % 100;
+  const word = (tail === 1 && hund !== 11) ? 'объект'
+             : (tail >= 2 && tail <= 4 && (hund < 12 || hund > 14)) ? 'объекта'
+             : 'объектов';
+  btn.title = n
+    ? `Вставить ${n} ${word}` + (clipboardFrom ? ` с доски «${clipboardFrom}»` : '')
+    : 'Вставить';
+}
+function setClipboard(objs, fromName){
+  clipboardObjs = objs.map(o => JSON.parse(JSON.stringify(o)));
+  clipboardFrom = fromName || '';
+  updatePasteUI();
+  // сохраняем рядом с досками; если вдруг не вышло (переполнение и т.п.) —
+  // в этой вкладке буфер всё равно работает, просто не переживёт перезагрузку
+  idbPut(CLIP_KEY, { objects: clipboardObjs, from: clipboardFrom, at: nowTs() })
+    .then(() => { try { localStorage.setItem(CLIP_PING, String(Date.now())); } catch (e) {} })
+    .catch(() => {});
+}
+function loadClipboard(){
+  return idbGet(CLIP_KEY).then(saved => {
+    if (saved && Array.isArray(saved.objects) && saved.objects.length){
+      clipboardObjs = saved.objects;
+      clipboardFrom = saved.from || '';
+    }
+    updatePasteUI();
+  }).catch(() => {});
+}
+// скопировали в одной вкладке — вторая подхватывает тот же буфер
+window.addEventListener('storage', (e) => { if (e.key === CLIP_PING) loadClipboard(); });
 let pendingMoveArmed = false; // кнопка «Переместить»: следующий клик где угодно на холсте потащит выделенное, даже мимо самой фигуры (удобно для тонких линий)
 // «рука» по умолчанию только панорамирует, даже если жест начался прямо
 // на фигуре — иначе панорамирование по доске, полной рисунков, было бы
@@ -3975,6 +4019,7 @@ document.getElementById('railZoomLabel').addEventListener('click', () => setZoom
    Раньше это жило только в меню «⋯» у доски в списке: чтобы спасти работу,
    надо было сначала выйти из доски — а именно в момент сбоя сохранения
    выходить опаснее всего, несохранённое просто терялось. */
+document.getElementById('railPaste')?.addEventListener('click', () => pasteClipboard());
 document.getElementById('railBackup').addEventListener('click', () => {
   try {
     if (typeof B !== 'undefined' && B) exportBoardToFile(B);
@@ -4680,8 +4725,7 @@ document.addEventListener('paste', async (e) => {
   if (!boardActive) return;
   const tag = (document.activeElement && document.activeElement.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-  const items = e.clipboardData && e.clipboardData.items;
-  if (!items) return;
+  const items = (e.clipboardData && e.clipboardData.items) || [];
   for (const item of items){
     if (item.type && item.type.startsWith('image/')){
       const file = item.getAsFile();
@@ -4690,6 +4734,9 @@ document.addEventListener('paste', async (e) => {
       return;
     }
   }
+  // Промпт №38: картинки в системном буфере нет — значит Ctrl+V относится к
+  // нашему собственному буферу, и это тот самый перенос с доски на доску
+  if (clipboardObjs && clipboardObjs.length){ e.preventDefault(); pasteClipboard(); }
 });
 
 // перетаскивание — локальный файл с компьютера или картинка, схваченная
@@ -4751,6 +4798,19 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='y'){ e.preventDefault(); if (lastActiveSurface === 'notes') rfDoRedo(); else doRedo(); return; }
+  /* Промпт №38: копирование и вырезание с клавиатуры. Вставка (Ctrl+V) не
+     здесь, а в обработчике события 'paste' ниже — иначе на одно нажатие
+     сработали бы оба и вставилось бы дважды. */
+  if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='c'){
+    const sel = getSelectedObjects();
+    if (sel.length){ e.preventDefault(); setClipboard(sel, B && B.name); }
+    return;
+  }
+  if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='x'){
+    const sel = getSelectedObjects();
+    if (sel.length){ e.preventDefault(); setClipboard(sel, B && B.name); deleteSelected(); }
+    return;
+  }
   if (e.key === 'Escape'){
     cancelDrafts(); selectedId=null; multiSelectIds=[]; updateContextMenu(); scheduleRedraw();
     rfCancelDrafts(); rfSelectedId=null; rfMultiSelectIds=[]; rfScheduleRedraw();
@@ -4807,7 +4867,9 @@ document.getElementById('bdCtxMenu').addEventListener('click', (e) => {
   } else if (act === 'delete'){
     deleteSelected();
   } else if (act === 'copy'){
-    if (sel.length) clipboardObjs = sel.map(o => JSON.parse(JSON.stringify(o)));
+    if (sel.length) setClipboard(sel, B && B.name);
+  } else if (act === 'cut'){
+    if (sel.length){ setClipboard(sel, B && B.name); deleteSelected(); }
   } else if (act === 'paste'){
     pasteClipboard();
   } else if (act === 'savelib'){
@@ -4905,6 +4967,7 @@ window.boardsAppBoot = function(){
       const lbl = document.getElementById('blSortLabel');
       if (lbl) lbl.textContent = sortLabels[sortMode];
     }
+    loadClipboard();
     renderList();
     const m = /board=([^&]+)/.exec(location.hash);
     if (m && DB.boards.some(b=>b.id===m[1])) openBoard(m[1]);
