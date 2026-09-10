@@ -67,7 +67,17 @@
     };
     return;
   }
-  const SB = window.supabase.createClient(cfg.url, cfg.anonKey);
+  /* Промпт №36: у realtime есть лимит на число сообщений в секунду, и по
+     умолчанию он равен 10. Когда на доске активно пишут, только штрихи дают
+     около 20 сообщений в секунду (живая трансляция раз в 45 мс), плюс
+     перемещение по доске и снимки состояния — лимит пробивается, сервер
+     начинает молча ронять сообщения, а то и рвёт соединение. Отсюда обе
+     жалобы: «связь иногда слетает» и «ученик не видит, что я стираю».
+     Поднимаем разрешённый предел и ниже (см. очередь исходящих) держим
+     собственную отправку заведомо под ним. */
+  const SB = window.supabase.createClient(cfg.url, cfg.anonKey, {
+    realtime: { params: { eventsPerSecond: 40 } },
+  });
 
   // код читается «безопасным для устной диктовки» алфавитом — без 0/O/1/I/L,
   // чтобы не путать при звонке (см. комментарий в trainer_sessions.sql)
@@ -465,10 +475,14 @@
   // попросить участников прислать актуальное состояние (после переподключения
   // мы могли пропустить и штрихи, и смену задания — снимок всё это чинит)
   function requestSyncFromPeers() {
-    try { channel && channel.send({ type: 'broadcast', event: 'sync_request', payload: { uid: CLIENT_ID } }); } catch (e) {}
+    if (!channel) return;
+    queueSend({ type: 'broadcast', event: 'sync_request', payload: { uid: CLIENT_ID } }, 'sync_request');
   }
 
   function subscribeChannel(c, onSubscribed) {
+    // очередь исходящих привязана к каналу: при пересоздании канала копить
+    // старые сообщения бессмысленно — состояние всё равно уйдёт заново
+    dropQueued();
     if (channel) { try { SB.removeChannel(channel); } catch (e) {} channel = null; }
     channel = SB.channel('trainer_session:' + c)
       .on('broadcast', { event: 'state' }, ({ payload }) => {
@@ -516,6 +530,9 @@
           // могли пропустить и штрихи, и смену задания — просим у остальных
           // участников актуальный снимок, чтобы догнать всё разом
           if (wasBroken) requestSyncFromPeers();
+          // Промпт №36: и, симметрично, досылаем СВОЁ — то, что не ушло, пока
+          // связи не было (нажатый «Проверить», выбранный ответ, новое задание)
+          if (needStateResend) { needStateResend = false; setTimeout(push, 120); }
           return;
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
@@ -544,23 +561,53 @@
      получает живьём, отдельными лёгкими событиями board_stroke. В БД при
      этом продолжает уходить полный снимок, а любой присоединившийся или
      переподключившийся получает полную картину через sync_request. */
-  const MAX_BROADCAST_BYTES = 60 * 1024;
+  /* Промпт №36: бюджет был 60 КБ при реальном пределе 256 КБ — снимок садился
+     на диету намного раньше, чем нужно. Поднимаем до 180 КБ (запас на служебную
+     обвязку сообщения) и, главное, меняем сам способ ужимания для доски. */
+  const MAX_BROADCAST_BYTES = 180 * 1024;
+  // Штрихи доски получатель склеивает по их опознавательным знакам (sid) и
+  // никогда не удаляет по отсутствию — значит, вместо того чтобы выбрасывать
+  // массив штрихов целиком, можно послать его ХВОСТ: последние штрихи как раз
+  // и есть то новое, чего у собеседника ещё нет. Именно это чинило «стираю, а
+  // у ученика не стирается»: ластик — это тоже штрих, он всегда последний, и
+  // при старом способе он выпадал из рассылки вместе со всем массивом, а
+  // дойти живьём мог не успеть.
+  const MERGEABLE_ARRAYS = ['strokes', 'bgStrokes'];
+  const TAIL_STEPS = [120, 60, 30, 12, 4];
   let trimWarned = false;
+
+  function jsonSize(v) { try { return JSON.stringify(v).length; } catch (e) { return 0; } }
 
   function trimForBroadcast(state) {
     let json;
     try { json = JSON.stringify(state); } catch (e) { return state; }
     if (!json || json.length <= MAX_BROADCAST_BYTES) return state;
 
-    // ищем самые тяжёлые массивы верхнего уровня и убираем их по убыванию
-    // веса, пока снимок не влезет в бюджет
-    const weights = Object.keys(state)
-      .filter(k => Array.isArray(state[k]))
-      .map(k => { let w = 0; try { w = JSON.stringify(state[k]).length; } catch (e) {} return { k, w }; })
-      .sort((a, b) => b.w - a.w);
-
     const light = Object.assign({}, state);
     let size = json.length;
+
+    // сначала укорачиваем массивы штрихов до хвоста — без потери смысла
+    for (const k of MERGEABLE_ARRAYS) {
+      if (size <= MAX_BROADCAST_BYTES) break;
+      const arr = state[k];
+      if (!Array.isArray(arr) || arr.length === 0) continue;
+      const full = jsonSize(arr);
+      for (const n of TAIL_STEPS) {
+        if (arr.length <= n) continue;
+        const tail = arr.slice(-n);
+        const w = jsonSize(tail);
+        light[k] = tail;
+        size = size - full + w;
+        if (size <= MAX_BROADCAST_BYTES) break;
+      }
+    }
+
+    // если и этого мало — выкидываем самые тяжёлые оставшиеся массивы
+    const weights = Object.keys(light)
+      .filter(k => Array.isArray(light[k]))
+      .map(k => ({ k, w: jsonSize(light[k]) }))
+      .sort((a, b) => b.w - a.w);
+
     const dropped = [];
     for (const { k, w } of weights) {
       if (size <= MAX_BROADCAST_BYTES) break;
@@ -581,12 +628,92 @@
     return light;
   }
 
+  /* ═══ Промпт №36: очередь исходящих сообщений ═══
+     Сервер realtime считает сообщения в секунду и при превышении лимита
+     сначала молча их теряет, а потом закрывает соединение. Раньше мы слали
+     всё подряд немедленно: во время активного письма на доске это гарантированно
+     пробивало лимит. Теперь любое исходящее сообщение проходит через эту
+     очередь. Она держит темп заведомо ниже разрешённого, а лишнее не
+     выбрасывает, а СКЛЕИВАЕТ: несколько подряд идущих снимков состояния
+     сворачиваются в последний (он и так самый свежий), пачки точек одного и
+     того же штриха — в одну, перемещения по доске — в последнее. Важное
+     (начало и конец штриха, очистка, переход) при этом никуда не девается. */
+  const SEND_BUDGET_PER_SEC = 28;   // при разрешённых 40 — с честным запасом
+  let sendStamps = [];
+  let outQueue = [];
+  let outTimer = null;
+
+  function budgetLeft() {
+    const now = Date.now();
+    sendStamps = sendStamps.filter(t => now - t < 1000);
+    return SEND_BUDGET_PER_SEC - sendStamps.length;
+  }
+  /* Промпт №36: раньше результат отправки не смотрели вовсе. А channel.send()
+     честно отвечает 'ok' / 'timed out' / 'error' — и бывает так, что канал
+     ещё ПРИНИМАЕТ (учитель обновил задание — у ученика обновилось), а вот
+     отправка с этой стороны уже молча не проходит. Со стороны это выглядит
+     ровно так, как жаловались: ученик нажал «Проверить», у себя всё видит, а
+     до учителя это не доезжает, и дальше «Следующее задание» тоже. Теперь
+     неудачная отправка — это повод считать канал сломанным и переподключиться,
+     а свой снимок после восстановления отправить заново. */
+  let sendFailures = 0;
+  let needStateResend = false;
+
+  let resendTimer = null;
+  const RESEND_EVERY_MS = 2000;
+  function scheduleStateResend() {
+    if (resendTimer) return;
+    resendTimer = setTimeout(() => {
+      resendTimer = null;
+      if (!needStateResend) return;
+      needStateResend = false;
+      push();                    // не вышло снова — push() опять взведёт этот же таймер
+    }, RESEND_EVERY_MS);
+  }
+  function noteSendFailure(msg) {
+    if (msg && msg.event === 'state') { needStateResend = true; scheduleStateResend(); }
+    sendFailures++;
+    if (sendFailures < 2) return;          // одиночная осечка бывает и на живом канале
+    sendFailures = 0;
+    if (resubscribing || reconnectTimer) return;
+    setConnState(CONN.RECONNECTING);
+    reconnectNow();
+  }
+  function sendNow(msg) {
+    sendStamps.push(Date.now());
+    let res;
+    try { res = channel.send(msg); } catch (e) { noteSendFailure(msg); return; }
+    if (res && typeof res.then === 'function') {
+      res.then(r => { if (r === 'ok') sendFailures = 0; else noteSendFailure(msg); },
+               () => noteSendFailure(msg));
+    }
+  }
+  function flushOut() {
+    outTimer = null;
+    if (!channel) { outQueue = []; return; }
+    while (outQueue.length && budgetLeft() > 0) sendNow(outQueue.shift().msg);
+    if (outQueue.length) outTimer = setTimeout(flushOut, 60);
+  }
+  // key — метка для склейки; одинаковые метки в очереди объединяются
+  function queueSend(msg, key, mergeFn) {
+    if (!channel) return;
+    if (!outQueue.length && budgetLeft() > 0) { sendNow(msg); return; }
+    if (key) {
+      const prev = outQueue.find(item => item.key === key);
+      if (prev) { prev.msg = mergeFn ? mergeFn(prev.msg, msg) : msg; return; }
+    }
+    outQueue.push({ key: key || null, msg });
+    if (!outTimer) outTimer = setTimeout(flushOut, 60);
+  }
+  function dropQueued() { outQueue = []; clearTimeout(outTimer); outTimer = null; }
+
   function push() {
     if (applyingRemote || !code) return;
     const state = fullState();
     if (channel) {
       const payloadState = trimForBroadcast(state);
-      try { channel.send({ type: 'broadcast', event: 'state', payload: { uid: CLIENT_ID, state: payloadState } }); } catch (e) {}
+      // снимки склеиваются: в очереди всегда имеет смысл только последний
+      queueSend({ type: 'broadcast', event: 'state', payload: { uid: CLIENT_ID, state: payloadState } }, 'state');
     }
     scheduleSave();
   }
@@ -595,7 +722,7 @@
   // «пришлите, что у вас сейчас» (подключение/переподключение)
   function pushFull() {
     if (applyingRemote || !code || !channel) return;
-    try { channel.send({ type: 'broadcast', event: 'state', payload: { uid: CLIENT_ID, state: fullState() } }); } catch (e) {}
+    queueSend({ type: 'broadcast', event: 'state', payload: { uid: CLIENT_ID, state: fullState() } }, 'state');
   }
 
   // Промпт №21: тот, кто НЕ переходил по чужой ссылке/коду (т.е. сам открыл
@@ -760,9 +887,7 @@
       // у обработчика 'sync_request' в subscribeChannel) — как только канал
       // реально подписан, просим текущих участников прислать актуальное
       // состояние ещё раз, напрямую
-      subscribed.then(() => {
-        try { channel && channel.send({ type: 'broadcast', event: 'sync_request', payload: { uid: CLIENT_ID } }); } catch (e) {}
-      });
+      subscribed.then(() => { requestSyncFromPeers(); });
     }
     return { ok: true };
   }
@@ -813,9 +938,9 @@
       if (applyingRemote) return;
       entry.lastLocalInputAt = Date.now();
       if (channel) {
-        try {
-          channel.send({ type: 'broadcast', event: 'field', payload: { uid: CLIENT_ID, fieldId, value: el.value } });
-        } catch (e) {}
+        // склеиваем по полю: в очереди осмысленно только последнее значение
+        queueSend({ type: 'broadcast', event: 'field', payload: { uid: CLIENT_ID, fieldId, value: el.value } },
+                  'field:' + fieldId);
       }
       scheduleSave();
     };
@@ -862,7 +987,23 @@
   // текущая, ещё не законченная линия на доске) ──
   function broadcastEvent(name, data) {
     if (!channel) return;
-    try { channel.send({ type: 'broadcast', event: 'ev', payload: { uid: CLIENT_ID, name, data } }); } catch (e) {}
+    const msg = { type: 'broadcast', event: 'ev', payload: { uid: CLIENT_ID, name, data } };
+    // Промпт №36: что можно склеивать, если очередь не успевает опустеть.
+    // Начало и конец штриха — нельзя: без них у собеседника не появится ни
+    // сам штрих, ни его завершение (а для ластика конец — это и есть стирание).
+    if (name === 'board_view') { queueSend(msg, 'ev:board_view'); return; }
+    if (name === 'board_stroke' && data && data.phase === 'move') {
+      queueSend(msg, 'ev:board_stroke:' + data.surface + ':' + data.sid, (prev, next) => {
+        const a = prev.payload.data, b = next.payload.data;
+        // «замена последней точки» (инструмент «линия») перекрывает накопленное
+        if (b.replace) return next;
+        if (a.replace) return next;
+        b.points = (a.points || []).concat(b.points || []);
+        return next;
+      });
+      return;
+    }
+    queueSend(msg);
   }
   function onEvent(name, cb) {
     if (!eventListeners.has(name)) eventListeners.set(name, new Set());
