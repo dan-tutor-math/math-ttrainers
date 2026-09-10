@@ -397,10 +397,11 @@
   // ── троттлинг живой трансляции точек: не чаще, чем раз в THROTTLE_MS,
   // копим точки в буфере и шлём их одной пачкой — собеседник всё равно видит
   // линию «живьём», но канал не заваливается сообщением на каждый pixel ──
-  // Промпт №36: 45 мс — это 22 сообщения в секунду только на штрихи, и вместе
-  // с перемещением по доске и снимками это пробивало лимит realtime. 60 мс
-  // (≈16/с) на глаз не отличается, а запас по лимиту даёт заметный.
-  const BOARD_THROTTLE_MS = 60;
+  // Промпт №37: ограничитель библиотеки снят (см. session-share.js), поэтому
+  // темп трансляции выбираем по задержке, а не «чтобы влезть». 30 мс — это
+  // 33 пачки точек в секунду; вместе с перемещением и снимками выходит около
+  // 50 сообщений в секунду при разрешённых сотне.
+  const BOARD_THROTTLE_MS = 30;
   function makeLiveSender(surface){
     let pending = []; let replaceLast = false; let timer = null; let sid = null; let lastSentAt = 0;
     function flush(){
@@ -1081,7 +1082,7 @@
      Вид шлём отдельным лёгким эфемерным событием, а не через общий снимок
      состояния: перемещение должно быть живым, а снимок и debounce-нут, и
      тяжёл (см. trimForBroadcast в session-share.js). */
-  const VIEW_THROTTLE_MS = 120;   // Промпт №36: см. BOARD_THROTTLE_MS
+  const VIEW_THROTTLE_MS = 60;    // Промпт №37: см. BOARD_THROTTLE_MS
   let viewSendTimer = null, applyingRemoteView = false;
 
   function currentView(){
