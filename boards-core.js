@@ -199,8 +199,130 @@ function clearSaveFailedWarning(){
   const bar = document.getElementById('saveFailBanner');
   if (bar) bar.remove();
 }
+/* ═══ Промпт №40: сохранение больше не затирает чужую работу ═══
+   Все доски лежат в хранилище ОДНОЙ записью, а каждая вкладка держит свою
+   копию в памяти и раньше писала её туда целиком. Достаточно было открыть
+   доску во второй вкладке и что-нибудь там тронуть — и запись этой вкладки
+   стирала всё, что успели написать в первой. Именно так и пропадали записи
+   после занятия: вторая вкладка, открытая утром, «помнила» доску пустой.
+
+   Теперь запись идёт в одной транзакции: читаем то, что реально лежит в
+   хранилище прямо сейчас, вливаем в него свои изменения и только потом
+   записываем. Доска берётся та, у которой свежее отметка правки; доски,
+   созданные в другой вкладке, не теряются; удаление разносится отдельным
+   списком «удалённых» (иначе удалённая в одной вкладке доска возвращалась бы
+   из копии другой). */
+const DELETED_KEEP_MS = 90 * 24 * 3600 * 1000;   // сколько помним об удалении
+
+function noteDeleted(kind, id){
+  DB.deleted = DB.deleted || [];
+  DB.deleted.push({ kind, id, at: nowTs() });
+}
+function pruneDeleted(list){
+  const edge = nowTs() - DELETED_KEEP_MS;
+  return (list || []).filter(d => d && d.id && (d.at || 0) > edge);
+}
+function stamp(b){ return Math.max(b && b.updatedAt || 0, b && b.createdAt || 0); }
+// «чья версия главнее»: сперва номер правки, при равенстве — время
+function storedWins(sb, mb){
+  const rs = (sb.rev || 0), rm = (mb.rev || 0);
+  if (rs !== rm) return rs > rm;
+  return stamp(sb) > stamp(mb);
+}
+
+/* Слияние «что в хранилище» и «что у меня в памяти». mine — главный по
+   порядку следования и по общим настройкам, но содержимое каждой доски
+   берётся то, которое новее. */
+function mergeDbs(stored, mine){
+  if (!stored || !Array.isArray(stored.boards)) return mine;
+  const deleted = pruneDeleted((stored.deleted || []).concat(mine.deleted || []));
+  const goneIds = new Set(deleted.map(d => d.id));
+
+  const storedById = new Map(stored.boards.map(b => [b.id, b]));
+  const mineById = new Map(mine.boards.map(b => [b.id, b]));
+  const out = [];
+  const taken = new Set();
+  let activeChanged = false;
+  // сначала — в моём порядке (порядок карточек тоже настройка вкладки).
+  // Объекты досок НЕ подменяем новыми: на открытую доску указывает B, и
+  // подмена оборвала бы связь с тем, что сейчас рисуют. Если свежее оказалась
+  // чужая версия — переливаем её содержимое в свой же объект.
+  mine.boards.forEach(mb => {
+    if (goneIds.has(mb.id)) return;
+    taken.add(mb.id);
+    const sb = storedById.get(mb.id);
+    if (!sb) { out.push(mb); return; }
+    const lastOpened = Math.max(sb.lastOpenedAt || 0, mb.lastOpenedAt || 0);
+    if (storedWins(sb, mb)) {
+      const myView = mb.view;
+      Object.assign(mb, sb);
+      if (myView) mb.view = myView;        // куда прокручено — дело этой вкладки
+      if (B && B.id === mb.id) activeChanged = true;
+    }
+    mb.lastOpenedAt = lastOpened;
+    out.push(mb);
+  });
+  // если открытая доска подтянула чужую, более свежую версию — перерисуем
+  if (activeChanged) setTimeout(() => { try { scheduleRedraw(); } catch (e) {} }, 0);
+  // доски, созданные в другой вкладке, пока я работал
+  stored.boards.forEach(sb => { if (!taken.has(sb.id) && !goneIds.has(sb.id)) out.push(sb); });
+
+  const folders = [];
+  const fTaken = new Set();
+  (mine.folders || []).forEach(f => { if (!goneIds.has(f.id)) { fTaken.add(f.id); folders.push(f); } });
+  (stored.folders || []).forEach(f => { if (!fTaken.has(f.id) && !goneIds.has(f.id)) folders.push(f); });
+
+  return Object.assign({}, mine, { boards: out, folders, deleted });
+}
+
+/* Одна транзакция на чтение+запись: пока она идёт, другая вкладка в эту же
+   запись не влезет — значит, слияние не может «разъехаться». */
+function idbSaveMerged(){
+  return idbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    const store = tx.objectStore(IDB_STORE);
+    const req = store.get('db');
+    req.onsuccess = () => {
+      try {
+        DB = mergeDbs(req.result, DB);
+        DB.deleted = pruneDeleted(DB.deleted);
+        store.put(DB, 'db');
+      } catch (e) { reject(e); }
+    };
+    req.onerror = () => reject(req.error);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('запись прервана'));
+  }));
+}
+
+/* ═══ Промпт №40: автоматические резервные копии ═══
+   Даже с правильным слиянием остаётся класс бед, от которых спасает только
+   копия: сбой браузера, случайное «удалить», чужая ошибка в коде. Поэтому
+   перед записью, но не чаще раза в 15 минут, откладываем снимок всего
+   хранилища. Снимков три — примерно на последние сутки работы. */
+const SNAP_KEYS = ['db_snap1', 'db_snap2', 'db_snap3'];
+const SNAP_EVERY_MS = 15 * 60 * 1000;
+function maybeSnapshot(current){
+  if (!current || !Array.isArray(current.boards) || !current.boards.length) return Promise.resolve();
+  return idbGet('db_snap_meta').then(meta => {
+    const now = Date.now();
+    const last = (meta && meta.at) || 0;
+    if (now - last < SNAP_EVERY_MS) return;
+    const slot = ((meta && meta.slot) || 0) % SNAP_KEYS.length;
+    return idbPut(SNAP_KEYS[slot], { at: now, db: current })
+      .then(() => idbPut('db_snap_meta', { at: now, slot: slot + 1 }));
+  }).catch(() => {});
+}
+function listSnapshots(){
+  return Promise.all(SNAP_KEYS.map(k => idbGet(k).then(v => (v && v.db ? { key: k, at: v.at, db: v.db } : null)).catch(() => null)))
+    .then(list => list.filter(Boolean).sort((a, b) => b.at - a.at));
+}
+
 function idbSaveDB(){
-  return idbPut('db', DB).then(() => { clearSaveFailedWarning(); return true; })
+  idbGet('db').then(maybeSnapshot).catch(() => {});
+  return idbSaveMerged()
+    .then(() => { clearSaveFailedWarning(); pingOtherTabs(); return true; })
     .catch(err => {
       // IndexedDB не сработал — пробуем хотя бы старым способом, чтобы
       // работа не потерялась совсем
@@ -208,6 +330,26 @@ function idbSaveDB(){
       catch (e) { console.error('[boards] сохранение не прошло:', err || e); showSaveFailedWarning(err || e); return false; }
     });
 }
+
+/* Соседние вкладки должны узнавать о чужих сохранениях — иначе они так и
+   будут держать в памяти устаревшую копию и подсовывать её при каждом своём
+   сохранении (слияние это переживёт, но список досок будет врать). */
+const DB_PING = 'boardsDbPing';
+let lastPingSent = 0;
+function pingOtherTabs(){
+  const now = Date.now();
+  if (now - lastPingSent < 400) return;     // не частим
+  lastPingSent = now;
+  try { localStorage.setItem(DB_PING, String(now)); } catch (e) {}
+}
+window.addEventListener('storage', (e) => {
+  if (e.key !== DB_PING) return;
+  idbGet('db').then(stored => {
+    if (!stored || !Array.isArray(stored.boards)) return;
+    DB = mergeDbs(stored, DB);
+    if (!boardActive) renderList();
+  }).catch(() => {});
+});
 /* Отметка времени правки. Раньше updatedAt записывалось один раз при
    создании доски и дальше не менялось никогда — то есть узнать, какая из
    двух версий доски свежее, было в принципе невозможно. Сохранение идёт
@@ -215,9 +357,19 @@ function idbSaveDB(){
    и штампуем открытую доску: любое изменение внутри неё проходит тут. */
 function touchBoard(board){
   const b = board || (typeof B !== 'undefined' ? B : null);
-  if (b) b.updatedAt = nowTs();
+  if (!b) return;
+  b.updatedAt = nowTs();
+  // Промпт №40: номер правки. По нему слияние вкладок понимает, чья копия
+  // доски главнее. Одного updatedAt мало: загрузка доски из файла осознанно
+  // ставит СТАРУЮ версию, и по времени слияние бы её тут же откатило.
+  b.rev = (b.rev || 0) + 1;
+}
+function bumpRev(copy, a, b){
+  copy.rev = Math.max((a && a.rev) || 0, (b && b.rev) || 0) + 1;
+  return copy;
 }
 function saveDB(){
+  stampAuthors();
   touchBoard();
   clearTimeout(saveTimer);
   saveTimer = setTimeout(idbSaveDB, 300);
@@ -359,6 +511,78 @@ function askWhichVersion(mine, theirs, restCount){
   });
 }
 
+/* ═══ Промпт №40: окно «Резервные копии» ═══
+   Восстановление — только добавляющее: ничего из того, что есть сейчас, оно
+   не стирает. Доска, которой сейчас нет, возвращается как была; доска,
+   которая есть, но в копии полнее, кладётся рядом отдельной доской с датой
+   в названии — а дальше уже человек решает, какая ему нужна. */
+function openSnapshotsModal(){
+  listSnapshots().then(snaps => {
+    const wrap = document.createElement('div');
+    wrap.className = 'bl-conflict-back';
+    const rows = snaps.length ? snaps.map((sn, i) => {
+      const boards = sn.db.boards || [];
+      const objs = boards.reduce((n, b) => n + (b.objects || []).length, 0);
+      return `<label class="bl-conflict-opt">
+          <input type="radio" name="blSnapPick" value="${i}"${i === 0 ? ' checked' : ''}>
+          <span class="bl-conflict-h">Копия от ${fmtWhen(sn.at)}</span>
+          <span class="bl-conflict-m">досок: ${boards.length} · объектов: ${objs}</span>
+        </label>`;
+    }).join('') : '<div class="bl-conflict-sub">Копий пока нет — они появляются сами, примерно раз в четверть часа работы.</div>';
+    wrap.innerHTML = `
+      <div class="bl-conflict">
+        <div class="bl-conflict-title">Резервные копии</div>
+        <div class="bl-conflict-sub">Копии складываются автоматически. Восстановление только добавляет: ничего из того, что есть сейчас, не пропадёт.</div>
+        <div class="bl-conflict-cols">${rows}</div>
+        <div class="bl-conflict-btns">
+          ${snaps.length ? '<button id="blSnapOk">Восстановить</button>' : ''}
+          <button id="blSnapCancel">Закрыть</button>
+        </div>
+      </div>`;
+    document.body.appendChild(wrap);
+    wrap.querySelector('#blSnapCancel').addEventListener('click', () => wrap.remove());
+    const ok = wrap.querySelector('#blSnapOk');
+    if (ok) ok.addEventListener('click', () => {
+      const i = +wrap.querySelector('input[name="blSnapPick"]:checked').value;
+      wrap.remove();
+      restoreFromSnapshot(snaps[i]);
+    });
+  });
+}
+function restoreFromSnapshot(sn){
+  const when = fmtWhen(sn.at);
+  let back = 0, copies = 0;
+  (sn.db.boards || []).forEach(sb => {
+    const mine = DB.boards.find(b => b.id === sb.id);
+    if (!mine){
+      const b = JSON.parse(JSON.stringify(sb));
+      // след об удалении мешал бы доске вернуться — раз человек восстанавливает
+      // осознанно, снимаем его
+      DB.deleted = (DB.deleted || []).filter(d => d.id !== b.id);
+      DB.boards.push(b); back++;
+      return;
+    }
+    if ((sb.objects || []).length > (mine.objects || []).length){
+      const b = JSON.parse(JSON.stringify(sb));
+      b.id = uid();
+      b.name = (sb.name || 'Доска') + ' (копия от ' + when + ')';
+      b.createdAt = nowTs(); b.updatedAt = nowTs(); b.syncedAt = 0; b.pairMissing = false;
+      DB.boards.push(b); copies++;
+    }
+  });
+  (sn.db.folders || []).forEach(sf => {
+    if (!DB.folders.some(f => f.id === sf.id)){
+      DB.deleted = (DB.deleted || []).filter(d => d.id !== sf.id);
+      DB.folders.push(JSON.parse(JSON.stringify(sf)));
+    }
+  });
+  idbSaveDB();
+  renderList();
+  alert(back || copies
+    ? `Восстановлено из копии от ${when}:\n· вернулось досок: ${back}\n· добавлено копий более полных версий: ${copies}`
+    : `В копии от ${when} нет ничего, чего не было бы сейчас.`);
+}
+
 /* ── слияние архива ───────────────────────────────────────────────── */
 async function mergeArchive(payload){
   const stamp = nowTs();
@@ -407,7 +631,7 @@ async function mergeArchive(payload){
         if (res.all) blanket = res.pick;
       }
       if (choice === 'theirs'){
-        const copy = JSON.parse(JSON.stringify(tb));
+        const copy = bumpRev(JSON.parse(JSON.stringify(tb)), mine, tb);
         copy.syncedAt = stamp; copy.pairMissing = false;
         DB.boards[idx] = copy; stats.updated++;
       } else if (choice === 'both'){
@@ -426,7 +650,7 @@ async function mergeArchive(payload){
 
     // спора нет — просто берём ту версию, над которой работали позже
     if ((tb.updatedAt || 0) > (mine.updatedAt || 0)){
-      const copy = JSON.parse(JSON.stringify(tb));
+      const copy = bumpRev(JSON.parse(JSON.stringify(tb)), mine, tb);
       copy.syncedAt = stamp; copy.pairMissing = false;
       DB.boards[idx] = copy; stats.updated++;
     } else {
@@ -940,10 +1164,13 @@ function openCardMenu(btn){
       if (kind === 'folder'){
         const n = DB.boards.filter(b => b.folderId === id).length;
         if (!confirm(`Удалить папку и ${n} досок в ней? Это нельзя отменить.`)) return;
+        DB.boards.filter(b => b.folderId === id).forEach(b => noteDeleted('board', b.id));
+        noteDeleted('folder', id);
         DB.boards = DB.boards.filter(b => b.folderId !== id);
         DB.folders = DB.folders.filter(f => f.id !== id);
       } else {
         if (!confirm('Удалить доску? Это нельзя отменить.')) return;
+        noteDeleted('board', id);
         DB.boards = DB.boards.filter(b => b.id !== id);
       }
       saveDB(); renderList();
@@ -988,6 +1215,7 @@ document.getElementById('blCreateFolder').addEventListener('click', () => {
   saveDB(); renderList();
 });
 document.getElementById('blExportAll').addEventListener('click', exportAllBoardsArchive);
+document.getElementById('blSnapshots')?.addEventListener('click', openSnapshotsModal);
 document.getElementById('blImportBoard').addEventListener('click', () => {
   const input = document.getElementById('blImportFile');
   input.value = ''; // сброс — иначе повторный выбор ТОГО ЖЕ файла не даст событие change
@@ -1054,6 +1282,52 @@ function rememberView(){
   clearTimeout(viewSaveTimer);
   viewSaveTimer = setTimeout(() => { idbSaveDB().catch(() => {}); }, 700);
 }
+/* ═══ Промпт №41: три уровня доступа к общей доске ═══
+   «Полный доступ» — можно всё, как у владельца.
+   «Только свои записи» — можно писать и править/стирать только то, что
+      написал сам; чужое нельзя даже выделить.
+   «Только просмотр» — видно всё, тронуть нельзя ничего.
+   Уровень приходит из boards-cloud.js при открытии общей доски; на своих
+   (необщих) досках он всегда «полный». */
+let boardAccess = 'full';          // 'full' | 'own' | 'view'
+let boardUserId = null;            // кто я — чтобы отличать свои записи от чужих
+let knownObjIds = new Set();       // что уже лежало на доске до моих правок
+
+window.setBoardAccess = function(access, userId){
+  boardAccess = (access === 'own' || access === 'view') ? access : 'full';
+  boardUserId = userId || null;
+  document.documentElement.setAttribute('data-access', boardAccess);
+  const note = document.getElementById('bdAccessNote');
+  if (note) note.textContent = boardAccess === 'view'
+    ? 'Только просмотр — рисовать на этой доске нельзя'
+    : (boardAccess === 'own' ? 'Правится только то, что вы написали сами' : '');
+  try { selectedId = null; multiSelectIds = []; clearEditLock(); updateContextMenu(); scheduleRedraw(); } catch (e) {}
+};
+window.getBoardAccess = function(){ return boardAccess; };
+// объекты, пришедшие от собеседника, своими не считаются
+window.boardsNoteForeignObjects = function(ids){ (ids || []).forEach(id => knownObjIds.add(id)); };
+// а это — «подпиши всё моё прямо сейчас»: вызывается ПЕРЕД тем, как в доску
+// вольют чужие изменения, иначе мой только что нарисованный штрих, ещё не
+// успевший попасть в сохранение, оказался бы записан в чужие
+window.boardsStampMine = function(){ stampAuthors(); };
+
+function mayDraw(){ return boardAccess !== 'view'; }
+// можно ли трогать конкретный объект — выделять, двигать, стирать
+function mayTouch(obj){
+  if (boardAccess === 'full') return true;
+  if (boardAccess === 'view') return false;
+  return !!(obj && boardUserId && obj.by === boardUserId);
+}
+/* Подпись авторства ставится при сохранении и только на объекты, которых
+   раньше на доске не было: всё, что лежало до моего прихода (и всё, что
+   прислал собеседник), остаётся чужим — иначе ученик, открыв доску,
+   «присвоил» бы себе все записи учителя. */
+function stampAuthors(){
+  if (!boardUserId || !B || !Array.isArray(B.objects)) return;
+  B.objects.forEach(o => { if (!o.by && !knownObjIds.has(o.id)) o.by = boardUserId; });
+  knownObjIds = new Set(B.objects.map(o => o.id));
+}
+
 function clampCam(){
   if (!B || !cssW || !cssH) return;
   const tw = totalW(), th = totalH();
@@ -1180,6 +1454,7 @@ function pushUndo(){
   redoStack.length = 0;
 }
 function doUndo(){
+  if (!mayDraw()) return;                             // Промпт №41
   if (!undoStack.length) return;
   redoStack.push(JSON.stringify(B.objects));
   B.objects = JSON.parse(undoStack.pop());
@@ -1188,6 +1463,7 @@ function doUndo(){
   scheduleRedraw(); saveDB();
 }
 function doRedo(){
+  if (!mayDraw()) return;                             // Промпт №41
   if (!redoStack.length) return;
   undoStack.push(JSON.stringify(B.objects));
   B.objects = JSON.parse(redoStack.pop());
@@ -1255,6 +1531,7 @@ function openBoard(id){
   document.getElementById('bdName').value = b.name;
   location.hash = 'board=' + id;
 
+  knownObjIds = new Set((B.objects || []).map(o => o.id));   // Промпт №41
   undoStack.length = 0; redoStack.length = 0; selectedId = null; multiSelectIds = [];
   draft = null; curvePts = null; circleState = null; polyState = null; penStroke = null;
   armedHandId = null; clearEditLock();
@@ -2207,6 +2484,9 @@ function pointInPolygon(p, pts){
   return inside;
 }
 function hitTestObject(obj, pt, tol){
+  // Промпт №41: чужой объект просто «не ловится» — ни ластиком, ни выделением,
+  // ни за ручки. Одна проверка закрывает сразу все способы его тронуть.
+  if (!mayTouch(obj)) return false;
   if (obj.type==='pen' || obj.type==='line'){
     for (let i=0;i<obj.points.length-1;i++) if (distToSeg(pt,obj.points[i],obj.points[i+1])<=tol) return true;
     return obj.points.length===1 && dist(pt,obj.points[0])<=tol;
@@ -2296,7 +2576,7 @@ function getSelectedObjects(){
 function deleteSelected(){
   // закрепление защищает картинку только от ластика — кнопка «Удалить»
   // (и Backspace) удаляют её точно так же, как любой другой объект
-  const sel = getSelectedObjects();
+  const sel = getSelectedObjects().filter(mayTouch);   // Промпт №41
   if (!sel.length) return;
   const ids = sel.map(o=>o.id);
   pushUndo();
@@ -2327,6 +2607,12 @@ canvas.addEventListener('pointerdown', (e) => {
   const pt = eventWorld(e);
 
   if (e.button === 2 || e.button === 1 || (e.button===0 && e.altKey)){ e.preventDefault(); dragMode='pan'; panStart={x:e.clientX,y:e.clientY}; camStart={x:cam.x,y:cam.y}; canvas.style.cursor='grabbing'; return; }
+
+  // Промпт №41: «только просмотр» — доску можно листать, но не менять
+  if (!mayDraw()){
+    e.preventDefault(); dragMode='pan'; panStart={x:e.clientX,y:e.clientY};
+    camStart={x:cam.x,y:cam.y}; canvas.style.cursor='grabbing'; return;
+  }
 
   // ── кнопка «Переместить» из расширенного меню: следующий клик где угодно
   // тащит уже выделенный объект/группу, даже если курсор не попадает точно в фигуру
@@ -2570,6 +2856,7 @@ canvas.addEventListener('pointerup', (e) => {
     // считаем «зацепленным» любой объект, чей bbox хоть как-то пересекается с
     // рамкой — не обязательно целиком внутри неё
     const hits = B.objects.filter(o => {
+      if (!mayTouch(o)) return false;               // Промпт №41
       const b = objectBBox(o);
       return b.maxX >= x0 && b.minX <= x1 && b.maxY >= y0 && b.minY <= y1;
     });
@@ -4927,6 +5214,7 @@ document.getElementById('bdCtxMenu').addEventListener('click', (e) => {
   }
 });
 function pasteClipboard(){
+  if (!mayDraw()) return;                             // Промпт №41
   if (!clipboardObjs || !clipboardObjs.length || !B) return;
   pushUndo();
   // «Вставить» кладёт копию туда, где сейчас работает пользователь, а не
@@ -4978,6 +5266,7 @@ document.getElementById('bdCtxZoomOut').addEventListener('click', () => setZoom(
    облако — если boards-cloud.js не подключён, ничего этого не вызывается.
    ═══════════════════════════════════════════════════════════════════════ */
 window.getDB = function(){ return DB; };
+window.__w2s = function(p){ return worldToScreen(p); };   // для проверок
 window.getCurrentBoard = function(){ return B; };
 window.boardsRedraw = function(){ scheduleRedraw(); updateContextMenu(); };
 window.boardsClearSelection = function(){ selectedId = null; multiSelectIds = []; clearEditLock(); };

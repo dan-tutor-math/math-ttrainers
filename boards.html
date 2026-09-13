@@ -208,6 +208,22 @@ html[data-theme="dark"] .bd-dock{box-shadow:var(--shadow), inset 0 1px 0 rgba(25
 .bd-tool svg{width:calc(18px*var(--dock-scale,1));height:calc(18px*var(--dock-scale,1));stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}
 .bd-tool:hover{background:var(--hover-1);}
 .bd-tool.active{background:var(--ink);color:#fff;}
+/* Промпт №41: «только просмотр» — инструменты рисования не нужны вовсе,
+   оставляем лишь «руку», чтобы доску можно было листать. Плашка сверху
+   объясняет, почему панель короче обычного. */
+html[data-access="view"] .bd-tool:not([data-tool="hand"]),
+html[data-access="view"] #deleteBtn,
+html[data-access="view"] #undoBtn,
+html[data-access="view"] #redoBtn,
+html[data-access="view"] .bd-dock-colors,
+html[data-access="view"] #railPaste{display:none!important;}
+.bd-access-note{position:fixed;top:56px;left:50%;transform:translateX(-50%);z-index:340;
+  font-family:var(--font-ui);font-size:12.5px;font-weight:600;color:var(--muted-3);
+  background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);
+  -webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);
+  border-radius:999px;padding:6px 14px;box-shadow:var(--shadow);display:none;}
+html[data-access="view"] .bd-access-note,
+html[data-access="own"] .bd-access-note{display:block;}
 .bd-tool:active{transform:scale(.92);}
 /* «золотой» акцент-штрих в духе паркеровской ручки — маленькая деталь на
    каждой иконке; остаётся золотым в любой теме и при любом состоянии
@@ -690,6 +706,10 @@ function resolveBasketTexInHtml(html){
           <svg viewBox="0 0 24 24" fill="none"><path d="M12 4v12M12 16l-4-4M12 16l4-4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 18v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
           Выгрузить все доски
         </button>
+        <button class="bl-btn" id="blSnapshots" title="Автоматические резервные копии — вернуть доску, которая пропала">
+          <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M3 12a9 9 0 1 0 3-6.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="3,4 3,9 8,9" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          Копии
+        </button>
         <button class="bl-btn" id="blImportBoard">
           <svg viewBox="0 0 24 24" fill="none"><path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
           Загрузить из файла
@@ -998,6 +1018,8 @@ function resolveBasketTexInHtml(html){
       <div class="bd-trainers-toast" id="bdTrainersToast"></div>
     </div>
   </div>
+
+  <div class="bd-access-note" id="bdAccessNote"></div>
 
   <div class="bd-ctx-menu" id="bdCtxMenu">
     <button data-act="move">Переместить</button>

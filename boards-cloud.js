@@ -509,6 +509,9 @@
     .bd-share-hint{font-size:12.5px;line-height:1.45;color:var(--muted-2);}
     .bd-share-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--pencil);}
     .bd-share-row .role{color:var(--muted-2);font-size:11.5px;}
+    .bd-share-row .who{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .bd-share-rolesel{flex:0 0 auto;max-width:132px;font-size:11.5px;padding:4px 6px;border-radius:8px;
+      border:1px solid var(--glass-border);background:var(--glass);color:var(--pencil);cursor:pointer;}
     .bd-share-row button{border:none;background:none;color:var(--teacher);cursor:pointer;font-size:11.5px;text-decoration:underline;padding:0;}
     .bd-share-invite{display:flex;flex-direction:column;gap:6px;border-top:1px solid var(--glass-border);padding-top:12px;}
     .bd-share-invite input{font-size:13px;padding:8px 10px;border-radius:9px;border:1px solid var(--glass-border);background:var(--glass);color:var(--pencil);outline:none;}
@@ -753,12 +756,77 @@
     });
   }
 
+  /* ═══ Промпт №42: тяжёлые объекты (картинки) ═══
+     У сообщения realtime есть предел размера, и всё, что в него не влезло,
+     сервер выбрасывает МОЛЧА. Именно поэтому одна картинка у ученика
+     появлялась, а другая — нет: разница была только в весе.
+     Теперь в рассылку тяжёлый объект едет не целиком, а заглушкой с одним
+     лишь номером; получатель по этому номеру забирает его из базы обычным
+     запросом, где никакого предела нет. Лёгкие объекты (а это всё
+     рукописное) как летали напрямую, так и летают. */
+  const BROADCAST_LIMIT = 180 * 1024;   // запас к пределу сообщения realtime
+  const HEAVY_OBJ_BYTES = 30 * 1024;    // с какого веса объект считаем тяжёлым
+
+  function jsonLen(v){ try { return JSON.stringify(v).length; } catch (e) { return 0; } }
+
+  function lightenDiff(diff) {
+    if (jsonLen(diff) <= BROADCAST_LIMIT) return { diff, heavy: [] };
+    const heavy = [];
+    const light = (o) => {
+      if (!o || jsonLen(o) <= HEAVY_OBJ_BYTES) return o;
+      heavy.push(o.id);
+      return { id: o.id, __heavy: true };
+    };
+    const out = {
+      added: diff.added.map(light),
+      updated: diff.updated.map(u => ({ id: u.id, after: light(u.after) })),
+      removed: diff.removed.map(r => ({ id: r.id })),
+    };
+    return { diff: out, heavy };
+  }
+
+  // забрать тяжёлые объекты из базы. Запись собеседника могла ещё не дойти —
+  // поэтому пробуем несколько раз с нарастающей паузой
+  const HEAVY_RETRY_MS = [200, 600, 1500, 3000, 6000];
+  async function fetchHeavyObjects(boardId, ids, attempt) {
+    attempt = attempt || 0;
+    if (!ids.length || !boardId || boardId !== cloudBoardId) return;
+    const { data: rows, error } = await window.SB.from('board_objects')
+      .select('obj_id, data').eq('board_id', boardId).in('obj_id', ids);
+    const got = new Set();
+    if (!error && rows && rows.length) {
+      const board = window.getCurrentBoard();
+      if (!board || board.cloudBoardId !== boardId) return;
+      if (window.boardsStampMine) window.boardsStampMine();
+      cloudApplyingRemote = true;
+      rows.forEach(r => {
+        if (!r.data) return;
+        got.add(r.obj_id);
+        const idx = board.objects.findIndex(o => o.id === r.obj_id);
+        if (idx >= 0) board.objects[idx] = r.data; else board.objects.push(r.data);
+      });
+      cloudApplyingRemote = false;
+      if (window.boardsNoteForeignObjects) window.boardsNoteForeignObjects(rows.map(r => r.obj_id));
+      window.boardsRedraw();
+    }
+    const left = ids.filter(id => !got.has(id));
+    if (left.length && attempt < HEAVY_RETRY_MS.length) {
+      setTimeout(() => fetchHeavyObjects(boardId, left, attempt + 1), HEAVY_RETRY_MS[attempt]);
+    } else if (left.length) {
+      console.warn('[облачная доска] не удалось получить объекты:', left.join(', '));
+    }
+  }
+
+  // наружу отдаём только для проверок — сама логика никуда больше не ходит
+  window.__cloudDiffTest = { lightenDiff, BROADCAST_LIMIT, HEAVY_OBJ_BYTES };
+
   async function pushDiffToSupabase(boardId, diff) {
     // отправляем немедленно, синхронно, до первого await ниже — так
     // остальные участники видят изменение сразу, не дожидаясь ни ответа
     // сервера на запись, ни тем более цикла репликации postgres_changes
+    const { diff: forAir } = lightenDiff(diff);
     if (cloudChannel) {
-      try { cloudChannel.send({ type: 'broadcast', event: 'board_diff', payload: { diff, uid: window.CURRENT_USER ? window.CURRENT_USER.id : null } }); } catch (e) {}
+      try { cloudChannel.send({ type: 'broadcast', event: 'board_diff', payload: { diff: forAir, uid: window.CURRENT_USER ? window.CURRENT_USER.id : null } }); } catch (e) {}
     }
     const rows = diff.added.concat(diff.updated.map(u => u.after)).map(obj => ({
       board_id: boardId, obj_id: obj.id, data: obj,
@@ -767,6 +835,15 @@
     if (rows.length) {
       const { error } = await window.SB.from('board_objects').upsert(rows, { onConflict: 'board_id,obj_id' });
       if (error) console.error('[облачная доска] не удалось сохранить изменения:', error.message);
+      // Промпт №42: запись прошла — говорим об этом отдельным лёгким
+      // сообщением. Если первая рассылка потерялась, это второй шанс: по
+      // номерам собеседник заберёт объекты из базы сам
+      else if (cloudChannel) {
+        try {
+          cloudChannel.send({ type: 'broadcast', event: 'board_ready',
+            payload: { ids: rows.map(r => r.obj_id), uid: window.CURRENT_USER ? window.CURRENT_USER.id : null } });
+        } catch (e) {}
+      }
     }
     const ids = diff.removed.map(r => r.id);
     if (ids.length) {
@@ -870,9 +947,12 @@
       if (idx >= 0) { const copy = arr.slice(); copy[idx] = obj; return copy; }
       return arr.concat([obj]);
     };
+    if (window.boardsStampMine) window.boardsStampMine();   // Промпт №41
     cloudApplyingRemote = true;
     board.objects = applyToArray(board.objects);
     cloudApplyingRemote = false;
+    // пришедшее от собеседника своим не считается
+    if (window.boardsNoteForeignObjects) window.boardsNoteForeignObjects(board.objects.map(o => o.id));
     // если у меня прямо сейчас идёт свой незавершённый жест — обновляем и
     // его «снимок до», чтобы чужое изменение не попало в diff как моё
     // собственное, когда мой жест зафиксируется
@@ -887,16 +967,26 @@
     // я его уже применил локально в момент рисования, применять второй раз
     // не нужно (см. тот же приём у курсоров, cloudHandleRemoteCursor)
     if (payload.uid && window.CURRENT_USER && payload.uid === window.CURRENT_USER.id) return;
+    // Промпт №42: заглушки тяжёлых объектов не применяем — по ним идём в базу
+    const heavyIds = [];
+    const d = {
+      added: (payload.diff.added || []).filter(o => { if (o && o.__heavy){ heavyIds.push(o.id); return false; } return true; }),
+      updated: (payload.diff.updated || []).filter(u => { if (u && u.after && u.after.__heavy){ heavyIds.push(u.id); return false; } return true; }),
+      removed: payload.diff.removed || [],
+    };
+    if (window.boardsStampMine) window.boardsStampMine();   // Промпт №41
     cloudApplyingRemote = true;
-    applyDiffLocally(board, payload.diff);
+    applyDiffLocally(board, d);
     cloudApplyingRemote = false;
+    if (window.boardsNoteForeignObjects) window.boardsNoteForeignObjects(board.objects.map(o => o.id));
+    if (heavyIds.length) fetchHeavyObjects(cloudBoardId, heavyIds);
     // если у меня прямо сейчас идёт свой незавершённый жест — обновляем и
     // его «снимок до», чтобы чужое изменение не попало в diff как моё
     // собственное, когда мой жест зафиксируется (тот же приём, что и в
     // cloudHandleRemoteChange для postgres_changes)
     if (cloudGestureBefore !== null) {
       const tmp = { objects: JSON.parse(cloudGestureBefore) };
-      applyDiffLocally(tmp, payload.diff);
+      applyDiffLocally(tmp, d);
       cloudGestureBefore = JSON.stringify(tmp.objects);
     }
     window.boardsRedraw();
@@ -907,6 +997,7 @@
     if (!error && rows) {
       cloudApplyingRemote = true;
       board.objects = rows.map(r => r.data);
+      if (window.boardsNoteForeignObjects) window.boardsNoteForeignObjects(board.objects.map(o => o.id));
       cloudApplyingRemote = false;
       window.boardsClearSelection();
       window.boardsRedraw();
@@ -922,8 +1013,43 @@
       // быстрый путь для самих объектов доски — см. pushDiffToSupabase выше;
       // postgres_changes (обработчик над этим) остаётся как подстраховка
       .on('broadcast', { event: 'board_diff' }, ({ payload }) => cloudHandleRemoteDiff(payload))
+      // Промпт №42: «объекты записаны, заберите их сами» — страховка на случай,
+      // если основная рассылка не долетела
+      .on('broadcast', { event: 'board_ready' }, ({ payload }) => {
+        if (!payload || !payload.ids) return;
+        if (payload.uid && window.CURRENT_USER && payload.uid === window.CURRENT_USER.id) return;
+        const b = window.getCurrentBoard();
+        if (!b) return;
+        const have = new Set(b.objects.map(o => o.id));
+        const missing = payload.ids.filter(id => !have.has(id));
+        if (missing.length) fetchHeavyObjects(cloudBoardId, missing);
+      })
       .subscribe();
+    startReconcile(boardId);
   }
+
+  /* Промпт №42: последняя линия обороны. Раз в полминуты спрашиваем у базы
+     один только список номеров объектов (это несколько килобайт, не больше)
+     и, если у нас чего-то нет, докачиваем. Ничего не удаляем: свои объекты
+     могут быть ещё не записаны. Так «картинка не появилась» перестаёт быть
+     необратимым — максимум полминуты, и она придёт сама. */
+  let reconcileTimer = null;
+  function startReconcile(boardId) {
+    stopReconcile();
+    reconcileTimer = setInterval(async () => {
+      if (!cloudBoardId || cloudBoardId !== boardId) return;
+      if (document.hidden) return;
+      const board = window.getCurrentBoard();
+      if (!board || board.cloudBoardId !== boardId) return;
+      const { data: rows, error } = await window.SB.from('board_objects')
+        .select('obj_id').eq('board_id', boardId);
+      if (error || !rows) return;
+      const have = new Set(board.objects.map(o => o.id));
+      const missing = rows.map(r => r.obj_id).filter(id => !have.has(id));
+      if (missing.length) fetchHeavyObjects(boardId, missing);
+    }, 30000);
+  }
+  function stopReconcile() { if (reconcileTimer) { clearInterval(reconcileTimer); reconcileTimer = null; } }
   function cloudTeardownSubscription() {
     if (cloudChannel) {
       // по-хорошему сообщаем остальным, что нас больше нет — на случай
@@ -934,6 +1060,7 @@
     }
     stopCursorAnim();
     clearAllCursors();
+    stopReconcile();
   }
 
   window.onBoardOpened = function (board) {
@@ -941,11 +1068,17 @@
     cloudUndoStack = []; cloudRedoStack = []; cloudGestureBefore = null;
     cloudBoardId = board.cloudBoardId || null;
     cloudRole = board.cloudRole || null;
+    // Промпт №41: доска сама должна знать, что этому человеку на ней можно
+    if (window.setBoardAccess) {
+      window.setBoardAccess(cloudBoardId ? (ROLE_ACCESS[cloudRole] || 'full') : 'full',
+                            window.CURRENT_USER && window.CURRENT_USER.id);
+    }
     if (cloudBoardId) { cloudSetupSubscription(cloudBoardId, board); startCursorAnim(); }
   };
   window.onBoardClosed = function () {
     cloudTeardownSubscription();
     cloudBoardId = null; cloudRole = null;
+    if (window.setBoardAccess) window.setBoardAccess('full', window.CURRENT_USER && window.CURRENT_USER.id);
   };
 
   // ------------------------------------------------------------------
@@ -967,6 +1100,32 @@
     renderSharePanel();
   }
 
+  /* ═══ Промпт №41: три уровня доступа вместо двух ═══
+     В базе роль хранится строкой; 'editor' и 'admin' там были и раньше,
+     добавился 'viewer'. Подпись у каждой роли одна на всё приложение —
+     и в списке, и в выпадающем списке при приглашении. */
+  const ROLE_LABEL = {
+    owner:  'владелец',
+    admin:  'полный доступ',
+    editor: 'только свои записи',
+    viewer: 'только просмотр',
+  };
+  // что это значит для самой доски (см. setBoardAccess в boards-core.js)
+  const ROLE_ACCESS = { owner: 'full', admin: 'full', editor: 'own', viewer: 'view' };
+  function roleOptions(sel){
+    return ['editor', 'admin', 'viewer']
+      .map(r => `<option value="${r}"${r === sel ? ' selected' : ''}>${ROLE_LABEL[r]}</option>`).join('');
+  }
+  const ROLE_DB_HINT = 'База пока не знает такой уровень доступа. Его нужно один раз разрешить в настройках базы — см. подсказку в HANDOFF.';
+  function roleError(error){ return /viol|check|constraint|invalid/i.test(error.message || '') ? ROLE_DB_HINT : null; }
+  async function changeRole(userId, role) {
+    if (!cloudBoardId) return;
+    const { error } = await window.SB.from('board_access')
+      .upsert({ board_id: cloudBoardId, user_id: userId, role }, { onConflict: 'board_id,user_id' });
+    if (error) { renderSharePanel(roleError(error) || ('Не получилось изменить: ' + error.message), true); return; }
+    renderSharePanel();
+  }
+
   async function inviteToBoard(email, role) {
     if (!cloudBoardId) return;
     const { data: profile, error: pErr } = await window.SB.from('profiles').select('id').eq('email', email).maybeSingle();
@@ -975,7 +1134,7 @@
       return;
     }
     const { error } = await window.SB.from('board_access').upsert({ board_id: cloudBoardId, user_id: profile.id, role }, { onConflict: 'board_id,user_id' });
-    if (error) { renderSharePanel('Не получилось добавить: ' + error.message, true); return; }
+    if (error) { renderSharePanel(roleError(error) || ('Не получилось добавить: ' + error.message), true); return; }
     renderSharePanel();
   }
   async function revokeAccess(userId) {
@@ -1000,9 +1159,12 @@
     }
 
     if (board.cloudRole !== 'owner' && board.cloudRole !== 'admin') {
+      const what = board.cloudRole === 'viewer'
+        ? 'Вы видите её, но рисовать на ней нельзя.'
+        : 'Вы можете писать на ней и править то, что написали сами.';
       sharePop.innerHTML = `
         <div class="bd-share-title">Совместная работа</div>
-        <div class="bd-share-hint">Это общая доска. У вас есть право рисовать на ней; управлять списком доступа может только её владелец.</div>
+        <div class="bd-share-hint">Это общая доска. ${what} Управлять списком доступа может только её владелец.</div>
       `;
       return;
     }
@@ -1016,8 +1178,8 @@
       const emailById = new Map((profiles || []).map(p => [p.id, p.email]));
       peopleHtml = accessRows.map(r => `
         <div class="bd-share-row" data-uid="${r.user_id}">
-          <span>${emailById.get(r.user_id) || r.user_id}</span>
-          <span class="role">${r.role === 'admin' ? 'полный админ' : 'может рисовать'}</span>
+          <span class="who" title="${emailById.get(r.user_id) || r.user_id}">${emailById.get(r.user_id) || r.user_id}</span>
+          <select class="bd-share-rolesel" data-uid="${r.user_id}">${roleOptions(r.role)}</select>
           <button class="bd-share-revoke" data-uid="${r.user_id}">Убрать</button>
         </div>`).join('');
     }
@@ -1027,16 +1189,16 @@
       ${peopleHtml || '<div class="bd-share-hint">Пока никого, кроме вас.</div>'}
       <div class="bd-share-invite">
         <input type="email" id="bdShareEmail" placeholder="email ученика">
-        <select id="bdShareRole">
-          <option value="editor">Может рисовать</option>
-          <option value="admin">Полный админ</option>
-        </select>
+        <select id="bdShareRole">${roleOptions('editor')}</select>
         <button class="primary" id="bdShareAddBtn">Добавить</button>
       </div>
       ${message ? `<div class="bd-share-msg${isError ? ' err' : ''}">${message}</div>` : ''}
     `;
     sharePop.querySelectorAll('.bd-share-revoke').forEach(btn => {
       btn.addEventListener('click', () => revokeAccess(btn.dataset.uid));
+    });
+    sharePop.querySelectorAll('.bd-share-rolesel').forEach(sel => {
+      sel.addEventListener('change', () => changeRole(sel.dataset.uid, sel.value));
     });
     document.getElementById('bdShareAddBtn').addEventListener('click', () => {
       const email = document.getElementById('bdShareEmail').value.trim();
