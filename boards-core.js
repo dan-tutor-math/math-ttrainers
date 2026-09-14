@@ -342,14 +342,25 @@ function pingOtherTabs(){
   lastPingSent = now;
   try { localStorage.setItem(DB_PING, String(now)); } catch (e) {}
 }
-window.addEventListener('storage', (e) => {
-  if (e.key !== DB_PING) return;
-  idbGet('db').then(stored => {
+function refreshFromStore(){
+  return idbGet('db').then(stored => {
     if (!stored || !Array.isArray(stored.boards)) return;
     DB = mergeDbs(stored, DB);
     if (!boardActive) renderList();
   }).catch(() => {});
+}
+window.addEventListener('storage', (e) => { if (e.key === DB_PING) refreshFromStore(); });
+/* Промпт №43: и обязательно — при возвращении к вкладке. Сообщение о чужом
+   сохранении вкладка получает и в фоне, но перерисовать себя она в фоне не
+   может: браузер останавливает отрисовку у невидимых вкладок. Плюс само
+   сообщение может и не дойти (окно другого браузера, приватный режим,
+   отключённое хранилище). Поэтому переключение на вкладку — отдельный повод
+   перечитать хранилище: так доска свежая уже в момент, когда на неё
+   посмотрели, а не через несколько секунд. */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') refreshFromStore();
 });
+window.addEventListener('focus', () => { refreshFromStore(); });
 /* Отметка времени правки. Раньше updatedAt записывалось один раз при
    создании доски и дальше не менялось никогда — то есть узнать, какая из
    двух версий доски свежее, было в принципе невозможно. Сохранение идёт
@@ -4639,6 +4650,88 @@ async function imageFitsStorage(src){
   } catch (e) { return { ok: true }; }
 }
 
+/* ═══ Промпт №44: обрезка картинки прямо в предпросмотре ═══
+   Рамку тянут левой кнопкой мыши по самому предпросмотру. Храним её в долях
+   от размера картинки (0..1), а не в пикселях экрана: предпросмотр может
+   масштабироваться, а доли — нет. Режем при вставке, один раз, — на доску
+   ложится уже обрезанная картинка, и лишние пиксели не занимают место.  */
+let cropRect = null;   // {x, y, w, h} в долях от картинки
+
+function setCropUI(){
+  const box = document.getElementById('imgCropBox');
+  const img = document.querySelector('#imgModalPreview img');
+  const reset = document.getElementById('imgCropReset');
+  if (!box || !img) return;
+  if (!cropRect){
+    box.style.display = 'none';
+    if (reset) reset.style.display = 'none';
+    return;
+  }
+  const host = document.getElementById('imgModalPreview').getBoundingClientRect();
+  const r = img.getBoundingClientRect();
+  box.style.display = 'block';
+  box.style.left   = (r.left - host.left + cropRect.x * r.width) + 'px';
+  box.style.top    = (r.top - host.top + cropRect.y * r.height) + 'px';
+  box.style.width  = (cropRect.w * r.width) + 'px';
+  box.style.height = (cropRect.h * r.height) + 'px';
+  if (reset) reset.style.display = '';
+}
+function previewHTML(src){
+  return `<img src="${src}" alt="">
+    <div class="bd-crop-box" id="imgCropBox" style="display:none"></div>
+    <div class="bd-crop-hint">Потяните рамку по картинке, чтобы обрезать</div>`;
+}
+// вырезаем выбранный кусок в новую картинку
+function cropDataUrl(src, rect){
+  return new Promise((resolve) => {
+    const im = new Image();
+    im.onload = () => {
+      try {
+        const sx = Math.round(rect.x * im.naturalWidth);
+        const sy = Math.round(rect.y * im.naturalHeight);
+        const sw = Math.max(1, Math.round(rect.w * im.naturalWidth));
+        const sh = Math.max(1, Math.round(rect.h * im.naturalHeight));
+        const c = document.createElement('canvas');
+        c.width = sw; c.height = sh;
+        c.getContext('2d').drawImage(im, sx, sy, sw, sh, 0, 0, sw, sh);
+        // PNG сохраняет прозрачность; для фотографий это тяжеловато, поэтому
+        // непрозрачные куски отдаём JPEG — так же, как при обычной вставке
+        resolve({ src: c.toDataURL(hasAlpha(c) ? 'image/png' : 'image/jpeg', 0.9), w: sw, h: sh });
+      } catch (e) { resolve(null); }
+    };
+    im.onerror = () => resolve(null);
+    im.src = src;
+  });
+}
+function hasAlpha(canvas){
+  try {
+    const d = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
+    for (let i = 3; i < d.length; i += 4) if (d[i] !== 255) return true;
+    return false;
+  } catch (e) { return true; }
+}
+// поворот картинки на 90° — крутим сами пиксели, а не рисуем повёрнуто:
+// доска умеет только прямые прямоугольники, а так поворот переживает и
+// сохранение, и передачу ученику, и экспорт в PDF
+function rotateDataUrl(src, dir){
+  return new Promise((resolve) => {
+    const im = new Image();
+    im.onload = () => {
+      try {
+        const c = document.createElement('canvas');
+        c.width = im.naturalHeight; c.height = im.naturalWidth;
+        const ctx2 = c.getContext('2d');
+        if (dir > 0){ ctx2.translate(c.width, 0); ctx2.rotate(Math.PI / 2); }
+        else { ctx2.translate(0, c.height); ctx2.rotate(-Math.PI / 2); }
+        ctx2.drawImage(im, 0, 0);
+        resolve({ src: c.toDataURL(hasAlpha(c) ? 'image/png' : 'image/jpeg', 0.92), w: c.width, h: c.height });
+      } catch (e) { resolve(null); }
+    };
+    im.onerror = () => resolve(null);
+    im.src = src;
+  });
+}
+
 async function openImageModal(src, worldPt){
   const fit = await imageFitsStorage(src);
   if (!fit.ok) {
@@ -4652,7 +4745,9 @@ async function openImageModal(src, worldPt){
   }
   const size = await loadImageSize(src);
   pendingImage = { src, natW: size.w, natH: size.h, worldPt: worldPt || viewportCenterWorld() };
-  document.getElementById('imgModalPreview').innerHTML = `<img src="${src}" alt="">`;
+  cropRect = null;
+  document.getElementById('imgModalPreview').innerHTML = previewHTML(src);
+  setCropUI();
   // по умолчанию не закрепляем: сразу после вставки картинку можно спокойно
   // подвинуть и растянуть по размеру — закрепить можно потом, кнопкой на панели
   document.getElementById('imgOptLock').checked = false;
@@ -4678,15 +4773,62 @@ function renderImageLibrary(){
       if (!it || !pendingImage) return;
       const size = await loadImageSize(it.src);
       pendingImage.src = it.src; pendingImage.natW = size.w; pendingImage.natH = size.h;
-      document.getElementById('imgModalPreview').innerHTML = `<img src="${it.src}" alt="">`;
+      cropRect = null;
+      document.getElementById('imgModalPreview').innerHTML = previewHTML(it.src);
+      setCropUI();
     });
   });
 }
 
+/* тянем рамку по предпросмотру */
+(function initCropDrag(){
+  const host = document.getElementById('imgModalPreview');
+  if (!host) return;
+  let start = null;
+  const imgRect = () => { const im = host.querySelector('img'); return im ? im.getBoundingClientRect() : null; };
+  const frac = (e, r) => ({
+    x: clamp((e.clientX - r.left) / r.width, 0, 1),
+    y: clamp((e.clientY - r.top) / r.height, 0, 1),
+  });
+  host.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    const r = imgRect(); if (!r) return;
+    host.setPointerCapture(e.pointerId);
+    start = frac(e, r);
+    cropRect = null; setCropUI();
+    e.preventDefault();
+  });
+  host.addEventListener('pointermove', (e) => {
+    if (!start) return;
+    const r = imgRect(); if (!r) return;
+    const p = frac(e, r);
+    cropRect = { x: Math.min(start.x, p.x), y: Math.min(start.y, p.y),
+                 w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y) };
+    setCropUI();
+  });
+  const end = () => {
+    start = null;
+    // случайный клик без протяжки — это не обрезка, а промах
+    if (cropRect && (cropRect.w < 0.02 || cropRect.h < 0.02)){ cropRect = null; setCropUI(); }
+  };
+  host.addEventListener('pointerup', end);
+  host.addEventListener('pointercancel', end);
+  window.addEventListener('resize', setCropUI);
+  const reset = document.getElementById('imgCropReset');
+  if (reset) reset.addEventListener('click', () => { cropRect = null; setCropUI(); });
+})();
+
 document.getElementById('imgModalClose').addEventListener('click', closeImageModal);
 document.getElementById('imgModalBackdrop').addEventListener('click', (e) => { if (e.target.id==='imgModalBackdrop') closeImageModal(); });
-document.getElementById('imgModalInsert').addEventListener('click', () => {
+document.getElementById('imgModalInsert').addEventListener('click', async () => {
   if (!pendingImage || !B) return;
+  // Промпт №44: обрезаем ОДИН раз, прямо здесь — на доску ложится уже
+  // обрезанная картинка, а не полная с невидимыми полями
+  if (cropRect && cropRect.w > 0.02 && cropRect.h > 0.02){
+    const cut = await cropDataUrl(pendingImage.src, cropRect);
+    if (cut){ pendingImage.src = cut.src; pendingImage.natW = cut.w; pendingImage.natH = cut.h; }
+    cropRect = null;
+  }
   // масштаб при вставке: пропорции сохраняем как у реального файла, но
   // крупные картинки сразу ужимаем, чтобы не занимали весь экран — точную
   // подгонку размера удобно докрутить сразу же колесом мыши, пока картинка
@@ -4713,10 +4855,39 @@ document.getElementById('imgModalInsert').addEventListener('click', () => {
     B.imageLib = B.imageLib || [];
     B.imageLib.push({ id: uid(), src: pendingImage.src, createdAt: nowTs() });
   }
+  /* Промпт №44: сразу после вставки картинку почти всегда двигают и
+     подгоняют по месту — поэтому включаем «руку» и «взводим» именно эту
+     картинку: первый же клик по ней её потащит. Чтобы начать писать
+     поверх, достаточно нажать ручку, как обычно. */
+  const handBtn = document.querySelector('.bd-tool[data-tool="hand"]');
+  if (handBtn) handBtn.click();
+  selectedId = obj.id; multiSelectIds = [];
+  armedHandId = obj.id;
   enterEditLock(obj, 'image');
-  saveDB(); scheduleRedraw();
+  saveDB(); scheduleRedraw(); updateContextMenu();
   closeImageModal();
 });
+
+/* ═══ Промпт №44: поворот картинки на 90° ═══
+   Ученик прислал фотографию боком — разворачиваем на месте, не выходя с
+   доски. Габариты меняются местами вокруг центра, чтобы картинка осталась
+   там же, где лежала, а не уехала. */
+async function rotateSelectedImage(dir){
+  const sel = getSelectedObjects();
+  if (sel.length !== 1 || sel[0].type !== 'image') return;
+  const obj = sel[0];
+  const res = await rotateDataUrl(obj.src, dir);
+  if (!res) return;
+  pushUndo();
+  const p = obj.points[0];
+  const cx = p.x + obj.w / 2, cy = p.y + obj.h / 2;
+  const nw = obj.h, nh = obj.w;
+  obj.src = res.src;
+  obj.natW = res.w; obj.natH = res.h;
+  obj.w = nw; obj.h = nh;
+  obj.points = [{ x: cx - nw / 2, y: cy - nh / 2 }];
+  saveDB(); scheduleRedraw(); updateContextMenu();
+}
 
 /* ═══════════════ «Добавить из Подборки» — вставка задания прямо с
    тренажёра на доску. Подборка (Basket, см. basket-core.js) — общее,
@@ -5175,6 +5346,8 @@ function updateContextMenu(){
   document.getElementById('bdCtxGroup').disabled = sel.length < 2;
   document.getElementById('bdCtxSaveLib').disabled = !isSingleImage;
   document.getElementById('bdCtxSaveLib').style.display = (sel.length===1 && sel[0].type!=='image') ? 'none' : '';
+  const rot = document.getElementById('bdCtxRotate');
+  if (rot) rot.style.display = isSingleImage ? 'flex' : 'none';   // Промпт №44
   const pinBtn = document.getElementById('bdCtxPin');
   pinBtn.style.display = isSingleImage ? '' : 'none';
   pinBtn.textContent = (isSingleImage && sel[0].locked) ? 'Открепить' : 'Закрепить';
@@ -5207,6 +5380,10 @@ document.getElementById('bdCtxMenu').addEventListener('click', (e) => {
       multiSelectIds.forEach(id => { const o=B.objects.find(x=>x.id===id); if (o) o.groupId = gid; });
       saveDB(); scheduleRedraw();
     }
+  } else if (act === 'rotl'){
+    rotateSelectedImage(-1);
+  } else if (act === 'rotr'){
+    rotateSelectedImage(1);
   } else if (act === 'pin'){
     if (sel.length===1 && sel[0].type==='image'){
       pushUndo(); sel[0].locked = !sel[0].locked; saveDB(); scheduleRedraw();

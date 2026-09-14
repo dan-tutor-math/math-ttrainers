@@ -470,6 +470,11 @@ html[data-theme="dark"] .bd-optbar{box-shadow:var(--shadow), inset 0 1px 0 rgba(
 .bd-ctx-menu button{display:block;width:100%;text-align:left;background:none;border:none;padding:8px 10px;border-radius:9px;font-size:13px;font-weight:600;color:var(--pencil);cursor:pointer;}
 .bd-ctx-menu button:hover:not(:disabled){background:var(--hover-1);}
 .bd-ctx-menu button:disabled{opacity:.4;cursor:default;}
+.bd-ctx-rotate{display:none;align-items:center;justify-content:space-between;gap:6px;padding:4px 2px;}
+.bd-ctx-rotate span{font-family:var(--font-ui);font-size:11.5px;color:var(--muted-2);}
+.bd-ctx-rotate button{font-size:17px;line-height:1;width:32px;height:28px;border-radius:9px;
+  border:1px solid var(--glass-border);background:var(--glass);color:var(--pencil);cursor:pointer;}
+.bd-ctx-rotate button:hover{border-color:var(--ink);}
 .bd-ctx-zoom{display:flex;align-items:center;justify-content:space-between;gap:4px;padding-top:8px;margin-top:4px;border-top:1px solid var(--glass-border);}
 .bd-ctx-zoom button{width:26px;height:26px;flex:none;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);font-weight:700;cursor:pointer;color:var(--pencil);}
 .bd-ctx-zoom span{font-family:var(--font-mono);font-size:12px;color:var(--muted-2);}
@@ -489,6 +494,17 @@ html[data-theme="dark"] .bd-optbar{box-shadow:var(--shadow), inset 0 1px 0 rgba(
 .bd-modal-body{display:flex;gap:18px;padding:20px;flex-wrap:wrap;}
 .bd-modal-preview{flex:1 1 300px;min-height:220px;border-radius:14px;background:var(--paper);border:1px solid var(--glass-border);display:flex;align-items:center;justify-content:center;overflow:hidden;}
 .bd-modal-preview img{max-width:100%;max-height:320px;display:block;}
+/* Промпт №44: обрезка прямо в предпросмотре — рамку тянут левой кнопкой */
+.bd-modal-preview{position:relative;cursor:crosshair;user-select:none;-webkit-user-select:none;}
+.bd-crop-box{position:absolute;border:1.5px solid var(--ink);background:rgba(10,60,160,.12);
+  box-shadow:0 0 0 9999px rgba(0,0,0,.28);pointer-events:none;border-radius:2px;}
+.bd-crop-hint{position:absolute;left:10px;bottom:8px;font-family:var(--font-ui);font-size:11.5px;
+  font-weight:600;color:var(--muted-3);background:var(--glass-strong);border-radius:999px;
+  padding:4px 10px;pointer-events:none;}
+.bd-crop-reset{font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--ink);
+  background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:10px;
+  padding:7px 12px;cursor:pointer;}
+.bd-crop-reset:hover{border-color:var(--ink);}
 .bd-modal-side{flex:1 1 240px;display:flex;flex-direction:column;gap:12px;}
 .bd-modal-toggle-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;cursor:pointer;}
 .bd-modal-toggle-row span{display:flex;flex-direction:column;gap:2px;}
@@ -1030,6 +1046,11 @@ function resolveBasketTexInHtml(html){
     <button data-act="savelib" id="bdCtxSaveLib">Сохранить в библиотеку</button>
     <button data-act="group" id="bdCtxGroup">Объединить в группу</button>
     <button data-act="pin" id="bdCtxPin">Закрепить</button>
+    <div class="bd-ctx-rotate" id="bdCtxRotate">
+      <button data-act="rotl" title="Повернуть влево на 90°">↺</button>
+      <span>поворот</span>
+      <button data-act="rotr" title="Повернуть вправо на 90°">↻</button>
+    </div>
     <div class="bd-ctx-zoom">
       <button id="bdCtxZoomOut">−</button>
       <span id="bdCtxZoomLabel">100%</span>
@@ -1067,6 +1088,7 @@ function resolveBasketTexInHtml(html){
             </span>
             <input type="checkbox" id="imgOptLib">
           </label>
+          <button class="bd-crop-reset" id="imgCropReset" style="display:none">Показать целиком</button>
           <button class="bl-btn primary" id="imgModalInsert" style="width:100%;justify-content:center;margin-top:auto;">Вставить</button>
         </div>
       </div>
