@@ -120,6 +120,53 @@ function ensureBoardLoaded(b){
   }).catch(() => { b.objects = []; b.imageLib = []; return b; });
 }
 
+// Промпт №48: ensureBoardLoaded подгружает доску один раз, но ничего не
+// выгружает обратно — доска, которую открывали в этой сессии, так и
+// оставалась в памяти НАВСЕГДА, пока не перезагрузишь всю страницу. За
+// долгую рабочую сессию (открыл одну доску, вернулся в список, открыл
+// другую, и так десяток раз) это тихо копится — а декодированная в
+// памяти браузера картинка (imgCache, см. ниже) весит НАМНОГО больше
+// своего же base64-веса на диске: скриншот в пару мегабайт разворачивается
+// в десятки мегабайт по 4 байта на пиксель. Через несколько часов работы
+// с несколькими досками с картинками это и даёт тот самый мгновенный
+// скачок на несколько гигабайт и крах вкладки, который ловили в этой
+// сессии живьём через Activity Monitor. Выгружаем доску обратно в лёгкое
+// состояние (как будто её не открывали) при уходе со страницы доски —
+// вызывается из backToList(); данные при этом никуда не пропадают, они
+// уже сохранены в свою запись boarddata:<id> и просто подгрузятся заново,
+// если доску откроют снова.
+// Промпт №48 (правка после находки гонки): пока идёт операция, которой
+// ЗАКОНОМЕРНО нужны все доски разом (выгрузка всего архива, восстановление
+// из копии, слияние архива) — она сама держит подгруженные доски какое-то
+// время через await/диалоги, и если ровно в этот момент пользователь (или,
+// в тестах, соседний вызов) успевает уйти с другой доски, unloadBoard мог
+// выдернуть objects из-под уже идущей операции ПОСЛЕ того, как та их
+// прочитала, но ДО того, как записала итог, — доска экспортировалась бы
+// пустой. Пока счётчик > 0, выгрузку просто откладываем: доска полежит в
+// памяти чуть дольше, зато операции с «нужны все доски» ничего не потеряют.
+let boardsPinned = 0;
+function pinAllBoards(){ boardsPinned++; }
+function unpinAllBoards(){ boardsPinned = Math.max(0, boardsPinned - 1); }
+
+function unloadBoard(b){
+  if (boardsPinned > 0) return;              // идёт операция «нужны все доски целиком» — не мешаем
+  if (!b || b.objects === undefined) return; // уже не подгружена — нечего выгружать
+  const srcs = new Set();
+  (b.objects || []).forEach(o => { if (o.type === 'image' && o.src) srcs.add(o.src); });
+  (b.refPanel && b.refPanel.imageObjects || []).forEach(o => { if (o.src) srcs.add(o.src); });
+  // не трогаем кэш картинки, если она же используется какой-то ДРУГОЙ доской,
+  // до сих пор подгруженной в память, — редкий случай (общая картинка), но
+  // проверить его дешевле, чем потом ловить «Загрузка…» на чужой доске
+  DB.boards.forEach(other => {
+    if (other === b || other.objects === undefined) return;
+    (other.objects || []).forEach(o => { if (o.type === 'image' && o.src) srcs.delete(o.src); });
+    (other.refPanel && other.refPanel.imageObjects || []).forEach(o => { if (o.src) srcs.delete(o.src); });
+  });
+  srcs.forEach(src => { delete imgCache[src]; });
+  b.objects = undefined;
+  b.imageLib = undefined;
+}
+
 // какие доски правились с последнего сохранения — раз в 300 мс рисования
 // это почти всегда ровно одна (открытая), но объёмные операции (импорт
 // файла, перенос архивом, восстановление из копии) правят сразу несколько
@@ -675,8 +722,13 @@ function boardWeight(b){
 function exportAllBoardsArchive(){
   // единственное место, где нам ЗАКОНОМЕРНО нужны все доски целиком сразу —
   // это осознанное разовое действие пользователя, а не то, что происходит
-  // на каждой загрузке страницы (см. Промпт №47 про ленивую подгрузку)
-  Promise.all((DB.boards || []).map(ensureBoardLoaded)).then(() => exportAllBoardsArchiveReady());
+  // на каждой загрузке страницы (см. Промпт №47 про ленивую подгрузку).
+  // pinAllBoards() — см. Промпт №48: пока собираем архив, не даём
+  // unloadBoard() выдернуть чью-то доску из-под уже идущего экспорта
+  pinAllBoards();
+  Promise.all((DB.boards || []).map(ensureBoardLoaded))
+    .then(() => exportAllBoardsArchiveReady())
+    .finally(unpinAllBoards);
 }
 function exportAllBoardsArchiveReady(){
   const stamp = nowTs();
@@ -789,9 +841,14 @@ function restoreFromSnapshot(sn){
   // Промпт №47: сравнение «что полнее» ниже читает mine.objects — доска
   // могла быть ещё не подгружена в память (см. ensureBoardLoaded), сначала
   // догружаем всех «своих» кандидатов, иначе сравнение соврёт (посчитает
-  // недогруженную доску пустой) и создаст лишнюю копию
+  // недогруженную доску пустой) и создаст лишнюю копию.
+  // pinAllBoards() — см. Промпт №48: то же самое соображение, что и в
+  // exportAllBoardsArchive — не даём unloadBoard() выдернуть доску, пока
+  // сравниваем её с копией
+  pinAllBoards();
   Promise.all((sn.db.boards || []).map(sb => ensureBoardLoaded(DB.boards.find(b => b.id === sb.id))))
-    .then(() => restoreFromSnapshotReady(sn));
+    .then(() => restoreFromSnapshotReady(sn))
+    .finally(unpinAllBoards);
 }
 function restoreFromSnapshotReady(sn){
   const when = fmtWhen(sn.at);
@@ -829,6 +886,18 @@ function restoreFromSnapshotReady(sn){
 
 /* ── слияние архива ───────────────────────────────────────────────── */
 async function mergeArchive(payload){
+  // Промпт №48: слияние может подолгу ждать пользователя в askWhichVersion
+  // (диалог выбора версии) с уже подгруженной mine — держим pin на всё
+  // время функции, а не только вокруг ensureBoardLoaded, иначе unloadBoard
+  // успеет отработать прямо во время ожидания клика в диалоге
+  pinAllBoards();
+  try {
+    return await mergeArchiveReady(payload);
+  } finally {
+    unpinAllBoards();
+  }
+}
+async function mergeArchiveReady(payload){
   const stamp = nowTs();
   const theirBoards = Array.isArray(payload.boards) ? payload.boards : [];
   const theirFolders = Array.isArray(payload.folders) ? payload.folders : [];
@@ -1852,7 +1921,14 @@ function backToList(){
   // переносе досок между компьютерами каждая открытая доска выглядела бы
   // спорной. Настоящие правки свою отметку уже поставили в момент правки.
   clearTimeout(saveTimer); saveTimer = null;
-  idbSaveDB().catch(() => {});
+  // Промпт №48: доску, которую покидаем, выгружаем из памяти — но только
+  // ПОСЛЕ того, как её собственная запись точно дописана на диск (ждём
+  // idbSaveDB здесь, а не идём дальше сразу же), иначе при сбое записи
+  // выгрузка удалит из памяти то, что ещё не успело сохраниться
+  const leaving = B;
+  idbSaveDB()
+    .catch(() => {})
+    .then(() => { unloadBoard(leaving); });
   renderList();
   if (window.onBoardClosed) window.onBoardClosed();
 }
@@ -5705,6 +5781,10 @@ document.getElementById('bdCtxZoomOut').addEventListener('click', () => setZoom(
    ═══════════════════════════════════════════════════════════════════════ */
 window.getDB = function(){ return DB; };
 window.__w2s = function(p){ return worldToScreen(p); };   // для проверок
+// Промпт №48: для проверки, что unloadBoard() реально чистит decoded-картинки,
+// а не только obj/imageLib — сам imgCache наружу не отдаём (незачем), только
+// булев ответ по конкретному src
+window.__imgCacheHas = function(src){ return Object.prototype.hasOwnProperty.call(imgCache, src); };
 window.getCurrentBoard = function(){ return B; };
 window.boardsRedraw = function(){ scheduleRedraw(); updateContextMenu(); };
 window.boardsClearSelection = function(){ selectedId = null; multiSelectIds = []; clearEditLock(); };
