@@ -1774,16 +1774,49 @@ let penStroke = null;       // штрих, который рисуется пр�
 
 const undoStack = [], redoStack = [];
 const UNDO_LIMIT = 60;
+/* Промпт №50: НАЙДЕНА настоящая причина падений с почти мгновенным скачком
+   памяти на несколько гигабайт (см. HANDOFF, раздел 10 — там же живой
+   пример краша на ~6.3 ГБ). pushUndo() вызывается на КАЖДЫЙ штрих/перетаскивание
+   и клал в undoStack ПОЛНУЮ копию всей доски целиком (JSON.stringify
+   B.objects) — если у доски богатая история (например, общая доска,
+   которой пользуются на каждом уроке месяцами, объекты в ней никогда не
+   схлопываются и не чистятся), один такой снимок может весить десятки
+   мегабайт, а стек хранит их до 60 штук ОДНОВРЕМЕННО — то есть до 60×
+   вес доски единовременно висит в памяти. Именно поэтому доска, в которой
+   давно никто ничего не трогал руками, спокойно открывалась (её просто
+   читают), а падение случалось ровно в момент, когда начинали писать —
+   на первом же pushUndo. Теперь общий вес истории отмены/повтора ограничен
+   явным бюджетом байт, а не только количеством снимков: на лёгких досках
+   поведение не меняется (60 снимков там весят копейки и лимит по счётчику
+   срабатывает раньше лимита по байтам), а на тяжёлых стек становится
+   короче 60, зато вкладка не падает. */
+const UNDO_BYTES_BUDGET = 40 * 1024 * 1024;
+let undoBytes = 0, redoBytes = 0;
+function trimStackToBudget(stack, bytesRef){
+  // bytesRef — объект-обёртка {v: число}, чтобы менять счётчик байт по ссылке
+  while (stack.length > 1 && (stack.length > UNDO_LIMIT || bytesRef.v > UNDO_BYTES_BUDGET)) {
+    bytesRef.v -= stack.shift().length;
+  }
+}
 function pushUndo(){
-  undoStack.push(JSON.stringify(B.objects));
-  if (undoStack.length > UNDO_LIMIT) undoStack.shift();
-  redoStack.length = 0;
+  const snap = JSON.stringify(B.objects);
+  undoStack.push(snap);
+  const ref = { v: undoBytes + snap.length };
+  trimStackToBudget(undoStack, ref);
+  undoBytes = ref.v;
+  redoStack.length = 0; redoBytes = 0;
 }
 function doUndo(){
   if (!mayDraw()) return;                             // Промпт №41
   if (!undoStack.length) return;
-  redoStack.push(JSON.stringify(B.objects));
-  B.objects = JSON.parse(undoStack.pop());
+  const redoSnap = JSON.stringify(B.objects);
+  redoStack.push(redoSnap);
+  const rRef = { v: redoBytes + redoSnap.length };
+  trimStackToBudget(redoStack, rRef);
+  redoBytes = rRef.v;
+  const popped = undoStack.pop();
+  undoBytes -= popped.length;
+  B.objects = JSON.parse(popped);
   selectedId = null; multiSelectIds = []; clearEditLock();
   updateContextMenu();
   scheduleRedraw(); saveDB();
@@ -1791,8 +1824,14 @@ function doUndo(){
 function doRedo(){
   if (!mayDraw()) return;                             // Промпт №41
   if (!redoStack.length) return;
-  undoStack.push(JSON.stringify(B.objects));
-  B.objects = JSON.parse(redoStack.pop());
+  const undoSnap = JSON.stringify(B.objects);
+  undoStack.push(undoSnap);
+  const uRef = { v: undoBytes + undoSnap.length };
+  trimStackToBudget(undoStack, uRef);
+  undoBytes = uRef.v;
+  const popped = redoStack.pop();
+  redoBytes -= popped.length;
+  B.objects = JSON.parse(popped);
   selectedId = null; multiSelectIds = []; clearEditLock();
   updateContextMenu();
   scheduleRedraw(); saveDB();
@@ -1864,7 +1903,7 @@ function openBoardReady(b, id){
   location.hash = 'board=' + id;
 
   knownObjIds = new Set((B.objects || []).map(o => o.id));   // Промпт №41
-  undoStack.length = 0; redoStack.length = 0; selectedId = null; multiSelectIds = [];
+  undoStack.length = 0; redoStack.length = 0; undoBytes = 0; redoBytes = 0; selectedId = null; multiSelectIds = [];
   draft = null; curvePts = null; circleState = null; polyState = null; penStroke = null;
   armedHandId = null; clearEditLock();
   document.getElementById('bdCtxMenu')?.classList.remove('open');
@@ -4059,27 +4098,48 @@ function rfSetObjects(arr){
 // при переключении между вкладками «Изображение»/«Текст→Рисовать», потому что
 // у них разные наборы объектов (см. rfObjects() выше), и история/выделение от
 // одного набора не должны применяться к другому
+// Промпт №50: тот же бюджет байт, что и у основного undoStack доски (см.
+// комментарий там) — панель заметок хранит те же полные JSON-снимки
+// (во вкладке «Изображение» это ещё и картинки), поэтому подвержена той
+// же болезни на разросшихся заметках
+let rfUndoBytes = 0, rfRedoBytes = 0;
 function rfResetTransient(){
-  rfUndoStack.length = 0; rfRedoStack.length = 0; rfSelectedId = null; rfMultiSelectIds = [];
+  rfUndoStack.length = 0; rfRedoStack.length = 0; rfUndoBytes = 0; rfRedoBytes = 0;
+  rfSelectedId = null; rfMultiSelectIds = [];
   rfDraft = null; rfCurvePts = null; rfCircleState = null; rfPolyState = null; rfPenStroke = null;
   rfArmedHandId = null; rfClearEditLock(); rfDragMode = null;
 }
 function rfPushUndo(){
-  rfUndoStack.push(JSON.stringify(rfObjects()));
-  if (rfUndoStack.length > UNDO_LIMIT) rfUndoStack.shift();
-  rfRedoStack.length = 0;
+  const snap = JSON.stringify(rfObjects());
+  rfUndoStack.push(snap);
+  const ref = { v: rfUndoBytes + snap.length };
+  trimStackToBudget(rfUndoStack, ref);
+  rfUndoBytes = ref.v;
+  rfRedoStack.length = 0; rfRedoBytes = 0;
 }
 function rfDoUndo(){
   if (!rfUndoStack.length) return;
-  rfRedoStack.push(JSON.stringify(rfObjects()));
-  rfSetObjects(JSON.parse(rfUndoStack.pop()));
+  const redoSnap = JSON.stringify(rfObjects());
+  rfRedoStack.push(redoSnap);
+  const rRef = { v: rfRedoBytes + redoSnap.length };
+  trimStackToBudget(rfRedoStack, rRef);
+  rfRedoBytes = rRef.v;
+  const popped = rfUndoStack.pop();
+  rfUndoBytes -= popped.length;
+  rfSetObjects(JSON.parse(popped));
   rfSelectedId = null; rfMultiSelectIds = []; rfClearEditLock();
   rfScheduleRedraw(); saveDB();
 }
 function rfDoRedo(){
   if (!rfRedoStack.length) return;
-  rfUndoStack.push(JSON.stringify(rfObjects()));
-  rfSetObjects(JSON.parse(rfRedoStack.pop()));
+  const undoSnap = JSON.stringify(rfObjects());
+  rfUndoStack.push(undoSnap);
+  const uRef = { v: rfUndoBytes + undoSnap.length };
+  trimStackToBudget(rfUndoStack, uRef);
+  rfUndoBytes = uRef.v;
+  const popped = rfRedoStack.pop();
+  rfRedoBytes -= popped.length;
+  rfSetObjects(JSON.parse(popped));
   rfSelectedId = null; rfMultiSelectIds = []; rfClearEditLock();
   rfScheduleRedraw(); saveDB();
 }
@@ -5788,6 +5848,9 @@ window.__w2s = function(p){ return worldToScreen(p); };   // для провер
 // а не только obj/imageLib — сам imgCache наружу не отдаём (незачем), только
 // булев ответ по конкретному src
 window.__imgCacheHas = function(src){ return Object.prototype.hasOwnProperty.call(imgCache, src); };
+// Промпт №50: для проверки, что бюджет байт реально ограничивает вес
+// истории отмены на тяжёлых досках, а не только на глаз по .length стека
+window.__undoStackInfo = function(){ return { count: undoStack.length, bytes: undoBytes, limit: UNDO_LIMIT, budget: UNDO_BYTES_BUDGET }; };
 window.getCurrentBoard = function(){ return B; };
 window.boardsRedraw = function(){ scheduleRedraw(); updateContextMenu(); };
 window.boardsClearSelection = function(){ selectedId = null; multiSelectIds = []; clearEditLock(); };
