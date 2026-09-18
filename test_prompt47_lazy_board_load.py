@@ -155,6 +155,46 @@ def run():
             still_unloaded["bA"] is None and still_unloaded["bC"] is None,
         )
 
+        # ── 3б. автоматический снимок (раз в 15 минут) НЕ подтягивает
+        # неоткрытые доски с диска — первая версия этого фикса случайно
+        # вернула ту же беду через пару секунд после открытия любой доски
+        # (см. Промпт №47, вторая правка в HANDOFF) ──────────────────────
+        page.evaluate(
+            """() => new Promise((resolve, reject) => {
+                const req = indexedDB.open('ogeBoardsDB');
+                req.onsuccess = () => {
+                    const tx = req.result.transaction('state', 'readwrite');
+                    tx.objectStore('state').put({ at: 0, slot: 0 }, 'db_snap_meta');
+                    tx.oncomplete = () => resolve(true);
+                    tx.onerror = () => reject(tx.error);
+                };
+            })"""
+        )
+        page.evaluate("() => window.idbSaveDB()")
+        page.wait_for_timeout(300)
+        still_unloaded_after_snapshot = page.evaluate(
+            "() => ({ bA: window.getDB().boards.find(b=>b.id==='bA').objects, bC: window.getDB().boards.find(b=>b.id==='bC').objects })"
+        )
+        check(
+            "автоматический снимок не подтягивает неоткрытые доски в память (bA, bC остаются лёгкими)",
+            still_unloaded_after_snapshot["bA"] is None and still_unloaded_after_snapshot["bC"] is None,
+        )
+        snap_written = page.evaluate(
+            """() => new Promise((resolve) => {
+                const req = indexedDB.open('ogeBoardsDB');
+                req.onsuccess = () => {
+                    const tx = req.result.transaction('state', 'readonly');
+                    const r = tx.objectStore('state').get('db_snap1');
+                    r.onsuccess = () => resolve(r.result || null);
+                    r.onerror = () => resolve(null);
+                };
+            })"""
+        )
+        check(
+            "снимок реально записался (не просто молча пропущен)",
+            snap_written is not None,
+        )
+
         # ── 4. «Выгрузить все доски» всё равно собирает ВСЕ доски целиком ──
         page.evaluate("() => window.backToList()")
         with page.expect_download() as dl_info:

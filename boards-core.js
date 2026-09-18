@@ -481,20 +481,20 @@ function maybeSnapshot(){
     const last = (meta && meta.at) || 0;
     if (now - last < SNAP_EVERY_MS) return;
     const slot = ((meta && meta.slot) || 0) % SNAP_KEYS.length;
-    // Промпт №47: с ленивой подгрузкой (см. ensureBoardLoaded) доска, которую
-    // в этой сессии ещё не открывали, лежит в памяти БЕЗ штрихов/картинок —
-    // для снимка это недопустимо (иначе резервная копия окажется неполной),
-    // поэтому недостающие доски догружаются с диска прямо тут, во временную
-    // копию — саму DB.boards в памяти это не трогает и лишнюю память не держит
-    return Promise.all(DB.boards.map(b =>
-      b.objects !== undefined
-        ? Promise.resolve(Object.assign({}, b))
-        : idbGet(IDB_BOARD_PREFIX + b.id).then(payload => Object.assign({}, b, payload || { objects: [], imageLib: [] }))
-    )).then(boardsFull => {
-      const snap = JSON.parse(JSON.stringify({ folders: DB.folders, boards: boardsFull, deleted: DB.deleted, sortMode: DB.sortMode }));
-      return idbPut(SNAP_KEYS[slot], { at: now, db: snap })
-        .then(() => idbPut('db_snap_meta', { at: now, slot: slot + 1 }));
-    });
+    // Промпт №47 (первая версия) пыталась догружать с диска штрихи ВСЕХ
+    // неоткрытых досок прямо тут, чтобы снимок был полным — но это ровно та
+    // же исходная беда: разом в памяти оказываются штрихи и картинки всех
+    // 22 досок, только теперь это происходит не при заходе на сайт, а через
+    // пару секунд после открытия ЛЮБОЙ доски (как только придёт время
+    // очередного 15-минутного снимка) — вкладка падала снова, просто по
+    // другому поводу. Берём в снимок только то, что и так уже подгружено —
+    // доска, которую в этой сессии не открывали, останется в снимке лёгкой
+    // (без штрихов); её содержимое и так цело в своей записи `boarddata:<id>`
+    // независимо от снимков, так что это не потеря данных, а осознанный
+    // компромисс ради того, чтобы снимок никогда не стоил всей памяти сразу
+    const snap = JSON.parse(JSON.stringify({ folders: DB.folders, boards: DB.boards, deleted: DB.deleted, sortMode: DB.sortMode }));
+    return idbPut(SNAP_KEYS[slot], { at: now, db: snap })
+      .then(() => idbPut('db_snap_meta', { at: now, slot: slot + 1 }));
   }).catch(() => {});
 }
 function listSnapshots(){
