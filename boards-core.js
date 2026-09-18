@@ -92,6 +92,9 @@ function idbDelete(key){
    на диск при каждом штрихе, а теперь пишут только нужную часть. */
 const IDB_BOARD_PREFIX = 'boarddata:';
 const IDB_INDEX_VERSION = 2;
+// Промпт №49: ключ метки «пытаемся открыть доску по хэшу из адреса» — см.
+// boardsAppBoot внизу файла, защита от бесконечного цикла крах-перезагрузка
+const AUTO_OPEN_GUARD_KEY = 'boardsAutoOpenAttempt';
 
 // то, что уходит в индекс: доска без тяжёлых полей
 function stripHeavy(b){
@@ -5811,8 +5814,31 @@ window.boardsAppBoot = function(){
     }
     loadClipboard();
     renderList();
+    // Промпт №49: если открытие ИМЕННО этой доски роняет вкладку (браузер
+    // сам её перезагружает после краша), в адресе остаётся #board=<id> — и
+    // код ниже тут же открыл бы её снова, получая бесконечный цикл
+    // крах → перезагрузка → снова открытие той же доски → снова крах, из
+    // которого обычными действиями в интерфейсе не выбраться (человек не
+    // успевает даже посмотреть на список досок). sessionStorage переживает
+    // такую перезагрузку (это та же вкладка) — если в прошлый раз уже
+    // начинали открывать эту доску через хэш и не успели пометить это как
+    // «пережито», второй раз не повторяем попытку, а просто остаёмся на
+    // списке и убираем хэш из адреса
     const m = /board=([^&]+)/.exec(location.hash);
-    if (m && DB.boards.some(b=>b.id===m[1])) openBoard(m[1]);
+    if (m && DB.boards.some(b=>b.id===m[1])) {
+      let prevAttempt = null;
+      try { prevAttempt = sessionStorage.getItem(AUTO_OPEN_GUARD_KEY); } catch(e){}
+      if (prevAttempt === m[1]) {
+        try { sessionStorage.removeItem(AUTO_OPEN_GUARD_KEY); } catch(e){}
+        location.hash = '';
+      } else {
+        try { sessionStorage.setItem(AUTO_OPEN_GUARD_KEY, m[1]); } catch(e){}
+        openBoard(m[1]);
+        // крах (если это он) обычно случается в первые пару секунд — если
+        // вкладка их пережила, считаем открытие благополучным и снимаем метку
+        setTimeout(() => { try { sessionStorage.removeItem(AUTO_OPEN_GUARD_KEY); } catch(e){} }, 4000);
+      }
+    }
   });
 };
 if (!window.__hasCloudGate) window.boardsAppBoot();
