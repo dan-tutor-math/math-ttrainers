@@ -180,8 +180,11 @@ def run():
         )
 
         # ── 2. рисование на одной доске не трогает запись другой ────
+        # Промпт №47: openBoard теперь сам асинхронно догружает штрихи доски
+        # (см. ensureBoardLoaded) — ждём, пока это реально случится, а не
+        # просто отсчитываем фиксированную паузу
         page.evaluate("() => window.openBoard('bA')")
-        page.wait_for_timeout(50)
+        page.wait_for_function("window.getCurrentBoard() && window.getCurrentBoard().id === 'bA' && Array.isArray(window.getCurrentBoard().objects)")
         before_b = idb_get(page, "boarddata:bB")
 
         # рисуем на доске A через тот же путь, что и настоящий штрих:
@@ -215,7 +218,7 @@ def run():
         # ── 3. целостность после перезагрузки страницы ───────────────
         page.evaluate("() => window.backToList()")
         page.evaluate("() => window.openBoard('bB')")
-        page.wait_for_timeout(50)
+        page.wait_for_function("window.getCurrentBoard() && window.getCurrentBoard().id === 'bB' && Array.isArray(window.getCurrentBoard().objects)")
         page.evaluate(
             """() => {
                 const b = window.getCurrentBoard();
@@ -229,10 +232,15 @@ def run():
         page.evaluate(BOOT_JS)
         page.wait_for_function("window.getDB && Array.isArray(window.getDB().boards) && window.getDB().boards.length === 2")
         page.wait_for_timeout(300)
-        reloaded = page.evaluate(
-            "() => window.getDB().boards.map(b => ({id: b.id, ids: b.objects.map(o=>o.id)}))"
-        )
-        by_id = {b["id"]: set(b["ids"]) for b in reloaded}
+        # Промпт №47: после перезагрузки доски в памяти лёгкие (без штрихов) —
+        # они лениво подгружаются только при открытии (см. ensureBoardLoaded).
+        # Проверяем то же самое, что и раньше — целостность штрихов каждой
+        # доски, — но через фактически сохранённые записи на диске, а не
+        # через ещё не подгруженные объекты в памяти
+        by_id = {
+            board_id: {o["id"] for o in idb_get(page, "boarddata:" + board_id)["objects"]}
+            for board_id in ("bA", "bB")
+        }
         check(
             "после перезагрузки у доски A все 4 штриха (3 исходных + новый)",
             by_id.get("bA", set()) >= {"bA-obj0", "bA-obj1", "bA-obj2", "bA-new"},
@@ -256,8 +264,9 @@ def run():
         page.evaluate("() => window.backToList()")
         page.evaluate("() => window.openBoard('bA')")
         page2.evaluate("() => window.openBoard('bA')")
-        page.wait_for_timeout(50)
-        page2.wait_for_timeout(50)
+        BOARD_READY_JS = "window.getCurrentBoard() && window.getCurrentBoard().id === 'bA' && Array.isArray(window.getCurrentBoard().objects)"
+        page.wait_for_function(BOARD_READY_JS)
+        page2.wait_for_function(BOARD_READY_JS)
         # обе вкладки в одном браузере обычно узнают о чужом сохранении через
         # пинг localStorage (см. refreshFromStore) — это отдельная, более
         # быстрая защита, и она реально снимает большинство конфликтов ДО

@@ -105,6 +105,21 @@ function heavyOf(b){
   return { objects: b.objects || [], imageLib: b.imageLib || [] };
 }
 
+// Промпт №47: доска из индекса приходит БЕЗ objects/imageLib (см. stripHeavy) —
+// b.objects === undefined и есть признак «эту доску ещё не подгружали».
+// Догружаем её тяжёлые поля из собственной записи один раз и дальше держим
+// в памяти как обычно (это не меняется — меняется только МОМЕНТ загрузки:
+// не все 22 доски разом при заходе на сайт, а по одной, когда её реально
+// открывают/используют)
+function ensureBoardLoaded(b){
+  if (!b || b.objects !== undefined) return Promise.resolve(b);
+  return idbGet(IDB_BOARD_PREFIX + b.id).then(payload => {
+    b.objects = (payload && payload.objects) || [];
+    b.imageLib = (payload && payload.imageLib) || [];
+    return b;
+  }).catch(() => { b.objects = []; b.imageLib = []; return b; });
+}
+
 // какие доски правились с последнего сохранения — раз в 300 мс рисования
 // это почти всегда ровно одна (открытая), но объёмные операции (импорт
 // файла, перенос архивом, восстановление из копии) правят сразу несколько
@@ -146,13 +161,16 @@ function idbLoadDB(){
   return idbGet('db').then(saved => {
     if (saved && Array.isArray(saved.boards)) {
       if (saved.__v === IDB_INDEX_VERSION) {
-        // новый формат: подгружаем тяжёлые поля каждой доски отдельно и
-        // складываем обратно в тот же объект — дальше весь остальной код
-        // работает с полными досками, как и раньше, разница только в том,
-        // как это лежит на диске
-        return Promise.all(saved.boards.map(b =>
-          idbGet(IDB_BOARD_PREFIX + b.id).then(payload => Object.assign(b, payload || { objects: [], imageLib: [] }))
-        )).then(() => { DB = saved; return true; });
+        // Промпт №47: раньше тут же, при самой загрузке страницы, тяжёлые
+        // поля ВСЕХ досок разом подгружались в память (Promise.all по
+        // каждой доске) — при десятках досок с картинками это столько
+        // памяти, что вкладка падала ещё до того, как успевал появиться
+        // список досок (без единого штриха, без открытия хоть одной
+        // доски). Теперь в индексе только лёгкие поля, а штрихи и картинки
+        // каждой доски подгружаются лениво — при её открытии (см.
+        // ensureBoardLoaded, вызывается из openBoard)
+        DB = saved;
+        return true;
       }
       // старый формат — доски уже полные (со штрихами и картинками), просто
       // раскладываем их по новым записям
@@ -463,9 +481,20 @@ function maybeSnapshot(){
     const last = (meta && meta.at) || 0;
     if (now - last < SNAP_EVERY_MS) return;
     const slot = ((meta && meta.slot) || 0) % SNAP_KEYS.length;
-    const snap = JSON.parse(JSON.stringify({ folders: DB.folders, boards: DB.boards, deleted: DB.deleted, sortMode: DB.sortMode }));
-    return idbPut(SNAP_KEYS[slot], { at: now, db: snap })
-      .then(() => idbPut('db_snap_meta', { at: now, slot: slot + 1 }));
+    // Промпт №47: с ленивой подгрузкой (см. ensureBoardLoaded) доска, которую
+    // в этой сессии ещё не открывали, лежит в памяти БЕЗ штрихов/картинок —
+    // для снимка это недопустимо (иначе резервная копия окажется неполной),
+    // поэтому недостающие доски догружаются с диска прямо тут, во временную
+    // копию — саму DB.boards в памяти это не трогает и лишнюю память не держит
+    return Promise.all(DB.boards.map(b =>
+      b.objects !== undefined
+        ? Promise.resolve(Object.assign({}, b))
+        : idbGet(IDB_BOARD_PREFIX + b.id).then(payload => Object.assign({}, b, payload || { objects: [], imageLib: [] }))
+    )).then(boardsFull => {
+      const snap = JSON.parse(JSON.stringify({ folders: DB.folders, boards: boardsFull, deleted: DB.deleted, sortMode: DB.sortMode }));
+      return idbPut(SNAP_KEYS[slot], { at: now, db: snap })
+        .then(() => idbPut('db_snap_meta', { at: now, slot: slot + 1 }));
+    });
   }).catch(() => {});
 }
 function listSnapshots(){
@@ -644,6 +673,12 @@ function boardWeight(b){
 }
 
 function exportAllBoardsArchive(){
+  // единственное место, где нам ЗАКОНОМЕРНО нужны все доски целиком сразу —
+  // это осознанное разовое действие пользователя, а не то, что происходит
+  // на каждой загрузке страницы (см. Промпт №47 про ленивую подгрузку)
+  Promise.all((DB.boards || []).map(ensureBoardLoaded)).then(() => exportAllBoardsArchiveReady());
+}
+function exportAllBoardsArchiveReady(){
   const stamp = nowTs();
   const payload = {
     __app: 'oge-boards', __kind: 'boards-archive', __version: 1,
@@ -751,6 +786,14 @@ function openSnapshotsModal(){
   });
 }
 function restoreFromSnapshot(sn){
+  // Промпт №47: сравнение «что полнее» ниже читает mine.objects — доска
+  // могла быть ещё не подгружена в память (см. ensureBoardLoaded), сначала
+  // догружаем всех «своих» кандидатов, иначе сравнение соврёт (посчитает
+  // недогруженную доску пустой) и создаст лишнюю копию
+  Promise.all((sn.db.boards || []).map(sb => ensureBoardLoaded(DB.boards.find(b => b.id === sb.id))))
+    .then(() => restoreFromSnapshotReady(sn));
+}
+function restoreFromSnapshotReady(sn){
   const when = fmtWhen(sn.at);
   let back = 0, copies = 0;
   (sn.db.boards || []).forEach(sb => {
@@ -828,6 +871,9 @@ async function mergeArchive(payload){
       conflictsLeft--;
       let choice = blanket;
       if (!choice){
+        // окно сравнения ниже читает mine.objects — доска могла быть ещё не
+        // подгружена в память (см. ensureBoardLoaded)
+        await ensureBoardLoaded(mine);
         const res = await askWhichVersion(mine, tb, conflictsLeft);
         choice = res.pick;
         if (res.all) blanket = res.pick;
@@ -1382,7 +1428,9 @@ function openCardMenu(btn){
       saveDB(); renderList();
     } else if (act === 'export'){
       const b = DB.boards.find(x => x.id === id);
-      if (b) exportBoardToFile(b);
+      // доска могла быть ещё не подгружена в память (см. ensureBoardLoaded) —
+      // без этого экспорт ушёл бы без штрихов и картинок
+      if (b) ensureBoardLoaded(b).then(() => exportBoardToFile(b));
     } else if (act === 'move'){
       const b = DB.boards.find(x => x.id === id);
       const names = ['(без папки)'].concat(DB.folders.map(f => f.name));
@@ -1681,6 +1729,12 @@ function doRedo(){
 function openBoard(id){
   const b = DB.boards.find(x => x.id === id);
   if (!b) return;
+  // Промпт №47: у этой доски могут быть ещё не подгружены штрихи/картинки
+  // (см. ensureBoardLoaded) — раньше это делалось для ВСЕХ досок сразу при
+  // заходе на сайт; теперь только для той, что реально открывают
+  ensureBoardLoaded(b).then(() => openBoardReady(b, id));
+}
+function openBoardReady(b, id){
   b.lastOpenedAt = nowTs();
   B = b;
   B.objects = B.objects || [];
