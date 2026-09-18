@@ -56,11 +56,86 @@ function idbPut(key, value){
     tx.onabort = () => reject(tx.error || new Error('запись прервана'));
   }));
 }
+function idbDelete(key){
+  return idbOpen().then(db => new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(key);
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('удаление прервано'));
+  })).catch(() => {});   // это только уборка мусора — сбой здесь не критичен
+}
+
+/* ═══ Промпт №45: доски — отдельными записями ═══
+   Раньше ВСЕ доски со всеми картинками лежали ОДНОЙ записью ('db') — и на
+   каждое сохранение (пауза 300 мс после любого штриха) сериализовалась и
+   переписывалась целиком вся коллекция, а не только та доска, в которой
+   рисуют. Пока досок было немного, это не чувствовалось; когда их
+   накопилось два десятка, часть — с вставленными картинками, запись стала
+   ощутимо грузить процессор и диск при каждом штрихе, а один раз вкладка
+   так и вовсе упала. Проблема не в новой правке — она была заложена
+   изначально, просто раньше не набрала веса, чтобы её заметить.
+
+   Теперь тяжёлые поля каждой доски (штрихи `objects` и `imageLib`) лежат
+   СВОЕЙ записью `boarddata:<id>`, а запись `db` держит только лёгкие
+   метаданные — имена, папки, даты, `rev`, вид. При автосохранении во время
+   рисования переписывается индекс (маленький, метаданные всех досок сразу)
+   и запись ОДНОЙ активной доски — остальные 21 не трогаются вовсе.
+
+   В памяти же (`DB.boards[i]`) по-прежнему лежат ПОЛНЫЕ доски со всем
+   содержимым, как и раньше — это сознательное решение: почти весь
+   остальной код (экспорт, перенос архивом, резервные копии, окно выбора
+   версии при конфликте) читает `board.objects` для любой доски, а не
+   только открытой, и трогать все эти места было бы куда рискованнее, чем
+   разделить саму запись на диске. Расход памяти от этого не растёт — тем
+   же был и раньше, это те же данные, просто раньше их же целиком писали
+   на диск при каждом штрихе, а теперь пишут только нужную часть. */
+const IDB_BOARD_PREFIX = 'boarddata:';
+const IDB_INDEX_VERSION = 2;
+
+// то, что уходит в индекс: доска без тяжёлых полей
+function stripHeavy(b){
+  const copy = Object.assign({}, b);
+  delete copy.objects;
+  delete copy.imageLib;
+  return copy;
+}
+// то, что уходит в отдельную запись доски
+function heavyOf(b){
+  return { objects: b.objects || [], imageLib: b.imageLib || [] };
+}
+
+// какие доски правились с последнего сохранения — раз в 300 мс рисования
+// это почти всегда ровно одна (открытая), но объёмные операции (импорт
+// файла, перенос архивом, восстановление из копии) правят сразу несколько
+let dirtyBoardIds = new Set();
+function markBoardDirty(id){ if (id) dirtyBoardIds.add(id); }
 
 // синхронное чтение старого хранилища — нужно и для переезда, и на случай,
 // если IndexedDB почему-то недоступен (например, приватное окно)
 function loadDB(){
   try { const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); if (raw && raw.boards) DB = raw; } catch(e){}
+}
+
+/* Переезд со старого формата (одна запись 'db' со ВСЕМИ полями каждой
+   доски) на новый (лёгкий индекс + отдельная запись на каждую доску).
+   Тяжёлые поля уже лежат у нас в памяти (пришли из старой записи целиком),
+   поэтому просто раскладываем их по своим ключам и переписываем индекс.
+   Одноразовая операция: как только индекс получит __v: 2, дальше грузимся
+   уже по-новому. Делается один раз при первом заходе после обновления —
+   стоит ровно столько же записи, сколько раньше стоило одно обычное
+   сохранение, просто раздельными кусками вместо одного. */
+function migrateToSplitStorage(oldDb){
+  const boards = Array.isArray(oldDb.boards) ? oldDb.boards : [];
+  return Promise.all(boards.map(b => idbPut(IDB_BOARD_PREFIX + b.id, heavyOf(b))))
+    .then(() => idbPut('db', {
+      __v: IDB_INDEX_VERSION,
+      folders: oldDb.folders || [],
+      boards: boards.map(stripHeavy),
+      deleted: oldDb.deleted || [],
+      sortMode: oldDb.sortMode,
+    }))
+    .then(() => console.info('[boards] доски переведены на раздельное хранение — обычное сохранение больше не переписывает всё сразу'));
 }
 
 /* Загрузка из IndexedDB. Если там пусто, а в localStorage лежат старые
@@ -69,10 +144,29 @@ function loadDB(){
    доски пропали бы совсем. */
 function idbLoadDB(){
   return idbGet('db').then(saved => {
-    if (saved && saved.boards) { DB = saved; return true; }
+    if (saved && Array.isArray(saved.boards)) {
+      if (saved.__v === IDB_INDEX_VERSION) {
+        // новый формат: подгружаем тяжёлые поля каждой доски отдельно и
+        // складываем обратно в тот же объект — дальше весь остальной код
+        // работает с полными досками, как и раньше, разница только в том,
+        // как это лежит на диске
+        return Promise.all(saved.boards.map(b =>
+          idbGet(IDB_BOARD_PREFIX + b.id).then(payload => Object.assign(b, payload || { objects: [], imageLib: [] }))
+        )).then(() => { DB = saved; return true; });
+      }
+      // старый формат — доски уже полные (со штрихами и картинками), просто
+      // раскладываем их по новым записям
+      DB = saved;
+      return migrateToSplitStorage(saved).then(() => true).catch(err => {
+        // не удалось разложить — не страшно, работаем как раньше единым
+        // блоком, следующая попытка будет при следующей загрузке страницы
+        console.warn('[boards] переезд на раздельное хранение не удался, работаем по-старому:', err && err.message);
+        return true;
+      });
+    }
     loadDB();
     if (DB && DB.boards && DB.boards.length) {
-      return idbPut('db', DB).then(() => {
+      return migrateToSplitStorage(DB).then(() => {
         try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
         console.info('[boards] доски перенесены из localStorage в IndexedDB — место больше не кончится');
         return true;
@@ -275,42 +369,102 @@ function mergeDbs(stored, mine){
   return Object.assign({}, mine, { boards: out, folders, deleted });
 }
 
-/* Одна транзакция на чтение+запись: пока она идёт, другая вкладка в эту же
-   запись не влезет — значит, слияние не может «разъехаться». */
-function idbSaveMerged(){
+/* Одна транзакция на чтение+запись индекса: пока она идёт, другая вкладка
+   в эту же запись не влезет — значит, слияние не может «разъехаться».
+   Сюда идут только лёгкие метаданные — штрихи и картинки сохраняются
+   отдельно, см. idbSaveDB. Возвращает, проиграла ли открытая доска слияние
+   (тогда её содержимое устарело и его нужно перечитать, а не переписывать
+   своим). */
+function idbSaveIndexMerged(){
   return idbOpen().then(db => new Promise((resolve, reject) => {
     const tx = db.transaction(IDB_STORE, 'readwrite');
     const store = tx.objectStore(IDB_STORE);
     const req = store.get('db');
+    let activeLost = false;
     req.onsuccess = () => {
       try {
-        DB = mergeDbs(req.result, DB);
-        DB.deleted = pruneDeleted(DB.deleted);
-        store.put(DB, 'db');
-      } catch (e) { reject(e); }
+        const stored = (req.result && Array.isArray(req.result.boards)) ? req.result : null;
+        activeLost = activeLostTo(stored);
+        // сравниваем и переставляем ЛЁГКИЕ копии — mergeDbs не трогает
+        // тяжёлые поля (rev/updatedAt на них не завязаны), а сами реальные
+        // доски (с их objects/imageLib в памяти) ниже подставляются обратно
+        const mineIndex = {
+          folders: DB.folders, deleted: DB.deleted, sortMode: DB.sortMode,
+          boards: DB.boards.map(stripHeavy),
+        };
+        const merged = mergeDbs(stored, mineIndex);
+        merged.deleted = pruneDeleted(merged.deleted);
+        applyMergedIndex(merged);
+        store.put(Object.assign({ __v: IDB_INDEX_VERSION }, {
+          folders: DB.folders, boards: DB.boards.map(stripHeavy),
+          deleted: DB.deleted, sortMode: DB.sortMode,
+        }), 'db');
+      } catch (e) { reject(e); return; }
     };
     req.onerror = () => reject(req.error);
-    tx.oncomplete = () => resolve(true);
+    tx.oncomplete = () => resolve({ activeLost });
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error('запись прервана'));
   }));
+}
+// проиграла ли МОЯ открытая доска слияние (в другой вкладке её продвинули
+// дальше) — тогда мои несохранённые правки по ней уже не главные
+function activeLostTo(stored){
+  if (!B || !stored) return false;
+  const sb = stored.boards && stored.boards.find(x => x.id === B.id);
+  return !!(sb && storedWins(sb, stripHeavy(B)));
+}
+// результат mergeDbs (лёгкие копии) — обратно в реальные доски с их
+// тяжёлыми полями. Доска, которая была и раньше, получает СВОИ метаданные
+// (Object.assign не трогает objects/imageLib — их просто нет у lite-копии);
+// доска, которой раньше не было (её создали в другой вкладке), пока лежит
+// без содержимого — оно подтянется, когда её откроют
+function applyMergedIndex(merged){
+  const realById = new Map(DB.boards.map(r => [r.id, r]));
+  DB.boards = merged.boards.map(m => {
+    const real = realById.get(m.id);
+    if (real) { Object.assign(real, m); return real; }
+    return m;
+  });
+  DB.folders = merged.folders;
+  DB.deleted = merged.deleted;
+}
+// открытая доска проиграла слияние — подтягиваем то, что реально лежит на
+// диске, вместо того чтобы через триста миллисекунд затереть это своим
+// устаревшим содержимым (та же логика, что раньше делал Object.assign(mb, sb)
+// целиком, просто тяжёлая часть теперь лежит отдельно и её надо перечитать)
+function refreshActivePayloadIfLost(lost){
+  if (!lost || !B) return Promise.resolve();
+  const id = B.id;
+  return idbGet(IDB_BOARD_PREFIX + id).then(payload => {
+    if (!B || B.id !== id) return;   // за время запроса успели закрыть доску
+    B.objects = (payload && payload.objects) || [];
+    B.imageLib = (payload && payload.imageLib) || [];
+    try { scheduleRedraw(); } catch (e) {}
+  });
 }
 
 /* ═══ Промпт №40: автоматические резервные копии ═══
    Даже с правильным слиянием остаётся класс бед, от которых спасает только
    копия: сбой браузера, случайное «удалить», чужая ошибка в коде. Поэтому
-   перед записью, но не чаще раза в 15 минут, откладываем снимок всего
-   хранилища. Снимков три — примерно на последние сутки работы. */
+   не чаще раза в 15 минут откладываем снимок всего хранилища. Снимков три —
+   примерно на последние сутки работы.
+   Промпт №45: снимок берём из того, что реально лежит в памяти (DB) — там
+   по-прежнему полные доски со всем содержимым, читать их из отдельных
+   записей на диске ради снимка незачем, раз они и так уже собраны. Дороже
+   обычного сохранения (тут действительно копируется всё), но это раз в
+   четверть часа, а не на каждый штрих. */
 const SNAP_KEYS = ['db_snap1', 'db_snap2', 'db_snap3'];
 const SNAP_EVERY_MS = 15 * 60 * 1000;
-function maybeSnapshot(current){
-  if (!current || !Array.isArray(current.boards) || !current.boards.length) return Promise.resolve();
+function maybeSnapshot(){
+  if (!DB || !Array.isArray(DB.boards) || !DB.boards.length) return Promise.resolve();
   return idbGet('db_snap_meta').then(meta => {
     const now = Date.now();
     const last = (meta && meta.at) || 0;
     if (now - last < SNAP_EVERY_MS) return;
     const slot = ((meta && meta.slot) || 0) % SNAP_KEYS.length;
-    return idbPut(SNAP_KEYS[slot], { at: now, db: current })
+    const snap = JSON.parse(JSON.stringify({ folders: DB.folders, boards: DB.boards, deleted: DB.deleted, sortMode: DB.sortMode }));
+    return idbPut(SNAP_KEYS[slot], { at: now, db: snap })
       .then(() => idbPut('db_snap_meta', { at: now, slot: slot + 1 }));
   }).catch(() => {});
 }
@@ -319,13 +473,39 @@ function listSnapshots(){
     .then(list => list.filter(Boolean).sort((a, b) => b.at - a.at));
 }
 
+/* Промпт №45: раньше здесь одной записью писалась вся `DB` целиком — на
+   каждый штрих переписывались все доски со всеми картинками разом. Теперь
+   отдельно (и всегда) — маленький индекс всех досок, и отдельно — тяжёлая
+   часть ТОЛЬКО тех досок, что реально правили с прошлого сохранения
+   (dirtyBoardIds, см. touchBoard). Пока правят одну открытую доску, это
+   значит: индекс + ровно одна запись, а не двадцать две. */
 function idbSaveDB(){
-  idbGet('db').then(maybeSnapshot).catch(() => {});
-  return idbSaveMerged()
+  maybeSnapshot().catch(() => {});
+  const toFlush = Array.from(dirtyBoardIds);
+  dirtyBoardIds = new Set();
+  return idbSaveIndexMerged()
+    .then(({ activeLost }) => {
+      const jobs = [];
+      if (activeLost) {
+        jobs.push(refreshActivePayloadIfLost(true));
+        // свои правки по ЭТОЙ доске уже не главные — её мы не дописываем,
+        // остальные «грязные» доски (например, из только что загруженного
+        // файла) это не касается, их пишем как обычно
+        const i = B ? toFlush.indexOf(B.id) : -1;
+        if (i >= 0) toFlush.splice(i, 1);
+      }
+      toFlush.forEach(id => {
+        const b = DB.boards.find(x => x.id === id);
+        if (b) jobs.push(idbPut(IDB_BOARD_PREFIX + id, heavyOf(b)));
+      });
+      return Promise.all(jobs);
+    })
     .then(() => { clearSaveFailedWarning(); pingOtherTabs(); return true; })
     .catch(err => {
-      // IndexedDB не сработал — пробуем хотя бы старым способом, чтобы
-      // работа не потерялась совсем
+      // не получилось — возвращаем доски в список «грязных», чтобы
+      // следующее сохранение попробовало ещё раз, и пробуем аварийный путь
+      // через localStorage, чтобы работа не потерялась совсем
+      toFlush.forEach(id => dirtyBoardIds.add(id));
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); clearSaveFailedWarning(); return true; }
       catch (e) { console.error('[boards] сохранение не прошло:', err || e); showSaveFailedWarning(err || e); return false; }
     });
@@ -345,8 +525,12 @@ function pingOtherTabs(){
 function refreshFromStore(){
   return idbGet('db').then(stored => {
     if (!stored || !Array.isArray(stored.boards)) return;
-    DB = mergeDbs(stored, DB);
-    if (!boardActive) renderList();
+    const lost = activeLostTo(stored);
+    const mineIndex = { folders: DB.folders, deleted: DB.deleted, sortMode: DB.sortMode, boards: DB.boards.map(stripHeavy) };
+    const merged = mergeDbs(stored, mineIndex);
+    merged.deleted = pruneDeleted(merged.deleted);
+    applyMergedIndex(merged);
+    return refreshActivePayloadIfLost(lost).then(() => { if (!boardActive) renderList(); });
   }).catch(() => {});
 }
 window.addEventListener('storage', (e) => { if (e.key === DB_PING) refreshFromStore(); });
@@ -374,6 +558,12 @@ function touchBoard(board){
   // доски главнее. Одного updatedAt мало: загрузка доски из файла осознанно
   // ставит СТАРУЮ версию, и по времени слияние бы её тут же откатило.
   b.rev = (b.rev || 0) + 1;
+  // Промпт №45: любая правка отмечается как «грязная» — при следующем
+  // сохранении её тяжёлые поля (штрихи/картинки) действительно запишутся на
+  // диск. Через этот же путь идёт весь обычный рисунок (saveDB → touchBoard
+  // без аргумента → правится B), поэтому обычное рисование помечает ровно
+  // одну доску — открытую.
+  markBoardDirty(b.id);
 }
 function bumpRev(copy, a, b){
   copy.rev = Math.max((a && a.rev) || 0, (b && b.rev) || 0) + 1;
@@ -570,7 +760,7 @@ function restoreFromSnapshot(sn){
       // след об удалении мешал бы доске вернуться — раз человек восстанавливает
       // осознанно, снимаем его
       DB.deleted = (DB.deleted || []).filter(d => d.id !== b.id);
-      DB.boards.push(b); back++;
+      DB.boards.push(b); markBoardDirty(b.id); back++;
       return;
     }
     if ((sb.objects || []).length > (mine.objects || []).length){
@@ -578,7 +768,7 @@ function restoreFromSnapshot(sn){
       b.id = uid();
       b.name = (sb.name || 'Доска') + ' (копия от ' + when + ')';
       b.createdAt = nowTs(); b.updatedAt = nowTs(); b.syncedAt = 0; b.pairMissing = false;
-      DB.boards.push(b); copies++;
+      DB.boards.push(b); markBoardDirty(b.id); copies++;
     }
   });
   (sn.db.folders || []).forEach(sf => {
@@ -627,6 +817,7 @@ async function mergeArchive(payload){
       copy.syncedAt = stamp;
       copy.pairMissing = false;
       DB.boards.push(copy);
+      markBoardDirty(copy.id);
       stats.added++;
       continue;
     }
@@ -644,13 +835,14 @@ async function mergeArchive(payload){
       if (choice === 'theirs'){
         const copy = bumpRev(JSON.parse(JSON.stringify(tb)), mine, tb);
         copy.syncedAt = stamp; copy.pairMissing = false;
-        DB.boards[idx] = copy; stats.updated++;
+        DB.boards[idx] = copy; markBoardDirty(copy.id); stats.updated++;
       } else if (choice === 'both'){
         const copy = JSON.parse(JSON.stringify(tb));
         copy.id = uid();
         copy.name = (tb.name || 'Доска') + ' (версия из файла)';
         copy.syncedAt = stamp; copy.pairMissing = false;
         DB.boards.push(copy);
+        markBoardDirty(copy.id);
         mine.syncedAt = stamp;
         stats.both++;
       } else {
@@ -663,7 +855,7 @@ async function mergeArchive(payload){
     if ((tb.updatedAt || 0) > (mine.updatedAt || 0)){
       const copy = bumpRev(JSON.parse(JSON.stringify(tb)), mine, tb);
       copy.syncedAt = stamp; copy.pairMissing = false;
-      DB.boards[idx] = copy; stats.updated++;
+      DB.boards[idx] = copy; markBoardDirty(copy.id); stats.updated++;
     } else {
       mine.syncedAt = stamp; stats.kept++;
     }
@@ -712,6 +904,7 @@ function importBoardPayload(src){
     createdAt: nowTs(), updatedAt: nowTs(), lastOpenedAt: null,
   });
   DB.boards.push(b);
+  markBoardDirty(b.id);
   saveDB();
   renderList();
   alert(`Доска «${b.name}» загружена.`);
@@ -735,6 +928,7 @@ function importBoardFromFile(file){
         createdAt: nowTs(), updatedAt: nowTs(), lastOpenedAt: null,
       });
       DB.boards.push(b);
+      markBoardDirty(b.id);
       saveDB();
       renderList();
       alert(`Доска «${b.name}» загружена.`);
@@ -1175,13 +1369,14 @@ function openCardMenu(btn){
       if (kind === 'folder'){
         const n = DB.boards.filter(b => b.folderId === id).length;
         if (!confirm(`Удалить папку и ${n} досок в ней? Это нельзя отменить.`)) return;
-        DB.boards.filter(b => b.folderId === id).forEach(b => noteDeleted('board', b.id));
+        DB.boards.filter(b => b.folderId === id).forEach(b => { noteDeleted('board', b.id); idbDelete(IDB_BOARD_PREFIX + b.id); });
         noteDeleted('folder', id);
         DB.boards = DB.boards.filter(b => b.folderId !== id);
         DB.folders = DB.folders.filter(f => f.id !== id);
       } else {
         if (!confirm('Удалить доску? Это нельзя отменить.')) return;
         noteDeleted('board', id);
+        idbDelete(IDB_BOARD_PREFIX + id);   // отдельная запись доски — мусор без неё не подчистится сама
         DB.boards = DB.boards.filter(b => b.id !== id);
       }
       saveDB(); renderList();
