@@ -2366,7 +2366,19 @@ function render(c, w, h, camv, isScreen, renderDpr){
   c.save();
   c.setTransform(renderDpr,0,0,renderDpr,0,0);
   drawSheetsAndGrid(c, camv, w, h);
-  B.objects.forEach(o => renderObject(c, o, camv));
+  // раньше рисовали ВСЕ объекты доски на каждый кадр, даже те, что на других
+  // страницах далеко за пределами экрана — при доске из десятков рисунков
+  // это означало сотни лишних c.stroke()/fillText() на каждое движение пера.
+  // Отсекаем по прямоугольнику видимой области (с небольшим запасом, чтобы
+  // объект не мигал у самого края) — рисуем только то, что реально попадает в кадр
+  const cullPad = 80 / camv.zoom;
+  const visMinX = camv.x - cullPad, visMinY = camv.y - cullPad;
+  const visMaxX = camv.x + w / camv.zoom + cullPad, visMaxY = camv.y + h / camv.zoom + cullPad;
+  B.objects.forEach(o => {
+    const b = objectBBox(o);
+    if (b.maxX < visMinX || b.minX > visMaxX || b.maxY < visMinY || b.minY > visMaxY) return;
+    renderObject(c, o, camv);
+  });
   if (isScreen) drawDraftPreview(c, camv);
   if (isScreen && selectedId){
     const obj = B.objects.find(o=>o.id===selectedId);
