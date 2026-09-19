@@ -575,7 +575,14 @@ function idbSaveDB(){
       }
       toFlush.forEach(id => {
         const b = DB.boards.find(x => x.id === id);
-        if (b) jobs.push(idbPut(IDB_BOARD_PREFIX + id, heavyOf(b)));
+        // Промпт №52: доска, выгруженная из памяти (objects === undefined,
+        // см. unloadBoard/ensureBoardLoaded), НЕ пустая — её содержимое лежит
+        // на диске в своей записи. Метаданные такой доски правят и на списке
+        // (перенос в папку, переименование), это метит её «грязной», и
+        // heavyOf() тогда писал бы вместо настоящих штрихов пустой массив —
+        // ровно так пропал целый урок после переноса доски в архив. Пишем
+        // тяжёлую часть только у доски, которая реально лежит в памяти
+        if (b && b.objects !== undefined) jobs.push(idbPut(IDB_BOARD_PREFIX + id, heavyOf(b)));
       });
       return Promise.all(jobs);
     })
@@ -630,6 +637,12 @@ window.addEventListener('focus', () => { refreshFromStore(); });
    через одну точку (saveDB вызывается из полусотни мест), поэтому здесь же
    и штампуем открытую доску: любое изменение внутри неё проходит тут. */
 function touchBoard(board){
+  // Промпт №52: без аргумента правится открытая доска. Но B после выхода в
+  // список не обнуляется и указывает на только что покинутую (и уже
+  // выгруженную) доску — а saveDB() на списке зовут удаление, переименование
+  // и перенос ЛЮБОЙ доски. Раньше это молча поднимало rev покинутой доске и
+  // метило её «грязной». На списке «открытой доски» нет — и штамповать некого
+  if (!board && !boardActive) return;
   const b = board || (typeof B !== 'undefined' ? B : null);
   if (!b) return;
   b.updatedAt = nowTs();
@@ -5852,6 +5865,7 @@ window.__imgCacheHas = function(src){ return Object.prototype.hasOwnProperty.cal
 // истории отмены на тяжёлых досках, а не только на глаз по .length стека
 window.__undoStackInfo = function(){ return { count: undoStack.length, bytes: undoBytes, limit: UNDO_LIMIT, budget: UNDO_BYTES_BUDGET }; };
 window.getCurrentBoard = function(){ return B; };
+window.__applyDrop = function(st, t){ return applyDrop(st, t); };   // для проверок: перенос в папку без мыши
 window.boardsRedraw = function(){ scheduleRedraw(); updateContextMenu(); };
 window.boardsClearSelection = function(){ selectedId = null; multiSelectIds = []; clearEditLock(); };
 
