@@ -3854,6 +3854,10 @@ const TRAINER_CAPTURE = {
   frac_div:  [ { sel:'#board' } ],
   powers:    [ { sel:'#questionPanel' }, { selAll:'.added-task-card .added-card-question' } ],
 };
+// Промпт №55: ЕГЭ профиль — одна страница на все 20 позиций (ege_prof.html?n=…),
+// поэтому у всех её записей один и тот же узел задания, и ставим их циклом.
+// #egeQuestion — только условие, без полей ответа и кнопок.
+for (let n = 1; n <= 20; n++) TRAINER_CAPTURE['ege' + n] = [ { sel:'#egeQuestion' } ];
 
 // список тренажёров для панели — те же названия/файлы, что и в реестре
 // TRAINERS на главной странице (index.html), сгруппированы так же просто,
@@ -3889,6 +3893,23 @@ const TRAINERS_PANEL_GROUPS = [
     { id:'powers',    name:'Действия со степенями',   href:'powers.html',            eq:'a⁵·a³=a⁸' },
   ]},
 ];
+// ЕГЭ профиль вставляем вторым разделом (после ОГЭ) — те же названия, что в
+// реестре на главной; все двадцать номеров ведут в один файл с номером в адресе
+const EGE_PROF_PANEL = [
+  'Планиметрия', 'Векторы', 'Стереометрия', 'Начала теории вероятностей',
+  'Вероятности сложных событий', 'Случайная величина', 'Простейшие уравнения',
+  'Вычисления и преобразования', 'Производная и графики',
+  'Задачи с прикладным содержанием', 'Текстовые задачи', 'Графики функций',
+  'Кредиты и вклады', 'Уравнения', 'Стереометрическая задача', 'Неравенства',
+  'Прикладная задача', 'Планиметрическая задача', 'Задача с параметром',
+  'Числа и их свойства',
+];
+TRAINERS_PANEL_GROUPS.splice(1, 0, { title: 'ЕГЭ профиль', items: EGE_PROF_PANEL.map((title, i) => ({
+  id: 'ege' + (i + 1),
+  name: '№' + (i + 1) + '. ' + title,
+  href: 'ege_prof.html?n=' + (i + 1),
+  eq: i < 13 ? 'краткий ответ' : 'с решением',
+})) });
 
 const trainersToggleBtn = document.getElementById('bdTrainersToggle');
 const trainersPanelEl = document.getElementById('bdTrainersPanel');
@@ -5376,6 +5397,9 @@ const TRAINER_NAMES = {
   frac_mul:'Умножение дробей', frac_div:'Деление дробей', neg_pos:'Положительные и отрицательные числа',
   powers:'Действия со степенями',
 };
+// подписи для «Подборки» — берём из списка панели тренажёров, чтобы название
+// ЕГЭ-задания было записано на доске один в один как в реестре на главной
+EGE_PROF_PANEL.forEach((title, i) => { TRAINER_NAMES['ege' + (i + 1)] = 'ЕГЭ профиль №' + (i + 1) + '. ' + title; });
 function escapeHtmlBd(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function renderBasketPicker(){
