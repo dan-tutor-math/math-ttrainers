@@ -747,13 +747,162 @@
       updated: d.updated.map(u => ({ id: u.id, before: u.after, after: u.before })),
     };
   }
-  function applyDiffLocally(board, d) {
-    d.removed.forEach(r => { board.objects = board.objects.filter(o => o.id !== r.id); });
-    d.added.forEach(o => { if (!board.objects.some(x => x.id === o.id)) board.objects.push(JSON.parse(JSON.stringify(o))); });
+  /* ═══ Промпт №53: действия на общей доске откатывались сами ═══
+     Живой случай: учитель увеличивает картинку — через секунду она сама
+     возвращается к старому размеру; удаляет картинку — через секунду она
+     появляется снова. Происходило именно тогда, когда ученик в это время
+     пишет на доске. Причин было несколько, и все про одно: до получателя
+     доезжала СТАРАЯ версия объекта, и её применяли поверх новой, потому что
+     отличить старую от новой было не по чему.
+
+     - Тяжёлый объект (картинка) едет заглушкой, и получатель сразу идёт за
+       ним в базу. Но рассылка уходит ДО записи в базу — первый же запрос
+       отдавал прошлую версию, и она считалась полученной.
+     - Если это старьё приезжало посреди жеста ученика (он пишет не
+       отрываясь), оно попадало в его «снимок после», но не в «снимок до», и
+       уходило обратно учителю как правка ученика. Учитель получал свою же
+       картинку в прошлом размере, а удалённая — воскресала.
+     - Записи в базу шли параллельно: два изменения подряд могли дойти до
+       базы в обратном порядке, а удаление — раньше предыдущего сохранения
+       той же картинки. Тогда в базе оставалось старьё, и его через полминуты
+       подтягивала сверка.
+     - Своё же эхо из postgres_changes (запись первого из двух быстрых
+       изменений) приходило после второго и откатывало его.
+
+     Лечение. У каждого объекта есть номер версии `rv` (и `rvBy` — кто её
+     сделал, чтобы при равных номерах все участники выбрали одно и то же).
+     Любая своя правка поднимает номер, а чужая версия применяется, только
+     если она не старее той, что уже на доске. Удалённый объект оставляет
+     «надгробие» с номером своей версии: вернуть его может только более
+     новая версия (отмена удаления её и даёт), а старые копии из запоздавших
+     ответов базы и чужих жестов больше ничего не воскрешают. Плюс записи в
+     базу идут строго по очереди — это НЕ та очередь, от которой отказались
+     в промптах №36–37: рассылка по каналу как уходила сразу, так и уходит,
+     упорядочены только запросы к базе. */
+  let cloudTombs = new Map();          // id -> номер версии удалённого объекта
+  const TOMB_LIMIT = 5000;
+  let cloudWriteChain = Promise.resolve();
+
+  function myUid() { return window.CURRENT_USER ? window.CURRENT_USER.id : ''; }
+  function revOf(o) { return (o && typeof o.rv === 'number') ? o.rv : 0; }
+  function cloneObj(o) { return JSON.parse(JSON.stringify(o)); }
+
+  // при равных номерах решает автор версии — сравнение одинаковое у всех
+  // участников, поэтому при одновременной правке все сойдутся на одной
+  function incomingWins(inc, local) {
+    if (!local) return true;
+    const a = revOf(inc), b = revOf(local);
+    if (a !== b) return a > b;
+    return String(inc.rvBy || '') >= String(local.rvBy || '');
+  }
+  function tombBlocks(id, rv) {
+    return cloudTombs.has(id) && (rv || 0) <= cloudTombs.get(id);
+  }
+  function addTomb(id, rv) {
+    const prev = cloudTombs.has(id) ? cloudTombs.get(id) : -1;
+    cloudTombs.delete(id);
+    cloudTombs.set(id, Math.max(prev, rv || 0));
+    // Map помнит порядок вставки — выбрасываем самые давние
+    while (cloudTombs.size > TOMB_LIMIT) cloudTombs.delete(cloudTombs.keys().next().value);
+  }
+
+  // чужая версия объекта: 'applied' — легла на доску, 'same' — такая уже
+  // есть, 'stale' — у нас новее или объект удалён позже этой версии
+  function acceptRemoteObject(board, inc) {
+    if (!inc || !inc.id) return 'stale';
+    if (tombBlocks(inc.id, revOf(inc))) return 'stale';
+    const idx = board.objects.findIndex(o => o.id === inc.id);
+    const local = idx >= 0 ? board.objects[idx] : null;
+    if (local && !incomingWins(inc, local)) return 'stale';
+    // одинаковое не трогаем: подмена объекта на равный ему ничего не даёт,
+    // а лишняя перерисовка тяжёлой картинки заметна
+    if (local && JSON.stringify(local) === JSON.stringify(inc)) return 'same';
+    const copy = cloneObj(inc);
+    if (idx >= 0) board.objects[idx] = copy; else board.objects.push(copy);
+    cloudTombs.delete(inc.id);
+    return 'applied';
+  }
+  // rv — версия, которую удалял собеседник. Она может быть новее нашей:
+  // учитель увеличил картинку и сразу удалил, а увеличенная до нас ещё не
+  // доехала — без этого номера запоздавшее увеличение её бы воскресило
+  function removeRemoteObject(board, id, rv) {
+    const local = board.objects.find(o => o.id === id);
+    addTomb(id, Math.max(revOf(local), rv || 0));
+    if (local) board.objects = board.objects.filter(o => o.id !== id);
+    return !!local;
+  }
+
+  // Если у меня идёт свой жест, всё пришедшее от других должно попасть и в
+  // его «снимок до» — иначе при завершении жеста чужое изменение уйдёт в
+  // рассылку как моё. Раньше это делалось для двух путей из трёх, а про
+  // догрузку картинок из базы забыли — именно через неё старьё и уходило
+  function syncGestureBefore(board, ids) {
+    if (cloudGestureBefore === null || !ids || !ids.length) return;
+    const before = JSON.parse(cloudGestureBefore);
+    const want = new Set(ids);
+    const nowById = new Map();
+    board.objects.forEach(o => { if (want.has(o.id)) nowById.set(o.id, o); });
+    const out = [];
+    const seen = new Set();
+    before.forEach(o => {
+      if (!want.has(o.id)) { out.push(o); return; }
+      seen.add(o.id);
+      if (nowById.has(o.id)) out.push(nowById.get(o.id));
+    });
+    nowById.forEach((o, id) => { if (!seen.has(id)) out.push(o); });
+    cloudGestureBefore = JSON.stringify(out);
+  }
+
+  // своя правка: поднимаем номер версии у всего, что добавлено или
+  // изменено, и ставим надгробия на удалённое. Объекты в diff.added и
+  // diff.updated[].after — это живые объекты доски, номер ложится прямо на них
+  function stampLocalDiff(diff) {
+    const me = myUid();
+    diff.added.forEach(o => {
+      o.rv = Math.max(revOf(o), cloudTombs.has(o.id) ? cloudTombs.get(o.id) : 0) + 1;
+      o.rvBy = me;
+      cloudTombs.delete(o.id);
+    });
+    diff.updated.forEach(u => {
+      u.after.rv = Math.max(revOf(u.before), revOf(u.after)) + 1;
+      u.after.rvBy = me;
+    });
+    diff.removed.forEach(r => addTomb(r.id, revOf(r.obj)));
+  }
+
+  // отмена/повтор: применяем свой diff к доске и сразу выдаём номер версии
+  // новее текущего — иначе отмена вернула бы объект со СТАРЫМ номером, и
+  // остальные участники справедливо сочли бы его устаревшим
+  function applyOwnDiff(board, d) {
+    const me = myUid();
+    const out = { added: [], updated: [], removed: [] };
+    d.removed.forEach(r => {
+      const local = board.objects.find(o => o.id === r.id);
+      if (!local) return;
+      addTomb(r.id, revOf(local));
+      board.objects = board.objects.filter(o => o.id !== r.id);
+      out.removed.push({ id: r.id, obj: local });
+    });
+    d.added.forEach(o => {
+      if (board.objects.some(x => x.id === o.id)) return;
+      const c = cloneObj(o);
+      c.rv = Math.max(revOf(o), cloudTombs.has(o.id) ? cloudTombs.get(o.id) : 0) + 1;
+      c.rvBy = me;
+      cloudTombs.delete(o.id);
+      board.objects.push(c);
+      out.added.push(c);
+    });
     d.updated.forEach(u => {
       const idx = board.objects.findIndex(o => o.id === u.id);
-      if (idx >= 0) board.objects[idx] = JSON.parse(JSON.stringify(u.after));
+      if (idx < 0) return;
+      const cur = board.objects[idx];
+      const c = cloneObj(u.after);
+      c.rv = Math.max(revOf(cur), revOf(u.after)) + 1;
+      c.rvBy = me;
+      board.objects[idx] = c;
+      out.updated.push({ id: u.id, before: cur, after: c });
     });
+    return out;
   }
 
   /* ═══ Промпт №42: тяжёлые объекты (картинки) ═══
@@ -775,73 +924,104 @@
     const light = (o) => {
       if (!o || jsonLen(o) <= HEAVY_OBJ_BYTES) return o;
       heavy.push(o.id);
-      return { id: o.id, __heavy: true };
+      // Промпт №53: заглушка несёт номер версии — получатель по нему
+      // понимает, что из базы пришло старьё, и спрашивает ещё раз
+      return { id: o.id, __heavy: true, rv: revOf(o), rvBy: o.rvBy || '' };
     };
     const out = {
       added: diff.added.map(light),
       updated: diff.updated.map(u => ({ id: u.id, after: light(u.after) })),
-      removed: diff.removed.map(r => ({ id: r.id })),
+      removed: diff.removed.map(r => ({ id: r.id, rv: revOf(r.obj) })),
     };
     return { diff: out, heavy };
   }
 
   // забрать тяжёлые объекты из базы. Запись собеседника могла ещё не дойти —
-  // поэтому пробуем несколько раз с нарастающей паузой
+  // поэтому пробуем несколько раз с нарастающей паузой. expect — какой номер
+  // версии мы ждём по каждому объекту: пока в базе лежит версия старше,
+  // считаем, что запись ещё не дошла, и спрашиваем снова (Промпт №53)
   const HEAVY_RETRY_MS = [200, 600, 1500, 3000, 6000];
-  async function fetchHeavyObjects(boardId, ids, attempt) {
+  async function fetchHeavyObjects(boardId, ids, attempt, expect) {
     attempt = attempt || 0;
+    expect = expect || {};
     if (!ids.length || !boardId || boardId !== cloudBoardId) return;
     const { data: rows, error } = await window.SB.from('board_objects')
       .select('obj_id, data').eq('board_id', boardId).in('obj_id', ids);
-    const got = new Set();
+    const board = window.getCurrentBoard();
+    if (!board || board.cloudBoardId !== boardId || boardId !== cloudBoardId) return;
+    const done = new Set();
+    // пока ходили в базу, объект могли удалить — тогда он больше не нужен
+    ids.forEach(id => { if (tombBlocks(id, expect[id] || 0)) done.add(id); });
+    const applied = [];
     if (!error && rows && rows.length) {
-      const board = window.getCurrentBoard();
-      if (!board || board.cloudBoardId !== boardId) return;
       if (window.boardsStampMine) window.boardsStampMine();
       cloudApplyingRemote = true;
       rows.forEach(r => {
-        if (!r.data) return;
-        got.add(r.obj_id);
-        const idx = board.objects.findIndex(o => o.id === r.obj_id);
-        if (idx >= 0) board.objects[idx] = r.data; else board.objects.push(r.data);
+        if (!r.data || done.has(r.obj_id)) return;
+        if (expect[r.obj_id] !== undefined && revOf(r.data) < expect[r.obj_id]) return;   // в базе ещё прошлая версия
+        done.add(r.obj_id);
+        if (acceptRemoteObject(board, r.data) === 'applied') applied.push(r.obj_id);
       });
       cloudApplyingRemote = false;
-      if (window.boardsNoteForeignObjects) window.boardsNoteForeignObjects(rows.map(r => r.obj_id));
-      window.boardsRedraw();
+      if (applied.length) {
+        if (window.boardsNoteForeignObjects) window.boardsNoteForeignObjects(applied);
+        syncGestureBefore(board, applied);
+        window.boardsRedraw();
+      }
     }
-    const left = ids.filter(id => !got.has(id));
+    const left = ids.filter(id => !done.has(id));
     if (left.length && attempt < HEAVY_RETRY_MS.length) {
-      setTimeout(() => fetchHeavyObjects(boardId, left, attempt + 1), HEAVY_RETRY_MS[attempt]);
+      setTimeout(() => fetchHeavyObjects(boardId, left, attempt + 1, expect), HEAVY_RETRY_MS[attempt]);
     } else if (left.length) {
       console.warn('[облачная доска] не удалось получить объекты:', left.join(', '));
     }
   }
 
   // наружу отдаём только для проверок — сама логика никуда больше не ходит
-  window.__cloudDiffTest = { lightenDiff, BROADCAST_LIMIT, HEAVY_OBJ_BYTES };
+  window.__cloudDiffTest = {
+    lightenDiff, BROADCAST_LIMIT, HEAVY_OBJ_BYTES,
+    tombs: () => cloudTombs,
+    writesIdle: () => cloudWriteChain,
+  };
 
-  async function pushDiffToSupabase(boardId, diff) {
-    // отправляем немедленно, синхронно, до первого await ниже — так
-    // остальные участники видят изменение сразу, не дожидаясь ни ответа
-    // сервера на запись, ни тем более цикла репликации postgres_changes
+  function pushDiffToSupabase(boardId, liveDiff) {
+    // копия на момент правки: объекты в diff живые, и следующий жест успел
+    // бы поменять их раньше, чем очередь дойдёт до записи в базу
+    const diff = cloneObj(liveDiff);
+    // отправляем немедленно, синхронно — так остальные участники видят
+    // изменение сразу, не дожидаясь ни записи в базу, ни postgres_changes
     const { diff: forAir } = lightenDiff(diff);
     if (cloudChannel) {
-      try { cloudChannel.send({ type: 'broadcast', event: 'board_diff', payload: { diff: forAir, uid: window.CURRENT_USER ? window.CURRENT_USER.id : null } }); } catch (e) {}
+      try { cloudChannel.send({ type: 'broadcast', event: 'board_diff', payload: { diff: forAir, uid: myUid() || null } }); } catch (e) {}
     }
+    cloudWriteChain = cloudWriteChain
+      .then(() => writeDiffToDb(boardId, diff))
+      .catch(e => console.error('[облачная доска] ошибка записи:', e && e.message ? e.message : e));
+    return cloudWriteChain;
+  }
+
+  // Промпт №53: запросы к базе строго по очереди. Параллельные запросы
+  // приходили в базу в любом порядке: «размер 2» мог записаться раньше
+  // «размера 1», а удаление — раньше предыдущего сохранения той же картинки,
+  // и в базе оставалось старьё
+  async function writeDiffToDb(boardId, diff) {
     const rows = diff.added.concat(diff.updated.map(u => u.after)).map(obj => ({
       board_id: boardId, obj_id: obj.id, data: obj,
-      updated_by: window.CURRENT_USER ? window.CURRENT_USER.id : null,
+      updated_by: myUid() || null,
     }));
     if (rows.length) {
       const { error } = await window.SB.from('board_objects').upsert(rows, { onConflict: 'board_id,obj_id' });
       if (error) console.error('[облачная доска] не удалось сохранить изменения:', error.message);
       // Промпт №42: запись прошла — говорим об этом отдельным лёгким
       // сообщением. Если первая рассылка потерялась, это второй шанс: по
-      // номерам собеседник заберёт объекты из базы сам
-      else if (cloudChannel) {
+      // номерам собеседник заберёт объекты из базы сам. Промпт №53: вместе с
+      // номерами версий — чтобы забирали и то, что у них есть, но старее
+      else if (cloudChannel && boardId === cloudBoardId) {
+        const revs = {};
+        rows.forEach(r => { revs[r.obj_id] = revOf(r.data); });
         try {
           cloudChannel.send({ type: 'broadcast', event: 'board_ready',
-            payload: { ids: rows.map(r => r.obj_id), uid: window.CURRENT_USER ? window.CURRENT_USER.id : null } });
+            payload: { ids: rows.map(r => r.obj_id), revs, uid: myUid() || null } });
         } catch (e) {}
       }
     }
@@ -860,7 +1040,9 @@
     if (!board) return;
     const diff = computeDiff(before, board.objects);
     if (diffIsEmpty(diff)) return;
-    cloudUndoStack.push(diff);
+    stampLocalDiff(diff);
+    // в стек отмены — копию: живые объекты доски меняются дальше
+    cloudUndoStack.push(cloneObj(diff));
     if (cloudUndoStack.length > 100) cloudUndoStack.shift();
     cloudRedoStack.length = 0;
     pushDiffToSupabase(cloudBoardId, diff);
@@ -869,16 +1051,15 @@
   function cloudUndo() {
     if (!cloudUndoStack.length) return;
     const diff = cloudUndoStack.pop();
-    const inv = invertDiff(diff);
     const board = window.getCurrentBoard();
     if (!board) return;
     cloudApplyingRemote = true;
-    applyDiffLocally(board, inv);
+    const sent = applyOwnDiff(board, invertDiff(diff));
     cloudApplyingRemote = false;
     cloudRedoStack.push(diff);
     window.boardsClearSelection();
     window.boardsRedraw();
-    pushDiffToSupabase(cloudBoardId, inv);
+    if (!diffIsEmpty(sent)) pushDiffToSupabase(cloudBoardId, sent);
   }
   function cloudRedo() {
     if (!cloudRedoStack.length) return;
@@ -886,12 +1067,12 @@
     const board = window.getCurrentBoard();
     if (!board) return;
     cloudApplyingRemote = true;
-    applyDiffLocally(board, diff);
+    const sent = applyOwnDiff(board, diff);
     cloudApplyingRemote = false;
     cloudUndoStack.push(diff);
     window.boardsClearSelection();
     window.boardsRedraw();
-    pushDiffToSupabase(cloudBoardId, diff);
+    if (!diffIsEmpty(sent)) pushDiffToSupabase(cloudBoardId, sent);
   }
 
   // ------------------------------------------------------------------
@@ -933,30 +1114,62 @@
   // ------------------------------------------------------------------
   // применение изменений, пришедших от другого участника в реальном времени
   // ------------------------------------------------------------------
+
+  // Промпт №53: удаление через postgres_changes не несёт ничего, кроме
+  // номера объекта, — ни версии, ни автора. Оно может прийти ПОСЛЕ того, как
+  // объект вернули отменой, и снесло бы уже вернувшийся. Поэтому такое
+  // удаление не применяем вслепую, а переспрашиваем у базы: запись в неё
+  // идёт по очереди, и если объекта там действительно нет — удаляем
+  let goneCheckIds = new Set();
+  let goneCheckTimer = null;
+  function scheduleGoneCheck(id) {
+    goneCheckIds.add(id);
+    if (goneCheckTimer) return;
+    const boardId = cloudBoardId;
+    goneCheckTimer = setTimeout(async () => {
+      goneCheckTimer = null;
+      const ids = Array.from(goneCheckIds);
+      goneCheckIds = new Set();
+      if (!ids.length || boardId !== cloudBoardId) return;
+      const { data: rows, error } = await window.SB.from('board_objects')
+        .select('obj_id').eq('board_id', boardId).in('obj_id', ids);
+      if (error || !rows) return;
+      const board = window.getCurrentBoard();
+      if (!board || board.cloudBoardId !== boardId || boardId !== cloudBoardId) return;
+      const alive = new Set(rows.map(r => r.obj_id));
+      const gone = ids.filter(id => !alive.has(id));
+      if (!gone.length) return;
+      if (window.boardsStampMine) window.boardsStampMine();
+      cloudApplyingRemote = true;
+      const removed = gone.filter(id => removeRemoteObject(board, id));
+      cloudApplyingRemote = false;
+      if (removed.length) { syncGestureBefore(board, removed); window.boardsRedraw(); }
+    }, 400);
+  }
+
   function cloudHandleRemoteChange(payload) {
     const board = window.getCurrentBoard();
     if (!board || !cloudBoardId) return;
-    const applyToArray = (arr) => {
-      if (payload.eventType === 'DELETE') {
-        const oldId = payload.old && payload.old.obj_id;
-        return oldId ? arr.filter(o => o.id !== oldId) : arr;
-      }
-      const obj = payload.new && payload.new.data;
-      if (!obj) return arr;
-      const idx = arr.findIndex(o => o.id === obj.id);
-      if (idx >= 0) { const copy = arr.slice(); copy[idx] = obj; return copy; }
-      return arr.concat([obj]);
-    };
+    if (payload.eventType === 'DELETE') {
+      const oldId = payload.old && payload.old.obj_id;
+      if (oldId && board.objects.some(o => o.id === oldId)) scheduleGoneCheck(oldId);
+      return;
+    }
+    const row = payload.new || {};
+    // своё эхо не применяем: оно может прийти уже после следующей моей
+    // правки того же объекта и откатить её (так «сам собой» отменялся
+    // второй подряд размер картинки)
+    if (row.updated_by && row.updated_by === myUid()) return;
+    const obj = row.data;
+    if (!obj) return;
     if (window.boardsStampMine) window.boardsStampMine();   // Промпт №41
     cloudApplyingRemote = true;
-    board.objects = applyToArray(board.objects);
+    const res = acceptRemoteObject(board, obj);
     cloudApplyingRemote = false;
+    if (res !== 'applied') return;
     // пришедшее от собеседника своим не считается
-    if (window.boardsNoteForeignObjects) window.boardsNoteForeignObjects(board.objects.map(o => o.id));
-    // если у меня прямо сейчас идёт свой незавершённый жест — обновляем и
-    // его «снимок до», чтобы чужое изменение не попало в diff как моё
-    // собственное, когда мой жест зафиксируется
-    if (cloudGestureBefore !== null) cloudGestureBefore = JSON.stringify(applyToArray(JSON.parse(cloudGestureBefore)));
+    if (window.boardsNoteForeignObjects) window.boardsNoteForeignObjects([obj.id]);
+    syncGestureBefore(board, [obj.id]);
     window.boardsRedraw();
   }
 
@@ -969,27 +1182,51 @@
     if (payload.uid && window.CURRENT_USER && payload.uid === window.CURRENT_USER.id) return;
     // Промпт №42: заглушки тяжёлых объектов не применяем — по ним идём в базу
     const heavyIds = [];
-    const d = {
-      added: (payload.diff.added || []).filter(o => { if (o && o.__heavy){ heavyIds.push(o.id); return false; } return true; }),
-      updated: (payload.diff.updated || []).filter(u => { if (u && u.after && u.after.__heavy){ heavyIds.push(u.id); return false; } return true; }),
-      removed: payload.diff.removed || [],
-    };
+    const expect = {};
+    const touched = [];
+    const incoming = (payload.diff.added || []).concat((payload.diff.updated || []).map(u => u && u.after));
     if (window.boardsStampMine) window.boardsStampMine();   // Промпт №41
     cloudApplyingRemote = true;
-    applyDiffLocally(board, d);
+    (payload.diff.removed || []).forEach(r => {
+      if (!r || !r.id) return;
+      if (removeRemoteObject(board, r.id, Math.max(r.rv || 0, revOf(r.obj)))) touched.push(r.id);
+    });
+    incoming.forEach(o => {
+      if (!o || !o.id) return;
+      if (o.__heavy) {
+        if (tombBlocks(o.id, revOf(o))) return;
+        const local = board.objects.find(x => x.id === o.id);
+        if (local && !incomingWins(o, local)) return;
+        heavyIds.push(o.id);
+        expect[o.id] = revOf(o);
+        return;
+      }
+      if (acceptRemoteObject(board, o) === 'applied') touched.push(o.id);
+    });
     cloudApplyingRemote = false;
-    if (window.boardsNoteForeignObjects) window.boardsNoteForeignObjects(board.objects.map(o => o.id));
-    if (heavyIds.length) fetchHeavyObjects(cloudBoardId, heavyIds);
+    if (touched.length && window.boardsNoteForeignObjects) window.boardsNoteForeignObjects(touched);
+    if (heavyIds.length) fetchHeavyObjects(cloudBoardId, heavyIds, 0, expect);
     // если у меня прямо сейчас идёт свой незавершённый жест — обновляем и
     // его «снимок до», чтобы чужое изменение не попало в diff как моё
-    // собственное, когда мой жест зафиксируется (тот же приём, что и в
-    // cloudHandleRemoteChange для postgres_changes)
-    if (cloudGestureBefore !== null) {
-      const tmp = { objects: JSON.parse(cloudGestureBefore) };
-      applyDiffLocally(tmp, d);
-      cloudGestureBefore = JSON.stringify(tmp.objects);
-    }
-    window.boardsRedraw();
+    syncGestureBefore(board, touched);
+    if (touched.length) window.boardsRedraw();
+  }
+
+  // что из объявленного (номер и версия) нам стоит забрать из базы
+  function wantedFromAnnounce(board, list) {
+    const have = new Map(board.objects.map(o => [o.id, o]));
+    const ids = [], expect = {};
+    list.forEach(({ id, rv }) => {
+      if (rv === undefined) {
+        // старый клиент без версий — как раньше, только недостающее
+        if (!have.has(id) && !cloudTombs.has(id)) ids.push(id);
+        return;
+      }
+      if (tombBlocks(id, rv)) return;
+      const local = have.get(id);
+      if (!local || revOf(local) < rv) { ids.push(id); expect[id] = rv; }
+    });
+    return { ids, expect };
   }
 
   async function cloudSetupSubscription(boardId, board) {
@@ -1020,9 +1257,9 @@
         if (payload.uid && window.CURRENT_USER && payload.uid === window.CURRENT_USER.id) return;
         const b = window.getCurrentBoard();
         if (!b) return;
-        const have = new Set(b.objects.map(o => o.id));
-        const missing = payload.ids.filter(id => !have.has(id));
-        if (missing.length) fetchHeavyObjects(cloudBoardId, missing);
+        const revs = payload.revs || {};
+        const { ids, expect } = wantedFromAnnounce(b, payload.ids.map(id => ({ id, rv: revs[id] })));
+        if (ids.length) fetchHeavyObjects(cloudBoardId, ids, 0, expect);
       })
       .subscribe();
     startReconcile(boardId);
@@ -1032,7 +1269,9 @@
      один только список номеров объектов (это несколько килобайт, не больше)
      и, если у нас чего-то нет, докачиваем. Ничего не удаляем: свои объекты
      могут быть ещё не записаны. Так «картинка не появилась» перестаёт быть
-     необратимым — максимум полминуты, и она придёт сама. */
+     необратимым — максимум полминуты, и она придёт сама.
+     Промпт №53: вместе с номерами берём и версии — чтобы докачивать и то,
+     что у нас есть, но устарело, и НЕ воскрешать удалённое у нас. */
   let reconcileTimer = null;
   function startReconcile(boardId) {
     stopReconcile();
@@ -1041,12 +1280,17 @@
       if (document.hidden) return;
       const board = window.getCurrentBoard();
       if (!board || board.cloudBoardId !== boardId) return;
-      const { data: rows, error } = await window.SB.from('board_objects')
-        .select('obj_id').eq('board_id', boardId);
+      let { data: rows, error } = await window.SB.from('board_objects')
+        .select('obj_id, rv:data->rv').eq('board_id', boardId);
+      if (error) {
+        // если выборка по полю внутри json вдруг не пройдёт — как раньше
+        ({ data: rows, error } = await window.SB.from('board_objects').select('obj_id').eq('board_id', boardId));
+      }
       if (error || !rows) return;
-      const have = new Set(board.objects.map(o => o.id));
-      const missing = rows.map(r => r.obj_id).filter(id => !have.has(id));
-      if (missing.length) fetchHeavyObjects(boardId, missing);
+      const { ids, expect } = wantedFromAnnounce(board, rows.map(r => ({
+        id: r.obj_id, rv: typeof r.rv === 'number' ? r.rv : (r.rv === undefined ? undefined : 0),
+      })));
+      if (ids.length) fetchHeavyObjects(boardId, ids, 0, expect);
     }, 30000);
   }
   function stopReconcile() { if (reconcileTimer) { clearInterval(reconcileTimer); reconcileTimer = null; } }
@@ -1061,11 +1305,13 @@
     stopCursorAnim();
     clearAllCursors();
     stopReconcile();
+    clearTimeout(goneCheckTimer); goneCheckTimer = null; goneCheckIds = new Set();
   }
 
   window.onBoardOpened = function (board) {
     cloudTeardownSubscription();
     cloudUndoStack = []; cloudRedoStack = []; cloudGestureBefore = null;
+    cloudTombs = new Map();
     cloudBoardId = board.cloudBoardId || null;
     cloudRole = board.cloudRole || null;
     // Промпт №41: доска сама должна знать, что этому человеку на ней можно
