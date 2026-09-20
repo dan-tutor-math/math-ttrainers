@@ -781,6 +781,7 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="trainer-multi.js"></script>
 <script>
 /* ═══════════════ утилиты ═══════════════ */
 const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
@@ -2520,6 +2521,210 @@ function syncKeypadVisibility(){
 
 renderPicker();
 setupFloatingKeypad();
+
+/* ═══ Промпт №54: совместная работа над самим заданием, а не только доской ═══
+   В промптах №32–33 мост состояния получили все тренажёры с выбором типа,
+   кроме этого: здесь у задания есть ещё и решение по шагам, и его обошли
+   стороной. В итоге в совместной сессии учитель и ученик видели каждый
+   своё задание — общей была только доска поверх. Теперь синхронизируется
+   то же, что в ОГЭ №6: экран (выбор типа или задание), тип, само задание и
+   выбранный вариант ответа. Ход решения по шагам у каждого свой — это его
+   собственный ввод, как и поле ответа в других тренажёрах. */
+// Задание в общем снимке — таким, каким оно было создано или получено.
+// Шаг «выбор дроби» вставляет в curTask.steps свои шаги (splice) — у каждого
+// свои, по его выбору. Если слать curTask как есть, эта вставка выглядела бы
+// у собеседника как НОВОЕ задание, и его решение по шагам начиналось бы
+// заново, да ещё с чужими шагами. Поэтому снимаем копию один раз — при смене
+// самого объекта задания — и дальше шлём и сравниваем её
+let tsTaskRef = null, tsTaskPristine = null;
+function tsPristineTask(){
+  if (curTask !== tsTaskRef) {
+    tsTaskRef = curTask;
+    tsTaskPristine = curTask ? JSON.parse(JSON.stringify(curTask)) : null;
+  }
+  return tsTaskPristine;
+}
+function tsWrongIndex(){
+  const btns = [...els.mcqOptions.querySelectorAll('.mcq-btn')];
+  const i = btns.findIndex(b => b.classList.contains('wrong'));
+  return i >= 0 ? i : null;
+}
+function tsGetState(){
+  const base = {
+    picker: els.picker.style.display !== 'none',
+    curMode: curMode,
+    curTask: tsPristineTask(),
+    taskAnswered: !!taskAnswered,
+    hadWrongPick: !!hadWrongPick,
+    // что сейчас видно на вариантах: какой отмечен неверным и открыта ли
+    // кнопка «изменить ответ» — этого хватает, чтобы у собеседника варианты
+    // выглядели так же, не пересылая внутренние флаги решения по шагам
+    wrongIndex: tsWrongIndex(),
+    wrongShown: els.changeAnswerBtn.style.display === 'block',
+  };
+  if (window.__boardGetState) Object.assign(base, window.__boardGetState());
+  if (window.__cardsGetState) Object.assign(base, window.__cardsGetState());
+  return base;
+}
+// вход в тип задания без resumeOrNewTask: у присоединившегося задание
+// приходит от главного, своё генерировать и записывать в свой прогресс
+// незачем — иначе на мгновение мелькнул бы чужой пример, а в сохранённом
+// «продолжить с того же места» оказался бы случайный
+function tsEnterMode(id){
+  curMode = id;
+  els.picker.style.display = 'none';
+  els.taskArea.style.display = 'block';
+  const m = id === 'random' ? null : MODES.find(x => x.id === id);
+  els.taskTitle.textContent = m ? m.title : 'Все типы вперемешку';
+  const showNav = id !== 'random';
+  els.prevTypeBtn.style.display = showNav ? 'inline-flex' : 'none';
+  els.nextTypeBtn.style.display = showNav ? 'inline-flex' : 'none';
+  curProg = (id !== 'random') ? loadProgOrFresh(id) : freshProg();
+  renderMedalBadges();
+  renderExampleHistory();
+}
+// варианты ответа приводим к тому, что видно у собеседника
+function tsApplyAnswerView(state){
+  taskAnswered = !!state.taskAnswered;
+  hadWrongPick = !!state.hadWrongPick;
+  const btns = [...els.mcqOptions.querySelectorAll('.mcq-btn')];
+  btns.forEach(b => b.classList.remove('wrong', 'correct', 'disabled'));
+  const wi = (typeof state.wrongIndex === 'number' && btns[state.wrongIndex]) ? state.wrongIndex : null;
+  if (taskAnswered) {
+    optionsLocked = true;
+    btns.forEach(b => { b.onclick = null; b.classList.add('disabled'); });
+    if (wi !== null) btns[wi].classList.add('wrong');
+    if (btns[curTask.correctIndex]) btns[curTask.correctIndex].classList.add('correct');
+    els.changeAnswerBtn.style.display = 'none';
+    els.optionsHint.style.display = 'none';
+    // разбор показываем один раз — при переходе в «решено», а не на каждый
+    // входящий снимок (иначе анимация появления переигрывалась бы на
+    // каждый штрих собеседника, см. раздел «Грабли» в HANDOFF)
+    if (els.mainPanel.style.display === 'none') finishTask(false);
+    return;
+  }
+  if (state.wrongShown && wi !== null) {
+    optionsLocked = true;
+    btns.forEach(b => { b.onclick = null; b.classList.add('disabled'); });
+    btns[wi].classList.add('wrong');
+    els.changeAnswerBtn.style.display = 'block';
+    return;
+  }
+  optionsLocked = false;
+  els.changeAnswerBtn.style.display = 'none';
+  attachMCQHandlers();
+}
+function tsApplyState(state){
+  if (!state) return;
+  if (window.__boardApplyState) window.__boardApplyState(state);
+  if (window.__cardsApplyState) window.__cardsApplyState(state);
+  if (typeof state.picker === 'undefined') return; // снимок без задания (пустая сессия)
+
+  if (state.picker) {
+    if (els.picker.style.display === 'none') {
+      els.taskArea.style.display = 'none';
+      els.picker.style.display = 'block';
+      syncKeypadVisibility();
+      renderPicker();
+    }
+    return;
+  }
+  if (els.picker.style.display !== 'none' || curMode !== state.curMode) tsEnterMode(state.curMode);
+  if (!state.curTask) return;
+
+  // Промпт №31: перерисовываем только при настоящем изменении — снимок
+  // прилетает на каждый штрих собеседника
+  const taskChanged = !curTask || JSON.stringify(tsPristineTask()) !== JSON.stringify(state.curTask);
+  const viewChanged = !!taskAnswered !== !!state.taskAnswered
+    || !!hadWrongPick !== !!state.hadWrongPick
+    || tsWrongIndex() !== (typeof state.wrongIndex === 'number' ? state.wrongIndex : null)
+    || (els.changeAnswerBtn.style.display === 'block') !== !!state.wrongShown;
+  if (!taskChanged && !viewChanged) return;
+
+  if (taskChanged) {
+    // то же, что делает newTask(), только задание не придумывается, а берётся
+    // пришедшее; решение по шагам начинается для него заново
+    curTask = state.curTask;
+    tsTaskRef = curTask;
+    tsTaskPristine = JSON.parse(JSON.stringify(state.curTask));
+    stepIdx = 0;
+    optionsLocked = false;
+    hadWrongPick = false;
+    taskAnswered = false;
+    stepsDone = false;
+    els.stepInput.disabled = false;
+    els.stepGo.disabled = false;
+    els.mixedFill._fracChain = false;
+    renderCurrentTask();
+    runStep();
+  }
+  tsApplyAnswerView(state);
+}
+
+// Промпт №54: пришедшее от собеседника назад не рассылаем — иначе через
+// 300 мс эхо откатывало бы его следующее действие (подробно — в ОГЭ №6)
+function tsWatchSig(s){ return JSON.stringify([s.picker, s.curMode, s.curTask, s.taskAnswered, s.hadWrongPick, s.wrongIndex, s.wrongShown]); }
+let tsPeerSig = null;
+/* Версия задания в общем снимке. Снимок уходит не только при правке задания,
+   но и с каждым штрихом доски — и несёт то задание, которое было у
+   отправителя В ТОТ МОМЕНТ. Без версии такой снимок, догнавший свежий ответ
+   ученика, откатывал ответ обратно; а две одновременные правки расходились
+   навсегда (каждый применял чужую и молчал). Поэтому у состояния задания есть
+   номер правки и автор: чужое применяется, только если оно новее своего, при
+   равных номерах решает автор — одинаково у всех участников. */
+let tsRev = -1, tsRevBy = '';
+const tsMe = Math.random().toString(36).slice(2, 10);
+function tsGetStateVersioned(){
+  return Object.assign(tsGetState(), { __tsRev: tsRev, __tsBy: tsRevBy });
+}
+function tsIncomingWins(state){
+  if (typeof state.__tsRev !== 'number') return true;   // вкладка до №54, без версий — как раньше
+  if (tsRev < 0) return true;                           // у нас своей версии ещё нет
+  if (state.__tsRev !== tsRev) return state.__tsRev > tsRev;
+  return String(state.__tsBy || '') > tsRevBy;
+}
+function tsApplyStateFromPeer(state){
+  if (!state) return;
+  if (!tsIncomingWins(state)) {
+    // задание в снимке не новее нашего — берём из него только доску и карточки
+    if (window.__boardApplyState) window.__boardApplyState(state);
+    if (window.__cardsApplyState) window.__cardsApplyState(state);
+    return;
+  }
+  if (typeof state.__tsRev === 'number') { tsRev = state.__tsRev; tsRevBy = String(state.__tsBy || ''); }
+  tsApplyState(state);
+  try { tsPeerSig = tsWatchSig(tsGetState()); } catch (e) {}
+}
+window.__trainerState = { get: tsGetState, apply: tsApplyState,
+  newTask: function(){ if (curMode) newTask(); } };
+if (window.TrainerSession) {
+  window.TrainerSession.init({ trainer: 'oge7', getState: tsGetStateVersioned, applyState: tsApplyStateFromPeer });
+
+  /* Как в ОГЭ №6: вызовов push() по коду нет, поэтому следим за состоянием
+     таймером и рассылаем при изменении. Отличие одно: исходная подпись —
+     то, что уже на экране. Иначе первый же тик рассылал бы пример, который
+     страница придумала себе сама ещё до подключения, и присоединившийся мог
+     перебить им задание учителя, если ответ базы запаздывал больше 300 мс. */
+  (function watchState(){
+    let last = '';
+    try { last = tsWatchSig(tsGetState()); } catch (e) {}
+    setInterval(() => {
+      let sig;
+      try { sig = tsWatchSig(tsGetState()); }
+      catch (e) { return; }
+      if (sig === last) return;
+      last = sig;
+      // пришедшее от собеседника назад не шлём, но только один раз: после
+      // любой своей правки подпись собеседника уже не действует — иначе
+      // возврат к ней (снял только что поставленную отметку) не ушёл бы
+      const echo = sig === tsPeerSig;
+      tsPeerSig = null;
+      if (echo) return;
+      tsRev = Math.max(tsRev, 0) + 1; tsRevBy = tsMe;   // своя правка — новая версия
+      window.TrainerSession.push();
+    }, 300);
+  })();
+}
 </script>
 
 
@@ -2710,17 +2915,11 @@ setupAutoHeightAnimation(document.querySelector('.sheet'));
 <script>
 /* Промпт №30: совместная сессия (подключение по коду, синхронный переход
    между тренажёрами, блокировка самостоятельного выхода ученика) —
-   реализована один раз в session-share.js, здесь только подключение.
-   Собственное состояние задания этого тренажёра пока не расшаривается
-   (getState/applyState — заглушки), расшаривается сама сессия/навигация. */
+   реализована один раз в session-share.js, здесь только кнопка.
+   Промпт №54: сама сессия (init) теперь запускается в конце основного
+   скрипта — там, где объявлены curTask/curMode: мост состояния задания
+   обязан лежать в том же <script>, иначе он их не видит. */
 if (window.TrainerSession) {
-  // Промпт №32: доска входит в общий снимок состояния — именно это и делает
-  // совместную работу на доске возможной в этом тренажёре
-  window.TrainerSession.init({
-    trainer: 'oge7',
-    getState: () => (window.__boardGetState ? window.__boardGetState() : {}),
-    applyState: (state) => { if (window.__boardApplyState) window.__boardApplyState(state); },
-  });
   window.TrainerSession.mountShareButton();
 }
 document.getElementById('homeBtn').addEventListener('click', function (e) {

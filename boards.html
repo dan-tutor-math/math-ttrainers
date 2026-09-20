@@ -1145,8 +1145,13 @@ function resolveBasketTexInHtml(html){
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<!-- Промпт №54: те же версии, что лежат в репозитории для тренажёров (jsPDF 2.5.1,
+     html2canvas 1.4.1), — локальными файлами, а не с cdnjs. Причина та же, что у
+     supabase-js.umd.js: синхронный скрипт с недоступного CDN (Cloudflare у части
+     российских провайдеров тормозит) держит загрузку всей страницы досок до
+     таймаута. Плюс браузер берёт их из кэша, если тренажёры уже открывались. -->
+<script src="jspdf.umd.min.js"></script>
+<script src="html2canvas.min.js"></script>
 <script src="basket-core.js"></script>
 <!-- этот маркер должен выполниться ДО boards-core.js — говорит ему не
      запускать приложение самому, а подождать, пока boards-cloud.js (ниже)

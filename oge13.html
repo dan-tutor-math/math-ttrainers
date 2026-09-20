@@ -1364,10 +1364,54 @@ function tsApplyState(state){
   }
 }
 
+/* ═══ Промпт №54: эхо собеседника и медленное подключение ═══
+   Состояние здесь отслеживается таймером (см. watchState ниже), и у этого
+   были две дыры. Первая — эхо: получив снимок от собеседника, страница
+   через 300 мс своим же таймером отправляла его обратно. Если за это время
+   тот успевал сделать следующее действие (новое задание, следующий шаг
+   решения), запоздавшее эхо откатывало его назад, и откат расходился всем.
+   Вторая — первый тик таймера рассылал то, что страница придумала себе
+   сама при загрузке: у присоединившегося с медленным ответом базы это был
+   экран выбора типа или случайный пример, и он перебивал задание учителя.
+   Поэтому: пришедшее от собеседника назад не рассылаем (tsPeerSig — один
+   раз, до первой своей правки), а исходная подпись таймера — то, что уже
+   на экране. */
+function tsWatchSig(s){ return JSON.stringify([s.picker, s.curMode, s.curSubMode, s.curTask, s.taskAnswered, s.hadWrongPick]); }
+let tsPeerSig = null;
+/* Версия задания в общем снимке. Снимок уходит не только при правке задания,
+   но и с каждым штрихом доски — и несёт то задание, которое было у
+   отправителя В ТОТ МОМЕНТ. Без версии такой снимок, догнавший свежий ответ
+   ученика, откатывал ответ обратно; а две одновременные правки расходились
+   навсегда (каждый применял чужую и молчал). Поэтому у состояния задания есть
+   номер правки и автор: чужое применяется, только если оно новее своего, при
+   равных номерах решает автор — одинаково у всех участников. */
+let tsRev = -1, tsRevBy = '';
+const tsMe = Math.random().toString(36).slice(2, 10);
+function tsGetStateVersioned(){
+  return Object.assign(tsGetState(), { __tsRev: tsRev, __tsBy: tsRevBy });
+}
+function tsIncomingWins(state){
+  if (typeof state.__tsRev !== 'number') return true;   // вкладка до №54, без версий — как раньше
+  if (tsRev < 0) return true;                           // у нас своей версии ещё нет
+  if (state.__tsRev !== tsRev) return state.__tsRev > tsRev;
+  return String(state.__tsBy || '') > tsRevBy;
+}
+function tsApplyStateFromPeer(state){
+  if (!state) return;
+  if (!tsIncomingWins(state)) {
+    // задание в снимке не новее нашего — берём из него только доску и карточки
+    if (window.__boardApplyState) window.__boardApplyState(state);
+    if (window.__cardsApplyState) window.__cardsApplyState(state);
+    return;
+  }
+  if (typeof state.__tsRev === 'number') { tsRev = state.__tsRev; tsRevBy = String(state.__tsBy || ''); }
+  tsApplyState(state);
+  try { tsPeerSig = tsWatchSig(tsGetState()); } catch (e) {}
+}
 window.__trainerState = { get: tsGetState, apply: tsApplyState,
   newTask: function(){ if (typeof newTask === 'function') newTask(); } };
 if (window.TrainerSession) {
-  window.TrainerSession.init({ trainer: 'oge13', getState: tsGetState, applyState: tsApplyState });
+  window.TrainerSession.init({ trainer: 'oge13', getState: tsGetStateVersioned, applyState: tsApplyStateFromPeer });
   if (els.answerInput) window.TrainerSession.registerField('main', els.answerInput);
 
   /* В ОГЭ №8 каждое действие само вызывает TrainerSession.push() — там эти
@@ -1378,14 +1422,20 @@ if (window.TrainerSession) {
      Доска сюда не входит: её штрихи и так летят своим, живым каналом. */
   (function watchState(){
     let last = '';
+    try { last = tsWatchSig(tsGetState()); } catch (e) {}
     setInterval(() => {
       let sig;
-      try {
-        const s = tsGetState();
-        sig = JSON.stringify([s.picker, s.curMode, s.curSubMode, s.curTask, s.taskAnswered, s.hadWrongPick]);
-      } catch (e) { return; }
+      try { sig = tsWatchSig(tsGetState()); }
+      catch (e) { return; }
       if (sig === last) return;
       last = sig;
+      // пришедшее от собеседника назад не шлём, но только один раз: после
+      // любой своей правки подпись собеседника уже не действует — иначе
+      // возврат к ней (снял только что поставленную отметку) не ушёл бы
+      const echo = sig === tsPeerSig;
+      tsPeerSig = null;
+      if (echo) return;
+      tsRev = Math.max(tsRev, 0) + 1; tsRevBy = tsMe;   // своя правка — новая версия
       window.TrainerSession.push();
     }, 300);
   })();

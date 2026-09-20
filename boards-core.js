@@ -1,7 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   boards.html — отдельный режим «Доски»: список папок/досок + бесконечный
-   векторный холст с горизонтальной лентой тетрадных листов.
-   Черновой отдельный файл — пока не встроен в общую навигацию index.html.
+   boards-core.js — движок приложения «Доски» (boards.html): список папок и
+   досок, бесконечный векторный холст из тетрадных листов, хранение в
+   IndexedDB, экспорт. Вход и общие доски — отдельным слоем в boards-cloud.js.
+   С главной (index.html) сюда ведёт кнопка «Доски». Карта модели данных и
+   история решений — в HANDOFF.md, разделы 6–8.
    ═══════════════════════════════════════════════════════════════════════ */
 
 const STORAGE_KEY = 'ogeBoards:v1';
@@ -82,14 +84,11 @@ function idbDelete(key){
    рисования переписывается индекс (маленький, метаданные всех досок сразу)
    и запись ОДНОЙ активной доски — остальные 21 не трогаются вовсе.
 
-   В памяти же (`DB.boards[i]`) по-прежнему лежат ПОЛНЫЕ доски со всем
-   содержимым, как и раньше — это сознательное решение: почти весь
-   остальной код (экспорт, перенос архивом, резервные копии, окно выбора
-   версии при конфликте) читает `board.objects` для любой доски, а не
-   только открытой, и трогать все эти места было бы куда рискованнее, чем
-   разделить саму запись на диске. Расход памяти от этого не растёт — тем
-   же был и раньше, это те же данные, просто раньше их же целиком писали
-   на диск при каждом штрихе, а теперь пишут только нужную часть. */
+   В памяти доски тоже лёгкие, пока их не открыли: тяжёлые поля
+   подгружаются по одной при открытии (Промпт №47, ensureBoardLoaded) и
+   выгружаются обратно при выходе в список (Промпт №48, unloadBoard).
+   Код, которому нужны ВСЕ доски целиком (экспорт архива, перенос, копии),
+   сам догружает их и «застолбляет» на время работы (pinAllBoards). */
 const IDB_BOARD_PREFIX = 'boarddata:';
 const IDB_INDEX_VERSION = 2;
 // Промпт №49: ключ метки «пытаемся открыть доску по хэшу из адреса» — см.
@@ -114,13 +113,29 @@ function heavyOf(b){
 // в памяти как обычно (это не меняется — меняется только МОМЕНТ загрузки:
 // не все 22 доски разом при заходе на сайт, а по одной, когда её реально
 // открывают/используют)
+// Промпт №54: если прочитать запись НЕ ПОЛУЧИЛОСЬ (сбой хранилища, а не
+// «записи нет»), доска остаётся невыгруженной и обещание отклоняется. Раньше
+// сбой чтения превращался в `objects = []` — доска выглядела подгруженной и
+// пустой, и первый же штрих на ней переписал бы на диске весь урок этим
+// одним штрихом (та же беда, что в промпте №52, только через чтение).
+// Отсутствие записи — законная пустая доска (например, только что созданная
+// или подтянутая из облака), её по-прежнему считаем пустой.
 function ensureBoardLoaded(b){
   if (!b || b.objects !== undefined) return Promise.resolve(b);
   return idbGet(IDB_BOARD_PREFIX + b.id).then(payload => {
+    // пока читали, доску могли подгрузить другим путём — не затираем
+    if (b.objects !== undefined) return b;
     b.objects = (payload && payload.objects) || [];
     b.imageLib = (payload && payload.imageLib) || [];
     return b;
-  }).catch(() => { b.objects = []; b.imageLib = []; return b; });
+  });
+}
+// одно сообщение на все места, где доску не удалось прочитать с диска
+function alertBoardReadFailed(err){
+  console.error('[boards] не удалось прочитать доску с диска:', err);
+  alert('Не получилось прочитать доску из памяти браузера. Её содержимое не тронуто — '
+    + 'попробуйте ещё раз или перезагрузите страницу. Если повторяется — см. HANDOFF, '
+    + '«Если доски тормозят или падают».');
 }
 
 // Промпт №48: ensureBoardLoaded подгружает доску один раз, но ничего не
@@ -207,8 +222,13 @@ function migrateToSplitStorage(oldDb){
    доски — переносим их и только ПОСЛЕ успешной записи освобождаем старый
    ключ: до этого момента ничего удалять нельзя, иначе при сбое переезда
    доски пропали бы совсем. */
+// Промпт №54: IndexedDB прочитался при загрузке — значит, доски живут в нём.
+// Тогда сбой записи — это настоящий сбой, и о нём надо сказать человеку, а не
+// прятать за копией в localStorage (см. idbSaveDB)
+let idbWorks = false;
 function idbLoadDB(){
   return idbGet('db').then(saved => {
+    idbWorks = true;
     if (saved && Array.isArray(saved.boards)) {
       if (saved.__v === IDB_INDEX_VERSION) {
         // Промпт №47: раньше тут же, при самой загрузке страницы, тяжёлые
@@ -229,6 +249,12 @@ function idbLoadDB(){
         // не удалось разложить — не страшно, работаем как раньше единым
         // блоком, следующая попытка будет при следующей загрузке страницы
         console.warn('[boards] переезд на раздельное хранение не удался, работаем по-старому:', err && err.message);
+        // Промпт №54: но первое же сохранение запишет индекс УЖЕ без
+        // штрихов поверх старой полной записи — значит, штрихи каждой доски
+        // должны уйти в её собственную запись тем же сохранением. Без этой
+        // пометки туда попали бы только правленные доски, а остальные
+        // остались бы лишь в памяти до перезагрузки
+        (DB.boards || []).forEach(b => { if (b && b.objects !== undefined) markBoardDirty(b.id); });
         return true;
       });
     }
@@ -243,6 +269,10 @@ function idbLoadDB(){
     return true;
   }).catch(err => {
     console.warn('[boards] IndexedDB недоступен, работаем на localStorage:', err && err.message);
+    // Промпт №54: сюда попадаем и когда чтение прошло, а переезд из
+    // localStorage записаться не смог — тогда доски живут в localStorage,
+    // и именно туда должна идти аварийная копия (см. idbSaveDB)
+    idbWorks = false;
     loadDB();
     return false;
   });
@@ -332,9 +362,14 @@ function showSaveFailedWarning(err){
     save.style.cssText = 'background:#fff;color:#c0392b;border:0;border-radius:8px;padding:6px 12px;'
       + 'font:inherit;font-weight:700;cursor:pointer;';
     save.addEventListener('click', () => {
+      // Промпт №54: на списке досок B указывает на ПОКИНУТУЮ и уже
+      // выгруженную доску (промпт №52) — её выгрузка давала файл без
+      // единого штриха. А «все доски» раньше писались как JSON.stringify(DB),
+      // где у неоткрытых досок нет содержимого, и такой файл даже не
+      // загружался обратно. Теперь: открыта доска — она, иначе — полный архив.
       try {
-        if (typeof B !== 'undefined' && B) exportBoardToFile(B);
-        else exportAllBoardsToFile();
+        if (boardActive && B) exportBoardToFile(B);
+        else exportAllBoardsArchive();
       } catch (e) { alert('Не удалось выгрузить: ' + (e && e.message || e)); }
     });
 
@@ -517,11 +552,10 @@ function refreshActivePayloadIfLost(lost){
    копия: сбой браузера, случайное «удалить», чужая ошибка в коде. Поэтому
    не чаще раза в 15 минут откладываем снимок всего хранилища. Снимков три —
    примерно на последние сутки работы.
-   Промпт №45: снимок берём из того, что реально лежит в памяти (DB) — там
-   по-прежнему полные доски со всем содержимым, читать их из отдельных
-   записей на диске ради снимка незачем, раз они и так уже собраны. Дороже
-   обычного сохранения (тут действительно копируется всё), но это раз в
-   четверть часа, а не на каждый штрих. */
+   Промпт №45/47: снимок берём из того, что реально лежит в памяти (DB), —
+   с диска ради снимка ничего не дочитываем (см. комментарий в
+   maybeSnapshot: это вернуло бы падения по памяти). Неоткрытые в этой
+   сессии доски попадают в снимок лёгкими, без штрихов. */
 const SNAP_KEYS = ['db_snap1', 'db_snap2', 'db_snap3'];
 const SNAP_EVERY_MS = 15 * 60 * 1000;
 function maybeSnapshot(){
@@ -589,9 +623,22 @@ function idbSaveDB(){
     .then(() => { clearSaveFailedWarning(); pingOtherTabs(); return true; })
     .catch(err => {
       // не получилось — возвращаем доски в список «грязных», чтобы
-      // следующее сохранение попробовало ещё раз, и пробуем аварийный путь
-      // через localStorage, чтобы работа не потерялась совсем
+      // следующее сохранение попробовало ещё раз
       toFlush.forEach(id => dirtyBoardIds.add(id));
+      /* Промпт №54: раньше здесь всегда шла аварийная копия в localStorage,
+         и если она вставала — предупреждение снималось. Но при рабочем
+         IndexedDB эту копию при загрузке НИКТО не читает (idbLoadDB берёт
+         localStorage, только когда в IndexedDB пусто), то есть человеку
+         говорили «всё в порядке», а сохранённое терялось. Вдобавок копия
+         всех досок забивала localStorage, где лежат вход Supabase, тема и
+         «Подборка» — их запись могла начать отказывать следом. Поэтому
+         копия в localStorage — только когда IndexedDB недоступен вовсе
+         (приватное окно): тогда именно её и прочитает следующая загрузка. */
+      if (idbWorks) {
+        console.error('[boards] сохранение не прошло:', err);
+        showSaveFailedWarning(err);
+        return false;
+      }
       try { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); clearSaveFailedWarning(); return true; }
       catch (e) { console.error('[boards] сохранение не прошло:', err || e); showSaveFailedWarning(err || e); return false; }
     });
@@ -670,20 +717,11 @@ function saveDB(){
 loadDB();
 
 /* ───────── экспорт/импорт отдельной доски файлом ─────────
-   Доски хранятся только локально в этом браузере (localStorage) — сервера
-   у них нет. Это даёт ручной, но надёжный способ не потерять конкретную
-   доску (сохранить файл себе на диск/в облако как резервную копию) и
-   перенести её на другое устройство: экспортировать на одном, загрузить
-   файл на другом через кнопку «Загрузить доску из файла». */
-function exportAllBoardsToFile(){
-  // аварийная выгрузка всего сразу — когда конкретная доска не открыта
-  const blob = new Blob([JSON.stringify(DB)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'все-доски-' + new Date().toISOString().slice(0, 10) + '.json';
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-}
+   Обычные доски хранятся только в этом браузере (IndexedDB), на сервере —
+   лишь общие (boards-cloud.js). Файл — ручной, но надёжный способ не
+   потерять конкретную доску и перенести её на другое устройство. Загружается
+   он той же кнопкой «Загрузить из файла», что и архив всех досок
+   (importAnyBoardsFile разбирается по содержимому). */
 function exportBoardToFile(board){
   const payload = {
     __app: 'oge-boards', __kind: 'board-export', __version: 1,
@@ -743,7 +781,9 @@ function exportAllBoardsArchive(){
   // unloadBoard() выдернуть чью-то доску из-под уже идущего экспорта
   pinAllBoards();
   Promise.all((DB.boards || []).map(ensureBoardLoaded))
-    .then(() => exportAllBoardsArchiveReady())
+    // архив без одной из досок хуже, чем никакого: человек решит, что всё
+    // сохранено, и пойдёт пересобирать хранилище (HANDOFF, раздел 6)
+    .then(() => exportAllBoardsArchiveReady(), alertBoardReadFailed)
     .finally(unpinAllBoards);
 }
 function exportAllBoardsArchiveReady(){
@@ -863,7 +903,7 @@ function restoreFromSnapshot(sn){
   // сравниваем её с копией
   pinAllBoards();
   Promise.all((sn.db.boards || []).map(sb => ensureBoardLoaded(DB.boards.find(b => b.id === sb.id))))
-    .then(() => restoreFromSnapshotReady(sn))
+    .then(() => restoreFromSnapshotReady(sn), alertBoardReadFailed)
     .finally(unpinAllBoards);
 }
 function restoreFromSnapshotReady(sn){
@@ -1019,7 +1059,20 @@ function importAnyBoardsFile(file){
   reader.onload = async () => {
     let payload = null;
     try { payload = JSON.parse(reader.result); } catch (e) {}
-    if (payload && payload.__kind === 'boards-archive'){ await mergeArchive(payload); return; }
+    if (payload && payload.__kind === 'boards-archive'){
+      try { await mergeArchive(payload); }
+      catch (e) {
+        // сюда приходим, если посреди переноса не прочиталась одна из своих
+        // досок (окно сравнения версий) — часть досок из файла к этому
+        // моменту уже добавлена. Повторная загрузка того же файла безопасна:
+        // слияние идёт по id, уже перенесённое просто совпадёт
+        console.error('[boards] перенос из файла прерван:', e);
+        renderList();
+        alert('Перенос прерван: не получилось прочитать одну из досок в памяти браузера. '
+          + 'Часть досок из файла уже добавлена. Перезагрузите страницу и загрузите тот же файл ещё раз.');
+      }
+      return;
+    }
     if (payload && payload.__kind === 'board-export' && payload.board){ importBoardPayload(payload.board); return; }
     alert('Не удалось прочитать файл — это не файл досок.');
   };
@@ -1040,36 +1093,6 @@ function importBoardPayload(src){
   renderList();
   alert(`Доска «${b.name}» загружена.`);
 }
-function importBoardFromFile(file){
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const payload = JSON.parse(reader.result);
-      const src = (payload && payload.__kind === 'board-export' && payload.board) ? payload.board : null;
-      if (!src || !Array.isArray(src.objects)) throw new Error('bad format');
-      // новый id всегда, независимо от исходного — чтобы не перезаписать
-      // существующую доску с таким же id и чтобы один и тот же файл можно
-      // было безопасно загрузить хоть на нескольких устройствах, хоть
-      // повторно на одном и том же (например, для восстановления после
-      // случайного удаления)
-      const folderStillExists = src.folderId && DB.folders.some(f => f.id === src.folderId);
-      const b = Object.assign({}, src, {
-        id: uid(),
-        folderId: folderStillExists ? src.folderId : null,
-        createdAt: nowTs(), updatedAt: nowTs(), lastOpenedAt: null,
-      });
-      DB.boards.push(b);
-      markBoardDirty(b.id);
-      saveDB();
-      renderList();
-      alert(`Доска «${b.name}» загружена.`);
-    } catch (err) {
-      alert('Не удалось прочитать файл — это не файл экспортированной доски (⋯ → «Экспортировать в файл»).');
-    }
-  };
-  reader.readAsText(file);
-}
-
 /* ───────── палитра — привязана к переменным темы, поэтому чернила
    остаются читаемыми что на светлой, что на тёмной бумаге ───────── */
 const PALETTE = [
@@ -1079,10 +1102,27 @@ const PALETTE = [
   { tok: '--ok',      name: 'Зелёный' },
   { tok: '--moved',   name: 'Голубой' },
 ];
-function resolveColor(tok){
-  if (typeof tok === 'string' && tok.indexOf('--') === 0) {
-    return getComputedStyle(document.documentElement).getPropertyValue(tok).trim() || '#000';
+/* Промпт №54: значения переменных темы кэшируем. resolveColor зовётся на
+   КАЖДЫЙ объект КАЖДЫЙ кадр (render → renderObject), и каждый вызов
+   getComputedStyle(...).getPropertyValue стоил заметно: на доске из 2500
+   штрихов в кадре это ~15% времени отрисовки. Переменные темы меняются только
+   при смене темы, а она всегда идёт через атрибут data-theme (кнопка, системная
+   тема, совместная сессия) — на него и сбрасываем кэш. */
+const themeVarCache = new Map();
+function themeVar(name){
+  let v = themeVarCache.get(name);
+  if (v === undefined) {
+    v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    themeVarCache.set(name, v);
   }
+  return v;
+}
+try {
+  new MutationObserver(() => themeVarCache.clear())
+    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+} catch (e) {}
+function resolveColor(tok){
+  if (typeof tok === 'string' && tok.indexOf('--') === 0) return themeVar(tok) || '#000';
   return tok || '#000';
 }
 // canvas 2D context НЕ умеет резолвить CSS-переменные внутри строки font
@@ -1102,7 +1142,7 @@ const UI_FONT_FAMILY = getComputedStyle(document.documentElement).getPropertyVal
 const screenList = document.getElementById('screenList');
 const screenBoard = document.getElementById('screenBoard');
 let curFolderId = null;   // null = «Все доски» (корень), '__recent' = «Недавние», иначе id папки
-let sortMode = 'new';     // 'my' | 'new' | 'old' | 'az'
+let sortMode = 'new';     // 'my' | 'work' | 'new' | 'old' | 'az'
 // 'my' — порядок, который пользователь выставил сам, перетаскивая карточки.
 // Это просто порядок элементов в самих массивах DB.folders/DB.boards, поэтому
 // он переживает перезагрузку вместе с досками и не требует отдельных полей.
@@ -1515,7 +1555,7 @@ function openCardMenu(btn){
       const b = DB.boards.find(x => x.id === id);
       // доска могла быть ещё не подгружена в память (см. ensureBoardLoaded) —
       // без этого экспорт ушёл бы без штрихов и картинок
-      if (b) ensureBoardLoaded(b).then(() => exportBoardToFile(b));
+      if (b) ensureBoardLoaded(b).then(() => exportBoardToFile(b), alertBoardReadFailed);
     } else if (act === 'move'){
       const b = DB.boards.find(x => x.id === id);
       const names = ['(без папки)'].concat(DB.folders.map(f => f.name));
@@ -1856,7 +1896,7 @@ function openBoard(id){
   // Промпт №47: у этой доски могут быть ещё не подгружены штрихи/картинки
   // (см. ensureBoardLoaded) — раньше это делалось для ВСЕХ досок сразу при
   // заходе на сайт; теперь только для той, что реально открывают
-  ensureBoardLoaded(b).then(() => openBoardReady(b, id));
+  ensureBoardLoaded(b).then(() => openBoardReady(b, id), alertBoardReadFailed);
 }
 function openBoardReady(b, id){
   b.lastOpenedAt = nowTs();
@@ -1982,8 +2022,12 @@ function backToList(){
   // выгрузка удалит из памяти то, что ещё не успело сохраниться
   const leaving = B;
   idbSaveDB()
-    .catch(() => {})
-    .then(() => { unloadBoard(leaving); });
+    .catch(() => false)
+    // Промпт №54: idbSaveDB при сбое не бросает, а возвращает false — и
+    // раньше доска выгружалась всё равно, унося из памяти несохранённые
+    // штрихи. При сбое она остаётся подгруженной и «грязной»: следующее
+    // сохранение попробует ещё раз, а «Выгрузить в файл» возьмёт её из памяти
+    .then(ok => { if (ok !== false) unloadBoard(leaving); });
   renderList();
   if (window.onBoardClosed) window.onBoardClosed();
 }
@@ -2114,8 +2158,8 @@ function applyTextEditorLiveStyle(){
    листов пришлось бы каждый кадр перебирать десятки тысяч линий. */
 function drawSheetsAndGrid(c, camv, w, h){
   // свой цвет клетки (настройки листа) — если не выбран, берём цвет по теме
-  const gridColor = B.gridColor ? resolveColor(B.gridColor) : getComputedStyle(document.documentElement).getPropertyValue('--grid').trim();
-  const paperColor = getComputedStyle(document.documentElement).getPropertyValue('--paper').trim();
+  const gridColor = B.gridColor ? resolveColor(B.gridColor) : themeVar('--grid');
+  const paperColor = themeVar('--paper');
   const tw = totalW(), th = totalH();
 
   const p0 = worldToScreen({ x: 0, y: 0 });
@@ -2273,10 +2317,10 @@ function renderImageObject(c, obj, camv){
   if (im.complete && im.naturalWidth){
     c.drawImage(im, p0.x, p0.y, w, h);
   } else {
-    c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--glass-strong').trim() || '#eee';
+    c.fillStyle = themeVar('--glass-strong') || '#eee';
     roundRectPath(c, p0.x, p0.y, w, h, 8);
     c.fill();
-    c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--muted-2').trim() || '#888';
+    c.fillStyle = themeVar('--muted-2') || '#888';
     c.font = '13px ' + UI_FONT_FAMILY; c.textAlign='center'; c.textBaseline='middle';
     c.fillText('Загрузка…', p0.x + w/2, p0.y + h/2);
   }
@@ -2468,7 +2512,7 @@ function applyHandle(obj, role, pt){
 function drawSelection(c, obj, camv){
   const handles = getHandles(obj);
   c.save();
-  c.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
+  c.fillStyle = themeVar('--ink');
   c.strokeStyle = '#fff'; c.lineWidth = 1.5;
   handles.forEach(h => {
     const s = worldToScreen(h);
@@ -2544,7 +2588,7 @@ function render(c, w, h, camv, isScreen, renderDpr){
   c.save();
   c.setTransform(renderDpr,0,0,renderDpr,0,0);
   c.clearRect(0,0,w,h);
-  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  const bg = themeVar('--bg');
   c.fillStyle = bg; c.fillRect(0,0,w,h);
   c.restore();
 
@@ -2583,7 +2627,7 @@ function drawMultiOutline(c, obj, camv){
   const b = objectBBox(obj);
   const p0 = worldToScreen({x:b.minX,y:b.minY}), p1 = worldToScreen({x:b.maxX,y:b.maxY});
   c.save();
-  c.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--ink').trim();
+  c.strokeStyle = themeVar('--ink');
   c.setLineDash([5,3]); c.lineWidth = 1.5;
   c.strokeRect(Math.min(p0.x,p1.x)-4, Math.min(p0.y,p1.y)-4, Math.abs(p1.x-p0.x)+8, Math.abs(p1.y-p0.y)+8);
   c.restore();
@@ -3316,6 +3360,10 @@ canvas.addEventListener('wheel', (e) => {
     }
   }
   cam.x += e.deltaX/cam.zoom; cam.y += e.deltaY/cam.zoom; clampCam(); scheduleRedraw();
+  // Промпт №54: на тачпаде Mac это основной способ двигать доску, а вид
+  // запоминался только при перетаскивании и масштабе — при падении вкладки
+  // доска открывалась не там, где закончили (rememberView сам с паузой)
+  rememberView();
 }, { passive:false });
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -3789,7 +3837,9 @@ const TRAINER_CAPTURE = {
   oge9:      [ { sel:'#questionPanel', gateBtn:'mcqBasketAddBtn' }, { sel:'#live', gateBtn:'linBasketAddBtn' }, { sel:'#eqLine', gateBtn:'quadBasketAddBtn' } ],
   oge10:     [ { sel:'#questionPanel' } ],
   oge11:     [ { sel:'#questionPanel' } ],
-  oge12:     [ { sel:'#questionPanel' } ],
+  // Промпт №54: у ОГЭ №12 и «Степеней» те же добавленные карточки, что у №8
+  // (это его копии), — раньше с них снималось только первое задание
+  oge12:     [ { sel:'#questionPanel' }, { selAll:'.added-task-card .added-card-question' } ],
   oge13:     [ { sel:'#questionPanel' } ],
   oge14:     [ { sel:'#questionPanel' } ],
   oge15_18:  [ { sel:'#questionPanel' } ],
@@ -3802,6 +3852,7 @@ const TRAINER_CAPTURE = {
   quadratic: [ { sel:'#eqLine' } ],
   frac_mul:  [ { sel:'#board' } ],
   frac_div:  [ { sel:'#board' } ],
+  powers:    [ { sel:'#questionPanel' }, { selAll:'.added-task-card .added-card-question' } ],
 };
 
 // список тренажёров для панели — те же названия/файлы, что и в реестре
@@ -3833,6 +3884,9 @@ const TRAINERS_PANEL_GROUPS = [
     { id:'quadratic', name:'Квадратные уравнения',    href:'quadratic.html',         eq:'2x²−7x+3=0' },
     { id:'frac_mul',  name:'Умножение дробей',        href:'fraction_multiply.html', eq:'4⁄9×3⁄8' },
     { id:'frac_div',  name:'Деление дробей',          href:'fraction_divide.html',   eq:'2⁄3÷4⁄5' },
+    // Промпт №54: тренажёр степеней появился на главной позже этой панели,
+    // сюда его добавить забыли
+    { id:'powers',    name:'Действия со степенями',   href:'powers.html',            eq:'a⁵·a³=a⁸' },
   ]},
 ];
 
@@ -4214,7 +4268,7 @@ function rfRender(){
   c.save();
   c.setTransform(rfDpr,0,0,rfDpr,0,0);
   c.clearRect(0,0,w,h);
-  const bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  const bg = themeVar('--bg');
   c.fillStyle = bg; c.fillRect(0,0,w,h);
   c.restore();
 
@@ -4768,8 +4822,8 @@ document.getElementById('railZoomLabel').addEventListener('click', () => setZoom
 document.getElementById('railPaste')?.addEventListener('click', () => pasteClipboard());
 document.getElementById('railBackup').addEventListener('click', () => {
   try {
-    if (typeof B !== 'undefined' && B) exportBoardToFile(B);
-    else exportAllBoardsToFile();
+    if (boardActive && B) exportBoardToFile(B);
+    else exportAllBoardsArchive();
   } catch (e) { alert('Не удалось выгрузить доску: ' + (e && e.message || e)); }
 });
 document.getElementById('railFullscreen').addEventListener('click', () => {
@@ -5320,6 +5374,7 @@ const TRAINER_NAMES = {
   add_col:'Сложение в столбик', sub_col:'Вычитание в столбик', mul_col:'Умножение в столбик', div_col:'Деление в столбик',
   linear:'Линейные уравнения', quadratic:'Квадратные уравнения',
   frac_mul:'Умножение дробей', frac_div:'Деление дробей', neg_pos:'Положительные и отрицательные числа',
+  powers:'Действия со степенями',
 };
 function escapeHtmlBd(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
