@@ -290,6 +290,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .mode-card .mtitle{font-weight:600;font-size:15px;color:var(--pencil);line-height:1.3;flex:1 1 260px;margin:0;}
 .mode-card .mex{font-family:var(--font-mono);font-size:13px;color:var(--ink);flex:0 0 auto;}
 .mode-card.random{background:linear-gradient(135deg, var(--hl-10), transparent);border-color:var(--ink);}
+/* нулевой тип — задание из демоверсии ФИПИ: выделен так же, как «Случайно» */
+.mode-card.demo{background:linear-gradient(135deg, var(--hl-10), transparent);border-color:var(--ink);}
 
 /* ─── шапка задачи ─── */
 .task-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
@@ -1853,8 +1855,33 @@ function gen_sqrt_choice(){
   };
 }
 
+/* ═══════════════ демоверсия ОГЭ-2027 ═══════════════
+   Нулевой тип (в списке — «00») — задание №7 из демоверсии ФИПИ слово в
+   слово: та же прямая от 7 до 9, те же четыре точки, те же варианты.
+   Генератор нарочно отдаёт всегда одно и то же: тип нужен, чтобы разобрать
+   с учеником именно экзаменационную формулировку, поэтому в «Случайно» он
+   не попадает. Третий шаг — сравнение с серединой отрезка: по двум первым
+   шагам остаются две точки, C и D, и честно выбрать между ними можно,
+   только возведя в квадрат 8,5. */
+function gen_demo2027(){
+  const pts = [{frac:0.125,label:'A'}, {frac:0.375,label:'B'}, {frac:0.625,label:'C'}, {frac:0.875,label:'D'}];
+  return {
+    prompt: `На координатной прямой отмечены точки A, B, C, D. Одна из них соответствует числу <b>${sqrtStr(77)}</b>. Какая это точка?`,
+    plan: `Сначала найдём, между какими соседними целыми числами лежит √77, — это укажет нужный участок прямой. Затем сравним корень с серединой этого участка, чтобы выбрать одну из двух точек.`,
+    steps: [
+      {type:'qa', question:`Найдём границы: возведём в квадрат одно из целых чисел и сравним с 77. Чему равно 8²?`, answer:64},
+      {type:'qa', question:`Теперь проверим соседнее целое число. Чему равно 9²?`, answer:81},
+      {type:'qa', question:`Значит, 8 < √77 < 9 — подходят только точки C и D. Середина между 8 и 9 — это 8,5. Чему равно 8,5²?`, answer:'72,25'},
+    ],
+    numline: numberLineHTML(7, 9, [7, 8, 9], pts),
+    options: ['точка A', 'точка B', 'точка C', 'точка D'], correctIndex: 3,
+    explain: `8² = 64 < 77 < 81 = 9², значит, 8 < √77 < 9: подходят только точки C и D.<br>8,5² = 72,25 < 77, значит, √77 > 8,5 — число лежит в правой половине отрезка от 8 до 9. Это точка D.`
+  };
+}
+
 /* ═══════════════ реестр типов ═══════════════ */
 const MODES = [
+  { id:'demo2027',              title:'Задание из демоверсии ОГЭ 2027',                example:'√77 ↔ D',             gen:gen_demo2027, demo:true },
   { id:'int_bracket',           title:'Между какими целыми заключена дробь',          example:'8 < 110⁄13 < 9',      gen:gen_int_bracket },
   { id:'decimal_interval',      title:'В каком промежутке лежит дробь',                example:'0,6 ⩽ 7⁄11 ⩽ 0,7',    gen:gen_decimal_interval },
   { id:'between_fracs',         title:'Число между двумя дробями',                     example:'4⁄11 < 0,4 < 7⁄17',   gen:gen_between_fracs },
@@ -2175,6 +2202,10 @@ function recordSolve() {
   if (awardedTier) playMedalAnimation(awardedTier);
 }
 
+function modeNum(m){
+  if (m.demo) return '00';
+  return String(MODES.filter(x => !x.demo).indexOf(m) + 1).padStart(2, '0');
+}
 function renderPicker(){
   els.modesGrid.innerHTML = `
     <div class="mode-card random" data-id="random">
@@ -2182,13 +2213,15 @@ function renderPicker(){
       <div class="mtitle">Все вперемешку</div>
       <div class="mex">как на настоящем экзамене</div>
     </div>
-  ` + MODES.map((m,i)=>{
+  ` + MODES.map((m)=>{
     const p = loadProg(m.id);
     const meds = p && p.medals;
     const badges = meds ? ['gold', 'silver', 'bronze'].filter(t => meds[t]).map(t => `${MEDAL_EMOJI[t]}${meds[t]}`).join(' ') : '';
+    // тип из демоверсии — «00», остальные нумеруются с 01 без него: так номера
+    // прежних типов не сдвинулись и совпадают с тем, к чему привыкли
     return `
-    <div class="mode-card" data-id="${m.id}">
-      <div class="mnum">${String(i+1).padStart(2,'0')}</div>
+    <div class="mode-card${m.demo ? ' demo' : ''}" data-id="${m.id}">
+      <div class="mnum">${modeNum(m)}</div>
       <div class="mtitle">${m.title}</div>
       ${badges ? `<div class="mode-medals">${badges}</div>` : ''}
     </div>
@@ -2277,7 +2310,7 @@ function renderCurrentTask(){
 }
 
 function newTask(){
-  const m = curMode==='random' ? pick(MODES) : MODES.find(x=>x.id===curMode);
+  const m = curMode==='random' ? pick(MODES.filter(x=>!x.demo)) : MODES.find(x=>x.id===curMode);
   curTask = m.gen();
   stepIdx = 0;
   optionsLocked = false;

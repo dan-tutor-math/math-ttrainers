@@ -167,7 +167,7 @@ def check_cards(browser, failures, errors):
         page = new_page(ctx, errors)
         page.goto(f"{BASE}/{slug}.html")
         page.wait_for_function("() => window.__trainerState")
-        page.click("#modesGrid .mode-card:not(.random)")
+        page.click("#modesGrid .mode-card:not(.random):not(.demo)")
         page.wait_for_timeout(300)
         parent = state(page)
         try:
@@ -188,11 +188,13 @@ def check_cards(browser, failures, errors):
         print(f"  A/{slug}: тип {cs.get('curMode')}, задание видно: {visible}")
         ctx.close()
 
-    # ОГЭ №19: экрана выбора нет, режим «Экзамен» сразу
+    # ОГЭ №19: с Промпта №61 есть экран выбора типа (нулевой — из демоверсии);
+    # открываем обычный тип, как ученик
     ctx = browser.new_context()
     page = new_page(ctx, errors)
     page.goto(f"{BASE}/oge19.html")
     page.wait_for_function("() => window.__trainerState")
+    page.click('.mode-card[data-id="geom"]')
     try:
         frame = add_one_card(page)
         cs = frame.evaluate("() => window.__trainerState.get()")
@@ -235,7 +237,7 @@ def check_oge7(browser, failures, errors):
     teacher = new_page(ctx, errors)
     teacher.goto(f"{BASE}/oge7.html")
     code = wait_code(teacher)
-    teacher.click("#modesGrid .mode-card:not(.random)")
+    teacher.click("#modesGrid .mode-card:not(.random):not(.demo)")
     teacher.wait_for_timeout(700)   # дать таймеру разослать выбор типа
     t0 = state(teacher)
 
@@ -311,6 +313,9 @@ def check_oge19(browser, failures, errors):
     teacher = new_page(ctx, errors)
     teacher.goto(f"{BASE}/oge19.html")
     code = wait_code(teacher)
+    # Промпт №61: сначала экран выбора типа — учитель открывает обычный тип,
+    # ученик попадает туда же через общий снимок
+    teacher.click('.mode-card[data-id="geom"]')
     teacher.wait_for_timeout(400)
     t0 = state(teacher)
 
@@ -390,8 +395,8 @@ def check_no_echo(browser, failures, errors, slugs):
         teacher.goto(f"{BASE}/{slug}.html")
         code = wait_code(teacher)
         solo = teacher.evaluate("() => !!window.__trainerState.get().solo")
-        if not solo and teacher.query_selector("#modesGrid .mode-card:not(.random)"):
-            teacher.click("#modesGrid .mode-card:not(.random)")
+        if not solo and teacher.query_selector("#modesGrid .mode-card:not(.random):not(.demo)"):
+            teacher.click("#modesGrid .mode-card:not(.random):not(.demo)")
         teacher.wait_for_timeout(700)
         before = state(teacher)
         # ученик с медленной базой: снимок из базы приходит через 700 мс
@@ -439,6 +444,7 @@ def check_versions(browser, failures, errors):
     teacher = new_page(ctx, errors, latency=150)
     teacher.goto(f"{BASE}/oge19.html")
     code = wait_code(teacher)
+    teacher.click('.mode-card[data-id="geom"]')   # Промпт №61: экран выбора типа
     student = new_page(ctx, errors, latency=150)
     student.goto(f"{BASE}/oge19.html?s={code}")
     wait_code(student)
@@ -476,7 +482,7 @@ def check_versions(browser, failures, errors):
     page = new_page(ctx, errors)
     page.goto(f"{BASE}/oge7.html")
     page.wait_for_function("() => window.__trainerState")
-    page.click("#modesGrid .mode-card:not(.random)")
+    page.click("#modesGrid .mode-card:not(.random):not(.demo)")
     page.wait_for_timeout(300)
     same = page.evaluate("""() => {
         const before = JSON.stringify(window.__trainerState.get().curTask);

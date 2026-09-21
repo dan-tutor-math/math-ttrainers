@@ -456,12 +456,28 @@ EGE_BASE_TITLES.forEach((title, i) => {
 });
 const egeBaseIds = () => EGE_BASE_TITLES.map((t, i) => 'egeb' + (i + 1));
 
+/* ОГЭ, часть 2 (Промпт №61): задания 20–25 — та же страница, что у ЕГЭ,
+   с банком oge-part2-bank.js (oge_part2.html?n=20). Пока в каждом номере
+   одно задание — из демоверсии ОГЭ-2027. Id oge20…oge25 не пересекаются с
+   первой частью (oge1_5, oge6 … oge19). Названия — по спецификации ОГЭ. */
+const OGE_PART2_TITLES = {
+  20: 'Уравнения и неравенства', 21: 'Текстовая задача', 22: 'Графики функций',
+  23: 'Геометрическая задача на вычисление', 24: 'Геометрическая задача на доказательство',
+  25: 'Геометрическая задача повышенной сложности',
+};
+Object.keys(OGE_PART2_TITLES).forEach(n => {
+  TRAINERS['oge' + n] = { name: '№' + n + '. ' + OGE_PART2_TITLES[n], href: 'oge_part2.html?n=' + n };
+});
+
 /* ───────── дерево разделов ─────────
    у вкладки либо есть subtabs (тогда открываются они), либо сразу groups (плоская вкладка).
    soon:true — вкладка пока без тренажёров ("скоро"). items — id-шники из TRAINERS. */
 const NAV = [
   { id: 'exams', title: 'Экзамены', subtabs: [
-    { id: 'oge',      title: 'ОГЭ',           groups: [ { items: ['oge1_5','oge6','oge7','oge8','oge9','oge10','oge11','oge12','oge13','oge14','oge15_18','oge19'] } ] },
+    { id: 'oge',      title: 'ОГЭ',           groups: [
+      { title: 'Часть 1 — краткий ответ', items: ['oge1_5','oge6','oge7','oge8','oge9','oge10','oge11','oge12','oge13','oge14','oge15_18','oge19'], continueNum: true },
+      { title: 'Часть 2 — развёрнутый ответ', items: ['oge20','oge21','oge22','oge23','oge24','oge25'], continueNum: true },
+    ] },
     { id: 'ege_prof', title: 'ЕГЭ профиль',   groups: [
       // continueNum: нумерация карточек продолжается со второй группы —
       // здесь она совпадает с номером задания на экзамене

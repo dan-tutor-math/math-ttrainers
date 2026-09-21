@@ -1,17 +1,19 @@
 """
-Промпт №57: ЕГЭ профиль (ege_prof.html) и ЕГЭ база (ege_base.html) — одна и
-та же страница с разными настройками. Логику правят в ege_prof.html, а
-ege_base.html пересобирается этим скриптом:
+Промпт №57 (№61): ЕГЭ профиль (ege_prof.html), ЕГЭ база (ege_base.html) и
+ОГЭ, часть 2 (oge_part2.html) — одна и та же страница с разными
+настройками. Логику правят в ege_prof.html, а остальные файлы
+пересобираются этим скриптом:
 
-    python3 sync_ege_pages.py          — пересобрать ege_base.html
+    python3 sync_ege_pages.py          — пересобрать ege_base.html и oge_part2.html
     python3 sync_ege_pages.py --check  — только проверить, что страницы
-                                         не разошлись (так делает тест №57)
+                                         не разошлись (так делают тесты №57 и №61)
 
-Что отличается у базы (и только это):
+Что отличается у каждой копии (и только это):
   - блок настроек EXAM между «настройки экзамена» и «конец настроек» — у
-    базы свой, он берётся из текущего ege_base.html и не перезаписывается;
-  - «ЕГЭ профиль» → «ЕГЭ база» (заголовок вкладки, <h1>, комментарии);
-  - ege-prof-… → ege-base-… (банк заданий и рисунки).
+    каждой свой, он берётся из текущего файла копии и не перезаписывается;
+  - название экзамена: «ЕГЭ профиль» → «ЕГЭ база» / «ОГЭ, часть 2»
+    (заголовок вкладки, <h1>, комментарии);
+  - файлы банка и рисунков: ege-prof-… → ege-base-… / oge-part2-….
 Всё остальное — байт в байт. Если понадобится различие в логике, его
 заводят полем в EXAM, а не правкой одного из файлов.
 """
@@ -20,10 +22,12 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PROF = os.path.join(HERE, 'ege_prof.html')
-BASE = os.path.join(HERE, 'ege_base.html')
 START = '/* ═══════════════ настройки экзамена ═══════════════'
 END = '/* ═══════════════ конец настроек ═══════════════ */'
-SUBS = [('ЕГЭ профиль', 'ЕГЭ база'), ('ege-prof-', 'ege-base-')]
+TARGETS = [
+    ('ege_base.html', [('ЕГЭ профиль', 'ЕГЭ база'), ('ege-prof-', 'ege-base-')]),
+    ('oge_part2.html', [('ЕГЭ профиль', 'ОГЭ, часть 2'), ('ege-prof-', 'oge-part2-')]),
+]
 
 
 def split(text, name):
@@ -35,34 +39,41 @@ def split(text, name):
     return text[:i], text[i:j], text[j:]
 
 
-def build(prof_text, base_block):
+def build(prof_text, block, subs):
     head, _, tail = split(prof_text, 'ege_prof.html')
-    for a, b in SUBS:
+    for a, b in subs:
         head = head.replace(a, b)
         tail = tail.replace(a, b)
-    return head + base_block + tail
+    return head + block + tail
 
 
 def main():
     prof = open(PROF, encoding='utf-8').read()
-    base = open(BASE, encoding='utf-8').read()
-    _, base_block, _ = split(base, 'ege_base.html')
-    want = build(prof, base_block)
-    if '--check' in sys.argv:
-        if want != base:
-            # первая строка расхождения — чтобы было видно, где именно
-            a, b = want.splitlines(), base.splitlines()
-            for n, (x, y) in enumerate(zip(a, b), 1):
-                if x != y:
-                    print(f'строка {n}:\n  ожидалось: {x[:160]}\n  в файле:   {y[:160]}')
-                    break
-            else:
-                print(f'разная длина: {len(a)} и {len(b)} строк')
-            raise SystemExit('ege_base.html разошёлся с ege_prof.html — запустите python3 sync_ege_pages.py')
-        print('ege_base.html совпадает с ege_prof.html (кроме настроек)')
-        return
-    open(BASE, 'w', encoding='utf-8').write(want)
-    print('ege_base.html пересобран')
+    check = '--check' in sys.argv
+    bad = []
+    for name, subs in TARGETS:
+        path = os.path.join(HERE, name)
+        cur = open(path, encoding='utf-8').read()
+        _, block, _ = split(cur, name)
+        want = build(prof, block, subs)
+        if not check:
+            open(path, 'w', encoding='utf-8').write(want)
+            print(f'{name} пересобран')
+            continue
+        if want == cur:
+            print(f'{name} совпадает с ege_prof.html (кроме настроек)')
+            continue
+        # первая строка расхождения — чтобы было видно, где именно
+        a, b = want.splitlines(), cur.splitlines()
+        for n, (x, y) in enumerate(zip(a, b), 1):
+            if x != y:
+                print(f'{name}, строка {n}:\n  ожидалось: {x[:160]}\n  в файле:   {y[:160]}')
+                break
+        else:
+            print(f'{name}: разная длина: {len(a)} и {len(b)} строк')
+        bad.append(name)
+    if bad:
+        raise SystemExit(', '.join(bad) + ' разошлись с ege_prof.html — запустите python3 sync_ege_pages.py')
 
 
 if __name__ == '__main__':

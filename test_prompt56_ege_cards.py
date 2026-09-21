@@ -423,8 +423,8 @@ def test_oge_cards_only_task(browser):
     for slug in ["oge19", "oge7", "oge9", "addition"]:
         ctx, page, errors = new_page(browser, f"{BASE}/{slug}.html", wait=1500)
         # у ОГЭ сначала экран выбора типа — открываем первый тип, как ученик
-        if page.evaluate("!!document.querySelector('#pickerArea .mode-card, .modes .mode-card')"):
-            page.click('#pickerArea .mode-card, .modes .mode-card')
+        if page.evaluate("!!document.querySelector('#pickerArea .mode-card:not(.demo), .modes .mode-card:not(.demo)')"):
+            page.click('#pickerArea .mode-card:not(.demo), .modes .mode-card:not(.demo)')
             page.wait_for_timeout(400)
         page.click('#addRailToggle')
         page.click('.add-qty-btn[data-n="1"]')

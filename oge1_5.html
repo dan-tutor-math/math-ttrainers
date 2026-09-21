@@ -268,6 +268,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .mode-card:hover{border-color:var(--ink); transform:translateX(3px)}
 .mode-card .mtitle{font-weight:600;font-size:15px;color:var(--pencil);line-height:1.3;flex:1 1 260px;margin:0;}
 .mode-card.random{background:linear-gradient(135deg, var(--hl-10), transparent);border-color:var(--ink);margin-bottom:14px;}
+/* нулевой тип — задания из демоверсии ФИПИ: выделен так же, как «Случайно» */
+.mode-card.demo{background:linear-gradient(135deg, var(--hl-10), transparent);border-color:var(--ink);}
 .mode-card.soon{opacity:.55;cursor:default;}
 .mode-card.soon:hover{border-color:var(--glass-border);transform:none;}
 .soon-badge{font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-1);background:var(--glass);border-radius:8px;padding:3px 8px;}
@@ -874,8 +876,10 @@ const TIRE_DATASETS = [
     } },
 ];
 
-function tireCellsTableHTML(ds){
-  const head1 = `<th rowspan="2">Ширина шин (мм)</th><th colspan="${ds.rims.length}">Диаметр диска (дюймы)</th>`;
+// widthHead — подпись столбца ширин: у Шины 0 она как в демоверсии-2027
+// («Ширина шины»), у Шины 1 — прежняя
+function tireCellsTableHTML(ds, widthHead){
+  const head1 = `<th rowspan="2">${widthHead || 'Ширина шин (мм)'}</th><th colspan="${ds.rims.length}">Диаметр диска (дюймы)</th>`;
   const head2 = ds.rims.map(r=>`<th>${r}</th>`).join('');
   const body = ds.widths.map(w => {
     const cells = ds.rims.map(r => {
@@ -985,6 +989,75 @@ const TIRE1_TASKS = [
   { id: 'tire1_t5', title: 'Задание 5', gen: gen_tire_task5 },
 ];
 
+/* ═══════════════ ШИНА 0 — демоверсия ОГЭ-2027 ═══════════════
+   Пять заданий демоверсии ФИПИ-2027 слово в слово, с теорией оттуда же
+   (заводская шина 175/70 R12). В отличие от «Шины 1» здесь ничего не
+   выбирается случайно: тип нужен, чтобы разобрать с учеником именно
+   экзаменационный вариант. Поэтому нет и кнопки «Новая шина», а в
+   «Случайно» эти задания не попадают. Рисунки те же, что у «Шины 1». */
+const TIRE_DEMO_THEORY_PARAGRAPHS = [
+  `Автомобильное колесо представляет собой металлический диск с установленной на него резиновой шиной. Диаметр диска совпадает с диаметром внутреннего отверстия в шине.`,
+  `Для маркировки автомобильных шин применяется единая система обозначений. Например, 195/65 R15 (рис. 1). Первое число означает ширину шины B в миллиметрах (рис. 2). Второе число — высоту боковины шины H в процентах от ширины шины. Например, шина с маркировкой 195/65 R15 имеет ширину B = 195 мм и высоту боковины H = 195 · 0,65 = 126,75 (мм).`,
+  `Буква R означает, что шина имеет радиальную конструкцию, то есть нити каркаса в боковине шины расположены вдоль радиусов колеса. Такие шины применяются на всех легковых автомобилях.`,
+  `За буквой R следует диаметр диска d в дюймах (в одном дюйме 25,4 мм). Таким образом, общий диаметр колеса D можно найти, зная диаметр диска и высоту боковины.`,
+  `Завод производит легковые автомобили определённой модели и устанавливает на них колёса с шинами 175/70 R12.`,
+];
+function buildDemoTireTheoryHTML() {
+  return TIRE_THEORY_IMAGES_HTML +
+    `<div class="theory-text">${TIRE_DEMO_THEORY_PARAGRAPHS.map(p => `<p>${p}</p>`).join('')}</div>`;
+}
+// таблица разрешённых шин из задания 1 демоверсии
+const TIRE_DEMO_TABLE = { widths:[175,185,195], rims:[12,13,14],
+  cells:{
+    '175,12':[70], '175,13':[65], '175,14':null,
+    '185,12':null, '185,13':[60], '185,14':null,
+    '195,12':null, '195,13':[60], '195,14':null,
+  } };
+function gen_tire_demo1() {
+  return {
+    type: 'input', unit: 'мм', correctValue: 195,
+    prompt: `Завод допускает установку шин с другими маркировками. В таблице показаны разрешённые размеры шин.` +
+      tireCellsTableHTML(TIRE_DEMO_TABLE, 'Ширина шины (мм)') +
+      `<br>Шины какой наибольшей ширины можно устанавливать на автомобиль, если диаметр диска равен 13 дюймам? Ответ дайте в миллиметрах.`,
+    explain: `Смотрим столбец «13» — диаметр диска 13 дюймов. В нём разрешены шины 175/65, 185/60 и 195/60, то есть ширины 175, 185 и 195 мм.<br>Наибольшая из них — 195 мм.`
+  };
+}
+function gen_tire_demo2() {
+  return {
+    type: 'input', unit: 'мм', correctValue: 107.25,
+    prompt: `Сколько миллиметров составляет высота боковины шины, имеющей маркировку 165/65 R14?`,
+    explain: `В маркировке 165/65 R14 ширина шины B = 165 мм, а высота боковины — 65% от ширины.<br>H = 165 · 0,65 = 107,25 мм.`
+  };
+}
+function gen_tire_demo3() {
+  return {
+    type: 'input', unit: 'мм', correctValue: 549.8,
+    prompt: `Найдите диаметр колеса автомобиля, выходящего с завода. Ответ дайте в миллиметрах.`,
+    explain: `С завода выходят колёса с шинами 175/70 R12.<br>Высота боковины: H = 175 · 0,7 = 122,5 мм.<br>Диаметр диска: d = 12 · 25,4 = 304,8 мм.<br>Диаметр колеса — это диск и две боковины, сверху и снизу:<br>D = 304,8 + 2 · 122,5 = 549,8 мм.`
+  };
+}
+function gen_tire_demo4() {
+  return {
+    type: 'input', unit: 'мм', correctValue: 2.75,
+    prompt: `На сколько миллиметров радиус колеса с шиной 185/60 R13 меньше, чем радиус колеса с шиной 175/65 R13?`,
+    explain: `Радиус колеса — это радиус диска и одна высота боковины. Диск у обеих шин 13 дюймов, поэтому радиусы отличаются только высотой боковины.<br>175/65 R13: H = 175 · 0,65 = 113,75 мм.<br>185/60 R13: H = 185 · 0,6 = 111 мм.<br>Разница: 113,75 − 111 = 2,75 мм.`
+  };
+}
+function gen_tire_demo5() {
+  return {
+    type: 'input', unit: '%', correctValue: 1.4,
+    prompt: `На сколько процентов увеличится пробег автомобиля при одном обороте колеса, если заменить колёса, установленные на заводе, колёсами с шинами 175/65 R13? Результат округлите до десятых.`,
+    explain: `За один оборот колесо проезжает длину своей окружности, а она пропорциональна диаметру, поэтому пробег вырастет во столько же раз, во сколько вырастет диаметр колеса.<br>Заводское колесо (задание 3): D₁ = 549,8 мм.<br>Новое колесо 175/65 R13:<br>H = 175 · 0,65 = 113,75 мм;<br>d = 13 · 25,4 = 330,2 мм;<br>D₂ = 330,2 + 2 · 113,75 = 557,7 мм.<br>Диаметр вырос на 557,7 − 549,8 = 7,9 мм.<br>7,9 : 549,8 · 100% ≈ 1,44%.<br>С округлением до десятых — 1,4.`
+  };
+}
+const TIRE_DEMO_TASKS = [
+  { id: 'tire0_t1', title: 'Задание 1', demo: true, gen: gen_tire_demo1 },
+  { id: 'tire0_t2', title: 'Задание 2', demo: true, gen: gen_tire_demo2 },
+  { id: 'tire0_t3', title: 'Задание 3', demo: true, gen: gen_tire_demo3 },
+  { id: 'tire0_t4', title: 'Задание 4', demo: true, gen: gen_tire_demo4 },
+  { id: 'tire0_t5', title: 'Задание 5', demo: true, gen: gen_tire_demo5 },
+];
+
 /* ═══════════════ ТЕМА «ТАРИФЫ» ═══════════════ */
 function gen_tariff1() {
   const base = pick([300,350,400,450,500]);
@@ -1027,6 +1100,8 @@ function gen_tariff2() {
 /* ═══════════════ реестр тем ═══════════════ */
 const GROUPS = [
   { title: '🚗 Шины', modes: [
+    { id: 'tire_demo2027', title: 'Шина 0 · Демоверсия ОГЭ 2027', kind: 'taskset', demo: true,
+      tasks: TIRE_DEMO_TASKS, theory: buildDemoTireTheoryHTML },
     { id: 'tire_set1', title: 'Шина 1', kind: 'taskset', tasks: TIRE1_TASKS },
   ]},
   { title: '📱 Тарифы', modes: [
@@ -1036,6 +1111,8 @@ const GROUPS = [
 ];
 const SOON_THEMES = ['🏡 Участок', '🏠 Квартира', '🔥 Печь для бани', '📄 Листы бумаги', '🗺️ План местности'];
 const ALL_MODES = GROUPS.flatMap(g => g.modes.flatMap(m => m.kind === 'taskset' ? m.tasks.filter(t => t.gen) : [m]));
+// «Случайно» — только из генераторов: задания демоверсии всегда одни и те же
+const RANDOM_MODES = ALL_MODES.filter(m => !m.demo);
 
 /* ═══════════════ управление ═══════════════ */
 let totalSolved = 0, streak = 0, totalErrors = 0;
@@ -1260,7 +1337,7 @@ function renderPicker() {
     <div class="modes">
       ${g.modes.map(m => {
         const badges = pickerBadgeFor(m);
-        return `<div class="mode-card" data-id="${m.id}"><div class="mtitle">${m.title}</div>${badges ? `<div class="mode-medals">${badges}</div>` : ''}</div>`;
+        return `<div class="mode-card${m.demo ? ' demo' : ''}" data-id="${m.id}"><div class="mtitle">${m.title}</div>${badges ? `<div class="mode-medals">${badges}</div>` : ''}</div>`;
       }).join('')}
     </div>
   `).join('');
@@ -1309,6 +1386,9 @@ function enterTaskset(tasksetMode) {
       tasksetMode.tasks.forEach(t => clearProg(t.id));
     }
     curTasksetTheory = buildTireTheoryHTML(curFactoryTire);
+  } else if (tasksetMode.theory) {
+    // у тем с постоянной теорией (Шина 0 из демоверсии) она строится сразу
+    curTasksetTheory = tasksetMode.theory();
   }
   setCurMode(tasksetMode.tasks[0].id);
   curSubMode = 'exam';
@@ -1366,6 +1446,14 @@ function openTask() {
   els.picker.style.display = 'none';
   els.taskArea.style.display = 'block';
   window.scrollTo(0, 0);
+  // у присоединившегося к сессии тема не выбиралась кликом — он получает
+  // только id задания. Для темы с постоянной теорией (Шина 0) восстанавливаем
+  // её по этому id: теория и навигация «Задание N из 5» — как у ведущего.
+  // «Шину 1» так не трогаем: её заводская шина у каждого своя
+  if (!curTasksetRef) {
+    const ts = GROUPS.flatMap(g => g.modes).find(x => x.kind === 'taskset' && x.theory && x.tasks.some(t => t.id === curMode));
+    if (ts) { curTasksetRef = ts; curTasksetTheory = ts.theory(); }
+  }
 
   let title;
   if (curMode === 'random') {
@@ -1566,7 +1654,7 @@ function newTask() {
   // режима копия, чтобы при возврате сюда позже не подставились чужие заметки)
   if (window.clearInkForMode) window.clearInkForMode(curMode);
 
-  const m = curMode === 'random' ? pick(ALL_MODES) : ALL_MODES.find(x => x.id === curMode);
+  const m = curMode === 'random' ? pick(RANDOM_MODES) : ALL_MODES.find(x => x.id === curMode);
   curTask = m.gen();
   taskAnswered = false;
   optionsLocked = false;

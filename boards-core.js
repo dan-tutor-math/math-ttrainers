@@ -3865,6 +3865,10 @@ for (let n = 1; n <= 20; n++) {
 for (let n = 1; n <= 21; n++) {
   TRAINER_CAPTURE['egeb' + n] = [ { sel:'#egeQuestion' }, { selAll:'.added-task-card .added-card-question' } ];
 }
+// Промпт №61: ОГЭ, часть 2 — та же страница (oge_part2.html), номера 20–25, id oge20…
+for (let n = 20; n <= 25; n++) {
+  TRAINER_CAPTURE['oge' + n] = [ { sel:'#egeQuestion' }, { selAll:'.added-task-card .added-card-question' } ];
+}
 
 // список тренажёров для панели — те же названия/файлы, что и в реестре
 // TRAINERS на главной странице (index.html), сгруппированы так же просто,
@@ -3933,6 +3937,18 @@ TRAINERS_PANEL_GROUPS.splice(2, 0, { title: 'ЕГЭ база', items: EGE_BASE_P
   href: 'ege_base.html?n=' + (i + 1),
   eq: 'краткий ответ',
 })) });
+
+// ОГЭ, часть 2 (Промпт №61) — в тот же раздел «ОГЭ», следом за №19; названия
+// те же, что в реестре на главной, все шесть номеров ведут в oge_part2.html
+const OGE_PART2_PANEL = {
+  20: 'Уравнения и неравенства', 21: 'Текстовая задача', 22: 'Графики функций',
+  23: 'Геометрическая задача на вычисление', 24: 'Геометрическая задача на доказательство',
+  25: 'Геометрическая задача повышенной сложности',
+};
+Object.keys(OGE_PART2_PANEL).forEach(n => {
+  TRAINERS_PANEL_GROUPS[0].items.push({ id: 'oge' + n, name: '№' + n + '. ' + OGE_PART2_PANEL[n],
+    href: 'oge_part2.html?n=' + n, eq: n === '24' ? 'доказательство' : 'с решением' });
+});
 
 const trainersToggleBtn = document.getElementById('bdTrainersToggle');
 const trainersPanelEl = document.getElementById('bdTrainersPanel');
@@ -5424,6 +5440,7 @@ const TRAINER_NAMES = {
 // ЕГЭ-задания было записано на доске один в один как в реестре на главной
 EGE_PROF_PANEL.forEach((title, i) => { TRAINER_NAMES['ege' + (i + 1)] = 'ЕГЭ профиль №' + (i + 1) + '. ' + title; });
 EGE_BASE_PANEL.forEach((title, i) => { TRAINER_NAMES['egeb' + (i + 1)] = 'ЕГЭ база №' + (i + 1) + '. ' + title; });
+Object.keys(OGE_PART2_PANEL).forEach(n => { TRAINER_NAMES['oge' + n] = '№' + n + '. ' + OGE_PART2_PANEL[n]; });
 function escapeHtmlBd(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function renderBasketPicker(){

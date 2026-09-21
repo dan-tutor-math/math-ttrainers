@@ -329,7 +329,7 @@ def test_cards(browser):
     # та же поломка была во всех тренажёрах с карточками-кадрами — проверяем
     # на соседнем, у которого своих режимов обучения нет
     ctx, page, errors = new_page(browser, f"{BASE}/oge13.html")
-    page.click('#modesGrid .mode-card')
+    page.click('#modesGrid .mode-card:not(.demo)')
     page.wait_for_timeout(500)
     add_card(page, 0)
     fr = card_frames(page)[0]

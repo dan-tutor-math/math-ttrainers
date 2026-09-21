@@ -226,6 +226,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .mode-card:hover{border-color:var(--ink); transform:translateX(3px)}
 .mode-card .mtitle{font-weight:600;font-size:15px;color:var(--pencil);line-height:1.3;flex:1 1 260px;margin:0;}
 .mode-card .msub{font-family:var(--font-ui);font-weight:500;font-size:12.5px;color:var(--muted-2);flex-basis:100%;margin-top:2px;}
+/* нулевой тип — задание из демоверсии ФИПИ: выделен, чтобы его было видно сразу */
+.mode-card.demo{background:linear-gradient(135deg, var(--hl-10), transparent);border-color:var(--ink);}
 .back-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 14px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);margin-bottom:14px;display:inline-block;transition:transform .15s;}
 .back-btn:active{transform:scale(.96)}
 .back-btn:hover{border-color:var(--ink)}
@@ -887,6 +889,7 @@ html[data-theme="dark"] #quadEngineArea input {background:var(--card)}html[data-
 
   <div id="pickerArea">
     <div class="modes">
+      <div class="mode-card demo" data-id="demo2027"><div class="mtitle">№0. Задание из демоверсии ОГЭ 2027</div><div class="msub">3(x + 8) − 2(x − 8) = 8 — по шагам, как в линейном уравнении</div><div class="mode-medals" id="pickerMedals_demo2027"></div></div>
       <div class="mode-card" data-id="linear"><div class="mtitle">Линейное уравнение</div><div class="msub">перенос слагаемых, скобки, деление — по шагам</div><div class="mode-medals" id="pickerMedals_linear"></div></div>
       <div class="mode-card" data-id="quadratic"><div class="mtitle">Квадратное уравнение</div><div class="msub">от простых случаев до дискриминанта — по шагам</div><div class="mode-medals" id="pickerMedals_quadratic"></div></div>
       <div class="mode-card" data-id="rational"><div class="mtitle">Дробно-рациональное уравнение</div><div class="msub">равенство дроби нулю</div><div class="mode-medals" id="pickerMedals_rational"></div></div>
@@ -1122,8 +1125,13 @@ function renderPickerBadges() {
   set('pickerMedals_linear', linTotal);
   set('pickerMedals_quadratic', quadTotal);
   set('pickerMedals_rational', ratTotal);
+  set('pickerMedals_demo2027', (loadProg('linear:' + LIN_DEMO_LEVEL) || {}).medals);
 }
 const LIN_LEVEL_IDS = [0,1,2,3,4];
+// уровень линейного движка с уравнением из демоверсии (см. LEVELS в движке):
+// номер 5, чтобы не сдвинуть сохранённый прогресс уровней 0–4, а в ряду
+// уровней он стоит первым и подписан «0»
+const LIN_DEMO_LEVEL = 5;
 const QUAD_LEVEL_IDS = [0,1,2,3,4,5,6,7,8,9];
 // какой уровень был активен последним внутри линейного/квадратного движка —
 // чтобы "назад" в общий список и обратно не сбрасывал вниз на уровень 0
@@ -1197,12 +1205,12 @@ function openModeById(id){
     curMode = id;
     hideAllViews();
     window.scrollTo(0,0);
-    if (id === 'linear') {
+    if (id === 'linear' || id === 'demo2027') {
       const area = document.getElementById('linEngineArea');
       area.innerHTML = LIN_ENGINE_HTML;
       area.style.display = 'block';
       document.getElementById('linBackBtn').onclick = showPicker;
-      window.startLinearEngine();
+      window.startLinearEngine(id === 'demo2027' ? LIN_DEMO_LEVEL : null);
       // .panel/.sheet этого движка появились в DOM только что — заводим для них
       // ту же плавную анимацию высоты, что и у статичного (рационального) движка
       area.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimation(p));
@@ -1642,6 +1650,7 @@ window.startLinearEngine = (function(){
 
 /* ───────── уровни и генерация ───────── */
 const LEVELS = [
+  {id:5, name:'0. Демоверсия 2027',     desc:'задание №9 из демоверсии ОГЭ 2027: 3(x + 8) − 2(x − 8) = 8'},
   {id:0, name:'1. Разминка',            desc:'2–3 икса с двух сторон, знаки вперемешку'},
   {id:1, name:'2. Много слагаемых',     desc:'6–8 слагаемых в уравнении'},
   {id:2, name:'3. Скобки',              desc:'раскрытие через умножение — фонтанчик, знак множителя разный'},
@@ -1649,7 +1658,7 @@ const LEVELS = [
   {id:4, name:'5. Экзамен',             desc:'всё вперемешку'},
 ];
 let curLevel = 0;
-const solvedByLevel = [0,0,0,0,0];
+const solvedByLevel = [0,0,0,0,0,0];
 let totalSolved = 0, streak = 0, taskCounter = 0, uid = 0;
 
 const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
@@ -1731,7 +1740,23 @@ function genBracket(mSign){
   }
 }
 
+/* Промпт №61: задание №9 демоверсии ОГЭ-2027 — всегда одно и то же, тип
+   нужен ради экзаменационной формулировки. Обе скобки в нём слева, поэтому
+   оно описано как «две скобки» с флагом sameSide: фонтанчики те же, только
+   вторая скобка рисуется слева со знаком множителя как действием, а справа
+   одно число. После приведения подобных выходит x = −32 — коэффициент 1,
+   и шаг «делим обе части» пропускается (делить на 1 незачем). */
+function genDemo2027(){
+  return {isBracket:true, isDouble:true, sameSide:true, demo:true,
+    bL:{m:3, p:1, q:8, A:3, B:24}, bR:{m:-2, p:1, q:-8, A:-2, B:16},
+    exL:null, exR:{coef:8, isX:false}, x0:-32};
+}
+// «− 2(x − 8)»: у второй скобки в той же части множитель пишется как действие
+function signedBrText(b, twoTerms){
+  return `${b.m<0?'−':'+'} ${Math.abs(b.m)}(${twoTerms({coef:b.p,isX:true},{coef:b.q,isX:false})})`;
+}
 function gen(level){
+  if(level===5) return genDemo2027();
   if(level===4) level = ri(0,3);
   if(level===2) return genBracket(Math.random()<0.5 ? 1 : -1);
   if(level===3) return genDoubleBracket();
@@ -1773,6 +1798,7 @@ function equationPreviewText(P){
   if(P.isDouble){
     const brText = b => `${numText(b.m)}(${twoTerms({coef:b.p,isX:true},{coef:b.q,isX:false})})`;
     const exText = t => t ? ' '+termText(t,false) : '';
+    if(P.sameSide) return `${brText(P.bL)} ${signedBrText(P.bR, twoTerms)} = ${termText(P.exR,true)}`;
     return `${brText(P.bL)}${exText(P.exL)} = ${brText(P.bR)}${exText(P.exR)}`;
   } else if(P.isBracket){
     const rightText = P.R.map((t,i)=>termText(t,i===0)).join(' ');
@@ -1894,7 +1920,9 @@ function renderAll(){
     if(P.isDouble){
       const brText = b => `${numText(b.m)}(${twoTerms({coef:b.p,isX:true},{coef:b.q,isX:false})})`;
       const exText = t => t ? ' '+termText(t,false) : '';
-      text = `${brText(P.bL)}${exText(P.exL)} = ${brText(P.bR)}${exText(P.exR)}`;
+      text = P.sameSide
+        ? `${brText(P.bL)} ${signedBrText(P.bR, twoTerms)} = ${termText(P.exR,true)}`
+        : `${brText(P.bL)}${exText(P.exL)} = ${brText(P.bR)}${exText(P.exR)}`;
     } else if(P.isBracket){
       const rightText = P.R.map((t,i)=>termText(t,i===0)).join(' ');
       text = `${numText(P.m)}(${twoTerms({coef:P.p,isX:true},{coef:P.q,isX:false})}) = ${rightText}`;
@@ -1906,8 +1934,8 @@ function renderAll(){
     live.innerHTML = `<div class="eqline plain">${text}</div>`;
   } else if(S.phase==='bracket' && P.isDouble){
     const steps=S.br.steps, pos=S.br.pos, cur=steps[pos];
-    const mkBr = (b, side) => {
-      const mDisp = numText(b.m);
+    const mkBr = (b, side, signed) => {
+      const mDisp = signed ? termText({coef:b.m,isX:false}, false) : numText(b.m);
       const innerP={coef:b.p,isX:true}, innerQ={coef:b.q,isX:false};
       const idxP = steps.indexOf(side+'p'), idxQ = steps.indexOf(side+'q');
       const pClass = cur===side+'p' ? 'target' : (idxP<pos ? 'struck-soft' : '');
@@ -1919,7 +1947,13 @@ function renderAll(){
     };
     const exHTML = t => t ? `<span class="term">${termText(t,false)}</span>` : '';
     const doneHTML = doubleResultsHTML(pos);
-    live.innerHTML = `
+    live.innerHTML = P.sameSide ? `
+      <div class="eqline" id="brEq">
+        ${mkBr(P.bL,'L')}${mkBr(P.bR,'R',true)}
+        <span class="eq-sign">=</span>
+        <span class="term">${termText(P.exR,true)}</span>
+      </div>
+      <div class="eqline" id="brResults">${doneHTML}</div>` : `
       <div class="eqline" id="brEq">
         ${mkBr(P.bL,'L')}${exHTML(P.exL)}
         <span class="eq-sign">=</span>
@@ -1995,7 +2029,9 @@ function setPrompt(){
           const b = cur[0]==='L' ? P.bL : P.bR;
           const term = cur[1]==='p' ? termText({coef:b.p,isX:true},true) : termText({coef:b.q,isX:false},true);
           const mDisp = numText(b.m);
-          const side = cur[0]==='L' ? 'слева' : 'справа';
+          const side = P.sameSide
+            ? (cur[0]==='L' ? 'в первой скобке' : 'во второй скобке')
+            : (cur[0]==='L' ? 'слева' : 'справа');
           p.innerHTML = `Фонтанчик ${side}: множитель обязан долететь до каждого слагаемого в своей скобке.<br>${mDisp} · ${term} = ?`;
         }
         break;
@@ -2177,6 +2213,15 @@ function doubleResultsHTML(pos){
   const plain = (t,isNew) =>
     `<span class="term${isNew?' pop':''}">${termText(t,false)}</span>`;
   let html='';
+  if(P.sameSide){
+    // обе скобки слева: их результаты идут подряд, справа — одно число
+    if(pos>=1) html += chip(P.bL.A, true, true, pos===1);
+    if(pos>=2) html += chip(P.bL.B, false, false, pos===2);
+    if(pos>=3) html += chip(P.bR.A, true, false, pos===3);
+    if(pos>=4) html += chip(P.bR.B, false, false, pos===4);
+    if(pos>=4) html += `<span class="eq-sign">=</span><span class="term${pos===4?' pop':''}">${termText(P.exR,true)}</span>`;
+    return html;
+  }
   if(pos>=1) html += chip(P.bL.A, true, true, pos===1);
   if(pos>=2) html += chip(P.bL.B, false, false, pos===2);
   if(pos>=2) html += plain(P.exL, pos===2);
@@ -2229,14 +2274,24 @@ function submitBracketDouble(inp){
 
 function finishBracketDouble(){
   clearFountain();
-  const mkFrozenBr = (b) => {
-    const mDisp = numText(b.m);
+  const mkFrozenBr = (b, signed) => {
+    const mDisp = signed ? termText({coef:b.m,isX:false}, false) : numText(b.m);
     const innerP={coef:b.p,isX:true}, innerQ={coef:b.q,isX:false};
     return `<span class="term">${mDisp}</span><span style="font-size:24px">(</span>`+
       `<span class="term">${termText(innerP,true)}</span><span class="term">${termText(innerQ,false)}</span>`+
       `<span style="font-size:24px">)</span>`;
   };
   const exHTML = t => t ? `<span class="term">${termText(t,false)}</span>` : '';
+  if(P.sameSide){
+    S.frozen.push(
+      `<div class="eqline frozen">${mkFrozenBr(P.bL)}${mkFrozenBr(P.bR,true)}<span class="eq-sign">=</span><span class="term">${termText(P.exR,true)}</span></div>`);
+    S.L = [T(P.bL.A,true), T(P.bL.B,false), T(P.bR.A,true), T(P.bR.B,false)];
+    S.R = [T(P.exR.coef, P.exR.isX)];
+    S.phase = 'move';
+    S.errStep = 0;
+    renderAll(); setPrompt(); renderInputs();
+    return;
+  }
   S.frozen.push(
     `<div class="eqline frozen">${mkFrozenBr(P.bL)}${exHTML(P.exL)}<span class="eq-sign">=</span>${mkFrozenBr(P.bR)}${exHTML(P.exR)}</div>`);
   const Lterms = [T(P.bL.A,true), T(P.bL.B,false)];
@@ -2440,7 +2495,10 @@ function submitCollect(){
   iM.classList.toggle('good', okM);
   if(okK && okM){
     setHint(pick(['Верно!','Точно!','Отлично!']), true);
-    S.phase='divide'; S.errStep=0;
+    S.errStep=0;
+    // перед x стоит 1 — это уже ответ, делить обе части на 1 незачем
+    if(S.K===1){ finish(); return; }
+    S.phase='divide';
     renderAll(); setPrompt(); renderInputs();
     return;
   }
@@ -2570,11 +2628,19 @@ function submitX(){
 
 function finish(){
   S.phase='done';
+  if(S.K===1){
+    S.frozen.push(
+      `<div class="eqline frozen"><span style="font-size:24px">x</span><span class="eq-sign">=</span>`+
+      `<span class="term" style="color:var(--ok);border:2px solid rgba(46,125,83,.4)">${numText(P.x0)}</span></div>`);
+  } else {
   S.frozen.push(
     `<div class="eqline eqline-frac frozen"><span style="font-size:24px">x</span><span class="eq-sign">=</span>`+
     `<span class="frac"><span class="num">${numText(S.M)}</span><span class="den">${numText(S.K)}</span></span>`+
     `<span class="eq-sign">=</span><span class="term" style="color:var(--ok);border:2px solid rgba(46,125,83,.4)">${numText(P.x0)}</span></div>`);
-  const lv = P.isDouble
+  }
+  const lv = P.sameSide
+    ? P.bL.m*(P.bL.p*P.x0+P.bL.q) + P.bR.m*(P.bR.p*P.x0+P.bR.q)
+    : P.isDouble
     ? P.bL.m*(P.bL.p*P.x0+P.bL.q) + (P.exL ? P.exL.coef*(P.exL.isX?P.x0:1) : 0)
     : (P.isBracket
         ? P.m*(P.p*P.x0+P.q)
@@ -2695,7 +2761,7 @@ function setupFloatingKeypad(){
 }
 
 
-return function start(){
+return function start(forceLevel){
   document.getElementById('refreshBtn').onclick = newProblem;
   const linBasketBtn = document.getElementById('linBasketAddBtn');
   if (linBasketBtn) linBasketBtn.onclick = () => {
@@ -2712,8 +2778,11 @@ return function start(){
   setupFloatingKeypad();
   setupInputEnhancer('inputArea');
   setupInputEnhancer('live');
+  // карточка «Демоверсия» открывает движок сразу на своём уровне; последний
+  // выбранный уровень при этом не перезаписываем — «Линейное уравнение»
+  // откроется там же, где его оставили
   const savedLevel = loadLastLevel('linear');
-  curLevel = (savedLevel != null) ? savedLevel : 0;
+  curLevel = (forceLevel != null) ? forceLevel : ((savedLevel != null) ? savedLevel : 0);
   for(let i=0;i<solvedByLevel.length;i++) solvedByLevel[i]=0;
   totalSolved = 0; streak = 0; taskCounter = 0;
   document.getElementById('stSolved').textContent = '0';

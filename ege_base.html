@@ -131,6 +131,14 @@ body{
 /* ─── интерактивная доска на фоне вокруг примера ─── */
 #boardCanvas{position:fixed;top:0;left:0;z-index:2;touch-action:none;cursor:crosshair;border-radius:20px;}
 #boardCanvasBg{position:fixed;top:0;left:0;z-index:0;touch-action:none;cursor:crosshair;}
+/* Промпт №60 (включается EXAM.boardPinned). trainer-board.js ставит холст
+   листа в координатах ДОКУМЕНТА, а position:fixed считает их от окна — при
+   прокрутке заметки уезжали вместе с экраном, а не с заданием. И холст выше
+   .wrap по z-index перехватывал нажатия: «Проверить» и поле ответа под ним
+   не нажимались. Как в ОГЭ №8: absolute и без pointer-events — рисование
+   запускает document-обработчик в trainer-board.js, а кнопки и поля он
+   пропускает сам (isBoardInteractiveTarget) */
+html[data-board-pinned] #boardCanvas{position:absolute;pointer-events:none;}
 #boardSpace{height:0;pointer-events:none;transition:height .2s ease;}
 .board-toolbar{position:fixed;right:18px;bottom:18px;z-index:50;display:flex;gap:8px;align-items:center;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;padding:9px 11px;box-shadow:var(--shadow);}
 .toolbar-sep{width:1px;align-self:stretch;background:var(--glass-border);margin:2px 0;}
@@ -736,7 +744,7 @@ html[data-medals="on"] .board-view-toolbar{bottom:64px;}
 <script>
 /* ═══════════════ настройки экзамена ═══════════════
    ЕГЭ база (ege_base.html) — та же страница, что ЕГЭ профиль
-   (ege_prof.html), с другим банком заданий. Логику здесь НЕ правят: её
+   (ege_prof.html) и ОГЭ, часть 2 (oge_part2.html), с другим банком заданий. Логику здесь НЕ правят: её
    правят в ege_prof.html и пересобирают этот файл командой
    python3 sync_ege_pages.py — он сохраняет этот блок настроек, а всё
    остальное берёт из профиля. Тест test_prompt57_ege_base.py проверяет,
@@ -750,6 +758,9 @@ const EXAM = {
   showPart: false,           // в базе частей нет: все 21 задание с кратким ответом
   // подсказка, если ответ записан не по форме бланка
   part1Format: 'Ответ — целое число или конечная десятичная дробь, например −0,6',
+  // промпт №60 — сначала здесь, в профиле пока выключено:
+  boardPinned: true,         // заметки приклеены к заданию, кнопки под ними нажимаются
+  calcShared: true,          // «Сложить/Вычесть/…/История» открываются у обоих в сессии
 };
 /* ═══════════════ конец настроек ═══════════════ */
 
@@ -759,6 +770,7 @@ const EXAM = {
    EXAM): страница не знает ни одной формулы — добавление новых прототипов
    её не трогает. */
 const BANK = (EXAM.bank || { tasks: {} }).tasks;
+if (EXAM.boardPinned) document.documentElement.setAttribute('data-board-pinned', '');
 const FIGS = EXAM.figs || {};
 const NUMS = Object.keys(BANK).map(Number).sort((a, b) => a - b);
 
@@ -1183,12 +1195,13 @@ function renderPicker(){
   const src = (list[0] && list[0].src) || '';
   els.pickerTitle.textContent = 'Прототипы задания №' + S.n + ' · ' + list.length +
     (list.length === 1 ? ' штука' : (list.length < 5 ? ' штуки' : ' штук')) +
-    (src ? ' · ' + src.toLowerCase() : '');
+    // строчной делаем только первую букву: «демоверсия ФИПИ 2027», а не «фипи»
+    (src ? ' · ' + src.charAt(0).toLowerCase() + src.slice(1) : '');
   /* отметку «решено» держим слева, рядом с номером: правый край карточки на
      обычном экране уходит под кнопки темы и подсказок в углу страницы */
   els.protoList.innerHTML = list.map((p, i) => `
     <div class="mode-card" data-pid="${p.id}">
-      <div class="mtitle">Прототип ${i + 1}</div>
+      <div class="mtitle">${p.title ? p.title : 'Прототип ' + (i + 1)}</div>
       ${isSolved(p.id) ? '<div class="mdone">✓ решено</div>' : ''}
       <div class="mpeek">${protoPeek(p)}</div>
     </div>`).join('');
@@ -1227,6 +1240,7 @@ function subtitleOf(t){
 // «Ответ: 12 (порядок цифр не важен)», «Ответ: 6840 (подходят также: …)» —
 // ученик, записавший другой верный вариант, должен увидеть, что он тоже верен
 function answerLine(p){
+  if (p.proof) return '';   // у доказательства ответа нет — только само доказательство
   if (partOf(S.n) !== 1) return 'Ответ. ' + rich(p.answerTex || '');
   let s = 'Ответ: ' + prettyNum(p.answer);
   if (p.anyOrder) s += ' <span class="ans-note">(порядок цифр не важен)</span>';
@@ -1244,6 +1258,21 @@ function fieldsOf(p){
    под которым поле регистрируется в совместной сессии. */
 function buildAnswerArea(root, p, st, prefix, onChanged){
   const list = fieldsOf(p);
+  /* Промпт №61: задание на доказательство (ОГЭ №24) — полей нет, проверять
+     нечего. Кнопка открывает доказательство и критерии, как после ответа;
+     счёт не меняется: самопроверку нельзя засчитать ни решённой, ни ошибкой.
+     Без этой ветки пустой список полей «проходил» проверку, и задание
+     считалось решённым по одному нажатию */
+  if (p.proof) {
+    root.innerHTML = '<div class="input-answer-row"><button class="check-btn">Сверить с доказательством</button></div>' +
+      '<div class="answer-msg"></div>';
+    root.querySelector('.check-btn').onclick = () => {
+      if (st.answered) return;
+      st.answered = true;
+      onChanged();
+    };
+    return;
+  }
   let html = '';
   list.forEach(f => {
     html += '<div class="p2-field" data-fid="' + f.id + '">';
@@ -1343,6 +1372,12 @@ function renderSolution(){
       '<tr><td class="pts">' + row[0] + '</td><td>' + rich(row[1]) + '</td></tr>').join('');
   }
 }
+/* Какое задание сейчас нарисовано в #taskArea. Условие, поле ответа и разбор
+   рисует только openTask, а при запуске страница стоит на первом прототипе
+   номера из адреса, НО ничего не нарисовав (открыт список прототипов). Если
+   собеседник открыл как раз этот прототип, совпадения S.n/S.pid мало — без
+   этой отметки ученик видел пустую карточку до смены прототипа. */
+let drawnTask = null;
 function openTask(n, pid){
   if (!task(n)) return;
   // задание на экране сейчас сменится — сперва снимок в конспект урока
@@ -1354,6 +1389,7 @@ function openTask(n, pid){
   const p = pid ? protoById(n, pid) : protos(n)[0];
   S.pid = p.id;
   curProto = p;
+  drawnTask = n + ':' + p.id;
   S.answered = false; S.hadWrong = false; S.correct = false;
   S.marks = {}; S.yn = {};
   S.sol = false;
@@ -1364,7 +1400,10 @@ function openTask(n, pid){
   els.pageTitle.textContent = EXAM.title + ' · №' + n;
   els.pageSub.textContent = subtitleOf(t);
   const idx = protos(n).findIndex(x => x.id === p.id);
-  els.taskTitle.textContent = '№' + n + ' · прототип ' + (idx + 1) + ' из ' + protos(n).length;
+  // у прототипа может быть своё название (в ОГЭ, часть 2 — «№0. Задание из
+  // демоверсии ОГЭ 2027»), тогда в шапке оно, а не порядковый номер; номер
+  // задания и так стоит в заголовке страницы
+  els.taskTitle.textContent = p.title ? p.title : '№' + n + ' · прототип ' + (idx + 1) + ' из ' + protos(n).length;
   document.title = EXAM.title + ' · №' + n + ' — ' + t.title;
   els.questionText.innerHTML = rich(p.text) + (p.fig && FIGS[p.fig] ? '<div class="ege-fig">' + FIGS[p.fig] + '</div>' : '');
   els.manualNote.innerHTML = p.manual ? '⚠️ ' + rich(p.manual) : '';
@@ -1438,7 +1477,7 @@ function render(){
   });
   els.nextStepBtn.style.display = (S.mode === 'learn' && !S.answered && shown < total) ? 'inline-flex' : 'none';
   const allShown = shown >= total && total > 0;
-  els.solAnswer.style.display = allShown ? 'block' : 'none';
+  els.solAnswer.style.display = (allShown && !curProto.proof) ? 'block' : 'none';
   els.critBox.style.display = (allShown && curProto.criteria) ? 'block' : 'none';
   // «Следующий прототип» относится к одному заданию на экране: когда рядом
   // стоят добавленные карточки, кнопка только сбивает с толку
@@ -1610,7 +1649,7 @@ function solutionHTML(p){
   if (p.hint) h += '<div class="sol-hint"><b>Идея.</b> ' + rich(p.hint) + '</div>';
   h += (p.steps || []).map((st, i) =>
     '<div class="sol-step"><span class="no">' + (i + 1) + '</span><div class="body">' + rich(st) + '</div></div>').join('');
-  h += '<div class="sol-answer">' + answerLine(p) + '</div>';
+  if (!p.proof) h += '<div class="sol-answer">' + answerLine(p) + '</div>';
   if (p.criteria) {
     h += '<details class="crit"><summary>Критерии оценивания ФИПИ (максимум ' + task(S.n).points + ' б.)</summary><table>' +
       p.criteria.map(row => '<tr><td class="pts">' + row[0] + '</td><td>' + rich(row[1]) + '</td></tr>').join('') + '</table></details>';
@@ -1993,6 +2032,9 @@ function tsGetState(){
     totalSolved, streak, totalErrors,
   };
   if (window.__boardGetState) Object.assign(base, window.__boardGetState());
+  // какой калькулятор в столбик открыт (и открыта ли его история) — общее:
+  // учитель жмёт «Сложить», у ученика открывается то же окно
+  if (EXAM.calcShared && window.__calcGetState) Object.assign(base, window.__calcGetState());
   return base;
 }
 function tsApplyState(state){
@@ -2000,8 +2042,16 @@ function tsApplyState(state){
   if (window.__boardApplyState) window.__boardApplyState(state);
   if (typeof state.egeN === 'undefined') return; // снимок без задания (пустая сессия)
   if (!BANK[state.egeN]) return;
+  if (EXAM.calcShared && window.__calcApplyState) window.__calcApplyState(state);
 
-  if (state.egeN !== S.n || state.egePid !== S.pid) openTask(state.egeN, state.egePid);
+  // Сравниваем с прототипом, который реально откроется: неизвестный id (банк
+  // у собеседника новее) заменяется первым, и иначе openTask звался бы на
+  // каждом снимке, заваливая конспект урока одинаковыми снимками.
+  // drawnTask нужен потому, что прототип, на котором страница стоит с
+  // запуска, ещё не нарисован — совпадения номера и id тут мало
+  const wantPid = (protoById(state.egeN, state.egePid) || {}).id;
+  const needDraw = state.egeScreen !== 'picker' && drawnTask !== state.egeN + ':' + wantPid;
+  if (state.egeN !== S.n || wantPid !== S.pid || needDraw) openTask(state.egeN, wantPid);
   // экран (список прототипов или само задание) тоже общий: учитель вернулся
   // к списку — ученик вернулся вместе с ним
   if (state.egeScreen === 'picker') { S.screen = 'picker'; renderPicker(); render(); return; }
@@ -2033,7 +2083,12 @@ function tsApplyState(state){
 }
 function tsWatchSig(s){
   return JSON.stringify([s.egeScreen, s.egeN, s.egePid, s.curSubMode, s.answered, s.hadWrong,
-    s.correct, s.marks, s.yn, s.sol, s.step, s.cards, s.workW]);
+    s.correct, s.marks, s.yn, s.sol, s.step, s.cards, s.workW,
+    // приведение обязательно: мост калькулятора объявлен в следующем
+    // <script>, и исходная подпись таймера снимается ещё без него — без
+    // приведения первый тик счёл бы это своей правкой и разослал бы экран
+    // только что подключившегося поверх учительского
+    s.calcOp || null, !!s.calcHist]);
 }
 let tsPeerSig = null;
 /* Версия задания в общем снимке: снимок уходит и с каждым штрихом доски, неся
@@ -2170,14 +2225,18 @@ document.querySelectorAll('.panel:not(.calc-history-panel):not(.calc-panel)').fo
   if (!calcPanel || !calcIframe) return;
 
   let calcResizeTimer = null;
+  let calcOp = null;   // какой калькулятор открыт — для общего снимка сессии
 
-  function openCalc(op) {
+  function openCalc(op, fromPeer) {
+    calcOp = op;
     calcPanel.style.display = 'block';
     calcPanelTitle.textContent = CALC_OP_META[op].title;
     calcIframe.style.height = '760px';
     calcIframe.src = `${CALC_OP_META[op].file}?embed=1`;
     document.querySelectorAll('.calc-tool-btn[data-op]').forEach(b => b.classList.toggle('active', b.dataset.op === op));
-    calcPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    // у собеседника страницу не дёргаем: прокрутку ведущего и так везёт
+    // синхронное перемещение по доске
+    if (!fromPeer) calcPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     clearInterval(calcResizeTimer);
     calcResizeTimer = setInterval(fitCalcIframe, 400);
   }
@@ -2193,6 +2252,7 @@ document.querySelectorAll('.panel:not(.calc-history-panel):not(.calc-panel)').fo
     } catch (e) { /* кросс-доменные ограничения — оставляем текущую высоту */ }
   }
   function closeCalc() {
+    calcOp = null;
     calcPanel.style.display = 'none';
     calcIframe.src = 'about:blank';
     clearInterval(calcResizeTimer);
@@ -2247,13 +2307,13 @@ document.querySelectorAll('.panel:not(.calc-history-panel):not(.calc-panel)').fo
       done();
     }
   }
-  function toggleCalcHistory() {
+  function toggleCalcHistory(e, fromPeer) {
     const willOpen = calcHistoryPanel.style.display !== 'block';
     calcHistoryPanel.style.display = willOpen ? 'block' : 'none';
     calcHistoryBtn.classList.toggle('active', willOpen);
     if (willOpen) {
       renderCalcHistory();
-      calcHistoryPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      if (!fromPeer) calcHistoryPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
   }
   function closeCalcHistory() {
@@ -2269,6 +2329,21 @@ document.querySelectorAll('.panel:not(.calc-history-panel):not(.calc-panel)').fo
   });
   if (calcHistoryBtn) calcHistoryBtn.onclick = toggleCalcHistory;
   if (calcHistoryClose) calcHistoryClose.onclick = closeCalcHistory;
+
+  /* Мост для общего снимка сессии (включается EXAM.calcShared). Общее —
+     только КАКОЕ окно открыто; пример внутри калькулятора (кадр *_embed.html
+     сессию не подключает) и записи истории у каждого свои. Открывать заново
+     тот же калькулятор нельзя: смена src стёрла бы набранный пример */
+  window.__calcGetState = function(){
+    return { calcOp: calcOp, calcHist: calcHistoryPanel.style.display === 'block' };
+  };
+  window.__calcApplyState = function(st){
+    if (!st || !('calcOp' in st)) return;   // снимок со страницы без моста
+    const want = CALC_OP_META[st.calcOp] ? st.calcOp : null;
+    if (want !== calcOp) { if (want) openCalc(want, true); else closeCalc(); }
+    const histOpen = calcHistoryPanel.style.display === 'block';
+    if (typeof st.calcHist === 'boolean' && st.calcHist !== histOpen) toggleCalcHistory(null, true);
+  };
 
   window.addEventListener('message', (e) => {
     const d = e.data;
