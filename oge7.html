@@ -215,7 +215,8 @@ html[data-board="on"] body{background:
 .focus-toggle:active{transform:scale(.92)}
 
 /* ─── аккуратное сворачивание: max-height/opacity вместо мгновенного display:none ─── */
-h1,.sub,.stats,.hint,.example-history-toggle,.example-history-panel{overflow:hidden;min-height:0;transition:max-height .32s ease, opacity .22s ease, margin .32s ease;}
+.submode-tabs,h1,.sub,.stats,.hint,.example-history-toggle,.example-history-panel{overflow:hidden;min-height:0;transition:max-height .32s ease, opacity .22s ease, margin .32s ease;}
+.submode-tabs{max-height:56px}
 h1{max-height:64px}
 .sub{max-height:50px}
 .stats{max-height:90px}
@@ -227,7 +228,8 @@ html[data-focus="on"] .sub,
 html[data-focus="on"] .stats,
 html[data-focus="on"] .hint,
 html[data-focus="on"] .example-history-toggle,
-html[data-focus="on"] .example-history-panel{
+html[data-focus="on"] .example-history-panel,
+html[data-focus="on"] .submode-tabs{
   max-height:0;
   min-height:0;
   padding:0;
@@ -291,6 +293,18 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
 /* ─── шапка задачи ─── */
 .task-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+/* ─── режимы «Обучение / Тренировка / Экзамен» (Промпт №58) — те же вкладки,
+   что в остальных тренажёрах ОГЭ и в ЕГЭ ─── */
+.submode-tabs{display:flex;gap:8px;margin-bottom:14px;}
+.submode-tab{flex:1;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:10px 6px;cursor:pointer;text-align:center;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s, border-color .15s, color .15s, background .15s;}
+.submode-tab:active{transform:scale(.96)}
+.submode-tab:hover{border-color:var(--ink);}
+.submode-tab.active{color:#fff;background:var(--ink);border-color:var(--ink);}
+.sol-btn-row{display:flex;margin:-4px 0 14px;}
+.soft-btn{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--ink);background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:11px;padding:9px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:transform .12s, border-color .12s;}
+.soft-btn:hover{border-color:var(--ink)}
+.soft-btn:active{transform:scale(.96)}
+.explain .answer-line{margin-top:10px;}
 .type-nav{display:flex;align-items:center;gap:8px;}
 .type-nav-btn{height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-ui);font-weight:600;font-size:12px;line-height:1;cursor:pointer;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;transition:transform .12s, border-color .12s;}
 .type-nav-btn:hover{border-color:var(--ink)}
@@ -674,7 +688,7 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
 
 <div class="wrap">
   <h1>ОГЭ №7. Сравнение и оценка чисел</h1>
-  <div class="sub">выбери тип задания — реши шаги, потом выбери верный ответ</div>
+  <div class="sub">выбери тип задания; в «Обучении» решаешь по шагам, в «Экзамене» — сразу выбираешь ответ</div>
 
   <div id="pickerArea">
     <div class="modes" id="modesGrid"></div>
@@ -695,6 +709,12 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
       </div>
     </div>
 
+    <div class="submode-tabs">
+      <button class="submode-tab" id="tabLearn">Обучение</button>
+      <button class="submode-tab" id="tabPractice">Тренировка</button>
+      <button class="submode-tab active" id="tabExam">Экзамен</button>
+    </div>
+
     <div class="panel" id="questionPanel" style="display:none">
       <div class="prompt" id="questionPromptText"></div>
       <div id="questionNumlineHost"></div>
@@ -702,6 +722,12 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
       <div class="mcq-options" id="mcqOptions"></div>
       <button class="change-answer-btn" id="changeAnswerBtn" style="display:none">✎ Изменить ответ</button>
       <div class="options-hint" id="optionsHint" style="display:none">Решение готово — теперь выбери ответ ↑</div>
+    </div>
+
+    <!-- «Тренировка»: разбор по кнопке. Снаружи #questionPanel нарочно — он
+         целиком уходит «В подборку» и снимается на доску, кнопке там не место -->
+    <div class="sol-btn-row" id="solBtnRow" style="display:none">
+      <button class="soft-btn" id="showSolutionBtn">Показать решение и ответ</button>
     </div>
 
     <div class="panel" id="planPanel" style="display:none">
@@ -1882,7 +1908,129 @@ const els = {
   stSolved: document.getElementById('stSolved'),
   stErrors: document.getElementById('stErrors'),
   stStreak: document.getElementById('stStreak'),
+  tabLearn: document.getElementById('tabLearn'),
+  tabPractice: document.getElementById('tabPractice'),
+  tabExam: document.getElementById('tabExam'),
+  solBtnRow: document.getElementById('solBtnRow'),
+  showSolutionBtn: document.getElementById('showSolutionBtn'),
 };
+
+/* ═══════════════ режимы «Обучение / Тренировка / Экзамен» (Промпт №58) ═══════════════
+   Обучение — то, что было здесь всегда: план и решение по шагам (деление в
+   столбик, смешанное число, проверка вариантов), ответ выбирается, когда шаги
+   пройдены. Тренировка — условие и варианты, разбор с ответом открывается
+   кнопкой. Экзамен — только условие и варианты, как на ОГЭ; разбор — после
+   ответа. Первая неверная попытка во всех режимах отмечается красным и даёт
+   «Изменить ответ»; в Тренировке и Экзамене вторая неверная сразу
+   показывает верный вариант, в Обучении — только после шагов решения.
+   Режим общий на страницу и переживает смену типа — как в ЕГЭ. */
+let curSubMode = 'exam';
+let solShown = false;      // «Тренировка»: разбор раскрыт кнопкой
+let finishShown = false;   // разбор после ответа уже показан (см. finishTask)
+// карточка «+» — это та же страница в кадре (trainer-multi.js, ?card=1); её
+// режим всегда тот же, что у основной страницы, а своих вкладок у неё нет
+const IS_CARD = new URLSearchParams(location.search).get('card') === '1';
+function parentSubMode(){
+  try { return window.parent !== window ? window.parent.document.documentElement.getAttribute('data-submode') : null; }
+  catch (e) { return null; }
+}
+if (IS_CARD && parentSubMode()) curSubMode = parentSubMode();
+
+function guardAction(action, fn){
+  return (window.TrainerSession && window.TrainerSession.guardStudentAction)
+    ? window.TrainerSession.guardStudentAction(action, fn) : fn;
+}
+function syncTabs(){
+  els.tabLearn.classList.toggle('active', curSubMode === 'learn');
+  els.tabPractice.classList.toggle('active', curSubMode === 'practice');
+  els.tabExam.classList.toggle('active', curSubMode === 'exam');
+  // по этому атрибуту карточки «+» узнают режим основной страницы
+  document.documentElement.setAttribute('data-submode', curSubMode);
+}
+function setSubMode(mode){
+  if (mode === curSubMode) return;
+  curSubMode = mode;
+  if (mode !== 'practice') solShown = false;
+  syncTabs();
+  applyModeView();
+}
+// показать текущее задание так, как положено в выбранном режиме. Само задание
+// и уже сделанный выбор ответа при смене режима не теряются
+function applyModeView(){
+  if (!curTask || els.taskArea.style.display === 'none') return;
+  if (taskAnswered) { syncSolutionUI(); return; }  // решённое выглядит одинаково во всех режимах
+  els.optionsHint.style.display = 'none';
+  if (curSubMode === 'learn') {
+    els.planPanel.style.display = curTask.plan ? 'block' : 'none';
+    restartSteps();
+  } else {
+    els.planPanel.style.display = 'none';
+    els.sheetArea.style.display = 'none';
+    els.qaPanel.style.display = 'none';
+    // в «Обучении» после ошибки варианты ждут конца решения по шагам; здесь
+    // шагов нет, поэтому варианты снова доступны — если только на них не
+    // висит неверный выбор с кнопкой «Изменить ответ»
+    if (els.changeAnswerBtn.style.display !== 'block') {
+      optionsLocked = false;
+      els.mcqOptions.querySelectorAll('.mcq-btn').forEach(b => b.classList.remove('disabled'));
+      attachMCQHandlers();
+    }
+  }
+  syncSolutionUI();
+  syncKeypadVisibility();
+}
+// решение по шагам — с начала. Шаги, которые вставил выбор дроби (fromChoice),
+// выбрасываем: иначе при повторном прохождении они задвоились бы
+function restartSteps(){
+  curTask.steps = curTask.steps.filter(st => !st.fromChoice);
+  stepIdx = 0;
+  stepsDone = false;
+  els.stepInput.disabled = false;
+  els.stepGo.disabled = false;
+  els.mixedFill._fracChain = false;
+  runStep();
+}
+function solutionHTML(){
+  const i = curTask.correctIndex;
+  return `<b>Решение:</b> ${curTask.explain}<div class="answer-line"><b>Ответ:</b> ${i + 1}) ${curTask.options[i]}</div>`;
+}
+// «Тренировка»: кнопка «Показать решение и ответ» и сам разбор по ней
+function syncSolutionUI(){
+  const canShow = curSubMode === 'practice' && !!curTask && !taskAnswered;
+  els.solBtnRow.style.display = canShow ? 'flex' : 'none';
+  els.showSolutionBtn.textContent = solShown ? 'Скрыть решение и ответ' : 'Показать решение и ответ';
+  if (taskAnswered) return;   // разбор после ответа показывает finishTask
+  if (canShow && solShown) {
+    const wasHidden = els.mainPanel.style.display === 'none';
+    els.explainBox.innerHTML = solutionHTML();
+    els.explainBox.style.display = 'block';
+    els.nextBtn.style.display = 'none';
+    els.mainPanel.style.display = 'block';
+    if (wasHidden) {
+      els.mainPanel.classList.remove('reveal');
+      void els.mainPanel.offsetWidth;
+      els.mainPanel.classList.add('reveal');
+    }
+  } else {
+    els.mainPanel.style.display = 'none';
+    els.explainBox.style.display = 'none';
+  }
+}
+els.tabLearn.onclick = () => setSubMode('learn');
+els.tabPractice.onclick = () => setSubMode('practice');
+els.tabExam.onclick = () => setSubMode('exam');
+els.showSolutionBtn.onclick = guardAction('showSolution', () => {
+  if (taskAnswered || curSubMode !== 'practice') return;
+  solShown = !solShown;
+  syncSolutionUI();
+});
+syncTabs();
+if (IS_CARD) {
+  setInterval(() => {
+    const m = parentSubMode();
+    if (m && m !== curSubMode) setSubMode(m);
+  }, 400);
+}
 
 /* ═══════════════ память по прототипам + история + медали (localStorage) ═══════════════
    Каждый прототип (mode-card) хранит свой прогресс отдельно, под собственным ключом,
@@ -1904,7 +2052,10 @@ const SESSION_GAP_MS = 3 * 60 * 60 * 1000; // 3 часа без захода в 
 // версия вёрстки задания (KaTeX для дробей/корней вместо старого текстового вывода) —
 // если в localStorage лежит задание, отрисованное более старой версией кода, его нельзя
 // показывать «как есть»: нужно перегенерировать текст заново в новом формате.
-const TASK_RENDER_VERSION = 2;
+// Версия 3 (Промпт №58): шаги, вставленные выбором дроби, помечены fromChoice.
+// Сохранённое раньше задание могло хранить их без пометки — при продолжении
+// они задвоились бы, поэтому такое задание придумывается заново
+const TASK_RENDER_VERSION = 3;
 function loadProgOrFresh(key) {
   const saved = loadProg(key);
   if (!saved) return freshProg();
@@ -2113,12 +2264,16 @@ function renderCurrentTask(){
   els.changeAnswerBtn.style.display='none';
   attachMCQHandlers();
 
-  els.planPanel.style.display = curTask.plan ? 'block' : 'none';
+  // план и решение по шагам — только в «Обучении»
+  els.planPanel.style.display = (curTask.plan && curSubMode === 'learn') ? 'block' : 'none';
   els.planText.innerHTML = curTask.plan ? `<b>План решения.</b> ${curTask.plan}` : '';
 
   els.mainPanel.style.display='none';
   els.nextBtn.style.display='none';
   els.explainBox.style.display='none';
+  solShown = false;
+  finishShown = false;
+  syncSolutionUI();
 }
 
 function newTask(){
@@ -2159,6 +2314,9 @@ function resumeOrNewTask(){
   }
   if (curMode !== 'random' && curProg && curProg.task) {
     curTask = curProg.task;
+    // задание сохраняется вместе с шагами, которые вставил выбор дроби, —
+    // решение по шагам начнётся заново, и они бы задвоились
+    curTask.steps = (curTask.steps || []).filter(st => !st.fromChoice);
     stepIdx = 0;
     taskAnswered = !!curProg.answered;
     hadWrongPick = !!curProg.hadWrongPick;
@@ -2246,9 +2404,10 @@ function attachMCQHandlers(){
           saveProg(curMode, curProg);
         }
         finishTask(true);
-      } else if(stepsDone){
-        // это уже вторая попытка, сделанная после того как решение по шагам
-        // пройдено полностью — дальше просто показываем правильный ответ
+      } else if(stepsDone || (curSubMode !== 'learn' && hadWrongPick)){
+        // вторая неверная попытка: в «Обучении» — уже после того, как решение
+        // по шагам пройдено, в «Тренировке» и «Экзамене» — сразу (шагов там
+        // нет) — дальше просто показываем правильный ответ
         b.classList.add('wrong');
         streak = 0;
         totalErrors++;
@@ -2262,10 +2421,11 @@ function attachMCQHandlers(){
         }
         revealCorrectAnswer();
       } else {
-        // неверно — правильный вариант пока НЕ показываем; ученик должен решить
-        // сам по шагам ниже, а затем выбрать ответ ещё раз самостоятельно.
-        // На случай случайного клика не по тому варианту — даём кнопку
-        // «изменить ответ», которая сразу разблокирует варианты снова.
+        // неверно — правильный вариант пока НЕ показываем. В «Обучении»
+        // ученик должен решить сам по шагам ниже, а затем выбрать ответ ещё
+        // раз самостоятельно; в «Тренировке» и «Экзамене» — просто вторая
+        // попытка. На случай случайного клика не по тому варианту — даём
+        // кнопку «изменить ответ», которая сразу разблокирует варианты снова.
         b.classList.add('wrong');
         hadWrongPick = true;
         streak = 0;
@@ -2279,7 +2439,7 @@ function attachMCQHandlers(){
           saveProg(curMode, curProg);
         }
         els.changeAnswerBtn.style.display='block';
-        scrollToSolution();
+        if(curSubMode === 'learn') scrollToSolution();
       }
     };
   });
@@ -2302,6 +2462,14 @@ function qaPanelEls(){
 
 function runStep(){
   if(taskAnswered) return;
+  if(curSubMode !== 'learn'){
+    // в «Тренировке» и «Экзамене» шагов нет. Сюда же попадает и отложенный
+    // вызов из виджета шага, если режим сменили, пока он ждал своей очереди
+    els.sheetArea.style.display='none';
+    els.qaPanel.style.display='none';
+    syncKeypadVisibility();
+    return;
+  }
   const steps = curTask.steps;
   if(stepIdx >= steps.length){
     // все шаги решены — но ответ должен выбрать сам ученик, автоматически
@@ -2354,8 +2522,10 @@ function runStep(){
     els.sheetArea.style.display='none';
     els.qaPanel.style.display='block';
     createChoiceWidget(qaPanelEls(), step, (cand)=>{
+      // fromChoice: эти шаги не из задания, а из выбора ученика — при новом
+      // прохождении решения (смена режима, продолжение) их выбрасывают
       const divStep = {
-        type:'div', dividend:String(cand.num), divisor:cand.den, decimal: !!step.decimal,
+        type:'div', fromChoice:true, dividend:String(cand.num), divisor:cand.den, decimal: !!step.decimal,
         maxDecimalDigits: step.maxDecimalDigits,
         question: `Разделим выбранную дробь в столбик${step.decimal ? (step.maxDecimalDigits===1?' до десятых' : ' до сотых') : ''}, чтобы узнать её значение.`
       };
@@ -2366,13 +2536,13 @@ function runStep(){
           ? [Math.floor(cand.rem*10/cand.den)]
           : [Math.floor(rem100/10), rem100%10];
         followStep = {
-          type:'decimal',
+          type:'decimal', fromChoice:true,
           question:`Запишем в виде десятичной — впиши цифры сам, затем сравни с положением точки A на прямой и выбери подходящий вариант выше:`,
           sourceNum: cand.num, sourceDen: cand.den, intPart: cand.ip, digits
         };
       } else {
         followStep = {
-          type:'mixed',
+          type:'mixed', fromChoice:true,
           question:`Запишем в виде смешанного числа — впиши целую часть, числитель и знаменатель остатка сам, затем сравни с положением точки A на прямой и выбери подходящий вариант выше:`,
           sourceNum: cand.num, sourceDen: cand.den, whole: cand.ip, num: cand.rem, den: cand.den
         };
@@ -2404,6 +2574,9 @@ function finishTask(isFreshSolve){
   // ещё до того, как эта запись будет сделана (гонка состояний)
   if(isFreshSolve && curMode !== 'random') recordSolve();
 
+  finishShown = true;
+  solShown = false;
+  els.solBtnRow.style.display='none';
   els.optionsHint.style.display='none';
   const fading = [els.sheetArea, els.qaPanel, els.planPanel].filter(el=>el.style.display!=='none');
   fading.forEach(el=>el.classList.add('fade-out'));
@@ -2540,7 +2713,10 @@ let tsTaskRef = null, tsTaskPristine = null;
 function tsPristineTask(){
   if (curTask !== tsTaskRef) {
     tsTaskRef = curTask;
-    tsTaskPristine = curTask ? JSON.parse(JSON.stringify(curTask)) : null;
+    // шаги из выбора дроби (fromChoice) — не часть задания: копию могли снять
+    // и после такой вставки
+    tsTaskPristine = curTask ? JSON.parse(JSON.stringify(Object.assign({}, curTask,
+      { steps: (curTask.steps || []).filter(st => !st.fromChoice) }))) : null;
   }
   return tsTaskPristine;
 }
@@ -2561,6 +2737,9 @@ function tsGetState(){
     // выглядели так же, не пересылая внутренние флаги решения по шагам
     wrongIndex: tsWrongIndex(),
     wrongShown: els.changeAnswerBtn.style.display === 'block',
+    // режим и раскрытый в «Тренировке» разбор — общие, как в ЕГЭ
+    curSubMode: curSubMode,
+    solShown: !!solShown,
   };
   if (window.__boardGetState) Object.assign(base, window.__boardGetState());
   if (window.__cardsGetState) Object.assign(base, window.__cardsGetState());
@@ -2599,8 +2778,10 @@ function tsApplyAnswerView(state){
     els.optionsHint.style.display = 'none';
     // разбор показываем один раз — при переходе в «решено», а не на каждый
     // входящий снимок (иначе анимация появления переигрывалась бы на
-    // каждый штрих собеседника, см. раздел «Грабли» в HANDOFF)
-    if (els.mainPanel.style.display === 'none') finishTask(false);
+    // каждый штрих собеседника, см. раздел «Грабли» в HANDOFF). Смотрим на
+    // флаг, а не на видимость панели: в «Тренировке» она уже может быть
+    // открыта кнопкой «Показать решение», а разбор после ответа — другой
+    if (!finishShown) finishTask(false);
     return;
   }
   if (state.wrongShown && wi !== null) {
@@ -2619,6 +2800,16 @@ function tsApplyState(state){
   if (window.__boardApplyState) window.__boardApplyState(state);
   if (window.__cardsApplyState) window.__cardsApplyState(state);
   if (typeof state.picker === 'undefined') return; // снимок без задания (пустая сессия)
+
+  // режим общий у обоих участников; в карточке «+» — всегда как на основной
+  // странице (см. IS_CARD), а не тот, что был при её создании
+  const wantMode = (!IS_CARD && state.curSubMode) ? state.curSubMode : curSubMode;
+  const modeChanged = wantMode !== curSubMode;
+  if (modeChanged) {
+    curSubMode = wantMode;
+    if (curSubMode !== 'practice') solShown = false;
+    syncTabs();
+  }
 
   if (state.picker) {
     if (els.picker.style.display === 'none') {
@@ -2639,7 +2830,8 @@ function tsApplyState(state){
     || !!hadWrongPick !== !!state.hadWrongPick
     || tsWrongIndex() !== (typeof state.wrongIndex === 'number' ? state.wrongIndex : null)
     || (els.changeAnswerBtn.style.display === 'block') !== !!state.wrongShown;
-  if (!taskChanged && !viewChanged) return;
+  const solChanged = !!solShown !== (curSubMode === 'practice' && !!state.solShown);
+  if (!taskChanged && !viewChanged && !modeChanged && !solChanged) return;
 
   if (taskChanged) {
     // то же, что делает newTask(), только задание не придумывается, а берётся
@@ -2657,13 +2849,19 @@ function tsApplyState(state){
     els.mixedFill._fracChain = false;
     renderCurrentTask();
     runStep();
+  } else if (modeChanged) {
+    applyModeView();
   }
   tsApplyAnswerView(state);
+  if (!taskAnswered) {
+    solShown = curSubMode === 'practice' && !!state.solShown;
+    syncSolutionUI();
+  }
 }
 
 // Промпт №54: пришедшее от собеседника назад не рассылаем — иначе через
 // 300 мс эхо откатывало бы его следующее действие (подробно — в ОГЭ №6)
-function tsWatchSig(s){ return JSON.stringify([s.picker, s.curMode, s.curTask, s.taskAnswered, s.hadWrongPick, s.wrongIndex, s.wrongShown]); }
+function tsWatchSig(s){ return JSON.stringify([s.picker, s.curMode, s.curTask, s.taskAnswered, s.hadWrongPick, s.wrongIndex, s.wrongShown, s.curSubMode, s.solShown]); }
 let tsPeerSig = null;
 /* Версия задания в общем снимке. Снимок уходит не только при правке задания,
    но и с каждым штрихом доски — и несёт то задание, которое было у

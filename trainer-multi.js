@@ -104,6 +104,13 @@
   let railOpen = false;
   let wrapEl = null;
   const frames = new Map(); // id -> iframe
+  /* Промпт №58: снимок, уже отданный кадру (id → JSON). Список карточек
+     перерисовывается при каждом добавлении и удалении, и раньше каждая уже
+     стоящая карточка при этом заново получала свой снимок с момента
+     создания — ответ, который ученик в ней успел дать, стирался. Теперь
+     снимок уходит в кадр только один раз, либо когда он действительно другой
+     (например, пришёл от ведущего позже, чем загрузился кадр). */
+  const applied = new Map();
 
   function uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -258,6 +265,7 @@
     frame.style.height = '320px';
     frame.addEventListener('load', () => {
       frames.set(card.id, frame);
+      applied.delete(card.id);   // свежая загрузка кадра — снимка в нём ещё нет
       loading.remove();
       applyToFrame(card.id);
     });
@@ -284,6 +292,9 @@
     const api = frame.contentWindow.__trainerState;
     if (!api) return;
     if (card.state) {
+      const sig = JSON.stringify(card.state);
+      if (applied.get(card.id) === sig) return;
+      applied.set(card.id, sig);
       try { api.apply(card.state); } catch (e) {}
       return;
     }
@@ -310,6 +321,8 @@
       if (parentSnap) api.apply(JSON.parse(JSON.stringify(parentSnap)));
       if (api.newTask) api.newTask();
       card.state = taskSnapshot(frame.contentWindow);
+      // этот снимок кадр и так уже показывает — повторно его не применяем
+      applied.set(card.id, JSON.stringify(card.state));
       TS.push();
     } catch (e) {}
   }
@@ -319,7 +332,7 @@
     const want = new Set(cards.map(c => c.id));
     // убираем лишние
     Array.from(wrap.children).forEach(el => {
-      if (!want.has(el.dataset.id)) { frames.delete(el.dataset.id); el.remove(); }
+      if (!want.has(el.dataset.id)) { frames.delete(el.dataset.id); applied.delete(el.dataset.id); el.remove(); }
     });
     // добавляем недостающие, сохраняя порядок
     cards.forEach(card => {
