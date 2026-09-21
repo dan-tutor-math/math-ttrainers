@@ -72,8 +72,9 @@ def run():
             page.goto(f"{BASE}/{slug}.html")
             page.wait_for_timeout(1200)
             bridge = page.evaluate("() => !!window.__trainerState") if slug in TRAINERS else None
-            # у тренажёров из семейства ОГЭ №8 своя система карточек, без моста
-            needs_bridge = slug in TRAINERS and slug not in ("oge8", "oge12", "powers")
+            # у тренажёров из семейства ОГЭ №8 своя система карточек, без моста;
+            # с Промпта №56 туда же перешёл ЕГЭ профиль
+            needs_bridge = slug in TRAINERS and slug not in ("oge8", "oge12", "powers", "ege_prof")
             ok = not errors and (not needs_bridge or bridge)
             print(f"[{'OK' if ok else 'FAIL'}] {slug}" + (f": {errors[:2]}" if errors else "")
                   + ("" if not needs_bridge or bridge else ": нет window.__trainerState"))

@@ -116,24 +116,46 @@ def test_catalog(browser):
     ctx.close()
 
 
+def open_proto(page, i=1):
+    """Открыть i-й прототип со страницы выбора (как в ОГЭ: сначала список)."""
+    page.click(f'.mode-card:nth-of-type({i})')
+    page.wait_for_timeout(250)
+
+
 def test_navigation(browser):
     ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=7")
     check("адрес ?n=7 открывает №7", page.evaluate("S.n") == 7)
     check("заголовок по номеру", "№7" in page.inner_text("#pageTitle"))
-    check("прототипов у №7 — три", page.eval_on_selector_all('.proto-chip', 'e => e.length') == 3)
+    check("сначала открывается список прототипов",
+          page.evaluate("S.screen") == "picker"
+          and page.eval_on_selector('#taskArea', 'e => e.style.display') == 'none')
+    check("в списке три прототипа №7", page.eval_on_selector_all('.mode-card', 'e => e.length') == 3)
 
-    page.click('.proto-chip:nth-of-type(3)')
-    page.wait_for_timeout(200)
-    check("переключение прототипа", page.evaluate("S.pid") == "7.3")
+    open_proto(page, 3)
+    check("карточка прототипа открывает задание",
+          page.evaluate("S.pid") == "7.3" and page.evaluate("S.screen") == "task"
+          and page.eval_on_selector('#pickerArea', 'e => e.style.display') == 'none')
 
-    page.click('.num-chip[data-n="13"]')
-    page.wait_for_timeout(300)
-    check("переключение номера", page.evaluate("S.n") == 13)
-    check("адрес переписан на текущий номер", page.url.endswith("n=13"), page.url)
+    page.click('#nextProtoBtn')
+    page.wait_for_timeout(250)
+    check("«Следующий прототип» листает по кругу", page.evaluate("S.pid") == "7.1")
+    page.click('#prevProtoBtn')
+    page.wait_for_timeout(250)
+    check("«Предыдущий прототип» возвращает назад", page.evaluate("S.pid") == "7.3")
 
-    page.click('#refreshBtn')
-    page.wait_for_timeout(200)
-    check("⟳ у одного прототипа не ломает задание", page.evaluate("S.pid") == "13.1")
+    page.click('#backBtn')
+    page.wait_for_timeout(250)
+    check("«← все прототипы» возвращает к списку",
+          page.evaluate("S.screen") == "picker"
+          and page.eval_on_selector('#pickerArea', 'e => e.style.display') != 'none')
+    check("номер задания остаётся в адресе", page.url.endswith("n=7"), page.url)
+
+    page.goto(f"{BASE}/ege_prof.html?n=13")
+    page.wait_for_timeout(1200)
+    open_proto(page, 1)
+    check("у единственного прототипа переходов нет",
+          page.eval_on_selector('#nextProtoBtn', 'e => e.style.display') == 'none'
+          and page.eval_on_selector('#prevProtoBtn', 'e => e.style.display') == 'none')
     check("навигация: без ошибок JS", not errors, str(errors[:1]))
     ctx.close()
 
@@ -141,15 +163,16 @@ def test_navigation(browser):
 def test_part1_flow(browser):
     ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=4")
     page.evaluate("localStorage.removeItem('ogeProg:ege_prof:solved')")
+    open_proto(page, 1)
 
     page.fill('input[data-fid="main"]', '3/10')
-    page.click('#checkBtn')
+    page.click('#answerArea .check-btn')
     page.wait_for_timeout(150)
     check("часть 1: дробь 3/10 — просьба записать иначе, а не ошибка",
-          "целое число" in page.inner_text('#answerMsg') and page.evaluate("totalErrors") == 0)
+          "целое число" in page.inner_text('#answerArea .answer-msg') and page.evaluate("totalErrors") == 0)
 
     page.fill('input[data-fid="main"]', '0,7')
-    page.click('#checkBtn')
+    page.click('#answerArea .check-btn')
     page.wait_for_timeout(150)
     check("часть 1: первая неверная попытка — красное поле",
           page.evaluate("S.hadWrong") is True and not page.evaluate("S.answered")
@@ -157,7 +180,7 @@ def test_part1_flow(browser):
     check("часть 1: решение пока не показано", page.eval_on_selector('#mainPanel', 'e => e.style.display') == 'none')
 
     page.fill('input[data-fid="main"]', '0,71')
-    page.click('#checkBtn')
+    page.click('#answerArea .check-btn')
     page.wait_for_timeout(150)
     check("часть 1: вторая неверная — подставлен верный ответ",
           page.eval_on_selector('input[data-fid="main"]', 'e => e.value') == '0,3'
@@ -170,7 +193,7 @@ def test_part1_flow(browser):
     check("«следующий прототип» листает внутри номера", page.evaluate("S.pid") == "4.2")
 
     page.fill('input[data-fid="main"]', '0,38')
-    page.click('#checkBtn')
+    page.click('#answerArea .check-btn')
     page.wait_for_timeout(200)
     check("часть 1: верный ответ засчитан",
           page.evaluate("S.correct") is True and page.evaluate("totalSolved") == 1)
@@ -183,40 +206,43 @@ def test_part1_flow(browser):
 def test_part2_flow(browser):
     ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=18")
     # 18.2: ответ 169/5 — принимаем и дробью, и десятичной записью
-    page.click('.proto-chip:nth-of-type(2)')
-    page.wait_for_timeout(200)
+    open_proto(page, 2)
     page.fill('input[data-fid="b"]', '33,8')
-    page.click('#checkBtn')
+    page.click('#answerArea .check-btn')
     page.wait_for_timeout(200)
     check("часть 2: 33,8 засчитано вместо 169/5", page.evaluate("S.correct") is True)
 
     page.goto(f"{BASE}/ege_prof.html?n=15")
     page.wait_for_timeout(1200)
+    open_proto(page, 1)
     page.fill('input[data-fid="b"]', '72*sqrt3')
-    page.click('#checkBtn')
+    page.click('#answerArea .check-btn')
     page.wait_for_timeout(200)
     check("часть 2: 72*sqrt3 засчитано вместо 72√3", page.evaluate("S.correct") is True)
 
     page.goto(f"{BASE}/ege_prof.html?n=16")
     page.wait_for_timeout(1200)
+    open_proto(page, 1)
     page.fill('input[data-fid="ans"]', '1<x<=4')
-    page.click('#checkBtn')
+    page.click('#answerArea .check-btn')
     page.wait_for_timeout(200)
     check("часть 2: неравенство 1<x<=4 засчитано вместо (1;4]", page.evaluate("S.correct") is True)
 
     page.goto(f"{BASE}/ege_prof.html?n=14")
     page.wait_for_timeout(1200)
+    open_proto(page, 1)
     page.fill('input[data-fid="b"]', '-7π/2; -5π/2; -15π/4')
-    page.click('#checkBtn')
+    page.click('#answerArea .check-btn')
     page.wait_for_timeout(200)
     check("часть 2: корни в другом порядке засчитаны", page.evaluate("S.correct") is True)
 
     page.goto(f"{BASE}/ege_prof.html?n=20")
     page.wait_for_timeout(1200)
+    open_proto(page, 1)
     page.click('.yn-group[data-fid="a"] .yn-btn[data-val="да"]')
     page.click('.yn-group[data-fid="b"] .yn-btn[data-val="да"]')
     page.fill('input[data-fid="c"]', '150')
-    page.click('#checkBtn')
+    page.click('#answerArea .check-btn')
     page.wait_for_timeout(200)
     check("часть 2: неверное «да» помечено, верные — нет",
           page.evaluate("S.marks.b") == 'bad' and page.evaluate("S.marks.a") == 'good'
@@ -229,15 +255,16 @@ def test_part2_flow(browser):
 
 def test_modes(browser):
     ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=11")
+    open_proto(page, 1)
     check("экзамен: решения не видно", page.eval_on_selector('#mainPanel', 'e => e.style.display') == 'none')
 
     page.click('#tabPractice')
     page.wait_for_timeout(150)
     check("тренировка: есть кнопка «Показать решение и ответ»",
-          page.eval_on_selector('#solBtnRow', 'e => e.style.display') != 'none')
+          page.eval_on_selector('#card1BtnRow', 'e => e.style.display') != 'none')
     page.click('#showSolutionBtn')
     page.wait_for_timeout(150)
-    shown = page.eval_on_selector_all('.sol-step', 'els => els.filter(e => e.style.display !== "none").length')
+    shown = page.eval_on_selector_all('#solSteps .sol-step', 'els => els.filter(e => e.style.display !== "none").length')
     check("тренировка: решение раскрывается целиком", shown == page.evaluate("curProto.steps.length"))
     page.click('#showSolutionBtn')
     page.wait_for_timeout(150)
@@ -246,7 +273,7 @@ def test_modes(browser):
 
     page.click('#tabLearn')
     page.wait_for_timeout(150)
-    shown = page.eval_on_selector_all('.sol-step', 'els => els.filter(e => e.style.display !== "none").length')
+    shown = page.eval_on_selector_all('#solSteps .sol-step', 'els => els.filter(e => e.style.display !== "none").length')
     check("обучение: сначала один шаг и идея", shown == 1
           and page.eval_on_selector('#solHint', 'e => e.style.display') != 'none')
     check("обучение: ответ ещё закрыт", page.eval_on_selector('#solAnswer', 'e => e.style.display') == 'none')
@@ -254,7 +281,7 @@ def test_modes(browser):
     for _ in range(total - 1):
         page.click('#nextStepBtn')
         page.wait_for_timeout(80)
-    shown = page.eval_on_selector_all('.sol-step', 'els => els.filter(e => e.style.display !== "none").length')
+    shown = page.eval_on_selector_all('#solSteps .sol-step', 'els => els.filter(e => e.style.display !== "none").length')
     check("обучение: шаги открываются по одному до конца", shown == total)
     check("обучение: в конце показан ответ",
           page.eval_on_selector('#solAnswer', 'e => e.style.display') == 'block')
@@ -264,19 +291,18 @@ def test_modes(browser):
 
 def test_state_bridge(browser):
     ctx1, teacher, err1 = new_page(browser, f"{BASE}/ege_prof.html?n=1")
-    ctx2, student, err2 = new_page(browser, f"{BASE}/ege_prof.html?n=1")
+    ctx2, student, err2 = new_page(browser, f"{BASE}/ege_prof.html?n=12")
 
-    teacher.click('.num-chip[data-n="12"]')
-    teacher.wait_for_timeout(200)
-    teacher.click('.proto-chip:nth-of-type(3)')
-    teacher.wait_for_timeout(200)
+    teacher.goto(f"{BASE}/ege_prof.html?n=12")
+    teacher.wait_for_timeout(1200)
+    open_proto(teacher, 3)
     teacher.click('#tabPractice')
     teacher.fill('input[data-fid="main"]', '64')
-    teacher.click('#checkBtn')
+    teacher.click('#answerArea .check-btn')
     teacher.wait_for_timeout(200)
 
-    snapshot = teacher.evaluate("JSON.parse(JSON.stringify(window.__trainerState.get()))")
-    student.evaluate("s => window.__trainerState.apply(s)", snapshot)
+    snapshot = teacher.evaluate("JSON.parse(JSON.stringify(tsGetState()))")
+    student.evaluate("s => tsApplyState(s)", snapshot)
     student.wait_for_timeout(300)
     check("мост: номер и прототип переехали",
           student.evaluate("S.n") == 12 and student.evaluate("S.pid") == "12.3")
@@ -315,15 +341,15 @@ def test_bank(browser):
           // эталонный ответ обязан проходить собственную проверку
           if (t.part === 1) {
             const f = { id: 'main', type: 'plain', value: p.answer };
-            if (checkField(f, p.answer) !== true) bad.answer.push(p.id);
+            if (checkField(f, p.answer, S) !== true) bad.answer.push(p.id);
           } else {
             if (!p.fields || !p.fields.length) { bad.fields.push(p.id); continue; }
             for (const f of p.fields) {
               if (f.type === 'yesno') {
                 S.yn[f.id] = f.value;
-                if (checkField(f, null) !== true) bad.answer.push(p.id + '/' + f.id);
+                if (checkField(f, null, S) !== true) bad.answer.push(p.id + '/' + f.id);
                 S.yn = {};
-              } else if (checkField(f, f.value) !== true) {
+              } else if (checkField(f, f.value, S) !== true) {
                 bad.answer.push(p.id + '/' + f.id);
               }
             }
@@ -375,6 +401,7 @@ def test_basket(browser):
     page.route("https://**/*", lambda route: route.abort())
     page.goto(f"{BASE}/ege_prof.html?n=8")
     page.wait_for_timeout(1400)
+    open_proto(page, 1)
     page.evaluate("localStorage.removeItem('ogeBasket:v1')")
     page.click('#basketAddBtn')
     page.wait_for_timeout(300)
@@ -445,6 +472,9 @@ def test_board_capture(browser):
     page.wait_for_timeout(400)
     page.evaluate('() => document.querySelector(\'.bd-trainers-item[data-id="ege1"]\').click()')
     page.wait_for_timeout(3000)
+    # в панели тренажёр открывается на списке прототипов — выбираем первый
+    page.frame_locator('#bdTrainersIframe').locator('.mode-card').first.click()
+    page.wait_for_timeout(1200)
     page.evaluate("() => document.getElementById('bdTrainersAddBtn').click()")
     try:
         page.wait_for_function("() => (window.getCurrentBoard().objects || []).length > 0", timeout=25000)

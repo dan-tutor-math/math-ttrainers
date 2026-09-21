@@ -3856,8 +3856,11 @@ const TRAINER_CAPTURE = {
 };
 // Промпт №55: ЕГЭ профиль — одна страница на все 20 позиций (ege_prof.html?n=…),
 // поэтому у всех её записей один и тот же узел задания, и ставим их циклом.
-// #egeQuestion — только условие, без полей ответа и кнопок.
-for (let n = 1; n <= 20; n++) TRAINER_CAPTURE['ege' + n] = [ { sel:'#egeQuestion' } ];
+// #egeQuestion — только условие, без полей ответа и кнопок; у добавленных
+// кнопкой «+» карточек ту же роль играет .added-card-question (Промпт №56).
+for (let n = 1; n <= 20; n++) {
+  TRAINER_CAPTURE['ege' + n] = [ { sel:'#egeQuestion' }, { selAll:'.added-task-card .added-card-question' } ];
+}
 
 // список тренажёров для панели — те же названия/файлы, что и в реестре
 // TRAINERS на главной странице (index.html), сгруппированы так же просто,

@@ -62,7 +62,24 @@
          теории со статистикой — всё это уже есть у основного примера
          выше, а в карточке только зря занимает экран */
       .levels, #levels, .theory, .stats-row, #statsRow, .stat-row,
-      #boardSpace, .keypad-toggle { display: none !important; }
+      #boardSpace, .keypad-toggle,
+      /* Промпт №56: в карточке должно быть ТОЛЬКО задание. Раньше сюда
+         пролезала вся оставшаяся обвязка страницы: шапка задания с
+         названием и кнопками, вкладки режимов (в ОГЭ №19 они лежат
+         не в .submode-row), калькулятор в столбик, плавающая кнопка
+         «свернуть подсказки», клавиатура, история примеров и медали —
+         у каждой добавленной карточки это повторялось заново */
+      .task-head, .submode-tabs, .calc-tools, #calcTools, .calc-panel,
+      .focus-toggle, .keypad-float, #keypadFloat, .example-history-toggle,
+      .example-history-panel, .medal-tray, .medal-badge-row,
+      .work-resize-handle,
+      /* .corner — это «📥 ⟳ пример №N» арифметических тренажёров, тоже обвязка.
+         А вот .corner-left трогать нельзя: там кнопка «отменить шаг», без неё
+         дробь в карточке не порешаешь */
+      .corner,
+      /* холст доски в кадре не нужен: рисует доска РОДИТЕЛЬСКОЙ страницы,
+         поверх всех карточек сразу */
+      #boardCanvas { display: none !important; }
       body { background: transparent !important; }
       .wrap { padding-top: 0 !important; margin-top: 0 !important; }
       html, body { overflow-x: hidden; }

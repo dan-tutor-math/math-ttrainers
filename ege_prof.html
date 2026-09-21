@@ -217,7 +217,6 @@ html[data-focus="on"] .submode-row{
 html[data-focus="on"] #pickerArea{display:none!important;}
 h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,5vw,34px);color:var(--pencil);text-align:center;}
 .sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 18px;}
-.task-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
 .submode-tabs{display:flex;gap:8px;}
 .submode-row{margin-bottom:14px;}
 .submode-tab{flex:1;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:10px 6px;cursor:pointer;text-align:center;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s, border-color .15s, color .15s, background .15s;}
@@ -231,31 +230,31 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .basket-add-btn:hover{border-color:var(--ink)}
 .basket-add-btn:active{transform:scale(.9)}
 .basket-add-btn.ok{background:var(--ok, #34c759);border-color:var(--ok, #34c759);color:#fff;}
-.task-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3);margin-right:auto;}
+.task-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3);}
 .panel{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:20px;margin-bottom:14px;}
 @keyframes revealUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
 #mainPanel.reveal{animation:revealUp .38s cubic-bezier(.22,.9,.35,1) both;}
 
-/* ─── выбор номера задания и прототипа ─── */
-/* справа сверху висят кнопки темы/доски/фокуса — оставляем им место,
-   иначе последняя фишка номера уезжает под них */
-.num-strip{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px;padding-right:62px;}
-.num-chip{position:relative;min-width:36px;height:34px;padding:0 8px;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);border-radius:11px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .12s, border-color .12s, background .12s, color .12s;}
-.num-chip:hover{border-color:var(--ink)}
-.num-chip:active{transform:scale(.94)}
-.num-chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
-.num-chip.done::after{content:'';position:absolute;top:3px;right:4px;width:6px;height:6px;border-radius:50%;background:var(--ok);}
-.num-chip.active.done::after{background:#fff;}
-.part-label{font-family:var(--font-ui);font-weight:600;font-size:11px;color:var(--muted-6);text-transform:uppercase;letter-spacing:.04em;margin:0 6px 0 2px;white-space:nowrap;}
-.proto-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:16px;padding-right:62px;}
-.proto-label{font-family:var(--font-ui);font-weight:500;font-size:13px;color:var(--muted-6);margin-right:2px;}
-.proto-chip{min-width:30px;height:28px;padding:0 10px;font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);border-radius:9px;cursor:pointer;display:inline-flex;align-items:center;gap:4px;transition:transform .12s, border-color .12s, background .12s, color .12s;}
-.proto-chip:hover{border-color:var(--ink)}
-.proto-chip:active{transform:scale(.94)}
-.proto-chip.active{background:var(--ink);border-color:var(--ink);color:#fff;}
-.proto-chip .tick{font-size:11px;color:var(--ok)}
-.proto-chip.active .tick{color:#fff}
-.src-note{font-family:var(--font-ui);font-size:12px;color:var(--muted-6);margin-left:auto;}
+/* ─── экран выбора прототипа (как список типов в ОГЭ №8) ─── */
+.group-title{font-family:var(--font-ui);font-weight:700;font-size:14px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.04em;margin:0 2px 10px;}
+.modes{display:flex;flex-direction:column;gap:8px;margin-bottom:6px;}
+.mode-card{display:flex;align-items:center;flex-wrap:wrap;gap:6px 16px;text-align:left;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:14px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:11px 18px;cursor:pointer;transition:transform .12s, border-color .12s;font-family:var(--font-ui);}
+.mode-card:hover{border-color:var(--ink);transform:translateX(3px)}
+.mode-card .mtitle{font-weight:600;font-size:15px;color:var(--pencil);line-height:1.3;flex:0 0 auto;margin:0;}
+.mode-card .mpeek{font-family:var(--font-ui);font-size:13px;color:var(--muted-6);line-height:1.35;flex:1 1 240px;min-width:0;}
+.mode-card .mdone{font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--ok);flex:0 0 auto;}
+/* шапка задания: слева переходы между прототипами, справа название и «в подборку».
+   flex-wrap — чтобы на телефоне кнопки переносились, а не вылезали за край */
+.task-head{display:flex;flex-wrap:wrap;row-gap:8px;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;padding-right:62px;}
+.type-nav{display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;gap:8px;}
+.type-nav-btn{height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-ui);font-weight:600;font-size:12px;line-height:1;cursor:pointer;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;transition:transform .12s, border-color .12s;}
+.type-nav-btn:hover{border-color:var(--ink)}
+.type-nav-btn:active{transform:scale(.9)}
+.back-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 14px;cursor:pointer;transition:transform .12s, border-color .12s;}
+.back-btn:active{transform:scale(.96)}
+.back-btn:hover{border-color:var(--ink)}
+.corner{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
+.src-note{font-family:var(--font-ui);font-size:12px;color:var(--muted-6);}
 
 /* ─── условие ─── */
 .ege-text{font-family:var(--font-ui);font-weight:400;font-size:clamp(16px,2.6vw,18px);line-height:1.6;color:var(--muted-5);}
@@ -312,6 +311,81 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .soft-btn{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--ink);background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:11px;padding:9px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:transform .12s, border-color .12s;}
 .soft-btn:hover{border-color:var(--ink)}
 .soft-btn:active{transform:scale(.96)}
+
+/* ─── несколько заданий на экране (как в ОГЭ №8) ─── */
+.work-zone{position:relative;left:50%;transform:translateX(-50%);max-width:calc(100vw - 24px);width:var(--work-w, 100%);}
+.work-resize-handle{position:absolute;top:0;bottom:0;width:10px;cursor:ew-resize;touch-action:none;z-index:5;}
+.work-resize-handle.left{left:0;}
+.work-resize-handle.right{right:0;}
+.tasks-columns{display:grid;gap:14px;align-items:start;}
+.added-task-card{position:relative;}
+.card-btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.card-btn-row .soft-btn{margin-top:0;}
+.icon-only{font-size:15px;line-height:1;padding:8px 11px;}
+.added-remove-btn{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--teacher);background:none;border:1px solid transparent;border-radius:11px;padding:8px 10px;cursor:pointer;margin-left:auto;transition:border-color .12s;}
+.added-remove-btn:hover{border-color:var(--teacher)}
+.added-explain{margin-top:12px;border-top:1px solid var(--glass-border);padding-top:12px;}
+.add-rail{position:fixed;left:12px;top:50%;transform:translateY(-50%);z-index:120;display:flex;flex-direction:column;align-items:center;gap:8px;}
+.add-rail-toggle{width:44px;height:44px;flex:0 0 auto;border:none;border-radius:50%;background:var(--ink);color:#fff;font-size:24px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.25);transition:transform .15s;}
+.add-rail-toggle:hover{transform:scale(1.06)}
+.add-rail.open .add-rail-toggle{transform:rotate(45deg)}
+.add-rail-body{display:none;flex-direction:column;gap:6px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;padding:10px 8px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:70vh;overflow-y:auto;}
+.add-rail.open .add-rail-body{display:flex;}
+.add-rail-label{font-family:var(--font-ui);font-weight:600;font-size:11px;color:var(--muted-3);text-align:center;margin-bottom:2px;}
+.add-rail-body .add-qty-btn{min-width:46px;text-align:center;padding:8px 6px;font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--ink);background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:10px;cursor:pointer;}
+.add-rail-body .add-qty-btn:hover{border-color:var(--ink)}
+.add-rail-sep{height:1px;background:var(--glass-border);margin:4px 2px;}
+.add-rail-act{padding:7px 6px;font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--ink);background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:10px;cursor:pointer;}
+.add-rail-act:hover{border-color:var(--ink)}
+
+/* ─── медали за серию без ошибок ─── */
+.medal-badge-row{display:inline-flex;flex-wrap:wrap;row-gap:3px;gap:3px;font-size:15px;vertical-align:middle;}
+.medal-tray{position:fixed;left:0;right:0;bottom:0;z-index:150;display:none;gap:7px;align-items:center;padding:8px 16px;overflow-x:auto;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border-top:1px solid var(--glass-border);}
+.medal-tray.show{display:flex;}
+html[data-medals="on"] .board-toolbar,
+html[data-medals="on"] .board-view-toolbar{bottom:64px;}
+.medal-tray-icon{font-size:20px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.2));animation:medalPop .45s cubic-bezier(.34,1.56,.64,1) both;flex:none;}
+@keyframes medalPop{0%{transform:scale(0);}70%{transform:scale(1.3);}100%{transform:scale(1);}}
+.medal-flyer{position:fixed;z-index:300;pointer-events:none;font-size:44px;filter:drop-shadow(0 4px 14px rgba(0,0,0,.3));transition:transform .85s cubic-bezier(.32,.9,.35,1), opacity .85s ease .1s;}
+.mode-medals{font-family:var(--font-ui);font-size:12px;opacity:.85;flex:0 0 auto;}
+
+/* ─── история решённых заданий ─── */
+.example-history-toggle{display:block;width:100%;margin:2px 0 14px;font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:10px;cursor:pointer;transition:border-color .12s;}
+.example-history-toggle:hover{border-color:var(--ink)}
+.example-history-panel{display:none;position:relative;padding:18px;}
+.example-history-list{display:flex;flex-direction:column;}
+.example-history-row{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--glass-border);}
+.example-history-row:first-child{border-top:none;}
+.example-history-num{font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-6);min-width:26px;}
+.example-history-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;font-family:var(--font-ui);font-size:14px;color:var(--muted-4);}
+.example-history-answer{font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--ok);}
+.example-history-answer.bad{color:var(--teacher)}
+.example-history-empty{font-family:var(--font-ui);font-size:14px;color:var(--muted-6);text-align:center;padding:16px 0;}
+
+/* ─── плавающая клавиатура для ввода с телефона ─── */
+.keypad{display:grid;grid-template-columns:repeat(3, 44px);gap:6px}
+.keypad button{width:44px;height:40px;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-mono);font-size:18px;cursor:pointer;touch-action:manipulation}
+.keypad button:active{background:var(--hl)}
+.keypad button.kp-minus{color:var(--teacher);font-weight:700}
+.keypad button.kp-back{grid-column:span 3;width:auto;height:36px;font-size:15px;color:var(--muted-6);}
+.keypad button.kp-enter{grid-column:span 3;width:auto;height:38px;font-family:var(--font-ui);font-weight:600;font-size:14px;background:var(--ink);color:#fff;border-color:var(--ink);}
+.keypad button.kp-enter:active{background:var(--ink-active);}
+.keypad-float{position:fixed;top:160px;right:16px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:210;}
+.keypad-close{position:absolute;top:-11px;right:-11px;width:26px;height:26px;border-radius:50%;background:var(--teacher);color:#fff;border:2px solid #fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s;}
+.keypad-close:active{transform:scale(.9)}
+.keypad-drag-handle{position:absolute;top:-11px;left:-11px;width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;border:2px solid #fff;font-size:12px;line-height:1;cursor:grab;display:flex;align-items:center;justify-content:center;touch-action:none;}
+.keypad-toggle{position:fixed;top:160px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s;}
+.keypad-toggle:active{transform:scale(.92)}
+/* на ноутбуке и телефоне справа сверху клавиатура ложится прямо на задание —
+   опускаем её в нижний угол, как в ОГЭ №8 */
+@media(max-width:1250px){.keypad-float,.keypad-toggle{top:auto;bottom:16px;right:16px}}
+/* на узком экране колонка добавления не должна наезжать на задание */
+@media (max-width:760px){
+  .add-rail{left:6px;}
+  .add-rail-toggle{width:38px;height:38px;font-size:20px;}
+  .add-rail-body{padding:8px 6px;}
+  .add-rail-body .add-qty-btn{min-width:38px;font-size:11px;padding:6px 4px;}
+}
 
 /* ─── решение ─── */
 .sol-hint{font-family:var(--font-ui);font-size:15px;line-height:1.55;color:var(--muted-4);background:var(--hl-10);border-radius:14px;padding:12px 14px;margin-bottom:14px;}
@@ -499,19 +573,26 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
   <h1 id="pageTitle">ЕГЭ профиль</h1>
   <div class="sub" id="pageSub">демоверсия ФИПИ 2027</div>
 
-  <div id="taskArea">
-    <!-- выбор номера и прототипа: в карточках «+ ещё примеры» и в режиме
-         «свернуть подсказки» скрывается целиком (см. #pickerArea в CSS и
-         в trainer-multi.js) -->
-    <div id="pickerArea">
-      <div class="num-strip" id="numStrip"></div>
-      <div class="proto-row" id="protoRow"></div>
-    </div>
+  <!-- экран выбора прототипа: открывается первым, как список типов в ОГЭ.
+       В карточках «+ ещё примеры» скрыт целиком (см. #pickerArea в
+       trainer-multi.js) — там сразу показывается само задание -->
+  <div id="pickerArea">
+    <div class="group-title" id="pickerTitle"></div>
+    <div class="modes" id="protoList"></div>
+  </div>
 
+  <div id="taskArea" style="display:none">
     <div class="task-head">
-      <div class="task-title" id="taskTitle"></div>
-      <button class="basket-add-btn" id="basketAddBtn" title="В подборку">📥</button>
-      <button class="refresh-btn" id="refreshBtn" title="Следующий прототип">⟳</button>
+      <div class="type-nav">
+        <button class="back-btn" id="backBtn">← все прототипы</button>
+        <button class="type-nav-btn" id="prevProtoBtn" title="Предыдущий прототип">◀ Предыдущий прототип</button>
+        <button class="type-nav-btn" id="nextProtoBtn" title="Следующий прототип">Следующий прототип ▶</button>
+      </div>
+      <div class="corner">
+        <div class="task-title" id="taskTitle"></div>
+        <span class="medal-badge-row" id="medalBadgeRow"></span>
+        <button class="basket-add-btn" id="basketAddBtn" title="В подборку">📥</button>
+      </div>
     </div>
 
     <div class="submode-row">
@@ -522,30 +603,41 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       </div>
     </div>
 
-    <div class="panel" id="questionPanel">
-      <!-- #egeQuestion — ровно то, что уходит «В подборку» и снимается на доску
-           (см. TRAINER_CAPTURE в boards-core.js): только условие, без полей -->
-      <div id="egeQuestion">
-        <div class="ege-text" id="questionText"></div>
-      </div>
-      <div class="answer-area" id="answerArea"></div>
-      <div class="answer-msg" id="answerMsg"></div>
-      <div class="manual-note" id="manualNote" style="display:none"></div>
-      <div class="btn-row" id="solBtnRow" style="display:none">
-        <button class="soft-btn" id="showSolutionBtn">Показать решение и ответ</button>
-      </div>
-    </div>
+    <!-- рабочая зона: первое задание и добавленные кнопкой «+» карточки.
+         На широком экране раскладываются в несколько колонок, края можно
+         растянуть за ручки — так же, как в ОГЭ №8 -->
+    <div class="work-zone" id="workZone">
+      <div class="work-resize-handle left" id="workResizeLeft" title="Потяните — расширить рабочую зону"></div>
+      <div class="work-resize-handle right" id="workResizeRight" title="Потяните — расширить рабочую зону"></div>
+      <div class="tasks-columns" id="tasksColumns">
+        <div id="card1Wrapper">
+          <div class="panel" id="questionPanel">
+            <!-- #egeQuestion — ровно то, что уходит «В подборку» и снимается на доску
+                 (см. TRAINER_CAPTURE в boards-core.js): только условие, без полей -->
+            <div id="egeQuestion">
+              <div class="ege-text" id="questionText"></div>
+            </div>
+            <div class="answer-area" id="answerArea"></div>
+            <div class="manual-note" id="manualNote" style="display:none"></div>
+            <div class="card-btn-row" id="card1BtnRow" style="display:none">
+              <button class="soft-btn icon-only" id="basketInlineBtn" title="В подборку">📥</button>
+              <button class="soft-btn" id="showSolutionBtn" style="display:none">Показать решение и ответ</button>
+            </div>
+          </div>
 
-    <div class="panel" id="mainPanel" style="display:none">
-      <div class="sol-hint" id="solHint" style="display:none"></div>
-      <div id="solSteps"></div>
-      <button class="soft-btn" id="nextStepBtn" style="display:none">Следующий шаг →</button>
-      <div class="sol-answer" id="solAnswer" style="display:none"></div>
-      <details class="crit" id="critBox" style="display:none">
-        <summary id="critSummary">Критерии оценивания ФИПИ</summary>
-        <table id="critTable"></table>
-      </details>
-      <button class="next-btn" id="nextBtn" style="display:none">Следующее задание →</button>
+          <div class="panel" id="mainPanel" style="display:none">
+            <div class="sol-hint" id="solHint" style="display:none"></div>
+            <div id="solSteps"></div>
+            <button class="soft-btn" id="nextStepBtn" style="display:none">Следующий шаг →</button>
+            <div class="sol-answer" id="solAnswer" style="display:none"></div>
+            <details class="crit" id="critBox" style="display:none">
+              <summary id="critSummary">Критерии оценивания ФИПИ</summary>
+              <table id="critTable"></table>
+            </details>
+            <button class="next-btn" id="nextBtn" style="display:none">Следующее задание →</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="calc-tools" id="calcTools">
@@ -579,14 +671,49 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       <div class="stat"><div class="v" id="stErrors">0</div><div class="l">ошибок</div></div>
       <div class="stat"><div class="v" id="stStreak">0</div><div class="l">серия без ошибок</div></div>
     </div>
+
+    <button class="example-history-toggle" id="exampleHistoryToggle">🕓 История решённого (0)</button>
+    <div class="panel example-history-panel" id="exampleHistoryPanel">
+      <button class="calc-panel-close" id="exampleHistoryClose" title="Закрыть">✕</button>
+      <div class="calc-panel-title">Что уже решали в этом задании</div>
+      <div class="example-history-list" id="exampleHistoryList"></div>
+      <div class="example-history-empty" id="exampleHistoryEmpty">Пока пусто — реши что-нибудь.</div>
+    </div>
   </div>
+<div class="medal-tray" id="medalTray" aria-hidden="true"></div>
+
+<!-- колонка добавления заданий: своя, не из trainer-multi.js — карточки здесь
+     рисуются прямо на странице, как в ОГЭ №8, а не кадрами-iframe -->
+<div class="add-rail" id="addRail" style="display:none">
+  <button class="add-rail-toggle" id="addRailToggle" title="Добавить задания" aria-expanded="false">+</button>
+  <div class="add-rail-body" id="addRailBody">
+    <span class="add-rail-label">Добавить</span>
+    <button class="add-qty-btn" data-n="1">+1</button>
+    <button class="add-qty-btn" data-n="2">+2</button>
+    <button class="add-qty-btn" data-n="3">+3</button>
+    <button class="add-qty-btn" data-n="5">+5</button>
+    <button class="add-qty-btn" data-n="10">+10</button>
+    <div class="add-rail-sep" id="addRailSep" style="display:none"></div>
+    <button class="add-rail-act" id="addToBasketAllBtn" style="display:none">📥 Все</button>
+    <button class="add-rail-act" id="addClearBtn" style="display:none">Убрать все</button>
+  </div>
+</div>
+
+<button class="keypad-toggle" id="kpToggle" title="Показать клавиатуру" style="display:none">⌨</button>
+<div class="keypad-float" id="keypadFloat" style="display:none">
+  <button class="keypad-drag-handle" id="kpDragHandle" title="Перетащить клавиатуру" aria-label="Переместить клавиатуру">✋</button>
+  <button class="keypad-close" id="kpClose" title="Скрыть клавиатуру">✕</button>
+  <div class="keypad" id="keypadButtons"></div>
+</div>
   <div id="boardSpace" aria-hidden="true"></div></div>
 
 <script src="basket-core.js"></script>
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
-<script src="trainer-multi.js"></script>
+<script src="html2canvas.min.js"></script>
+<script src="jspdf.umd.min.js"></script>
+<script src="lesson-history.js"></script>
 <script src="ege-prof-figs.js"></script>
 <script src="ege-prof-bank.js"></script>
 <script>
@@ -820,21 +947,34 @@ function sameSets(a, b){
 
 /* ═══════════════ состояние ═══════════════ */
 const S = {
+  // screen: 'picker' — список прототипов этого номера (как список типов в ОГЭ),
+  // 'task' — само задание. Номер задания приходит из адреса и внутри страницы
+  // не меняется: между номерами переходят через каталог на главной
+  screen: 'picker',
   n: NUMS[0], pid: null, mode: 'exam',
   answered: false, hadWrong: false, correct: false,
   marks: {},   // id поля → 'good' | 'bad' | 'fixed' (подставлен верный ответ)
   yn: {},      // id поля → 'да' | 'нет'
   sol: false,  // «Тренировка»: решение раскрыто
   step: 0,     // «Обучение»: сколько шагов решения открыто
+  // добавленные кнопкой «+» задания: каждое со своим прототипом и своим
+  // состоянием той же формы, что и у основного (см. freshCard)
+  cards: [],
 };
 let totalSolved = 0, totalErrors = 0, streak = 0;
 let curProto = null, lastFocusedInput = null;
 
 const els = {};
-['numStrip','protoRow','taskTitle','pageTitle','pageSub','questionPanel','questionText','answerArea',
- 'answerMsg','manualNote','solBtnRow','showSolutionBtn','mainPanel','solHint','solSteps','nextStepBtn',
+['pickerArea','pickerTitle','protoList','taskArea','backBtn','prevProtoBtn','nextProtoBtn',
+ 'taskTitle','pageTitle','pageSub','questionPanel','questionText','answerArea','card1BtnRow',
+ 'basketInlineBtn','workZone','workResizeLeft','workResizeRight','tasksColumns','card1Wrapper',
+ 'addRail','addRailToggle','addRailBody','addRailSep',
+ 'addToBasketAllBtn','addClearBtn','medalBadgeRow','medalTray','exampleHistoryToggle','exampleHistoryPanel',
+ 'exampleHistoryList','exampleHistoryEmpty','exampleHistoryClose',
+ 'keypadFloat','kpToggle','kpClose','kpDragHandle','keypadButtons',
+ 'manualNote','showSolutionBtn','mainPanel','solHint','solSteps','nextStepBtn',
  'solAnswer','critBox','critSummary','critTable','nextBtn','tabLearn','tabPractice','tabExam',
- 'refreshBtn','basketAddBtn','stSolved','stErrors','stStreak'].forEach(id => { els[id] = document.getElementById(id); });
+ 'basketAddBtn','stSolved','stErrors','stStreak'].forEach(id => { els[id] = document.getElementById(id); });
 
 /* отметки «решено» живут в общем для всех тренажёров localStorage под
    ключом ogeProg: — их стирает кнопка сброса прогресса на главной */
@@ -848,6 +988,128 @@ function markSolved(pid){
 }
 const isSolved = pid => solvedIds.indexOf(pid) >= 0;
 
+/* ═══════════════ прогресс номера: медали и история решённого ═══════════════
+   Единица прогресса здесь — НОМЕР задания, а не прототип: прототип решается
+   один раз, а медаль даётся за пятёрку решённых примеров, как в ОГЭ №8. Поэтому
+   ключ хранения — «n7», а в истории лежат прототипы (и основное задание, и
+   добавленные карточки — они такие же задания, просто рядом). */
+const PROGRESS_NS = 'ogeProg:ege_prof:';
+const SESSION_GAP_MS = 3 * 60 * 60 * 1000; // три часа без захода — считаем, что началось новое занятие
+function freshProg(){ return { solvedInBatch: 0, errorsInBatch: 0, history: [], medals: { gold: 0, silver: 0, bronze: 0 } }; }
+let curProg = freshProg(), progLoadedFor = null;
+function loadProgFor(n){
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(PROGRESS_NS + 'n' + n) || 'null'); } catch (e) {}
+  if (!saved) return freshProg();
+  // после долгой паузы обнуляем историю и прогресс к медали, но сами медали
+  // не трогаем: это заслуженное достижение, а не состояние занятия
+  if (!saved.lastActiveAt || (Date.now() - saved.lastActiveAt) > SESSION_GAP_MS) {
+    return Object.assign(freshProg(), { medals: saved.medals || { gold: 0, silver: 0, bronze: 0 } });
+  }
+  return Object.assign(freshProg(), saved);
+}
+function saveProg(){
+  curProg.lastActiveAt = Date.now();
+  try { localStorage.setItem(PROGRESS_NS + 'n' + S.n, JSON.stringify(curProg)); } catch (e) {}
+}
+const MEDAL_EMOJI = { gold: '🥇', silver: '🥈', bronze: '🥉' };
+const MEDAL_TITLE = { gold: 'Золото — пять примеров без ошибок', silver: 'Серебро — пять примеров, 1–2 ошибки', bronze: 'Бронза — пять примеров решено' };
+
+// готовый ответ строкой: в первой части это число с бланка, во второй — запись
+// из банка (там уже формулы, поэтому вставляем как разметку)
+function answerHTML(p){
+  return task(S.n).part === 1 ? prettyNum(p.answer) : rich(p.answerTex || '');
+}
+function addHistory(p, st, ok){
+  curProg.history.unshift({
+    pid: p.id, peek: protoPeek(p), correct: !!ok, hadError: !!st.hadWrong, answer: answerHTML(p),
+  });
+  curProg.history = curProg.history.slice(0, 8);
+  if (ok) curProg.solvedInBatch = (curProg.solvedInBatch || 0) + 1;
+  saveProg();
+}
+function awardMedals(){
+  if ((curProg.solvedInBatch || 0) < 5) return;
+  const errs = curProg.errorsInBatch || 0;
+  const tier = errs === 0 ? 'gold' : (errs <= 2 ? 'silver' : 'bronze');
+  curProg.medals[tier] = (curProg.medals[tier] || 0) + 1;
+  curProg.solvedInBatch = 0;
+  curProg.errorsInBatch = 0;
+  saveProg();
+  playMedalAnimation(tier);
+}
+function renderMedals(){
+  const m = curProg.medals || {};
+  els.medalBadgeRow.textContent = ['gold', 'silver', 'bronze']
+    .filter(t => m[t]).map(t => MEDAL_EMOJI[t] + '×' + m[t]).join(' ');
+}
+function renderExampleHistory(){
+  const items = curProg.history || [];
+  els.exampleHistoryToggle.textContent = '🕓 История решённого (' + items.length + ')';
+  els.exampleHistoryEmpty.style.display = items.length ? 'none' : 'block';
+  els.exampleHistoryList.innerHTML = items.map(h =>
+    '<div class="example-history-row">' +
+      '<span class="example-history-num">' + (h.correct ? (h.hadError ? '🟡' : '✅') : '❌') + '</span>' +
+      '<div class="example-history-body">' +
+        '<span>' + h.peek + '</span>' +
+        (h.answer ? '<span class="example-history-answer' + (h.correct ? '' : ' bad') + '">Ответ: ' + h.answer + '</span>' : '') +
+      '</div>' +
+    '</div>').join('');
+}
+// медаль вылетает от заголовка задания и «садится» в полку внизу экрана
+function playMedalAnimation(tier){
+  const rect = els.taskTitle.getBoundingClientRect();
+  const flyer = document.createElement('div');
+  flyer.className = 'medal-flyer';
+  flyer.textContent = MEDAL_EMOJI[tier];
+  flyer.style.left = (rect.left + rect.width / 2 - 22) + 'px';
+  flyer.style.top = (rect.top - 10) + 'px';
+  flyer.style.opacity = '0';
+  flyer.style.transform = 'scale(.4)';
+  document.body.appendChild(flyer);
+  requestAnimationFrame(() => {
+    flyer.style.opacity = '1';
+    flyer.style.transform = 'scale(1.3)';
+    setTimeout(() => {
+      els.medalTray.classList.add('show');
+      // панель доски поднимается над полкой — см. html[data-medals] в стилях
+      document.documentElement.setAttribute('data-medals', 'on');
+      const trayRect = els.medalTray.getBoundingClientRect();
+      const curRect = flyer.getBoundingClientRect();
+      flyer.style.transform = 'translate(' + ((trayRect.left + 24) - curRect.left) + 'px, ' +
+        ((trayRect.top + trayRect.height / 2 - 10) - curRect.top) + 'px) scale(.5)';
+      flyer.style.opacity = '0.15';
+      setTimeout(() => {
+        flyer.remove();
+        const icon = document.createElement('span');
+        icon.className = 'medal-tray-icon';
+        icon.textContent = MEDAL_EMOJI[tier];
+        icon.title = MEDAL_TITLE[tier];
+        els.medalTray.appendChild(icon);
+      }, 900);
+    }, 650);
+  });
+}
+els.exampleHistoryToggle.onclick = () => {
+  const open = els.exampleHistoryPanel.style.display !== 'block';
+  els.exampleHistoryPanel.style.display = open ? 'block' : 'none';
+  if (open) els.exampleHistoryPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+els.exampleHistoryClose.onclick = () => { els.exampleHistoryPanel.style.display = 'none'; };
+
+/* ═══ конспект урока: снимок области вместе с заметками поверх неё ═══
+   Снимаем ровно тот кусок, который сейчас заменяется (одна карточка или вся
+   рабочая зона), и после снимка стираем заметки доски в его границах —
+   иначе линии остались бы висеть над уже другим заданием. */
+function snapshotAndClear(scope, targetEl){
+  if (!targetEl) return;
+  const rect = targetEl.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return; // область не видна — снимать нечего
+  const finish = () => { if (window.__boardClearInScreenRect) window.__boardClearInScreenRect(rect); };
+  if (window.LessonHistory) window.LessonHistory.captureIfEnabled(scope, targetEl).then(finish);
+  else finish();
+}
+
 const TS = window.TrainerSession || null;
 function guard(action, fn){ return TS && TS.guardStudentAction ? TS.guardStudentAction(action, fn) : fn; }
 
@@ -856,29 +1118,53 @@ function protos(n){ return (task(n) || {}).protos || []; }
 function protoById(n, pid){ return protos(n).find(p => p.id === pid) || protos(n)[0] || null; }
 
 /* ═══════════════ отрисовка ═══════════════ */
+/* начало условия для карточки в списке прототипов: формулы остаются
+   формулами (иначе у «Найдите корень уравнения …» вся суть в многоточии),
+   поэтому обрезаем строку только там, где все $…$ уже закрыты */
+function protoPeek(p){
+  const src = String(p.text)
+    .replace(/\[\[fig:[\w.-]+\]\]/g, '')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const LIMIT = 110;
+  if (src.length <= LIMIT) return rich(src);
+  let cut = -1, dollars = 0;
+  for (let i = 0; i < src.length; i++) {
+    if (src[i] === '$') dollars++;
+    if (i >= LIMIT && dollars % 2 === 0 && src[i] === ' ') { cut = i; break; }
+  }
+  if (cut < 0) return rich(src);
+  return rich(src.slice(0, cut)) + '…';
+}
 function renderPicker(){
-  let html = '<span class="part-label">Часть 1</span>';
-  NUMS.forEach(n => {
-    if (n === 14) html += '<span class="part-label">Часть 2</span>';
-    const all = protos(n);
-    const done = all.length && all.every(p => isSolved(p.id));
-    html += `<button class="num-chip${n === S.n ? ' active' : ''}${done ? ' done' : ''}" data-n="${n}" title="${task(n).title}">${n}</button>`;
-  });
-  els.numStrip.innerHTML = html;
-  els.numStrip.querySelectorAll('.num-chip').forEach(btn => {
-    btn.onclick = guard('switchTask', () => { openTask(+btn.dataset.n); });
-  });
-
+  const t = task(S.n);
   const list = protos(S.n);
-  let prow = '<span class="proto-label">Прототип:</span>';
-  list.forEach((p, i) => {
-    prow += `<button class="proto-chip${p.id === S.pid ? ' active' : ''}" data-pid="${p.id}">${i + 1}${isSolved(p.id) ? '<span class="tick">✓</span>' : ''}</button>`;
+  const src = (list[0] && list[0].src) || '';
+  els.pickerTitle.textContent = 'Прототипы задания №' + S.n + ' · ' + list.length +
+    (list.length === 1 ? ' штука' : (list.length < 5 ? ' штуки' : ' штук')) +
+    (src ? ' · ' + src.toLowerCase() : '');
+  /* отметку «решено» держим слева, рядом с номером: правый край карточки на
+     обычном экране уходит под кнопки темы и подсказок в углу страницы */
+  els.protoList.innerHTML = list.map((p, i) => `
+    <div class="mode-card" data-pid="${p.id}">
+      <div class="mtitle">Прототип ${i + 1}</div>
+      ${isSolved(p.id) ? '<div class="mdone">✓ решено</div>' : ''}
+      <div class="mpeek">${protoPeek(p)}</div>
+    </div>`).join('');
+  els.protoList.querySelectorAll('.mode-card').forEach(card => {
+    card.onclick = guard('switchTask', () => openTask(S.n, card.dataset.pid));
   });
-  prow += `<span class="src-note">${(curProto && curProto.src) || ''}</span>`;
-  els.protoRow.innerHTML = prow;
-  els.protoRow.querySelectorAll('.proto-chip').forEach(btn => {
-    btn.onclick = guard('switchTask', () => { openTask(S.n, btn.dataset.pid); });
-  });
+  els.pageTitle.textContent = 'ЕГЭ профиль · №' + S.n;
+  els.pageSub.textContent = t.title + ' · часть ' + t.part + ' · ' +
+    t.points + (t.points === 1 ? ' балл' : ' балла');
+}
+function showPicker(){
+  S.screen = 'picker';
+  renderPicker();
+  render();
+  window.scrollTo(0, 0);
 }
 
 const FIELD_HINTS = {
@@ -896,9 +1182,10 @@ function fieldsOf(p){
     ? [{ id: 'main', label: 'Ответ:', type: 'plain', value: p.answer, tex: prettyNum(p.answer) }]
     : (p.fields || []);
 }
-function renderAnswerArea(){
-  if (TS && TS.unregisterFieldsWithPrefix) TS.unregisterFieldsWithPrefix('ege:');
-  const p = curProto;
+/* Поля ответа рисуются одинаково для основного задания и для добавленных
+   карточек — отличаются только корневым узлом, состоянием и префиксом id,
+   под которым поле регистрируется в совместной сессии. */
+function buildAnswerArea(root, p, st, prefix, onChanged){
   const list = fieldsOf(p);
   let html = '';
   list.forEach(f => {
@@ -923,38 +1210,69 @@ function renderAnswerArea(){
     html += '<div class="sym-bar">' + ['π', '√', '∞', '≤', '≥', '∪', ';', '/', '(', ')']
       .map(c => '<button class="sym-btn" data-ch="' + c + '">' + c + '</button>').join('') + '</div>';
   }
-  html += '<div class="input-answer-row"><button class="check-btn" id="checkBtn">Проверить</button></div>';
-  els.answerArea.innerHTML = html;
+  html += '<div class="input-answer-row"><button class="check-btn">Проверить</button></div>';
+  html += '<div class="answer-msg"></div>';
+  root.innerHTML = html;
 
-  els.answerArea.querySelectorAll('input.answer-input').forEach(inp => {
-    const fid = inp.dataset.fid;
-    inp.addEventListener('focus', () => { lastFocusedInput = inp; });
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter') check(); });
-    if (TS && TS.registerField) TS.registerField('ege:' + p.id + ':' + fid, inp);
+  const submit = () => { runCheck(p, st, root); onChanged(); };
+  root.querySelectorAll('input.answer-input').forEach(inp => {
+    inp.addEventListener('focus', () => { lastFocusedInput = inp; syncKeypadVisibility(); });
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+    if (TS && TS.registerField) TS.registerField('ege:' + prefix + ':' + p.id + ':' + inp.dataset.fid, inp);
     if (!lastFocusedInput) lastFocusedInput = inp;
   });
-  els.answerArea.querySelectorAll('.yn-btn').forEach(btn => {
+  root.querySelectorAll('.yn-btn').forEach(btn => {
     btn.onclick = () => {
-      if (S.answered) return;
-      S.yn[btn.parentElement.dataset.fid] = btn.dataset.val;
-      render();
+      if (st.answered) return;
+      st.yn[btn.parentElement.dataset.fid] = btn.dataset.val;
+      onChanged();
     };
   });
-  els.answerArea.querySelectorAll('.sym-btn').forEach(btn => {
-    btn.onclick = () => {
-      const inp = lastFocusedInput || els.answerArea.querySelector('input.answer-input');
-      if (!inp || inp.disabled) return;
-      const pos = inp.selectionStart == null ? inp.value.length : inp.selectionStart;
-      const end = inp.selectionEnd == null ? pos : inp.selectionEnd;
-      inp.value = inp.value.slice(0, pos) + btn.dataset.ch + inp.value.slice(end);
-      const caret = pos + btn.dataset.ch.length;
-      inp.focus();
-      try { inp.setSelectionRange(caret, caret); } catch (e) {}
-      // событие нужно, чтобы набранное улетело собеседнику в совместной сессии
-      inp.dispatchEvent(new Event('input', { bubbles: true }));
-    };
+  root.querySelectorAll('.sym-btn').forEach(btn => {
+    btn.onclick = () => insertSymbol(root, btn.dataset.ch);
   });
-  document.getElementById('checkBtn').onclick = check;
+  root.querySelector('.check-btn').onclick = submit;
+}
+// вставка π, √ и прочего в поле, в котором последний раз стоял курсор
+function insertSymbol(root, ch){
+  let inp = lastFocusedInput;
+  if (!inp || !root.contains(inp) || inp.disabled) inp = root.querySelector('input.answer-input:not([disabled])');
+  if (!inp) return;
+  const pos = inp.selectionStart == null ? inp.value.length : inp.selectionStart;
+  const end = inp.selectionEnd == null ? pos : inp.selectionEnd;
+  inp.value = inp.value.slice(0, pos) + ch + inp.value.slice(end);
+  const caret = pos + ch.length;
+  inp.focus();
+  try { inp.setSelectionRange(caret, caret); } catch (e) {}
+  // событие нужно, чтобы набранное улетело собеседнику в совместной сессии
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+}
+// подсветка полей и кнопки по состоянию — тоже общая для задания и карточек
+function applyAnswerMarks(root, p, st){
+  fieldsOf(p).forEach(f => {
+    const mark = st.marks[f.id] || '';
+    const inp = root.querySelector('input.answer-input[data-fid="' + f.id + '"]');
+    if (inp) {
+      inp.classList.remove('good', 'bad', 'fixed');
+      if (mark) inp.classList.add(mark);
+      inp.disabled = !!st.answered;
+      if (mark === 'fixed' && inp.value !== f.value) inp.value = f.value;
+    }
+    const grp = root.querySelector('.yn-group[data-fid="' + f.id + '"]');
+    if (grp) {
+      grp.classList.remove('good', 'bad', 'fixed');
+      if (mark) grp.classList.add(mark);
+      const val = mark === 'fixed' ? f.value : st.yn[f.id];
+      grp.querySelectorAll('.yn-btn').forEach(b => b.classList.toggle('sel', b.dataset.val === val));
+    }
+  });
+  const btn = root.querySelector('.check-btn');
+  if (btn) { btn.disabled = !!st.answered; btn.style.display = st.answered ? 'none' : 'inline-block'; }
+}
+function renderAnswerArea(){
+  if (TS && TS.unregisterFieldsWithPrefix) TS.unregisterFieldsWithPrefix('ege:main:');
+  buildAnswerArea(els.answerArea, curProto, S, 'main', () => render());
+  els.answerMsg = els.answerArea.querySelector('.answer-msg');
 }
 function renderSolution(){
   const p = curProto;
@@ -973,7 +1291,12 @@ function renderSolution(){
 }
 function openTask(n, pid){
   if (!task(n)) return;
+  // задание на экране сейчас сменится — сперва снимок в конспект урока
+  // вместе с заметками доски поверх него
+  if (S.screen === 'task') snapshotAndClear('whole', els.workZone);
+  S.screen = 'task';
   S.n = n;
+  if (progLoadedFor !== n) { curProg = loadProgFor(n); progLoadedFor = n; }
   const p = pid ? protoById(n, pid) : protos(n)[0];
   S.pid = p.id;
   curProto = p;
@@ -987,13 +1310,16 @@ function openTask(n, pid){
   els.pageTitle.textContent = 'ЕГЭ профиль · №' + n;
   els.pageSub.textContent = t.title + ' · часть ' + t.part + ' · ' +
     t.points + (t.points === 1 ? ' балл' : ' балла');
-  els.taskTitle.textContent = '№' + n + '. ' + t.title;
+  const idx = protos(n).findIndex(x => x.id === p.id);
+  els.taskTitle.textContent = '№' + n + ' · прототип ' + (idx + 1) + ' из ' + protos(n).length;
   document.title = 'ЕГЭ №' + n + ' — ' + t.title;
   els.questionText.innerHTML = rich(p.text) + (p.fig && FIGS[p.fig] ? '<div class="ege-fig">' + FIGS[p.fig] + '</div>' : '');
   els.manualNote.innerHTML = p.manual ? '⚠️ ' + rich(p.manual) : '';
   els.manualNote.style.display = p.manual ? 'block' : 'none';
   renderAnswerArea();
   renderSolution();
+  renderKeypadKeys();   // во второй части на клавиатуре есть π, √ и знаки промежутков
+  regenCards();         // добавленные карточки набираются заново от нового задания
   renderPicker();
   render();
   syncUrl();
@@ -1016,32 +1342,31 @@ function stepsShown(){
   return 0;
 }
 function render(){
+  // какой экран сейчас: список прототипов или задание
+  const onTask = S.screen === 'task' && curProto;
+  els.pickerArea.style.display = onTask ? 'none' : 'block';
+  els.taskArea.style.display = onTask ? 'block' : 'none';
+  // «+ ещё примеры» относится к открытому заданию — на списке прототипов
+  // колонка только мешает (так же спрятана на экране выбора в ОГЭ №8)
+  els.addRail.style.display = onTask ? '' : 'none';
+  if (!onTask) return;
+  // переходы между прототипами прячем, когда прототип единственный
+  const many = protos(S.n).length > 1;
+  els.prevProtoBtn.style.display = many ? 'inline-flex' : 'none';
+  els.nextProtoBtn.style.display = many ? 'inline-flex' : 'none';
+
   els.tabLearn.classList.toggle('active', S.mode === 'learn');
   els.tabPractice.classList.toggle('active', S.mode === 'practice');
   els.tabExam.classList.toggle('active', S.mode === 'exam');
 
-  const list = fieldsOf(curProto);
-  list.forEach(f => {
-    const mark = S.marks[f.id] || '';
-    const inp = els.answerArea.querySelector('input.answer-input[data-fid="' + f.id + '"]');
-    if (inp) {
-      inp.classList.remove('good', 'bad', 'fixed');
-      if (mark) inp.classList.add(mark);
-      inp.disabled = !!S.answered;
-      if (mark === 'fixed' && inp.value !== f.value) inp.value = f.value;
-    }
-    const grp = els.answerArea.querySelector('.yn-group[data-fid="' + f.id + '"]');
-    if (grp) {
-      grp.classList.remove('good', 'bad', 'fixed');
-      if (mark) grp.classList.add(mark);
-      const val = mark === 'fixed' ? f.value : S.yn[f.id];
-      grp.querySelectorAll('.yn-btn').forEach(b => b.classList.toggle('sel', b.dataset.val === val));
-    }
-  });
-  const checkBtn = document.getElementById('checkBtn');
-  if (checkBtn) { checkBtn.disabled = !!S.answered; checkBtn.style.display = S.answered ? 'none' : 'inline-block'; }
+  applyAnswerMarks(els.answerArea, curProto, S);
 
-  els.solBtnRow.style.display = (S.mode === 'practice' && !S.answered) ? 'flex' : 'none';
+  // личные кнопки у первой карточки нужны, когда она перестала быть
+  // единственной, и всегда — в «Тренировке» (там у неё своё «показать решение»)
+  const hasCards = S.cards.length > 0;
+  els.card1BtnRow.style.display = (hasCards || (S.mode === 'practice' && !S.answered)) ? 'flex' : 'none';
+  els.basketInlineBtn.style.display = hasCards ? 'inline-flex' : 'none';
+  els.showSolutionBtn.style.display = (S.mode === 'practice' && !S.answered) ? 'inline-flex' : 'none';
   els.showSolutionBtn.textContent = S.sol ? 'Скрыть решение и ответ' : 'Показать решение и ответ';
 
   const shown = stepsShown();
@@ -1062,31 +1387,33 @@ function render(){
   const allShown = shown >= total && total > 0;
   els.solAnswer.style.display = allShown ? 'block' : 'none';
   els.critBox.style.display = (allShown && curProto.criteria) ? 'block' : 'none';
-  els.nextBtn.style.display = S.answered ? 'block' : 'none';
-  els.nextBtn.textContent = nextLabel();
+  // «Следующий прототип» относится к одному заданию на экране: когда рядом
+  // стоят добавленные карточки, кнопка только сбивает с толку
+  els.nextBtn.style.display = (S.answered && !hasCards) ? 'block' : 'none';
+  els.nextBtn.textContent = protos(S.n).length > 1 ? 'Следующий прототип →' : '← Все прототипы';
   els.stSolved.textContent = totalSolved;
   els.stErrors.textContent = totalErrors;
   els.stStreak.textContent = streak;
+  syncAllCards();
+  renderMedals();
+  renderExampleHistory();
+  syncAddUI();
+  applyColumns();
+  syncKeypadVisibility();
 }
-function nextTarget(){
+// сосед по списку прототипов этого номера, по кругу
+function protoNeighbour(delta){
   const list = protos(S.n);
   const i = list.findIndex(p => p.id === S.pid);
-  if (i >= 0 && i < list.length - 1) return { n: S.n, pid: list[i + 1].id, sameTask: true };
-  const ni = NUMS.indexOf(S.n);
-  const n2 = NUMS[(ni + 1) % NUMS.length];
-  return { n: n2, pid: protos(n2)[0].id, sameTask: false };
-}
-function nextLabel(){
-  const t = nextTarget();
-  return t.sameTask ? 'Следующий прототип →' : 'Перейти к №' + t.n + ' →';
+  return list[(i + delta + list.length) % list.length];
 }
 
 /* ═══════════════ проверка ответа ═══════════════ */
-function checkField(f, value){
+function checkField(f, value, st){
   // → true/false, либо null, если запись не разобрали (это не ошибка ученика,
   // а просьба записать иначе: на бланке ЕГЭ формат ответа тоже оговорён)
   if (f.type === 'yesno') {
-    const v = S.yn[f.id];
+    const v = st.yn[f.id];
     return v ? v === f.value : null;
   }
   const raw = String(value || '').trim();
@@ -1111,46 +1438,55 @@ function checkField(f, value){
   }
   return null;
 }
-function check(){
-  if (S.answered) return;
-  const list = fieldsOf(curProto);
+/* Проверка одного задания — хоть основного, хоть добавленной карточки.
+   Счёт (решено/ошибок/серия), медали и история — общие на страницу:
+   добавленные задания это такие же задания, просто рядом. */
+function runCheck(p, st, root){
+  if (st.answered) return;
+  const list = fieldsOf(p);
   const results = {};
   let unparsed = false;
   list.forEach(f => {
-    const inp = els.answerArea.querySelector('input.answer-input[data-fid="' + f.id + '"]');
-    const res = checkField(f, inp ? inp.value : null);
-    if (res === null) unparsed = true;
-    results[f.id] = res;
+    const inp = root.querySelector('input.answer-input[data-fid="' + f.id + '"]');
+    results[f.id] = checkField(f, inp ? inp.value : null, st);
+    if (results[f.id] === null) unparsed = true;
   });
+  const msgEl = root.querySelector('.answer-msg');
   if (unparsed) {
-    els.answerMsg.textContent = task(S.n).part === 1
+    if (msgEl) msgEl.textContent = task(S.n).part === 1
       ? 'Ответ — целое число или конечная десятичная дробь, например −0,8'
       : 'Заполни все поля так, как подсказано под ними';
     return;
   }
-  els.answerMsg.textContent = '';
+  if (msgEl) msgEl.textContent = '';
   const allOk = list.every(f => results[f.id] === true);
-  list.forEach(f => { S.marks[f.id] = results[f.id] ? 'good' : 'bad'; });
+  list.forEach(f => { st.marks[f.id] = results[f.id] ? 'good' : 'bad'; });
 
   if (allOk) {
-    S.answered = true; S.correct = true;
+    st.answered = true; st.correct = true;
     totalSolved++; streak++;
-    markSolved(curProto.id);
-    renderPicker();
-  } else if (S.hadWrong) {
+    markSolved(p.id);
+    addHistory(p, st, true);
+    awardMedals();
+  } else if (st.hadWrong) {
     // вторая неудачная попытка — как в ОГЭ №8: подставляем верный ответ
     // и открываем разбор
-    S.answered = true; S.correct = false;
-    list.forEach(f => { if (!results[f.id]) S.marks[f.id] = 'fixed'; });
+    st.answered = true; st.correct = false;
+    list.forEach(f => { if (!results[f.id]) st.marks[f.id] = 'fixed'; });
     totalErrors++; streak = 0;
+    curProg.errorsInBatch = (curProg.errorsInBatch || 0) + 1;
+    addHistory(p, st, false);
   } else {
-    S.hadWrong = true;
+    st.hadWrong = true;
     totalErrors++; streak = 0;
-    const bad = els.answerArea.querySelector('.answer-input.bad');
+    // ошибка в пятёрке решает, какой будет медаль: без ошибок — золото
+    curProg.errorsInBatch = (curProg.errorsInBatch || 0) + 1;
+    saveProg();
+    const bad = root.querySelector('.answer-input.bad');
     if (bad) { bad.classList.remove('shake'); void bad.offsetWidth; bad.classList.add('shake'); }
   }
-  render();
 }
+function check(){ runCheck(curProto, S, els.answerArea); render(); }
 
 /* ═══════════════ кнопки ═══════════════ */
 function switchMode(mode){
@@ -1164,56 +1500,447 @@ els.tabPractice.onclick = () => switchMode('practice');
 els.tabExam.onclick = () => switchMode('exam');
 els.showSolutionBtn.onclick = guard('showSolution', () => { S.sol = !S.sol; render(); });
 els.nextStepBtn.onclick = guard('showSolution', () => { S.step = Math.min(S.step + 1, (curProto.steps || []).length); render(); });
-els.nextBtn.onclick = guard('switchTask', () => { const t = nextTarget(); openTask(t.n, t.pid); });
-els.refreshBtn.onclick = guard('refreshOne', () => {
-  const list = protos(S.n);
-  const i = list.findIndex(p => p.id === S.pid);
-  openTask(S.n, list[(i + 1) % list.length].id);
+els.nextBtn.onclick = guard('switchTask', () => {
+  if (protos(S.n).length > 1) openTask(S.n, protoNeighbour(1).id);
+  else showPicker();
 });
+els.backBtn.onclick = guard('switchTask', showPicker);
+els.prevProtoBtn.onclick = guard('switchTask', () => openTask(S.n, protoNeighbour(-1).id));
+els.nextProtoBtn.onclick = guard('switchTask', () => openTask(S.n, protoNeighbour(1).id));
+// 📥 в шапке — как в ОГЭ №8: всё, что сейчас на экране (основное задание и
+// добавленные карточки); одну карточку кладёт её личная кнопка
 els.basketAddBtn.onclick = () => {
-  const rich2 = window.Basket ? window.Basket.extractFromSelectorsRich(['#egeQuestion']) : null;
-  if (!rich2 || !rich2.text) return;
-  const i = protos(S.n).findIndex(p => p.id === S.pid);
-  window.Basket.add({
-    trainerId: 'ege' + S.n,
-    modeTitle: task(S.n).title + ' · прототип ' + (i + 1),
-    text: rich2.text, html: rich2.html,
-  });
-  els.basketAddBtn.classList.add('ok');
-  els.basketAddBtn.textContent = '✓';
-  setTimeout(() => { els.basketAddBtn.classList.remove('ok'); els.basketAddBtn.textContent = '📥'; }, 900);
+  if (!window.Basket) return;
+  addAllToBasket();
+  flashOk(els.basketAddBtn, '📥');
 };
 
+/* ═══════════════ несколько заданий на экране ═══════════════
+   Кнопки «+1…+10» дописывают карточки в конец рабочей зоны, НЕ перерисовывая
+   ни уже стоящие карточки, ни основное задание: набранный, но ещё не
+   проверенный текст в них не должен пропадать. В карточке — только само
+   задание: условие, поле ответа и её собственные кнопки; ни вкладок режима,
+   ни статистики, ни клавиатуры — весь остальной интерфейс тренажёра один на
+   странице. Состояние карточки той же формы, что и у основного задания,
+   поэтому проверка (runCheck) и подсветка (applyAnswerMarks) — общие. */
+function freshCard(pid){ return { pid, answered: false, hadWrong: false, correct: false, marks: {}, yn: {}, sol: false }; }
+// следующий прототип этого же номера, по кругу: прототипов на номер немного,
+// поэтому новые карточки идут по списку подряд, а не случайно — так на экране
+// не оказывается пять копий одного и того же задания
+function pidAfter(pid){
+  const list = protos(S.n);
+  const i = list.findIndex(p => p.id === pid);
+  return list[(i + 1 + list.length) % list.length].id;
+}
+function nextCardPid(){
+  const last = S.cards.length ? S.cards[S.cards.length - 1].pid : S.pid;
+  return pidAfter(last);
+}
+function cardProto(c){ return protoById(S.n, c.pid); }
+
+// разбор для карточки: то же, что показывает основная панель решения, но
+// одним куском — в карточке нет ни пошагового «Обучения», ни кнопки «дальше»
+function solutionHTML(p){
+  let h = '';
+  if (p.hint) h += '<div class="sol-hint"><b>Идея.</b> ' + rich(p.hint) + '</div>';
+  h += (p.steps || []).map((st, i) =>
+    '<div class="sol-step"><span class="no">' + (i + 1) + '</span><div class="body">' + rich(st) + '</div></div>').join('');
+  h += '<div class="sol-answer">' + (task(S.n).part === 1 ? 'Ответ: ' + prettyNum(p.answer) : 'Ответ. ' + rich(p.answerTex || '')) + '</div>';
+  if (p.criteria) {
+    h += '<details class="crit"><summary>Критерии оценивания ФИПИ (максимум ' + task(S.n).points + ' б.)</summary><table>' +
+      p.criteria.map(row => '<tr><td class="pts">' + row[0] + '</td><td>' + rich(row[1]) + '</td></tr>').join('') + '</table></details>';
+  }
+  return h;
+}
+function cardEl(idx){ return els.tasksColumns.querySelector('.added-task-card[data-idx="' + idx + '"]'); }
+
+function makeCardEl(c, idx){
+  const p = cardProto(c);
+  const div = document.createElement('div');
+  div.className = 'panel added-task-card';
+  div.dataset.idx = String(idx);
+  /* .added-card-question — ровно условие, без полей и кнопок: и «В подборку»,
+     и снимок на доску берут у карточки то же самое, что у основного задания
+     берут из #egeQuestion (см. TRAINER_CAPTURE в boards-core.js) */
+  div.innerHTML =
+    '<div class="added-card-question"><div class="ege-text">' + rich(p.text) +
+      (p.fig && FIGS[p.fig] ? '<div class="ege-fig">' + FIGS[p.fig] + '</div>' : '') + '</div></div>' +
+    '<div class="answer-area"></div>' +
+    (p.manual ? '<div class="manual-note">⚠️ ' + rich(p.manual) + '</div>' : '') +
+    '<div class="card-btn-row">' +
+      '<button class="soft-btn icon-only added-refresh-btn" title="Другой прототип">⟳</button>' +
+      '<button class="soft-btn icon-only added-basket-btn" title="В подборку">📥</button>' +
+      '<button class="soft-btn added-solution-btn">Показать решение и ответ</button>' +
+      '<button class="added-remove-btn">− Убрать</button>' +
+    '</div>' +
+    '<div class="added-explain" style="display:none"></div>';
+
+  const area = div.querySelector('.answer-area');
+  buildAnswerArea(area, p, c, 'card' + idx, () => { syncCard(+div.dataset.idx); render(); });
+
+  div.querySelector('.added-refresh-btn').onclick = guard('refreshOne', () => refreshCard(+div.dataset.idx));
+  div.querySelector('.added-remove-btn').onclick = guard('deleteTask', () => removeCard(+div.dataset.idx));
+  div.querySelector('.added-solution-btn').onclick = guard('showSolution', () => {
+    const cur = S.cards[+div.dataset.idx];
+    if (!cur || cur.answered) return;
+    cur.sol = !cur.sol;
+    syncCard(+div.dataset.idx);
+  });
+  const basketBtn = div.querySelector('.added-basket-btn');
+  basketBtn.onclick = () => {
+    if (!addOneToBasket('.added-task-card[data-idx="' + div.dataset.idx + '"] .added-card-question', div.dataset.idx)) return;
+    basketBtn.classList.add('ok');
+    basketBtn.textContent = '✓';
+    setTimeout(() => { basketBtn.classList.remove('ok'); basketBtn.textContent = '📥'; }, 900);
+  };
+  return div;
+}
+// подсветка полей и кнопки карточки по её состоянию; DOM карточки не
+// пересоздаём — иначе пропадёт набранный текст в соседних полях
+function syncCard(idx){
+  const c = S.cards[idx], div = cardEl(idx);
+  if (!c || !div) return;
+  const p = cardProto(c);
+  applyAnswerMarks(div.querySelector('.answer-area'), p, c);
+  // вне «Тренировки» раскрытое вручную решение закрываем: в «Экзамене» его
+  // быть не должно, а в «Обучении» разбор идёт по шагам у основного задания
+  if (S.mode !== 'practice' && !c.answered && c.sol) c.sol = false;
+  const solBtn = div.querySelector('.added-solution-btn');
+  solBtn.style.display = (S.mode === 'practice' && !c.answered) ? 'inline-flex' : 'none';
+  solBtn.textContent = c.sol ? 'Скрыть решение и ответ' : 'Показать решение и ответ';
+  const explain = div.querySelector('.added-explain');
+  const show = c.answered || c.sol;
+  explain.style.display = show ? 'block' : 'none';
+  explain.innerHTML = show ? solutionHTML(p) : '';
+}
+function syncAllCards(){ S.cards.forEach((c, i) => syncCard(i)); }
+
+function renderCards(skipPush){
+  // #card1Wrapper не трогаем: в нём живут рабочие узлы, на которые уже
+  // указывают ссылки в els — перерисовываем только добавленные карточки
+  if (TS && TS.unregisterFieldsWithPrefix) TS.unregisterFieldsWithPrefix('ege:card');
+  els.tasksColumns.querySelectorAll('.added-task-card').forEach(el => el.remove());
+  S.cards.forEach((c, i) => els.tasksColumns.appendChild(makeCardEl(c, i)));
+  syncAllCards();
+  applyColumns();
+  syncAddUI();
+  if (!skipPush && TS && TS.push) TS.push();
+}
+function appendCards(n){
+  for (let k = 0; k < n; k++) {
+    const c = freshCard(nextCardPid());
+    S.cards.push(c);
+    els.tasksColumns.appendChild(makeCardEl(c, S.cards.length - 1));
+    syncCard(S.cards.length - 1);
+  }
+  render();
+  if (TS && TS.push) TS.push();
+}
+function removeCard(idx){
+  snapshotAndClear('single', cardEl(idx));
+  S.cards.splice(idx, 1);
+  renderCards();   // сдвинулись индексы — перерисовываем список целиком
+  render();
+}
+function clearCards(){
+  snapshotAndClear('whole', els.tasksColumns);
+  S.cards = [];
+  renderCards();
+  render();
+}
+function refreshCard(idx){
+  const c = S.cards[idx];
+  if (!c) return;
+  snapshotAndClear('single', cardEl(idx));
+  S.cards[idx] = freshCard(pidAfter(c.pid));
+  const old = cardEl(idx);
+  if (old) { old.replaceWith(makeCardEl(S.cards[idx], idx)); syncCard(idx); }
+  else renderCards(true);
+  render();
+  if (TS && TS.push) TS.push();
+}
+// при переходе на другой прототип карточки набираются заново — от нового
+// основного задания и в прежнем количестве; их прежние ответы уже не про это
+function regenCards(){
+  if (!S.cards.length) return;
+  let pid = S.pid;
+  S.cards = S.cards.map(() => { pid = pidAfter(pid); return freshCard(pid); });
+  renderCards(true);   // рассылку сделает сам openTask, уже согласованным снимком
+}
+
+/* пороги по общему числу заданий: 1–3 → одна колонка, 4–6 → две, дальше три */
+function applyColumns(){
+  const total = 1 + S.cards.length;
+  let cols = total <= 3 ? 1 : (total <= 6 ? 2 : 3);
+  if (window.innerWidth < 560) cols = 1;
+  else if (window.innerWidth < 820) cols = Math.min(cols, 2);
+  els.tasksColumns.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+  els.tasksColumns.style.gridTemplateRows = 'repeat(' + Math.max(1, Math.ceil(total / cols)) + ', auto)';
+}
+window.addEventListener('resize', () => { if (S.screen === 'task') applyColumns(); });
+
+/* ── «В подборку» ──
+   Личная кнопка у каждой карточки кладёт только её; 📥 в шапке и «📥 Все» в
+   колонке добавления — все задания, которые сейчас на экране. */
+function addOneToBasket(selector, label){
+  if (!window.Basket) return false;
+  const r = window.Basket.extractFromSelectorsRich([selector]);
+  if (!r || !r.text) return false;
+  window.Basket.add({
+    trainerId: 'ege' + S.n,
+    modeTitle: task(S.n).title + ' · прототип ' + label,
+    text: r.text, html: r.html,
+  });
+  return true;
+}
+function mainBasketLabel(){ return String(protos(S.n).findIndex(p => p.id === S.pid) + 1); }
+function addAllToBasket(){
+  addOneToBasket('#egeQuestion', mainBasketLabel());
+  S.cards.forEach((c, i) => addOneToBasket('.added-task-card[data-idx="' + i + '"] .added-card-question',
+    String(protos(S.n).findIndex(p => p.id === c.pid) + 1)));
+}
+function flashOk(btn, back){
+  btn.classList.add('ok');
+  btn.textContent = '✓';
+  setTimeout(() => { btn.classList.remove('ok'); btn.textContent = back; }, 900);
+}
+els.basketInlineBtn.onclick = () => {
+  if (addOneToBasket('#egeQuestion', mainBasketLabel())) flashOk(els.basketInlineBtn, '📥');
+};
+
+/* ── колонка добавления ── */
+let addRailOpen = false;
+function syncAddUI(){
+  const has = S.cards.length > 0;
+  els.addRail.classList.toggle('open', addRailOpen);
+  els.addRailToggle.setAttribute('aria-expanded', addRailOpen ? 'true' : 'false');
+  els.addRailToggle.title = addRailOpen ? 'Свернуть' : 'Добавить задания';
+  els.addRailSep.style.display = has ? 'block' : 'none';
+  els.addToBasketAllBtn.style.display = has ? 'inline-flex' : 'none';
+  els.addClearBtn.style.display = has ? 'inline-flex' : 'none';
+}
+els.addRailToggle.onclick = () => { addRailOpen = !addRailOpen; syncAddUI(); };
+els.addRailBody.querySelectorAll('.add-qty-btn').forEach(btn => {
+  btn.onclick = guard('switchTask', () => appendCards(+btn.dataset.n));
+});
+els.addClearBtn.onclick = guard('deleteTask', clearCards);
+els.addToBasketAllBtn.onclick = () => {
+  if (!window.Basket) return;
+  addAllToBasket();
+  flashOk(els.addToBasketAllBtn, '📥 Все');
+};
+
+/* ═══ растягиваемая рабочая зона ═══
+   Колонки с заданиями тянутся за любой край и расширяются симметрично —
+   нужно прежде всего при трёх колонках, но доступно всегда. */
+const WORK_W_KEY = 'ege_prof:workZoneW';
+function clampWorkW(w){
+  const min = 380;
+  let max = window.innerWidth - 24;
+  try {
+    if (els.keypadFloat && getComputedStyle(els.keypadFloat).display !== 'none') {
+      // край рабочей зоны не должен заезжать под плавающую клавиатуру
+      const byKeypad = 2 * (els.keypadFloat.getBoundingClientRect().left - 16 - window.innerWidth / 2);
+      if (byKeypad > 0) max = Math.min(max, byKeypad);
+    }
+  } catch (e) {}
+  max = Math.max(min, max);
+  return Math.min(max, Math.max(min, w));
+}
+try {
+  const w = parseFloat(localStorage.getItem(WORK_W_KEY));
+  if (w) els.workZone.style.setProperty('--work-w', clampWorkW(w) + 'px');
+} catch (e) {}
+function setupWorkZoneResize(handleEl, side){
+  let start = null;
+  handleEl.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    try { handleEl.setPointerCapture(e.pointerId); } catch (err) {}
+    handleEl.classList.add('dragging');
+    start = { x: e.clientX, w: els.workZone.getBoundingClientRect().width };
+  });
+  handleEl.addEventListener('pointermove', e => {
+    if (!start) return;
+    const dx = (side === 'right') ? (e.clientX - start.x) : (start.x - e.clientX);
+    els.workZone.style.setProperty('--work-w', clampWorkW(start.w + dx * 2) + 'px');
+  });
+  const end = () => {
+    if (!start) return;
+    start = null;
+    handleEl.classList.remove('dragging');
+    try { localStorage.setItem(WORK_W_KEY, String(parseFloat(getComputedStyle(els.workZone).width))); } catch (e) {}
+    setTimeout(forceRepaintWorkArea, 30);
+    // ширина рабочей зоны уходит собеседнику: заметки поверх заданий имеют
+    // смысл только в том же масштабе, в каком их рисовали
+    if (TS && TS.push) TS.push();
+  };
+  handleEl.addEventListener('pointerup', end);
+  handleEl.addEventListener('pointercancel', end);
+}
+setupWorkZoneResize(els.workResizeLeft, 'left');
+setupWorkZoneResize(els.workResizeRight, 'right');
+/* после растягивания и после прокрутки иногда остаются «призрачные»
+   полупрозрачные прямоугольники — лечится принудительной перерисовкой */
+function forceRepaint(el){
+  if (!el) return;
+  const prev = el.style.opacity;
+  el.style.opacity = '0.999999';
+  requestAnimationFrame(() => { el.style.opacity = prev; });
+}
+function forceRepaintWorkArea(){ forceRepaint(els.workZone); forceRepaint(els.keypadFloat); }
+let repaintTimer = null;
+window.addEventListener('scroll', () => {
+  clearTimeout(repaintTimer);
+  repaintTimer = setTimeout(forceRepaintWorkArea, 120);
+}, { passive: true });
+
+/* ═══ плавающая клавиатура ═══
+   Экранная клавиатура телефона не набирает ни π, ни корень, ни знаки
+   промежутков — во второй части они на клавиатуре есть, в первой не нужны
+   (там ответ — число с бланка). */
+let keypadOpen = true;
+function renderKeypadKeys(){
+  const digits = ['7','8','9','4','5','6','1','2','3',',','0','−'];
+  let html = digits.map(k => {
+    const cls = k === '−' ? 'kp-minus' : (k === ',' ? 'kp-comma' : '');
+    // на кнопке красивый минус, а в поле вставляем обычный дефис: его понимает
+    // разбор ответа (в normMinus красивый тоже приводится, но лишний шаг ни к чему)
+    return '<button type="button" class="' + cls + '" data-key="' + (k === '−' ? '-' : k) + '">' + k + '</button>';
+  }).join('');
+  if (task(S.n).part === 2) {
+    html += ['π','√','∞','≤','≥','∪','(',')',';'].map(c =>
+      '<button type="button" data-key="' + c + '">' + c + '</button>').join('');
+  }
+  html += '<button type="button" class="kp-back" data-key="back">⌫ Стереть</button>' +
+          '<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>';
+  els.keypadButtons.innerHTML = html;
+  els.keypadButtons.querySelectorAll('button').forEach(btn => { btn.onclick = () => keypadPress(btn.dataset.key); });
+}
+// поле, в которое пишет клавиатура: последнее, где стоял курсор — иначе
+// первое свободное; так одна клавиатура обслуживает и основное задание, и карточки
+function keypadTarget(){
+  let inp = lastFocusedInput;
+  if (!inp || !els.workZone.contains(inp) || inp.disabled) {
+    inp = els.workZone.querySelector('input.answer-input:not([disabled])');
+  }
+  return inp;
+}
+function keypadPress(ch){
+  const inp = keypadTarget();
+  if (!inp) return;
+  lastFocusedInput = inp;
+  const area = inp.closest('.answer-area');
+  if (ch === 'enter') {
+    const btn = area && area.querySelector('.check-btn');
+    if (btn && !btn.disabled) btn.click();
+    return;
+  }
+  if (ch === 'back') {
+    const pos = inp.selectionStart == null ? inp.value.length : inp.selectionStart;
+    const end = inp.selectionEnd == null ? pos : inp.selectionEnd;
+    const from = (pos === end) ? Math.max(0, pos - 1) : pos;
+    inp.value = inp.value.slice(0, from) + inp.value.slice(end);
+    inp.focus();
+    try { inp.setSelectionRange(from, from); } catch (e) {}
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    return;
+  }
+  insertSymbol(area || els.workZone, ch);
+}
+function syncKeypadVisibility(){
+  const free = S.screen === 'task' && els.taskArea.style.display !== 'none' &&
+    !!els.workZone.querySelector('input.answer-input:not([disabled])');
+  els.keypadFloat.style.display = (free && keypadOpen) ? 'block' : 'none';
+  els.kpToggle.style.display = (free && !keypadOpen) ? 'flex' : 'none';
+}
+els.kpClose.onclick = () => { keypadOpen = false; syncKeypadVisibility(); };
+els.kpToggle.onclick = () => { keypadOpen = true; syncKeypadVisibility(); };
+(function makeKeypadDraggable(floatEl, handleEl){
+  let dragging = false, offX = 0, offY = 0;
+  function clamp(x, y){
+    const maxX = Math.max(4, window.innerWidth - floatEl.offsetWidth - 4);
+    const maxY = Math.max(4, window.innerHeight - floatEl.offsetHeight - 4);
+    return { x: Math.min(Math.max(x, 4), maxX), y: Math.min(Math.max(y, 4), maxY) };
+  }
+  handleEl.addEventListener('pointerdown', e => {
+    dragging = true;
+    const r = floatEl.getBoundingClientRect();
+    floatEl.style.left = r.left + 'px';
+    floatEl.style.top = r.top + 'px';
+    floatEl.style.right = 'auto';
+    offX = e.clientX - r.left; offY = e.clientY - r.top;
+    try { handleEl.setPointerCapture(e.pointerId); } catch (err) {}
+    e.preventDefault();
+  });
+  handleEl.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const pos = clamp(e.clientX - offX, e.clientY - offY);
+    floatEl.style.left = pos.x + 'px';
+    floatEl.style.top = pos.y + 'px';
+  });
+  const up = e => { dragging = false; try { handleEl.releasePointerCapture(e.pointerId); } catch (err) {} };
+  handleEl.addEventListener('pointerup', up);
+  handleEl.addEventListener('pointercancel', up);
+  window.addEventListener('resize', () => {
+    if (floatEl.style.left && floatEl.style.left !== 'auto') {
+      const r = floatEl.getBoundingClientRect();
+      const pos = clamp(r.left, r.top);
+      floatEl.style.left = pos.x + 'px';
+      floatEl.style.top = pos.y + 'px';
+    }
+  });
+})(els.keypadFloat, els.kpDragHandle);
+
 /* ═══════════════ запуск ═══════════════ */
+const URL_PARAMS = new URLSearchParams(location.search);
 const URL_N = (function(){
-  const v = parseInt(new URLSearchParams(location.search).get('n'), 10);
+  const v = parseInt(URL_PARAMS.get('n'), 10);
   return BANK[v] ? v : null;
 })();
-openTask(URL_N || NUMS[0]);
+S.n = URL_N || NUMS[0];
+curProto = protos(S.n)[0];
+S.pid = curProto.id;
+curProg = loadProgFor(S.n); progLoadedFor = S.n;
+renderKeypadKeys();
+renderAnswerArea(); renderSolution(); showPicker();
+syncUrl();
 
 /* ═══ общий снимок для совместной сессии, доски и карточек ═══
    Схема та же, что в остальных тренажёрах после Промпта №54: состояние
    версионируется (__tsRev/__tsBy), пришедшее от собеседника назад не
    рассылается, изменения ловит таймер. Значения полей ответа синхронизирует
    session-share сам — через registerField (см. renderAnswerArea). */
+function cardsSnapshot(){
+  return S.cards.map(c => ({
+    pid: c.pid, answered: !!c.answered, hadWrong: !!c.hadWrong, correct: !!c.correct,
+    marks: c.marks || {}, yn: c.yn || {}, sol: !!c.sol,
+  }));
+}
 function tsGetState(){
   const base = {
-    egeN: S.n, egePid: S.pid, curSubMode: S.mode,
+    egeScreen: S.screen, egeN: S.n, egePid: S.pid, curSubMode: S.mode,
     answered: !!S.answered, hadWrong: !!S.hadWrong, correct: !!S.correct,
     marks: S.marks, yn: S.yn, sol: !!S.sol, step: S.step,
+    cards: cardsSnapshot(),
+    // ширина растянутой рабочей зоны: задания и заметки поверх них должны быть
+    // видны обоим в одном масштабе
+    workW: parseFloat(getComputedStyle(els.workZone).width) || null,
+    totalSolved, streak, totalErrors,
   };
   if (window.__boardGetState) Object.assign(base, window.__boardGetState());
-  if (window.__cardsGetState) Object.assign(base, window.__cardsGetState());
   return base;
 }
 function tsApplyState(state){
   if (!state) return;
   if (window.__boardApplyState) window.__boardApplyState(state);
-  if (window.__cardsApplyState) window.__cardsApplyState(state);
   if (typeof state.egeN === 'undefined') return; // снимок без задания (пустая сессия)
   if (!BANK[state.egeN]) return;
 
   if (state.egeN !== S.n || state.egePid !== S.pid) openTask(state.egeN, state.egePid);
+  // экран (список прототипов или само задание) тоже общий: учитель вернулся
+  // к списку — ученик вернулся вместе с ним
+  if (state.egeScreen === 'picker') { S.screen = 'picker'; renderPicker(); render(); return; }
+  S.screen = 'task';
   if (state.curSubMode && state.curSubMode !== S.mode) S.mode = state.curSubMode;
   S.answered = !!state.answered;
   S.hadWrong = !!state.hadWrong;
@@ -1222,10 +1949,26 @@ function tsApplyState(state){
   S.yn = state.yn || {};
   S.sol = !!state.sol;
   S.step = state.step || 0;
+  if (typeof state.workW === 'number' && state.workW > 0) {
+    els.workZone.style.setProperty('--work-w', clampWorkW(state.workW) + 'px');
+  }
+  /* Карточки перерисовываем ТОЛЬКО когда их список действительно изменился:
+     перерисовка пересоздаёт поля ввода, а в них в этот момент может набирать
+     ответ собеседник — его текст потерялся бы на каждом чужом штрихе доски. */
+  const incoming = (state.cards || []).filter(c => c && c.pid && protoById(S.n, c.pid))
+    .map(c => ({ pid: c.pid, answered: !!c.answered, hadWrong: !!c.hadWrong, correct: !!c.correct,
+                 marks: c.marks || {}, yn: c.yn || {}, sol: !!c.sol }));
+  // при совпадении объекты состояния НЕ подменяем: на них уже ссылаются
+  // обработчики нарисованных карточек (кнопки «да/нет», проверка ответа)
+  if (JSON.stringify(cardsSnapshot()) !== JSON.stringify(incoming)) {
+    S.cards = incoming;
+    renderCards(true);
+  }
   render();
 }
 function tsWatchSig(s){
-  return JSON.stringify([s.egeN, s.egePid, s.curSubMode, s.answered, s.hadWrong, s.correct, s.marks, s.yn, s.sol, s.step]);
+  return JSON.stringify([s.egeScreen, s.egeN, s.egePid, s.curSubMode, s.answered, s.hadWrong,
+    s.correct, s.marks, s.yn, s.sol, s.step, s.cards, s.workW]);
 }
 let tsPeerSig = null;
 /* Версия задания в общем снимке: снимок уходит и с каждым штрихом доски, неся
@@ -1253,16 +1996,18 @@ function tsApplyStateFromPeer(state){
   tsApplyState(state);
   try { tsPeerSig = tsWatchSig(tsGetState()); } catch (e) {}
 }
-window.__trainerState = {
-  get: tsGetState, apply: tsApplyState,
-  // «+ ещё примеры»: в карточке показываем следующий прототип этого же номера
-  newTask: function(){
-    const list = protos(S.n);
-    const i = list.findIndex(p => p.id === S.pid);
-    openTask(S.n, list[(i + 1) % list.length].id);
-  },
-};
+/* Мост __trainerState нужен только кадрам-iframe из trainer-multi.js. Здесь
+   добавленные задания рисуются прямо на странице (как в ОГЭ №8), поэтому
+   trainer-multi.js не подключён и мост не нужен. */
 if (window.TrainerSession) {
+  // конспект урока: счётчик снимков и кнопка «скачать PDF» живут в панели
+  // совместного доступа — она одна на все тренажёры
+  if (window.LessonHistory) {
+    window.TrainerSession.registerHistoryUI({
+      getCount: window.LessonHistory.getCount,
+      onDownload: window.LessonHistory.downloadPdf,
+    });
+  }
   window.TrainerSession.init({ trainer: 'ege_prof', getState: tsGetStateVersioned, applyState: tsApplyStateFromPeer })
     .then(function(){
       /* Номер задания в адресе — это выбор учителя, сделанный на главной
