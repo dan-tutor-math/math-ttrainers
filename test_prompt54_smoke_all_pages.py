@@ -1,7 +1,7 @@
 """
 Промпт №54: дымовая проверка всех страниц платформы.
 
-Открывает каждую страницу (22 тренажёра, главную, доски и «калькуляторы в
+Открывает каждую страницу (23 тренажёра, главную, доски и «калькуляторы в
 столбик» *_embed.html) и падает, если на какой-нибудь случилась ошибка
 JavaScript. На тренажёрах дополнительно проверяет, что мост состояния для
 совместной сессии и «+ примеров» на месте (window.__trainerState).
@@ -28,7 +28,7 @@ BASE = f"http://127.0.0.1:{PORT}"
 
 TRAINERS = [
     "oge1_5", "oge6", "oge7", "oge8", "oge9", "oge10", "oge11", "oge12", "oge13",
-    "oge14", "oge15_18", "oge19", "powers", "ege_prof",
+    "oge14", "oge15_18", "oge19", "powers", "ege_prof", "ege_base",
     "addition", "subtraction", "multiplication", "division",
     "linear", "quadratic", "fraction_multiply", "fraction_divide",
 ]
@@ -73,8 +73,8 @@ def run():
             page.wait_for_timeout(1200)
             bridge = page.evaluate("() => !!window.__trainerState") if slug in TRAINERS else None
             # у тренажёров из семейства ОГЭ №8 своя система карточек, без моста;
-            # с Промпта №56 туда же перешёл ЕГЭ профиль
-            needs_bridge = slug in TRAINERS and slug not in ("oge8", "oge12", "powers", "ege_prof")
+            # с Промпта №56 туда же перешёл ЕГЭ профиль, с №57 — ЕГЭ база
+            needs_bridge = slug in TRAINERS and slug not in ("oge8", "oge12", "powers", "ege_prof", "ege_base")
             ok = not errors and (not needs_bridge or bridge)
             print(f"[{'OK' if ok else 'FAIL'}] {slug}" + (f": {errors[:2]}" if errors else "")
                   + ("" if not needs_bridge or bridge else ": нет window.__trainerState"))

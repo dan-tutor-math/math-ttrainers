@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#0B0E1A">
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ЕГЭ профиль — задания демоверсии</title>
+<title>ЕГЭ база — задания демоверсии</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
@@ -52,7 +52,7 @@ html.katex-fonts-ready .katex{visibility:visible}
   --hl-10:rgba(0,76,153,.10);
   --hl-14:var(--hl);
   --hl-35:rgba(0,76,153,.35);
-  /* цвета внутри вырезанных из демоверсии рисунков (см. ege-prof-figs.js) */
+  /* цвета внутри вырезанных из демоверсии рисунков (см. ege-base-figs.js) */
   --fig-grid:#9aa1ad;
 }
 html[data-theme="dark"]{
@@ -587,7 +587,7 @@ html[data-medals="on"] .board-view-toolbar{bottom:64px;}
 </div>
 
 <div class="wrap">
-  <h1 id="pageTitle">ЕГЭ профиль</h1>
+  <h1 id="pageTitle">ЕГЭ база</h1>
   <div class="sub" id="pageSub">демоверсия ФИПИ 2027</div>
 
   <!-- экран выбора прототипа: открывается первым, как список типов в ОГЭ.
@@ -731,29 +731,29 @@ html[data-medals="on"] .board-view-toolbar{bottom:64px;}
 <script src="html2canvas.min.js"></script>
 <script src="jspdf.umd.min.js"></script>
 <script src="lesson-history.js"></script>
-<script src="ege-prof-figs.js"></script>
-<script src="ege-prof-bank.js"></script>
+<script src="ege-base-figs.js"></script>
+<script src="ege-base-bank.js"></script>
 <script>
 /* ═══════════════ настройки экзамена ═══════════════
-   ЕГЭ профиль (ege_prof.html) и ЕГЭ база (ege_base.html) — одна и та же
-   страница. Всё, чем они различаются в логике, собрано в этом блоке; кроме
-   него у файлов отличаются только заголовок, подключённые банк и рисунки
-   (ege-prof-… / ege-base-…) и слова «профиль» / «база». Это проверяет
-   test_prompt57_ege_base.py: правку логики делают в одном файле и целиком
-   переносят во второй, оставив у него свой блок настроек. */
+   ЕГЭ база (ege_base.html) — та же страница, что ЕГЭ профиль
+   (ege_prof.html), с другим банком заданий. Логику здесь НЕ правят: её
+   правят в ege_prof.html и пересобирают этот файл командой
+   python3 sync_ege_pages.py — он сохраняет этот блок настроек, а всё
+   остальное берёт из профиля. Тест test_prompt57_ege_base.py проверяет,
+   что страницы не разошлись. */
 const EXAM = {
-  slug: 'ege_prof',          // имя файла = слаг тренажёра в совместной сессии
-  idPrefix: 'ege',           // id позиции в каталоге, подборке и на доске: ege7
-  title: 'ЕГЭ профиль',
-  bank: window.EGE_PROF_BANK,
-  figs: window.EGE_PROF_FIGS,
-  showPart: true,            // в профиле две части; в базе частей нет
-  // подсказка, если ответ части 1 записан не по форме бланка
-  part1Format: 'Ответ — целое число или конечная десятичная дробь, например −0,8',
+  slug: 'ege_base',          // имя файла = слаг тренажёра в совместной сессии
+  idPrefix: 'egeb',          // id позиции в каталоге, подборке и на доске: egeb7
+  title: 'ЕГЭ база',
+  bank: window.EGE_BASE_BANK,
+  figs: window.EGE_BASE_FIGS,
+  showPart: false,           // в базе частей нет: все 21 задание с кратким ответом
+  // подсказка, если ответ записан не по форме бланка
+  part1Format: 'Ответ — целое число или конечная десятичная дробь, например −0,6',
 };
 /* ═══════════════ конец настроек ═══════════════ */
 
-/* ═══════════════ ЕГЭ профиль — логика страницы ═══════════════
+/* ═══════════════ ЕГЭ база — логика страницы ═══════════════
    Одна страница на все позиции экзамена: номер задания приходит в адресе
    (?n=7). Задания, решения и рисунки лежат в банке и файле рисунков (см.
    EXAM): страница не знает ни одной формулы — добавление новых прототипов
@@ -2076,7 +2076,7 @@ if (window.TrainerSession) {
   window.TrainerSession.init({ trainer: EXAM.slug, getState: tsGetStateVersioned, applyState: tsApplyStateFromPeer })
     .then(function(){
       /* Номер задания в адресе — это выбор учителя, сделанный на главной
-         («ЕГЭ профиль → №7»). Снимок из базы к этому моменту мог вернуть
+         («ЕГЭ база → №7»). Снимок из базы к этому моменту мог вернуть
          страницу на прошлое задание, поэтому после подключения адрес
          пересиливает — но только у ведущего: присоединившегося уводит за
          ведущим сама сессия. */

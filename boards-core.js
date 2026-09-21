@@ -3861,6 +3861,10 @@ const TRAINER_CAPTURE = {
 for (let n = 1; n <= 20; n++) {
   TRAINER_CAPTURE['ege' + n] = [ { sel:'#egeQuestion' }, { selAll:'.added-task-card .added-card-question' } ];
 }
+// Промпт №57: ЕГЭ база — та же страница (ege_base.html), 21 позиция, id egeb…
+for (let n = 1; n <= 21; n++) {
+  TRAINER_CAPTURE['egeb' + n] = [ { sel:'#egeQuestion' }, { selAll:'.added-task-card .added-card-question' } ];
+}
 
 // список тренажёров для панели — те же названия/файлы, что и в реестре
 // TRAINERS на главной странице (index.html), сгруппированы так же просто,
@@ -3912,6 +3916,22 @@ TRAINERS_PANEL_GROUPS.splice(1, 0, { title: 'ЕГЭ профиль', items: EGE_
   name: '№' + (i + 1) + '. ' + title,
   href: 'ege_prof.html?n=' + (i + 1),
   eq: i < 13 ? 'краткий ответ' : 'с решением',
+})) });
+// ЕГЭ база — третьим разделом, сразу за профилем; названия те же, что на главной
+const EGE_BASE_PANEL = [
+  'Простейшие текстовые задачи', 'Величины и их значения', 'Графики, диаграммы и таблицы',
+  'Вычисления по формулам', 'Начала теории вероятностей', 'Выбор оптимального варианта',
+  'Анализ графиков и диаграмм', 'Анализ утверждений', 'Площади на клетчатом плане',
+  'Прикладная планиметрия', 'Прикладная стереометрия', 'Планиметрия', 'Стереометрия',
+  'Вычисления', 'Проценты и доли', 'Значения выражений', 'Простейшие уравнения',
+  'Числа на прямой и неравенства', 'Цифровая запись числа', 'Текстовые задачи',
+  'Задачи на смекалку',
+];
+TRAINERS_PANEL_GROUPS.splice(2, 0, { title: 'ЕГЭ база', items: EGE_BASE_PANEL.map((title, i) => ({
+  id: 'egeb' + (i + 1),
+  name: '№' + (i + 1) + '. ' + title,
+  href: 'ege_base.html?n=' + (i + 1),
+  eq: 'краткий ответ',
 })) });
 
 const trainersToggleBtn = document.getElementById('bdTrainersToggle');
@@ -5403,6 +5423,7 @@ const TRAINER_NAMES = {
 // подписи для «Подборки» — берём из списка панели тренажёров, чтобы название
 // ЕГЭ-задания было записано на доске один в один как в реестре на главной
 EGE_PROF_PANEL.forEach((title, i) => { TRAINER_NAMES['ege' + (i + 1)] = 'ЕГЭ профиль №' + (i + 1) + '. ' + title; });
+EGE_BASE_PANEL.forEach((title, i) => { TRAINER_NAMES['egeb' + (i + 1)] = 'ЕГЭ база №' + (i + 1) + '. ' + title; });
 function escapeHtmlBd(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function renderBasketPicker(){
