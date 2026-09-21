@@ -216,7 +216,10 @@ html[data-focus="on"] .submode-tabs{
 html[data-focus="on"] #pickerArea{display:none!important;}
 h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,5vw,34px);color:var(--pencil);text-align:center;}
 .sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 22px;}
-.task-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+/* Промпт №63: как в ОГЭ №8 — кнопки шапки задания (типы, 📥, ⟳) не
+   сжимаются, и на телефоне их ряд вылезал за край экрана, давая
+   горизонтальную прокрутку. С переносом лишнее уходит на следующую строку */
+.task-head{display:flex;flex-wrap:wrap;row-gap:8px;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
 /* экран выбора типа — как в остальных тренажёрах ОГЭ (Промпт №61: до него
    тип здесь был один, и страница сразу открывала задание) */
 .modes{display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
@@ -235,7 +238,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .back-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 14px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);transition:transform .15s;}
 .back-btn:active{transform:scale(.96)}
 .back-btn:hover{border-color:var(--ink)}
-.corner{font-family:var(--font-ui);font-weight:500;display:flex;align-items:center;gap:10px;}
+.corner{font-family:var(--font-ui);font-weight:500;display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;gap:10px;}
 .submode-tabs{display:flex;gap:8px;margin-bottom:14px;}
 .submode-tab{flex:1;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:10px 6px;cursor:pointer;text-align:center;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s, border-color .15s, color .15s, background .15s;}
 .submode-tab:active{transform:scale(.96)}
@@ -279,7 +282,14 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:14px;box-shadow:0 6px 18px var(--ok-shadow);transition:transform .15s;}
 .next-btn:active{transform:scale(.98)}
 .stats{display:flex;gap:10px;flex-wrap:wrap;}
-.stat{flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:12px 14px;text-align:center;}
+/* плашки статистики без тени, как кнопки калькулятора над ними: у .stats
+   overflow:hidden (плавное сворачивание), он срезал тень снизу и по углам,
+   и оставались только полоски по бокам */
+.stat{flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;padding:12px 14px;text-align:center;}
+/* Промпт №63: на экране меньше 360px три карточки счёта с min-width:110px не
+   помещались в ряд, третья уходила на вторую строку и обрезалась (у .stats
+   max-height и overflow:hidden). Там им разрешено сжиматься */
+@media(max-width:359px){.stat{min-width:0}}
 .stat .v{font-family:var(--font-ui);font-weight:700;font-size:22px;color:var(--ink);}
 .stat .l{font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-6);}
 .theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}

@@ -36,7 +36,7 @@ import time
 
 from playwright.sync_api import sync_playwright
 
-PORT = 8982
+PORT = 8984
 BASE = f"http://127.0.0.1:{PORT}"
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -638,11 +638,9 @@ def test_phone(browser):
     for slug, mid in [("oge11", "demo2027"), ("oge13", "demo2027"), ("oge15_18", "demo15"), ("oge15_18", "demo18")]:
         ctx, page, errors = new_page(browser, f"{BASE}/{slug}.html", width=375)
         open_type(page, mid)
-        # шапка задания с кнопками типов на 375 пикселях вылезает и без
-        # нулевого типа — это старое, меряем только само задание
-        over = page.evaluate("""() => [...document.querySelectorAll('#questionPanel *')]
-          .filter(e => e.getBoundingClientRect().right > window.innerWidth + 1).length""")
-        check(f"телефон: {slug}/{mid} — задание с рисунками в ширине экрана", over == 0, str(over))
+        # с №63 шапка задания на телефоне переносится — меряем всю страницу
+        over = page.evaluate("document.documentElement.scrollWidth - window.innerWidth")
+        check(f"телефон: {slug}/{mid} — без прокрутки вбок", over <= 0, str(over))
         ctx.close()
     ctx, page, errors = new_page(browser, f"{BASE}/oge_part2.html?n=22", width=375)
     page.click('#protoList .mode-card')

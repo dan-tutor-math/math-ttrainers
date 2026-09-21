@@ -263,8 +263,11 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .mode-card.soon{opacity:.55;cursor:default;}
 .mode-card.soon:hover{border-color:var(--glass-border);transform:none;}
 .soon-badge{font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-1);background:var(--glass);border-radius:8px;padding:3px 8px;}
-.task-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
-.type-nav{display:flex;align-items:center;gap:8px;}
+/* Промпт №63: как в ОГЭ №8 — кнопки шапки задания (типы, 📥, ⟳) не
+   сжимаются, и на телефоне их ряд вылезал за край экрана, давая
+   горизонтальную прокрутку. С переносом лишнее уходит на следующую строку */
+.task-head{display:flex;flex-wrap:wrap;row-gap:8px;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.type-nav{display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;gap:8px;}
 .type-nav-btn{height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-ui);font-weight:600;font-size:12px;line-height:1;cursor:pointer;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;transition:transform .12s, border-color .12s;}
 .type-nav-btn:hover{border-color:var(--ink)}
 .type-nav-btn:active{transform:scale(.9)}
@@ -278,7 +281,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .back-btn:active{transform:scale(.96)}
 .back-btn:hover{border-color:var(--ink)}
 .task-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3)}
-.corner{font-family:var(--font-ui);font-weight:500;display:flex;align-items:center;gap:10px;}
+.corner{font-family:var(--font-ui);font-weight:500;display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;gap:10px;}
 .refresh-btn{width:28px;height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}
 .refresh-btn:hover{border-color:var(--ink);transform:rotate(80deg)}
 .refresh-btn:active{transform:scale(.9)}
@@ -295,6 +298,10 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .data-table{width:100%;border-collapse:collapse;margin:10px 0 4px;font-family:var(--font-mono);font-size:14px;}
 .data-table th,.data-table td{border:1px solid var(--glass-border);padding:6px 10px;text-align:center;}
 .data-table th{background:var(--glass);font-family:var(--font-ui);font-weight:600;color:var(--muted-3);}
+/* Промпт №63: на телефоне таблица из условия (в шинах — «215/55; 215/50» в
+   трёх столбцах) не помещалась в экран даже с переносами и растягивала страницу
+   вбок. На узком экране у ячеек меньше поля и мельче шрифт */
+@media(max-width:420px){.data-table{font-size:12.5px}.data-table th,.data-table td{padding:5px 4px}}
 .mcq-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3);margin-bottom:10px;}
 .mcq-options{display:flex;flex-direction:column;gap:8px;}
 .change-answer-btn{display:none;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--teacher);background:none;border:none;padding:10px 2px 0;cursor:pointer;text-decoration:underline;animation:revealUp .3s ease both;transition:opacity .15s;}
@@ -316,7 +323,14 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:14px;box-shadow:0 6px 18px var(--ok-shadow);transition:transform .15s;}
 .next-btn:active{transform:scale(.98)}
 .stats{display:flex;gap:10px;flex-wrap:wrap;}
-.stat{flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:12px 14px;text-align:center;}
+/* плашки статистики без тени, как кнопки калькулятора над ними: у .stats
+   overflow:hidden (плавное сворачивание), он срезал тень снизу и по углам,
+   и оставались только полоски по бокам */
+.stat{flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;padding:12px 14px;text-align:center;}
+/* Промпт №63: на экране меньше 360px три карточки счёта с min-width:110px не
+   помещались в ряд, третья уходила на вторую строку и обрезалась (у .stats
+   max-height и overflow:hidden). Там им разрешено сжиматься */
+@media(max-width:359px){.stat{min-width:0}}
 .stat .v{font-family:var(--font-ui);font-weight:700;font-size:22px;color:var(--ink);}
 .stat .l{font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-6);}
 .theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
