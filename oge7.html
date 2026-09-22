@@ -2681,6 +2681,10 @@ function makeKeypadDraggable(floatEl, handleEl){
     floatEl.style.left = rect.left + 'px';
     floatEl.style.top = rect.top + 'px';
     floatEl.style.right = 'auto';
+    // На телефоне CSS прижимает клавиатуру к низу (bottom:16px). Если его не
+    // сбросить, при заданном top панель растягивается до низа экрана и за ней
+    // остаётся пустой «хвост».
+    floatEl.style.bottom = 'auto';
     offsetX = e.clientX - rect.left;
     offsetY = e.clientY - rect.top;
     try{ handleEl.setPointerCapture(e.pointerId); }catch(err){}

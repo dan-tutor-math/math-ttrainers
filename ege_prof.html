@@ -1983,6 +1983,10 @@ els.kpToggle.onclick = () => { keypadOpen = true; syncKeypadVisibility(); };
     floatEl.style.left = r.left + 'px';
     floatEl.style.top = r.top + 'px';
     floatEl.style.right = 'auto';
+    // На телефоне CSS прижимает клавиатуру к низу (bottom:16px). Если его не
+    // сбросить, при заданном top панель растягивается до низа экрана и за ней
+    // остаётся пустой «хвост».
+    floatEl.style.bottom = 'auto';
     offX = e.clientX - r.left; offY = e.clientY - r.top;
     try { handleEl.setPointerCapture(e.pointerId); } catch (err) {}
     e.preventDefault();
