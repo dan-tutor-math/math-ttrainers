@@ -1828,6 +1828,10 @@ let curvePts = null;        // {pts:[...], preview} — «кривая»: про
 let circleState = null;     // {center, r, previewR}
 let polyState = null;       // {pts:[...]}
 let penStroke = null;       // штрих, который рисуется прямо сейчас
+// Промпт №69: фигуры «одним движением» — зажал, потянул, отпустил.
+// {type:'rect'|'pivot', a, b}: у прямоугольника a и b — противоположные
+// углы, у прямой с центром a — центр, b — конец под курсором
+let shapeDrag = null;
 
 const undoStack = [], redoStack = [];
 const UNDO_LIMIT = 60;
@@ -2120,12 +2124,64 @@ function scheduleRedraw(){
 // пока камера (панорамирование/зум/ресайз окна) двигается
 function syncTextEditorToCam(){
   if (!textEditSession) return;
-  const { wrap, worldPt } = textEditSession;
+  const s = textEditSession;
+  const { wrap, worldPt } = s;
   const scr = worldToScreen(worldPt);
   const r = canvas.getBoundingClientRect();
-  wrap.style.left = Math.round(r.left + scr.x) + 'px';
-  wrap.style.top = Math.round(r.top + scr.y) + 'px';
+  // Промпт №69: поле стоит ровно там, где холст нарисует текст. Горизонталь
+  // совпадает сама (у поля нет отступов), по вертикали CSS и canvas ставят
+  // первую строку по-разному: холст — верх строки по textBaseline 'top',
+  // CSS — с половиной межстрочного интервала сверху. Разницу базовых линий
+  // меряем один раз на шрифт (textEditorBaselineRatio) и сдвигаем поле на неё
+  const fsPx = Math.max(4, (s.fontSize || curFontSize || 22) * cam.zoom);
+  const shift = textEditorBaselineRatio(s.bold, s.italic) * fsPx;
+  wrap.style.left = (r.left + scr.x) + 'px';
+  wrap.style.top = (r.top + scr.y + shift) + 'px';
   applyTextEditorLiveStyle();
+}
+/* Разница «где базовая линия первой строки у холста» минус «где у textarea»,
+   в долях размера шрифта. Холст: рисуем «H» с textBaseline 'top' и ищем
+   нижний ряд закрашенных пикселей. CSS: пустой inline-block нулевой высоты
+   садится нижним краем на базовую линию — его offsetTop и есть она. Меряем
+   на 100px для точности, результат пропорционален размеру. Кэш сбрасывается,
+   когда догружается веб-шрифт: метрики у запасного шрифта другие */
+const baselineRatioCache = {};
+function textEditorBaselineRatio(bold, italic){
+  const key = (bold ? 'b' : '') + (italic ? 'i' : '');
+  if (key in baselineRatioCache) return baselineRatioCache[key];
+  let ratio = 0;
+  try {
+    const FS = 100, W = 90, H = 220, TOP = 20;
+    const style = (italic ? 'italic ' : '') + (bold ? '700 ' : '');
+    const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+    const c = cv.getContext('2d', { willReadFrequently: true });
+    c.font = style + FS + 'px ' + UI_FONT_FAMILY;
+    c.textBaseline = 'top'; c.fillStyle = '#000';
+    c.fillText('H', 10, TOP);
+    const data = c.getImageData(0, 0, W, H).data;
+    let bottom = -1;
+    for (let y = H-1; y >= 0 && bottom < 0; y--){
+      for (let x = 0; x < W; x++){ if (data[(y*W + x)*4 + 3] > 127){ bottom = y; break; } }
+    }
+    const d = document.createElement('div');
+    d.style.cssText = 'position:absolute;left:-10000px;top:0;white-space:pre;margin:0;padding:0;border:0;';
+    d.style.fontFamily = 'var(--font-ui),sans-serif';
+    d.style.fontSize = FS + 'px'; d.style.lineHeight = '1.25';
+    d.style.fontWeight = bold ? '700' : '400'; d.style.fontStyle = italic ? 'italic' : 'normal';
+    d.innerHTML = 'H<span style="display:inline-block;width:0;height:0;vertical-align:baseline"></span>';
+    document.body.appendChild(d);
+    const cssBase = d.lastChild.offsetTop;
+    d.remove();
+    if (bottom >= 0) ratio = ((bottom + 1 - TOP) - cssBase) / FS;
+  } catch(e){ ratio = 0; }
+  baselineRatioCache[key] = ratio;
+  return ratio;
+}
+if (document.fonts && document.fonts.addEventListener){
+  document.fonts.addEventListener('loadingdone', () => {
+    Object.keys(baselineRatioCache).forEach(k => delete baselineRatioCache[k]);
+    if (textEditSession) syncTextEditorToCam();
+  });
 }
 // растягивает textarea точно по содержимому (ширина и высота), без переноса
 // строк — canvas ниже тоже никогда не переносит текст сам, только по явным
@@ -2133,12 +2189,20 @@ function syncTextEditorToCam(){
 // при наборе (несколько коротких визуальных строк), разойдётся с финальным
 // рендером на доске (одна длинная строка) — из-за этого итоговый текст и
 // выглядел «не тем, что было при редактировании»
-function autoGrowTextarea(ta){
+function autoGrowTextarea(ta, fixedW){
+  // Промпт №69: у поля с рамкой ширина задана (перенос по ней), растёт
+  // только высота; без рамки — как раньше, по содержимому в обе стороны
+  if (fixedW){
+    ta.style.width = fixedW + 'px';
+    ta.style.height = '0px';
+    ta.style.height = Math.max(4, ta.scrollHeight) + 'px';
+    return;
+  }
   ta.style.width = '0px';
   ta.style.height = '0px';
   const sw = ta.scrollWidth, sh = ta.scrollHeight;
-  ta.style.width = Math.max(24, sw) + 'px';
-  ta.style.height = Math.max(20, sh) + 'px';
+  ta.style.width = Math.max(4, sw) + 'px';
+  ta.style.height = Math.max(4, sh) + 'px';
 }
 // единая точка, где живые данные редактируемого текста (размер, цвет, фон,
 // начертание) превращаются в то, что видно в textarea — используется и при
@@ -2158,8 +2222,13 @@ function applyTextEditorLiveStyle(){
   if (s.strike) deco.push('line-through');
   s.textarea.style.textDecoration = deco.length ? deco.join(' ') : 'none';
   s.textarea.style.color = resolveColor(s.color);
-  s.textarea.style.background = s.bg ? resolveColor(s.bg) : '';
-  autoGrowTextarea(s.textarea);
+  // Промпт №69: подложка во время ввода прозрачная — виден лист; цвет только
+  // если у текста выбран фон (он и будет на доске)
+  s.textarea.style.background = s.bg ? resolveColor(s.bg) : 'transparent';
+  const wrapping = !!s.boxW;
+  s.textarea.classList.toggle('wrapping', wrapping);
+  s.textarea.setAttribute('wrap', wrapping ? 'soft' : 'off');
+  autoGrowTextarea(s.textarea, wrapping ? Math.max(4, s.boxW * cam.zoom) : 0);
 }
 
 /* доска — сплошное полотно: одна заливка «бумаги» на весь мир (0..totalW,
@@ -2358,6 +2427,7 @@ function renderObject(c, obj, camv, opts){
     strokePolyline(c, wp, true);
   } else if (obj.type === 'line'){
     strokePolyline(c, wp, false);
+    if (obj.pivot) drawPivotMark(c, { x:(wp[0].x+wp[1].x)/2, y:(wp[0].y+wp[1].y)/2 }, obj.width, camv.zoom);
     if (obj.arrowEnd || obj.arrowStart){
       c.save(); c.setLineDash([]);
       if (obj.arrowEnd) drawArrowHead(c, wp[0], wp[1], c.lineWidth);
@@ -2410,7 +2480,7 @@ function renderObject(c, obj, camv, opts){
       c.restore();
     }
     c.fillStyle = color;
-    (obj.content || '').split('\n').forEach((line, i) => {
+    textLayout(obj).lines.forEach((line, i) => {
       const ly = p.y + i*lineH;
       c.fillText(line, p.x, ly);
       if (obj.underline || obj.strike){
@@ -2449,6 +2519,12 @@ function drawAngleArcAndLabel(c, v, a, b, camv, width){
 }
 
 function getHandles(obj){
+  // Промпт №69: у прямой с центром первая ручка — центр (её ищут первой,
+  // чтобы на короткой прямой центр не перехватывался концами)
+  if (obj.type === 'line' && obj.pivot){
+    const a = obj.points[0], b = obj.points[1];
+    return [{role:'pc',x:(a.x+b.x)/2,y:(a.y+b.y)/2},{role:'p0',x:a.x,y:a.y},{role:'p1',x:b.x,y:b.y}];
+  }
   if (obj.type === 'line') return [{role:'p0',x:obj.points[0].x,y:obj.points[0].y},{role:'p1',x:obj.points[1].x,y:obj.points[1].y}];
   if (obj.type === 'curve'){
     if (obj.ctrl) return [{role:'p0',x:obj.points[0].x,y:obj.points[0].y},{role:'p1',x:obj.points[1].x,y:obj.points[1].y},{role:'ctrl',x:obj.ctrl.x,y:obj.ctrl.y}];
@@ -2470,6 +2546,11 @@ function getHandles(obj){
     const c = obj.points[0];
     return [{role:'center',x:c.x,y:c.y},{role:'r',x:c.x+obj.r,y:c.y}];
   }
+  if (obj.type === 'text'){
+    // Промпт №69: края рамки текста — тянуть ширину (перенос строк по ней)
+    const p = obj.points[0], w = obj.boxW || obj.w || 10, my = p.y + (obj.h || 20)/2;
+    return [{role:'tw',x:p.x,y:my},{role:'te',x:p.x+w,y:my}];
+  }
   if (obj.type === 'image'){
     // маркеры изменения размера доступны и у закреплённых картинок —
     // закрепление защищает только от ластика, двигать и тянуть за угол
@@ -2485,7 +2566,58 @@ function getHandles(obj){
   return [];
 }
 function applyHandle(obj, role, pt){
+  const rawPt = pt;
   pt = maybeSnap(pt);
+  // Промпт №69: прямая с закреплённым центром. Центр переносит прямую
+  // целиком; конец только задаёт направление — длина и центр не меняются.
+  // Для поворота берём точку курсора без прилипания к клеткам: прилипание
+  // дёргало бы прямую рывками по узлам сетки возле центра
+  if (obj.type === 'line' && obj.pivot && (role === 'pc' || role === 'p0' || role === 'p1')){
+    const a = obj.points[0], b = obj.points[1];
+    const cx = (a.x+b.x)/2, cy = (a.y+b.y)/2;
+    if (role === 'pc'){
+      const dx = pt.x - cx, dy = pt.y - cy;
+      obj.points = [ {x:a.x+dx, y:a.y+dy}, {x:b.x+dx, y:b.y+dy} ];
+      return;
+    }
+    const half = dist(a, b) / 2;
+    let vx = rawPt.x - cx, vy = rawPt.y - cy;
+    const len = Math.hypot(vx, vy);
+    if (len < 1e-6 || half < 1e-6) return;
+    vx /= len; vy /= len;
+    const end = { x: cx + vx*half, y: cy + vy*half }, opp = { x: cx - vx*half, y: cy - vy*half };
+    obj.points = role === 'p0' ? [end, opp] : [opp, end];
+    return;
+  }
+  // Промпт №69: ширина рамки текста. Правый край — просто ширина, левый —
+  // сдвиг начала при неподвижном правом крае; перенос строк сразу по новой ширине
+  if (obj.type === 'text' && (role === 'te' || role === 'tw')){
+    const p = obj.points[0];
+    const minW = Math.max(16, (obj.fontSize || 22) * 1.2);
+    const curW = obj.boxW || obj.w || minW;
+    if (role === 'te') obj.boxW = Math.max(minW, pt.x - p.x);
+    else {
+      const right = p.x + curW;
+      const nx = Math.min(pt.x, right - minW);
+      obj.points[0] = { x: nx, y: p.y };
+      obj.boxW = right - nx;
+    }
+    measureTextObj(obj);
+    return;
+  }
+  // Промпт №69: угол прямоугольника — противоположный угол на месте, два
+  // соседних пересчитываются так, чтобы углы остались прямыми
+  if (obj.type === 'quad' && obj.rect && role && role.indexOf('pt') === 0 && obj.points.length === 4){
+    const i = +role.slice(2), o = (i+2)%4, n = (i+1)%4, m = (i+3)%4;
+    const O = obj.points[o], P = pt;
+    const pts = obj.points.slice();
+    pts[i] = { x:P.x, y:P.y };
+    // ребро k→k+1 горизонтальное при чётном k (так строит shapeFromDrag)
+    if (i % 2 === 0){ pts[n] = { x:O.x, y:P.y }; pts[m] = { x:P.x, y:O.y }; }
+    else            { pts[n] = { x:P.x, y:O.y }; pts[m] = { x:O.x, y:P.y }; }
+    obj.points = pts;
+    return;
+  }
   if (role === 'p0') obj.points[0] = pt;
   else if (role === 'p1') obj.points[1] = pt;
   else if (role === 'ctrl') obj.ctrl = pt;
@@ -2526,6 +2658,14 @@ function applyHandle(obj, role, pt){
 
 function drawSelection(c, obj, camv){
   const handles = getHandles(obj);
+  if (obj.type === 'text'){
+    // Промпт №69: рамка текста — видно, где он будет переноситься
+    const p = worldToScreen(obj.points[0]);
+    c.save();
+    c.strokeStyle = themeVar('--ink'); c.lineWidth = 1; c.setLineDash([5,3]);
+    c.strokeRect(p.x - 3, p.y - 3, (obj.boxW || obj.w || 10)*camv.zoom + 6, (obj.h || 20)*camv.zoom + 6);
+    c.restore();
+  }
   c.save();
   c.fillStyle = themeVar('--ink');
   c.strokeStyle = '#fff'; c.lineWidth = 1.5;
@@ -2594,6 +2734,7 @@ function drawDraftPreview(c, camv){
   if (penStroke){
     strokePolyline(c, penStroke.points.map(p=>worldToScreen(p)), true);
   }
+  if (shapeDrag) drawShapeDragPreview(c, shapeDrag, worldToScreen, camv.zoom);
   c.restore();
 }
 
@@ -2664,7 +2805,60 @@ function drawMarquee(c, camv){
    ИНСТРУМЕНТЫ — точки собираются кликами (без перетаскивания), что даёт
    единый, предсказуемый жест для всех фигур
    ═══════════════════════════════════════════════════════════════════════ */
-const FIXED_COUNT = { line: 2, ellipse: 2, quad: 4, angle: 3 };
+const FIXED_COUNT = { line: 2, ellipse: 2, angle: 3 };
+/* Промпт №69: инструменты-протяжки. Кнопка «Четырёхугольник» стала
+   «Прямоугольником» (id инструмента 'quad' оставлен — на нём клавиша 7 и
+   старые настройки), объект — тот же 'quad' из четырёх точек, но с флагом
+   rect: ручки углов держат прямые углы. Старые четырёхугольники без флага
+   правятся как раньше, по точке. «Прямая с закреплённым центром» — обычный
+   'line' с флагом pivot: рисуется, выгружается, стирается и едет в общую
+   доску как любая прямая, особые у неё только ручки (applyHandle) */
+const DRAG_SHAPE_TOOLS = { quad: 'rect', pivot: 'pivot' };
+function shapeFromDrag(sd, zoom){
+  if (!sd) return null;
+  const a = sd.a, b = sd.b || sd.a;
+  if (sd.type === 'rect'){
+    // случайный клик без протяжки (или в линию) — не фигура
+    if (Math.abs(b.x-a.x)*zoom < 3 || Math.abs(b.y-a.y)*zoom < 3) return null;
+    const obj = newBase('quad');
+    // порядок обхода важен для applyHandle: ребро 0–1 горизонтальное, 1–2 вертикальное
+    obj.points = [ {x:a.x,y:a.y}, {x:b.x,y:a.y}, {x:b.x,y:b.y}, {x:a.x,y:b.y} ];
+    obj.rect = true;
+    return obj;
+  }
+  if (sd.type === 'pivot'){
+    if (dist(a, b)*zoom < 4) return null;
+    const obj = newBase('line');
+    obj.points = [ {x:2*a.x-b.x, y:2*a.y-b.y}, {x:b.x, y:b.y} ];
+    obj.pivot = true;
+    return obj;
+  }
+  return null;
+}
+function drawShapeDragPreview(c, sd, toScreen, zoom){
+  if (!sd || !sd.b) return;
+  const a = sd.a, b = sd.b;
+  if (sd.type === 'rect'){
+    const pts = [ {x:a.x,y:a.y}, {x:b.x,y:a.y}, {x:b.x,y:b.y}, {x:a.x,y:b.y} ].map(toScreen);
+    c.beginPath(); c.moveTo(pts[0].x, pts[0].y);
+    for (let i=1;i<4;i++) c.lineTo(pts[i].x, pts[i].y);
+    c.closePath();
+    if (curFill){ c.save(); c.globalAlpha *= 0.16; c.fill(); c.restore(); }
+    c.stroke();
+  } else if (sd.type === 'pivot'){
+    const p0 = toScreen({x:2*a.x-b.x, y:2*a.y-b.y}), p1 = toScreen(b), cc = toScreen(a);
+    c.beginPath(); c.moveTo(p0.x, p0.y); c.lineTo(p1.x, p1.y); c.stroke();
+    drawPivotMark(c, cc, curWidth, zoom);
+  }
+}
+// отметка центра у прямой с закреплённым центром — заметная точка, в
+// экспорте тоже видна: по ней ученик понимает, вокруг чего поворачивается прямая
+function drawPivotMark(c, s, width, zoom){
+  const r = Math.max(3.2, (width || 2) * 1.35) * zoom;
+  c.save(); c.setLineDash([]);
+  c.beginPath(); c.arc(s.x, s.y, r, 0, Math.PI*2); c.fill();
+  c.restore();
+}
 
 function commitObject(obj){
   pushUndo();
@@ -2682,10 +2876,12 @@ function newBase(type){
   return obj;
 }
 function bumpColorUsage(tok){
-  // счётчик использований больше нигде не показываем (сбивал с толку) —
-  // просто поднимаем цвет наверх списка недавних
-  B.recentColors = [tok].concat(B.recentColors.filter(t=>t!==tok)).slice(0,8);
-  saveDB(); renderSwatches();
+  // Промпт №69: палитра — это сохранённые человеком ячейки, а не «недавние».
+  // Раньше каждый штрих поднимал свой цвет в начало и резал список до 8:
+  // ячейки прыгали, а свежедобавленный цвет выталкивал самый старый. Теперь
+  // рисование палитру не трогает вовсе; функция оставлена, потому что её
+  // зовут все места создания объектов (и заметки справочной панели)
+  void tok;
 }
 
 /* ── инструмент «Текст» ──────────────────────────────────────────────────
@@ -2696,17 +2892,59 @@ function bumpColorUsage(tok){
    попадание курсора (hitTestObject) и рамка выделения (objectBBox). ── */
 let textEditSession = null; // { objId, isNew, worldPt, textarea, wrap } — пока открыто ровно одно поле редактирования
 
+/* Промпт №69: у текста может быть рамка — ширина boxW (в мировых единицах).
+   Строка, упёршаяся в правый край рамки, переносится по словам (слово
+   длиннее рамки режется по буквам), как в поле ввода с white-space:pre-wrap.
+   Без boxW (тексты до №69) — как раньше, только по явным «\n». Раскладка
+   считается в мировых единицах, поэтому не зависит от масштаба и
+   кэшируется по объекту (WeakMap — в сохранение доски кэш не попадает) */
+const textMeasureCtx = document.createElement('canvas').getContext('2d');
+const textLayoutCache = new WeakMap();
+function textFontCss(obj, px){ return (obj.italic?'italic ':'') + (obj.bold?'700 ':'') + px + 'px ' + UI_FONT_FAMILY; }
+function wrapTextLines(c, content, maxW){
+  const out = [];
+  const fits = (str) => c.measureText(str.replace(/\s+$/, '')).width <= maxW;
+  String(content || '').split('\n').forEach(par => {
+    if (!(maxW > 0) || c.measureText(par).width <= maxW){ out.push(par); return; }
+    // слово вместе с пробелами после него: пробелы в конце строки «висят» за
+    // краем рамки и ширину не занимают — так же ведёт себя textarea
+    const tokens = par.match(/\S+\s*|\s+/g) || [''];
+    let line = '';
+    tokens.forEach(tok => {
+      if (fits(line + tok)){ line += tok; return; }
+      if (line){ out.push(line.replace(/\s+$/, '')); line = ''; }
+      let t = tok;
+      while (!fits(t) && t.replace(/\s+$/, '').length > 1){
+        let k = 1;
+        while (k < t.length && c.measureText(t.slice(0, k+1)).width <= maxW) k++;
+        out.push(t.slice(0, k)); t = t.slice(k);
+      }
+      line = t;
+    });
+    out.push(line.replace(/\s+$/, ''));
+  });
+  return out;
+}
+function textLayout(obj){
+  const fs = obj.fontSize || 22;
+  const font = textFontCss(obj, fs);
+  const key = font + '|' + (obj.boxW || 0) + '|' + (obj.content || '');
+  const hit = textLayoutCache.get(obj);
+  if (hit && hit.key === key) return hit;
+  textMeasureCtx.font = font;
+  const lines = obj.boxW ? wrapTextLines(textMeasureCtx, obj.content, obj.boxW) : String(obj.content || '').split('\n');
+  let maxW = 0;
+  lines.forEach(l => { const w = textMeasureCtx.measureText(l).width; if (w > maxW) maxW = w; });
+  const res = { key, lines, maxW };
+  textLayoutCache.set(obj, res);
+  return res;
+}
 function measureTextObj(obj){
   const fs = obj.fontSize || 22;
-  const lines = (obj.content || '').split('\n');
-  ctx.save();
-  ctx.font = (obj.italic?'italic ':'') + (obj.bold?'700 ':'') + fs + 'px ' + UI_FONT_FAMILY;
-  let maxW = 0;
-  lines.forEach(l => { const w = ctx.measureText(l).width; if (w > maxW) maxW = w; });
-  ctx.restore();
+  const lay = textLayout(obj);
   const lineH = fs * 1.25;
-  obj.w = Math.max(4, maxW);
-  obj.h = Math.max(lineH, lines.length * lineH);
+  obj.w = Math.max(4, lay.maxW);
+  obj.h = Math.max(lineH, lay.lines.length * lineH);
 }
 
 function openTextEditor(existingObj, worldPt){
@@ -2722,8 +2960,13 @@ function openTextEditor(existingObj, worldPt){
   ta.className = 'bd-text-editor-input';
   ta.value = existingObj ? existingObj.content : '';
   ta.placeholder = 'Текст…';
-  ta.setAttribute('wrap', 'off'); // без авто-переноса — canvas тоже не переносит текст сам, только по «\n» (см. autoGrowTextarea)
+  // перенос включается, когда у текста есть рамка (applyTextEditorLiveStyle);
+  // без неё — только по «\n», как рисует холст
+  ta.setAttribute('wrap', 'off');
   ta.spellcheck = false;
+  // Промпт №69: края рамки — тянуть ширину поля
+  const gripW = document.createElement('div'); gripW.className = 'bd-text-grip w'; gripW.title = 'Потяните — ширина рамки';
+  const gripE = document.createElement('div'); gripE.className = 'bd-text-grip e'; gripE.title = 'Потяните — ширина рамки';
 
   const btns = document.createElement('div');
   btns.className = 'bd-text-editor-btns';
@@ -2733,11 +2976,17 @@ function openTextEditor(existingObj, worldPt){
   cancelBtn.type = 'button'; cancelBtn.className = 'bd-text-editor-cancel'; cancelBtn.title = 'Отмена'; cancelBtn.textContent = '\u2715';
   btns.appendChild(okBtn); btns.appendChild(cancelBtn);
 
-  wrap.appendChild(ta); wrap.appendChild(btns);
+  wrap.appendChild(ta); wrap.appendChild(gripW); wrap.appendChild(gripE); wrap.appendChild(btns);
   document.body.appendChild(wrap);
 
+  // копия точки: левый край рамки можно сдвинуть, а объект до «Подтвердить»
+  // (и до pushUndo) трогать нельзя
   textEditSession = {
-    objId: existingObj ? existingObj.id : null, isNew, worldPt: p, textarea: ta, wrap,
+    objId: existingObj ? existingObj.id : null, isNew, worldPt: { x: p.x, y: p.y }, textarea: ta, wrap,
+    // Промпт №69: ширина рамки. Новый текст сразу получает рамку до правого
+    // края видимой области (или листа), чтобы не уходил вправо бесконечно;
+    // старый текст без рамки остаётся без переноса, пока рамку не потянут
+    boxW: existingObj ? (existingObj.boxW || null) : defaultTextBoxW(p),
     fontSize: (existingObj ? existingObj.fontSize : curFontSize) || 22,
     bold: existingObj ? !!existingObj.bold : curBold,
     italic: existingObj ? !!existingObj.italic : curItalic,
@@ -2760,13 +3009,14 @@ function openTextEditor(existingObj, worldPt){
   cancelBtn.addEventListener('mousedown', (e) => e.preventDefault());
   okBtn.addEventListener('click', () => confirmTextEditor());
   cancelBtn.addEventListener('click', () => cancelTextEditor());
+  [gripW, gripE].forEach(g => wireTextGrip(g, g === gripW ? 'w' : 'e'));
   // клик куда угодно ещё (по доске, по панели инструментов...) — считаем
   // подтверждением, как только поле теряет фокус. Кнопки новой панели
   // редактирования (над доком) гасят mousedown централизованно (см. optbar
   // ниже) и поэтому фокус не отнимают — сюда «естественный» blur прилетает
   // только от кликов ПО-НАСТОЯЩЕМУ мимо (холст, другой инструмент и т.п.)
   ta.addEventListener('blur', () => { if (textEditSession) confirmTextEditor(); });
-  ta.addEventListener('input', () => autoGrowTextarea(ta));
+  ta.addEventListener('input', () => applyTextEditorLiveStyle());   // с рамкой ширина фиксирована — растёт только высота
   ta.addEventListener('keydown', (e) => {
     if (e.key === 'Escape'){ e.preventDefault(); cancelTextEditor(); }
     else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)){ e.preventDefault(); confirmTextEditor(); }
@@ -2779,6 +3029,50 @@ function openTextEditor(existingObj, worldPt){
   // textarea мгновенно получала бы blur и поле закрывалось бы, не успев
   // открыться (blur-обработчик выше принял бы это за подтверждение)
   setTimeout(() => { ta.focus(); if (existingObj) ta.select(); }, 0);
+}
+
+// ширина рамки нового текста: до правого края видимой области, но не дальше
+// правого края листа (минус клетка поля), если до него есть место
+function defaultTextBoxW(worldPt){
+  const fs = curFontSize || 22;
+  const v = visibleBoardRect();
+  let right = v.x + v.w;
+  const sw = sheetWpx();
+  if (sw > 0){
+    const sheetRight = (Math.floor(worldPt.x / sw) + 1) * sw - (B.cellSize || 24);
+    if (sheetRight - worldPt.x >= fs * 5) right = Math.min(right, sheetRight);
+  }
+  return Math.max(fs * 5, right - worldPt.x);
+}
+function wireTextGrip(grip, side){
+  let st = null;
+  // и pointerdown, и mousedown гасим: иначе поле теряет фокус, а потеря
+  // фокуса — это «подтвердить» (см. blur ниже), и редактор закрылся бы
+  grip.addEventListener('mousedown', (e) => e.preventDefault());
+  grip.addEventListener('pointerdown', (e) => {
+    const s = textEditSession;
+    if (!s) return;
+    e.preventDefault(); e.stopPropagation();
+    grip.setPointerCapture(e.pointerId);
+    const w0 = s.boxW || (s.textarea.offsetWidth / cam.zoom);
+    st = { x: e.clientX, w0, left0: s.worldPt.x };
+  });
+  grip.addEventListener('pointermove', (e) => {
+    const s = textEditSession;
+    if (!st || !s) return;
+    const minW = Math.max(16, (s.fontSize || 22) * 1.2);
+    const dx = (e.clientX - st.x) / cam.zoom;
+    if (side === 'e') s.boxW = Math.max(minW, st.w0 + dx);
+    else {
+      const right = st.left0 + st.w0;
+      const nx = Math.min(st.left0 + dx, right - minW);
+      s.worldPt.x = nx; s.boxW = right - nx;
+    }
+    syncTextEditorToCam();
+  });
+  const end = () => { st = null; if (textEditSession) textEditSession.textarea.focus(); };
+  grip.addEventListener('pointerup', end);
+  grip.addEventListener('pointercancel', end);
 }
 
 function confirmTextEditor(){
@@ -2794,7 +3088,8 @@ function confirmTextEditor(){
   if (!value || !value.trim()) return; // пустой текст — ничего не создаём и не сохраняем
   const fields = { color: s.color, fontSize: s.fontSize, bold: s.bold, italic: s.italic, underline: s.underline, strike: s.strike, bg: s.bg, locked: s.locked };
   if (s.isNew){
-    const obj = Object.assign({ id: uid(), type:'text', points:[s.worldPt], content: value }, fields);
+    const obj = Object.assign({ id: uid(), type:'text', points:[{ x: s.worldPt.x, y: s.worldPt.y }], content: value }, fields);
+    if (s.boxW) obj.boxW = s.boxW;
     if (curOpacity) obj.opacity = SEMI_OPACITY;
     measureTextObj(obj);
     commitObject(obj);
@@ -2804,6 +3099,8 @@ function confirmTextEditor(){
       pushUndo();
       obj.content = value;
       Object.assign(obj, fields);
+      obj.points = [{ x: s.worldPt.x, y: s.worldPt.y }];
+      if (s.boxW) obj.boxW = s.boxW; else delete obj.boxW;
       measureTextObj(obj);
       saveDB(); scheduleRedraw();
     }
@@ -2917,7 +3214,7 @@ canvas.addEventListener('dblclick', (e) => {
 });
 
 function cancelDrafts(){
-  draft=null; curvePts=null; circleState=null; polyState=null; penStroke=null; armedHandId=null;
+  draft=null; curvePts=null; circleState=null; polyState=null; penStroke=null; shapeDrag=null; armedHandId=null;
   marqueeStart=null; marqueeCur=null; pendingMoveArmed=false; clearEditLock();
   // расширенное меню выделения обновляем СРАЗУ (не дожидаясь следующего кадра
   // rAF) — иначе при быстрой смене инструмента меню на миг остаётся открытым
@@ -3105,7 +3402,12 @@ canvas.addEventListener('pointerdown', (e) => {
       if (hitTestObject(obj, pt, 8/cam.zoom)){
         pushUndo(); dragMode='move'; dragObjId=obj.id; dragStart=pt; dragOrig=clonePts(obj); return;
       }
-      if (editLockTool === tool) return; // клик мимо тем же инструментом — игнорируем
+      // Промпт №69: у фигур-протяжек (прямоугольник, прямая с центром)
+      // клик мимо только что построенной сразу начинает следующую — как у
+      // обычной прямой; иначе вторую фигуру пришлось бы «разрешать»
+      // повторным нажатием кнопки инструмента
+      if (editLockTool === tool && DRAG_SHAPE_TOOLS[tool]){ clearEditLock(); selectedId = null; }
+      else if (editLockTool === tool) return; // клик мимо тем же инструментом — игнорируем
     }
   }
 
@@ -3235,6 +3537,11 @@ canvas.addEventListener('pointerdown', (e) => {
   }
   if (tool === 'eraser'){ dragMode='erase'; eraseAt(pt); return; }
 
+  if (DRAG_SHAPE_TOOLS[tool]){
+    const a = maybeSnap(pt);
+    shapeDrag = { type: DRAG_SHAPE_TOOLS[tool], a, b: a };
+    scheduleRedraw(); return;
+  }
   if (tool === 'curve'){ curvePointClick(pt); scheduleRedraw(); return; }
   if (tool === 'circle'){ circleClick(pt); scheduleRedraw(); return; }
   if (tool === 'poly'){ polyClick(pt); scheduleRedraw(); return; }
@@ -3288,6 +3595,7 @@ canvas.addEventListener('pointermove', (e) => {
     });
     scheduleRedraw(); return;
   }
+  if (shapeDrag){ shapeDrag.b = maybeSnap(pt); scheduleRedraw(); return; }
   if (draft){ draft.preview = maybeSnap(pt); scheduleRedraw(); return; }
   if (curvePts){ curvePts.preview = maybeSnap(pt); scheduleRedraw(); return; }
   if (circleState && circleState.r==null){ circleState.previewR = dist(circleState.center, pt); scheduleRedraw(); return; }
@@ -3308,6 +3616,17 @@ canvas.addEventListener('pointerup', (e) => {
     obj.points = [draft.pts[0], endPt];
     draft = null;
     commitObject(obj);
+    scheduleRedraw();
+  }
+  // Промпт №69: отпустили кнопку — прямоугольник (или прямая с центром)
+  // фиксируется с противоположным углом (концом) в точке отпускания; сразу
+  // в «замке редактирования», чтобы можно было поправить ручками
+  if (shapeDrag){
+    shapeDrag.b = maybeSnap(eventWorld(e));
+    const obj = shapeFromDrag(shapeDrag, cam.zoom);
+    const via = tool;
+    shapeDrag = null;
+    if (obj){ commitObject(obj); enterEditLock(obj, via); updateContextMenu(); }
     scheduleRedraw();
   }
   if (dragMode === 'move' || dragMode === 'handle' || dragMode === 'multimove'){ saveDB(); }
@@ -3337,6 +3656,7 @@ canvas.addEventListener('pointerup', (e) => {
   }
 });
 canvas.addEventListener('pointercancel', () => {
+  if (shapeDrag){ shapeDrag = null; scheduleRedraw(); }
   if (dragMode==='pan') updateCursor();
   if (dragMode==='marquee'){ marqueeStart=null; marqueeCur=null; }
   dragMode=null;
@@ -3439,7 +3759,7 @@ function updateCursor(){
    ═══════════════════════════════════════════════════════════════════════ */
 const optbar = document.getElementById('bdOptbar');
 optbar.addEventListener('mousedown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
-const TOOLS_WITH_OPTS = ['pen','line','curve','quad','poly','ellipse','circle','angle','text'];
+const TOOLS_WITH_OPTS = ['pen','line','pivot','curve','quad','poly','ellipse','circle','angle','text'];
 document.querySelectorAll('.bd-tool[data-tool]').forEach(btn => {
   btn.addEventListener('click', () => {
     // если сейчас рисуется незавершённая кривая (или многоугольник) и
@@ -3477,6 +3797,8 @@ document.querySelectorAll('.bd-tool[data-tool]').forEach(btn => {
 function applyOptbarForTool(){
   optbar.classList.toggle('open', TOOLS_WITH_OPTS.includes(tool));
   optbar.classList.remove('text-editing');
+  // Промпт №69: паттерны — только у «Ручки»
+  document.getElementById('bdPatterns').classList.toggle('open', tool === 'pen');
   layoutOptbar();
   layoutRefPanel();
   document.getElementById('bdRadiusField').style.display = (tool==='circle') ? 'flex' : 'none';
@@ -3496,6 +3818,7 @@ function applyOptbarForTool(){
 function openTextEditToolbar(){
   optbar.classList.add('open');
   optbar.classList.add('text-editing');
+  document.getElementById('bdPatterns').classList.remove('open');
   document.getElementById('bdFontSizeField').style.display = 'flex';
   document.querySelector('.bd-width').style.display = 'none';
   document.getElementById('toggleDash').style.display = 'none';
@@ -3539,7 +3862,51 @@ function saveDockPrefs(){
     localStorage.setItem('boardsDockScale', String(dockScale));
   } catch(e){}
 }
+/* Промпт №69: панель паттернов — левее дока. Места перебираются по
+   порядку, берётся первое, где панель целиком на экране и не наезжает ни на
+   док, ни на оптбар, ни на левую колонку. Док внизу: слева от него на той же
+   высоте; не влезает (узкий экран, док во всю ширину) — над доком у его
+   левого края, выше оптбара; дальше — справа от дока. Док сбоку: столбиком
+   над доком или под ним; если док во всю высоту — рядом с ним у верхнего
+   или нижнего края, а если там оптбар — сразу за оптбаром */
+function layoutPatterns(){
+  const el = document.getElementById('bdPatterns');
+  if (!el || !el.classList.contains('open')) return;
+  el.style.setProperty('--dock-scale', dockScale);
+  const d = dockEl.getBoundingClientRect();
+  const vertical = dockPos !== 'bottom';
+  el.classList.toggle('vertical', vertical);
+  const pw = el.offsetWidth, ph = el.offsetHeight;
+  const W = window.innerWidth, H = window.innerHeight, G = 10;
+  const ob = optbar.classList.contains('open') ? optbar.getBoundingClientRect() : null;
+  const rail = document.getElementById('bdRail');
+  const rr = rail ? rail.getBoundingClientRect() : null;
+  const blocks = [d].concat(ob && ob.width ? [ob] : [], rr && rr.width ? [rr] : []);
+  const cands = [];
+  if (!vertical){
+    cands.push([d.left - G - pw, d.top + d.height/2 - ph/2]);
+    cands.push([d.left, Math.min(ob ? ob.top : d.top, d.top) - G - ph]);
+    cands.push([d.right + G, d.top + d.height/2 - ph/2]);
+  } else {
+    const side = dockPos === 'left' ? d.right + G : d.left - G - pw;
+    cands.push([d.left + d.width/2 - pw/2, d.top - G - ph]);
+    cands.push([d.left + d.width/2 - pw/2, d.bottom + G]);
+    cands.push([side, d.top]);
+    cands.push([side, d.bottom - ph]);
+    // оптбар сбоку от дока высокий и занимает середину — тогда за ним
+    if (ob && ob.width){
+      const beyond = dockPos === 'left' ? ob.right + G : ob.left - G - pw;
+      cands.push([beyond, ob.top], [beyond, d.top]);
+    }
+  }
+  const fits = ([x, y]) => x >= 4 + boardInset && y >= 4 && x + pw <= W - 4 && y + ph <= H - 4
+    && blocks.every(b => x + pw <= b.left || x >= b.right || y + ph <= b.top || y >= b.bottom);
+  const best = cands.find(fits) || cands[0];
+  el.style.left = Math.round(clamp(best[0], 4, Math.max(4, W - pw - 4))) + 'px';
+  el.style.top = Math.round(clamp(best[1], 4, Math.max(4, H - ph - 4))) + 'px';
+}
 function layoutOptbar(){
+  layoutPatterns();
   if (!optbar.classList.contains('open')) return;
   if (dockPos === 'bottom'){
     optbar.classList.remove('side');
@@ -3558,6 +3925,7 @@ function layoutOptbar(){
     if (dockPos === 'left'){ optbar.style.left = (r.right + 10) + 'px'; optbar.style.right = ''; }
     else { optbar.style.right = (window.innerWidth - r.left + 10) + 'px'; optbar.style.left = ''; }
   }
+  layoutPatterns();
 }
 function applyDockLayout(){
   dockEl.classList.remove('pos-bottom','pos-left','pos-right');
@@ -5582,6 +5950,7 @@ let rfDragHandleRole = null, rfDragObjId = null, rfDragStart = null, rfDragOrig 
 let rfPanStart = null, rfCamStart = null;
 
 let rfDraft = null, rfCurvePts = null, rfCircleState = null, rfPolyState = null, rfPenStroke = null;
+let rfShapeDrag = null;   // Промпт №69: протяжка прямоугольника/прямой с центром в заметках
 
 const rfUndoStack = [], rfRedoStack = [];
 // Какой именно массив объектов сейчас «на холсте», зависит от вкладки:
@@ -5764,6 +6133,7 @@ function rfDrawDraftPreview(c){
   if (rfPenStroke){
     strokePolyline(c, rfPenStroke.points.map(p=>rfWorldToScreen(p)), true);
   }
+  if (rfShapeDrag) drawShapeDragPreview(c, rfShapeDrag, rfWorldToScreen, rfCam.zoom);
   c.restore();
 }
 
@@ -5835,7 +6205,7 @@ function rfFinishPoly(){
   rfCommitObject(obj); rfEnterEditLock(obj, 'poly');
 }
 function rfCancelDrafts(){
-  rfDraft=null; rfCurvePts=null; rfCircleState=null; rfPolyState=null; rfPenStroke=null; rfArmedHandId=null;
+  rfDraft=null; rfCurvePts=null; rfCircleState=null; rfPolyState=null; rfPenStroke=null; rfShapeDrag=null; rfArmedHandId=null;
   rfClearEditLock();
   rfScheduleRedraw();
 }
@@ -5907,7 +6277,8 @@ refDrawCanvas.addEventListener('pointerdown', (e) => {
       if (hitTestObject(obj, pt, 8/rfCam.zoom)){
         rfPushUndo(); rfDragMode='move'; rfDragObjId=obj.id; rfDragStart=pt; rfDragOrig=clonePts(obj); return;
       }
-      if (rfEditLockTool === tool) return;
+      if (rfEditLockTool === tool && DRAG_SHAPE_TOOLS[tool]){ rfClearEditLock(); rfSelectedId = null; }
+      else if (rfEditLockTool === tool) return;
     }
   }
 
@@ -5956,6 +6327,11 @@ refDrawCanvas.addEventListener('pointerdown', (e) => {
   }
   if (tool === 'eraser'){ rfDragMode='erase'; rfEraseAt(pt); return; }
 
+  if (DRAG_SHAPE_TOOLS[tool]){
+    const a = maybeSnap(pt);
+    rfShapeDrag = { type: DRAG_SHAPE_TOOLS[tool], a, b: a };
+    rfScheduleRedraw(); return;
+  }
   if (tool === 'curve'){ rfCurvePointClick(pt); rfScheduleRedraw(); return; }
   if (tool === 'circle'){ rfCircleClick(pt); rfScheduleRedraw(); return; }
   if (tool === 'poly'){ rfPolyClick(pt); rfScheduleRedraw(); return; }
@@ -5995,6 +6371,7 @@ refDrawCanvas.addEventListener('pointermove', (e) => {
     });
     rfScheduleRedraw(); return;
   }
+  if (rfShapeDrag){ rfShapeDrag.b = maybeSnap(pt); rfScheduleRedraw(); return; }
   if (rfDraft){ rfDraft.preview = maybeSnap(pt); rfScheduleRedraw(); return; }
   if (rfCurvePts){ rfCurvePts.preview = maybeSnap(pt); rfScheduleRedraw(); return; }
   if (rfCircleState && rfCircleState.r==null){ rfCircleState.previewR = dist(rfCircleState.center, pt); rfScheduleRedraw(); return; }
@@ -6003,6 +6380,13 @@ refDrawCanvas.addEventListener('pointermove', (e) => {
 
 refDrawCanvas.addEventListener('pointerup', (e) => {
   if (!B) return;
+  if (rfShapeDrag){
+    rfShapeDrag.b = maybeSnap(rfEventWorld(e));
+    const obj = shapeFromDrag(rfShapeDrag, rfCam.zoom);
+    rfShapeDrag = null;
+    if (obj){ rfCommitObject(obj); rfEnterEditLock(obj, tool); }
+    rfScheduleRedraw();
+  }
   if (rfDragMode === 'move' || rfDragMode === 'handle'){ saveDB(); }
   if (rfDragMode === 'pan') rfUpdateCursor();
   rfDragMode = null; rfDragHandleRole=null; rfDragObjId=null;
@@ -6013,6 +6397,7 @@ refDrawCanvas.addEventListener('pointerup', (e) => {
   }
 });
 refDrawCanvas.addEventListener('pointercancel', () => {
+  if (rfShapeDrag){ rfShapeDrag = null; rfScheduleRedraw(); }
   if (rfDragMode==='pan') rfUpdateCursor();
   rfDragMode=null;
   if (rfPenStroke){ rfPenStroke=null; rfScheduleRedraw(); }
@@ -6068,18 +6453,132 @@ function renderSwatches(){
   });
   // цвет мог смениться — курсор пера должен тут же перекраситься следом
   updateCursor();
+  updateSwatchAddState();
+  renderPatterns();
 }
-document.getElementById('bdSwatchAdd').addEventListener('click', () => document.getElementById('bdColorInput').click());
+/* Промпт №69: баг «добавил цвет — вся палитра стала этим цветом».
+   <input type="color"> шлёт 'input' на КАЖДОЕ движение по полю выбора, а
+   обработчик на каждое такое событие клал новый оттенок в начало списка и
+   резал его до 8 — пока человек вёл курсор к нужному цвету, восемь
+   промежуточных оттенков вытесняли все сохранённые ячейки. Теперь одно
+   открытие пипетки = одна новая ячейка в конце палитры: первый 'input'
+   её создаёт, следующие только перекрашивают её же, 'change' закрывает
+   выбор (если такой цвет уже был — лишняя ячейка убирается, выбирается
+   существующая). Остальные ячейки не трогаются никогда. */
+const PALETTE_MAX = 12;
+let colorPickSlot = -1;   // индекс ячейки, которую сейчас красит пипетка; -1 — выбор не начат
+function updateSwatchAddState(){
+  const add = document.getElementById('bdSwatchAdd');
+  if (!add || !B) return;
+  const full = B.recentColors.length >= PALETTE_MAX;
+  add.disabled = full;
+  add.title = full ? 'Палитра заполнена — уберите ненужный цвет (×), чтобы добавить новый' : 'Свой цвет';
+}
+document.getElementById('bdSwatchAdd').addEventListener('click', () => {
+  if (B && B.recentColors.length >= PALETTE_MAX) return;
+  colorPickSlot = -1;
+  document.getElementById('bdColorInput').click();
+});
 document.getElementById('bdColorInput').addEventListener('input', (e) => {
+  if (!B) return;
   const hex = e.target.value;
   curColorTok = hex;
   if (textEditSession){ textEditSession.color = curColorTok; applyTextEditorLiveStyle(); }
-  B.recentColors = [hex].concat(B.recentColors.filter(t=>t!==hex)).slice(0,8);
+  if (colorPickSlot < 0 || colorPickSlot >= B.recentColors.length){
+    if (B.recentColors.length >= PALETTE_MAX){ renderSwatches(); return; }
+    B.recentColors = B.recentColors.concat([hex]);
+    colorPickSlot = B.recentColors.length - 1;
+  } else {
+    B.recentColors[colorPickSlot] = hex;
+  }
   saveDB(); renderSwatches();
 });
+document.getElementById('bdColorInput').addEventListener('change', (e) => {
+  if (!B) return;
+  const hex = e.target.value;
+  if (colorPickSlot >= 0 && colorPickSlot < B.recentColors.length){
+    const dup = B.recentColors.findIndex((t, i) => i !== colorPickSlot && String(t).toLowerCase() === String(hex).toLowerCase());
+    if (dup >= 0){ B.recentColors.splice(colorPickSlot, 1); saveDB(); }
+  }
+  colorPickSlot = -1;
+  renderSwatches();
+});
 
-document.getElementById('widthMinus').addEventListener('click', () => { curWidth=clamp(curWidth-1,1,20); document.getElementById('widthVal').textContent=curWidth; });
-document.getElementById('widthPlus').addEventListener('click', () => { curWidth=clamp(curWidth+1,1,20); document.getElementById('widthVal').textContent=curWidth; });
+document.getElementById('widthMinus').addEventListener('click', () => { curWidth=clamp(curWidth-1,1,20); document.getElementById('widthVal').textContent=curWidth; renderPatterns(); });
+document.getElementById('widthPlus').addEventListener('click', () => { curWidth=clamp(curWidth+1,1,20); document.getElementById('widthVal').textContent=curWidth; renderPatterns(); });
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Промпт №69: ПАТТЕРНЫ РУЧКИ — до пяти сохранённых наборов «цвет +
+   толщина + сплошная/пунктир». Это привычка человека, а не содержимое
+   доски, поэтому лежат в localStorage (как положение дока) и одинаковы на
+   всех досках. Цвет хранится так же, как у объектов: именем переменной темы
+   или hex, поэтому «чёрный/белый» паттерн перекрашивается вместе с темой.
+   ═══════════════════════════════════════════════════════════════════════ */
+const PATTERNS_KEY = 'boardsPenPatterns';
+const PATTERNS_MAX = 5;
+let penPatterns = [];
+try {
+  const raw = JSON.parse(localStorage.getItem(PATTERNS_KEY) || '[]');
+  if (Array.isArray(raw)) penPatterns = raw.filter(p => p && p.color).slice(0, PATTERNS_MAX)
+    .map(p => ({ color: String(p.color), width: clamp(Math.round(+p.width || 2), 1, 20), dash: !!p.dash }));
+} catch(e){}
+function savePatterns(){ try { localStorage.setItem(PATTERNS_KEY, JSON.stringify(penPatterns)); } catch(e){} }
+function currentPenPattern(){ return { color: curColorTok, width: curWidth, dash: !!curDash }; }
+function samePattern(a, b){ return a && b && String(a.color).toLowerCase() === String(b.color).toLowerCase() && a.width === b.width && !!a.dash === !!b.dash; }
+// цифра на кружке должна читаться на любом цвете заливки — берём белую или
+// чёрную по яркости самого цвета
+function contrastInk(color){
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(color).trim());
+  if (!m){
+    const rgb = /rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)/i.exec(String(color));
+    if (!rgb) return '#fff';
+    const L = (0.299*rgb[1] + 0.587*rgb[2] + 0.114*rgb[3]) / 255;
+    return L > 0.62 ? '#111' : '#fff';
+  }
+  const n = parseInt(m[1], 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255;
+  return (0.299*r + 0.587*g + 0.114*b) / 255 > 0.62 ? '#111' : '#fff';
+}
+function applyPenPattern(pt){
+  curColorTok = pt.color;
+  curWidth = clamp(pt.width, 1, 20);
+  curDash = !!pt.dash;
+  document.getElementById('widthVal').textContent = curWidth;
+  document.getElementById('toggleDash').classList.toggle('on', curDash);
+  renderSwatches();   // сама перерисует и паттерны (активный кружок) и курсор пера
+}
+function renderPatterns(){
+  const list = document.getElementById('bdPatternList');
+  if (!list) return;
+  const cur = currentPenPattern();
+  list.innerHTML = penPatterns.map((pt, i) => {
+    const c = resolveColor(pt.color);
+    const ink = contrastInk(c);
+    const dot = pt.dash
+      ? `<span class="bd-pattern-dot dashed" style="color:${escHtml(c)}"><span class="bd-pattern-num" style="background:${escHtml(c)};color:${ink}">${pt.width}</span></span>`
+      : `<span class="bd-pattern-dot" style="background:${escHtml(c)};color:${ink}">${pt.width}</span>`;
+    return `<button class="bd-pattern${samePattern(pt, cur) ? ' active' : ''}" data-i="${i}" title="Толщина ${pt.width}${pt.dash ? ', пунктир' : ''} — нажмите, чтобы рисовать так">${dot}`
+      + `<span class="bd-pattern-x" data-x="${i}" title="Удалить паттерн">×</span>`
+      + `<span class="bd-pattern-re" data-re="${i}" title="Заменить текущими настройками ручки">↻</span></button>`;
+  }).join('');
+  const add = document.getElementById('bdPatternAdd');
+  add.style.display = penPatterns.length >= PATTERNS_MAX ? 'none' : '';
+  layoutPatterns();
+}
+document.getElementById('bdPatternList').addEventListener('click', (e) => {
+  const x = e.target.closest('[data-x]');
+  if (x){ penPatterns.splice(+x.dataset.x, 1); savePatterns(); renderPatterns(); return; }
+  const re = e.target.closest('[data-re]');
+  if (re){ penPatterns[+re.dataset.re] = currentPenPattern(); savePatterns(); renderPatterns(); return; }
+  const btn = e.target.closest('.bd-pattern');
+  if (btn && penPatterns[+btn.dataset.i]) applyPenPattern(penPatterns[+btn.dataset.i]);
+});
+document.getElementById('bdPatternAdd').addEventListener('click', () => {
+  if (penPatterns.length >= PATTERNS_MAX) return;
+  penPatterns.push(currentPenPattern());
+  savePatterns(); renderPatterns();
+});
+// клик по кружку не должен уводить фокус (как у кнопок оптбара)
+document.getElementById('bdPatterns').addEventListener('mousedown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
 function setCurFontSize(v){
   v = clamp(Math.round(v), 8, 96);
   curFontSize = v;
@@ -6165,7 +6664,7 @@ document.getElementById('bdBgColorInput').addEventListener('input', (e) => {
   renderBgSwatches();
   applyTextEditorLiveStyle();
 });
-document.getElementById('toggleDash').addEventListener('click', (e) => { curDash=!curDash; e.currentTarget.classList.toggle('on',curDash); });
+document.getElementById('toggleDash').addEventListener('click', (e) => { curDash=!curDash; e.currentTarget.classList.toggle('on',curDash); renderPatterns(); });
 document.getElementById('toggleFill').addEventListener('click', (e) => { curFill=!curFill; e.currentTarget.classList.toggle('on',curFill); });
 document.getElementById('toggleSnap').addEventListener('click', (e) => { curSnap=!curSnap; e.currentTarget.classList.toggle('on',curSnap); });
 document.getElementById('toggleSnap').classList.add('on');
@@ -7137,7 +7636,7 @@ document.addEventListener('paste', async (e) => {
   }
   // Промпт №38: картинки в системном буфере нет — значит Ctrl+V относится к
   // нашему собственному буферу, и это тот самый перенос с доски на доску
-  if (clipboardObjs && clipboardObjs.length){ e.preventDefault(); pasteClipboard(); }
+  if (clipboardObjs && clipboardObjs.length){ e.preventDefault(); pasteClipboard(lastBoardPointer); }
 });
 
 // перетаскивание — локальный файл с компьютера или картинка, схваченная
@@ -7277,7 +7776,7 @@ document.getElementById('bdCtxMenu').addEventListener('click', (e) => {
   } else if (act === 'cut'){
     if (sel.length){ setClipboard(sel, B && B.name); deleteSelected(); }
   } else if (act === 'paste'){
-    pasteClipboard();
+    pasteClipboard({ x: e.clientX, y: e.clientY });
   } else if (act === 'savelib'){
     if (sel.length===1 && sel[0].type==='image' && B){
       B.imageLib = B.imageLib || [];
@@ -7301,24 +7800,37 @@ document.getElementById('bdCtxMenu').addEventListener('click', (e) => {
     }
   }
 });
-function pasteClipboard(){
+/* Промпт №69: где стоит курсор над доской. Нужен вставке по Ctrl+V: у
+   события 'paste' своих координат нет. pointerleave срабатывает и при уходе
+   из окна, и при наведении на панели поверх холста (док, колонка, меню) —
+   тогда курсор «вне доски» и вставка идёт в центр видимой области */
+let lastBoardPointer = null;
+canvas.addEventListener('pointermove', (e) => { lastBoardPointer = { x: e.clientX, y: e.clientY }; });
+canvas.addEventListener('pointerdown', (e) => { lastBoardPointer = { x: e.clientX, y: e.clientY }; });
+canvas.addEventListener('pointerleave', () => { lastBoardPointer = null; });
+// точка вставки в координатах доски: точка на экране, если она над холстом,
+// иначе центр видимого участка (без панелей — visibleBoardRect)
+function pasteAnchorWorld(clientPt){
+  if (clientPt){
+    const r = canvas.getBoundingClientRect();
+    if (clientPt.x >= r.left && clientPt.x <= r.right && clientPt.y >= r.top && clientPt.y <= r.bottom){
+      return screenToWorld(clientPt.x - r.left, clientPt.y - r.top);
+    }
+  }
+  const v = visibleBoardRect();
+  return { x: v.x + v.w/2, y: v.y + v.h/2 };
+}
+function pasteClipboard(clientPt){
   if (!mayDraw()) return;                             // Промпт №41
   if (!clipboardObjs || !clipboardObjs.length || !B) return;
   pushUndo();
-  // «Вставить» кладёт копию туда, где сейчас работает пользователь, а не
-  // рядом с местом исходного копирования: если на момент нажатия что-то
-  // выделено (а меню с кнопкой «Вставить» показывается только у выделения —
-  // значит именно рядом с ним и нажали), центрируем вставляемую группу на
-  // центре ЭТОГО выделения; иначе — на центре текущей видимой области.
-  const curSel = getSelectedObjects();
-  let anchor;
-  if (curSel.length){
-    let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-    curSel.forEach(o => { const b=objectBBox(o); minX=Math.min(minX,b.minX); minY=Math.min(minY,b.minY); maxX=Math.max(maxX,b.maxX); maxY=Math.max(maxY,b.maxY); });
-    anchor = { x:(minX+maxX)/2, y:(minY+maxY)/2 };
-  } else {
-    anchor = { x: cam.x + (cssW/2)/cam.zoom, y: cam.y + (cssH/2)/cam.zoom };
-  }
+  // Промпт №69: копия ложится туда, где сейчас пользователь: в точку
+  // курсора (Ctrl+V) или клика (пункт меню), а если курсор не над доской —
+  // в центр видимой области. Раньше при выделении (а после «Скопировать»
+  // исходник так и остаётся выделенным) копия центрировалась на нём и
+  // сдвигалась на полклетки — то есть появлялась у оригинала, даже если
+  // человек давно ушёл в другую часть доски
+  const anchor = pasteAnchorWorld(clientPt);
   // центр самой копируемой группы в её исходных координатах — сдвигаем всю
   // группу целиком так, чтобы её центр оказался в anchor, сохраняя взаимное
   // расположение объектов друг относительно друга
