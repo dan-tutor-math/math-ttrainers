@@ -1633,6 +1633,10 @@ let B = null;              // текущая доска (прямая ссылк
 let boardActive = false;
 let dpr = Math.max(1, window.devicePixelRatio || 1);
 let cssW = 0, cssH = 0;
+// Промпт №68: сколько экрана слева занято панелью тренажёров (открытой или
+// свёрнутой в полосу) — холст начинается правее, cssW — ширина самого холста,
+// а не окна (см. applyBoardInset)
+let boardInset = 0;
 
 /* доска — это одно сплошное полотно, лишь условно, полупрозрачными линиями
    поделённое на «листы» формата А4 (B.sheetCols × B.sheetRows клеток); сетка из
@@ -2050,7 +2054,7 @@ document.getElementById('bdName').addEventListener('input', (e) => {
 /* ── подгонка размера холста под окно ── */
 function resizeCanvas(){
   dpr = Math.max(1, window.devicePixelRatio || 1);
-  cssW = window.innerWidth; cssH = window.innerHeight;
+  cssW = Math.max(1, window.innerWidth - boardInset); cssH = window.innerHeight;
   canvas.width = Math.round(cssW * dpr);
   canvas.height = Math.round(cssH * dpr);
   canvas.style.width = cssW + 'px';
@@ -2058,7 +2062,13 @@ function resizeCanvas(){
   clampCam();
   scheduleRedraw();
 }
-window.addEventListener('resize', () => { if (boardActive) resizeCanvas(); if (rfVisible()) rfResizeCanvas(); });
+window.addEventListener('resize', () => {
+  // сначала отступ под панель тренажёров (на узком экране она ложится поверх
+  // доски, на широком — рядом), потом уже размер холста
+  if (typeof applyBoardInset === 'function') applyBoardInset();
+  if (boardActive) resizeCanvas();
+  if (rfVisible()) rfResizeCanvas();
+});
 
 /* ── камера: мир ↔ экран ──
    activeCam — камера, с которой сейчас идёт отрисовка: обычно это просто
@@ -3970,7 +3980,11 @@ const trainersIframe = document.getElementById('bdTrainersIframe');
 const trainersAddBtn = document.getElementById('bdTrainersAddBtn');
 const trainersToastEl = document.getElementById('bdTrainersToast');
 let trainersOpenId = null;     // id открытого сейчас тренажёра (null — список)
-let trainersInsertOffset = 0;  // лёгкий каскад для нескольких добавленных подряд картинок
+let trainersInsertOffset = 0;  // запасной каскад, если свободного места на экране нет совсем
+let trainersOpenHref = null;   // адрес открытого тренажёра — для «ещё такое же» (промпт №68)
+const trainersCollapseBtn = document.getElementById('bdTrainersCollapse');
+const trainersStripEl = document.getElementById('bdTrainersStrip');
+const trainersStripText = document.getElementById('bdTrainersStripText');
 
 // ширина панели — предпочтение зрителя (как масштаб/тема), не часть
 // содержимого доски, поэтому хранится не в B, а в localStorage
@@ -4008,8 +4022,10 @@ trainersSearchEl.addEventListener('input', () => renderTrainersList(trainersSear
 
 function openTrainerInPanel(id, href, name){
   trainersOpenId = id;
+  trainersOpenHref = href;
   trainersInsertOffset = 0;
   trainersTitleEl.textContent = name;
+  trainersStripText.textContent = name;
   trainersBackBtn.style.display = '';
   trainersPanelEl.classList.add('bd-trainers-in-frame');
   trainersIframe.src = href;
@@ -4017,24 +4033,78 @@ function openTrainerInPanel(id, href, name){
 }
 function closeTrainerFrame(){
   trainersOpenId = null;
+  trainersOpenHref = null;
   trainersTitleEl.textContent = 'Тренажёры';
+  trainersStripText.textContent = 'Тренажёры';
   trainersBackBtn.style.display = 'none';
   trainersPanelEl.classList.remove('bd-trainers-in-frame');
   trainersIframe.src = 'about:blank';
 }
 trainersBackBtn.addEventListener('click', closeTrainerFrame);
 
+/* ── Промпт №68: открыть / свернуть / закрыть ──
+   Три состояния панели: открыта; свёрнута в узкую полосу у левого края
+   (тренажёр в кадре живёт дальше — выбранный тип, уровень, набранное
+   остаются, развернуть — один клик по полосе); закрыта совсем (крестик —
+   как раньше: тренажёр тоже не выгружается, открыть можно кнопкой в
+   верхней панели). Кадр при сворачивании не трогаем вовсе: display:none у
+   предка iframe страницу внутри не перезагружает. */
+function trainersPanelIsOpen(){ return trainersPanelEl.classList.contains('open'); }
+function setTrainersPanel(state){          // 'open' | 'collapsed' | 'closed'
+  trainersPanelEl.classList.toggle('open', state === 'open');
+  trainersToggleBtn.classList.toggle('active', state === 'open');
+  trainersStripEl.classList.toggle('show', state === 'collapsed');
+  applyBoardInset();
+}
 trainersToggleBtn.addEventListener('click', () => {
-  const opening = !trainersPanelEl.classList.contains('open');
-  trainersPanelEl.classList.toggle('open', opening);
-  trainersToggleBtn.classList.toggle('active', opening);
+  if (!trainersPanelIsOpen()) setTrainersPanel('open');
+  // повторное нажатие сворачивает, если в панели открыт тренажёр (его
+  // незачем терять), и закрывает, если там просто список
+  else setTrainersPanel(trainersOpenId ? 'collapsed' : 'closed');
 });
-// крестик сворачивает панель, но не сбрасывает открытый тренажёр — как и
-// у справочной панели, повторное открытие возвращает туда же, где остановились
-trainersCloseBtn.addEventListener('click', () => {
-  trainersPanelEl.classList.remove('open');
-  trainersToggleBtn.classList.remove('active');
-});
+trainersCollapseBtn.addEventListener('click', () => setTrainersPanel('collapsed'));
+trainersStripEl.addEventListener('click', () => setTrainersPanel('open'));
+trainersCloseBtn.addEventListener('click', () => setTrainersPanel('closed'));
+
+/* ── отступ доски под панель ──
+   На широком экране панель встаёт РЯДОМ с доской: холст, левая панель
+   инструментов (масштаб, скриншот…), нижний док и полоса настроек сдвигаются
+   вправо на её ширину (CSS-переменная --bd-inset, см. boards.html), и
+   кнопки масштаба работают по центру оставшейся части. Раньше панель лежала
+   поверх и закрывала собой левую колонку инструментов. На узком экране
+   (телефон) места рядом нет — там панель по-прежнему поверх доски, а
+   свернуть её можно в полосу.
+   Состояние панели читаем с самого элемента, а не из setTrainersPanel:
+   класс open ставят и в других местах (тесты, будущие кнопки) — наблюдатель
+   ниже ловит любое изменение. */
+const BOARD_INSET_MIN_SCREEN = 700;
+const screenBoardEl = document.getElementById('screenBoard');
+function computeBoardInset(){
+  if (trainersPanelIsOpen()){
+    if (window.innerWidth < BOARD_INSET_MIN_SCREEN) return 0;
+    return Math.round(trainersPanelEl.getBoundingClientRect().width);
+  }
+  return trainersStripEl.classList.contains('show') ? Math.round(trainersStripEl.getBoundingClientRect().width || 30) : 0;
+}
+function applyBoardInset(){
+  // полоса нужна, только пока панель свёрнута — открытие любым путём её прячет
+  if (trainersPanelIsOpen()) trainersStripEl.classList.remove('show');
+  const next = computeBoardInset();
+  if (next === boardInset) return;
+  const d = next - boardInset;
+  boardInset = next;
+  screenBoardEl.style.setProperty('--bd-inset', next + 'px');
+  if (B && boardActive){
+    // то, что было на экране, остаётся на месте: холст съехал вправо на d,
+    // камера — на столько же. Иначе при каждом открытии панели доска
+    // прыгала бы вбок. Вид при этом не запоминаем — это не прокрутка
+    cam.x += d / cam.zoom;
+    resizeCanvas();
+    updateContextMenu();
+  }
+}
+new MutationObserver(applyBoardInset).observe(trainersPanelEl, { attributes: true, attributeFilter: ['class', 'style'] });
+if (window.ResizeObserver) new ResizeObserver(() => applyBoardInset()).observe(trainersPanelEl);
 
 // ручка изменения ширины — тянем правый край панели (левый зафиксирован у
 // края экрана), тот же приём, что и у справочной панели (см. setupRefResize)
@@ -4049,7 +4119,8 @@ trainersCloseBtn.addEventListener('click', () => {
   trainersResizeHandleW.addEventListener('pointermove', (e) => {
     if (!start) return;
     const dx = e.clientX - start.x; // тянем вправо — панель растёт
-    const maxW = window.innerWidth - 80;
+    // рядом с панелью доске нужно хотя бы 300 px (см. applyBoardInset)
+    const maxW = window.innerWidth - (window.innerWidth >= BOARD_INSET_MIN_SCREEN ? 300 : 80);
     const w = clamp(start.w + dx, 300, maxW);
     trainersPanelEl.style.setProperty('--tp-w', w + 'px');
   });
@@ -4172,35 +4243,136 @@ function collectTrainerCaptureNodes(doc, trainerId){
   return out;
 }
 
-// центр видимой области доски с поправкой на открытую панель тренажёров
-// (пристыкована к левому краю) — иначе новая картинка ляжет ровно там, где
-// сейчас сама панель, и её не будет видно, пока панель не свернут
-function trainersAwareCenterWorld(){
-  const panelOpen = trainersPanelEl.classList.contains('open');
-  const panelW = panelOpen ? trainersPanelEl.getBoundingClientRect().width : 0;
-  const screenCenterX = (Math.max(cssW, panelW + 160) + panelW) / 2; // центр свободной (правой) части экрана
-  return { x: cam.x + screenCenterX/cam.zoom, y: cam.y + cssH/2/cam.zoom };
+/* ── Промпт №68: куда класть новое задание ──
+   Раньше — в центр экрана с каскадом +28 на каждое следующее: задания
+   ложились внахлёст, а при открытой поверх доски панели часть картинки
+   пряталась под ней. Теперь ищем свободное место внутри того участка доски,
+   который сейчас виден (с учётом прокрутки, масштаба, верхней панели, дока и
+   панели тренажёров), — ближайшее к его центру. «Занято» — это другие
+   картинки (задания): поверх рисунков и надписей класть можно, их легко
+   подвинуть, а задание под заданием не видно вовсе. */
+const TASK_GAP = 12;          // зазор между заданиями, в единицах доски
+function taskObstacles(exceptId){
+  if (!B || !Array.isArray(B.objects)) return [];
+  const out = [];
+  B.objects.forEach(o => {
+    if (o.type !== 'image' || o.id === exceptId || !o.points || !o.points[0]) return;
+    const bb = objectBBox(o);
+    out.push({ x0: bb.minX, y0: bb.minY, x1: bb.maxX, y1: bb.maxY });
+  });
+  return out;
+}
+function rectHits(r, obs, gap){
+  for (const o of obs){
+    if (r.x < o.x1 + gap && r.x + r.w > o.x0 - gap && r.y < o.y1 + gap && r.y + r.h > o.y0 - gap) return o;
+  }
+  return null;
+}
+// видимый и не закрытый интерфейсом прямоугольник доски — в единицах доски
+function visibleBoardRect(){
+  // холст уже начинается правее панели (boardInset); на узком экране панель
+  // лежит поверх холста — тогда её ширину вычитаем здесь
+  const overlayW = (trainersPanelIsOpen() && !boardInset) ? trainersPanelEl.getBoundingClientRect().width : 0;
+  const rail = document.getElementById('bdRail');
+  const railW = (rail && rail.classList.contains('pos-left')) ? 64 : 12;
+  const sx0 = Math.min(cssW - 80, overlayW + railW), sy0 = 62;
+  const sx1 = Math.max(sx0 + 80, cssW - 16), sy1 = Math.max(sy0 + 80, cssH - 84);
+  return { x: cam.x + sx0 / cam.zoom, y: cam.y + sy0 / cam.zoom, w: (sx1 - sx0) / cam.zoom, h: (sy1 - sy0) / cam.zoom };
+}
+// ближайшее к центру области свободное место (перебор по сетке), или null
+function nearestFreeSpot(area, w, h, obs, cx, cy){
+  const step = Math.max(8, 16 / cam.zoom);
+  let best = null, bestD = Infinity;
+  for (let x = area.x; x + w <= area.x + area.w + 0.01; x += step){
+    for (let y = area.y; y + h <= area.y + area.h + 0.01; y += step){
+      const d = (x + w / 2 - cx) ** 2 + (y + h / 2 - cy) ** 2;
+      if (d >= bestD) continue;
+      if (!rectHits({ x, y, w, h }, obs, TASK_GAP)){ best = { x, y, w, h }; bestD = d; }
+    }
+  }
+  return best;
+}
+function findFreeSpotInView(w, h){
+  const v = visibleBoardRect();
+  const cx = v.x + v.w / 2, cy = v.y + v.h / 2;
+  const obs = taskObstacles();
+  const first = { x: cx - w / 2, y: cy - h / 2, w, h };
+  if (!rectHits(first, obs, TASK_GAP)) return first;
+  const inView = nearestFreeSpot(v, w, h, obs, cx, cy);
+  if (inView) return inView;
+  // на экране всё занято — ближайшее свободное место рядом с экраном;
+  // камера потом подъедет к нему (revealWorldRect в insertTaskImage), чтобы
+  // задание всё равно появилось на глазах, а не легло поверх другого
+  const around = { x: v.x - v.w, y: v.y - v.h, w: v.w * 3, h: v.h * 3 };
+  const near = nearestFreeSpot(around, w, h, obs, cx, cy);
+  if (near) return near;
+  // задание крупнее экрана или вокруг совсем тесно — в центр с каскадом
+  const off = trainersInsertOffset; trainersInsertOffset += 28;
+  return { x: cx - w / 2 + off, y: cy - h / 2 + off, w, h };
 }
 
-// вставка одной готовой картинки задания на доску — тот же формат объекта,
-// что и у обычной вставленной картинки (см. imgModalInsert выше), только
-// предел размера крупнее: это не иллюстрация для справки, а само задание —
-// его нужно будет читать и решать прямо на доске
-async function insertTaskImage(dataUrl, task){
+// рядом с заданием src, по направлению dir ('down'|'up'|'left'|'right'),
+// вплотную (зазор TASK_GAP); если там уже лежит другое задание — отодвигаемся
+// в том же направлении до первого свободного места
+function findSpotBeside(src, w, h, dir){
+  const bb = objectBBox(src);
+  const obs = taskObstacles(src.id);
+  let r;
+  if (dir === 'up') r = { x: bb.minX, y: bb.minY - TASK_GAP - h, w, h };
+  else if (dir === 'left') r = { x: bb.minX - TASK_GAP - w, y: bb.minY, w, h };
+  else if (dir === 'right') r = { x: bb.maxX + TASK_GAP, y: bb.minY, w, h };
+  else r = { x: bb.minX, y: bb.maxY + TASK_GAP, w, h };
+  for (let guard = 0; guard < 500; guard++){
+    const hit = rectHits(r, obs, TASK_GAP - 0.5);
+    if (!hit) break;
+    if (dir === 'up') r.y = hit.y0 - TASK_GAP - h;
+    else if (dir === 'left') r.x = hit.x0 - TASK_GAP - w;
+    else if (dir === 'right') r.x = hit.x1 + TASK_GAP;
+    else r.y = hit.y1 + TASK_GAP;
+  }
+  return r;
+}
+// новое задание должно появиться на глазах: если оно вышло за край видимого
+// участка — сдвигаем камеру ровно настолько, чтобы его стало видно целиком
+function revealWorldRect(r){
+  const v = visibleBoardRect();
+  let dx = 0, dy = 0;
+  if (r.w <= v.w){ if (r.x < v.x) dx = r.x - v.x; else if (r.x + r.w > v.x + v.w) dx = r.x + r.w - (v.x + v.w); }
+  else dx = r.x - v.x;
+  if (r.h <= v.h){ if (r.y < v.y) dy = r.y - v.y; else if (r.y + r.h > v.y + v.h) dy = r.y + r.h - (v.y + v.h); }
+  else dy = r.y - v.y;
+  if (!dx && !dy) return;
+  cam.x += dx; cam.y += dy;
+  clampCam(); scheduleRedraw(); rememberView();
+}
+
+// размер картинки задания на доске: предел крупнее, чем у обычной вставленной
+// картинки (это не иллюстрация, а само задание — его читают и решают)
+async function taskImageSize(dataUrl){
   const size = await loadImageSize(dataUrl);
   const maxDim = 520;
   let w = size.w, h = size.h;
   if (w > maxDim || h > maxDim){ const s = maxDim / Math.max(w, h); w *= s; h *= s; }
-  const center = trainersAwareCenterWorld();
-  const pt = { x: center.x - w/2 + trainersInsertOffset, y: center.y - h/2 + trainersInsertOffset };
-  trainersInsertOffset += 28;
+  return { w, h, natW: size.w, natH: size.h };
+}
+
+// вставка одной готовой картинки задания на доску — тот же формат объекта,
+// что и у обычной вставленной картинки (см. imgModalInsert выше).
+// place(w, h) → {x, y} — куда класть (по умолчанию — свободное место на экране)
+async function insertTaskImage(dataUrl, task, gen, place){
+  const sz = await taskImageSize(dataUrl);
+  const spot = place ? place(sz.w, sz.h) : findFreeSpotInView(sz.w, sz.h);
+  const pt = { x: spot.x, y: spot.y };
   // Промпт №66: задание с тренажёра сразу закреплено — ластиком его не
   // стереть и случайным касанием не сдвинуть (двигают его после двойного
   // клика, как любую закреплённую картинку; открепить — из меню)
-  const obj = { id: uid(), type:'image', src: dataUrl, points:[pt], w, h, natW: size.w, natH: size.h, locked: true };
+  const obj = { id: uid(), type:'image', src: dataUrl, points:[pt], w: sz.w, h: sz.h, natW: sz.natW, natH: sz.natH, locked: true };
   if (task) obj.task = task;
+  if (gen) obj.gen = gen;   // Промпт №68: из чего делать «ещё такое же»
   pushUndo();
   B.objects.push(obj);
+  revealWorldRect({ x: pt.x, y: pt.y, w: sz.w, h: sz.h });
+  return obj;
 }
 
 trainersAddBtn.addEventListener('click', async () => {
@@ -4218,9 +4390,11 @@ trainersAddBtn.addEventListener('click', async () => {
       try {
         // ответ читаем до снимка — пока на странице то же задание, что снимаем
         const info = trainerTaskInfo(win, trainersOpenId, el);
+        const gen = trainerGenInfo(win, trainersOpenId, trainersOpenHref, el);
         const shot = await captureTrainerNode(el, info);
-        await insertTaskImage(shot.dataUrl, (info && shot.hot) ? Object.assign({ v: 1 }, info, { hot: shot.hot }) : null);
+        await insertTaskImage(shot.dataUrl, (info && shot.hot) ? Object.assign({ v: 1 }, info, { hot: shot.hot }) : null, gen);
         added++;
+        scheduleRedraw();   // каждое задание — на глазах, не дожидаясь остальных из пакета
       } finally {
         if (restore) restore();
       }
@@ -4375,6 +4549,179 @@ function trainerTaskInfo(win, trainerId, el){
     console.warn('[доска] не удалось прочитать ответ задания', e);
     return null;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Промпт №68: «ЕЩЁ ТАКОЕ ЖЕ ЗАДАНИЕ» У ЗАДАНИЯ НА ДОСКЕ.
+   Доска сама заданий не придумывает — у каждого тренажёра свой генератор,
+   и повторять их здесь значило бы разойтись с ними при первой же правке
+   (та же причина, что у ответа в trainerTaskInfo). Поэтому при добавлении
+   задания в объект пишется obj.gen — из чего его можно сделать заново:
+
+     gen = { v: 1, tid, href, vw,       // тренажёр, его адрес, ширина кадра
+             kind: 'state',  snap }     // ОГЭ, арифметика, НОД: снимок моста
+                                        //   сессии (тип, уровень, раздел)
+           | kind: 'ege',    n, pid     // ЕГЭ и ОГЭ ч. 2: следующий прототип
+           | kind: 'engine', mode, lvl  // движки уравнений ОГЭ №9
+
+   По кнопке тренажёр открывается в НЕВИДИМОМ кадре (genFrameFor, адрес с
+   ?bdgen=1 — session-share.js тогда не подключается к сессии), в него
+   применяется снимок и зовётся тот же newTask(), что у «+1» в
+   trainer-multi.js; дальше снимок и ответ — теми же captureTrainerNode и
+   trainerTaskInfo, что у кнопки «Добавить на доску». Кадр остаётся жить
+   (до трёх разных тренажёров), поэтому второе нажатие — без загрузки.
+   Побочный эффект тот же, что у карточек «+1»: кадр пишет прогресс типа в
+   localStorage тренажёра (последнее задание, последний уровень).
+   ═══════════════════════════════════════════════════════════════════════ */
+function isEgeLikeTrainer(tid){ return /^(ege|egeb)\d+$/.test(tid) || /^oge2[0-5]$/.test(tid); }
+// снимок моста сессии без доски, калькулятора и служебных полей: только то,
+// что задаёт тип и уровень задания
+function stripTrainerSnap(st){
+  if (!st || typeof st !== 'object') return null;
+  const out = {};
+  Object.keys(st).forEach(k => {
+    if (k.indexOf('__') === 0 || k === 'strokes' || k === 'bgStrokes' || k === 'calcOp' || k === 'calcHist') return;
+    out[k] = st[k];
+  });
+  // добавленные «+» карточки (ОГЭ №8, №12, степени) в кадре не нужны — из
+  // них снимается только основное задание
+  if (Array.isArray(out.addedTasks)) out.addedTasks = [];
+  return plainCopy(out);
+}
+function trainerGenInfo(win, tid, href, el){
+  if (!win || !tid || !href || !el || el.id === 'theoryContent') return null;
+  try {
+    const base = { v: 1, tid, href, vw: Math.round(win.innerWidth || 0) || null };
+    if (isEgeLikeTrainer(tid)){
+      const card = el.closest ? el.closest('.added-task-card[data-idx]') : null;
+      const n = trainerEval(win, 'S.n');
+      const pid = trainerEval(win, card ? 'S.cards[' + Number(card.dataset.idx) + '].pid' : 'S.pid');
+      if (n == null || pid == null) return null;
+      return Object.assign(base, { kind: 'ege', n: Number(n), pid: String(pid) });
+    }
+    if (tid === 'oge9' && (el.id === 'live' || el.id === 'eqLine')){
+      // пример движка живёт в замыкании, но уровень виден по кнопке уровней
+      const st = typeof win.tsGetState === 'function' ? win.tsGetState() : null;
+      const lvlBtn = el.ownerDocument.querySelector('#levels .lvl.active');
+      const mode = (st && st.curMode) || (el.id === 'live' ? 'linear' : 'quadratic');
+      return Object.assign(base, { kind: 'engine', mode, lvl: lvlBtn ? Number(lvlBtn.dataset.id) : null });
+    }
+    const api = win.__trainerState;
+    const snap = stripTrainerSnap(api && api.get ? api.get() : (typeof win.tsGetState === 'function' ? win.tsGetState() : null));
+    return snap ? Object.assign(base, { kind: 'state', snap }) : null;
+  } catch (e) {
+    console.warn('[доска] не удалось запомнить тип задания', e);
+    return null;
+  }
+}
+
+const genFrames = new Map();   // адрес тренажёра → { frame, ready }
+const GEN_FRAMES_MAX = 3;
+function genFrameFor(href, vw){
+  let rec = genFrames.get(href);
+  if (!rec){
+    while (genFrames.size >= GEN_FRAMES_MAX){
+      const [k, r] = genFrames.entries().next().value;
+      r.frame.remove(); genFrames.delete(k);
+    }
+    const frame = document.createElement('iframe');
+    frame.className = 'bd-gen-frame';
+    frame.setAttribute('aria-hidden', 'true');
+    frame.tabIndex = -1;
+    // не display:none — html2canvas нужна настоящая вёрстка; просто далеко
+    // за краем экрана и прозрачный
+    frame.style.cssText = 'position:fixed;left:-30000px;top:0;height:1600px;border:0;opacity:0;pointer-events:none;';
+    frame.style.width = (vw || 720) + 'px';
+    const ready = new Promise((resolve, reject) => {
+      frame.addEventListener('load', () => {
+        const t0 = Date.now();
+        (function poll(){
+          let w = null;
+          try { w = frame.contentWindow; } catch (e) {}
+          if (w && w.document && w.document.readyState === 'complete' && typeof w.tsGetState === 'function'){
+            setTimeout(() => resolve(frame), 400);   // стартовые таймеры страницы (восстановление прогресса)
+            return;
+          }
+          if (Date.now() - t0 > 15000){ reject(new Error('тренажёр не загрузился')); return; }
+          setTimeout(poll, 100);
+        })();
+      }, { once: true });
+    });
+    frame.src = href + (href.indexOf('?') >= 0 ? '&' : '?') + 'bdgen=1';
+    document.body.appendChild(frame);
+    rec = { frame, ready };
+    genFrames.set(href, rec);
+    ready.catch(() => { if (genFrames.get(href) === rec){ frame.remove(); genFrames.delete(href); } });
+  }
+  if (vw) rec.frame.style.width = vw + 'px';   // снимок той же ширины, что у исходного
+  return rec.ready;
+}
+const genWait = ms => new Promise(r => setTimeout(r, ms));
+
+// в кадре — новое задание того же типа и уровня
+async function genNewTaskInFrame(win, g){
+  const doc = win.document;
+  if (g.kind === 'ege'){
+    win.eval('openTask(' + JSON.stringify(g.n) + ', pidAfter(' + JSON.stringify(g.pid) + ')); if (typeof render === "function") render();');
+  } else if (g.kind === 'engine'){
+    if (typeof win.openModeById !== 'function') throw new Error('нет openModeById');
+    win.openModeById(g.mode);
+    await genWait(150);
+    if (g.lvl != null){
+      const b = doc.querySelector('#levels .lvl[data-id="' + g.lvl + '"]');
+      if (b && !b.classList.contains('active')) b.click();
+      await genWait(80);
+    }
+    const rb = doc.getElementById('refreshBtn');
+    if (!rb) throw new Error('нет кнопки нового примера');
+    rb.click();
+  } else {
+    const api = win.__trainerState;
+    const snap = plainCopy(g.snap);
+    if (api && api.apply) api.apply(snap); else win.tsApplyState(snap);
+    await genWait(120);
+    if (api && api.newTask) api.newTask();
+    else if (typeof win.newTask === 'function') win.newTask();
+    else throw new Error('нет newTask');
+  }
+  await genWait(250);
+}
+
+let genChain = Promise.resolve();   // по одному: кадр у тренажёра один
+function makeSimilarTask(srcId, dir){
+  const run = async () => {
+    const src = taskObjById(srcId);
+    if (!src || !src.gen || !B) throw new Error('нет задания');
+    const g = src.gen;
+    const boardAtStart = B;
+    const frame = await genFrameFor(g.href, g.vw);
+    const win = frame.contentWindow;
+    await genNewTaskInFrame(win, g);
+    const nodes = collectTrainerCaptureNodes(win.document, g.tid);
+    const main = nodes.filter(n => n.el.id !== 'theoryContent' && !(n.el.closest && n.el.closest('.added-task-card')));
+    nodes.forEach(n => { if (n !== main[0] && n.restore) n.restore(); });
+    if (!main.length) throw new Error('в тренажёре не нашлось задания');
+    const { el, restore } = main[0];
+    try {
+      const info = trainerTaskInfo(win, g.tid, el);
+      const gen = trainerGenInfo(win, g.tid, g.href, el) || plainCopy(g);
+      if (g.vw) gen.vw = g.vw;
+      const shot = await captureTrainerNode(el, info);
+      // пока снимали, могли уйти с доски или удалить исходное задание
+      const srcNow = taskObjById(srcId);
+      if (B !== boardAtStart || !srcNow) throw new Error('доска сменилась');
+      const task = (info && shot.hot) ? Object.assign({ v: 1 }, info, { hot: shot.hot }) : null;
+      const obj = await insertTaskImage(shot.dataUrl, task, gen, (w, h) => findSpotBeside(srcNow, w, h, dir));
+      saveDB();
+      scheduleRedraw();
+      return obj;
+    } finally {
+      if (restore) restore();
+    }
+  };
+  const p = genChain.then(run, run);
+  genChain = p.catch(() => {});
+  return p;
 }
 
 /* ── чистка клона перед снимком и замер мест под живые элементы ── */
@@ -4760,7 +5107,12 @@ function taskLayer(){
   if (taskLayerEl) return taskLayerEl;
   const st = document.createElement('style');
   st.textContent = `
-    #bdTaskLayer{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+    /* Промпт №68: z-index:1 делает слой отдельным контекстом наложения. Без
+       него z-index каждого задания (номер в B.objects, до сотен) спорил с
+       интерфейсом на равных, и поле с «Проверить» вылезало поверх панели
+       тренажёров (z 255), инструментов и окон. Теперь все живые элементы —
+       сразу над холстом и под любой панелью */
+    #bdTaskLayer{position:absolute;inset:0;left:var(--bd-inset,0px);z-index:1;pointer-events:none;overflow:hidden;}
     .bd-task{position:absolute;pointer-events:none;}
     .bd-task-in{position:absolute;box-sizing:border-box;pointer-events:auto;margin:0;padding:0 .35em;
       border:2px solid rgba(0,0,0,.2);background:#fff;color:#1c1c1e;text-align:center;outline:none;
@@ -4785,6 +5137,23 @@ function taskLayer(){
     .bd-task-msg{position:absolute;left:0;pointer-events:none;background:#1c1c1e;color:#fff;font-size:12.5px;
       padding:5px 9px;border-radius:8px;white-space:nowrap;opacity:0;transition:opacity .2s;}
     .bd-task-msg.show{opacity:.92;}
+    .bd-task-more{position:absolute;left:calc(100% + 8px);top:18px;width:28px;height:28px;border-radius:14px;border:none;
+      padding:0;pointer-events:auto;cursor:pointer;background:var(--glass-strong);color:var(--pencil);
+      box-shadow:0 1px 5px rgba(0,0,0,.28);font-size:18px;font-weight:700;line-height:28px;opacity:.72;}
+    .bd-task-more:hover,.bd-task-more.on{opacity:1;background:var(--ink);color:#fff;}
+    .bd-task-more.busy{opacity:1;cursor:progress;animation:bdTaskBusy 1s linear infinite;}
+    @keyframes bdTaskBusy{to{transform:rotate(360deg);}}
+    .bd-task-dirs{position:absolute;left:calc(100% + 8px);top:52px;display:none;grid-template-columns:repeat(3,30px);
+      grid-template-rows:repeat(3,30px);gap:3px;padding:6px;pointer-events:auto;border-radius:12px;
+      background:var(--glass-strong);box-shadow:0 3px 14px rgba(0,0,0,.28);font-family:var(--font-ui);}
+    .bd-task-dirs.open{display:grid;}
+    .bd-task-dirs button{border:none;border-radius:8px;padding:0;cursor:pointer;background:var(--hover-1);
+      color:var(--pencil);font-size:16px;font-weight:700;}
+    .bd-task-dirs button:hover,.bd-task-dirs button:focus{background:var(--ink);color:#fff;outline:none;}
+    .bd-task-dirs button.def{box-shadow:inset 0 0 0 2px var(--ink);}
+    .bd-task-dirs .bd-task-dirs-mid{grid-area:2/2;display:flex;align-items:center;justify-content:center;
+      font-size:9.5px;line-height:1.1;text-align:center;color:var(--muted-2);}
+    [data-access="view"] .bd-task-more,[data-access="view"] .bd-task-dirs{display:none!important;}
     [data-access="view"] .bd-task-in,[data-access="view"] .bd-task-btn,
     [data-access="view"] .bd-task-opt,[data-access="view"] .bd-task-reset{pointer-events:none;}
   `;
@@ -4812,13 +5181,24 @@ function taskPlace(elm, r){
 }
 
 function buildTaskOverlay(obj){
-  const t = obj.task, hot = t.hot, sty = hot.style || {};
   const root = document.createElement('div');
   root.className = 'bd-task';
   root.dataset.id = obj.id;
-  if (sty.font) root.style.fontFamily = sty.font;
   const rec = { root, inputs: [], opts: [], check: null, msg: null, sig: null };
   const id = obj.id;
+  if (obj.gen) buildMoreButton(rec, id);
+  // клик по живому элементу не должен начинать жест доски под ним
+  root.addEventListener('pointerdown', (e) => e.stopPropagation());
+  if (!obj.task || !obj.task.hot){
+    const msg = document.createElement('div');
+    msg.className = 'bd-task-msg';
+    root.appendChild(msg);
+    rec.msg = msg;
+    taskLayer().appendChild(root);
+    return rec;
+  }
+  const t = obj.task, hot = t.hot, sty = hot.style || {};
+  if (sty.font) root.style.fontFamily = sty.font;
   if (t.kind === 'fields'){
     t.fields.forEach((f, i) => {
       const r = hot.fields[i]; if (!r) return;
@@ -4870,15 +5250,78 @@ function buildTaskOverlay(obj){
   msg.className = 'bd-task-msg';
   root.appendChild(msg);
   rec.msg = msg;
-  // клик по живому элементу не должен начинать жест доски под ним
-  root.addEventListener('pointerdown', (e) => e.stopPropagation());
   taskLayer().appendChild(root);
   return rec;
+}
+
+/* ── Промпт №68: кнопка «ещё такое же» и выбор, куда поставить ──
+   По кнопке — крестик из четырёх стрелок; «вниз» выделена и в фокусе, так
+   что Enter (или клик по ней) ставит новое задание вплотную под текущим. */
+const DIR_ARROWS = { up: '↑', left: '←', right: '→', down: '↓' };
+const DIR_AREAS = { up: '1/2', left: '2/1', right: '2/3', down: '3/2' };
+const DIR_NAMES = { up: 'сверху', left: 'слева', right: 'справа', down: 'снизу' };
+let openDirsRec = null;
+function closeTaskDirs(){
+  if (!openDirsRec) return;
+  openDirsRec.dirs.classList.remove('open');
+  openDirsRec.more.classList.remove('on');
+  openDirsRec = null;
+}
+document.addEventListener('pointerdown', (e) => {
+  if (openDirsRec && !openDirsRec.dirs.contains(e.target) && e.target !== openDirsRec.more) closeTaskDirs();
+}, true);
+function buildMoreButton(rec, id){
+  const more = document.createElement('button');
+  more.type = 'button'; more.className = 'bd-task-more'; more.textContent = '+';
+  more.title = 'Ещё такое же задание (тот же тип и уровень)';
+  const dirs = document.createElement('div');
+  dirs.className = 'bd-task-dirs';
+  const mid = document.createElement('div');
+  mid.className = 'bd-task-dirs-mid'; mid.textContent = 'куда?';
+  dirs.appendChild(mid);
+  ['up', 'left', 'right', 'down'].forEach(dir => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.dataset.dir = dir; b.textContent = DIR_ARROWS[dir];
+    b.title = 'Поставить ' + DIR_NAMES[dir] + (dir === 'down' ? ' (по умолчанию)' : '');
+    b.style.gridArea = DIR_AREAS[dir];
+    if (dir === 'down') b.classList.add('def');
+    b.addEventListener('click', () => { closeTaskDirs(); runMoreTask(rec, id, dir); });
+    dirs.appendChild(b);
+  });
+  dirs.addEventListener('keydown', (e) => {
+    const map = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right' };
+    if (map[e.key]){ e.preventDefault(); closeTaskDirs(); runMoreTask(rec, id, map[e.key]); }
+    else if (e.key === 'Escape'){ e.preventDefault(); closeTaskDirs(); }
+  });
+  more.addEventListener('click', () => {
+    if (more.classList.contains('busy')) return;
+    if (openDirsRec === rec){ closeTaskDirs(); return; }
+    closeTaskDirs();
+    openDirsRec = rec;
+    more.classList.add('on');
+    dirs.classList.add('open');
+    const def = dirs.querySelector('button.def');
+    if (def) def.focus({ preventScroll: true });
+  });
+  rec.more = more; rec.dirs = dirs;
+  rec.root.appendChild(more);
+  rec.root.appendChild(dirs);
+}
+function runMoreTask(rec, id, dir){
+  rec.more.classList.add('busy');
+  rec.more.disabled = true;
+  makeSimilarTask(id, dir)
+    .catch(err => {
+      console.error('[доска] «ещё такое же» не получилось', err);
+      if (rec.msg && rec.root.isConnected) taskFlash(id, 'Не получилось сделать новое задание — попробуйте ещё раз');
+    })
+    .finally(() => { rec.more.classList.remove('busy'); rec.more.disabled = false; });
 }
 
 // привести живые элементы к состоянию объекта (после проверки, отмены,
 // правки от собеседника)
 function applyTaskState(rec, obj){
+  if (!obj.task) return;
   const t = obj.task, st = t.st || null, d = taskDrafts.get(obj.id);
   rec.root.classList.toggle('answered', !!st);
   if (t.kind === 'fields'){
@@ -5023,14 +5466,20 @@ function syncTaskOverlays(){
     const vx0 = cam.x - pad, vy0 = cam.y - pad, vx1 = cam.x + cssW / cam.zoom + pad, vy1 = cam.y + cssH / cam.zoom + pad;
     for (let oi = 0; oi < B.objects.length; oi++){
       const o = B.objects[oi];
-      if (o.type !== 'image' || !o.task || !o.task.hot || !o.points || !o.points[0]) continue;
+      if (o.type !== 'image' || !o.points || !o.points[0]) continue;
+      // живые поля — у заданий с ответом; кнопка «ещё такое же» (промпт №68)
+      // — у любого задания с тренажёра, даже если ответ доске не известен
+      const live = !!(o.task && o.task.hot);
+      if (!live && !o.gen) continue;
       const x = o.points[0].x, y = o.points[0].y;
       if (x + o.w < vx0 || x > vx1 || y + o.h < vy0 || y > vy1) continue;
       seen.add(o.id);
       let rec = taskEls.get(o.id);
-      if (!rec){ rec = buildTaskOverlay(o); taskEls.set(o.id, rec); }
-      const sig = JSON.stringify(o.task.st || null);
-      if (rec.sig !== sig){
+      const shape = (live ? 'L' : '') + (o.gen ? 'G' : '');
+      if (rec && rec.shape !== shape){ rec.root.remove(); taskEls.delete(o.id); rec = null; }
+      if (!rec){ rec = buildTaskOverlay(o); rec.shape = shape; taskEls.set(o.id, rec); }
+      const sig = live ? JSON.stringify(o.task.st || null) : '';
+      if (live && rec.sig !== sig){
         // итог проверки сменился (своя проверка, отмена, ответ собеседника) —
         // черновые отметки утверждений больше не актуальны
         if (rec.sig !== null){ const d = taskDrafts.get(o.id); if (d) d.picks = null; }
@@ -5045,6 +5494,7 @@ function syncTaskOverlays(){
       root.style.width = sw + 'px'; root.style.height = sh + 'px';
       // шрифт и скругления — в масштабе картинки: сколько экранных пикселей
       // приходится на один CSS-пиксель тренажёра
+      if (!live) continue;
       const k = sw / (o.task.hot.w || sw);
       const sty = o.task.hot.style || {};
       const fh = (rec.inputs[0] && o.task.hot.fields[0]) ? o.task.hot.fields[0].h * sh : 0;
@@ -6794,8 +7244,11 @@ function updateContextMenu(){
   const p0 = worldToScreen({x:minX,y:minY}), p1 = worldToScreen({x:maxX,y:maxY});
   menu.classList.add('open');
   const menuW = menu.offsetWidth || 200, menuH = menu.offsetHeight || 300;
+  // меню стоит на экране (position:fixed), а p0/p1 — в координатах холста;
+  // с промпта №68 холст может начинаться правее панели тренажёров
+  p0.x += boardInset; p1.x += boardInset;
   let left = p1.x + 14;
-  if (left + menuW > cssW - 8) left = Math.max(8, p0.x - menuW - 14);
+  if (left + menuW > boardInset + cssW - 8) left = Math.max(boardInset + 8, p0.x - menuW - 14);
   let top = clamp(p0.y, 8, Math.max(8, cssH - menuH - 8));
   menu.style.left = left + 'px';
   menu.style.top = top + 'px';

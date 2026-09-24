@@ -131,7 +131,12 @@ html[data-theme="dark"] .bl-card-menu:hover{background:rgba(255,255,255,.18);}
 
 /* ═══════════════ экран 2 — сама доска ═══════════════ */
 #screenBoard{display:none;position:fixed;inset:0;overflow:hidden;background:var(--bg);}
-#boardCv{position:absolute;inset:0;touch-action:none;}
+#boardCv{position:absolute;inset:0;left:var(--bd-inset,0px);touch-action:none;}
+/* Промпт №68: --bd-inset — сколько пикселей слева занято панелью тренажёров
+   (открытой или свёрнутой в полосу). Холст и всё, что прижато к левому краю
+   или стоит по центру доски, сдвигаются на эту ширину, а не прячутся под
+   панелью: инструменты доски должны оставаться под рукой, пока панель
+   открыта. Ставится из boards-core.js (applyBoardInset) на #screenBoard */
 .bd-topbar{position:fixed;top:0;left:0;right:0;z-index:300;display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border-bottom:1px solid var(--glass-border);}
 .bd-back{display:inline-flex;align-items:center;gap:6px;background:none;border:none;color:var(--ink);font-weight:600;font-size:14px;cursor:pointer;padding:6px 8px;border-radius:8px;text-decoration:none;}
 .bd-back:hover{background:var(--hover-1);}
@@ -165,7 +170,7 @@ html[data-theme="dark"] .bl-card-menu:hover{background:rgba(255,255,255,.18);}
    наверх (горизонтально), когда сама панель инструментов встаёт слева,
    чтобы они не накладывались друг на друга ── */
 .bd-rail{position:fixed;z-index:250;display:flex;gap:6px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:16px;padding:6px;box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.5);}
-.bd-rail.pos-left{left:14px;top:70px;flex-direction:column;}
+.bd-rail.pos-left{left:calc(14px + var(--bd-inset,0px));top:70px;flex-direction:column;}
 /* когда рейл уезжает наверх (см. applyDockLayout — это происходит только
    когда сама панель инструментов встаёт слева), он садится прямо в строку
    верхней панели — на уровень названия доски, а не отдельной плашкой под
@@ -198,9 +203,9 @@ html[data-theme="dark"] .bd-rail{box-shadow:var(--shadow),inset 0 1px 0 rgba(255
 }
 html[data-theme="dark"] .bd-dock{box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.10), inset 0 0 0 .5px rgba(255,255,255,.07);}
 .bd-dock-tools{display:flex; align-items:center; gap:4px;}
-.bd-dock.pos-bottom{left:calc(50% + var(--dock-offset,0px));bottom:16px;top:auto;right:auto;transform:translateX(-50%);max-width:calc(100vw - 20px);padding-left:18px;}
-.bd-dock.pos-bottom .bd-dock-tools{flex-direction:row;max-width:calc(100vw - 38px);overflow-x:auto;overflow-y:visible;}
-.bd-dock.pos-left{left:14px;top:50%;bottom:auto;right:auto;transform:translateY(-50%);max-height:calc(100vh - 90px);padding-top:18px;}
+.bd-dock.pos-bottom{left:calc(50% + var(--bd-inset,0px) / 2 + var(--dock-offset,0px));bottom:16px;top:auto;right:auto;transform:translateX(-50%);max-width:calc(100vw - 20px - var(--bd-inset,0px));padding-left:18px;}
+.bd-dock.pos-bottom .bd-dock-tools{flex-direction:row;max-width:calc(100vw - 38px - var(--bd-inset,0px));overflow-x:auto;overflow-y:visible;}
+.bd-dock.pos-left{left:calc(14px + var(--bd-inset,0px));top:50%;bottom:auto;right:auto;transform:translateY(-50%);max-height:calc(100vh - 90px);padding-top:18px;}
 .bd-dock.pos-left .bd-dock-tools{flex-direction:column;max-height:calc(100vh - 108px);overflow-y:auto;overflow-x:visible;}
 .bd-dock.pos-right{right:14px;top:50%;bottom:auto;left:auto;transform:translateY(-50%);max-height:calc(100vh - 90px);padding-top:18px;}
 .bd-dock.pos-right .bd-dock-tools{flex-direction:column;max-height:calc(100vh - 108px);overflow-y:auto;overflow-x:visible;}
@@ -348,6 +353,17 @@ html[data-theme="dark"] .bd-ref-panel{box-shadow:var(--shadow), inset 0 1px 0 rg
   box-shadow:var(--shadow);
 }
 .bd-trainers-panel.open{display:flex;}
+/* широкий экран: панель стоит рядом с доской, а не поверх неё — оставляем
+   доске хотя бы 300 px, иначе ни порисовать, ни дотянуться до кнопок */
+@media (min-width:700px){ .bd-trainers-panel{max-width:calc(100vw - 300px);} }
+.bd-trainers-collapse{width:26px;height:26px;border-radius:50%;border:none;background:none;color:var(--muted-2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex:none;padding:0;}
+.bd-trainers-collapse svg{width:16px;height:16px;}
+.bd-trainers-collapse:hover{background:var(--hover-1);color:var(--pencil);}
+.bd-trainers-strip{position:fixed;top:53px;left:0;bottom:0;width:30px;z-index:255;display:none;flex-direction:column;align-items:center;gap:10px;padding:14px 0;border:none;border-right:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(26px) saturate(190%);-webkit-backdrop-filter:blur(26px) saturate(190%);color:var(--pencil);cursor:pointer;font-family:var(--font-ui);}
+.bd-trainers-strip.show{display:flex;}
+.bd-trainers-strip:hover{background:var(--hover-1);}
+.bd-trainers-strip svg{width:16px;height:16px;flex:none;}
+.bd-trainers-strip-text{writing-mode:vertical-rl;font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-height:calc(100% - 40px);}
 .bd-trainers-resize-w{position:absolute;top:0;bottom:0;right:0;left:auto;width:10px;z-index:3;cursor:ew-resize;touch-action:none;}
 .bd-trainers-resize-w:hover{background:var(--hover-1);}
 .bd-trainers-head{display:flex;align-items:center;gap:8px;padding:12px 12px 10px;flex:none;border-bottom:1px solid var(--glass-border);}
@@ -375,10 +391,10 @@ html[data-theme="dark"] .bd-ref-panel{box-shadow:var(--shadow), inset 0 1px 0 rg
 .bd-trainers-add:disabled{opacity:.6;cursor:default;}
 .bd-trainers-toast{position:absolute;left:50%;bottom:62px;transform:translateX(-50%);z-index:3;background:var(--ink);color:#fff;padding:6px 12px;border-radius:9px;font-family:var(--font-ui);font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s;}
 .bd-trainers-toast.show{opacity:1;}
-@media print{ .bd-trainers-panel{display:none!important;} }
+@media print{ .bd-trainers-panel,.bd-trainers-strip{display:none!important;} }
 
 /* ── всплывающая панель цвета/толщины/стиля над доком ── */
-.bd-optbar{position:fixed;left:50%;bottom:66px;transform:translateX(-50%);z-index:250;display:none;align-items:center;gap:calc(10px*var(--dock-scale,1));background:var(--glass-strong);backdrop-filter:blur(26px) saturate(190%);-webkit-backdrop-filter:blur(26px) saturate(190%);border:1px solid var(--glass-border);border-radius:calc(18px*var(--dock-scale,1));padding:calc(9px*var(--dock-scale,1)) calc(12px*var(--dock-scale,1));box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.5);flex-wrap:wrap;max-width:calc(100vw - 20px);}
+.bd-optbar{position:fixed;left:calc(50% + var(--bd-inset,0px) / 2);bottom:66px;transform:translateX(-50%);z-index:250;display:none;align-items:center;gap:calc(10px*var(--dock-scale,1));background:var(--glass-strong);backdrop-filter:blur(26px) saturate(190%);-webkit-backdrop-filter:blur(26px) saturate(190%);border:1px solid var(--glass-border);border-radius:calc(18px*var(--dock-scale,1));padding:calc(9px*var(--dock-scale,1)) calc(12px*var(--dock-scale,1));box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.5);flex-wrap:wrap;max-width:calc(100vw - 20px);}
 .bd-optbar.open{display:flex;}
 /* когда панель инструментов уезжает влево/вправо (вертикально), эта
    всплывающая панель тоже должна стать узкой колонкой, а не оставаться
@@ -1022,7 +1038,10 @@ function resolveBasketTexInHtml(html){
         <svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <div class="bd-trainers-title" id="bdTrainersTitle">Тренажёры</div>
-      <button class="bd-trainers-close" id="bdTrainersClose" title="Свернуть">✕</button>
+      <button class="bd-trainers-collapse" id="bdTrainersCollapse" title="Свернуть панель — тренажёр и задание в нём останутся, развернуть можно кнопкой у левого края">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M13 6l-6 6 6 6M19 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <button class="bd-trainers-close" id="bdTrainersClose" title="Закрыть панель">✕</button>
     </div>
     <div class="bd-trainers-list" id="bdTrainersList">
       <input type="text" class="bd-trainers-search" id="bdTrainersSearch" placeholder="Поиск тренажёра…">
@@ -1034,6 +1053,12 @@ function resolveBasketTexInHtml(html){
       <div class="bd-trainers-toast" id="bdTrainersToast"></div>
     </div>
   </div>
+  <!-- Промпт №68: свёрнутая панель тренажёров — узкая полоса у левого края;
+       тренажёр в панели при сворачивании не выгружается -->
+  <button class="bd-trainers-strip" id="bdTrainersStrip" title="Развернуть панель тренажёров">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M11 6l6 6-6 6M5 6l6 6-6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="bd-trainers-strip-text" id="bdTrainersStripText">Тренажёры</span>
+  </button>
 
   <div class="bd-access-note" id="bdAccessNote"></div>
 

@@ -51,8 +51,14 @@
    ═══════════════════════════════════════════════════════════════════════ */
 (function () {
   const cfg = window.SUPABASE_CONFIG || {};
-  if (!cfg.url || !cfg.anonKey || !window.supabase) {
-    console.warn('[session-share] SUPABASE_CONFIG или supabase-js не подключены — совместный доступ недоступен на этой странице.');
+  /* Промпт №68: ?bdgen=1 — страницу открыла доска в невидимом кадре, чтобы
+     сделать «ещё такое же задание» (boards-core.js, genFrame). Такому кадру
+     совместная сессия не нужна и вредна: у учителя с открытой сессией кадр
+     при старте записал бы в trainer_sessions свой слаг и разослал бы своё
+     задание ученику. Поэтому — та же пустышка, что и без настроек Supabase */
+  const BD_GEN = /[?&]bdgen=1(&|$)/.test(location.search);
+  if (BD_GEN || !cfg.url || !cfg.anonKey || !window.supabase) {
+    if (!BD_GEN) console.warn('[session-share] SUPABASE_CONFIG или supabase-js не подключены — совместный доступ недоступен на этой странице.');
     window.TrainerSession = {
       init: async () => {}, push(){}, registerField(){}, unregisterField(){}, unregisterFieldsWithPrefix(){}, mountShareButton(){},
       broadcastEvent(){}, onEvent(){}, getCode(){ return null; }, getShareUrl(){ return ''; },
