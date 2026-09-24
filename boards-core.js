@@ -2395,7 +2395,42 @@ function renderImageObject(c, obj, camv){
   const im = getImg(obj.src);
   c.save();
   if (im.complete && im.naturalWidth){
-    c.drawImage(im, p0.x, p0.y, w, h);
+    // Промпт №70: задание с тренажёра — карточка со скруглёнными углами.
+    // Обрезаем векторным контуром на каждом кадре: край ровный и чёткий при
+    // любом масштабе (в самом PNG углы тоже прозрачные — для выгрузки
+    // картинкой и старых вкладок)
+    const pv = activeCam === cam ? taskWidthPreview.get(obj.id) : null;
+    c.imageSmoothingEnabled = true;
+    c.imageSmoothingQuality = 'high';
+    if (pv){
+      // Промпт №70: черновик новой ширины — фон карточки нужной ширины и
+      // прежний снимок без растяжения, обрезанный по ней
+      const pw = pv.w * activeCam.zoom, px = pv.side === 'iw' ? p0.x + w - pw : p0.x;
+      const R = (obj.card ? obj.card.r * w : 0);
+      c.save();
+      roundRectPath(c, px, p0.y, pw, h, R);
+      c.fillStyle = (obj.css && obj.css.bg) || '#fff'; c.fill();
+      c.clip();
+      c.drawImage(im, pv.side === 'iw' ? px + pw - w : px, p0.y, w, h);
+      c.restore();
+      c.save();
+      roundRectPath(c, px, p0.y, pw, h, R);
+      c.strokeStyle = themeVar('--ink') || '#2e7de0'; c.lineWidth = 1.5; c.setLineDash([6, 4]); c.stroke();
+      if (pv.busy){
+        c.setLineDash([]);
+        c.fillStyle = 'rgba(0,0,0,.55)';
+        roundRectPath(c, px + pw / 2 - 70, p0.y + 8, 140, 24, 12); c.fill();
+        c.fillStyle = '#fff'; c.font = '12px ' + UI_FONT_FAMILY; c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillText('Перестраиваем…', px + pw / 2, p0.y + 20);
+      }
+      c.restore();
+    } else {
+      if (obj.card && obj.card.r > 0){
+        roundRectPath(c, p0.x, p0.y, w, h, obj.card.r * w);
+        c.clip();
+      }
+      c.drawImage(im, p0.x, p0.y, w, h);
+    }
   } else {
     c.fillStyle = themeVar('--glass-strong') || '#eee';
     roundRectPath(c, p0.x, p0.y, w, h, 8);
@@ -2556,12 +2591,20 @@ function getHandles(obj){
     // закрепление защищает только от ластика, двигать и тянуть за угол
     // можно всегда, пока картинка в фокусе (выделена/только что вставлена)
     const p = obj.points[0];
-    return [
+    const hs = [
       {role:'nw',x:p.x,y:p.y},
       {role:'ne',x:p.x+obj.w,y:p.y},
       {role:'se',x:p.x+obj.w,y:p.y+obj.h},
       {role:'sw',x:p.x,y:p.y+obj.h},
     ];
+    // Промпт №70: у задания с тренажёра ещё и боковые — ширина с переносом
+    // строк (углы — пропорциональный масштаб вместе с текстом)
+    if (taskCanReflow(obj)){
+      const pv = taskWidthPreview.get(obj.id);
+      const w = pv ? pv.w : obj.w, x0 = (pv && pv.side === 'iw') ? p.x + obj.w - w : p.x;
+      hs.push({role:'iw',x:x0,y:p.y+obj.h/2}, {role:'ie',x:x0+w,y:p.y+obj.h/2});
+    }
+    return hs;
   }
   return [];
 }
@@ -2632,6 +2675,13 @@ function applyHandle(obj, role, pt){
   } else if (obj.type === 'circle'){
     if (role === 'center') obj.points[0] = pt;
     else if (role === 'r') obj.r = Math.max(4, dist(obj.points[0], pt));
+  } else if (obj.type === 'image' && (role === 'ie' || role === 'iw')){
+    // Промпт №70: ширина задания — пока тянут, только черновик (см.
+    // reflowTaskWidth); сам объект меняется после отпускания
+    const p = obj.points[0], s = obj.w / obj.css.w;
+    const minW = TASK_MIN_CW * s, maxW = TASK_MAX_CW * s;
+    const w = role === 'ie' ? rawPt.x - p.x : p.x + obj.w - rawPt.x;
+    taskWidthPreview.set(obj.id, { w: Math.max(minW, Math.min(maxW, w)), side: role, busy: false });
   } else if (obj.type === 'image' && (role === 'se' || role === 'sw' || role === 'ne' || role === 'nw')){
     // сохраняем исходные пропорции — тянуть можно только по диагонали;
     // противоположный угол остаётся неподвижным «якорем»
@@ -2644,7 +2694,13 @@ function applyHandle(obj, role, pt){
       nw: { x: p.x + obj.w,  y: p.y + obj.h  },
     };
     const anchor = anchors[role];
-    const w = Math.max(20, Math.abs(pt.x - anchor.x));
+    // ширина — со знаком: протянули угол за противоположный — картинка не
+    // «выворачивается» и не растёт обратно, а упирается в минимум
+    const dxs = (role === 'se' || role === 'ne') ? pt.x - anchor.x : anchor.x - pt.x;
+    let w = Math.max(20, dxs);
+    // Промпт №70: задание с тренажёра — не мельче и не крупнее разумного,
+    // иначе текст станет нечитаемым (масштаб — на CSS-пиксель тренажёра)
+    if (obj.css && obj.css.w) w = Math.max(TASK_MIN_S * obj.css.w, Math.min(TASK_MAX_S * obj.css.w, w));
     const h = Math.max(20, w / ratio);
     let x0, y0;
     if (role === 'se'){ x0 = anchor.x; y0 = anchor.y; }
@@ -3629,6 +3685,7 @@ canvas.addEventListener('pointerup', (e) => {
     if (obj){ commitObject(obj); enterEditLock(obj, via); updateContextMenu(); }
     scheduleRedraw();
   }
+  if (dragMode === 'handle' && (dragHandleRole === 'ie' || dragHandleRole === 'iw')) finishTaskWidthDrag(dragObjId);
   if (dragMode === 'move' || dragMode === 'handle' || dragMode === 'multimove'){ saveDB(); }
   if (dragMode === 'pan') updateCursor(); // вернуть «раскрытую руку» или курсор текущего инструмента
   if (dragMode === 'marquee'){
@@ -4523,39 +4580,163 @@ function hideTrainersToast(){ trainersToastEl.classList.remove('show'); }
 // в клоне, а не на живой странице: чистка клона меняет вёрстку (прячется
 // разбор), и координаты с живой страницы съехали бы. Возвращает
 // { dataUrl, hot } — hot === null, если задание не интерактивное.
-async function captureTrainerNode(el, task){
-  if (typeof html2canvas !== 'function') throw new Error('html2canvas not loaded');
-  const doc = el.ownerDocument;
+/* ── Промпт №70: задание на доске — чистая карточка ──
+   Раньше снимок заливался цветом страницы тренажёра (backgroundColor у
+   html2canvas) прямоугольником по рамке узла, и на доске было видно всё
+   лишнее: углы за скруглением — квадратики цвета страницы, обрезанная по
+   краю снимка тень панели, «стекло» панели (полупрозрачный фон с
+   backdrop-filter, которого html2canvas не умеет) — серой подложкой, а
+   внутренняя тень (inset) панели — ещё одним прямоугольником внутри.
+   Теперь:
+   - снимок идёт на прозрачном фоне, у корня клона сняты тень, размытие и
+     отступы, у потомков — внутренние тени (html2canvas рисует их неверно);
+   - карточка собирается сама: скруглённый прямоугольник цвета карточки
+     тренажёра (её полупрозрачный фон, сведённый с фоном страницы в
+     непрозрачный — так он и выглядит на экране), поверх — снимок, и всё,
+     что за скруглением, вырезается до полной прозрачности;
+   - если снимаемый узел сам не карточка (у ЕГЭ — одно условие, у столбиков —
+     сам пример), цвет и скругление берутся у ближайшего предка-карточки, а
+     вокруг содержимого — поле, как внутри карточки;
+   - скругление запоминается в объекте (obj.card), и доска на каждом кадре
+     обрезает картинку ВЕКТОРНЫМ контуром (renderImageObject) — край ровный
+     при любом масштабе, а не растянутые пиксели снимка. */
+function parseCssColor(css){
+  const m = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+%?))?\s*\)/.exec(css || '');
+  if (!m) return null;
+  let a = m[4] == null ? 1 : parseFloat(m[4]);
+  if (m[4] && m[4].indexOf('%') > 0) a /= 100;
+  return { r: +m[1], g: +m[2], b: +m[3], a };
+}
+// цвет fg поверх непрозрачного bg — один непрозрачный цвет
+function flattenColor(fg, bg){
+  const f = parseCssColor(fg), b = parseCssColor(bg) || { r: 255, g: 255, b: 255, a: 1 };
+  if (!f) return 'rgb(' + b.r + ',' + b.g + ',' + b.b + ')';
+  const mix = k => Math.round(f[k] * f.a + b[k] * (1 - f.a));
+  return 'rgb(' + mix('r') + ',' + mix('g') + ',' + mix('b') + ')';
+}
+function trainerPageBg(doc){
   const win = doc.defaultView;
-  const bg = win ? win.getComputedStyle(doc.body).backgroundColor : '';
-  const bgColor = (bg && bg !== 'rgba(0, 0, 0, 0)') ? bg : '#ffffff';
-  const scale = Math.min(2, window.devicePixelRatio || 1);
+  const cands = [doc.body, doc.documentElement];
+  for (const e of cands){
+    const c = parseCssColor(win.getComputedStyle(e).backgroundColor);
+    if (c && c.a > 0) return flattenColor(win.getComputedStyle(e).backgroundColor, '#ffffff');
+  }
+  return '#ffffff';
+}
+// какой карточкой выглядит задание: сам узел или ближайший предок с фоном и
+// скруглением (панель тренажёра)
+const CARD_PAD = 18;   // поле вокруг содержимого, если узел сам не карточка
+function trainerCardStyle(el, pageBg){
+  const win = el.ownerDocument.defaultView;
+  for (let e = el; e && e !== e.ownerDocument.body; e = e.parentElement){
+    const cs = win.getComputedStyle(e);
+    const c = parseCssColor(cs.backgroundColor);
+    const r = parseFloat(cs.borderTopLeftRadius) || 0;
+    if (c && c.a > 0.02 && r > 0){
+      return { own: e === el, color: flattenColor(cs.backgroundColor, pageBg), radius: r,
+               pad: e === el ? 0 : CARD_PAD };
+    }
+  }
+  // карточки вокруг нет — белая «стеклянная» панель, как у всех тренажёров
+  const dark = isDarkColor(pageBg);
+  return { own: false, color: flattenColor(dark ? 'rgba(255,255,255,.07)' : 'rgba(255,255,255,.6)', pageBg), radius: 18, pad: CARD_PAD };
+}
+// чистка клона перед снимком — только то, что html2canvas рисует не так,
+// как браузер; вёрстку (размеры, отступы внутри) не трогаем
+function cleanCloneForCard(c, card){
+  c.style.setProperty('box-shadow', 'none', 'important');
+  c.style.setProperty('backdrop-filter', 'none', 'important');
+  c.style.setProperty('-webkit-backdrop-filter', 'none', 'important');
+  c.style.setProperty('margin', '0', 'important');
+  c.style.setProperty('transform', 'none', 'important');
+  c.style.setProperty('animation', 'none', 'important');
+  if (card.own) c.style.setProperty('background-color', card.color, 'important');
+  else c.style.setProperty('background', 'transparent', 'important');
+  const win = c.ownerDocument.defaultView;
+  c.querySelectorAll('*').forEach(e => {
+    const sh = win.getComputedStyle(e).boxShadow;
+    if (sh && sh !== 'none' && sh.indexOf('inset') >= 0) e.style.setProperty('box-shadow', 'none', 'important');
+  });
+}
+// содержимое на прозрачном фоне → карточка: скруглённый прямоугольник цвета
+// карточки, содержимое с полем pad, всё за скруглением — прозрачное
+function wrapIntoCard(content, card, scale, cssW, cssH){
+  const pad = card.pad;
+  const W = cssW + pad * 2, H = cssH + pad * 2;
+  const out = document.createElement('canvas');
+  out.width = Math.round(W * scale); out.height = Math.round(H * scale);
+  const c = out.getContext('2d');
+  const R = Math.min(card.radius, W / 2, H / 2) * scale;
+  roundRectPath(c, 0, 0, out.width, out.height, R);
+  c.fillStyle = card.color; c.fill();
+  c.drawImage(content, Math.round(pad * scale), Math.round(pad * scale));
+  // вырезаем углы: всё, что вне контура, — полностью прозрачное
+  c.globalCompositeOperation = 'destination-in';
+  roundRectPath(c, 0, 0, out.width, out.height, R);
+  c.fillStyle = '#000'; c.fill();
+  c.globalCompositeOperation = 'source-over';
+  return { canvas: out, W, H, R: R / scale };
+}
+
+// opts.html — содержимое узла, которое подставить в клон вместо того, что
+// сейчас на странице (перестройка задания под новую ширину, промпт №70);
+// opts.width — ширина узла в CSS-пикселях: текст и формулы переносятся по ней
+async function captureTrainerNode(el, task, opts){
+  if (typeof html2canvas !== 'function') throw new Error('html2canvas not loaded');
+  opts = opts || {};
+  const doc = el.ownerDocument;
+  const pageBg = trainerPageBg(doc);
+  const card = trainerCardStyle(el, pageBg);
+  // не меньше двух пикселей на CSS-пиксель: задание на доске часто смотрят
+  // крупнее, чем в тренажёре, и с одним пикселем текст сразу мылится
+  const scale = Math.max(2, Math.min(3, window.devicePixelRatio || 1));
   let hot = null;
-  const mark = task ? 'c' + uid() : null;
-  if (mark) el.setAttribute('data-bd-cap', mark);
+  const mark = 'c' + uid();
+  el.setAttribute('data-bd-cap', mark);
   // html2canvas старается разобрать все стили страницы, в том числе внешние
   // (шрифты с Google Fonts и т.п.) — если у ученика/учителя в этот момент
   // плохая сеть, разбор может надолго зависнуть; ограничиваем снимок по
   // времени, чтобы кнопка не осталась «залипшей», а показывалась понятная
   // ошибка и можно было попробовать ещё раз
-  const canvasPromise = html2canvas(el, {
-    backgroundColor: bgColor,
+  const vw = doc.defaultView ? doc.defaultView.innerWidth : 0;
+  const h2cOpts = {
+    backgroundColor: null,   // прозрачный фон — карточку собираем сами (wrapIntoCard)
     scale,
     useCORS: true,
-    onclone: mark ? (cloneDoc) => {
+    onclone: (cloneDoc) => {
       const c = cloneDoc.querySelector('[data-bd-cap="' + mark + '"]');
-      if (c) hot = prepareTaskClone(c, task);
-    } : undefined,
-  });
+      if (!c) return;
+      // сам узел клона не подменяем — html2canvas рисует именно его, по
+      // ссылке; меняем только содержимое и ширину
+      if (opts.html != null) c.innerHTML = opts.html;
+      if (opts.width){
+        c.style.setProperty('width', opts.width + 'px', 'important');
+        c.style.setProperty('max-width', 'none', 'important');
+        c.style.setProperty('min-width', '0', 'important');
+        c.style.setProperty('flex', 'none', 'important');
+        // высота — по содержимому: у панелей тренажёров во время их плавной
+        // анимации высоты (setupAutoHeightAnimation) стоит явная высота,
+        // и после переноса строк карточка осталась бы прежней высоты
+        c.style.setProperty('height', 'auto', 'important');
+        c.style.setProperty('min-height', '0', 'important');
+        c.style.setProperty('max-height', 'none', 'important');
+      }
+      cleanCloneForCard(c, card);
+      if (task) hot = prepareTaskClone(c, task);
+    },
+  };
+  // узел шире окна кадра — окно клона раздвигаем, иначе правый край срежется
+  if (opts.width && vw && opts.width > vw - 40) h2cOpts.windowWidth = Math.ceil(opts.width + 80);
+  const canvasPromise = html2canvas(el, h2cOpts);
   const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('capture timeout')), 20000));
   let canvas;
   try { canvas = await Promise.race([canvasPromise, timeoutPromise]); }
-  finally { if (mark) el.removeAttribute('data-bd-cap'); }
+  finally { el.removeAttribute('data-bd-cap'); }
+  let cw = canvas.width / scale, ch = canvas.height / scale;
   if (task && hot) {
     // html2canvas берёт размер холста не всегда по той же рамке, что
     // getBoundingClientRect в клоне (у столбиков холст уже рамки узла) —
     // доли пересчитываем к настоящему размеру снимка
-    const cw = canvas.width / scale, ch = canvas.height / scale;
     const kx = hot.w / cw, ky = hot.h / ch;
     if (Math.abs(kx - 1) > 0.01 || Math.abs(ky - 1) > 0.01) {
       const fix = r => r && ({ x: r.x * kx, y: r.y * ky, w: r.w * kx, h: r.h * ky });
@@ -4563,10 +4744,26 @@ async function captureTrainerNode(el, task){
     }
     hot.w = cw; hot.h = ch;
   }
-  if (task && hot && hot.fields.length && hot.style) {
+  let baked = false;
+  if (task && hot) {
+    // чего на снимке не нашлось (у ЕГЭ снимается одно условие, у столбиков —
+    // сам пример), то дорисовываем строкой ниже: подпись, поле, кнопка
+    const b = bakeTaskRows(canvas, task, hot, card.color, scale);
+    if (b) { canvas = b.canvas; hot = b.hot; cw = hot.w; ch = hot.h; baked = true; }
+  }
+  const wrapped = wrapIntoCard(canvas, card, scale, cw, ch);
+  canvas = wrapped.canvas;
+  if (task && hot && card.pad) {
+    // доли — от размера карточки с полем, а не от голого снимка
+    const p = card.pad, W = wrapped.W, H = wrapped.H;
+    const fix = r => r && ({ x: (r.x * cw + p) / W, y: (r.y * ch + p) / H, w: r.w * cw / W, h: r.h * ch / H });
+    hot.fields = hot.fields.map(fix); hot.opts = hot.opts.map(fix); hot.check = fix(hot.check);
+    hot.w = W; hot.h = H;
+  }
+  if (task && hot && !baked && hot.fields.length && hot.style) {
     // фон поля в тренажёре полупрозрачный (стекло поверх панели) — живое
     // поле с тем же rgba просвечивало бы нарисованный под ним «?». Берём
-    // готовый цвет пикселя со снимка у левого края поля, внутри рамки
+    // готовый цвет пикселя с собранной карточки у левого края поля
     try {
       const f = hot.fields[0];
       const px = canvas.getContext('2d').getImageData(
@@ -4574,13 +4771,15 @@ async function captureTrainerNode(el, task){
       hot.style.inBg = 'rgb(' + px[0] + ',' + px[1] + ',' + px[2] + ')';
     } catch (e) {}
   }
-  if (task && hot) {
-    // чего на снимке не нашлось (у ЕГЭ снимается одно условие, у столбиков —
-    // сам пример), то дорисовываем строкой ниже: подпись, поле, кнопка
-    const baked = bakeTaskRows(canvas, task, hot, bgColor, scale);
-    if (baked) { canvas = baked.canvas; hot = baked.hot; }
-  }
-  return { dataUrl: canvas.toDataURL('image/png'), hot: (task && hot && hotIsUsable(task, hot)) ? hot : null };
+  return {
+    dataUrl: canvas.toDataURL('image/png'),
+    hot: (task && hot && hotIsUsable(task, hot)) ? hot : null,
+    // скругление — долей ширины: картинка на доске масштабируется целиком
+    card: { r: +(wrapped.R / wrapped.W).toFixed(5) },
+    // размер карточки в CSS-пикселях тренажёра, поле вокруг содержимого и
+    // цвет карточки — для изменения размера на доске (промпт №70)
+    css: { w: wrapped.W, h: wrapped.H, pad: card.pad, bg: card.color },
+  };
 }
 
 // собрать список узлов текущего задания по TRAINER_CAPTURE — см. комментарий
@@ -4671,7 +4870,12 @@ function findFreeSpotInView(w, h){
   // на экране всё занято — ближайшее свободное место рядом с экраном;
   // камера потом подъедет к нему (revealWorldRect в insertTaskImage), чтобы
   // задание всё равно появилось на глазах, а не легло поверх другого
-  const around = { x: v.x - v.w, y: v.y - v.h, w: v.w * 3, h: v.h * 3 };
+  // (только в пределах самой доски: за её краем камера упирается в
+  // clampCam, и задание, положенное туда, так и осталось бы под верхней
+  // панелью — поймано на проверке промпта №70)
+  const ax0 = Math.max(v.x - v.w, 0), ay0 = Math.max(v.y - v.h, 0);
+  const ax1 = Math.min(v.x + 2 * v.w, totalW()), ay1 = Math.min(v.y + 2 * v.h, totalH());
+  const around = { x: ax0, y: ay0, w: Math.max(0, ax1 - ax0), h: Math.max(0, ay1 - ay0) };
   const near = nearestFreeSpot(around, w, h, obs, cx, cy);
   if (near) return near;
   // задание крупнее экрана или вокруг совсем тесно — в центр с каскадом
@@ -4717,7 +4921,11 @@ function revealWorldRect(r){
 // размер картинки задания на доске: предел крупнее, чем у обычной вставленной
 // картинки (это не иллюстрация, а само задание — его читают и решают)
 async function taskImageSize(dataUrl){
-  const size = await loadImageSize(dataUrl);
+  // через кэш доски (getImg), а не отдельную картинку: задание появляется
+  // сразу готовым, без кадра с заглушкой «Загрузка…» (промпт №70)
+  const im = getImg(dataUrl);
+  if (!(im.complete && im.naturalWidth)) await new Promise(r => { im.addEventListener('load', r, { once: true }); im.addEventListener('error', r, { once: true }); });
+  const size = { w: im.naturalWidth || 300, h: im.naturalHeight || 200 };
   const maxDim = 520;
   let w = size.w, h = size.h;
   if (w > maxDim || h > maxDim){ const s = maxDim / Math.max(w, h); w *= s; h *= s; }
@@ -4727,8 +4935,35 @@ async function taskImageSize(dataUrl){
 // вставка одной готовой картинки задания на доску — тот же формат объекта,
 // что и у обычной вставленной картинки (см. imgModalInsert выше).
 // place(w, h) → {x, y} — куда класть (по умолчанию — свободное место на экране)
-async function insertTaskImage(dataUrl, task, gen, place){
+/* ── Промпт №70: размер новых заданий ──
+   Новое задание — в том же масштабе, что последнее добавленное (s — сколько
+   единиц доски на CSS-пиксель тренажёра), и, если у последнего меняли
+   ширину, — той же ширины (только для того же вида узла: ширину условия
+   ЕГЭ на столбик переносить бессмысленно). Заданий ещё нет — обычный размер.
+   «Последнее» — по времени добавления (addedAt), а не по месту в списке:
+   порядок в B.objects меняют «на передний план» и отмена. */
+function lastTaskLook(){
+  if (!B || !Array.isArray(B.objects)) return null;
+  let best = null;
+  B.objects.forEach(o => {
+    if (o.type !== 'image' || !o.css || !o.css.w || !o.addedAt) return;
+    if (!best || o.addedAt > best.addedAt) best = o;
+  });
+  if (!best) return null;
+  return { s: best.w / best.css.w, cw: best.css.cw || null, node: best.gen ? best.gen.node : null };
+}
+function widthForNewTask(gen){
+  const look = lastTaskLook();
+  return (look && look.cw && gen && gen.node && gen.node === look.node) ? look.cw : null;
+}
+// shot — результат captureTrainerNode (card, css); cw — заданная ширина узла
+async function insertTaskImage(dataUrl, task, gen, place, shot, cw){
+  const card = shot && shot.card;
   const sz = await taskImageSize(dataUrl);
+  const look = lastTaskLook();
+  if (shot && shot.css && look){
+    sz.w = shot.css.w * look.s; sz.h = shot.css.h * look.s;
+  }
   const spot = place ? place(sz.w, sz.h) : findFreeSpotInView(sz.w, sz.h);
   const pt = { x: spot.x, y: spot.y };
   // Промпт №66: задание с тренажёра сразу закреплено — ластиком его не
@@ -4737,6 +4972,9 @@ async function insertTaskImage(dataUrl, task, gen, place){
   const obj = { id: uid(), type:'image', src: dataUrl, points:[pt], w: sz.w, h: sz.h, natW: sz.natW, natH: sz.natH, locked: true };
   if (task) obj.task = task;
   if (gen) obj.gen = gen;   // Промпт №68: из чего делать «ещё такое же»
+  if (card && card.r > 0) obj.card = card;   // Промпт №70: скругление карточки (renderImageObject)
+  if (shot && shot.css) obj.css = Object.assign({}, shot.css, cw ? { cw } : {});
+  obj.addedAt = Date.now();
   pushUndo();
   B.objects.push(obj);
   revealWorldRect({ x: pt.x, y: pt.y, w: sz.w, h: sz.h });
@@ -4759,8 +4997,9 @@ trainersAddBtn.addEventListener('click', async () => {
         // ответ читаем до снимка — пока на странице то же задание, что снимаем
         const info = trainerTaskInfo(win, trainersOpenId, el);
         const gen = trainerGenInfo(win, trainersOpenId, trainersOpenHref, el);
-        const shot = await captureTrainerNode(el, info);
-        await insertTaskImage(shot.dataUrl, (info && shot.hot) ? Object.assign({ v: 1 }, info, { hot: shot.hot }) : null, gen);
+        const cw = widthForNewTask(gen);
+        const shot = await captureTrainerNode(el, info, { width: cw });
+        await insertTaskImage(shot.dataUrl, (info && shot.hot) ? Object.assign({ v: 1 }, info, { hot: shot.hot }) : null, gen, null, shot, cw);
         added++;
         scheduleRedraw();   // каждое задание — на глазах, не дожидаясь остальных из пакета
       } finally {
@@ -4956,10 +5195,18 @@ function stripTrainerSnap(st){
   if (Array.isArray(out.addedTasks)) out.addedTasks = [];
   return plainCopy(out);
 }
+const GEN_HTML_MAX = 300000;
 function trainerGenInfo(win, tid, href, el){
   if (!win || !tid || !href || !el || el.id === 'theoryContent') return null;
   try {
     const base = { v: 1, tid, href, vw: Math.round(win.innerWidth || 0) || null };
+    // Промпт №70: вёрстка самого задания — чтобы перестроить его под новую
+    // ширину, не придумывая заново (у движков №9 и карточек «+» по-другому
+    // то же задание не воспроизвести). node — какой узел снимали: ширину,
+    // заданную у одного вида узлов, переносим только на такой же
+    const html = el.innerHTML;
+    if (html && html.length <= GEN_HTML_MAX) base.html = html;
+    base.node = el.id || (el.classList.contains('added-card-question') ? 'card' : el.className || 'node');
     if (isEgeLikeTrainer(tid)){
       const card = el.closest ? el.closest('.added-task-card[data-idx]') : null;
       const n = trainerEval(win, 'S.n');
@@ -5027,6 +5274,28 @@ function genFrameFor(href, vw){
 const genWait = ms => new Promise(r => setTimeout(r, ms));
 
 // в кадре — новое задание того же типа и уровня
+// в кадре — то же задание, что в объекте (для перестройки под ширину):
+// экран нужного типа; само содержимое узла потом подставляется из gen.html
+async function genShowSameInFrame(win, g){
+  const doc = win.document;
+  if (g.kind === 'ege'){
+    win.eval('openTask(' + JSON.stringify(g.n) + ', ' + JSON.stringify(g.pid) + '); if (typeof render === "function") render();');
+  } else if (g.kind === 'engine'){
+    if (typeof win.openModeById !== 'function') throw new Error('нет openModeById');
+    win.openModeById(g.mode);
+    await genWait(150);
+    if (g.lvl != null){
+      const b = doc.querySelector('#levels .lvl[data-id="' + g.lvl + '"]');
+      if (b && !b.classList.contains('active')) b.click();
+    }
+  } else {
+    const api = win.__trainerState;
+    const snap = plainCopy(g.snap);
+    if (api && api.apply) api.apply(snap); else win.tsApplyState(snap);
+  }
+  await genWait(250);
+}
+
 async function genNewTaskInFrame(win, g){
   const doc = win.document;
   if (g.kind === 'ege'){
@@ -5074,12 +5343,13 @@ function makeSimilarTask(srcId, dir){
       const info = trainerTaskInfo(win, g.tid, el);
       const gen = trainerGenInfo(win, g.tid, g.href, el) || plainCopy(g);
       if (g.vw) gen.vw = g.vw;
-      const shot = await captureTrainerNode(el, info);
+      const cw = widthForNewTask(gen);
+      const shot = await captureTrainerNode(el, info, { width: cw });
       // пока снимали, могли уйти с доски или удалить исходное задание
       const srcNow = taskObjById(srcId);
       if (B !== boardAtStart || !srcNow) throw new Error('доска сменилась');
       const task = (info && shot.hot) ? Object.assign({ v: 1 }, info, { hot: shot.hot }) : null;
-      const obj = await insertTaskImage(shot.dataUrl, task, gen, (w, h) => findSpotBeside(srcNow, w, h, dir));
+      const obj = await insertTaskImage(shot.dataUrl, task, gen, (w, h) => findSpotBeside(srcNow, w, h, dir), shot, cw);
       saveDB();
       scheduleRedraw();
       return obj;
@@ -5090,6 +5360,88 @@ function makeSimilarTask(srcId, dir){
   const p = genChain.then(run, run);
   genChain = p.catch(() => {});
   return p;
+}
+
+/* ── Промпт №70: ширина задания — перестройка, а не растяжение ──
+   За боковой маркер ширина карточки меняется без масштаба: задание заново
+   снимается в невидимом кадре тренажёра с той же вёрсткой (gen.html) и
+   новой шириной узла — текст и формулы переносятся по ней, размер шрифта
+   прежний. Пока тянут, доска показывает черновик (taskWidthPreview: фон
+   карточки новой ширины и прежний снимок, обрезанный по ней) — снимок
+   занимает доли секунды, делать его на каждое движение мыши нельзя.
+   Отмена — как у любой правки: pushUndo был в начале перетаскивания. */
+const TASK_MIN_CW = 220, TASK_MAX_CW = 1400;   // ширина карточки, CSS-пиксели тренажёра
+const TASK_MIN_S = 0.45, TASK_MAX_S = 3.5;     // масштаб: единиц доски на CSS-пиксель
+const taskWidthPreview = new Map();            // id → { w (доска), side, busy }
+function taskCanReflow(o){ return !!(o && o.type === 'image' && o.css && o.css.w && o.gen && o.gen.html != null); }
+function reflowTaskWidth(id, worldW, side){
+  const run = async () => {
+    const obj = taskObjById(id);
+    if (!taskCanReflow(obj)) throw new Error('нет вёрстки задания');
+    const g = obj.gen, boardAtStart = B;
+    const s = obj.w / obj.css.w;
+    const cardW = Math.max(TASK_MIN_CW, Math.min(TASK_MAX_CW, worldW / s));
+    const cw = Math.round(cardW - 2 * (obj.css.pad || 0));
+    const frame = await genFrameFor(g.href, g.vw);
+    const win = frame.contentWindow;
+    await genShowSameInFrame(win, g);
+    const nodes = collectTrainerCaptureNodes(win.document, g.tid);
+    const main = nodes.filter(n => n.el.id !== 'theoryContent' && !(n.el.closest && n.el.closest('.added-task-card')));
+    nodes.forEach(n => { if (n !== main[0] && n.restore) n.restore(); });
+    if (!main.length) throw new Error('в тренажёре не нашлось задания');
+    const { el, restore } = main[0];
+    try {
+      const t = obj.task ? plainCopy(obj.task) : null;
+      const shot = await captureTrainerNode(el, t, { html: g.html, width: cw });
+      const o = taskObjById(id);
+      if (!o || B !== boardAtStart) throw new Error('доска сменилась');
+      // живые поля обязаны найтись и на перестроенном — иначе лучше оставить как было
+      if (o.task && !shot.hot) throw new Error('на перестроенном задании не нашлось поле ответа');
+      // картинку грузим в кэш доски заранее: иначе на кадр-другой вместо
+      // задания мелькнула бы заглушка «Загрузка…»
+      const im = getImg(shot.dataUrl);
+      if (!(im.complete && im.naturalWidth)) await new Promise(r => { im.addEventListener('load', r, { once: true }); im.addEventListener('error', r, { once: true }); });
+      const size = { w: im.naturalWidth || 300, h: im.naturalHeight || 200 };
+      const nw = shot.css.w * s, nh = shot.css.h * s;
+      const x = side === 'iw' ? o.points[0].x + o.w - nw : o.points[0].x;
+      const oldSrc = o.src;
+      o.src = shot.dataUrl; o.natW = size.w; o.natH = size.h;
+      // прежний снимок в памяти не держим (раскрытая картинка весит много,
+      // раздел 6 HANDOFF); понадобится отмене — загрузится заново
+      if (!B.objects.some(x => x.src === oldSrc)) delete imgCache[oldSrc];
+      o.points[0] = { x, y: o.points[0].y };
+      o.w = nw; o.h = nh;
+      if (shot.card && shot.card.r > 0) o.card = shot.card;
+      o.css = Object.assign({}, shot.css, { cw });
+      if (o.task) o.task.hot = shot.hot;
+      touchTaskImage(o);
+      saveDB(); scheduleRedraw(); updateContextMenu();
+      return o;
+    } finally {
+      if (restore) restore();
+    }
+  };
+  const p = genChain.then(run, run);
+  genChain = p.catch(() => {});
+  return p;
+}
+// картинку задания подменили — старые живые поля и кэш картинки не годятся
+function touchTaskImage(o){
+  const rec = taskEls.get(o.id);
+  if (rec){ rec.root.remove(); taskEls.delete(o.id); }
+}
+function finishTaskWidthDrag(id){
+  const pv = taskWidthPreview.get(id);
+  if (!pv) return;
+  const o = taskObjById(id);
+  if (!o || Math.abs(pv.w - o.w) < 1){ taskWidthPreview.delete(id); scheduleRedraw(); return; }
+  pv.busy = true; scheduleRedraw();
+  reflowTaskWidth(id, pv.w, pv.side)
+    .catch(err => {
+      console.error('[доска] не удалось перестроить задание под ширину', err);
+      if (taskEls.get(id)) taskFlash(id, 'Не получилось изменить ширину — попробуйте ещё раз');
+    })
+    .finally(() => { taskWidthPreview.delete(id); scheduleRedraw(); });
 }
 
 /* ── чистка клона перед снимком и замер мест под живые элементы ── */
@@ -5195,7 +5547,8 @@ function bakeTaskRows(canvas, task, hot, bgColor, scale){
   const out = document.createElement('canvas');
   out.width = Math.round(totalW * scale); out.height = Math.round(totalH * scale);
   const c = out.getContext('2d');
-  c.fillStyle = bgColor; c.fillRect(0, 0, out.width, out.height);
+  // фон не заливаем: строка ответа ложится на карточку (wrapIntoCard), а
+  // bgColor — цвет карточки, по нему только выбираем светлые/тёмные цвета
   c.drawImage(canvas, 0, 0);
   c.scale(scale, scale);
   c.font = '600 ' + FONT + 'px ' + UI_FONT_FAMILY;
@@ -5843,7 +6196,9 @@ function syncTaskOverlays(){
       if (x + o.w < vx0 || x > vx1 || y + o.h < vy0 || y > vy1) continue;
       seen.add(o.id);
       let rec = taskEls.get(o.id);
-      const shape = (live ? 'L' : '') + (o.gen ? 'G' : '');
+      // форма живого слоя: у задания могли смениться места полей (новая
+      // ширина, её отмена, правка собеседника) — тогда слой собираем заново
+      const shape = (live ? 'L' + JSON.stringify(o.task.hot) : '') + (o.gen ? 'G' : '');
       if (rec && rec.shape !== shape){ rec.root.remove(); taskEls.delete(o.id); rec = null; }
       if (!rec){ rec = buildTaskOverlay(o); rec.shape = shape; taskEls.set(o.id, rec); }
       const sig = live ? JSON.stringify(o.task.st || null) : '';
@@ -5859,6 +6214,8 @@ function syncTaskOverlays(){
       // задания внахлёст: живые элементы верхнего (позже добавленного) — сверху
       root.style.zIndex = String(oi + 1);
       root.style.left = p0.x + 'px'; root.style.top = p0.y + 'px';
+      // пока тянут ширину, поля старого снимка не на своих местах — прячем
+      root.style.visibility = taskWidthPreview.has(o.id) ? 'hidden' : '';
       root.style.width = sw + 'px'; root.style.height = sh + 'px';
       // шрифт и скругления — в масштабе картинки: сколько экранных пикселей
       // приходится на один CSS-пиксель тренажёра
