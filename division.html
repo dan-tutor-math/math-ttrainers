@@ -662,6 +662,7 @@ html[data-focus="on"] .hint{
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="quick-answer.js"></script>
 <script src="trainer-multi.js"></script>
 <script>
 /* ───────────── уровни ───────────── */
@@ -1127,10 +1128,14 @@ function finish(rem, truncated){
       : `${P.dividend} : ${P.divisor} = ${S.qStr}`;
   }
   // звёзды
-  let stars = S.helped ? 1 : (S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1));
-  document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
-  totalSolved++; if(!P.custom) solvedByLevel[curLevel]++;
-  streak = (S.errTotal===0) ? streak+1 : 0;
+  // Промпт №67: пример уже закрыт ответом сразу (quick-answer.js) — второй
+  // раз не засчитываем, шаги были разбором
+  if (!QuickAnswer.settled(S)) {
+    let stars = S.helped ? 1 : (S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1));
+    document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
+    totalSolved++; if(!P.custom) solvedByLevel[curLevel]++;
+    streak = (S.errTotal===0) ? streak+1 : 0;
+  }
   document.getElementById('stSolved').textContent = totalSolved;
   document.getElementById('stStreak').textContent = streak;
   setHint(S.errTotal===0 ? 'Без единой ошибки — блестяще!' : `Решено! Ошибок по пути: ${S.errTotal}.`, S.errTotal===0);
@@ -1350,6 +1355,49 @@ newProblem();
    синхронизируем целиком: сам пример (P), ход решения (S) и уровень. Тогда в
    общей сессии учитель и ученик реально смотрят на один и тот же столбик, а
    не каждый на свой. Доска подмешивается сюда же. */
+/* ═══ Промпт №67: ответ можно вписать сразу, без решения по шагам ═══
+   Панель «Ответ» над панелью шагов — quick-answer.js. Итог лежит в S.quick
+   и уходит собеседнику вместе с S; счёт ведём здесь, как в finish(). */
+QuickAnswer.mount({
+  fields: P => {
+    // частное и остаток — двумя полями, как их и записывают
+    if (P.q != null && Number(P.r) > 0) return [
+      { id: 'q', label: 'Частное:', type: 'num', value: String(P.q) },
+      { id: 'r', label: 'Остаток:', type: 'num', value: String(P.r) },
+    ];
+    if (P.q != null) return [{ id: 'main', label: '', type: 'num', value: String(P.q) }];
+    // «Свой пример»: частное не хранится — считаем; бесконечную дробь
+    // (уголок останавливается на 6 знаках) сразу ответом не проверить
+    const D = Number(P.dividend), d = Number(P.divisor);
+    if (!d) return null;
+    const q = D / d;
+    if (Math.abs(Math.round(q * 1e6) - q * 1e6) > 1e-6) return null;
+    return [{ id: 'main', label: '', type: 'num', value: String(+q.toFixed(6)) }];
+  },
+  getP: () => P, getS: () => S,
+  onRight(){
+    // засчитываем так же, как finish() после шагов: звёзды по ошибкам, решено, серия
+    const stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
+    document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
+    totalSolved++; if(!P.custom) solvedByLevel[curLevel]++;
+    streak = (S.errTotal===0) ? streak+1 : 0;
+    document.getElementById('stSolved').textContent = totalSolved;
+    document.getElementById('stStreak').textContent = streak;
+    renderLevels();
+  },
+  onWrong(){
+    S.errTotal++;
+    streak = 0;
+    document.getElementById('stStreak').textContent = streak;
+  },
+  onFail(){
+    // вторая ошибка: как в ОГЭ — пример закрыт, но не решён
+    streak = 0;
+    document.getElementById('stStreak').textContent = streak;
+    document.getElementById('stStars').textContent = '☆☆☆';
+  },
+});
+
 function tsGetState(){
   const base = {
     solo: true,                                   // метка: тренажёр без выбора типов

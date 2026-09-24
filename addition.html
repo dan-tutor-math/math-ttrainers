@@ -718,6 +718,7 @@ html[data-focus="on"] .hint{
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="quick-answer.js"></script>
 <script src="trainer-multi.js"></script>
 <script>
 const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
@@ -1126,10 +1127,14 @@ function finish(){
   S.phase='done';
   renderAll(); setPrompt(); renderInputs();
   document.getElementById('result').textContent = `${P.topVal} + ${P.bottomVal} = ${P.topVal+P.bottomVal}`;
-  let stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
-  document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
-  totalSolved++; if(!P.custom) solvedByLevel[curLevel]++;
-  streak = (S.errTotal===0) ? streak+1 : 0;
+  // Промпт №67: пример уже закрыт ответом сразу (quick-answer.js) — второй
+  // раз не засчитываем, шаги были разбором
+  if (!QuickAnswer.settled(S)) {
+    let stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
+    document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
+    totalSolved++; if(!P.custom) solvedByLevel[curLevel]++;
+    streak = (S.errTotal===0) ? streak+1 : 0;
+  }
   document.getElementById('stSolved').textContent = totalSolved;
   document.getElementById('stStreak').textContent = streak;
   setHint(S.errTotal===0 ? 'Без единой ошибки — блестяще!' : `Решено! Ошибок по пути: ${S.errTotal}.`, S.errTotal===0);
@@ -1364,6 +1369,35 @@ setupAutoHeightAnimation(document.getElementById('mainSheet'));
    синхронизируем целиком: сам пример (P), ход решения (S) и уровень. Тогда в
    общей сессии учитель и ученик реально смотрят на один и тот же столбик, а
    не каждый на свой. Доска подмешивается сюда же. */
+/* ═══ Промпт №67: ответ можно вписать сразу, без решения по шагам ═══
+   Панель «Ответ» над панелью шагов — quick-answer.js. Итог лежит в S.quick
+   и уходит собеседнику вместе с S; счёт ведём здесь, как в finish(). */
+QuickAnswer.mount({
+  fields: P => [{ id: 'main', label: '', type: 'num', value: String(P.topVal + P.bottomVal) }],
+  getP: () => P, getS: () => S,
+  onRight(){
+    // засчитываем так же, как finish() после шагов: звёзды по ошибкам, решено, серия
+    const stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
+    document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
+    totalSolved++; if(!P.custom) solvedByLevel[curLevel]++;
+    streak = (S.errTotal===0) ? streak+1 : 0;
+    document.getElementById('stSolved').textContent = totalSolved;
+    document.getElementById('stStreak').textContent = streak;
+    renderLevels();
+  },
+  onWrong(){
+    S.errTotal++;
+    streak = 0;
+    document.getElementById('stStreak').textContent = streak;
+  },
+  onFail(){
+    // вторая ошибка: как в ОГЭ — пример закрыт, но не решён
+    streak = 0;
+    document.getElementById('stStreak').textContent = streak;
+    document.getElementById('stStars').textContent = '☆☆☆';
+  },
+});
+
 function tsGetState(){
   const base = {
     solo: true,                                   // метка: тренажёр без выбора типов

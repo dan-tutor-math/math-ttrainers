@@ -31,6 +31,7 @@ TRAINERS = [
     "oge14", "oge15_18", "oge19", "powers", "ege_prof", "ege_base", "oge_part2",
     "addition", "subtraction", "multiplication", "division",
     "linear", "quadratic", "fraction_multiply", "fraction_divide",
+    "gcd",
 ]
 OTHER = ["index", "boards", "addition_embed", "subtraction_embed",
          "multiplication_embed", "division_embed"]

@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#0B0E1A">
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Тренажёр: умножение дробей</title>
+<title>Тренажёр: наибольший общий делитель (НОД)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
@@ -538,6 +538,97 @@ html[data-focus="on"] .hint{
 .home-btn{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
 .home-btn:hover{border-color:var(--ink)}
 .home-btn:active{transform:scale(.92)}
+/* ═══ Промпт №65: тренажёр «НОД» — всё, чего нет в остальных тренажёрах ═══
+   Остальное (лист, панель, клавиатура, доска, статистика) — общая вёрстка
+   дробных тренажёров, скопирована без изменений, чтобы страница выглядела и
+   вела себя как соседние. */
+
+/* строка разделов стоит над уровнями и выглядит так же, но крупнее —
+   это три разных способа, а не три ступени сложности */
+.sections{margin-bottom:12px}
+.sections .lvl{font-size:15px;padding:10px 18px}
+.sections .lvl .sec-num{opacity:.6;margin-right:6px}
+.lvl-desc{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:14px;margin:-6px 0 14px;max-height:40px}
+html[data-card="1"] .lvl-desc{display:none}
+
+/* краткая теория раздела — над заданиями; общие свойства и ловушки — внизу */
+.sec-theory{margin:0 0 16px}
+.sec-theory .tcard{min-width:0}
+.tintro{font-family:var(--font-ui);font-size:14px;color:var(--muted-4);line-height:1.55;margin-bottom:8px}
+.tintro b{color:var(--ink)}
+.tex{font-family:var(--font-mono);font-size:15px;color:var(--ink);line-height:1.7;margin:8px 0 4px;padding:10px 14px;background:var(--card);border:1px solid var(--glass-border);border-radius:12px;overflow-x:auto}
+.tex .ln{display:block;white-space:nowrap}
+.tex .ok{color:var(--ok);font-weight:700}
+.tex-cols{display:flex;gap:26px;flex-wrap:wrap}
+.tex-tab{border-collapse:collapse;font-family:var(--font-mono);font-size:15px;color:var(--ink)}
+.tex-tab td{padding:0 10px;text-align:right;line-height:1.6}
+.tex-tab td.fr{border-left:2px solid var(--ink);text-align:left;color:var(--teacher)}
+
+/* условие задания: его же уносит «В подборку» и снимок на доску */
+.task-line{font-family:var(--font-ui);font-weight:600;font-size:clamp(20px,4vw,25px);color:var(--pencil);text-align:center;margin-bottom:calc(var(--cell)*.7);line-height:1.35}
+.task-line .tl{display:block;font-family:var(--font-mono);font-weight:500;color:var(--ink);font-size:clamp(17px,3.4vw,22px);margin-top:6px;white-space:nowrap}
+
+#work{font-family:var(--font-mono);color:var(--ink);display:flex;flex-direction:column;gap:14px;align-items:center}
+
+/* раздел 1: строки делителей */
+/* строки выровнены по левому краю одним блоком — так столбцы делителей
+   легче сравнивать глазами, чем в строках, отцентрованных каждая по-своему */
+.dv-list{display:flex;flex-direction:column;gap:12px;align-items:flex-start;max-width:100%}
+.dv-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:flex-start;max-width:100%}
+.nw{white-space:nowrap}
+.dv-lbl{font-family:var(--font-ui);font-weight:600;font-size:17px;color:var(--pencil);white-space:nowrap;margin-right:4px}
+.dv-row.active .dv-lbl{color:var(--ink)}
+.dv-row.dim{opacity:.45}
+.chips{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{min-width:38px;height:38px;padding:0 8px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:var(--card);border:1.5px solid var(--grid);color:var(--ink);font-family:var(--font-mono);font-size:20px;line-height:1;user-select:none;-webkit-user-select:none}
+.chip.tap{cursor:pointer;outline:2px dashed var(--teacher);outline-offset:-3px}
+.chip.tap:hover{background:rgba(201,58,43,.08)}
+.chip.common{background:var(--ok-tint);border-color:var(--ok);color:var(--ok);font-weight:700;outline:none}
+.chip.ph{color:var(--muted-7);border-style:dashed}
+.chip.bad{animation:shake .35s;border-color:var(--teacher);color:var(--teacher)}
+.common-line{font-family:var(--font-ui);font-weight:500;font-size:18px;color:var(--muted-3);text-align:center}
+.common-line b{font-family:var(--font-mono);color:var(--ok)}
+.gcd-result{font-family:var(--font-ui);font-weight:700;font-size:clamp(20px,4vw,26px);color:var(--ok);text-align:center}
+
+/* раздел 2: разложение «столбиком» — справа от черты простой делитель,
+   слева результат деления, внизу 1 */
+.fcols{display:flex;flex-wrap:wrap;gap:24px 48px;justify-content:center;align-items:flex-start}
+.fcol{display:flex;flex-direction:column;align-items:center}
+.fcol.dim{opacity:.4}
+.ftab{border-collapse:collapse;font-family:var(--font-mono);font-size:22px}
+.ftab td{padding:2px 12px;height:42px;text-align:right;min-width:58px;color:var(--ink)}
+.ftab td.fr{border-left:3px solid var(--ink);text-align:left;color:var(--teacher)}
+.ftab-res{font-family:var(--font-mono);font-size:18px;color:var(--ok);margin-top:8px;text-align:center;white-space:nowrap}
+.inl{width:66px;font-family:var(--font-mono);font-size:20px;text-align:center;border:2px solid var(--teacher);border-radius:8px;padding:3px 0;color:var(--teacher);background:var(--card)}
+.inl:focus{outline:none;border-color:var(--ink);color:var(--ink)}
+.inl.shake{animation:shake .35s}
+.fline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;justify-content:center;max-width:100%}
+.fl-lbl{font-family:var(--font-mono);font-size:22px;color:var(--pencil);margin-right:6px;white-space:nowrap}
+.dot-sep{color:var(--muted-1);font-size:20px}
+
+/* раздел 3: цепочка деления с остатком */
+.eu-block{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.eu-title{font-family:var(--font-ui);font-weight:600;font-size:17px;color:var(--pencil)}
+.eu-row{font-family:var(--font-mono);font-size:22px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--ink)}
+.eu-rem{color:var(--muted-3);font-size:19px;display:inline-flex;align-items:center;gap:6px}
+.eu-rem.zero{color:var(--ok);font-weight:700}
+.eu-res{color:var(--ok);font-family:var(--font-ui);font-weight:700;font-size:18px}
+
+input.num.solo{border-radius:14px;border-right:1px solid var(--glass-border);width:220px;max-width:100%}
+input.num.solo:focus{border-color:var(--ink)}
+
+@media(max-width:480px){
+  .chip{min-width:32px;height:34px;font-size:17px;padding:0 6px}
+  .ftab{font-size:19px}
+  .ftab td{min-width:46px;height:38px;padding:2px 8px}
+  .eu-row{font-size:19px}
+  .fl-lbl{font-size:19px}
+  .inl{width:56px;font-size:18px}
+  .sections .lvl{font-size:14px;padding:9px 12px}
+}
+.lvl-desc{overflow:hidden;transition:max-height .32s ease, opacity .22s ease, margin .32s ease}
+html[data-focus="on"] .lvl-desc{max-height:0;opacity:0;margin:0;pointer-events:none}
+
 </style>
 </head>
 <body>
@@ -667,10 +758,18 @@ html[data-focus="on"] .hint{
 </div>
 
 <div class="wrap">
-  <h1>Умножение дробей</h1>
-  <div class="sub">выбирай сам, что сокращать — крест-накрест или внутри одной дроби, любые числа</div>
+  <h1>Наибольший общий делитель</h1>
+  <div class="sub">три способа найти НОД — перебором делителей, разложением на простые множители и алгоритмом Евклида</div>
+
+  <!-- разделы идут по порядку: сначала самый наглядный способ, потом всё
+       быстрее и «взрослее». Класс levels — чтобы в карточке «+» строка
+       пряталась тем же правилом trainer-multi.js, что и уровни -->
+  <div class="levels sections" id="sections"></div>
+
+  <div class="theory sec-theory" id="secTheory"></div>
 
   <div class="levels" id="levels"></div>
+  <div class="lvl-desc" id="lvlDesc"></div>
 
   <div class="sheet">
     <div class="corner-left">
@@ -681,7 +780,8 @@ html[data-focus="on"] .hint{
       <button class="refresh-btn" id="refreshBtn" title="Обновить пример">⟳</button>
       <span id="taskNum">пример №1</span>
     </div>
-    <div class="frow" id="board"></div>
+    <div class="task-line" id="taskLine"></div>
+    <div id="work"></div>
   </div>
 
   <div class="panel">
@@ -725,21 +825,18 @@ html[data-focus="on"] .hint{
 
   <div class="theory">
     <div class="tcard">
-      <div class="tt">Алгоритм</div>
+      <div class="tt">Три важных свойства</div>
       <ol class="talg">
-        <li>Ищем любые два числа — числитель и знаменатель (не обязательно крест-накрест, можно и в одной дроби) — у которых есть общий делитель.</li>
-        <li>Сначала решаем, НА ЧТО сокращаем — это общий делитель.</li>
-        <li>Потом считаем, что получится у каждого из двух чисел после деления.</li>
-        <li>Повторяем, пока есть, что сокращать.</li>
-        <li>Умножаем все числители между собой, все знаменатели между собой.</li>
-        <li>Если результат ещё сократим — сокращаем и его. Если неправильная дробь — выделяем целую часть.</li>
+        <li><b>НОД(a, a) = a</b> — НОД числа с самим собой равен этому числу.</li>
+        <li><b>НОД(a, 1) = 1</b> — у единицы общий делитель с любым числом только 1.</li>
+        <li>Если НОД равен 1, числа называют <b>взаимно простыми</b>. Например, НОД(8, 15) = 1 — они взаимно простые, хотя ни одно из них не простое.</li>
       </ol>
     </div>
     <div class="tcard">
       <div class="tt">Ловушки</div>
-      <div class="ttrap">⚠ Не путай: сначала находим ДЕЛИТЕЛЬ, и только потом — что получится после деления. Это два разных числа!</div>
-      <div class="ttrap">⚠ Сокращаем числитель со знаменателем — не два числителя и не два знаменателя.</div>
-      <div class="ttrap">⚠ Дробь можно сокращать и «внутри себя», если у её собственных числителя и знаменателя есть общий делитель.</div>
+      <div class="ttrap">⚠ Не путай НОД и НОК. НОД — делитель (меньше или равен числам), НОК — кратное (больше или равно). НОД нужен, чтобы сокращать дроби, НОК — чтобы приводить к общему знаменателю.</div>
+      <div class="ttrap">⚠ При разложении берём только те простые множители, которые есть у обоих чисел, а не все подряд.</div>
+      <div class="ttrap">⚠ Одинаковый множитель берём в меньшей степени: если у одного числа 2³, а у другого 2², берём 2², а не 2³.</div>
     </div>
   </div>
 <div id="boardSpace" aria-hidden="true"></div></div>
@@ -761,154 +858,200 @@ html[data-focus="on"] .hint{
 const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
 const pick = a=>a[ri(0,a.length-1)];
 function gcd(a,b){ while(b){ [a,b]=[b,a%b]; } return a; }
-
-/* ───────── алгоритм: жадное сокращение в любом порядке (проверено на 30000 наборов) ───────── */
-function greedyFullyReduce(fractions){
-  const nums = fractions.map(f=>f.n);
-  const dens = fractions.map(f=>f.d);
-  const events = [];
-  let changed = true;
-  while(changed){
-    changed = false;
-    for(let i=0;i<nums.length && !changed;i++){
-      for(let j=0;j<dens.length && !changed;j++){
-        const g = gcd(nums[i], dens[j]);
-        if(g>1){ nums[i]/=g; dens[j]/=g; events.push({numIdx:i, denIdx:j, g}); changed = true; }
-      }
-    }
-  }
-  const resultNum = nums.reduce((a,b)=>a*b,1);
-  const resultDen = dens.reduce((a,b)=>a*b,1);
-  return {nums, dens, resultNum, resultDen, events};
+function gcdAll(arr){ return arr.reduce((g,x)=>gcd(g,x)); }
+function divisorsOf(n){ const r=[]; for(let d=1; d<=n; d++) if(n%d===0) r.push(d); return r; }
+function isPrime(n){ if(!Number.isInteger(n) || n<2) return false; for(let d=2; d*d<=n; d++) if(n%d===0) return false; return true; }
+function factorize(n){ const f=[]; let m=n; for(let p=2; p*p<=m; p++) while(m%p===0){ f.push(p); m/=p; } if(m>1) f.push(m); return f; }
+const maxPrime = n => { const f=factorize(n); return f[f.length-1]; };
+const prod = a => a.reduce((x,y)=>x*y, 1);
+// общие простые множители с учётом повторов — каждый столько раз, сколько
+// его у того числа, где его меньше (это и есть «меньшая степень»)
+function commonFactors(lists){
+  const counts = lists.map(l=>{ const m={}; l.forEach(p=>{ m[p]=(m[p]||0)+1; }); return m; });
+  const out = [];
+  Object.keys(counts[0]).map(Number).sort((a,b)=>a-b).forEach(p=>{
+    const k = Math.min(...counts.map(c=>c[p]||0));
+    for(let i=0;i<k;i++) out.push(p);
+  });
+  return out;
+}
+// сколько делений с остатком займёт алгоритм Евклида — по этому разводим уровни
+function euclidLen(a,b){ let x=Math.max(a,b), y=Math.min(a,b), n=0; while(y){ [x,y]=[y,x%y]; n++; } return n; }
+// 2 · 2 · 3 · 7 → 2² · 3 · 7: так разложение записано в теории
+const SUP = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'};
+function powForm(list){
+  const m = new Map(); list.slice().sort((a,b)=>a-b).forEach(p=>m.set(p,(m.get(p)||0)+1));
+  return [...m].map(([p,k])=> k>1 ? p+String(k).split('').map(c=>SUP[c]).join('') : String(p)).join(' · ');
+}
+function plural(n, one, few, many){
+  const m10=n%10, m100=n%100;
+  if(m10===1 && m100!==11) return one;
+  if(m10>=2 && m10<=4 && (m100<10 || m100>=20)) return few;
+  return many;
 }
 
-/* ───────── генерация ───────── */
-function genProblem(opts={}){
-  let guard=0;
-  const count = opts.count || 2;
-  const smallRange = opts.smallRange || [1,9];
-  const twoDigitRange = opts.twoDigitRange || [10,16];
-  while(true){
-    guard++; if(guard>20000) throw 'genProblem: не удалось сгенерировать';
-    const totalSlots = count*2; // числитель+знаменатель для каждой дроби
-    let twoDigitCount = 0;
-    if(opts.twoDigitCountRange){
-      twoDigitCount = Math.min(ri(opts.twoDigitCountRange[0], opts.twoDigitCountRange[1]), totalSlots);
-    }
-    const slots = [...Array(totalSlots).keys()];
-    for(let i=slots.length-1;i>0;i--){ const j=ri(0,i); [slots[i],slots[j]]=[slots[j],slots[i]]; }
-    const twoDigitSlots = new Set(slots.slice(0, twoDigitCount));
-
-    const fractions = [];
-    for(let k=0;k<count;k++){
-      const nSlot = k*2, dSlot = k*2+1;
-      const n = twoDigitSlots.has(nSlot) ? ri(twoDigitRange[0], twoDigitRange[1]) : ri(smallRange[0], smallRange[1]);
-      const d = twoDigitSlots.has(dSlot) ? ri(twoDigitRange[0], twoDigitRange[1]) : ri(Math.max(2,smallRange[0]), smallRange[1]);
-      fractions.push({n,d});
-    }
-    if(opts.wholeLast) fractions[fractions.length-1] = {n: ri(2, opts.maxWhole||9), d: 1};
-    const sim = greedyFullyReduce(fractions);
-    const cancelCount = sim.events.length;
-    if(opts.forbidCancel && cancelCount>0) continue;
-    if(opts.minCancel!==undefined && cancelCount<opts.minCancel) continue;
-    if(opts.maxCancel!==undefined && cancelCount>opts.maxCancel) continue;
-    const isImproper = sim.resultNum >= sim.resultDen;
-    if(opts.requireImproper && !isImproper) continue;
-    if(opts.forbidImproper && isImproper) continue;
-    return {fractions, sim, isImproper};
+/* ───────── генерация ─────────
+   Числа подбираются под уровень так же, как в приложенных примерах: пары до
+   30 для разминки, трёхзначные вроде 975 и 750 или 572 и 440, тройки вроде
+   80, 140 и 56 или 170, 306 и 255. Для трёх чисел НОД первых двух обязан быть
+   больше общего — иначе третье число ничего не меняло бы в решении. */
+function genNums(o){
+  const coprime = Math.random() < (o.coprimeChance || 0);
+  for(let guard=0; guard<200000; guard++){
+    const nums = [];
+    while(nums.length < o.count){ const v = ri(o.min, o.max); if(!nums.includes(v)) nums.push(v); }
+    const g = gcdAll(nums);
+    if(coprime ? g!==1 : g < (o.minG || 2)) continue;
+    if(o.count===3 && gcd(nums[0], nums[1]) === g) continue;
+    if(o.ok && !o.ok(nums, g)) continue;
+    return { nums };
   }
+  throw 'genNums: не удалось сгенерировать';
 }
+// раздел 2, уровень 1 — как в задании из учебника: числа уже разложены
+function genGiven(){
+  const SMALL = [2,3,5,7], ALL = [2,3,5,7,11,13,17,19];
+  for(let guard=0; guard<50000; guard++){
+    const coprime = Math.random() < .1;
+    const common = coprime ? [] : Array.from({length: ri(1,3)}, ()=>pick(SMALL));
+    const aEx = Array.from({length: ri(2,4)}, ()=>pick(ALL));
+    const bEx = Array.from({length: ri(1,3)}, ()=>pick(ALL));
+    // «лишние» множители не должны совпадать, иначе общих станет больше задуманного
+    if(aEx.some(p=>bEx.includes(p))) continue;
+    const a = common.concat(aEx).sort((x,y)=>x-y), b = common.concat(bEx).sort((x,y)=>x-y);
+    if(a.length>7 || b.length>7 || b.length<2) continue;
+    return { nums:[prod(a), prod(b)], given:[a, b] };
+  }
+  throw 'genGiven: не удалось сгенерировать';
+}
+const enoughDivs = k => nums => nums.every(n=>divisorsOf(n).length >= k);
 
-const LEVELS = [
-  {id:0, name:'Уровень 1', desc:'Разминка — 1–2 двузначных числа', gen:()=>genProblem({count:2, twoDigitCountRange:[1,2], forbidCancel:true, forbidImproper:true})},
-  {id:1, name:'Уровень 2', desc:'Числа побольше — 1–3 двузначных', gen:()=>genProblem({count:2, twoDigitCountRange:[1,3]})},
-  {id:2, name:'Уровень 3', desc:'Цепочка из трёх дробей', gen:()=>genProblem({count:3, twoDigitCountRange:[1,3], minCancel:2})},
-  {id:3, name:'Уровень 4', desc:'Большие числа, 3–4 дроби', gen:()=>genProblem({count:ri(0,1)?4:3, twoDigitCountRange:[2,6], twoDigitRange:[10,90]})},
-  {id:4, name:'Экзамен',   desc:'вперемешку'},
+const SECTIONS = [
+  { id:0, title:'Перебор делителей', short:'Перебор',
+    levels:[
+      { name:'Уровень 1', desc:'Два числа до 30', gen:()=>genNums({count:2, min:6, max:30, ok:enoughDivs(4)}) },
+      { name:'Уровень 2', desc:'Два числа до 60 — бывают и взаимно простые', gen:()=>genNums({count:2, min:12, max:60, coprimeChance:.15, ok:enoughDivs(4)}) },
+      { name:'Уровень 3', desc:'Два числа до 100 — делителей много', gen:()=>genNums({count:2, min:40, max:100, ok:enoughDivs(6)}) },
+      { name:'Уровень 4', desc:'Три числа до 60', gen:()=>genNums({count:3, min:12, max:60, ok:enoughDivs(4)}) },
+    ],
+    theory:`<div class="tcard">
+      <div class="tt">Способ 1. Перебор делителей</div>
+      <div class="tintro"><b>Делитель</b> числа — число, на которое оно делится без остатка. Выписываем все делители каждого числа и ищем наибольший <b>общий</b>.</div>
+      <div class="tex">
+        <span class="ln">Делители 20: 1, 2, 4, 5, 10, 20</span>
+        <span class="ln">Делители 30: 1, 2, 3, 5, 6, 10, 15, 30</span>
+        <span class="ln">Общие: 1, 2, 5, 10 → <span class="ok">НОД(20, 30) = 10</span></span>
+      </div>
+      <div class="tintro">Делители идут парами: 1 и 20, 2 и 10, 4 и 5 — ищи их парами, так ни один не потеряется. Способ хорош для небольших чисел, с большими становится громоздким.</div>
+    </div>` },
+  { id:1, title:'Разложение на простые множители', short:'Разложение',
+    levels:[
+      { name:'Уровень 1', desc:'Числа уже разложены — выбери общие множители', gen:genGiven },
+      { name:'Уровень 2', desc:'Два числа до 150', gen:()=>genNums({count:2, min:24, max:150, coprimeChance:.1, ok:n=>n.every(x=>factorize(x).length>=3 && maxPrime(x)<=13)}) },
+      { name:'Уровень 3', desc:'Два трёхзначных числа', gen:()=>genNums({count:2, min:200, max:999, minG:6, ok:n=>n.every(x=>factorize(x).length>=3 && maxPrime(x)<=17)}) },
+      { name:'Уровень 4', desc:'Три числа', gen:()=>genNums({count:3, min:40, max:400, ok:n=>n.every(x=>factorize(x).length>=3 && maxPrime(x)<=17)}) },
+    ],
+    theory:`<div class="tcard">
+      <div class="tt">Способ 2. Разложение на простые множители</div>
+      <div class="tintro">Раскладываем числа «столбиком»: справа от черты пишем простое число, на которое делится число слева, под ним — результат деления, пока не получится 1. Потом берём множители, которые есть <b>у обоих</b> чисел, — каждый в <b>меньшей</b> степени — и перемножаем.</div>
+      <div class="tex"><div class="tex-cols">
+        <table class="tex-tab"><tr><td>84</td><td class="fr">2</td></tr><tr><td>42</td><td class="fr">2</td></tr><tr><td>21</td><td class="fr">3</td></tr><tr><td>7</td><td class="fr">7</td></tr><tr><td>1</td><td class="fr"></td></tr></table>
+        <table class="tex-tab"><tr><td>60</td><td class="fr">2</td></tr><tr><td>30</td><td class="fr">2</td></tr><tr><td>15</td><td class="fr">3</td></tr><tr><td>5</td><td class="fr">5</td></tr><tr><td>1</td><td class="fr"></td></tr></table>
+      </div>
+        <span class="ln">84 = 2 · 2 · 3 · 7</span>
+        <span class="ln">60 = 2 · 2 · 3 · 5</span>
+        <span class="ln">Общие множители: 2 · 2 · 3 → <span class="ok">НОД = 12</span></span>
+      </div>
+      <div class="tintro">У 84 две двойки и у 60 две — берём две. Тройка у обоих по одной — берём одну. Пятёрка только у 60, семёрка только у 84 — не берём.</div>
+    </div>` },
+  { id:2, title:'Алгоритм Евклида', short:'Евклид',
+    levels:[
+      { name:'Уровень 1', desc:'Числа до 100, цепочка в 2–3 деления', gen:()=>genNums({count:2, min:20, max:100, ok:n=>{ const k=euclidLen(n[0],n[1]); return k>=2 && k<=3; }}) },
+      { name:'Уровень 2', desc:'Числа до 300, цепочка в 3–4 деления', gen:()=>genNums({count:2, min:60, max:300, coprimeChance:.15, ok:n=>{ const k=euclidLen(n[0],n[1]); return k>=3 && k<=4; }}) },
+      { name:'Уровень 3', desc:'Трёхзначные числа, цепочка длиннее', gen:()=>genNums({count:2, min:200, max:999, ok:n=>{ const k=euclidLen(n[0],n[1]); return k>=3 && k<=6; }}) },
+      { name:'Уровень 4', desc:'Три числа: НОД(a, b, c) = НОД(НОД(a, b), c)', gen:()=>genNums({count:3, min:40, max:400, ok:n=>{ const d=gcd(n[0],n[1]); return euclidLen(n[0],n[1])<=4 && euclidLen(d,n[2])<=4; }}) },
+    ],
+    theory:`<div class="tcard">
+      <div class="tt">Способ 3. Алгоритм Евклида</div>
+      <div class="tintro">Делим большее число на меньшее с остатком, потом меньшее — на остаток, и так, пока остаток не станет нулём. <b>Последний ненулевой остаток</b> (он же последний делитель) — это НОД.</div>
+      <div class="tex">
+        <span class="ln">НОД(48, 18):</span>
+        <span class="ln">48 ÷ 18 = 2 (остаток 12)</span>
+        <span class="ln">18 ÷ 12 = 1 (остаток 6)</span>
+        <span class="ln">12 ÷ 6 = 2 (остаток 0) → <span class="ok">НОД = 6</span></span>
+      </div>
+      <div class="tintro">Для трёх чисел сначала находим НОД двух, а потом — НОД результата и третьего числа.</div>
+    </div>` },
 ];
-let curLevel = 0;
-const solvedByLevel = [0,0,0,0,0];
+const EXAM_LEVEL = { name:'Экзамен', desc:'Вперемешку все уровни, подсказки короче' };
+const LEVELS_OF = sec => SECTIONS[sec].levels.concat([EXAM_LEVEL]);
+
+let curSection = 0, curLevel = 0;
+const solvedByLevel = SECTIONS.map(()=>[0,0,0,0,0]);
 let totalSolved = 0, streak = 0, taskCounter = 0;
 
-function gen(level){
-  if(level===4) level = ri(0,3);
-  return LEVELS[level].gen();
+function makeProblem(sec, lvl){
+  const base = lvl===4 ? ri(0,3) : lvl;
+  const P = SECTIONS[sec].levels[base].gen();
+  return Object.assign(P, { sec, lvl, base });
+}
+function mkChain(a, b){
+  return { a, b, rows:[{ x:Math.max(a,b), y:Math.min(a,b), q:null, r:null }], res:null };
+}
+function initState(P){
+  const S = { phase:'solve', errTotal:0, exam:P.lvl===4, history:[] };
+  if(P.sec===0){
+    S.step = 'divs'; S.cur = 0; S.divs = P.nums.map(()=>[]); S.common = [];
+  } else if(P.sec===1){
+    S.groups = [];
+    if(P.given){ S.step = 'pick'; S.facts = P.given.map(a=>a.slice()); }
+    else { S.step = 'fact'; S.cur = 0; S.sub = 'div'; S.cols = P.nums.map(n=>({ rows:[n], divs:[] })); S.facts = P.nums.map(()=>null); }
+  } else {
+    S.step = 'div'; S.ch = 0; S.chains = [mkChain(P.nums[0], P.nums[1])];
+  }
+  return S;
 }
 
 let P=null, S=null;
 
-function fieldRole(field){ return field[0]; } // 'n' | 'd'
-function fieldIdx(field){ return Number(field.slice(1)); }
-function curVal(field){
-  const store = fieldRole(field)==='n' ? S.struckN : S.struckD;
-  const idx = fieldIdx(field);
-  const hist = store[idx];
-  return (hist && hist.length) ? hist[hist.length-1] : P.fractions[idx][fieldRole(field)];
-}
-
-function anyReduciblePairExists(){
-  const n = P.fractions.length;
-  for(let i=0;i<n;i++) for(let j=0;j<n;j++){
-    if(gcd(curVal('n'+i), curVal('d'+j))>1) return true;
-  }
-  return false;
-}
-
 function newProblem(){
-  P = gen(curLevel);
+  P = makeProblem(curSection, curLevel);
+  S = initState(P);
   taskCounter++;
-  S = {
-    phase:'preview',
-    struckN: {}, struckD: {},
-    subPhase: 'selectFirst',
-    selectedFirst: null, selectedSecond: null,
-    pairNumField: null, pairDenField: null,
-    divisor: null,
-    numChain: null, denChain: null,
-    productNum: null, productDen: null,
-    resultNum: null, resultDen: null,
-    whole: null,
-    errTotal: 0,
-    exam: curLevel===4,
-    history: [],
-  };
   document.getElementById('taskNum').textContent = 'пример №'+taskCounter;
   document.getElementById('nextBtn').style.display='none';
   document.getElementById('stStars').textContent='—';
   setHint('');
-  renderAll(); setPrompt(); renderInputs(); syncUndoButton();
+  renderAll();
 }
 document.getElementById('refreshBtn').onclick = newProblem;
 const basketAddBtn = document.getElementById('basketAddBtn');
 if (basketAddBtn) basketAddBtn.onclick = () => {
-  const rich = window.Basket ? window.Basket.extractFromSelectorsRich(['#board']) : null;
+  const rich = window.Basket ? window.Basket.extractFromSelectorsRich(['#taskLine']) : null;
   if (!rich || !rich.text) return;
-  window.Basket.add({ trainerId: 'frac_mul', modeTitle: 'Умножение дробей', text: rich.text, html: rich.html });
+  window.Basket.add({ trainerId: 'gcd', modeTitle: 'НОД: ' + SECTIONS[curSection].title.toLowerCase(), text: rich.text, html: rich.html });
   basketAddBtn.classList.add('ok');
   basketAddBtn.textContent = '✓';
   setTimeout(() => { basketAddBtn.classList.remove('ok'); basketAddBtn.textContent = '📥'; }, 900);
 };
 
-/* ───────── отмена последнего шага ───────── */
+/* ───────── отмена последнего шага ─────────
+   Снимок — всё состояние решения, кроме самой истории: шаги у трёх разделов
+   разные, и перечислять поля каждого (как в дробях) значило бы забыть одно
+   при следующей правке */
 function pushHistory(){
-  const snapshot = JSON.parse(JSON.stringify({
-    struckN:S.struckN, struckD:S.struckD, subPhase:S.subPhase,
-    selectedFirst:S.selectedFirst, selectedSecond:S.selectedSecond,
-    pairNumField:S.pairNumField, pairDenField:S.pairDenField, divisor:S.divisor,
-    numChain:S.numChain, denChain:S.denChain,
-    productNum:S.productNum, productDen:S.productDen,
-    resultNum:S.resultNum, resultDen:S.resultDen, whole:S.whole,
-    errTotal:S.errTotal,
-  }));
-  S.history.push(snapshot);
+  const snap = JSON.parse(JSON.stringify(Object.assign({}, S, { history: undefined })));
+  S.history.push(snap);
   syncUndoButton();
 }
 function undoStep(){
   if(!S.history || S.history.length===0 || S.phase!=='solve') return;
   const prev = S.history.pop();
-  Object.assign(S, prev);
+  const hist = S.history;
+  Object.keys(S).forEach(k=>{ if(k!=='history') delete S[k]; });
+  Object.assign(S, prev, { history: hist });
   setHint('');
-  renderAll(); setPrompt(); renderInputs(); syncUndoButton();
+  renderAll();
 }
 function syncUndoButton(){
   const btn = document.getElementById('undoBtn');
@@ -917,223 +1060,164 @@ function syncUndoButton(){
 }
 document.getElementById('undoBtn').onclick = undoStep;
 
-function startSolving(){
-  S.phase = 'solve';
-  S.subPhase = 'selectFirst';
-  renderAll(); setPrompt(); renderInputs();
-}
-
-function enterMultiplyPhase(){
-  S.numChain = P.fractions.map((_,i)=>curVal('n'+i));
-  S.denChain = P.fractions.map((_,i)=>curVal('d'+i));
-  S.subPhase = 'multiplyNum';
-  renderAll(); setPrompt(); renderInputs();
-}
-
-function checkFinalSimplify(){
-  const g = gcd(S.productNum, S.productDen);
-  if(g>1){
-    S.subPhase = 'finalDivisor';
-    renderAll(); setPrompt(); renderInputs();
-  } else {
-    afterFinalSimplify(S.productNum, S.productDen);
-  }
-}
-
-function afterFinalSimplify(num, den){
-  S.productNum = num; S.productDen = den;
-  if(gcd(num,den)>1){
-    // сократили не до конца (например, поделили только на 2 из общего делителя 4) — идём на ещё один круг
-    checkFinalSimplify();
-    return;
-  }
-  if(num>=den){
-    S.resultNum = num; S.resultDen = den;
-    S.subPhase = 'mixedWhole';
-    renderAll(); setPrompt(); renderInputs();
-  } else {
-    S.resultNum = num; S.resultDen = den; S.whole = 0;
-    finish();
-  }
-}
-
 /* ───────── отрисовка ───────── */
-function digitsHTML(val){
-  return String(val).split('').map(ch=>`<span class="fdigit">${ch}</span>`).join('');
+const labelOf = r => P.given ? 'abc'[r] : String(P.nums[r]);
+const nodOf = () => P.given ? 'НОД(a, b)' : `НОД(${P.nums.join(', ')})`;
+const answerG = () => gcdAll(P.nums);
+
+function renderAll(){ renderTask(); renderWork(); setPrompt(); renderInputs(); }
+
+function renderTask(){
+  const t = document.getElementById('taskLine');
+  if(P.given){
+    t.innerHTML = `Найдите НОД(a, b), если<span class="tl">a = ${P.given[0].join(' · ')}</span><span class="tl">b = ${P.given[1].join(' · ')}</span>`;
+  } else {
+    t.innerHTML = `Найдите <span class="nw">НОД(${P.nums.join(', ')})</span>`;
+  }
 }
 
-function stackMarksHTML(history, liveInputId, direction, highlightCurrent){
-  // history: массив значений после каждого шага сокращения (последнее — текущее, живое)
-  // liveInputId: если задан, поверх стека рисуем ещё и активное поле ввода для нового уровня
-  const items = [];
-  const n = history ? history.length : 0;
-  for(let i=0;i<n;i++){
-    const isCurrent = (i===n-1) && !liveInputId;
-    const off = 24 + 30*i;
-    const style = direction==='up' ? `top:-${off}px;bottom:auto` : `bottom:-${off}px;top:auto`;
-    let cls = isCurrent ? 'newval' : 'newval stale';
-    if(isCurrent && highlightCurrent) cls += ' mark-hl';
-    items.push(`<span class="${cls}" style="${style}">${history[i]}</span>`);
-  }
-  if(liveInputId){
-    const off = 34 + 30*n;
-    const style = direction==='up' ? `top:-${off}px;bottom:auto` : `bottom:-${off}px;top:auto`;
-    const inputCl = direction==='up' ? 'inline-input' : 'inline-input below';
-    items.push(`<input class="${inputCl}" id="${liveInputId}" type="text" inputmode="none" autocomplete="off" placeholder="?" style="${style}">`);
-  }
-  return items.join('');
-}
-
-function fracHTML(idx, numVal, denVal, opts={}){
-  const numCl = ['fnum'];
-  const denCl = ['fden'];
-  if(opts.numTappable) numCl.push('tappable');
-  if(opts.denTappable) denCl.push('tappable');
-  const numHasHistory = !!(opts.numHistory && opts.numHistory.length);
-  const denHasHistory = !!(opts.denHistory && opts.denHistory.length);
-  // если у числа уже есть история сокращений, подсветку несёт только актуальная метка — не вся ячейка
-  // (иначе подсвечивается заодно и старая зачёркнутая цифра, что путает)
-  if(opts.numHl && !numHasHistory) numCl.push('hl');
-  if(opts.denHl && !denHasHistory) denCl.push('hl');
-  if(opts.numSel && !numHasHistory) numCl.push('selected');
-  if(opts.denSel && !denHasHistory) denCl.push('selected');
-  let numMark='', denMark='';
-  const numHighlighted = !!(opts.numHl || opts.numSel);
-  const denHighlighted = !!(opts.denHl || opts.denSel);
-  if(opts.numInput || numHasHistory){
-    numCl.push('struck');
-    numMark = stackMarksHTML(opts.numHistory, opts.numInput ? 'inlineNumInput' : null, 'up', numHighlighted);
-  }
-  if(opts.denInput || denHasHistory){
-    denCl.push('struck');
-    denMark = stackMarksHTML(opts.denHistory, opts.denInput ? 'inlineDenInput' : null, 'down', denHighlighted);
-  }
-  const fracCl = ['frac'];
-  if(opts.answer) fracCl.push('answer');
-  return `<div class="${fracCl.join(' ')}">
-    <div class="${numCl.join(' ')}" data-field="n${idx}">${digitsHTML(numVal)}${numMark}</div>
-    <div class="fbar"></div>
-    <div class="${denCl.join(' ')}" data-field="d${idx}">${digitsHTML(denVal)}${denMark}</div>
-  </div>`;
-}
-
-function plainFracHTML(numVal, denVal, opts={}){
-  const fracCl = ['frac'];
-  if(opts.answer) fracCl.push('answer');
-  const numCl = ['fnum']; const denCl = ['fden'];
-  let numMark='', denMark='';
-  if(opts.numInput){ numCl.push('struck'); numMark = stackMarksHTML([], 'inlineNumInput', 'up'); }
-  if(opts.denInput){ denCl.push('struck'); denMark = stackMarksHTML([], 'inlineDenInput', 'down'); }
-  return `<div class="${fracCl.join(' ')}">
-    <div class="${numCl.join(' ')}">${digitsHTML(numVal)}${numMark}</div>
-    <div class="fbar"></div>
-    <div class="${denCl.join(' ')}">${digitsHTML(denVal)}${denMark}</div>
-  </div>`;
-}
-
-function renderAll(){
-  const board = document.getElementById('board');
-
-  if(S.phase==='preview'){
-    const parts = P.fractions.map(f=>plainFracHTML(f.n,f.d));
-    board.innerHTML = parts.join('<span class="op-sign">×</span>') + `<span class="eq-sign">=</span><span class="op-sign">?</span>`;
-    return;
-  }
-
-  const isCancelPhase = ['selectFirst','selectSecond','divisor','fillResults'].includes(S.subPhase);
-  const isMultiplyPhase = ['multiplyNum','multiplyDen'].includes(S.subPhase);
-
-  const fracParts = P.fractions.map((f,idx)=>{
-    const opt = {};
-    if(S.struckN[idx]!==undefined) opt.numHistory = S.struckN[idx];
-    if(S.struckD[idx]!==undefined) opt.denHistory = S.struckD[idx];
-
-    if(isCancelPhase){
-      opt.numTappable = true; opt.denTappable = true;
-      if(S.selectedFirst==='n'+idx || S.selectedSecond==='n'+idx) opt.numSel = true;
-      if(S.selectedFirst==='d'+idx || S.selectedSecond==='d'+idx) opt.denSel = true;
-      if((S.subPhase==='divisor'||S.subPhase==='fillResults')){
-        if(S.pairNumField==='n'+idx) opt.numHl = true;
-        if(S.pairDenField==='d'+idx) opt.denHl = true;
-      }
-      if(S.subPhase==='fillResults'){
-        if(S.pairNumField==='n'+idx) opt.numInput = true;
-        if(S.pairDenField==='d'+idx) opt.denInput = true;
-      }
-    }
-    if(isMultiplyPhase){
-      if(S.subPhase==='multiplyNum') opt.numHl = true;
-      if(S.subPhase==='multiplyDen') opt.denHl = true;
-    }
-    return fracHTML(idx, f.n, f.d, opt);
+function renderWork(){
+  const w = document.getElementById('work');
+  if(P.sec===0) w.innerHTML = workList();
+  else if(P.sec===1) w.innerHTML = workFactor();
+  else w.innerHTML = workEuclid();
+  w.querySelectorAll('.chip.tap').forEach(el=>{
+    el.onclick = ()=> P.sec===0 ? onTapDivisor(Number(el.dataset.v), el) : onTapFactor(Number(el.dataset.r), Number(el.dataset.k), el);
   });
+}
 
-  let resultBlock = '';
-  if(isMultiplyPhase || S.subPhase==='finalDivisor' || S.subPhase==='finalFill' || S.subPhase==='mixedWhole' || S.subPhase==='mixedRemainder'){
-    let showNum = '?', showDen = '?';
-    if(S.subPhase==='multiplyDen') showNum = S.productNum;
-    else if(S.subPhase!=='multiplyNum') { showNum = S.productNum; showDen = S.productDen; }
-    const resOpt = {answer:true};
-    if(S.subPhase==='finalFill'){ resOpt.numInput = true; resOpt.denInput = true; }
-    resultBlock = `<span class="eq-sign">=</span>` + plainFracHTML(showNum, showDen, resOpt);
-  } else if(S.phase==='done'){
-    if(S.whole>0){
-      resultBlock = `<span class="eq-sign">=</span><span class="whole-part">${S.whole}</span>` + (S.resultNum>0 ? plainFracHTML(S.resultNum, S.resultDen, {answer:true}) : '');
-    } else {
-      resultBlock = `<span class="eq-sign">=</span>` + plainFracHTML(S.resultNum, S.resultDen, {answer:true});
-    }
-  }
-
-  board.innerHTML = fracParts.join('<span class="op-sign">×</span>') + resultBlock;
-
-  board.querySelectorAll('[data-field]').forEach(el=>{
-    el.onclick = ()=>onTapCell(el.dataset.field);
+function workList(){
+  const solving = S.phase==='solve';
+  const tap = solving && S.step==='common';
+  let h = '<div class="dv-list">';
+  P.nums.forEach((n,i)=>{
+    const started = S.step!=='divs' || i<=S.cur;
+    const active = solving && S.step==='divs' && i===S.cur;
+    const list = S.divs[i].slice().sort((a,b)=>a-b);
+    let chips = list.map(v=>`<span class="chip${S.common.includes(v)?' common':''}${tap?' tap':''}" data-v="${v}">${v}</span>`).join('');
+    if(active) chips += `<span class="chip ph">?</span>`;
+    if(!started) chips = `<span class="chip ph">…</span>`;
+    h += `<div class="dv-row${active?' active':''}${started?'':' dim'}"><span class="dv-lbl">Делители ${n}:</span><span class="chips">${chips}</span></div>`;
   });
+  h += '</div>';
+  if(S.step==='answer' || S.phase==='done'){
+    h += `<div class="common-line">Общие: <b>${S.common.slice().sort((a,b)=>a-b).join(', ')}</b></div>`;
+  }
+  if(S.phase==='done') h += `<div class="gcd-result">${nodOf()} = ${answerG()}</div>`;
+  return h;
+}
+
+function workFactor(){
+  const solving = S.phase==='solve';
+  if(S.step==='fact'){
+    let h = '<div class="fcols">';
+    S.cols.forEach((c,i)=>{
+      const active = solving && i===S.cur;
+      const future = i > S.cur;
+      let rows = '';
+      c.rows.forEach((v,r)=>{
+        let right = c.divs[r] !== undefined ? c.divs[r] : '';
+        if(active && S.sub==='div' && r===c.rows.length-1) right = `<input class="inl" id="fdiv" type="text" inputmode="none" autocomplete="off" placeholder="?">`;
+        rows += `<tr><td>${v}</td><td class="fr">${right}</td></tr>`;
+      });
+      if(active && S.sub==='quot') rows += `<tr><td><input class="inl" id="fquot" type="text" inputmode="none" autocomplete="off" placeholder="?"></td><td class="fr"></td></tr>`;
+      const done = c.rows[c.rows.length-1]===1;
+      const res = done ? `<div class="ftab-res">${c.rows[0]} = ${c.divs.join(' · ')}</div>` : '';
+      h += `<div class="fcol${future?' dim':''}"><table class="ftab">${rows}</table>${res}</div>`;
+    });
+    return h + '</div>';
+  }
+  // выбор общих множителей и произведение
+  const tap = solving && S.step==='pick';
+  let h = '';
+  S.facts.forEach((f,r)=>{
+    const chips = f.map((v,k)=>{
+      const inG = S.groups.some(g=>g.idx[r]===k);
+      return `<span class="chip${inG?' common':''}${tap?' tap':''}" data-r="${r}" data-k="${k}">${v}</span>`;
+    }).join('<span class="dot-sep">·</span>');
+    h += `<div class="fline"><span class="fl-lbl">${labelOf(r)} =</span>${chips}</div>`;
+  });
+  const vals = S.groups.map(g=>g.v).sort((a,b)=>a-b);
+  if(S.step==='pick') h += `<div class="common-line">Общие множители: <b>${vals.length ? vals.join(' · ') : '—'}</b></div>`;
+  else if(S.phase==='solve') h += vals.length ? `<div class="common-line">НОД = <b>${vals.join(' · ')}</b> = ?</div>` : `<div class="common-line">Общих множителей нет</div>`;
+  else h += `<div class="gcd-result">${nodOf()} = ${vals.length>1 ? vals.join(' · ')+' = ' : ''}${answerG()}</div>`;
+  return h;
+}
+
+function workEuclid(){
+  const solving = S.phase==='solve';
+  const three = P.nums.length===3;
+  let h = '';
+  S.chains.forEach((c,ci)=>{
+    let b = '';
+    if(three) b += `<div class="eu-title">Шаг ${ci+1}: НОД(${c.a}, ${c.b})</div>`;
+    c.rows.forEach((row,ri_)=>{
+      const act = solving && ci===S.ch && ri_===c.rows.length-1 && S.step==='div';
+      if(row.q!==null){
+        b += `<div class="eu-row">${row.x} ÷ ${row.y} = ${row.q} <span class="eu-rem${row.r===0?' zero':''}">(остаток ${row.r})</span></div>`;
+      } else if(act){
+        b += `<div class="eu-row">${row.x} ÷ ${row.y} = <input class="inl" id="eq" type="text" inputmode="none" autocomplete="off" placeholder="?"> <span class="eu-rem">(остаток <input class="inl" id="er" type="text" inputmode="none" autocomplete="off" placeholder="?">)</span></div>`;
+      }
+    });
+    if(solving && ci===S.ch && S.step==='pair'){
+      b += `<div class="eu-row"><input class="inl" id="ex" type="text" inputmode="none" autocomplete="off" placeholder="?"> ÷ <input class="inl" id="ey" type="text" inputmode="none" autocomplete="off" placeholder="?"> = …</div>`;
+    }
+    if(c.res!==null && three) b += `<div class="eu-res">НОД(${c.a}, ${c.b}) = ${c.res}</div>`;
+    h += `<div class="eu-block">${b}</div>`;
+  });
+  if(S.phase==='done') h += `<div class="gcd-result">${nodOf()} = ${answerG()}</div>`;
+  return h;
 }
 
 function setPrompt(){
   const p = document.getElementById('prompt');
-  if(S.phase==='preview'){
-    p.innerHTML = 'Посмотри на пример спокойно — спешить некуда.<br>Когда будешь готов, жми «Начать».';
+  if(S.phase==='done'){ p.innerHTML = 'Пример решён! 🎉'; return; }
+  const both = P.nums.length===3 ? 'у всех трёх чисел' : 'у обоих чисел';
+  if(P.sec===0){
+    if(S.step==='divs') p.innerHTML = oneByOne()
+      ? `Выпиши все делители числа <b>${P.nums[S.cur]}</b> — <b>по одному</b>: впиши делитель и жми «Добавить», каждый проверяется сразу. Когда всё выписано, жми «Все выписаны».`
+      : `Выпиши все делители числа <b>${P.nums[S.cur]}</b> — можно по одному или сразу несколько через запятую. Когда всё выписано, жми «Все выписаны».`;
+    else if(S.step==='common') p.innerHTML = `Отметь <b>общие</b> делители — коснись числа, которое есть в каждой строке. Когда отметишь все, жми «Общие отмечены».`;
+    else p.innerHTML = `Какой из общих делителей <b>наибольший</b>? <b>${nodOf()} = ?</b>`;
     return;
   }
-  if(S.phase==='done'){
-    p.innerHTML = 'Пример решён! 🎉';
+  if(P.sec===1){
+    if(S.step==='fact'){
+      const c = S.cols[S.cur], m = c.rows[c.rows.length-1];
+      if(S.sub==='div') p.innerHTML = `Раскладываем <b>${c.rows[0]}</b>. На какое <b>простое</b> число делится <b>${m}</b>? Впиши его справа от черты.`;
+      else p.innerHTML = `<b>${m} ÷ ${c.divs[c.divs.length-1]} = ?</b> Впиши результат слева, под числом ${m}.`;
+    } else if(S.step==='pick'){
+      p.innerHTML = `Отметь <b>общие</b> множители — коснись множителя, который есть ${both}: он отметится в каждой строке. Одинаковый множитель берём столько раз, сколько его там, где его меньше. Когда общих не осталось, жми «Общие выбраны».`;
+    } else {
+      p.innerHTML = S.groups.length
+        ? `Перемножь общие множители: <b>${S.groups.map(g=>g.v).sort((a,b)=>a-b).join(' · ')} = ?</b>`
+        : `Общих простых множителей нет — числа <b>взаимно простые</b>. <b>Чему равен НОД?</b>`;
+    }
     return;
   }
-  if(S.subPhase==='selectFirst'){
-    p.innerHTML = `Есть что сократить? Коснись любого числа — числителя или знаменателя. Или сразу жми «Умножаем» — если что-то останется несокращённым, досократим уже после умножения.`;
-  } else if(S.subPhase==='selectSecond'){
-    p.innerHTML = `Теперь коснись <b>второго</b> числа — числитель нужно соединить со знаменателем.`;
-  } else if(S.subPhase==='divisor'){
-    p.innerHTML = `${curVal(S.pairNumField)} и ${curVal(S.pairDenField)} — <b>на что сокращаем?</b> (их общий делитель)`;
-  } else if(S.subPhase==='fillResults'){
-    p.innerHTML = `Делим оба числа на ${S.divisor}. <b>Что получится у каждого?</b>`;
-  } else if(S.subPhase==='multiplyNum'){
-    p.innerHTML = `Сокращения позади — умножаем числители. <b>${S.numChain.join(' × ')} = ?</b>`;
-  } else if(S.subPhase==='multiplyDen'){
-    p.innerHTML = `Теперь знаменатели. <b>${S.denChain.join(' × ')} = ?</b>`;
-  } else if(S.subPhase==='finalDivisor'){
-    p.innerHTML = `Получилась дробь ${S.productNum}/${S.productDen} — она ещё сократима! <b>На что сокращаем?</b>`;
-  } else if(S.subPhase==='finalFill'){
-    p.innerHTML = `Делим оба числа на ${S.divisor}. <b>Что получится?</b>`;
-  } else if(S.subPhase==='mixedWhole'){
-    p.innerHTML = `Дробь ${S.resultNum}/${S.resultDen} — неправильная. <b>Сколько целых здесь поместится?</b>`;
-  } else if(S.subPhase==='mixedRemainder'){
-    p.innerHTML = `Целых ${S.whole}. <b>А что останется в числителе дробной части?</b>`;
+  const c = S.chains[S.ch];
+  if(S.step==='div'){
+    const row = c.rows[c.rows.length-1];
+    let pre = '';
+    if(S.ch>0 && c.rows.length===1) pre = `НОД(${S.chains[0].a}, ${S.chains[0].b}) = ${S.chains[0].res}. Теперь ищем НОД(${c.a}, ${c.b}) тем же способом. `;
+    p.innerHTML = pre + `Делим с остатком: <b>${row.x} ÷ ${row.y}</b>. Впиши неполное частное и остаток.`;
+  } else if(S.step==='pair'){
+    const row = c.rows[c.rows.length-1];
+    p.innerHTML = `Остаток ${row.r} — не ноль, продолжаем. <b>Что теперь делим и на что?</b>`;
+  } else {
+    p.innerHTML = `Остаток 0 — цепочка закончилась. <b>Чему равен НОД(${c.a}, ${c.b})?</b>`;
   }
 }
 
-function numInputHTML(id, extraStyle){
+function numInputHTML(id){
   return `<div class="num-wrap">
-    <input class="num" id="${id}" type="text" inputmode="none" autocomplete="off" placeholder="?"${extraStyle?` style="${extraStyle}"`:''}>
+    <input class="num" id="${id}" type="text" inputmode="none" autocomplete="off" placeholder="?">
     <div class="spin">
       <button type="button" class="spin-btn" data-target="${id}" data-dir="1">▲</button>
       <button type="button" class="spin-btn" data-target="${id}" data-dir="-1">▼</button>
     </div>
   </div>`;
 }
-
 function attachSpinners(area){
   area.querySelectorAll('.spin-btn').forEach(btn=>{
     btn.onclick = ()=>{
@@ -1143,69 +1227,99 @@ function attachSpinners(area){
       if(!Number.isFinite(v)) v = 0;
       v += Number(btn.dataset.dir);
       if(v<0) v=0;
-      if(v>999) v=999;
+      if(v>9999) v=9999;
       inp.value = String(v);
       inp.focus();
     };
   });
+}
+const LBL = t => `<span class="lbl" style="font-family:var(--font-ui);font-size:19px;color:var(--muted-6)">${t}</span>`;
+
+// поля ввода: Enter в первом из пары переводит во второе, в последнем — проверяет
+function wireInputs(ids){
+  const els = ids.map(id=>document.getElementById(id)).filter(Boolean);
+  els.forEach((el,i)=>{
+    el.addEventListener('focus', ()=>{ activeInputId = el.id; });
+    el.addEventListener('keydown', e=>{
+      if(e.key!=='Enter') return;
+      if(i<els.length-1) els[i+1].focus(); else submitAnswer();
+    });
+  });
+  // отложенный фокус не должен забирать курсор, если ввод уже начался в
+  // другом поле: иначе набранное во втором поле попадало в первое
+  if(els[0]){ activeInputId = els[0].id; setTimeout(()=>{
+    const a = document.activeElement;
+    if(a && a.tagName==='INPUT' && els.includes(a)) return;
+    if(document.body.contains(els[0])) els[0].focus();
+  }, 30); }
 }
 
 function renderInputs(){
   const area = document.getElementById('inputArea');
   syncKeypadVisibility();
   syncUndoButton();
-  if(S.phase==='preview'){
-    area.innerHTML = `<button class="go" id="goBtn">Начать →</button>`;
-    document.getElementById('goBtn').onclick = startSolving;
-    return;
-  }
   if(S.phase==='done'){ area.innerHTML=''; return; }
-
-  if(S.subPhase==='selectFirst'){
-    area.innerHTML = `<span class="lbl" style="font-family:var(--font-ui);font-size:19px;color:var(--muted-6)">Коснись числа на доске выше ↑</span>
-      <button class="go secondary" id="doneBtn">Умножаем →</button>`;
-    document.getElementById('doneBtn').onclick = onDoneCancel;
-    return;
-  }
-  if(S.subPhase==='selectSecond'){
-    area.innerHTML = `<span class="lbl" style="font-family:var(--font-ui);font-size:19px;color:var(--muted-6)">Коснись второго числа на доске выше ↑</span>`;
-    return;
-  }
-  if(S.subPhase==='fillResults' || S.subPhase==='finalFill'){
-    area.innerHTML = `
-      <span class="lbl" style="font-family:var(--font-ui);font-size:19px;color:var(--muted-6)">Впиши оба числа прямо на доске выше ↑</span>
-      <button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>`;
+  const ok = S.exam ? 'Готово' : 'ОК';
+  const single = ()=>{
+    area.innerHTML = `${numInputHTML('ans')}<button class="go" id="goBtn">${ok}</button>`;
+    attachSpinners(area); wireInputs(['ans']);
     document.getElementById('goBtn').onclick = submitAnswer;
-    const numEl = document.getElementById('inlineNumInput');
-    const denEl = document.getElementById('inlineDenInput');
-    activeInputId = 'inlineNumInput';
-    if(numEl){
-      numEl.addEventListener('focus', ()=>{ activeInputId='inlineNumInput'; });
-      numEl.addEventListener('keydown', e=>{ if(e.key==='Enter'){ if(denEl) denEl.focus(); else submitAnswer(); } });
-    }
-    if(denEl){
-      denEl.addEventListener('focus', ()=>{ activeInputId='inlineDenInput'; });
-      denEl.addEventListener('keydown', e=>{ if(e.key==='Enter') submitAnswer(); });
-    }
-    setTimeout(()=>{ if(numEl) numEl.focus(); }, 30);
+  };
+  const inline = (ids)=>{
+    area.innerHTML = `${LBL('Впиши прямо на листе выше ↑')}<button class="go" id="goBtn">${ok}</button>`;
+    document.getElementById('goBtn').onclick = submitAnswer;
+    wireInputs(ids);
+  };
+  const tapOnly = (btnText)=>{
+    area.innerHTML = `${LBL('Касайся чисел на листе выше ↑')}<button class="go secondary" id="doneBtn">${btnText}</button>`;
+    document.getElementById('doneBtn').onclick = submitAnswer;
+    activeInputId = null;
+  };
+  if(P.sec===0){
+    if(S.step==='divs'){
+      area.innerHTML = `<input class="num solo" id="ans" type="text" inputmode="none" autocomplete="off" placeholder="${oneByOne() ? '?' : '1, 2, 3…'}">
+        <button class="go" id="goBtn">Добавить</button>
+        <button class="go secondary" id="doneBtn">Все выписаны →</button>`;
+      document.getElementById('goBtn').onclick = submitAnswer;
+      // набранное, но не добавленное в список сначала добавляем — иначе
+      // «Все выписаны» ругался бы на делитель, который ученик уже ввёл
+      document.getElementById('doneBtn').onclick = ()=>{
+        const inp = document.getElementById('ans');
+        if(inp && inp.value.trim()){
+          const before = S.errTotal;
+          submitDivisors();
+          if(S.errTotal > before) return;
+        }
+        onAllDivisors();
+      };
+      wireInputs(['ans']);
+    } else if(S.step==='common') tapOnly('Общие отмечены →');
+    else single();
     return;
   }
-
-  // divisor / multiplyNum / multiplyDen / finalDivisor / mixedWhole / mixedRemainder — одиночный ввод
-  area.innerHTML = `
-    ${numInputHTML('ans')}
-    <button class="go" id="goBtn">${S.exam?'Готово':'ОК'}</button>`;
-  document.getElementById('goBtn').onclick = submitAnswer;
-  attachSpinners(area);
-  activeInputId = 'ans';
-  document.getElementById('ans').addEventListener('keydown', e=>{ if(e.key==='Enter') submitAnswer(); });
-  setTimeout(()=>{ const el=document.getElementById('ans'); if(el) el.focus(); }, 30);
+  if(P.sec===1){
+    if(S.step==='fact') inline([S.sub==='div' ? 'fdiv' : 'fquot']);
+    else if(S.step==='pick') tapOnly('Общие выбраны →');
+    else single();
+    return;
+  }
+  if(S.step==='div') inline(['eq','er']);
+  else if(S.step==='pair') inline(['ex','ey']);
+  else single();
 }
 
 function setHint(t, good=false){
   const h = document.getElementById('hint');
   h.innerHTML = t;
   h.className = 'hint'+(good?' good':'');
+}
+const praise = ()=> setHint(pick(['Верно!','Точно!','Отлично!']), true);
+function shake(el){ if(!el) return; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+function shakeChip(el){ if(!el) return; el.classList.remove('bad'); void el.offsetWidth; el.classList.add('bad'); setTimeout(()=>el.classList.remove('bad'), 600); }
+function miss(msgLearn, msgExam, inputs){
+  S.errTotal++;
+  (inputs||[]).forEach(el=>{ shake(el); el.value=''; });
+  setHint(S.exam ? msgExam : msgLearn);
 }
 
 /* ───────── ввод ответа словами: "тридцать четыре" наравне с "34" ───────── */
@@ -1230,250 +1344,338 @@ function parseRuNumberWords(raw){
   const tens={двадцать:20,тридцать:30,сорок:40,пятьдесят:50,шестьдесят:60,семьдесят:70,восемьдесят:80,девяносто:90};
   const hundreds={сто:100,двести:200,триста:300,четыреста:400,пятьсот:500,шестьсот:600,семьсот:700,восемьсот:800,девятьсот:900};
   const thousandWords=new Set(['тысяча','тысячи','тысяч']);
-  const millionWords=new Set(['миллион','миллиона','миллионов']);
   let total=0, current=0, matched=false;
   for(const w of words){
     if(w in hundreds){ current+=hundreds[w]; matched=true; continue; }
     if(w in tens){ current+=tens[w]; matched=true; continue; }
     if(w in ones){ current+=ones[w]; matched=true; continue; }
     if(thousandWords.has(w)){ total+=(current||1)*1000; current=0; matched=true; continue; }
-    if(millionWords.has(w)){ total+=(current||1)*1000000; current=0; matched=true; continue; }
     return NaN;
   }
   total+=current;
   if(!matched) return NaN;
   return negative?-total:total;
 }
+const readNum = id => { const el=document.getElementById(id); return el ? parseRuNumber(el.value) : NaN; };
+const isNat = v => Number.isInteger(v) && v>0;
 
-/* ───────── логика решения ───────── */
-function onTapCell(field){
-  if(S.subPhase==='selectFirst'){
-    pushHistory();
-    S.selectedFirst = field;
-    S.subPhase = 'selectSecond';
-    renderAll(); setPrompt(); renderInputs();
+/* ───────── раздел 1: перебор делителей ───────── */
+// уровень 1 (не «Экзамен») — делители по одному, дальше можно списком
+const oneByOne = () => P && P.sec===0 && P.lvl===0;
+function submitDivisors(){
+  const inp = document.getElementById('ans');
+  if(!inp || !inp.value.trim()) return;
+  const n = P.nums[S.cur], list = S.divs[S.cur];
+  // список через запятую или пробел: «1, 2, 3» — так записывают в тетради
+  const tokens = inp.value.split(/[\s,;]+/).filter(Boolean);
+  // на первом уровне — строго по одному: каждый делитель ученик проверяет
+  // отдельно, а не получает общий вердикт по списку. Это не ошибка, а просьба
+  // — счёт ошибок не растёт
+  if(oneByOne() && tokens.length > 1){
+    setHint('На этом уровне делители вписываем по одному — впиши один и жми «Добавить».');
+    shake(inp);
     return;
   }
-  if(S.subPhase==='selectSecond'){
-    if(field===S.selectedFirst){
-      setHint('Нужно выбрать два РАЗНЫХ числа.');
-      return;
-    }
-    const firstIsNum = fieldRole(S.selectedFirst)==='n';
-    const secondIsNum = fieldRole(field)==='n';
-    if(firstIsNum === secondIsNum){
-      S.errTotal++;
-      setHint(S.exam ? 'Нужны числитель и знаменатель.' : 'Сокращать можно только числитель со знаменателем — не два числителя и не два знаменателя.');
-      S.selectedFirst = null;
-      S.subPhase = 'selectFirst';
-      renderAll(); setPrompt(); renderInputs();
-      return;
-    }
-    const numField = firstIsNum ? S.selectedFirst : field;
-    const denField = firstIsNum ? field : S.selectedFirst;
-    const g = gcd(curVal(numField), curVal(denField));
-    if(g<=1){
-      S.errTotal++;
-      setHint(S.exam ? 'У этих чисел нет общего делителя.' : `У ${curVal(numField)} и ${curVal(denField)} нет общего делителя больше 1 — попробуй другую пару.`);
-      S.selectedFirst = null;
-      S.subPhase = 'selectFirst';
-      renderAll(); setPrompt(); renderInputs();
-      return;
-    }
-    setHint(pick(['Верно!','Точно!','Отлично!']), true);
-    pushHistory();
-    S.selectedSecond = field;
-    S.pairNumField = numField;
-    S.pairDenField = denField;
-    S.subPhase = 'divisor';
-    renderAll(); setPrompt(); renderInputs();
+  const fresh = [], bad = [];
+  let dup = 0;
+  tokens.forEach(t=>{
+    const v = parseRuNumber(t);
+    if(!isNat(v)) return;
+    if(n % v !== 0){ if(!bad.includes(v)) bad.push(v); return; }
+    if(list.includes(v) || fresh.includes(v)){ dup++; return; }
+    fresh.push(v);
+  });
+  inp.value = '';
+  if(fresh.length){ pushHistory(); fresh.forEach(v=>list.push(v)); }
+  if(bad.length){
+    S.errTotal++;
+    shake(inp);
+    const why = bad.map(v=>`${n} ÷ ${v} = ${Math.floor(n/v)} (остаток ${n%v})`).join('; ');
+    const learn = (bad.length===1 ? `${bad[0]} — не делитель ${n}: ` : `${bad.join(', ')} — не делители ${n}: `) + why + '.';
+    const exam = bad.length===1 ? `${bad[0]} — не делитель ${n}.` : `${bad.join(', ')} — не делители ${n}.`;
+    setHint((S.exam ? exam : learn) + (fresh.length ? ` Остальное записано.` : ''));
+  } else if(fresh.length) praise();
+  else if(dup) setHint('Это уже выписано.');
+  renderAll();
+}
+function onAllDivisors(){
+  const n = P.nums[S.cur], list = S.divs[S.cur];
+  const missing = divisorsOf(n).filter(d=>!list.includes(d));
+  if(missing.length){
+    S.errTotal++;
+    // подсказка через пары: 3 есть — значит, есть и 36 : 3 = 12
+    const pairOf = list.slice().sort((a,b)=>a-b).find(d=>!list.includes(n/d));
+    const learn = pairOf !== undefined
+      ? `Выписаны не все. Подсказка: делители идут парами — ${pairOf} есть, значит, есть и ${n} ÷ ${pairOf} = ${n/pairOf}.`
+      : `Выписаны не все: не хватает ещё ${missing.length} ${plural(missing.length,'делителя','делителей','делителей')}. Проверь по порядку 1, 2, 3, … — делители идут парами.`;
+    setHint(S.exam ? 'Выписаны не все делители.' : learn);
+    return;
   }
+  pushHistory();
+  S.cur++;
+  if(S.cur >= P.nums.length) S.step = 'common';
+  praise();
+  renderAll();
+}
+function onTapDivisor(v, el){
+  if(S.phase!=='solve' || S.step!=='common') return;
+  if(S.common.includes(v)){
+    pushHistory();
+    S.common = S.common.filter(x=>x!==v);
+    setHint('');
+    renderAll();
+    return;
+  }
+  const lacking = P.nums.filter((n,i)=>!S.divs[i].includes(v));
+  if(lacking.length){
+    S.errTotal++;
+    shakeChip(el);
+    setHint(S.exam ? `${v} — не общий делитель.` : `${v} нет среди делителей ${lacking.join(' и ')} — это не общий делитель.`);
+    return;
+  }
+  pushHistory();
+  S.common.push(v);
+  praise();
+  renderAll();
+}
+function onAllCommon(){
+  const expected = divisorsOf(answerG());
+  if(S.common.length < expected.length){
+    S.errTotal++;
+    const left = expected.length - S.common.length;
+    setHint(S.exam ? 'Отмечены не все общие делители.' : `Отмечены не все: общих делителей ещё ${left} — ищи число, которое есть в каждой строке.`);
+    return;
+  }
+  pushHistory();
+  S.step = 'answer';
+  praise();
+  renderAll();
+}
+function submitListAnswer(){
+  const inp = document.getElementById('ans');
+  if(!inp || inp.value==='') return;
+  const v = parseRuNumber(inp.value), g = answerG();
+  if(v!==g){
+    const learn = S.common.includes(v)
+      ? `${v} — общий делитель, но не наибольший.`
+      : `Нужен наибольший из отмеченных: ${S.common.slice().sort((a,b)=>a-b).join(', ')}.`;
+    miss(learn, 'Нужен наибольший общий делитель.', [inp]);
+    return;
+  }
+  inp.value = '';
+  pushHistory();
+  finish();
 }
 
-function onDoneCancel(){
-  setHint('');
+/* ───────── раздел 2: разложение на простые множители ───────── */
+function divisibilityWhy(m, p){
+  const digits = String(m).split('').map(Number);
+  if(p===2) return `${m} — нечётное, на 2 не делится.`;
+  if(p===3) return `сумма цифр ${digits.join(' + ')} = ${digits.reduce((a,b)=>a+b,0)} не делится на 3 — значит, и ${m} не делится.`;
+  if(p===5) return `${m} оканчивается на ${digits[digits.length-1]}, а не на 0 или 5 — на 5 не делится.`;
+  return `${m} ÷ ${p} = ${Math.floor(m/p)} (остаток ${m%p}).`;
+}
+function submitFactorStep(){
+  const c = S.cols[S.cur];
+  const m = c.rows[c.rows.length-1];
+  if(S.sub==='div'){
+    const inp = document.getElementById('fdiv');
+    if(!inp || inp.value==='') return;
+    const p = parseRuNumber(inp.value);
+    if(!isNat(p) || p===1){
+      miss('Нужно простое число: 2, 3, 5, 7, 11, 13…', 'Нужно простое число.', [inp]);
+      return;
+    }
+    if(!isPrime(p)){
+      miss(`${p} — составное число (${p} = ${factorize(p).join(' · ')}). Делим только на простые: 2, 3, 5, 7, 11, 13…`, `${p} — не простое число.`, [inp]);
+      return;
+    }
+    if(m % p !== 0){
+      miss(`${divisibilityWhy(m, p)} Попробуй другое простое.`, `${m} не делится на ${p}.`, [inp]);
+      return;
+    }
+    pushHistory();
+    c.divs.push(p);
+    S.sub = 'quot';
+    praise();
+    renderAll();
+    return;
+  }
+  const inp = document.getElementById('fquot');
+  if(!inp || inp.value==='') return;
+  const p = c.divs[c.divs.length-1];
+  const v = parseRuNumber(inp.value);
+  if(v !== m/p){
+    miss(`Проверь деление: ${m} ÷ ${p} = ? — можно посчитать в «÷ Поделить» ниже.`, 'Проверь деление.', [inp]);
+    return;
+  }
   pushHistory();
-  enterMultiplyPhase();
+  c.rows.push(v);
+  S.sub = 'div';
+  if(v===1){
+    // число разложено: внизу 1 — переходим к следующему
+    S.facts[S.cur] = c.divs.slice().sort((a,b)=>a-b);
+    S.cur++;
+    if(S.cur >= S.cols.length) S.step = 'pick';
+    setHint(`${c.rows[0]} = ${c.divs.join(' · ')}${c.divs.length>1 && new Set(c.divs).size<c.divs.length ? ' = '+powForm(c.divs) : ''} — разложено!`, true);
+  } else praise();
+  renderAll();
+}
+function onTapFactor(r, k, el){
+  if(S.phase!=='solve' || S.step!=='pick') return;
+  const gi = S.groups.findIndex(g=>g.idx[r]===k);
+  if(gi>=0){
+    pushHistory();
+    S.groups.splice(gi, 1);
+    setHint('');
+    renderAll();
+    return;
+  }
+  const v = S.facts[r][k];
+  const idx = [];
+  const lacking = [];
+  S.facts.forEach((f,rr)=>{
+    if(rr===r){ idx[rr] = k; return; }
+    // берём в пару первый свободный такой же множитель другой строки
+    const kk = f.findIndex((x,j)=>x===v && !S.groups.some(g=>g.idx[rr]===j));
+    if(kk<0) lacking.push(rr); else idx[rr] = kk;
+  });
+  if(lacking.length){
+    S.errTotal++;
+    shakeChip(el);
+    const learn = lacking.map(rr=>{
+      const has = S.facts[rr].includes(v);
+      return has ? `у ${labelOf(rr)} все множители ${v} уже взяты в пару` : `у ${labelOf(rr)} нет множителя ${v}`;
+    }).join(', а ');
+    setHint(S.exam ? `${v} — не общий множитель.` : `Этот ${v} не общий: ${learn}.`);
+    return;
+  }
+  pushHistory();
+  S.groups.push({ v, idx });
+  praise();
+  renderAll();
+}
+function onAllFactors(){
+  const expected = commonFactors(S.facts).length;
+  if(S.groups.length < expected){
+    S.errTotal++;
+    setHint(S.exam ? 'Выбраны не все общие множители.' : `Выбраны не все: общих множителей ещё ${expected - S.groups.length}. Сравни строки — какой множитель есть в каждой и ещё не отмечен?`);
+    return;
+  }
+  pushHistory();
+  S.step = 'product';
+  if(expected) praise(); else setHint('');
+  renderAll();
+}
+function submitProduct(){
+  const inp = document.getElementById('ans');
+  if(!inp || inp.value==='') return;
+  const v = parseRuNumber(inp.value);
+  const vals = S.groups.map(g=>g.v);
+  const expected = prod(vals);
+  if(v!==expected){
+    const learn = vals.length
+      ? `Перемножь по порядку: ${vals.sort((a,b)=>a-b).join(' · ')}.`
+      : 'Если общих множителей нет, у чисел общий делитель только 1.';
+    miss(learn, vals.length ? 'Проверь умножение.' : 'У взаимно простых чисел НОД = 1.', [inp]);
+    return;
+  }
+  inp.value = '';
+  pushHistory();
+  finish();
+}
+
+/* ───────── раздел 3: алгоритм Евклида ───────── */
+function submitEuclid(){
+  const c = S.chains[S.ch];
+  const row = c.rows[c.rows.length-1];
+  if(S.step==='div'){
+    const iq = document.getElementById('eq'), ir = document.getElementById('er');
+    if(!iq || !ir || iq.value==='' || ir.value==='') return;
+    const qv = parseRuNumber(iq.value), rv = parseRuNumber(ir.value);
+    const q = Math.floor(row.x/row.y), r = row.x % row.y;
+    if(qv!==q){
+      const learn = Number.isInteger(qv) && row.y*qv > row.x
+        ? `${row.y} · ${qv} = ${row.y*qv} — это уже больше ${row.x}. Сколько раз ${row.y} целиком помещается в ${row.x}?`
+        : `Сколько раз ${row.y} целиком помещается в ${row.x}? Проверь: ${row.y} · ${Number.isInteger(qv)?qv+1:'…'} ещё не больше ${row.x}?`;
+      miss(learn, 'Неполное частное неверно.', [iq, ir]);
+      return;
+    }
+    if(rv!==r){
+      const learn = Number.isInteger(rv) && rv >= row.y
+        ? `Остаток всегда меньше делителя ${row.y}. Остаток = ${row.x} − ${row.y} · ${q}.`
+        : `Частное верное. Остаток = ${row.x} − ${row.y} · ${q} = ?`;
+      miss(learn, 'Остаток неверный.', [ir]);
+      return;
+    }
+    pushHistory();
+    row.q = q; row.r = r;
+    S.step = r===0 ? 'res' : 'pair';
+    praise();
+    renderAll();
+    return;
+  }
+  if(S.step==='pair'){
+    const ix = document.getElementById('ex'), iy = document.getElementById('ey');
+    if(!ix || !iy || ix.value==='' || iy.value==='') return;
+    const xv = parseRuNumber(ix.value), yv = parseRuNumber(iy.value);
+    if(xv!==row.y || yv!==row.r){
+      miss(`Дальше делим прежний делитель (${row.y}) на остаток (${row.r}).`, 'Не та пара чисел.', [ix, iy]);
+      return;
+    }
+    pushHistory();
+    c.rows.push({ x:row.y, y:row.r, q:null, r:null });
+    S.step = 'div';
+    praise();
+    renderAll();
+    return;
+  }
+  const inp = document.getElementById('ans');
+  if(!inp || inp.value==='') return;
+  const v = parseRuNumber(inp.value);
+  if(v!==row.y){
+    const learn = v===0
+      ? 'Ноль — это последний остаток. НОД — последний НЕнулевой остаток, то есть последний делитель в цепочке.'
+      : 'НОД — последний ненулевой остаток, то есть делитель в последней строке цепочки.';
+    miss(learn, 'Посмотри на последнюю строку цепочки.', [inp]);
+    return;
+  }
+  inp.value = '';
+  pushHistory();
+  c.res = row.y;
+  if(P.nums.length===3 && S.ch===0){
+    S.chains.push(mkChain(c.res, P.nums[2]));
+    S.ch = 1;
+    S.step = 'div';
+    praise();
+    renderAll();
+    return;
+  }
+  finish();
 }
 
 function submitAnswer(){
-  if(S.subPhase==='divisor'){
-    const inp = document.getElementById('ans');
-    if(!inp || inp.value==='') return;
-    const v = parseRuNumber(inp.value);
-    const numV = curVal(S.pairNumField), denV = curVal(S.pairDenField);
-    const isValidDivisor = v>1 && numV%v===0 && denV%v===0;
-    if(!isValidDivisor){
-      S.errTotal++;
-      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
-      setHint(S.exam ? 'Нужно число больше 1, на которое делятся оба нацело.' : `${numV} и ${denV} должны делиться на это число без остатка — попробуй другое.`);
-      inp.value=''; return;
-    }
-    setHint(pick(['Верно!','Точно!','Отлично!']), true);
-    inp.value='';
-    pushHistory();
-    S.divisor = v;
-    S.subPhase = 'fillResults';
-    renderAll(); setPrompt(); renderInputs();
-    return;
-  }
-
-  if(S.subPhase==='fillResults'){
-    const inpA = document.getElementById('inlineNumInput');
-    const inpB = document.getElementById('inlineDenInput');
-    if(!inpA || !inpB || inpA.value===''|| inpB.value==='') return;
-    const vA = parseRuNumber(inpA.value), vB = parseRuNumber(inpB.value);
-    const expA = curVal(S.pairNumField)/S.divisor, expB = curVal(S.pairDenField)/S.divisor;
-    if(vA!==expA || vB!==expB){
-      S.errTotal++;
-      [inpA,inpB].forEach(el=>{ el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); });
-      setHint(S.exam ? 'Раздели оба числа на найденный делитель.' : `${curVal(S.pairNumField)} ÷ ${S.divisor} и ${curVal(S.pairDenField)} ÷ ${S.divisor}.`);
-      inpA.value=''; inpB.value=''; return;
-    }
-    setHint(pick(['Верно!','Точно!','Отлично!']), true);
-    inpA.value=''; inpB.value='';
-    pushHistory();
-    const nIdx = fieldIdx(S.pairNumField), dIdx = fieldIdx(S.pairDenField);
-    if(!S.struckN[nIdx]) S.struckN[nIdx] = [];
-    if(!S.struckD[dIdx]) S.struckD[dIdx] = [];
-    S.struckN[nIdx].push(expA);
-    S.struckD[dIdx].push(expB);
-    S.selectedFirst = null; S.selectedSecond = null;
-    S.pairNumField = null; S.pairDenField = null; S.divisor = null;
-    S.subPhase = 'selectFirst';
-    renderAll(); setPrompt(); renderInputs();
-    return;
-  }
-
-  if(S.subPhase==='multiplyNum'){
-    const inp = document.getElementById('ans');
-    if(!inp || inp.value==='') return;
-    const v = parseRuNumber(inp.value);
-    const expected = S.numChain.reduce((a,b)=>a*b,1);
-    if(v!==expected){
-      S.errTotal++;
-      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
-      setHint(S.exam ? 'Проверь умножение.' : `Перемножь все числители: ${S.numChain.join(' × ')}.`);
-      inp.value=''; return;
-    }
-    setHint(pick(['Верно!','Точно!','Отлично!']), true);
-    inp.value='';
-    pushHistory();
-    S.productNum = expected;
-    S.subPhase = 'multiplyDen';
-    renderAll(); setPrompt(); renderInputs();
-    return;
-  }
-
-  if(S.subPhase==='multiplyDen'){
-    const inp = document.getElementById('ans');
-    if(!inp || inp.value==='') return;
-    const v = parseRuNumber(inp.value);
-    const expected = S.denChain.reduce((a,b)=>a*b,1);
-    if(v!==expected){
-      S.errTotal++;
-      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
-      setHint(S.exam ? 'Проверь умножение.' : `Перемножь все знаменатели: ${S.denChain.join(' × ')}.`);
-      inp.value=''; return;
-    }
-    setHint(pick(['Верно!','Точно!','Отлично!']), true);
-    inp.value='';
-    pushHistory();
-    S.productDen = expected;
-    checkFinalSimplify();
-    return;
-  }
-
-  if(S.subPhase==='finalDivisor'){
-    const inp = document.getElementById('ans');
-    if(!inp || inp.value==='') return;
-    const v = parseRuNumber(inp.value);
-    const isValidDivisor = v>1 && S.productNum%v===0 && S.productDen%v===0;
-    if(!isValidDivisor){
-      S.errTotal++;
-      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
-      setHint(S.exam ? 'Нужно число больше 1, на которое делятся оба нацело.' : `${S.productNum} и ${S.productDen} должны делиться на это число без остатка — попробуй другое.`);
-      inp.value=''; return;
-    }
-    setHint(pick(['Верно!','Точно!','Отлично!']), true);
-    inp.value='';
-    pushHistory();
-    S.divisor = v;
-    S.subPhase = 'finalFill';
-    renderAll(); setPrompt(); renderInputs();
-    return;
-  }
-
-  if(S.subPhase==='finalFill'){
-    const inpA = document.getElementById('inlineNumInput');
-    const inpB = document.getElementById('inlineDenInput');
-    if(!inpA || !inpB || inpA.value===''|| inpB.value==='') return;
-    const vA = parseRuNumber(inpA.value), vB = parseRuNumber(inpB.value);
-    const expA = S.productNum/S.divisor, expB = S.productDen/S.divisor;
-    if(vA!==expA || vB!==expB){
-      S.errTotal++;
-      [inpA,inpB].forEach(el=>{ el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); });
-      setHint(S.exam ? 'Раздели оба числа на найденный делитель.' : `${S.productNum} ÷ ${S.divisor} и ${S.productDen} ÷ ${S.divisor}.`);
-      inpA.value=''; inpB.value=''; return;
-    }
-    setHint(pick(['Верно!','Точно!','Отлично!']), true);
-    inpA.value=''; inpB.value='';
-    pushHistory();
-    afterFinalSimplify(expA, expB);
-    return;
-  }
-
-  if(S.subPhase==='mixedWhole'){
-    const inp = document.getElementById('ans');
-    if(!inp || inp.value==='') return;
-    const v = parseRuNumber(inp.value);
-    const expected = Math.floor(S.resultNum/S.resultDen);
-    if(v!==expected){
-      S.errTotal++;
-      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
-      setHint(S.exam ? 'Раздели числитель на знаменатель нацело.' : `Сколько раз ${S.resultDen} помещается в ${S.resultNum} целиком?`);
-      inp.value=''; return;
-    }
-    setHint(pick(['Верно!','Точно!','Отлично!']), true);
-    inp.value='';
-    pushHistory();
-    S.whole = expected;
-    S.subPhase = 'mixedRemainder';
-    renderAll(); setPrompt(); renderInputs();
-    return;
-  }
-
-  if(S.subPhase==='mixedRemainder'){
-    const inp = document.getElementById('ans');
-    if(!inp || inp.value==='') return;
-    const v = parseRuNumber(inp.value);
-    const fullNum = S.resultNum, fullDen = S.resultDen;
-    const expected = fullNum - S.whole*fullDen;
-    if(v!==expected){
-      S.errTotal++;
-      inp.classList.remove('shake'); void inp.offsetWidth; inp.classList.add('shake');
-      setHint(S.exam ? 'Посчитай остаток.' : `${fullNum} − ${S.whole}×${fullDen} = ?`);
-      inp.value=''; return;
-    }
-    setHint(pick(['Верно!','Точно!','Отлично!']), true);
-    inp.value='';
-    pushHistory();
-    S.resultNum = expected;
-    finish();
-    return;
-  }
+  if(!S || S.phase!=='solve') return;
+  if(P.sec===0){
+    if(S.step==='divs') submitDivisors();
+    else if(S.step==='common') onAllCommon();
+    else submitListAnswer();
+  } else if(P.sec===1){
+    if(S.step==='fact') submitFactorStep();
+    else if(S.step==='pick') onAllFactors();
+    else submitProduct();
+  } else submitEuclid();
 }
 
 function finish(){
   S.phase='done';
-  S.subPhase=null;
-  renderAll(); setPrompt(); renderInputs();
+  renderAll();
   // Промпт №67: пример уже закрыт ответом сразу (quick-answer.js) — второй
   // раз не засчитываем, шаги были разбором
   if (!QuickAnswer.settled(S)) {
     let stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
     document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
-    totalSolved++; solvedByLevel[curLevel]++;
+    totalSolved++; solvedByLevel[curSection][curLevel]++;
     streak = (S.errTotal===0) ? streak+1 : 0;
   }
   document.getElementById('stSolved').textContent = totalSolved;
@@ -1483,29 +1685,48 @@ function finish(){
   renderLevels();
 }
 
-/* ───────── интерфейс уровней ───────── */
+/* ───────── разделы и уровни ───────── */
+function renderSections(){
+  const el = document.getElementById('sections');
+  el.innerHTML = SECTIONS.map(s=>
+    `<button class="lvl sec ${s.id===curSection?'active':''}" data-sec="${s.id}" title="${s.title}"><span class="sec-num">${s.id+1}.</span>${s.title}</button>`
+  ).join('');
+  el.querySelectorAll('.lvl').forEach(b=>b.onclick=()=>{
+    const sec = Number(b.dataset.sec);
+    if(sec===curSection) return;
+    curSection = sec; curLevel = 0;
+    renderSections(); renderTheory(); renderLevels(); newProblem();
+  });
+}
+function renderTheory(){
+  document.getElementById('secTheory').innerHTML = SECTIONS[curSection].theory;
+}
 function renderLevels(){
   const el = document.getElementById('levels');
-  el.innerHTML = LEVELS.map(L=>
-    `<button class="lvl ${L.id===curLevel?'active':''}" data-id="${L.id}" title="${L.desc}">
-      ${L.name}${solvedByLevel[L.id]>=5?'<span class="done-mark">★</span>':''}
+  const L = LEVELS_OF(curSection);
+  el.innerHTML = L.map((lv,i)=>
+    `<button class="lvl ${i===curLevel?'active':''}" data-id="${i}" title="${lv.desc}">
+      ${lv.name}${solvedByLevel[curSection][i]>=5?'<span class="done-mark">★</span>':''}
     </button>`
   ).join('');
   el.querySelectorAll('.lvl').forEach(b=>b.onclick=()=>{
     curLevel = Number(b.dataset.id);
     renderLevels(); newProblem();
   });
+  document.getElementById('lvlDesc').textContent = L[curLevel] ? L[curLevel].desc : '';
 }
 document.getElementById('nextBtn').onclick = newProblem;
 
-/* ───────── плавающая клавиатура ───────── */
+/* ───────── плавающая клавиатура ─────────
+   Вместо минуса — запятая: отрицательных чисел здесь нет, а делители в
+   первом разделе удобно вводить списком «1, 2, 3» */
 let activeInputId = 'ans';
 let keypadOpen = true;
 function setupFloatingKeypad(){
-  const keys = ['7','8','9','4','5','6','1','2','3','−','0','⌫'];
+  const keys = ['7','8','9','4','5','6','1','2','3',',','0','⌫'];
   document.getElementById('keypadButtons').innerHTML = keys.map(k=>{
-    const cls = k==='−' ? 'kp-minus' : (k==='⌫' ? 'kp-back' : '');
-    const val = k==='⌫' ? 'back' : (k==='−' ? '-' : k);
+    const cls = k===',' ? 'kp-comma' : (k==='⌫' ? 'kp-back' : '');
+    const val = k==='⌫' ? 'back' : k;
     return `<button type="button" class="${cls}" data-key="${val}">${k}</button>`;
   }).join('') + `<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>`;
   document.querySelectorAll('#keypadButtons button').forEach(btn=>{
@@ -1564,40 +1785,51 @@ function makeKeypadDraggable(floatEl, handleEl){
   });
 }
 function keypadPress(ch){
-  if(ch==='enter'){ document.getElementById('goBtn')?.click(); return; }
+  if(ch==='enter'){
+    // Ввод на клавиатуре — как Enter в поле: в паре полей сначала переходит ко второму
+    const inp = document.getElementById(activeInputId);
+    if(inp) inp.dispatchEvent(new KeyboardEvent('keydown', { key:'Enter', bubbles:true }));
+    else document.getElementById('goBtn')?.click();
+    return;
+  }
   const inp = document.getElementById(activeInputId);
   if(!inp) return;
   if(ch==='back') inp.value = inp.value.slice(0,-1);
+  else if(ch===',') inp.value = (inp.value||'').replace(/[\s,]*$/,'') + (inp.value.trim() ? ', ' : '');
   else inp.value = (inp.value||'') + ch;
   inp.focus();
 }
 function syncKeypadVisibility(){
-  const needsInput = S && S.phase==='solve' && ['divisor','fillResults','multiplyNum','multiplyDen','finalDivisor','finalFill','mixedWhole','mixedRemainder'].includes(S.subPhase);
+  const needsInput = !!(S && P && S.phase==='solve' && !(P.sec===0 && S.step==='common') && !(P.sec===1 && S.step==='pick'));
   document.getElementById('keypadFloat').style.display = (needsInput && keypadOpen) ? 'block' : 'none';
   document.getElementById('kpToggle').style.display = (needsInput && !keypadOpen) ? 'flex' : 'none';
 }
 
 setupFloatingKeypad();
+renderSections();
+renderTheory();
 renderLevels();
 newProblem();
 
 
-/* ═══ Промпт №33: совместная работа и в самом примере, а не только на доске ═══
-   Здесь нет ни списка типов, ни режимов — есть один пример на экране. Его и
-   синхронизируем целиком: сам пример (P), ход решения (S) и уровень. Тогда в
-   общей сессии учитель и ученик реально смотрят на один и тот же столбик, а
-   не каждый на свой. Доска подмешивается сюда же. */
+/* ═══ Совместная работа (по образцу дробных тренажёров, промпты №33 и №54) ═══
+   Один пример на экране — синхронизируем его целиком: раздел, уровень, сам
+   пример (P) и ход решения (S). Доска и карточки «+» подмешиваются сюда же. */
 /* ═══ Промпт №67: ответ можно вписать сразу, без решения по шагам ═══
    Панель «Ответ» над панелью шагов — quick-answer.js. Итог лежит в S.quick
    и уходит собеседнику вместе с S; счёт ведём здесь, как в finish(). */
 QuickAnswer.mount({
-  fields: P => (P.sim && P.sim.resultDen) ? [{ id: 'main', label: '', type: 'frac', value: P.sim.resultNum + '/' + P.sim.resultDen }] : null,
+  fields: P => {
+    if (!Array.isArray(P.nums) || !P.nums.length) return null;
+    const g2 = (a, b) => { while (b) { [a, b] = [b, a % b]; } return Math.abs(a); };
+    return [{ id: 'main', label: 'НОД =', type: 'num', value: String(P.nums.reduce(g2)) }];
+  },
   getP: () => P, getS: () => S,
   onRight(){
     // засчитываем так же, как finish() после шагов: звёзды по ошибкам, решено, серия
     const stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
     document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
-    totalSolved++; solvedByLevel[curLevel]++;
+    totalSolved++; solvedByLevel[curSection][curLevel]++;
     streak = (S.errTotal===0) ? streak+1 : 0;
     document.getElementById('stSolved').textContent = totalSolved;
     document.getElementById('stStreak').textContent = streak;
@@ -1619,72 +1851,64 @@ QuickAnswer.mount({
 function tsGetState(){
   const base = {
     solo: true,                                   // метка: тренажёр без выбора типов
+    curSection: typeof curSection !== 'undefined' ? curSection : null,
     curLevel: typeof curLevel !== 'undefined' ? curLevel : null,
     P: typeof P !== 'undefined' ? P : null,
     S: typeof S !== 'undefined' ? S : null,
   };
   if (window.__boardGetState) Object.assign(base, window.__boardGetState());
-  if (window.__cardsGetState) Object.assign(base, window.__cardsGetState()); // Промпт №33 — добавленные примеры
+  if (window.__cardsGetState) Object.assign(base, window.__cardsGetState());
   return base;
 }
 function tsApplyState(state){
   if (!state) return;
   if (window.__boardApplyState) window.__boardApplyState(state);
-  if (window.__cardsApplyState) window.__cardsApplyState(state); // Промпт №33
+  if (window.__cardsApplyState) window.__cardsApplyState(state);
   if (!state.solo || typeof state.P === 'undefined' || state.P === null) return;
   // перерисовываем только при настоящем изменении: снимок прилетает на каждый
   // штрих собеседника, а лишняя перерисовка сбрасывала бы ввод под пальцами
   let same = false;
   try {
-    same = JSON.stringify([curLevel, P, S]) === JSON.stringify([state.curLevel, state.P, state.S]);
+    same = JSON.stringify([curSection, curLevel, P, S]) === JSON.stringify([state.curSection, state.curLevel, state.P, state.S]);
   } catch (e) {}
   if (same) return;
+  const secChanged = state.curSection !== curSection;
+  curSection = typeof state.curSection === 'number' ? state.curSection : 0;
   curLevel = state.curLevel;
   P = state.P;
   S = state.S;
   try {
-    if (typeof renderAll === 'function') renderAll();
-    if (typeof setPrompt === 'function') setPrompt();
-    if (typeof renderInputs === 'function') renderInputs();
+    // теорию перерисовываем только при смене раздела: иначе на каждый шаг
+    // собеседника прыгала бы вёрстка над листом
+    renderSections();
+    if (secChanged) renderTheory();
+    renderLevels();
+    document.getElementById('nextBtn').style.display = S && S.phase==='done' ? 'block' : 'none';
+    renderAll();
   } catch (e) { console.error('[sync] не удалось применить пример:', e); }
 }
 
-/* ═══ Промпт №54: эхо собеседника и медленное подключение ═══
-   Состояние здесь отслеживается таймером (см. watchState ниже), и у этого
-   были две дыры. Первая — эхо: получив снимок от собеседника, страница
-   через 300 мс своим же таймером отправляла его обратно. Если за это время
-   тот успевал сделать следующее действие (новое задание, следующий шаг
-   решения), запоздавшее эхо откатывало его назад, и откат расходился всем.
-   Вторая — первый тик таймера рассылал то, что страница придумала себе
-   сама при загрузке: у присоединившегося с медленным ответом базы это был
-   экран выбора типа или случайный пример, и он перебивал задание учителя.
-   Поэтому: пришедшее от собеседника назад не рассылаем (tsPeerSig — один
-   раз, до первой своей правки), а исходная подпись таймера — то, что уже
-   на экране. */
-function tsWatchSig(s){ return JSON.stringify([s.curLevel, s.P, s.S]); }
+/* Эхо и медленное подключение — ровно по схеме промпта №54 (HANDOFF, раздел 4):
+   пришедшее от собеседника назад не рассылаем (tsPeerSig — один раз, до
+   первой своей правки), исходная подпись таймера — то, что уже на экране,
+   а у состояния задания есть версия, чтобы запоздавший снимок со штрихом
+   доски не откатывал свежий шаг решения. */
+function tsWatchSig(s){ return JSON.stringify([s.curSection, s.curLevel, s.P, s.S]); }
 let tsPeerSig = null;
-/* Версия задания в общем снимке. Снимок уходит не только при правке задания,
-   но и с каждым штрихом доски — и несёт то задание, которое было у
-   отправителя В ТОТ МОМЕНТ. Без версии такой снимок, догнавший свежий ответ
-   ученика, откатывал ответ обратно; а две одновременные правки расходились
-   навсегда (каждый применял чужую и молчал). Поэтому у состояния задания есть
-   номер правки и автор: чужое применяется, только если оно новее своего, при
-   равных номерах решает автор — одинаково у всех участников. */
 let tsRev = -1, tsRevBy = '';
 const tsMe = Math.random().toString(36).slice(2, 10);
 function tsGetStateVersioned(){
   return Object.assign(tsGetState(), { __tsRev: tsRev, __tsBy: tsRevBy });
 }
 function tsIncomingWins(state){
-  if (typeof state.__tsRev !== 'number') return true;   // вкладка до №54, без версий — как раньше
-  if (tsRev < 0) return true;                           // у нас своей версии ещё нет
+  if (typeof state.__tsRev !== 'number') return true;
+  if (tsRev < 0) return true;
   if (state.__tsRev !== tsRev) return state.__tsRev > tsRev;
   return String(state.__tsBy || '') > tsRevBy;
 }
 function tsApplyStateFromPeer(state){
   if (!state) return;
   if (!tsIncomingWins(state)) {
-    // задание в снимке не новее нашего — берём из него только доску и карточки
     if (window.__boardApplyState) window.__boardApplyState(state);
     if (window.__cardsApplyState) window.__cardsApplyState(state);
     return;
@@ -1696,10 +1920,7 @@ function tsApplyStateFromPeer(state){
 window.__trainerState = { get: tsGetState, apply: tsApplyState,
   newTask: function(){ if (typeof newProblem === 'function') newProblem(); } };
 if (window.TrainerSession) {
-  window.TrainerSession.init({ trainer: 'fraction_multiply', getState: tsGetStateVersioned, applyState: tsApplyStateFromPeer });
-  /* Здесь, как и в остальных тренажёрах кроме ОГЭ №8, вызовов push() по коду
-     нет — вместо того чтобы дописывать их в каждую кнопку, следим за
-     состоянием и рассылаем, как только оно изменилось. */
+  window.TrainerSession.init({ trainer: 'gcd', getState: tsGetStateVersioned, applyState: tsApplyStateFromPeer });
   (function watchState(){
     let last = '';
     try { last = tsWatchSig(tsGetState()); } catch (e) {}
@@ -1709,13 +1930,10 @@ if (window.TrainerSession) {
       catch (e) { return; }
       if (sig === last) return;
       last = sig;
-      // пришедшее от собеседника назад не шлём, но только один раз: после
-      // любой своей правки подпись собеседника уже не действует — иначе
-      // возврат к ней (снял только что поставленную отметку) не ушёл бы
       const echo = sig === tsPeerSig;
       tsPeerSig = null;
       if (echo) return;
-      tsRev = Math.max(tsRev, 0) + 1; tsRevBy = tsMe;   // своя правка — новая версия
+      tsRev = Math.max(tsRev, 0) + 1; tsRevBy = tsMe;
       window.TrainerSession.push();
     }, 300);
   })();

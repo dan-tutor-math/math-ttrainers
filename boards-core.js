@@ -2102,6 +2102,7 @@ function scheduleRedraw(){
     if (!boardActive) return;
     render(ctx, cssW, cssH, cam, true);
     syncTextEditorToCam();
+    syncTaskOverlays();   // Промпт №66
   });
 }
 // открытое поле редактирования текста «приклеено» к своей мировой точке —
@@ -2324,6 +2325,10 @@ function renderImageObject(c, obj, camv){
     c.font = '13px ' + UI_FONT_FAMILY; c.textAlign='center'; c.textBaseline='middle';
     c.fillText('Загрузка…', p0.x + w/2, p0.y + h/2);
   }
+  // Промпт №66: на экране ответ показывают живые элементы поверх картинки,
+  // а в выгрузку (PNG/PDF рисуются своей камерой) их не попадает — там
+  // рисуем введённое и отметки прямо на холсте
+  if (obj.task && activeCam !== cam) drawTaskStateForExport(c, obj, p0.x, p0.y, w, h);
   c.restore();
 }
 
@@ -3852,6 +3857,8 @@ const TRAINER_CAPTURE = {
   quadratic: [ { sel:'#eqLine' } ],
   frac_mul:  [ { sel:'#board' } ],
   frac_div:  [ { sel:'#board' } ],
+  // Промпт №65: у НОД условие лежит отдельно от листа с решением
+  gcd:       [ { sel:'#taskLine' } ],
   powers:    [ { sel:'#questionPanel' }, { selAll:'.added-task-card .added-card-question' } ],
 };
 // Промпт №55: ЕГЭ профиль — одна страница на все 20 позиций (ege_prof.html?n=…),
@@ -3902,6 +3909,7 @@ const TRAINERS_PANEL_GROUPS = [
     // Промпт №54: тренажёр степеней появился на главной позже этой панели,
     // сюда его добавить забыли
     { id:'powers',    name:'Действия со степенями',   href:'powers.html',            eq:'a⁵·a³=a⁸' },
+    { id:'gcd',       name:'Наибольший общий делитель (НОД)', href:'gcd.html',    eq:'НОД(84, 60)' },
   ]},
 ];
 // ЕГЭ профиль вставляем вторым разделом (после ОГЭ) — те же названия, что в
@@ -4069,24 +4077,71 @@ function hideTrainersToast(){ trainersToastEl.classList.remove('show'); }
 // рендерится по-настоящему (шрифты, KaTeX, таблицы), а не просто копируется
 // как текст, поэтому нужен html2canvas, а не Basket (тот отдаёт HTML/текст
 // для живого повторного показа, не растровую картинку)
-async function captureTrainerNode(el){
+// Промпт №66: если у задания известен ответ (task — см. trainerTaskInfo),
+// снимок делается с «чистого» клона (без введённого ответа, подсветки и
+// разбора) и в том же клоне замеряются поле ответа, варианты и кнопка
+// «Проверить» — поверх этих мест на доске лягут живые элементы. Замер именно
+// в клоне, а не на живой странице: чистка клона меняет вёрстку (прячется
+// разбор), и координаты с живой страницы съехали бы. Возвращает
+// { dataUrl, hot } — hot === null, если задание не интерактивное.
+async function captureTrainerNode(el, task){
   if (typeof html2canvas !== 'function') throw new Error('html2canvas not loaded');
   const doc = el.ownerDocument;
   const win = doc.defaultView;
   const bg = win ? win.getComputedStyle(doc.body).backgroundColor : '';
+  const bgColor = (bg && bg !== 'rgba(0, 0, 0, 0)') ? bg : '#ffffff';
+  const scale = Math.min(2, window.devicePixelRatio || 1);
+  let hot = null;
+  const mark = task ? 'c' + uid() : null;
+  if (mark) el.setAttribute('data-bd-cap', mark);
   // html2canvas старается разобрать все стили страницы, в том числе внешние
   // (шрифты с Google Fonts и т.п.) — если у ученика/учителя в этот момент
   // плохая сеть, разбор может надолго зависнуть; ограничиваем снимок по
   // времени, чтобы кнопка не осталась «залипшей», а показывалась понятная
   // ошибка и можно было попробовать ещё раз
   const canvasPromise = html2canvas(el, {
-    backgroundColor: (bg && bg !== 'rgba(0, 0, 0, 0)') ? bg : '#ffffff',
-    scale: Math.min(2, window.devicePixelRatio || 1),
+    backgroundColor: bgColor,
+    scale,
     useCORS: true,
+    onclone: mark ? (cloneDoc) => {
+      const c = cloneDoc.querySelector('[data-bd-cap="' + mark + '"]');
+      if (c) hot = prepareTaskClone(c, task);
+    } : undefined,
   });
   const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('capture timeout')), 20000));
-  const canvas = await Promise.race([canvasPromise, timeoutPromise]);
-  return canvas.toDataURL('image/png');
+  let canvas;
+  try { canvas = await Promise.race([canvasPromise, timeoutPromise]); }
+  finally { if (mark) el.removeAttribute('data-bd-cap'); }
+  if (task && hot) {
+    // html2canvas берёт размер холста не всегда по той же рамке, что
+    // getBoundingClientRect в клоне (у столбиков холст уже рамки узла) —
+    // доли пересчитываем к настоящему размеру снимка
+    const cw = canvas.width / scale, ch = canvas.height / scale;
+    const kx = hot.w / cw, ky = hot.h / ch;
+    if (Math.abs(kx - 1) > 0.01 || Math.abs(ky - 1) > 0.01) {
+      const fix = r => r && ({ x: r.x * kx, y: r.y * ky, w: r.w * kx, h: r.h * ky });
+      hot.fields = hot.fields.map(fix); hot.opts = hot.opts.map(fix); hot.check = fix(hot.check);
+    }
+    hot.w = cw; hot.h = ch;
+  }
+  if (task && hot && hot.fields.length && hot.style) {
+    // фон поля в тренажёре полупрозрачный (стекло поверх панели) — живое
+    // поле с тем же rgba просвечивало бы нарисованный под ним «?». Берём
+    // готовый цвет пикселя со снимка у левого края поля, внутри рамки
+    try {
+      const f = hot.fields[0];
+      const px = canvas.getContext('2d').getImageData(
+        Math.round((f.x * hot.w + 6) * scale), Math.round((f.y + f.h / 2) * hot.h * scale), 1, 1).data;
+      hot.style.inBg = 'rgb(' + px[0] + ',' + px[1] + ',' + px[2] + ')';
+    } catch (e) {}
+  }
+  if (task && hot) {
+    // чего на снимке не нашлось (у ЕГЭ снимается одно условие, у столбиков —
+    // сам пример), то дорисовываем строкой ниже: подпись, поле, кнопка
+    const baked = bakeTaskRows(canvas, task, hot, bgColor, scale);
+    if (baked) { canvas = baked.canvas; hot = baked.hot; }
+  }
+  return { dataUrl: canvas.toDataURL('image/png'), hot: (task && hot && hotIsUsable(task, hot)) ? hot : null };
 }
 
 // собрать список узлов текущего задания по TRAINER_CAPTURE — см. комментарий
@@ -4131,7 +4186,7 @@ function trainersAwareCenterWorld(){
 // что и у обычной вставленной картинки (см. imgModalInsert выше), только
 // предел размера крупнее: это не иллюстрация для справки, а само задание —
 // его нужно будет читать и решать прямо на доске
-async function insertTaskImage(dataUrl){
+async function insertTaskImage(dataUrl, task){
   const size = await loadImageSize(dataUrl);
   const maxDim = 520;
   let w = size.w, h = size.h;
@@ -4139,7 +4194,11 @@ async function insertTaskImage(dataUrl){
   const center = trainersAwareCenterWorld();
   const pt = { x: center.x - w/2 + trainersInsertOffset, y: center.y - h/2 + trainersInsertOffset };
   trainersInsertOffset += 28;
-  const obj = { id: uid(), type:'image', src: dataUrl, points:[pt], w, h, natW: size.w, natH: size.h };
+  // Промпт №66: задание с тренажёра сразу закреплено — ластиком его не
+  // стереть и случайным касанием не сдвинуть (двигают его после двойного
+  // клика, как любую закреплённую картинку; открепить — из меню)
+  const obj = { id: uid(), type:'image', src: dataUrl, points:[pt], w, h, natW: size.w, natH: size.h, locked: true };
+  if (task) obj.task = task;
   pushUndo();
   B.objects.push(obj);
 }
@@ -4154,10 +4213,13 @@ trainersAddBtn.addEventListener('click', async () => {
   trainersAddBtn.disabled = true;
   let added = 0;
   try {
+    const win = trainersIframe.contentWindow;
     for (const { el, restore } of nodes){
       try {
-        const dataUrl = await captureTrainerNode(el);
-        await insertTaskImage(dataUrl);
+        // ответ читаем до снимка — пока на странице то же задание, что снимаем
+        const info = trainerTaskInfo(win, trainersOpenId, el);
+        const shot = await captureTrainerNode(el, info);
+        await insertTaskImage(shot.dataUrl, (info && shot.hot) ? Object.assign({ v: 1 }, info, { hot: shot.hot }) : null);
         added++;
       } finally {
         if (restore) restore();
@@ -4174,6 +4236,869 @@ trainersAddBtn.addEventListener('click', async () => {
     showTrainersToast('Не получилось добавить задание');
   }
 });
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Промпт №66: ЗАДАНИЯ С ТРЕНАЖЁРОВ НА ДОСКЕ — ЖИВЫЕ.
+   Картинка задания остаётся обычной картинкой (на ней можно писать, её
+   видно в выгрузке, она едет в общую доску как раньше), а в объекте лежит
+   ещё поле task: какой ответ верный и где на картинке поле ответа, варианты
+   и кнопка «Проверить». Поверх этих мест доска кладёт настоящие <input> и
+   кнопки (слой #bdTaskLayer над холстом) и двигает их вместе с камерой.
+
+   task = {
+     v: 1,
+     kind: 'fields' | 'choice' | 'multi',
+     fields: [{ id, label, type, value, alts, seq, anyOrder, unit }],  // fields
+     n, correct,            // choice: номер верного; multi: массив номеров
+     hot: { w, h,           // размер снятого узла в CSS-пикселях тренажёра
+            fields: [{x,y,w,h}], opts: [{x,y,w,h}], check: {x,y,w,h},
+            style: {...} }, // доли от размеров картинки (0..1)
+     st: { res: 'ok'|'bad', vals, marks, pick, picks, tries }   // после проверки
+   }
+
+   Почему ответ берётся из самого тренажёра, а не вычисляется доской: у
+   каждого тренажёра своя модель задания, и повторять генераторы здесь —
+   значит разойтись с ними при первой же правке. Все они отдают состояние
+   через tsGetState() (мост совместной сессии), и из него же — curTask/P.
+   ЕГЭ держит задание в константе S, до неё достаём через eval окна кадра
+   (тот же домен, файлы тренажёров не меняются).
+
+   Черновик (что набрано, но не проверено, какие утверждения отмечены) живёт
+   только в taskDrafts, а в объект попадает при нажатии «Проверить»: иначе
+   каждое нажатие клавиши гоняло бы в общую доску всю картинку целиком
+   (объект тяжелее 30 КБ едет через базу, раздел 7 HANDOFF).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+function trainerEval(win, expr){
+  try { return win.eval(expr); } catch (e) { return undefined; }
+}
+function plainCopy(x){ try { return x == null ? x : JSON.parse(JSON.stringify(x)); } catch (e) { return null; } }
+function gcdOfList(nums){
+  const g = (a, b) => { a = Math.abs(a); b = Math.abs(b); while (b) { [a, b] = [b, a % b]; } return a; };
+  return (nums || []).reduce((acc, x) => g(acc, x), 0);
+}
+function numField(v, label, extra){
+  return Object.assign({ id: 'main', label: label || 'Ответ:', type: 'num', value: String(v) }, extra || {});
+}
+
+// ОГЭ №1–19 и «Степени»: curTask одинаковой формы во всех тренажёрах —
+// варианты (options + correctIndex), утверждения (№19), число (correctValue
+// или answer у №10)
+function taskFromCurTask(t){
+  if (!t) return null;
+  if (Array.isArray(t.options) && typeof t.correctIndex === 'number' && t.correctIndex >= 0 && t.correctIndex < t.options.length)
+    return { kind: 'choice', n: t.options.length, correct: t.correctIndex };
+  if (Array.isArray(t.statements) && t.statements.length){
+    const correct = [];
+    t.statements.forEach((s, i) => { if (s && s.isTrue) correct.push(i); });
+    return { kind: 'multi', n: t.statements.length, correct };
+  }
+  const v = t.correctValue !== undefined ? t.correctValue : t.answer;
+  if (typeof v === 'number' && isFinite(v)) return { kind: 'fields', fields: [numField(v, null, t.unit ? { unit: t.unit } : null)] };
+  return null;
+}
+
+function egeTaskInfo(win, cardIdx){
+  const p = trainerEval(win, cardIdx >= 0
+    ? 'protoById(S.n, S.cards[' + cardIdx + '].pid)'
+    : 'protoById(S.n, S.pid)');
+  // доказательство (ОГЭ №24) проверять нечем — только картинка
+  if (!p || p.proof || typeof win.fieldsOf !== 'function') return null;
+  let list;
+  try { list = win.fieldsOf(p); } catch (e) { return null; }
+  if (!Array.isArray(list) || !list.length) return null;
+  const fields = list.map(f => ({
+    id: String(f.id), label: String(f.label || ''), type: f.type,
+    value: f.value == null ? '' : String(f.value),
+    alts: (f.alts || []).map(String), seq: !!f.seq, anyOrder: !!f.anyOrder, unit: f.unit || '',
+  }));
+  if (fields.some(f => ['plain', 'num', 'nums', 'set', 'yesno'].indexOf(f.type) < 0)) return null;
+  return { kind: 'fields', fields };
+}
+
+function soloTaskInfo(trainerId, P){
+  if (!P) return null;
+  switch (trainerId){
+    case 'add_col': return { kind: 'fields', fields: [numField(P.topVal + P.bottomVal)] };
+    case 'sub_col': return { kind: 'fields', fields: [numField(P.topVal - P.bottomVal)] };
+    case 'mul_col': return { kind: 'fields', fields: [numField(P.topVal * P.bottomVal)] };
+    case 'div_col':
+      // с остатком — два поля, как пишут в тетради: частное и остаток
+      if (Number(P.r) > 0) return { kind: 'fields', fields: [
+        { id: 'q', label: 'Частное:', type: 'num', value: String(P.q) },
+        { id: 'r', label: 'Остаток:', type: 'num', value: String(P.r) },
+      ] };
+      return { kind: 'fields', fields: [numField(P.q)] };
+    case 'linear': return typeof P.x0 === 'number' ? { kind: 'fields', fields: [numField(P.x0, 'x =')] } : null;
+    case 'quadratic': {
+      let roots = null;
+      if (Array.isArray(P.roots)) roots = P.roots;
+      else if (P.kind === 'noB') roots = P.hasRoots ? [P.r, -P.r] : [];
+      else if (typeof P.x1 === 'number') roots = [P.x1, P.x2];
+      if (!roots) return null;
+      return { kind: 'fields', fields: [{ id: 'main', label: 'Корни:', type: 'nums', value: roots.join('; ') }] };
+    }
+    case 'frac_mul': case 'frac_div':
+      // сравниваем по значению: 21/130, 0,16…, смешанная запись — всё верно,
+      // если число то же (сокращать ли — решает учитель, а не доска)
+      return (P.sim && P.sim.resultDen) ? { kind: 'fields', fields: [numField(P.sim.resultNum + '/' + P.sim.resultDen)] } : null;
+    case 'gcd': return Array.isArray(P.nums) ? { kind: 'fields', fields: [numField(gcdOfList(P.nums), 'НОД =')] } : null;
+  }
+  return null;
+}
+
+// что верно в задании, которое сейчас снимают с узла el; null — задание
+// останется просто закреплённой картинкой (теория, №9 с квадратными и т. п.)
+function trainerTaskInfo(win, trainerId, el){
+  if (!win || !el || !trainerId) return null;
+  try {
+    const card = el.closest ? el.closest('.added-task-card[data-idx]') : null;
+    const cardIdx = card ? Number(card.dataset.idx) : -1;
+    if (/^(ege|egeb)\d+$/.test(trainerId) || /^oge2[0-5]$/.test(trainerId)) return egeTaskInfo(win, cardIdx);
+    if (el.id === 'theoryContent') return null;
+    const st = typeof win.tsGetState === 'function' ? plainCopy(win.tsGetState()) : null;
+    if (!st) return null;
+    if (trainerId === 'oge9'){
+      // движки линейных и квадратных уравнений в №9 закрыты в своих функциях,
+      // пример отдают через __boardLinP/__boardQuadP (oge9.html) — формы те же,
+      // что у linear.html и quadratic.html
+      if (el.id === 'live') return soloTaskInfo('linear', plainCopy(typeof win.__boardLinP === 'function' ? win.__boardLinP() : null));
+      if (el.id === 'eqLine') return soloTaskInfo('quadratic', plainCopy(typeof win.__boardQuadP === 'function' ? win.__boardQuadP() : null));
+    }
+    if (st.solo) return soloTaskInfo(trainerId, st.P);
+    if (cardIdx >= 0){
+      const bt = (st.addedTasks || [])[cardIdx];
+      return bt ? taskFromCurTask(bt.task) : null;
+    }
+    return taskFromCurTask(st.curTask);
+  } catch (e) {
+    console.warn('[доска] не удалось прочитать ответ задания', e);
+    return null;
+  }
+}
+
+/* ── чистка клона перед снимком и замер мест под живые элементы ── */
+function prepareTaskClone(c, task){
+  const win = c.ownerDocument.defaultView;
+  const visible = e => {
+    const r = e.getBoundingClientRect();
+    return r.width > 1 && r.height > 1 && win.getComputedStyle(e).visibility !== 'hidden';
+  };
+  // следы уже данного ответа на снимке не нужны: задание на доске начинается
+  // с чистого листа, разбор и «Следующий пример» тоже убираем
+  c.querySelectorAll('.explain, .added-explain, .next-btn, .answer-msg, #mainPanel').forEach(e => { e.style.display = 'none'; });
+  c.querySelectorAll('input, .mcq-btn, .stmt, .check-btn').forEach(e => {
+    ['good', 'bad', 'shake', 'correct', 'wrong', 'disabled', 'picked', 'ok', 'reveal', 'struck'].forEach(k => e.classList.remove(k));
+    if (e.tagName === 'INPUT'){ e.value = ''; e.setAttribute('value', ''); }
+    if ('disabled' in e) e.disabled = false;
+    e.removeAttribute('disabled');
+  });
+  const unhide = btn => { if (btn && btn.style.display === 'none') btn.style.display = ''; };
+  let fieldEl = null, checkEl = null, optEls = null;
+  if (task.kind === 'fields' && task.fields.length === 1){
+    const ins = [...c.querySelectorAll('input.answer-input')].filter(visible);
+    if (ins.length === 1){
+      fieldEl = ins[0];
+      checkEl = fieldEl.parentElement && fieldEl.parentElement.querySelector('.check-btn');
+      unhide(checkEl);
+    }
+  }
+  if (task.kind === 'choice'){
+    const btns = [...c.querySelectorAll('.mcq-btn')].filter(visible);
+    if (btns.length === task.n) optEls = btns;
+  }
+  if (task.kind === 'multi'){
+    const items = [...c.querySelectorAll('.stmt')].filter(visible);
+    if (items.length === task.n) optEls = items;
+    checkEl = c.querySelector('.check-btn');
+    if (checkEl && getComputedStyle(checkEl).display === 'none') checkEl.style.display = 'block';
+  }
+  // замер — после всех правок вёрстки клона
+  const base = c.getBoundingClientRect();
+  const rel = e => {
+    const r = e.getBoundingClientRect();
+    return { x: (r.left - base.left) / base.width, y: (r.top - base.top) / base.height,
+             w: r.width / base.width, h: r.height / base.height };
+  };
+  const hot = { w: base.width, h: base.height, fields: [], opts: [], check: null, style: null };
+  if (fieldEl) hot.fields = [rel(fieldEl)];
+  if (optEls) hot.opts = optEls.map(rel);
+  if (checkEl && visible(checkEl)) hot.check = rel(checkEl);
+  // подпись кнопки — как в тренажёре («Проверить ответ» в №19), иначе
+  // живая кнопка поверх картинки показывала бы другой текст
+  if (hot.check) hot.checkText = (checkEl.textContent || '').trim().slice(0, 40);
+  // цвета поля и кнопки — с самого тренажёра, чтобы живое поле на доске
+  // выглядело так же, как на картинке под ним (и в светлой, и в тёмной теме)
+  const cs = e => e ? win.getComputedStyle(e) : null;
+  const fs = cs(fieldEl), bs = cs(checkEl);
+  hot.style = {
+    inBg: fs ? fs.backgroundColor : null, inFg: fs ? fs.color : null, inBorder: fs ? fs.borderTopColor : null,
+    inRadius: fs ? parseFloat(fs.borderTopLeftRadius) || 0 : null,
+    btnBg: bs ? bs.backgroundColor : null, btnFg: bs ? bs.color : null,
+    btnRadius: bs ? parseFloat(bs.borderTopLeftRadius) || 0 : null,
+    font: win.getComputedStyle(c).fontFamily || null,
+  };
+  return hot;
+}
+
+function hotIsUsable(task, hot){
+  if (task.kind === 'fields') return hot.fields.length === task.fields.length;
+  if (task.kind === 'choice') return hot.opts.length === task.n;
+  if (task.kind === 'multi') return hot.opts.length === task.n && !!hot.check;
+  return false;
+}
+
+function isDarkColor(css){
+  const m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/.exec(css || '');
+  if (!m) return false;
+  return (0.299 * m[1] + 0.587 * m[2] + 0.114 * m[3]) < 128;
+}
+
+// дорисовать под снимком строку «Ответ: [поле] [Проверить]» (или ряд
+// номеров вариантов), если на самом снимке таких мест нет. Пишем прямо в
+// картинку, чтобы задание оставалось одним объектом: его рамка, закрепление,
+// перенос и копирование не знают ни о каких «приставках» снизу
+function bakeTaskRows(canvas, task, hot, bgColor, scale){
+  const need = task.kind === 'fields' ? !hot.fields.length : !hot.opts.length;
+  if (!need) return null;
+  const dark = isDarkColor(bgColor);
+  const ink = dark ? '#E8EAED' : '#1C1C1E';
+  const boxBorder = dark ? 'rgba(255,255,255,.28)' : 'rgba(0,0,0,.22)';
+  const boxBg = dark ? '#1f2227' : '#ffffff';
+  const btnBg = '#2E7DE0';
+  const W = hot.w, H = hot.h;                // в CSS-пикселях тренажёра
+  const ROW = 46, GAP = 10, PAD = 14, BTN_W = 124, FONT = 17;
+  const meas = document.createElement('canvas').getContext('2d');
+  meas.font = '600 ' + FONT + 'px ' + UI_FONT_FAMILY;
+  const rows = [];     // { label, box: 'field'|'opts' }
+  if (task.kind === 'fields') task.fields.forEach(f => rows.push({ label: taPlainLabel(f.label) || 'Ответ:', field: f }));
+  else rows.push({ label: task.kind === 'multi' ? 'Верные:' : 'Ответ:' });
+  const labelW = Math.max(...rows.map(r => meas.measureText(r.label).width)) + 12;
+  const extraH = PAD + rows.length * ROW + (rows.length - 1) * GAP + PAD;
+  const totalW = Math.max(W, PAD + labelW + 200 + GAP + BTN_W + PAD);
+  const totalH = H + extraH;
+  const out = document.createElement('canvas');
+  out.width = Math.round(totalW * scale); out.height = Math.round(totalH * scale);
+  const c = out.getContext('2d');
+  c.fillStyle = bgColor; c.fillRect(0, 0, out.width, out.height);
+  c.drawImage(canvas, 0, 0);
+  c.scale(scale, scale);
+  c.font = '600 ' + FONT + 'px ' + UI_FONT_FAMILY;
+  c.textBaseline = 'middle';
+  const frac = (x, y, w, h) => ({ x: x / totalW, y: y / totalH, w: w / totalW, h: h / totalH });
+  const hot2 = { w: totalW, h: totalH, fields: [], opts: [], check: null, style: hot.style || {} };
+  const box = (x, y, w, h, fill, stroke, r) => {
+    c.beginPath(); roundRectPath(c, x, y, w, h, r || 10);
+    if (fill){ c.fillStyle = fill; c.fill(); }
+    if (stroke){ c.strokeStyle = stroke; c.lineWidth = 2; c.stroke(); }
+  };
+  let y = H + PAD;
+  rows.forEach((r, i) => {
+    c.fillStyle = ink; c.textAlign = 'left';
+    c.fillText(r.label, PAD, y + ROW / 2);
+    const x0 = PAD + labelW;
+    const isLast = i === rows.length - 1;
+    const room = totalW - x0 - PAD - (isLast ? BTN_W + GAP : 0);
+    if (task.kind === 'fields'){
+      const wide = r.field.type === 'nums' || r.field.type === 'set' || r.field.seq;
+      const w = Math.min(room, wide ? 280 : 180);
+      box(x0, y, w, ROW, boxBg, boxBorder);
+      hot2.fields.push(frac(x0, y, w, ROW));
+      if (isLast){ box(x0 + w + GAP, y, BTN_W, ROW, btnBg, null); hot2.check = frac(x0 + w + GAP, y, BTN_W, ROW); }
+    } else {
+      const s = Math.min(ROW, (room - GAP * (task.n - 1)) / task.n);
+      for (let k = 0; k < task.n; k++){
+        const bx = x0 + k * (s + GAP);
+        box(bx, y, s, ROW, boxBg, boxBorder);
+        c.fillStyle = ink; c.textAlign = 'center';
+        c.fillText(String(k + 1), bx + s / 2, y + ROW / 2);
+        hot2.opts.push(frac(bx, y, s, ROW));
+      }
+      if (task.kind === 'multi'){
+        const bx = x0 + task.n * (s + GAP);
+        box(bx, y, BTN_W, ROW, btnBg, null);
+        hot2.check = frac(bx, y, BTN_W, ROW);
+      }
+    }
+    y += ROW + GAP;
+  });
+  hot2.style = Object.assign({}, hot2.style, {
+    inBg: boxBg, inFg: ink, inBorder: boxBorder, inRadius: 10, btnBg, btnFg: '#ffffff', btnRadius: 10,
+  });
+  return { canvas: out, hot: hot2 };
+}
+function taPlainLabel(label){
+  return String(label || '').replace(/<[^>]+>/g, '').replace(/\$/g, '').replace(/\\[a-zA-Z]+/g, '').replace(/[{}]/g, '').trim();
+}
+
+/* ── проверка ответа ─────────────────────────────────────────────────────
+   Та же логика, что в ege_prof.html (evalExpr/parseSet/checkField): точные
+   записи 72√3, 169/5, −15π/4, наборы корней через «;», промежутки. Копия, а
+   не подключение того файла: доске не нужен весь тренажёр ради разбора
+   одного поля. Правите разбор там — не забудьте и здесь. */
+function taNormMinus(s){ return String(s).replace(/[−–—‐‑]/g, '-'); }
+function taStrip(s){ return String(s).replace(/[\s   ]/g, ''); }
+function taParsePlain(raw){
+  const s = taStrip(taNormMinus(raw)).replace(',', '.');
+  if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
+  return parseFloat(s);
+}
+function taNormExpr(src){
+  let s = taStrip(taNormMinus(src)).toLowerCase();
+  s = s.replace(/sqrt|корень/g, '√');
+  s = s.replace(/infinity|inf|беск/g, '∞');
+  s = s.replace(/pi|пи|п/g, 'π');
+  s = s.replace(/[·×\*]/g, '*').replace(/[:÷]/g, '/').replace(/,/g, '.');
+  return s;
+}
+function taEval(src){
+  const s = taNormExpr(src);
+  if (!s) return NaN;
+  let i = 0;
+  const peek = () => s[i];
+  function number(){
+    const m = /^\d+(\.\d+)?/.exec(s.slice(i));
+    if (!m) return null;
+    i += m[0].length;
+    return parseFloat(m[0]);
+  }
+  const startsPrimary = ch => ch === '(' || ch === 'π' || ch === '∞' || ch === '√' || /[0-9]/.test(ch || '');
+  function primary(){
+    const ch = peek();
+    if (ch === '(') { i++; const v = expr(); if (peek() !== ')') throw 0; i++; return v; }
+    if (ch === 'π') { i++; return Math.PI; }
+    if (ch === '∞') { i++; return Infinity; }
+    if (ch === '√') { i++; const v = power(); if (v < 0) throw 0; return Math.sqrt(v); }
+    const n = number();
+    if (n === null) throw 0;
+    return n;
+  }
+  function power(){ const b = primary(); if (peek() === '^') { i++; return Math.pow(b, unary()); } return b; }
+  function unary(){
+    if (peek() === '-') { i++; return -unary(); }
+    if (peek() === '+') { i++; return unary(); }
+    return power();
+  }
+  function term(){
+    let v = unary();
+    for (;;) {
+      const ch = peek();
+      if (ch === '*') { i++; v *= unary(); }
+      else if (ch === '/') { i++; v /= unary(); }
+      else if (startsPrimary(ch)) { v *= power(); }
+      else break;
+    }
+    return v;
+  }
+  function expr(){
+    let v = term();
+    for (;;) {
+      const ch = peek();
+      if (ch === '+') { i++; v += term(); }
+      else if (ch === '-') { i++; v -= term(); }
+      else break;
+    }
+    return v;
+  }
+  try { const v = expr(); return i === s.length ? v : NaN; } catch (e) { return NaN; }
+}
+function taSameNum(a, b){
+  if (a === b) return true;
+  if (!isFinite(a) || !isFinite(b)) return false;
+  return Math.abs(a - b) <= 1e-9 * Math.max(1, Math.abs(b));
+}
+function taSplit(src){
+  const s = taNormMinus(src);
+  const out = [];
+  let depth = 0, cur = '';
+  for (let k = 0; k < s.length; k++) {
+    const ch = s[k];
+    if ('([{'.indexOf(ch) >= 0) depth++;
+    if (')]}'.indexOf(ch) >= 0) depth--;
+    const isSep = depth === 0 && (ch === ';' ||
+      (ch === ',' && !(/\d/.test(s[k - 1] || '') && /\d/.test(s[k + 1] || ''))));
+    if (isSep) { out.push(cur); cur = ''; } else cur += ch;
+  }
+  out.push(cur);
+  return out.map(x => x.trim()).filter(x => x !== '');
+}
+function taParseNums(src){
+  const items = taSplit(src).map(taEval);
+  return items.some(isNaN) ? null : items;
+}
+// корни сравниваем как множество: у x² + 6x + 9 = 0 «−3» и «−3; −3» — одно и то же
+function taSameNumSets(a, b){
+  if (!a || !b) return false;
+  const uniq = arr => arr.slice().sort((p, q) => p - q).filter((v, k, all) => k === 0 || !taSameNum(v, all[k - 1]));
+  const x = uniq(a), y = uniq(b);
+  return x.length === y.length && x.every((v, k) => taSameNum(v, y[k]));
+}
+function taParseSet(src){
+  let s = taNormMinus(src).toLowerCase();
+  s = s.replace(/<=/g, '≤').replace(/>=/g, '≥').replace(/\s+или\s+/g, ';');
+  s = s.replace(/∪/g, ';').replace(/\bu\b/g, ';');
+  s = s.replace(/[a-zа-я]\s*∈\s*/g, '');
+  const items = taSplit(s);
+  if (!items.length) return null;
+  const out = [];
+  for (const raw of items) {
+    const item = taStrip(raw);
+    if (/^[\(\[].*[\)\]]$/.test(item)) {
+      const parts = taSplit(item.slice(1, -1));
+      if (parts.length !== 2) return null;
+      const lo = taEval(parts[0]), hi = taEval(parts[1]);
+      if (isNaN(lo) || isNaN(hi) || lo > hi) return null;
+      out.push({ lo, loC: item[0] === '[' && isFinite(lo), hi, hiC: item[item.length - 1] === ']' && isFinite(hi) });
+      continue;
+    }
+    if (/^\{.*\}$/.test(item)) {
+      for (const p of taSplit(item.slice(1, -1))) {
+        const v = taEval(p);
+        if (isNaN(v)) return null;
+        out.push({ lo: v, loC: true, hi: v, hiC: true });
+      }
+      continue;
+    }
+    if (/[<>≤≥=]/.test(item)) {
+      const parts = item.split(/([<>≤≥=])/).filter(x => x !== '');
+      const isVar = x => /^[a-zа-я]$/.test(x);
+      if (parts.length === 3 && (isVar(parts[0]) || isVar(parts[2]))) {
+        let [l, op, r] = parts;
+        if (isVar(r)) { const flip = { '<': '>', '>': '<', '≤': '≥', '≥': '≤', '=': '=' }; [l, r] = [r, l]; op = flip[op]; }
+        const v = taEval(r);
+        if (isNaN(v)) return null;
+        if (op === '<') out.push({ lo: -Infinity, loC: false, hi: v, hiC: false });
+        else if (op === '≤') out.push({ lo: -Infinity, loC: false, hi: v, hiC: true });
+        else if (op === '>') out.push({ lo: v, loC: false, hi: Infinity, hiC: false });
+        else if (op === '≥') out.push({ lo: v, loC: true, hi: Infinity, hiC: false });
+        else out.push({ lo: v, loC: true, hi: v, hiC: true });
+        continue;
+      }
+      if (parts.length === 5 && isVar(parts[2])) {
+        const a = taEval(parts[0]), b = taEval(parts[4]);
+        const op1 = parts[1], op2 = parts[3];
+        if (isNaN(a) || isNaN(b)) return null;
+        if ((op1 === '<' || op1 === '≤') && (op2 === '<' || op2 === '≤')) out.push({ lo: a, loC: op1 === '≤' && isFinite(a), hi: b, hiC: op2 === '≤' && isFinite(b) });
+        else if ((op1 === '>' || op1 === '≥') && (op2 === '>' || op2 === '≥')) out.push({ lo: b, loC: op2 === '≥' && isFinite(b), hi: a, hiC: op1 === '≥' && isFinite(a) });
+        else return null;
+        continue;
+      }
+      return null;
+    }
+    const v = taEval(item);
+    if (isNaN(v)) return null;
+    out.push({ lo: v, loC: true, hi: v, hiC: true });
+  }
+  out.sort((p, q) => p.lo - q.lo || (p.loC === q.loC ? 0 : (p.loC ? -1 : 1)));
+  const merged = [];
+  for (const iv of out) {
+    const last = merged[merged.length - 1];
+    if (last && (iv.lo < last.hi || (taSameNum(iv.lo, last.hi) && (last.hiC || iv.loC)))) {
+      if (iv.hi > last.hi) { last.hi = iv.hi; last.hiC = iv.hiC; }
+      else if (taSameNum(iv.hi, last.hi)) last.hiC = last.hiC || iv.hiC;
+    } else merged.push(Object.assign({}, iv));
+  }
+  return merged;
+}
+function taSameSets(a, b){
+  if (!a || !b || a.length !== b.length) return false;
+  return a.every((iv, k) => taSameNum(iv.lo, b[k].lo) && taSameNum(iv.hi, b[k].hi)
+    && (!isFinite(iv.lo) || iv.loC === b[k].loC) && (!isFinite(iv.hi) || iv.hiC === b[k].hiC));
+}
+// → true / false / null (null — запись не разобрали: это не ошибка ученика,
+// а просьба записать иначе, отметка «неверно» не ставится)
+function taCheckField(f, value){
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+  const accepted = [f.value].concat(f.alts || []);
+  if (f.type === 'yesno'){
+    const v = raw.toLowerCase().replace(/[.!]/g, '');
+    if (v !== 'да' && v !== 'нет') return null;
+    return v === String(f.value).toLowerCase();
+  }
+  if (f.type === 'plain' && f.seq){
+    const d = taStrip(raw);
+    if (!/^\d+$/.test(d)) return null;
+    const key = x => f.anyOrder ? String(x).split('').sort().join('') : String(x);
+    return accepted.some(a => key(a) === key(d));
+  }
+  if (f.type === 'plain'){
+    const v = taParsePlain(raw);
+    if (v === null){
+      // на доске допускаем и точную запись (1/4 вместо 0,25) — как в num
+      const e = taEval(raw);
+      return isNaN(e) ? null : accepted.some(a => taSameNum(e, taParsePlain(a)));
+    }
+    return accepted.some(a => taSameNum(v, taParsePlain(a)));
+  }
+  if (f.type === 'num'){
+    let s = raw;
+    if (f.unit) s = s.replace(new RegExp('\\s*' + f.unit + '\\.?$', 'i'), '');
+    const v = taEval(s);
+    return isNaN(v) ? null : accepted.some(a => taSameNum(v, taEval(a)));
+  }
+  if (f.type === 'nums'){
+    // «нет корней» — законный ответ, если корней правда нет
+    if (/^(нет|нет\s*корней|∅|пусто)$/i.test(raw.replace(/\.$/, ''))) return !String(f.value || '').trim();
+    const v = taParseNums(raw);
+    if (v === null) return null;
+    if (!String(f.value || '').trim()) return false;
+    return taSameNumSets(v, taParseNums(f.value));
+  }
+  if (f.type === 'set'){
+    const v = taParseSet(raw);
+    return v === null ? null : taSameSets(v, taParseSet(f.value));
+  }
+  return null;
+}
+
+/* ── живые элементы поверх заданий ── */
+const taskDrafts = new Map();   // id объекта → { vals: {fid: текст}, picks: [номера] }
+const taskEls = new Map();      // id объекта → { root, sig, ... }
+let taskLayerEl = null;
+function taskLayer(){
+  if (taskLayerEl) return taskLayerEl;
+  const st = document.createElement('style');
+  st.textContent = `
+    #bdTaskLayer{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+    .bd-task{position:absolute;pointer-events:none;}
+    .bd-task-in{position:absolute;box-sizing:border-box;pointer-events:auto;margin:0;padding:0 .35em;
+      border:2px solid rgba(0,0,0,.2);background:#fff;color:#1c1c1e;text-align:center;outline:none;
+      font-weight:600;font-family:inherit;font-size:inherit;line-height:1;min-width:0;}
+    .bd-task-in:focus{border-color:var(--ink);}
+    .bd-task-in.good{border-color:var(--ok)!important;background:rgba(36,138,61,.12)!important;color:var(--ok)!important;}
+    .bd-task-in.bad{border-color:var(--teacher)!important;background:rgba(255,59,48,.10)!important;color:var(--teacher)!important;}
+    .bd-task-btn{position:absolute;box-sizing:border-box;pointer-events:auto;margin:0;padding:0;border:none;
+      background:var(--ink);color:#fff;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;overflow:hidden;}
+    .bd-task-btn:disabled{filter:grayscale(.6) brightness(1.15);cursor:default;}
+    .bd-task-opt{position:absolute;box-sizing:border-box;pointer-events:auto;margin:0;padding:0;cursor:pointer;
+      background:transparent;border:2.5px solid transparent;border-radius:.45em;}
+    .bd-task-opt:hover{background:rgba(46,125,224,.07);}
+    .bd-task-opt.picked{border-color:var(--ink);background:rgba(46,125,224,.13);}
+    .bd-task-opt.good{border-color:var(--ok);background:rgba(36,138,61,.18);}
+    .bd-task-opt.bad{border-color:var(--teacher);background:rgba(255,59,48,.15);}
+    .bd-task-opt.done{cursor:default;}
+    .bd-task-reset{position:absolute;pointer-events:auto;width:24px;height:24px;border-radius:12px;border:none;
+      background:var(--glass-strong);color:var(--pencil);box-shadow:0 1px 4px rgba(0,0,0,.25);font-size:14px;
+      line-height:24px;padding:0;cursor:pointer;display:none;}
+    .bd-task.answered .bd-task-reset{display:block;}
+    .bd-task-msg{position:absolute;left:0;pointer-events:none;background:#1c1c1e;color:#fff;font-size:12.5px;
+      padding:5px 9px;border-radius:8px;white-space:nowrap;opacity:0;transition:opacity .2s;}
+    .bd-task-msg.show{opacity:.92;}
+    [data-access="view"] .bd-task-in,[data-access="view"] .bd-task-btn,
+    [data-access="view"] .bd-task-opt,[data-access="view"] .bd-task-reset{pointer-events:none;}
+  `;
+  document.head.appendChild(st);
+  taskLayerEl = document.createElement('div');
+  taskLayerEl.id = 'bdTaskLayer';
+  canvas.insertAdjacentElement('afterend', taskLayerEl);
+  // колесо над полем или вариантом — всё равно масштаб/прокрутка доски
+  taskLayerEl.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    canvas.dispatchEvent(new WheelEvent('wheel', e));
+  }, { passive: false });
+  return taskLayerEl;
+}
+function taskObjById(id){ return B && Array.isArray(B.objects) ? B.objects.find(o => o.id === id) : null; }
+function taskDraft(id){
+  let d = taskDrafts.get(id);
+  // picks === null — отметок ещё не трогали (берём их из последней проверки)
+  if (!d){ d = { vals: {}, picks: null }; taskDrafts.set(id, d); }
+  return d;
+}
+function taskPlace(elm, r){
+  elm.style.left = (r.x * 100) + '%'; elm.style.top = (r.y * 100) + '%';
+  elm.style.width = (r.w * 100) + '%'; elm.style.height = (r.h * 100) + '%';
+}
+
+function buildTaskOverlay(obj){
+  const t = obj.task, hot = t.hot, sty = hot.style || {};
+  const root = document.createElement('div');
+  root.className = 'bd-task';
+  root.dataset.id = obj.id;
+  if (sty.font) root.style.fontFamily = sty.font;
+  const rec = { root, inputs: [], opts: [], check: null, msg: null, sig: null };
+  const id = obj.id;
+  if (t.kind === 'fields'){
+    t.fields.forEach((f, i) => {
+      const r = hot.fields[i]; if (!r) return;
+      const inp = document.createElement('input');
+      inp.type = 'text'; inp.className = 'bd-task-in'; inp.autocomplete = 'off'; inp.spellcheck = false;
+      inp.setAttribute('inputmode', f.type === 'yesno' ? 'text' : 'decimal');
+      inp.placeholder = '?';
+      inp.dataset.fid = f.id;
+      if (sty.inBg) inp.style.background = sty.inBg;
+      if (sty.inFg) inp.style.color = sty.inFg;
+      if (sty.inBorder) inp.style.borderColor = sty.inBorder;
+      taskPlace(inp, r);
+      inp.addEventListener('input', () => {
+        taskDraft(id).vals[f.id] = inp.value;
+        inp.classList.remove('bad');   // исправляет — красное снимаем, пока не проверит
+      });
+      inp.addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); taskCheck(id); } });
+      root.appendChild(inp);
+      rec.inputs.push(inp);
+    });
+  } else {
+    hot.opts.forEach((r, i) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'bd-task-opt'; b.dataset.i = String(i);
+      b.title = t.kind === 'multi' ? 'Отметить' : 'Выбрать этот вариант';
+      taskPlace(b, r);
+      b.addEventListener('click', () => taskPick(id, i));
+      root.appendChild(b);
+      rec.opts.push(b);
+    });
+  }
+  if (hot.check && t.kind !== 'choice'){
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'bd-task-btn'; b.textContent = hot.checkText || 'Проверить';
+    if (sty.btnBg) b.style.background = sty.btnBg;
+    if (sty.btnFg) b.style.color = sty.btnFg;
+    taskPlace(b, hot.check);
+    b.addEventListener('click', () => taskCheck(id));
+    root.appendChild(b);
+    rec.check = b;
+  }
+  const reset = document.createElement('button');
+  reset.type = 'button'; reset.className = 'bd-task-reset'; reset.textContent = '↺';
+  reset.title = 'Стереть ответ и решать заново';
+  reset.style.right = '-10px'; reset.style.top = '-10px';
+  reset.addEventListener('click', () => taskReset(id));
+  root.appendChild(reset);
+  const msg = document.createElement('div');
+  msg.className = 'bd-task-msg';
+  root.appendChild(msg);
+  rec.msg = msg;
+  // клик по живому элементу не должен начинать жест доски под ним
+  root.addEventListener('pointerdown', (e) => e.stopPropagation());
+  taskLayer().appendChild(root);
+  return rec;
+}
+
+// привести живые элементы к состоянию объекта (после проверки, отмены,
+// правки от собеседника)
+function applyTaskState(rec, obj){
+  const t = obj.task, st = t.st || null, d = taskDrafts.get(obj.id);
+  rec.root.classList.toggle('answered', !!st);
+  if (t.kind === 'fields'){
+    rec.inputs.forEach(inp => {
+      const fid = inp.dataset.fid;
+      const val = st && st.vals && st.vals[fid] != null ? st.vals[fid] : (d && d.vals[fid] != null ? d.vals[fid] : '');
+      if (document.activeElement !== inp) inp.value = val;
+      const mark = st && st.marks ? st.marks[fid] : null;
+      inp.classList.toggle('good', mark === true);
+      inp.classList.toggle('bad', mark === false && inp.value === (st.vals || {})[fid]);
+      inp.readOnly = !!(st && st.res === 'ok');
+    });
+    if (rec.check) rec.check.disabled = !!(st && st.res === 'ok');
+  } else if (t.kind === 'choice'){
+    rec.opts.forEach((b, i) => {
+      const picked = !!st && st.pick === i;
+      b.classList.toggle('good', picked && st.res === 'ok');
+      b.classList.toggle('bad', picked && st.res === 'bad');
+      b.classList.toggle('done', !!st && st.res === 'ok');
+    });
+  } else if (t.kind === 'multi'){
+    const picks = st && st.res === 'ok' ? st.picks : ((d && d.picks) ? d.picks : (st ? st.picks : []));
+    const checkedPicks = st ? st.picks : [];
+    const samePicks = st && JSON.stringify((picks || []).slice().sort()) === JSON.stringify((checkedPicks || []).slice().sort());
+    rec.opts.forEach((b, i) => {
+      const on = (picks || []).indexOf(i) >= 0;
+      b.classList.toggle('picked', on);
+      // после проверки: отмеченное верно — зелёным, отмеченное зря — красным
+      b.classList.toggle('good', !!(st && samePicks && on && t.correct.indexOf(i) >= 0 && st.res === 'ok'));
+      b.classList.toggle('bad', !!(st && samePicks && on && st.res === 'bad' && t.correct.indexOf(i) < 0));
+      b.classList.toggle('done', !!st && st.res === 'ok');
+    });
+    if (rec.check) rec.check.disabled = !!(st && st.res === 'ok');
+  }
+}
+
+function taskMayAnswer(){ return boardAccess !== 'view'; }
+
+function taskFlash(id, text){
+  const rec = taskEls.get(id);
+  if (!rec) return;
+  rec.msg.textContent = text;
+  const anchor = rec.inputs[0] || rec.check;
+  rec.msg.style.top = anchor ? 'calc(' + anchor.style.top + ' + ' + anchor.style.height + ' + 6px)' : '100%';
+  rec.msg.style.left = anchor ? anchor.style.left : '0';
+  rec.msg.classList.add('show');
+  clearTimeout(rec.msgTimer);
+  rec.msgTimer = setTimeout(() => rec.msg.classList.remove('show'), 2600);
+}
+
+// записать итог в объект: это обычная правка доски — с отменой, сохранением
+// и рассылкой собеседнику, как у любого штриха
+function commitTaskState(obj, st){
+  const rec = taskEls.get(obj.id);
+  if (rec) rec.msg.classList.remove('show');
+  pushUndo();
+  obj.task.st = st;
+  saveDB();
+  scheduleRedraw();
+}
+
+function taskCheck(id){
+  const obj = taskObjById(id);
+  if (!obj || !obj.task || !taskMayAnswer()) return;
+  const t = obj.task, prev = t.st || null;
+  if (prev && prev.res === 'ok') return;
+  if (t.kind === 'fields'){
+    const rec = taskEls.get(id);
+    const vals = {};
+    t.fields.forEach(f => {
+      const inp = rec && rec.inputs.find(x => x.dataset.fid === f.id);
+      vals[f.id] = inp ? inp.value.trim() : '';
+    });
+    const marks = {};
+    let unparsed = false;
+    t.fields.forEach(f => { const r = taCheckField(f, vals[f.id]); if (r === null) unparsed = true; marks[f.id] = r; });
+    if (unparsed){
+      const empty = t.fields.some(f => !vals[f.id]);
+      const f0 = t.fields.find(f => marks[f.id] === null) || t.fields[0];
+      taskFlash(id, empty ? 'Сначала впишите ответ'
+        : (f0.seq ? 'Цифры подряд, без запятых — например, 135'
+          : (f0.type === 'nums' ? 'Числа через «;», например: −2; 5' : 'Запишите числом, например 2,5 или 3/4')));
+      return;
+    }
+    const ok = t.fields.every(f => marks[f.id] === true);
+    commitTaskState(obj, { res: ok ? 'ok' : 'bad', vals, marks, tries: ((prev && prev.tries) || 0) + 1 });
+    const d = taskDrafts.get(id); if (d) d.vals = {};
+    return;
+  }
+  if (t.kind === 'multi'){
+    const d = taskDraft(id);
+    const picks = (d.picks || (prev && prev.picks) || []).slice().sort((a, b) => a - b);
+    if (!picks.length){ taskFlash(id, 'Отметьте верные утверждения'); return; }
+    const ok = picks.length === t.correct.length && picks.every(i => t.correct.indexOf(i) >= 0);
+    commitTaskState(obj, { res: ok ? 'ok' : 'bad', picks, tries: ((prev && prev.tries) || 0) + 1 });
+    d.picks = picks.slice();
+  }
+}
+
+function taskPick(id, i){
+  const obj = taskObjById(id);
+  if (!obj || !obj.task || !taskMayAnswer()) return;
+  const t = obj.task, prev = t.st || null;
+  if (prev && prev.res === 'ok') return;
+  if (t.kind === 'choice'){
+    // как в тренажёре: выбрал — сразу видно, верно ли; неверный можно
+    // сменить на другой
+    if (prev && prev.pick === i) return;
+    commitTaskState(obj, { res: i === t.correct ? 'ok' : 'bad', pick: i, tries: ((prev && prev.tries) || 0) + 1 });
+    return;
+  }
+  if (t.kind === 'multi'){
+    // отметки — черновик до «Проверить», в доску не пишутся
+    const d = taskDraft(id);
+    if (!d.picks) d.picks = (prev && prev.picks) ? prev.picks.slice() : [];
+    const k = d.picks.indexOf(i);
+    if (k >= 0) d.picks.splice(k, 1); else d.picks.push(i);
+    const rec = taskEls.get(id);
+    if (rec) applyTaskState(rec, obj);
+  }
+}
+
+function taskReset(id){
+  const obj = taskObjById(id);
+  if (!obj || !obj.task || !obj.task.st || !taskMayAnswer()) return;
+  taskDrafts.delete(id);
+  const rec = taskEls.get(id);
+  if (rec) rec.inputs.forEach(inp => { inp.value = ''; });
+  pushUndo();
+  delete obj.task.st;
+  saveDB();
+  scheduleRedraw();
+}
+
+// вызывается на каждый кадр перерисовки: создать/подвинуть/убрать живые
+// элементы у заданий, которые сейчас в кадре
+function syncTaskOverlays(){
+  const layer = taskLayer();
+  const seen = new Set();
+  if (boardActive && B && Array.isArray(B.objects)){
+    const pad = 40 / cam.zoom;
+    const vx0 = cam.x - pad, vy0 = cam.y - pad, vx1 = cam.x + cssW / cam.zoom + pad, vy1 = cam.y + cssH / cam.zoom + pad;
+    for (let oi = 0; oi < B.objects.length; oi++){
+      const o = B.objects[oi];
+      if (o.type !== 'image' || !o.task || !o.task.hot || !o.points || !o.points[0]) continue;
+      const x = o.points[0].x, y = o.points[0].y;
+      if (x + o.w < vx0 || x > vx1 || y + o.h < vy0 || y > vy1) continue;
+      seen.add(o.id);
+      let rec = taskEls.get(o.id);
+      if (!rec){ rec = buildTaskOverlay(o); taskEls.set(o.id, rec); }
+      const sig = JSON.stringify(o.task.st || null);
+      if (rec.sig !== sig){
+        // итог проверки сменился (своя проверка, отмена, ответ собеседника) —
+        // черновые отметки утверждений больше не актуальны
+        if (rec.sig !== null){ const d = taskDrafts.get(o.id); if (d) d.picks = null; }
+        rec.sig = sig; applyTaskState(rec, o);
+      }
+      const p0 = worldToScreen(o.points[0]);
+      const sw = o.w * cam.zoom, sh = o.h * cam.zoom;
+      const root = rec.root;
+      // задания внахлёст: живые элементы верхнего (позже добавленного) — сверху
+      root.style.zIndex = String(oi + 1);
+      root.style.left = p0.x + 'px'; root.style.top = p0.y + 'px';
+      root.style.width = sw + 'px'; root.style.height = sh + 'px';
+      // шрифт и скругления — в масштабе картинки: сколько экранных пикселей
+      // приходится на один CSS-пиксель тренажёра
+      const k = sw / (o.task.hot.w || sw);
+      const sty = o.task.hot.style || {};
+      const fh = (rec.inputs[0] && o.task.hot.fields[0]) ? o.task.hot.fields[0].h * sh : 0;
+      root.style.fontSize = Math.max(6, fh ? fh * 0.46 : 16 * k) + 'px';
+      rec.inputs.forEach(inp => { inp.style.borderRadius = ((sty.inRadius != null ? sty.inRadius : 10) * k) + 'px'; inp.style.borderWidth = Math.max(1, 2 * k) + 'px'; });
+      if (rec.check){ rec.check.style.borderRadius = ((sty.btnRadius != null ? sty.btnRadius : 10) * k) + 'px'; rec.check.style.fontSize = Math.max(6, (o.task.hot.check.h * sh) * 0.4) + 'px'; }
+      rec.opts.forEach(b => { b.style.borderRadius = (12 * k) + 'px'; b.style.borderWidth = Math.max(1.5, 2.5 * k) + 'px'; });
+    }
+  }
+  taskEls.forEach((rec, id) => {
+    if (seen.has(id)) return;
+    // поле с фокусом не выдёргиваем посреди набора (кадр мог отсечь его на
+    // долю секунды при прокрутке) — оно уберётся, когда фокус уйдёт
+    if (rec.root.contains(document.activeElement) && boardActive && taskObjById(id)) return;
+    rec.root.remove();
+    taskEls.delete(id);
+  });
+  layer.style.display = boardActive ? '' : 'none';
+}
+
+// выгрузка PNG/PDF: живых элементов там нет — рисуем состояние на холсте
+function drawTaskStateForExport(c, obj, x, y, w, h){
+  const t = obj.task, st = t.st, hot = t.hot;
+  if (!st || !hot) return;
+  const R = r => ({ x: x + r.x * w, y: y + r.y * h, w: r.w * w, h: r.h * h });
+  const OK = '#248A3D', BAD = '#FF3B30';
+  c.save();
+  if (t.kind === 'fields'){
+    t.fields.forEach((f, i) => {
+      const r = hot.fields[i]; if (!r) return;
+      const q = R(r);
+      const good = st.marks && st.marks[f.id] === true;
+      c.fillStyle = good ? '#EAF5EC' : '#FDECEC';
+      c.strokeStyle = good ? OK : BAD; c.lineWidth = Math.max(1, q.h * 0.06);
+      c.beginPath(); roundRectPath(c, q.x, q.y, q.w, q.h, q.h * 0.2); c.fill(); c.stroke();
+      c.fillStyle = good ? OK : BAD;
+      c.font = '600 ' + Math.max(6, q.h * 0.46) + 'px ' + UI_FONT_FAMILY;
+      c.textAlign = 'center'; c.textBaseline = 'middle';
+      c.fillText(String((st.vals || {})[f.id] || ''), q.x + q.w / 2, q.y + q.h / 2, q.w * 0.92);
+    });
+  } else {
+    const picked = t.kind === 'choice' ? [st.pick] : (st.picks || []);
+    picked.forEach(i => {
+      const r = hot.opts[i]; if (!r) return;
+      const q = R(r);
+      const good = t.kind === 'choice' ? st.res === 'ok' : t.correct.indexOf(i) >= 0 && st.res === 'ok';
+      c.fillStyle = good ? 'rgba(36,138,61,.18)' : (st.res === 'bad' ? 'rgba(255,59,48,.15)' : 'rgba(46,125,224,.13)');
+      c.strokeStyle = good ? OK : (st.res === 'bad' ? BAD : '#2E7DE0');
+      c.lineWidth = Math.max(1.5, q.h * 0.05);
+      c.beginPath(); roundRectPath(c, q.x, q.y, q.w, q.h, Math.min(12, q.h * 0.25)); c.fill(); c.stroke();
+    });
+  }
+  c.restore();
+}
 
 /* ═══════════════════════════════════════════════════════════════════════
    ХОЛСТ ЗАМЕТОК СПРАВОЧНОЙ ПАНЕЛИ (#bdRefDrawCanvas, вкладка «Текст» →
@@ -5434,7 +6359,7 @@ const TRAINER_NAMES = {
   add_col:'Сложение в столбик', sub_col:'Вычитание в столбик', mul_col:'Умножение в столбик', div_col:'Деление в столбик',
   linear:'Линейные уравнения', quadratic:'Квадратные уравнения',
   frac_mul:'Умножение дробей', frac_div:'Деление дробей', neg_pos:'Положительные и отрицательные числа',
-  powers:'Действия со степенями',
+  powers:'Действия со степенями', gcd:'Наибольший общий делитель (НОД)',
 };
 // подписи для «Подборки» — берём из списка панели тренажёров, чтобы название
 // ЕГЭ-задания было записано на доске один в один как в реестре на главной

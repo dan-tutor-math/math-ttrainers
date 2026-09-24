@@ -990,6 +990,7 @@ html[data-theme="dark"] #quadEngineArea input {background:var(--card)}html[data-
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="quick-answer.js"></script>
 <script src="trainer-multi.js"></script>
 <script>
 const LIN_ENGINE_HTML ="<button class=\"back-btn\" id=\"linBackBtn\">← все типы</button><div class=\"wrap\">\n  <h1>Линейные уравнения</h1>\n  <div class=\"sub\">переносим — знак меняется! раскрываем скобки фонтанчиком, считаем и делим</div>\n\n  <div class=\"levels\" id=\"levels\"></div>\n\n  <div class=\"sheet\">\n    <div class=\"corner\" id=\"cornerWrap\">\n      <button class=\"basket-add-btn\" id=\"linBasketAddBtn\" title=\"В подборку\">📥</button>\n      <button class=\"refresh-btn\" id=\"refreshBtn\" title=\"Обновить пример\">⟳</button>\n      <span id=\"taskNum\">пример №1</span>\n    </div>\n    <div id=\"frozen\"></div>\n    <div id=\"live\"></div>\n  </div>\n\n  <div class=\"panel\">\n    <div class=\"prompt\" id=\"prompt\"></div>\n    <div class=\"inrow\" id=\"inputArea\"></div>\n    <button class=\"next-btn\" id=\"nextBtn\" style=\"display:none\">Следующее уравнение →</button>\n    <div class=\"hint\" id=\"hint\"></div>\n  </div>\n\n  <div class=\"calc-tools\" id=\"lin_calcTools\">\n    <button class=\"calc-tool-btn\" data-op=\"add\">+ Сложить</button>\n    <button class=\"calc-tool-btn\" data-op=\"sub\">− Вычесть</button>\n    <button class=\"calc-tool-btn\" data-op=\"mul\">× Умножить</button>\n    <button class=\"calc-tool-btn\" data-op=\"div\">÷ Поделить</button>\n    <button class=\"calc-tool-btn\" id=\"lin_calcHistoryBtn\">🕓 История</button>\n  </div>\n  <div class=\"panel calc-history-panel\" id=\"lin_calcHistoryPanel\">\n    <button class=\"calc-panel-close\" id=\"lin_calcHistoryClose\" title=\"Закрыть\">✕</button>\n    <div class=\"calc-panel-title\">История решений</div>\n    <div class=\"calc-history-filters\" id=\"lin_calcHistoryFilters\">\n      <button class=\"calc-history-filter active\" data-filter=\"all\">Все</button>\n      <button class=\"calc-history-filter\" data-filter=\"add\">+</button>\n      <button class=\"calc-history-filter\" data-filter=\"sub\">−</button>\n      <button class=\"calc-history-filter\" data-filter=\"mul\">×</button>\n      <button class=\"calc-history-filter\" data-filter=\"div\">÷</button>\n    </div>\n    <div class=\"calc-history-list\" id=\"lin_calcHistoryList\"></div>\n    <div class=\"calc-history-empty\" id=\"lin_calcHistoryEmpty\">Пока пусто — реши что-нибудь в калькуляторе.</div>\n  </div>\n  <div class=\"panel calc-panel\" id=\"lin_calcPanel\">\n    <button class=\"calc-panel-close\" id=\"lin_calcPanelClose\" title=\"Закрыть\">✕</button>\n    <div class=\"calc-panel-title\" id=\"lin_calcPanelTitle\"></div>\n    <iframe class=\"calc-iframe\" id=\"lin_calcIframe\" title=\"Калькулятор в столбик\"></iframe>\n  </div>\n\n  <div class=\"stats\">\n    <div class=\"stat\"><div class=\"v\" id=\"stSolved\">0</div><div class=\"l\">решено</div></div>\n    <div class=\"stat\"><div class=\"v\" id=\"stStreak\">0</div><div class=\"l\">серия без ошибок</div></div>\n    <div class=\"stat\"><div class=\"v stars\" id=\"stStars\">—</div><div class=\"l\">это уравнение</div></div>\n  </div>\n\n  <button class=\"example-history-toggle\" id=\"lin_historyToggle\">🕓 История примеров (0)</button>\n  <div class=\"panel example-history-panel\" id=\"lin_historyPanel\">\n    <button class=\"calc-panel-close\" id=\"lin_historyClose\" title=\"Закрыть\">✕</button>\n    <div class=\"calc-panel-title\">Последние примеры этого уровня</div>\n    <div class=\"example-history-list\" id=\"lin_historyList\"></div>\n    <div class=\"example-history-empty\" id=\"lin_historyEmpty\">Пока пусто — реши что-нибудь.</div>\n  </div>\n\n  <div class=\"theory\">\n    <div class=\"tcard\">\n      <div class=\"tt\">Алгоритм</div>\n      <ol class=\"talg\">\n        <li>Переносим: слагаемые <b>с x — влево</b>, <b>числа — вправо</b>. При переносе через «=» знак меняется на противоположный!</li>\n        <li>Приводим подобные: считаем иксы слева, числа справа.</li>\n        <li>Делим <b>обе части</b> на число перед x.</li>\n      </ol>\n      <div class=\"tex\">5x − 7 = 2x + 8 &nbsp;→&nbsp; 5x − 2x = 8 + 7 &nbsp;→&nbsp; 3x = 15 &nbsp;→&nbsp; x = 5</div>\n    </div>\n    <div class=\"tcard\">\n      <div class=\"tt\">Ловушки</div>\n      <div class=\"ttrap\">⚠ Знак меняется только у тех слагаемых, которые переносим. Кто остался на месте — знак не трогаем!</div>\n      <div class=\"ttrap\">⚠ Делим именно на число перед x — со всеми его знаками. Если там −3, делим на −3.</div>\n      <div class=\"ttrap\">⚠ Минус на плюс при делении даёт минус: 12 : (−3) = −4.</div>\n      <div class=\"ttrap\">⚠ Проверяй себя подстановкой: подставь ответ в исходное уравнение.</div>\n    </div>\n  </div>\n</div><button class=\"keypad-toggle\" id=\"lin_kpToggle\" title=\"Показать клавиатуру\" style=\"display:none\">⌨</button>\n<div class=\"keypad-float\" id=\"lin_keypadFloat\" style=\"display:none\">\n  <button class=\"keypad-drag-handle\" id=\"lin_kpDragHandle\" title=\"Перетащить клавиатуру\" aria-label=\"Переместить клавиатуру\">✋</button>\n  <button class=\"keypad-close\" id=\"lin_kpClose\" title=\"Скрыть клавиатуру\">✕</button>\n  <div class=\"keypad\" id=\"lin_keypadButtons\"></div>\n</div>";
@@ -1664,6 +1665,11 @@ function makeKeypadDraggable(floatEl, handleEl){
   });
 }
 window.startLinearEngine = (function(){
+// Промпт №66: доска (панель «Тренажёры») читает текущий пример, чтобы задание,
+// добавленное на доску, можно было решить и проверить прямо там. Пример живёт
+// в замыкании движка — наружу отдаём только чтение; P объявлен ниже, стрелку
+// зовут уже после загрузки страницы
+window.__boardLinP = () => P;
 
 /* ───────── уровни и генерация ───────── */
 const LEVELS = [
@@ -1893,6 +1899,47 @@ function mountProblem(){
   setHint('');
   renderAll(); setPrompt(); renderInputs();
 }
+/* ═══ Промпт №67: ответ можно вписать сразу, без решения по шагам ═══
+   Панель «Ответ» над панелью шагов — quick-answer.js. Итог лежит в S.quick
+   и уходит собеседнику вместе с S; счёт ведём здесь, как в finish(). */
+QuickAnswer.mount({
+  fields: P => typeof P.x0 === 'number' ? [{ id: 'main', label: 'x =', type: 'num', value: String(P.x0) }] : null,
+  getP: () => P, getS: () => S,
+  active: () => !!document.getElementById('linBasketAddBtn'),
+  onRight(){
+    // засчитываем так же, как finish() после шагов: звёзды по ошибкам, решено, серия
+    const stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
+    document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
+    totalSolved++; solvedByLevel[curLevel]++;
+    streak = (S.errTotal===0) ? streak+1 : 0;
+    document.getElementById('stSolved').textContent = totalSolved;
+    document.getElementById('stStreak').textContent = streak;
+    renderLevels();
+    if(S.errTotal>0) curProg.errorsInBatch = (curProg.errorsInBatch||0)+1;
+    curProg.history.unshift({ prompt: equationPreviewText(P), hadError: S.errTotal>0, answer: 'x = ' + numText(P.x0) });
+    curProg.history = curProg.history.slice(0,5);
+    const awardedTier = tallyBatch(curProg);
+    saveProg('linear:'+curLevel, curProg);
+    renderLinHistory(); renderLevels();
+    if(awardedTier) playMedalAnimation(awardedTier, document.querySelector('.lvl.active'));
+  },
+  onWrong(){
+    S.errTotal++;
+    streak = 0;
+    document.getElementById('stStreak').textContent = streak;
+  },
+  onFail(){
+    // вторая ошибка: как в ОГЭ — пример закрыт, но не решён
+    streak = 0;
+    document.getElementById('stStreak').textContent = streak;
+    document.getElementById('stStars').textContent = '☆☆☆';
+    curProg.errorsInBatch = (curProg.errorsInBatch||0)+1;
+    curProg.history.unshift({ prompt: equationPreviewText(P), hadError: true, answer: 'x = ' + numText(P.x0) });
+    curProg.history = curProg.history.slice(0,5);
+    saveProg('linear:'+curLevel, curProg);
+    renderLinHistory();
+  },
+});
 function newProblem(){
   P = gen(curLevel);
   mountProblem();
@@ -2664,24 +2711,30 @@ function finish(){
         : P.L.reduce((s,t)=>s+t.coef*(t.isX?P.x0:1),0));
   S.frozen.push(`<div class="check-line">Проверка: подставим x = ${numText(P.x0)} → обе части равны ${numText(lv)} ✓</div>`);
   renderAll(); setPrompt(); renderInputs();
-  let stars = S.helped ? 1 : (S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1));
-  document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
-  totalSolved++; solvedByLevel[curLevel]++;
-  streak = (S.errTotal===0) ? streak+1 : 0;
+  // Промпт №67: пример уже закрыт ответом сразу (quick-answer.js) — второй
+  // раз не засчитываем, шаги были разбором
+  if (!QuickAnswer.settled(S)) {
+    let stars = S.helped ? 1 : (S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1));
+    document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
+    totalSolved++; solvedByLevel[curLevel]++;
+    streak = (S.errTotal===0) ? streak+1 : 0;
+  }
   document.getElementById('stSolved').textContent = totalSolved;
   document.getElementById('stStreak').textContent = streak;
   setHint(S.errTotal===0 ? 'Без единой ошибки — блестяще!' : `Решено! Ошибок по пути: ${S.errTotal}.`, S.errTotal===0);
   document.getElementById('nextBtn').style.display='block';
 
-  // прогресс/медали за пять решённых на этом уровне подряд
-  if(S.errTotal>0) curProg.errorsInBatch = (curProg.errorsInBatch||0)+1;
-  curProg.history.unshift({ prompt: equationPreviewText(P), hadError: S.errTotal>0, answer: 'x = ' + numText(P.x0) });
-  curProg.history = curProg.history.slice(0,5);
-  const awardedTier = tallyBatch(curProg);
-  saveProg('linear:'+curLevel, curProg);
-  renderLinHistory();
-  renderLevels();
-  if(awardedTier) playMedalAnimation(awardedTier, document.querySelector('.lvl.active'));
+  if (!QuickAnswer.settled(S)) {   // Промпт №67: уже засчитано ответом сразу
+    // прогресс/медали за пять решённых на этом уровне подряд
+    if(S.errTotal>0) curProg.errorsInBatch = (curProg.errorsInBatch||0)+1;
+    curProg.history.unshift({ prompt: equationPreviewText(P), hadError: S.errTotal>0, answer: 'x = ' + numText(P.x0) });
+    curProg.history = curProg.history.slice(0,5);
+    const awardedTier = tallyBatch(curProg);
+    saveProg('linear:'+curLevel, curProg);
+    renderLinHistory();
+    renderLevels();
+    if(awardedTier) playMedalAnimation(awardedTier, document.querySelector('.lvl.active'));
+  } else renderLevels();
 }
 
 /* ───────── интерфейс ───────── */
@@ -2811,6 +2864,11 @@ return function start(forceLevel){
 </script>
 <script>
 window.startQuadraticEngine = (function(){
+// Промпт №66: доска (панель «Тренажёры») читает текущий пример, чтобы задание,
+// добавленное на доску, можно было решить и проверить прямо там. Пример живёт
+// в замыкании движка — наружу отдаём только чтение; P объявлен ниже, стрелку
+// зовут уже после загрузки страницы
+window.__boardQuadP = () => P;
 
 /* ───────── утилиты ───────── */
 const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
@@ -3308,6 +3366,54 @@ function mountProblem(){
   setHint('');
   renderAll(); setPrompt(); renderInputs();
 }
+/* ═══ Промпт №67: ответ можно вписать сразу, без решения по шагам ═══
+   Панель «Ответ» над панелью шагов — quick-answer.js. Итог лежит в S.quick
+   и уходит собеседнику вместе с S; счёт ведём здесь, как в finish(). */
+QuickAnswer.mount({
+  fields: P => {
+    let roots = null;
+    if (Array.isArray(P.roots)) roots = P.roots;
+    else if (P.kind === 'noB') roots = P.hasRoots ? [P.r, -P.r] : [];
+    else if (typeof P.x1 === 'number') roots = [P.x1, P.x2];
+    if (!roots) return null;
+    return [{ id: 'main', label: 'Корни:', type: 'nums', value: roots.join('; ') }];
+  },
+  getP: () => P, getS: () => S,
+  active: () => !!document.getElementById('quadBasketAddBtn'),
+  onRight(){
+    // засчитываем так же, как finish() после шагов: звёзды по ошибкам, решено, серия
+    const stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
+    document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
+    totalSolved++; solvedByLevel[curLevel]++;
+    streak = (S.errTotal===0) ? streak+1 : 0;
+    document.getElementById('stSolved').textContent = totalSolved;
+    document.getElementById('stStreak').textContent = streak;
+    renderLevels();
+    if(S.errTotal>0) curProg.errorsInBatch = (curProg.errorsInBatch||0)+1;
+    curProg.history.unshift({ prompt: P.eqText, hadError: S.errTotal>0, answer: answerHTML(P).replace(/^Ответ:\s*/, '') });
+    curProg.history = curProg.history.slice(0,5);
+    const awardedTier = tallyBatch(curProg);
+    saveProg('quadratic:'+curLevel, curProg);
+    renderQuadHistory(); renderLevels();
+    if(awardedTier) playMedalAnimation(awardedTier, document.querySelector('.lvl.active'));
+  },
+  onWrong(){
+    S.errTotal++;
+    streak = 0;
+    document.getElementById('stStreak').textContent = streak;
+  },
+  onFail(){
+    // вторая ошибка: как в ОГЭ — пример закрыт, но не решён
+    streak = 0;
+    document.getElementById('stStreak').textContent = streak;
+    document.getElementById('stStars').textContent = '☆☆☆';
+    curProg.errorsInBatch = (curProg.errorsInBatch||0)+1;
+    curProg.history.unshift({ prompt: P.eqText, hadError: true, answer: answerHTML(P).replace(/^Ответ:\s*/, '') });
+    curProg.history = curProg.history.slice(0,5);
+    saveProg('quadratic:'+curLevel, curProg);
+    renderQuadHistory();
+  },
+});
 function newProblem(){
   P = gen(curLevel);
   mountProblem();
@@ -3949,24 +4055,30 @@ function finish(){
   S.phase = 'done';
   S.frozenSteps.push(`<div class="stepline ok">${answerHTML(P)}</div>`);
   renderAll(); setPrompt(); renderInputs();
-  let stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
-  document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
-  totalSolved++; solvedByLevel[curLevel]++;
-  streak = (S.errTotal===0) ? streak+1 : 0;
+  // Промпт №67: пример уже закрыт ответом сразу (quick-answer.js) — второй
+  // раз не засчитываем, шаги были разбором
+  if (!QuickAnswer.settled(S)) {
+    let stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
+    document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
+    totalSolved++; solvedByLevel[curLevel]++;
+    streak = (S.errTotal===0) ? streak+1 : 0;
+  }
   document.getElementById('stSolved').textContent = totalSolved;
   document.getElementById('stStreak').textContent = streak;
   setHint(S.errTotal===0 ? 'Без единой ошибки — блестяще!' : `Решено! Ошибок по пути: ${S.errTotal}.`, S.errTotal===0);
   document.getElementById('nextBtn').style.display='block';
 
-  // прогресс/медали за пять решённых на этом уровне подряд
-  if(S.errTotal>0) curProg.errorsInBatch = (curProg.errorsInBatch||0)+1;
-  curProg.history.unshift({ prompt: P.eqText, hadError: S.errTotal>0, answer: answerHTML(P).replace(/^Ответ:\s*/, '') });
-  curProg.history = curProg.history.slice(0,5);
-  const awardedTier = tallyBatch(curProg);
-  saveProg('quadratic:'+curLevel, curProg);
-  renderQuadHistory();
-  renderLevels();
-  if(awardedTier) playMedalAnimation(awardedTier, document.querySelector('.lvl.active'));
+  if (!QuickAnswer.settled(S)) {   // Промпт №67: уже засчитано ответом сразу
+    // прогресс/медали за пять решённых на этом уровне подряд
+    if(S.errTotal>0) curProg.errorsInBatch = (curProg.errorsInBatch||0)+1;
+    curProg.history.unshift({ prompt: P.eqText, hadError: S.errTotal>0, answer: answerHTML(P).replace(/^Ответ:\s*/, '') });
+    curProg.history = curProg.history.slice(0,5);
+    const awardedTier = tallyBatch(curProg);
+    saveProg('quadratic:'+curLevel, curProg);
+    renderQuadHistory();
+    renderLevels();
+    if(awardedTier) playMedalAnimation(awardedTier, document.querySelector('.lvl.active'));
+  } else renderLevels();
 }
 
 /* ───────── интерфейс уровней ───────── */
