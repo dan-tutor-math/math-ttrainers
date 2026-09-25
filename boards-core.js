@@ -4294,6 +4294,9 @@ const TRAINER_CAPTURE = {
   frac_div:  [ { sel:'#board' } ],
   // Промпт №65: у НОД условие лежит отдельно от листа с решением
   gcd:       [ { sel:'#taskLine' } ],
+  // Промпт №71: «Проценты» — условие отдельно от полей ответа, как у ЕГЭ;
+  // у добавленных «+» карточек — .added-card-question
+  percent:   [ { sel:'#pctQuestion' }, { selAll:'.added-task-card .added-card-question' } ],
   powers:    [ { sel:'#questionPanel' }, { selAll:'.added-task-card .added-card-question' } ],
 };
 // Промпт №55: ЕГЭ профиль — одна страница на все 20 позиций (ege_prof.html?n=…),
@@ -4345,6 +4348,7 @@ const TRAINERS_PANEL_GROUPS = [
     // сюда его добавить забыли
     { id:'powers',    name:'Действия со степенями',   href:'powers.html',            eq:'a⁵·a³=a⁸' },
     { id:'gcd',       name:'Наибольший общий делитель (НОД)', href:'gcd.html',    eq:'НОД(84, 60)' },
+    { id:'percent',   name:'Проценты',                href:'percent.html',           eq:'15% от 80' },
   ]},
 ];
 // ЕГЭ профиль вставляем вторым разделом (после ОГЭ) — те же названия, что в
@@ -5136,6 +5140,13 @@ function trainerTaskInfo(win, trainerId, el){
     const card = el.closest ? el.closest('.added-task-card[data-idx]') : null;
     const cardIdx = card ? Number(card.dataset.idx) : -1;
     if (/^(ege|egeb)\d+$/.test(trainerId) || /^oge2[0-5]$/.test(trainerId)) return egeTaskInfo(win, cardIdx);
+    // Промпт №71: тренажёр, у которого верный ответ лежит прямо в объекте
+    // задания («Проценты»), отдаёт его сам готовым — доске не нужно знать
+    // его модель задания. Новым тренажёрам достаточно завести этот хук
+    if (typeof win.__boardTaskInfo === 'function') {
+      const info = plainCopy(win.__boardTaskInfo(cardIdx));
+      return info && (info.kind === 'fields' ? Array.isArray(info.fields) && info.fields.length : info.kind === 'choice') ? info : null;
+    }
     if (el.id === 'theoryContent') return null;
     const st = typeof win.tsGetState === 'function' ? plainCopy(win.tsGetState()) : null;
     if (!st) return null;
@@ -7665,7 +7676,7 @@ const TRAINER_NAMES = {
   add_col:'Сложение в столбик', sub_col:'Вычитание в столбик', mul_col:'Умножение в столбик', div_col:'Деление в столбик',
   linear:'Линейные уравнения', quadratic:'Квадратные уравнения',
   frac_mul:'Умножение дробей', frac_div:'Деление дробей', neg_pos:'Положительные и отрицательные числа',
-  powers:'Действия со степенями', gcd:'Наибольший общий делитель (НОД)',
+  powers:'Действия со степенями', gcd:'Наибольший общий делитель (НОД)', percent:'Проценты',
 };
 // подписи для «Подборки» — берём из списка панели тренажёров, чтобы название
 // ЕГЭ-задания было записано на доске один в один как в реестре на главной
