@@ -604,7 +604,9 @@ html[data-medals="on"] .board-view-toolbar{bottom:64px;}
 </div>
 
 <div class="wrap">
-  <h1 id="pageTitle">ОГЭ, часть 2</h1>
+  <!-- номер в заголовке меняет страница, стрелки ◀ ▶ по бокам ставит
+       exam-nav.js — поэтому текст в своём span, а не прямо в h1 -->
+  <h1><span id="pageTitle">ОГЭ, часть 2</span></h1>
   <div class="sub" id="pageSub">демоверсия ФИПИ 2027</div>
 
   <!-- экран выбора прототипа: открывается первым, как список типов в ОГЭ.
@@ -745,6 +747,7 @@ html[data-medals="on"] .board-view-toolbar{bottom:64px;}
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="exam-nav.js"></script>
 <script src="html2canvas.min.js"></script>
 <script src="jspdf.umd.min.js"></script>
 <script src="lesson-history.js"></script>
@@ -1005,8 +1008,9 @@ function sameSets(a, b){
 /* ═══════════════ состояние ═══════════════ */
 const S = {
   // screen: 'picker' — список прототипов этого номера (как список типов в ОГЭ),
-  // 'task' — само задание. Номер задания приходит из адреса и внутри страницы
-  // не меняется: между номерами переходят через каталог на главной
+  // 'task' — само задание. Номер задания приходит из адреса; с промпта №73
+  // его меняют и стрелки ◀ ▶ у заголовка (exam-nav.js) — без перезагрузки,
+  // через тот же openTask, что и смена прототипа
   screen: 'picker',
   n: NUMS[0], pid: null, mode: 'exam',
   answered: false, hadWrong: false, correct: false,
@@ -1502,6 +1506,16 @@ function render(){
   applyColumns();
   syncKeypadVisibility();
 }
+/* Промпт №73: хук для стрелок между номерами (exam-nav.js). Номер меняется
+   тем же openTask, что и прототип: снимок в конспект, карточки «+» заново,
+   адрес — всё как при смене прототипа. pid() — открытый прототип, пока на
+   экране задание: его exam-nav запоминает, чтобы вернуть при возврате на
+   номер; на списке прототипов null — помним последний открытый */
+window.__examNav = {
+  n: () => S.n,
+  pid: () => (S.screen === 'task' && curProto) ? S.pid : null,
+  open: (n, pid) => { if (task(n)) openTask(n, pid && protoById(n, pid) ? pid : null); },
+};
 // сосед по списку прототипов этого номера, по кругу
 function protoNeighbour(delta){
   const list = protos(S.n);
