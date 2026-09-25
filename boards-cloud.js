@@ -522,6 +522,15 @@
     .bd-share-make:hover{background:var(--ink-active);}
     .bd-share-msg{font-size:12px;color:var(--muted-2);}
     .bd-share-msg.err{color:var(--teacher);}
+    .bd-share-vers{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--glass-border);padding-top:12px;}
+    #bdShareVersList{display:flex;flex-direction:column;gap:8px;}
+    #bdShareVersList:empty{display:none;}
+    .bd-share-vers-btn,.bd-ver-save{font-size:12.5px;font-weight:600;padding:7px 10px;border-radius:9px;
+      border:1px solid var(--glass-border);background:var(--glass);color:var(--pencil);cursor:pointer;}
+    .bd-ver-row{display:flex;flex-direction:column;gap:5px;padding:8px;border-radius:10px;border:1px solid var(--glass-border);}
+    .bd-ver-info{font-size:12px;color:var(--pencil);line-height:1.35;}
+    .bd-ver-acts{display:flex;gap:10px;flex-wrap:wrap;}
+    .bd-ver-acts button{border:none;background:none;color:var(--teacher);cursor:pointer;font-size:11.5px;text-decoration:underline;padding:0;}
 
     /* Курсоры других участников совместной доски — см. блок «живой курсор»
        ниже. Слой на весь экран, сам не ловит клики (pointer-events:none),
@@ -798,6 +807,128 @@
   function tombBlocks(id, rv) {
     return cloudTombs.has(id) && (rv || 0) <= cloudTombs.get(id);
   }
+
+  /* ═══ Промпт №10 (новый список): при входе на общую доску пропадало всё ═══
+     Живой случай: заходишь на общую доску — секунду всё на месте, потом
+     доска пустая; так при каждой перезагрузке, и нарисованное поверх пустой
+     доски после выхода и входа тоже пропадало.
+
+     Причина. При открытии общей доски объекты забирались из базы ОДНИМ
+     запросом, и его ответ целиком ЗАМЕНЯЛ то, что уже лежало на доске из
+     локальной копии (board.objects = rows). А база (PostgREST у Supabase)
+     отдаёт за один запрос не больше 1000 строк — настройка «Max rows» по
+     умолчанию, и об обрезке она не сообщает. Месяцы занятий с одной ученицей
+     перевалили за тысячу объектов, и с этого момента при каждом входе
+     на доске оставалась случайная тысяча строк (как правило, самое старое,
+     где-то далеко от места работы), а всё свежее — задания, решения, новые
+     штрихи — исчезало с экрана. В базе оно при этом лежало целым: запись шла
+     нормально, обрезалось только чтение. Сверка раз в полминуты страдала тем
+     же — видела только первую тысячу номеров.
+
+     Лечение:
+     - всё, что читает доску из базы целиком, читает постранично и сверяет
+       число полученного с числом строк в базе (selectAllPaged)
+     - ответ базы не заменяет доску, а сливается с ней по номерам версий
+       (cloudInitialLoad). Убрать с доски объект, которого в базе нет, можно
+       только когда ответ точно полный и объект раньше точно был в базе
+       (cloudSeen — эту память храним на диске): значит, его удалил
+       собеседник. Объект, которого в базе не было никогда, — это
+       несостоявшаяся запись; он остаётся и дописывается
+     - пустой ответ базы никогда не опустошает непустую доску
+     - несостоявшиеся записи повторяются при сверке (cloudUnsynced)
+     - перед сверкой с базой снимается версия доски на этом устройстве
+       (раздел «Версии» ниже), из неё можно вернуть пропавшее */
+  let cloudLoadState = 'idle';   // 'idle' | 'loading' | 'retry' | 'done' | 'failed'
+  let cloudLoadGen = 0;          // поколение открытия: ответ для прошлого открытия не применяем
+  let cloudSeen = new Set();     // номера объектов, которые точно были в базе
+  let cloudSeenKnown = false;    // есть ли вообще такая память (нет — первый вход после обновления)
+  let cloudMine = new Set();     // объекты, которые я правил в этой сессии — их запись уже в очереди
+  let cloudUnsynced = new Set(); // объекты, запись которых в базу не прошла — повторим при сверке
+  let cloudUnsyncedDel = new Set(); // то же для удалений
+
+  const PAGE_DATA = 250;         // строк с содержимым за запрос (картинки тяжёлые)
+  const PAGE_LIGHT = 1000;       // строк без содержимого (номера и версии)
+  const PAGE_PARALLEL = 3;       // сколько страниц просим одновременно
+  const IN_CHUNK = 150;          // номеров в одном .in() — длинный адрес сервер не примет
+  const LOAD_RETRY_MS = [1500, 4000, 10000];
+
+  function chunksOf(arr, n) {
+    const out = [];
+    for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+    return out;
+  }
+
+  // Все строки доски постранично. complete — получено ровно столько, сколько
+  // строк в базе; только при полном ответе можно делать вывод «этого в базе нет».
+  // Порядок по obj_id — без него страницы могут пересекаться и терять строки
+  async function selectAllPaged(boardId, sel, pageSize) {
+    const byId = new Map();
+    const page = (from, size) => window.SB.from('board_objects')
+      .select(sel, from === 0 ? { count: 'exact' } : undefined)
+      .eq('board_id', boardId).order('obj_id', { ascending: true })
+      .range(from, from + size - 1);
+    const first = await page(0, pageSize);
+    if (first.error) return { rows: [], complete: false, error: first.error };
+    (first.data || []).forEach(r => byId.set(r.obj_id, r));
+    const total = typeof first.count === 'number' ? first.count : null;
+    let size = pageSize;
+    // база может резать страницу сильнее, чем мы просили (свой «Max rows»)
+    if (first.data && first.data.length < pageSize && (total === null || first.data.length < total)) {
+      size = Math.max(1, first.data.length);
+    }
+    let from = (first.data || []).length;
+    let error = null;
+    if (total !== null) {
+      const offsets = [];
+      for (let o = from; o < total; o += size) offsets.push(o);
+      for (const batch of chunksOf(offsets, PAGE_PARALLEL)) {
+        const res = await Promise.all(batch.map(o => page(o, size)));
+        res.forEach(r => {
+          if (r.error) { error = r.error; return; }
+          (r.data || []).forEach(x => byId.set(x.obj_id, x));
+        });
+        if (error) break;
+      }
+    } else {
+      // количество не пришло — идём страница за страницей до пустой
+      for (let guard = 0; guard < 10000 && from > 0; guard++) {
+        const r = await page(from, size);
+        if (r.error) { error = r.error; break; }
+        if (!r.data || !r.data.length) break;
+        r.data.forEach(x => byId.set(x.obj_id, x));
+        from += r.data.length;
+      }
+    }
+    const rows = Array.from(byId.values());
+    const complete = !error && total !== null && rows.length >= total;
+    return { rows, complete, error, total };
+  }
+
+  // память «что было в базе» — отдельной записью на доску, рядом с досками
+  function seenKey(boardId) { return 'cloudseen:' + boardId; }
+  let seenSaveTimer = null;
+  let seenSavePending = null;
+  function saveSeenSoon() {
+    if (!cloudBoardId || !cloudSeenKnown || !window.idbPut) return;
+    const key = seenKey(cloudBoardId), set = cloudSeen;
+    seenSavePending = () => window.idbPut(key, { ids: Array.from(set), at: Date.now() }).catch(() => {});
+    clearTimeout(seenSaveTimer);
+    seenSaveTimer = setTimeout(flushSeen, 1200);
+  }
+  function flushSeen() {
+    clearTimeout(seenSaveTimer); seenSaveTimer = null;
+    const job = seenSavePending; seenSavePending = null;
+    if (job) job();
+  }
+  function loadSeen(boardId) {
+    if (!window.idbGet) return Promise.resolve(null);
+    return window.idbGet(seenKey(boardId)).then(v => (v && Array.isArray(v.ids)) ? v.ids : null).catch(() => null);
+  }
+
+  // пришедшее из облака — на диск (без подъёма rev, см. boardsPersistQuiet)
+  function persistBoardQuiet(board) {
+    if (window.boardsPersistQuiet && board) window.boardsPersistQuiet(board);
+  }
   function addTomb(id, rv) {
     const prev = cloudTombs.has(id) ? cloudTombs.get(id) : -1;
     cloudTombs.delete(id);
@@ -820,6 +951,10 @@
     const copy = cloneObj(inc);
     if (idx >= 0) board.objects[idx] = copy; else board.objects.push(copy);
     cloudTombs.delete(inc.id);
+    // Промпт №10: пришло от собеседника — значит, в базе оно есть (или вот-вот
+    // будет); и на диск эту доску пора переписать
+    cloudSeen.add(inc.id); saveSeenSoon();
+    persistBoardQuiet(board);
     return 'applied';
   }
   // rv — версия, которую удалял собеседник. Она может быть новее нашей:
@@ -829,6 +964,10 @@
     const local = board.objects.find(o => o.id === id);
     addTomb(id, Math.max(revOf(local), rv || 0));
     if (local) board.objects = board.objects.filter(o => o.id !== id);
+    // из cloudSeen НЕ убираем: «был в базе, теперь нет» — ровно то, по чему
+    // при следующем входе старая копия этого объекта с диска распознаётся как
+    // удалённая, а не как несостоявшаяся запись, которую надо дописать
+    if (local) persistBoardQuiet(board);
     return !!local;
   }
 
@@ -862,43 +1001,57 @@
       o.rv = Math.max(revOf(o), cloudTombs.has(o.id) ? cloudTombs.get(o.id) : 0) + 1;
       o.rvBy = me;
       cloudTombs.delete(o.id);
+      cloudMine.add(o.id);
     });
     diff.updated.forEach(u => {
       u.after.rv = Math.max(revOf(u.before), revOf(u.after)) + 1;
       u.after.rvBy = me;
+      cloudMine.add(u.id);
     });
-    diff.removed.forEach(r => addTomb(r.id, revOf(r.obj)));
+    diff.removed.forEach(r => { addTomb(r.id, revOf(r.obj)); cloudMine.add(r.id); });
   }
 
   // отмена/повтор: применяем свой diff к доске и сразу выдаём номер версии
   // новее текущего — иначе отмена вернула бы объект со СТАРЫМ номером, и
   // остальные участники справедливо сочли бы его устаревшим
-  function applyOwnDiff(board, d) {
+  // step — на сколько поднять номер. Обычно на 1; восстановление из версии
+  // (Промпт №10) поднимает сильнее: объект могли удалить, пока меня не было,
+  // и у собеседника лежит надгробие с номером новее моей старой копии —
+  // скачок номера ничего не ломает (важен только порядок), а надгробие обходит
+  function applyOwnDiff(board, d, step) {
+    step = step || 1;
     const me = myUid();
     const out = { added: [], updated: [], removed: [] };
-    d.removed.forEach(r => {
-      const local = board.objects.find(o => o.id === r.id);
-      if (!local) return;
-      addTomb(r.id, revOf(local));
-      board.objects = board.objects.filter(o => o.id !== r.id);
-      out.removed.push({ id: r.id, obj: local });
-    });
+    if (d.removed.length) {
+      const gone = new Set(d.removed.map(r => r.id));
+      board.objects.forEach(local => {
+        if (!gone.has(local.id)) return;
+        addTomb(local.id, revOf(local));
+        cloudMine.add(local.id);
+        out.removed.push({ id: local.id, obj: local });
+      });
+      board.objects = board.objects.filter(o => !gone.has(o.id));
+    }
+    const have = new Map(board.objects.map((o, i) => [o.id, i]));
     d.added.forEach(o => {
-      if (board.objects.some(x => x.id === o.id)) return;
+      if (have.has(o.id)) return;
       const c = cloneObj(o);
-      c.rv = Math.max(revOf(o), cloudTombs.has(o.id) ? cloudTombs.get(o.id) : 0) + 1;
+      c.rv = Math.max(revOf(o), cloudTombs.has(o.id) ? cloudTombs.get(o.id) : 0) + step;
       c.rvBy = me;
       cloudTombs.delete(o.id);
+      cloudMine.add(o.id);
+      have.set(o.id, board.objects.length);
       board.objects.push(c);
       out.added.push(c);
     });
     d.updated.forEach(u => {
-      const idx = board.objects.findIndex(o => o.id === u.id);
-      if (idx < 0) return;
+      const idx = have.get(u.id);
+      if (idx === undefined) return;
       const cur = board.objects[idx];
       const c = cloneObj(u.after);
-      c.rv = Math.max(revOf(cur), revOf(u.after)) + 1;
+      c.rv = Math.max(revOf(cur), revOf(u.after)) + step;
       c.rvBy = me;
+      cloudMine.add(u.id);
       board.objects[idx] = c;
       out.updated.push({ id: u.id, before: cur, after: c });
     });
@@ -945,15 +1098,22 @@
     attempt = attempt || 0;
     expect = expect || {};
     if (!ids.length || !boardId || boardId !== cloudBoardId) return;
-    const { data: rows, error } = await window.SB.from('board_objects')
-      .select('obj_id, data').eq('board_id', boardId).in('obj_id', ids);
+    // Промпт №10: кусками — сверка теперь видит все объекты доски, и
+    // недостающих может оказаться сотни; такой список номеров в одном адресе
+    // запроса сервер не примет. Сбой куска — его номера просто пойдут на повтор
+    const rows = [];
+    for (const part of chunksOf(ids, IN_CHUNK)) {
+      const res = await window.SB.from('board_objects')
+        .select('obj_id, data').eq('board_id', boardId).in('obj_id', part);
+      if (!res.error && res.data) rows.push(...res.data);
+    }
     const board = window.getCurrentBoard();
     if (!board || board.cloudBoardId !== boardId || boardId !== cloudBoardId) return;
     const done = new Set();
     // пока ходили в базу, объект могли удалить — тогда он больше не нужен
     ids.forEach(id => { if (tombBlocks(id, expect[id] || 0)) done.add(id); });
     const applied = [];
-    if (!error && rows && rows.length) {
+    if (rows.length) {
       if (window.boardsStampMine) window.boardsStampMine();
       cloudApplyingRemote = true;
       rows.forEach(r => {
@@ -982,6 +1142,10 @@
     lightenDiff, BROADCAST_LIMIT, HEAVY_OBJ_BYTES,
     tombs: () => cloudTombs,
     writesIdle: () => cloudWriteChain,
+    // Промпт №10
+    loadState: () => cloudLoadState,
+    seen: () => Array.from(cloudSeen),
+    reconcileNow: () => reconcileOnce(cloudBoardId),
   };
 
   function pushDiffToSupabase(boardId, liveDiff) {
@@ -1011,6 +1175,13 @@
     }));
     if (rows.length) {
       const { error } = await window.SB.from('board_objects').upsert(rows, { onConflict: 'board_id,obj_id' });
+      // Промпт №10: помним, что записано, а что нет. Записанное — «было в
+      // базе» (cloudSeen); незаписанное повторит сверка (cloudUnsynced), а не
+      // молча останется только на этом экране до перезагрузки
+      if (boardId === cloudBoardId) {
+        rows.forEach(r => { if (error) cloudUnsynced.add(r.obj_id); else { cloudUnsynced.delete(r.obj_id); cloudSeen.add(r.obj_id); } });
+        if (!error) saveSeenSoon();
+      }
       if (error) console.error('[облачная доска] не удалось сохранить изменения:', error.message);
       // Промпт №42: запись прошла — говорим об этом отдельным лёгким
       // сообщением. Если первая рассылка потерялась, это второй шанс: по
@@ -1028,6 +1199,9 @@
     const ids = diff.removed.map(r => r.id);
     if (ids.length) {
       const { error } = await window.SB.from('board_objects').delete().eq('board_id', boardId).in('obj_id', ids);
+      // Промпт №10: несостоявшееся удаление тоже повторяет сверка — иначе
+      // при следующем входе объект честно придёт из базы и воскреснет
+      if (boardId === cloudBoardId) ids.forEach(id => { if (error) cloudUnsyncedDel.add(id); else cloudUnsyncedDel.delete(id); });
       if (error) console.error('[облачная доска] не удалось удалить объекты:', error.message);
     }
   }
@@ -1131,9 +1305,14 @@
       const ids = Array.from(goneCheckIds);
       goneCheckIds = new Set();
       if (!ids.length || boardId !== cloudBoardId) return;
-      const { data: rows, error } = await window.SB.from('board_objects')
-        .select('obj_id').eq('board_id', boardId).in('obj_id', ids);
-      if (error || !rows) return;
+      // кусками (Промпт №10); сбой любого куска — не удаляем ничего
+      const rows = [];
+      for (const part of chunksOf(ids, IN_CHUNK)) {
+        const res = await window.SB.from('board_objects')
+          .select('obj_id').eq('board_id', boardId).in('obj_id', part);
+        if (res.error || !res.data) return;
+        rows.push(...res.data);
+      }
       const board = window.getCurrentBoard();
       if (!board || board.cloudBoardId !== boardId || boardId !== cloudBoardId) return;
       const alive = new Set(rows.map(r => r.obj_id));
@@ -1229,18 +1408,263 @@
     return { ids, expect };
   }
 
-  async function cloudSetupSubscription(boardId, board) {
-    const { data: rows, error } = await window.SB.from('board_objects').select('obj_id, data').eq('board_id', boardId);
-    if (!error && rows) {
-      cloudApplyingRemote = true;
-      board.objects = rows.map(r => r.data);
-      if (window.boardsNoteForeignObjects) window.boardsNoteForeignObjects(board.objects.map(o => o.id));
-      cloudApplyingRemote = false;
-      window.boardsClearSelection();
-      window.boardsRedraw();
-    } else if (error) {
-      console.error('[облачная доска] не удалось загрузить объекты:', error.message);
+  /* ═══ Промпт №10 (новый список): версии общей доски ═══
+     У обычных досок есть автоматические копии всего хранилища (db_snap1..3,
+     раз в 15 минут), у общих — не было ничего: главная копия лежит в базе,
+     истории там нет, и когда доска пустела при входе, откатиться было не к
+     чему. Теперь на каждом устройстве хранятся последние VER_MAX версий
+     каждой общей доски: при входе (до сверки с базой — это главное), раз в
+     десять минут работы, при выходе и перед каждым восстановлением. Версия
+     пишется, только если доска с прошлой версии изменилась.
+
+     Картинки (задания с тренажёров, вставки) весят в сотни раз больше
+     штрихов и почти не меняются. Если класть их в каждую версию, дюжина
+     версий доски с заданиями — это сотни мегабайт на диске (а раздутое
+     хранилище уже роняло вкладку, см. HANDOFF, раздел 6). Поэтому картинка
+     лежит один раз в пуле `cloudimg:<доска>:<хэш>`, а в версии — только
+     ссылка `__img`. Пул чистится, когда картинку перестаёт упоминать хоть
+     одна версия.
+
+     Восстановление — два действия в панели «Совместная работа»:
+     «Вернуть пропавшее» (дописывает объекты версии, которых сейчас нет, и
+     больше ничего не трогает) и «Откатить» (доска становится ровно такой,
+     как в версии). Оба идут обычной своей правкой: в базу, собеседнику и в
+     историю отмены — Ctrl+Z возвращает как было. */
+  const VER_MAX = 12;
+  const VER_EVERY_MS = 10 * 60 * 1000;
+  const VER_REASON = {
+    open: 'при входе', auto: 'во время работы', close: 'при выходе',
+    restore: 'перед восстановлением', manual: 'вручную',
+  };
+  let verChain = Promise.resolve();
+  let lastVerAt = 0;
+
+  function verMetaKey(cb) { return 'cloudver:' + cb; }
+  function verSlotKey(cb, slot) { return 'cloudver:' + cb + ':' + slot; }
+  function verImgKey(cb, h) { return 'cloudimg:' + cb + ':' + h; }
+
+  // хэш строки картинки: два независимых 32-битных плюс длина — совпадение
+  // двух разных картинок практически исключено. Картинки на доске те же
+  // строки из раза в раз, поэтому хэш кэшируется (сбрасывается при смене доски)
+  const srcHashCache = new Map();
+  function srcHash(s) {
+    let h = srcHashCache.get(s);
+    if (h) return h;
+    let a = 0x811c9dc5, b = 0;
+    for (let i = 0; i < s.length; i++) {
+      const c = s.charCodeAt(i);
+      a = Math.imul(a ^ c, 0x01000193);
+      b = (Math.imul(b, 31) + c) | 0;
     }
+    h = (a >>> 0).toString(36) + '_' + (b >>> 0).toString(36) + '_' + s.length.toString(36);
+    srcHashCache.set(s, h);
+    return h;
+  }
+  // подпись содержимого — чтобы не писать версию, если ничего не поменялось
+  function boardSig(objects) {
+    let a = 0x811c9dc5;
+    objects.forEach(o => {
+      const t = (o && o.id) + '@' + revOf(o);
+      for (let i = 0; i < t.length; i++) a = Math.imul(a ^ t.charCodeAt(i), 0x01000193);
+    });
+    return objects.length + ':' + (a >>> 0).toString(36);
+  }
+
+  // force — писать, даже если с прошлой версией не отличается
+  function saveVersion(board, reason, force) {
+    const cb = board && board.cloudBoardId;
+    if (!cb || !Array.isArray(board.objects) || !window.idbGet || !window.idbPut) return Promise.resolve(false);
+    if (!board.objects.length && !force) return Promise.resolve(false);
+    // снимок — сразу, синхронно: к моменту записи доска уже будет другой
+    const sig = boardSig(board.objects);
+    const imgs = new Map();
+    const snapshot = JSON.parse(JSON.stringify(board.objects.map(o => {
+      if (o && o.type === 'image' && typeof o.src === 'string' && o.src.length > 256) {
+        const h = srcHash(o.src);
+        imgs.set(h, o.src);
+        return Object.assign({}, o, { src: null, __img: h });
+      }
+      return o;
+    })));
+    const at = Date.now();
+    lastVerAt = at;
+    verChain = verChain.then(async () => {
+      const meta = (await window.idbGet(verMetaKey(cb))) || { list: [], pool: [] };
+      const list = Array.isArray(meta.list) ? meta.list.slice() : [];
+      if (!force && list.length && list[0].sig === sig) return false;
+      const pool = new Set(meta.pool || []);
+      for (const [h, src] of imgs) {
+        if (pool.has(h)) continue;
+        await window.idbPut(verImgKey(cb, h), src);
+        pool.add(h);
+      }
+      let slot;
+      if (list.length >= VER_MAX) slot = list.pop().slot;
+      else { const used = new Set(list.map(v => v.slot)); slot = 0; while (used.has(slot)) slot++; }
+      await window.idbPut(verSlotKey(cb, slot), { at, objects: snapshot });
+      list.unshift({ slot, at, reason, count: snapshot.length, sig, imgs: Array.from(imgs.keys()) });
+      // картинки, которые больше не упоминает ни одна версия, — из пула долой
+      const keep = new Set();
+      list.forEach(v => (v.imgs || []).forEach(h => keep.add(h)));
+      for (const h of Array.from(pool)) {
+        if (keep.has(h)) continue;
+        if (window.idbDelete) await window.idbDelete(verImgKey(cb, h));
+        pool.delete(h);
+      }
+      await window.idbPut(verMetaKey(cb), { list, pool: Array.from(pool) });
+      return true;
+    }).catch(e => { console.warn('[облачная доска] версию доски сохранить не удалось:', e && e.message ? e.message : e); return false; });
+    return verChain;
+  }
+  function listVersions(cb) {
+    if (!cb || !window.idbGet) return Promise.resolve([]);
+    return verChain.then(() => window.idbGet(verMetaKey(cb)))
+      .then(meta => (meta && Array.isArray(meta.list)) ? meta.list : []).catch(() => []);
+  }
+  // объекты версии с картинками из пула; картинка пропала из пула — объект
+  // пропускаем (картинка без src на доске была бы пустой рамкой)
+  async function loadVersionObjects(cb, entry) {
+    const rec = await window.idbGet(verSlotKey(cb, entry.slot));
+    if (!rec || !Array.isArray(rec.objects) || rec.at !== entry.at) return null;
+    const cache = new Map();
+    const out = [];
+    for (const o of rec.objects) {
+      if (o && o.__img) {
+        if (!cache.has(o.__img)) cache.set(o.__img, await window.idbGet(verImgKey(cb, o.__img)).catch(() => null));
+        const src = cache.get(o.__img);
+        if (!src) continue;
+        const c = Object.assign({}, o, { src });
+        delete c.__img;
+        out.push(c);
+      } else out.push(o);
+    }
+    return out;
+  }
+  // без номера версии и автора версии — сравниваем само содержимое
+  function bareJson(o) { const c = Object.assign({}, o); delete c.rv; delete c.rvBy; return JSON.stringify(c); }
+
+  // mode: 'missing' — вернуть пропавшее; 'rollback' — ровно как в версии
+  async function restoreVersion(entry, mode) {
+    const board = window.getCurrentBoard();
+    const cb = cloudBoardId;
+    if (!board || !cb || board.cloudBoardId !== cb) return { error: 'Доска закрыта' };
+    if ((ROLE_ACCESS[cloudRole] || 'full') !== 'full') return { error: 'Восстанавливать может только владелец или полный доступ' };
+    const objs = await loadVersionObjects(cb, entry);
+    if (!objs) return { error: 'Эта версия не читается — возможно, её уже вытеснила более новая' };
+    if (window.getCurrentBoard() !== board || cloudBoardId !== cb) return { error: 'Доска закрыта' };
+    // свой незавершённый жест — сначала отправить, иначе он смешается с восстановлением
+    if (cloudGestureBefore !== null) cloudFinalizeGesture();
+    saveVersion(board, 'restore', true);
+    const cur = new Map(board.objects.map(o => [o.id, o]));
+    const inVer = new Set(objs.map(o => o.id));
+    const d = { added: [], updated: [], removed: [] };
+    objs.forEach(o => {
+      const now = cur.get(o.id);
+      if (!now) d.added.push(o);
+      else if (mode === 'rollback' && bareJson(now) !== bareJson(o)) d.updated.push({ id: o.id, before: now, after: o });
+    });
+    if (mode === 'rollback') board.objects.forEach(o => { if (!inVer.has(o.id)) d.removed.push({ id: o.id, obj: o }); });
+    if (diffIsEmpty(d)) return { n: 0 };
+    if (window.boardsStampMine) window.boardsStampMine();
+    cloudApplyingRemote = true;
+    const sent = applyOwnDiff(board, d, 1000);
+    cloudApplyingRemote = false;
+    // возвращённое — не «моё» по авторству: у объектов свой by из версии
+    if (window.boardsNoteForeignObjects) window.boardsNoteForeignObjects(sent.added.map(o => o.id));
+    cloudUndoStack.push(cloneObj(sent));
+    if (cloudUndoStack.length > 100) cloudUndoStack.shift();
+    cloudRedoStack.length = 0;
+    window.boardsClearSelection();
+    window.boardsRedraw();
+    pushDiffToSupabase(cb, sent);
+    // правка: пусть обычное сохранение запишет доску на диск
+    window.saveDB();
+    return { n: sent.added.length + sent.updated.length + sent.removed.length,
+             added: sent.added.length, removed: sent.removed.length, updated: sent.updated.length };
+  }
+
+  // версия во время работы — раз в VER_EVERY_MS, если было что менять
+  setInterval(() => {
+    const board = window.getCurrentBoard && window.getCurrentBoard();
+    if (!cloudBoardId || !board || board.cloudBoardId !== cloudBoardId) return;
+    if (cloudLoadState !== 'done') return;   // пока доска не сверена с базой — версия была бы полуготовой
+    if (Date.now() - lastVerAt < VER_EVERY_MS) return;
+    saveVersion(board, 'auto');
+  }, 60 * 1000);
+  // и при закрытии вкладки — запись может не успеть, но обычно успевает
+  window.addEventListener('pagehide', () => {
+    const board = window.getCurrentBoard && window.getCurrentBoard();
+    if (cloudBoardId && board && board.cloudBoardId === cloudBoardId && cloudLoadState === 'done') saveVersion(board, 'close');
+    flushSeen();
+  });
+
+  // для проверок и для ручной работы из консоли
+  window.__cloudVersions = {
+    list: () => listVersions(cloudBoardId),
+    saveNow: (reason) => { const b = window.getCurrentBoard(); return saveVersion(b, reason || 'manual', true); },
+    restore: async (i, mode) => { const l = await listVersions(cloudBoardId); return l[i] ? restoreVersion(l[i], mode || 'missing') : { error: 'нет такой версии' }; },
+  };
+
+  function fmtVerTime(ts) {
+    const d = new Date(ts);
+    const p = (n) => String(n).padStart(2, '0');
+    return p(d.getDate()) + '.' + p(d.getMonth() + 1) + ', ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+  function objWord(n) {
+    const t = n % 10, h = n % 100;
+    return (t === 1 && h !== 11) ? 'объект' : (t >= 2 && t <= 4 && (h < 12 || h > 14)) ? 'объекта' : 'объектов';
+  }
+  async function renderVersionsList(message, isError) {
+    const box = document.getElementById('bdShareVersList');
+    if (!box) return;
+    const cb = cloudBoardId;
+    const list = await listVersions(cb);
+    if (!document.getElementById('bdShareVersList') || cb !== cloudBoardId) return;
+    const rows = list.map((v, i) => `
+      <div class="bd-ver-row" data-i="${i}">
+        <div class="bd-ver-info"><b>${fmtVerTime(v.at)}</b> · ${v.count} ${objWord(v.count)} · ${VER_REASON[v.reason] || VER_REASON.manual}</div>
+        <div class="bd-ver-acts">
+          <button class="bd-ver-missing" data-i="${i}" title="Дописать на доску то, что есть в этой версии и чего сейчас нет. Остальное не трогается">Вернуть пропавшее</button>
+          <button class="bd-ver-rollback" data-i="${i}" title="Сделать доску ровно такой, как в этой версии">Откатить</button>
+        </div>
+      </div>`).join('');
+    box.innerHTML = `
+      <div class="bd-share-hint">Версии хранятся на этом устройстве, последние ${VER_MAX}. Восстановление можно отменить (Ctrl+Z).</div>
+      ${rows || '<div class="bd-share-hint">Пока ни одной версии.</div>'}
+      <button class="bd-ver-save" id="bdVerSaveBtn">Сохранить версию сейчас</button>
+      ${message ? `<div class="bd-share-msg${isError ? ' err' : ''}">${message}</div>` : ''}`;
+    const act = async (i, mode) => {
+      const res = await restoreVersion(list[i], mode);
+      if (res.error) renderVersionsList(res.error, true);
+      else if (!res.n) renderVersionsList(mode === 'missing' ? 'Всё из этой версии уже на доске.' : 'Доска и так совпадает с этой версией.');
+      else renderVersionsList(mode === 'missing'
+        ? `Возвращено: ${res.added} ${objWord(res.added)}.`
+        : `Доска откатена: вернулось ${res.added}, убрано ${res.removed}, изменено обратно ${res.updated}.`);
+    };
+    box.querySelectorAll('.bd-ver-missing').forEach(btn => btn.addEventListener('click', () => act(+btn.dataset.i, 'missing')));
+    box.querySelectorAll('.bd-ver-rollback').forEach(btn => btn.addEventListener('click', () => {
+      // откат убирает с доски всё, чего не было в версии, — второе нажатие
+      // как подтверждение (системное окно подтверждения здесь не годится:
+      // оно останавливает страницу, пока его не закроют)
+      if (btn.dataset.armed === '1') { btn.dataset.armed = ''; act(+btn.dataset.i, 'rollback'); return; }
+      btn.dataset.armed = '1';
+      btn.textContent = 'Точно откатить?';
+      setTimeout(() => { if (btn.isConnected && btn.dataset.armed === '1') { btn.dataset.armed = ''; btn.textContent = 'Откатить'; } }, 4000);
+    }));
+    const saveBtn = document.getElementById('bdVerSaveBtn');
+    if (saveBtn) saveBtn.addEventListener('click', async () => {
+      const b = window.getCurrentBoard();
+      await saveVersion(b, 'manual', true);
+      renderVersionsList('Версия сохранена.');
+    });
+  }
+
+  async function cloudSetupSubscription(boardId, board) {
+    // Промпт №10: сначала канал, потом загрузка. Раньше канал открывался
+    // только после ответа базы, и всё, что собеседник успел сделать за время
+    // запроса, до нас не доходило вовсе (до сверки через полминуты). Пришедшее
+    // во время загрузки ложится на доску и сравнивается с ответом базы по
+    // номерам версий — порядок прихода ничего не решает
     cloudChannel = window.SB.channel('board_objects:' + boardId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'board_objects', filter: 'board_id=eq.' + boardId }, cloudHandleRemoteChange)
       // курсоры — тем же каналом, но отдельным типом сообщений: broadcast
@@ -1263,6 +1687,117 @@
       })
       .subscribe();
     startReconcile(boardId);
+    cloudInitialLoad(boardId, board, cloudLoadGen, 0);
+  }
+
+  // Промпт №10: загрузка общей доски при входе — слиянием, а не заменой.
+  // Подробности — в комментарии у cloudSeen выше
+  async function cloudInitialLoad(boardId, board, gen, attempt) {
+    const alive = () => gen === cloudLoadGen && boardId === cloudBoardId && window.getCurrentBoard() === board;
+    if (!alive()) return;
+    cloudLoadState = 'loading';
+    if (attempt === 0) {
+      // версия того, что лежит на этом устройстве, — до того, как база
+      // хоть что-то на доске поменяет: если сверка ошибётся, отсюда всё
+      // возвращается кнопкой (раздел «Версии» ниже)
+      if (board.objects.length) saveVersion(board, 'open');
+      const ids = await loadSeen(boardId);
+      if (!alive()) return;
+      if (ids) { ids.forEach(id => cloudSeen.add(id)); cloudSeenKnown = true; }
+    }
+    // что знали о базе ДО запроса: пока он идёт, свои записи пополняют
+    // cloudSeen, и объект, записанный прямо сейчас, но не попавший в ответ,
+    // выглядел бы удалённым собеседником
+    const seenBefore = cloudSeenKnown ? new Set(cloudSeen) : null;
+    const res = await selectAllPaged(boardId, 'obj_id, data', PAGE_DATA);
+    if (!alive()) return;
+    if (res.error) console.error('[облачная доска] не удалось загрузить объекты:', res.error.message || res.error);
+
+    const server = new Map();
+    res.rows.forEach(r => { if (r && r.data && r.data.id) server.set(r.data.id, r.data); });
+    const complete = res.complete;
+    const me = myUid();
+    const access = ROLE_ACCESS[cloudRole] || 'full';
+    const canWrite = access !== 'view';
+    const full = access === 'full';
+
+    if (window.boardsStampMine) window.boardsStampMine();   // Промпт №41
+    cloudApplyingRemote = true;
+    let next = board.objects.slice();
+    const at = new Map(next.map((o, i) => [o.id, i]));
+    const touched = [], upAdded = [], upUpdated = [];
+    // 1) что есть в базе — берём, если там не старее нашего
+    server.forEach(inc => {
+      if (tombBlocks(inc.id, revOf(inc))) return;        // удалили, пока шёл запрос
+      const i = at.get(inc.id);
+      if (i === undefined) { at.set(inc.id, next.length); next.push(cloneObj(inc)); touched.push(inc.id); return; }
+      const local = next[i];
+      if (incomingWins(inc, local)) {
+        // одна и та же версия одного автора — одно и то же содержимое (любая
+        // правка поднимает номер); не сериализуем зря картинки по сотне КБ
+        const sameVer = revOf(inc) > 0 && revOf(inc) === revOf(local) && (inc.rvBy || '') === (local.rvBy || '');
+        if (!sameVer && JSON.stringify(local) !== JSON.stringify(inc)) { next[i] = cloneObj(inc); touched.push(inc.id); }
+      } else if (canWrite && !cloudMine.has(inc.id)) {
+        // у нас версия новее, а в базе её нет — запись когда-то не дошла
+        upUpdated.push({ id: inc.id, before: inc, after: local });
+      }
+    });
+    // 2) чего в базе нет. Решаем, только если ответ точно полный: иначе
+    // «нет в ответе» не значит «нет в базе»
+    const drop = new Set();
+    if (complete) {
+      next.forEach(o => {
+        if (server.has(o.id) || cloudMine.has(o.id)) return;   // своё из этой сессии — уже в очереди записи
+        // «моё» — подписанное мной; неподписанное (нарисованное до того, как
+        // доску сделали общей) считаем своим у владельца и полного доступа
+        const mine = o.by ? o.by === me : full;
+        let keep;
+        if (server.size === 0) keep = true;               // пустая база не опустошает доску
+        else if (seenBefore) keep = !seenBefore.has(o.id); // было в базе и пропало — удалил собеседник
+        else keep = mine;   // первый вход после обновления: памяти о базе нет — своё дописываем, чужое старьё не воскрешаем
+        if (!keep) { drop.add(o.id); return; }
+        if (canWrite && (mine || full)) upAdded.push(o);
+      });
+    }
+    if (drop.size) {
+      next = next.filter(o => {
+        if (!drop.has(o.id)) return true;
+        addTomb(o.id, revOf(o)); touched.push(o.id);
+        return false;
+      });
+    }
+    board.objects = next;
+    // память «что было в базе»: при полном ответе — ровно ответ плюс
+    // записанное мной за время запроса; при неполном — только пополняем
+    if (complete) {
+      const s = new Set(server.keys());
+      cloudSeen.forEach(id => { if (cloudMine.has(id)) s.add(id); });
+      // удалённое остаётся в памяти навсегда — см. removeRemoteObject
+      if (seenBefore) seenBefore.forEach(id => s.add(id));
+      cloudSeen = s;
+    } else {
+      server.forEach((_, id) => cloudSeen.add(id));
+    }
+    cloudSeenKnown = true;
+    saveSeenSoon();
+    if (window.boardsNoteForeignObjects) window.boardsNoteForeignObjects(Array.from(server.keys()));
+    cloudApplyingRemote = false;
+    // у меня мог идти свой жест — пришедшее не должно уйти в него как моё
+    syncGestureBefore(board, touched);
+    if (touched.length) { persistBoardQuiet(board); window.boardsRedraw(); }
+    // несостоявшиеся записи — дописать (собеседнику они уйдут тем же путём)
+    if (upAdded.length || upUpdated.length) {
+      console.info('[облачная доска] дописываю в базу то, что туда не дошло:', upAdded.length + upUpdated.length);
+      pushDiffToSupabase(boardId, { added: upAdded, updated: upUpdated, removed: [] });
+    }
+    if (complete) { cloudLoadState = 'done'; return; }
+    if (attempt < LOAD_RETRY_MS.length) {
+      cloudLoadState = 'retry';
+      setTimeout(() => cloudInitialLoad(boardId, board, gen, attempt + 1), LOAD_RETRY_MS[attempt]);
+    } else {
+      cloudLoadState = 'failed';
+      console.warn('[облачная доска] доска загрузилась не полностью — недостающее докачает сверка');
+    }
   }
 
   /* Промпт №42: последняя линия обороны. Раз в полминуты спрашиваем у базы
@@ -1271,26 +1806,48 @@
      могут быть ещё не записаны. Так «картинка не появилась» перестаёт быть
      необратимым — максимум полминуты, и она придёт сама.
      Промпт №53: вместе с номерами берём и версии — чтобы докачивать и то,
-     что у нас есть, но устарело, и НЕ воскрешать удалённое у нас. */
+     что у нас есть, но устарело, и НЕ воскрешать удалённое у нас.
+     Промпт №10 (новый список): список — постранично (раньше сверка видела
+     только первую тысячу номеров), и здесь же повторяются несостоявшиеся
+     записи и удаления */
   let reconcileTimer = null;
-  function startReconcile(boardId) {
-    stopReconcile();
-    reconcileTimer = setInterval(async () => {
-      if (!cloudBoardId || cloudBoardId !== boardId) return;
-      if (document.hidden) return;
-      const board = window.getCurrentBoard();
-      if (!board || board.cloudBoardId !== boardId) return;
-      let { data: rows, error } = await window.SB.from('board_objects')
-        .select('obj_id, rv:data->rv').eq('board_id', boardId);
-      if (error) {
-        // если выборка по полю внутри json вдруг не пройдёт — как раньше
-        ({ data: rows, error } = await window.SB.from('board_objects').select('obj_id').eq('board_id', boardId));
-      }
-      if (error || !rows) return;
-      const { ids, expect } = wantedFromAnnounce(board, rows.map(r => ({
+  async function reconcileOnce(boardId) {
+    if (!cloudBoardId || cloudBoardId !== boardId) return;
+    const board = window.getCurrentBoard();
+    if (!board || board.cloudBoardId !== boardId) return;
+    // первая загрузка так и не прошла целиком — пробуем её заново
+    if (cloudLoadState === 'failed') { cloudInitialLoad(boardId, board, cloudLoadGen, LOAD_RETRY_MS.length); return; }
+    if (cloudLoadState !== 'done') return;
+    let res = await selectAllPaged(boardId, 'obj_id, rv:data->rv', PAGE_LIGHT);
+    if (res.error && !res.rows.length) {
+      // если выборка по полю внутри json вдруг не пройдёт — только номера
+      res = await selectAllPaged(boardId, 'obj_id', PAGE_LIGHT);
+    }
+    if (boardId !== cloudBoardId || window.getCurrentBoard() !== board) return;
+    if (res.rows.length) {
+      const { ids, expect } = wantedFromAnnounce(board, res.rows.map(r => ({
         id: r.obj_id, rv: typeof r.rv === 'number' ? r.rv : (r.rv === undefined ? undefined : 0),
       })));
       if (ids.length) fetchHeavyObjects(boardId, ids, 0, expect);
+    }
+    if (cloudUnsynced.size && ROLE_ACCESS[cloudRole] !== 'view') {
+      const again = board.objects.filter(o => cloudUnsynced.has(o.id));
+      cloudUnsynced.clear();
+      if (again.length) pushDiffToSupabase(boardId, { added: again, updated: [], removed: [] });
+    }
+    if (cloudUnsyncedDel.size && ROLE_ACCESS[cloudRole] !== 'view') {
+      const onBoard = new Set(board.objects.map(o => o.id));
+      const gone = Array.from(cloudUnsyncedDel).filter(id => !onBoard.has(id));
+      cloudUnsyncedDel.clear();
+      if (gone.length) pushDiffToSupabase(boardId, { added: [], updated: [],
+        removed: gone.map(id => ({ id, obj: { id, rv: cloudTombs.get(id) || 0 } })) });
+    }
+  }
+  function startReconcile(boardId) {
+    stopReconcile();
+    reconcileTimer = setInterval(() => {
+      if (document.hidden) return;
+      reconcileOnce(boardId);
     }, 30000);
   }
   function stopReconcile() { if (reconcileTimer) { clearInterval(reconcileTimer); reconcileTimer = null; } }
@@ -1310,8 +1867,15 @@
 
   window.onBoardOpened = function (board) {
     cloudTeardownSubscription();
+    flushSeen();
     cloudUndoStack = []; cloudRedoStack = []; cloudGestureBefore = null;
     cloudTombs = new Map();
+    // Промпт №10: всё, что относится к прошлому открытию, — забыть
+    cloudLoadGen++;
+    cloudLoadState = 'idle';
+    cloudSeen = new Set(); cloudSeenKnown = false;
+    cloudMine = new Set(); cloudUnsynced = new Set(); cloudUnsyncedDel = new Set();
+    srcHashCache.clear();
     cloudBoardId = board.cloudBoardId || null;
     cloudRole = board.cloudRole || null;
     // Промпт №41: доска сама должна знать, что этому человеку на ней можно
@@ -1319,10 +1883,15 @@
       window.setBoardAccess(cloudBoardId ? (ROLE_ACCESS[cloudRole] || 'full') : 'full',
                             window.CURRENT_USER && window.CURRENT_USER.id);
     }
-    if (cloudBoardId) { cloudSetupSubscription(cloudBoardId, board); startCursorAnim(); }
+    if (cloudBoardId) { lastVerAt = Date.now(); cloudSetupSubscription(cloudBoardId, board); startCursorAnim(); }
   };
   window.onBoardClosed = function () {
+    // Промпт №10: версия доски на выходе (если с прошлой что-то поменялось)
+    const board = window.getCurrentBoard();
+    if (cloudBoardId && board && board.cloudBoardId === cloudBoardId) saveVersion(board, 'close');
     cloudTeardownSubscription();
+    flushSeen();
+    cloudLoadGen++;
     cloudBoardId = null; cloudRole = null;
     if (window.setBoardAccess) window.setBoardAccess('full', window.CURRENT_USER && window.CURRENT_USER.id);
   };
@@ -1339,7 +1908,13 @@
     board.cloudRole = 'owner';
     if (board.objects.length) {
       const rows = board.objects.map(obj => ({ board_id: data.id, obj_id: obj.id, data: obj, updated_by: window.CURRENT_USER.id }));
-      await window.SB.from('board_objects').upsert(rows, { onConflict: 'board_id,obj_id' });
+      // Промпт №10: кусками — доска с картинками одним запросом может не
+      // пройти целиком. Не записавшееся не теряется: при открытии ниже
+      // (onBoardOpened) загрузка увидит, что этого в базе нет, и допишет
+      for (const part of chunksOf(rows, 100)) {
+        const { error: upErr } = await window.SB.from('board_objects').upsert(part, { onConflict: 'board_id,obj_id' });
+        if (upErr) console.error('[облачная доска] не удалось записать часть доски:', upErr.message);
+      }
     }
     window.saveDB();
     window.onBoardOpened(board);
@@ -1439,7 +2014,13 @@
         <button class="primary" id="bdShareAddBtn">Добавить</button>
       </div>
       ${message ? `<div class="bd-share-msg${isError ? ' err' : ''}">${message}</div>` : ''}
+      <div class="bd-share-vers">
+        <button class="bd-share-vers-btn" id="bdShareVersBtn">Версии доски</button>
+        <div id="bdShareVersList"></div>
+      </div>
     `;
+    // Промпт №10: версии общей доски — см. saveVersion
+    document.getElementById('bdShareVersBtn').addEventListener('click', () => renderVersionsList());
     sharePop.querySelectorAll('.bd-share-revoke').forEach(btn => {
       btn.addEventListener('click', () => revokeAccess(btn.dataset.uid));
     });

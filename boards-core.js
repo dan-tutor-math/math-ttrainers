@@ -514,6 +514,12 @@ function idbSaveIndexMerged(){
 // дальше) — тогда мои несохранённые правки по ней уже не главные
 function activeLostTo(stored){
   if (!B || !stored) return false;
+  // Промпт №10 (новый список): у общей доски главная копия — в базе, а не на
+  // диске соседней вкладки. Перечитать её с диска посреди работы значит
+  // подменить B.objects устаревшим содержимым, и облачный модуль на ближайшем
+  // жесте разослал бы разницу как «я удалил» — удаление ушло бы в базу.
+  // Обе вкладки и так получают одно и то же из realtime, пусть пишут своё
+  if (B.cloudBoardId) return false;
   const sb = stored.boards && stored.boards.find(x => x.id === B.id);
   return !!(sb && storedWins(sb, stripHeavy(B)));
 }
@@ -8378,6 +8384,19 @@ window.getCurrentBoard = function(){ return B; };
 window.__applyDrop = function(st, t){ return applyDrop(st, t); };   // для проверок: перенос в папку без мыши
 window.boardsRedraw = function(){ scheduleRedraw(); updateContextMenu(); };
 window.boardsClearSelection = function(){ selectedId = null; multiSelectIds = []; clearEditLock(); };
+// Промпт №10 (новый список): записать на диск содержимое общей доски, которое
+// пришло из базы или от собеседника. Это не правка — rev и updatedAt не
+// трогаем (иначе при переносе файлом каждая общая доска выглядела бы спорной),
+// только метим доску «грязной», чтобы её штрихи дописались. Раньше пришедшее
+// из облака на диск не попадало вовсе, и локальная копия общей доски
+// застревала в прошлом — при входе мелькала она, а не то, что в базе
+let quietSaveTimer = null;
+window.boardsPersistQuiet = function(board){
+  if (!board || board.objects === undefined) return;
+  markBoardDirty(board.id);
+  clearTimeout(quietSaveTimer);
+  quietSaveTimer = setTimeout(() => { quietSaveTimer = null; idbSaveDB().catch(() => {}); }, 1500);
+};
 
 /* ═══════════════════════════════════════════════════════════════════════
    СТАРТ
