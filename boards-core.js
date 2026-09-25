@@ -1958,6 +1958,9 @@ function openBoardReady(b, id){
 
   screenList.style.display = 'none';
   screenBoard.style.display = 'block';
+  // Промпт №9: пока доска была скрыта, док не мерился — подрезаем смещение
+  // теперь (окно могли сузить, а старые версии пускали док за край экрана)
+  clampDockOffset(); layoutOptbar();
   boardActive = true;
   document.title = b.name + ' — Доски';
   document.getElementById('bdName').value = b.name;
@@ -3895,7 +3898,8 @@ function closeTextEditToolbar(){
 
 /* ═══════════════════════════════════════════════════════════════════════
    ПОЛОЖЕНИЕ И РАЗМЕР ПАНЕЛИ ИНСТРУМЕНТОВ — можно перетащить целиком к
-   низу/левому/правому краю экрана за ручку-«гриппер» слева/сверху панели,
+   низу/левому/правому краю экрана за ручку-«гриппер» с любого конца панели
+   (слева или справа, у боковой — сверху или снизу; промпт №9),
    и подстроить размер иконок, потянув за границу панели (как у Dock в
    macOS). Настройка общая для всех досок (это предпочтение по интерфейсу,
    а не данные конкретной доски) — хранится в localStorage, как тема.
@@ -3995,54 +3999,179 @@ function applyDockLayout(){
   optbar.style.setProperty('--dock-scale', dockScale);
   railEl.classList.remove('pos-left','pos-top');
   railEl.classList.add(dockPos === 'left' ? 'pos-top' : 'pos-left');
+  // сохранённое смещение могло остаться от другого края или другого окна —
+  // подрезаем, чтобы панель не открылась наполовину за экраном
+  clampDockOffset();
   layoutOptbar();
   layoutRefPanel();
 }
-window.addEventListener('resize', () => { layoutOptbar(); layoutRefPanel(); });
+window.addEventListener('resize', () => { clampDockOffset(); layoutOptbar(); layoutRefPanel(); });
 
-// ── перетаскивание за ручку: переезд к низу/левому/правому краю, а по
-// нижнему краю — свободное скольжение влево-вправо ──
-let dockDragActive = false;
-dockGrip.addEventListener('pointerdown', (e) => {
-  e.preventDefault(); e.stopPropagation();
-  dockGrip.setPointerCapture(e.pointerId);
-  dockDragActive = true;
-});
-dockGrip.addEventListener('pointermove', (e) => {
-  if (!dockDragActive) return;
-  const W = window.innerWidth, EDGE = 110;
-  const newPos = e.clientX < EDGE ? 'left' : (e.clientX > W - EDGE ? 'right' : 'bottom');
-  if (newPos !== dockPos){ dockPos = newPos; applyDockLayout(); }
+/* ── Промпт №9: перемещение дока без перескока ──
+   Раньше смещение считалось как «курсор минус середина экрана», и в первый
+   же миг перетаскивания середина панели прыгала под курсор. Теперь в момент
+   нажатия запоминаем, в какой точке ручки её схватили (доля по ширине и
+   высоте самой ручки), и на каждом шаге ставим панель так, чтобы эта же
+   точка той же ручки оказалась под курсором. Доля, а не пиксели, — потому
+   что при переезде к боковому краю ручка меняет форму (была столбиком —
+   стала полоской), и точку нужно перенести на новую форму.
+   Ручек три: три точки у начала дока, три точки у конца и прямоугольничек
+   размера в режиме «вдоль края». Вдоль нижнего края панель едет по
+   горизонтали, вдоль бокового — по вертикали; поперёк края её держит CSS. */
+const dockGripEnd = document.getElementById('bdDockGripEnd');
+// порог «сделал движение к стене» (см. moveDockTo)
+const DOCK_SNAP_MIN = 8;
+// сколько пикселей движения смотрим, прежде чем решить, что делает тяга за
+// прямоугольничек — размер или перемещение
+const DOCK_AXIS_LOCK = 5;
+let dockDrag = null;
+
+/* Пределы смещения: панель целиком на экране и не залезает под соседние
+   неподвижные кнопки. Без второго условия панель, доведённая за правые три
+   точки до правого края, уезжала под кнопку справочных материалов в углу
+   (та выше по слоям) — и правую ручку уже было не схватить; сбоку так же
+   мешают верхняя полоса, тема и колонка инструментов. Препятствием считаем
+   только то, что лежит в той же полосе, что и док (для нижнего — по
+   высоте, для бокового — по ширине), а сторону стенки — по тому, в какой
+   половине экрана препятствие.
+   «Естественное» положение (смещение 0) берём из текущего прямоугольника
+   минус текущее смещение, а не пересчитываем CSS-формулу руками: в ней
+   участвует ширина боковой панели тренажёров, и любая её правка тихо
+   разошлась бы с этим кодом */
+function dockObstacles(){
+  const els = [document.getElementById('bdName')?.closest('.bd-topbar'), railEl,
+    document.getElementById('bdRefToggle'), document.getElementById('themeToggle')];
+  return els.filter(Boolean).map(el => el.getBoundingClientRect()).filter(r => r.width > 0 && r.height > 0);
+}
+function dockOffsetRange(){
+  const r = dockEl.getBoundingClientRect(), M = 8, G = 8;
+  const W = window.innerWidth, H = window.innerHeight;
+  const bottom = dockPos === 'bottom';
+  const size = bottom ? r.width : r.height;
+  const base = bottom ? r.left + r.width/2 - dockOffset : r.top + r.height/2 - dockOffset;
+  const screenA = bottom ? boardInset + M : M, screenZ = bottom ? W - M : H - M;
+  let a = screenA, z = screenZ;
+  dockObstacles().forEach(o => {
+    if (bottom ? (o.bottom <= r.top || o.top >= r.bottom) : (o.right <= r.left || o.left >= r.right)) return;
+    if (bottom) { if (o.left + o.width/2 < W/2) a = Math.max(a, o.right + G); else z = Math.min(z, o.left - G); }
+    else { if (o.top + o.height/2 < H/2) a = Math.max(a, o.bottom + G); else z = Math.min(z, o.top - G); }
+  });
+  // между кнопками панель не помещается (узкий экран) — тогда важнее, чтобы
+  // она целиком была на экране: соседей она перекроет и так, где бы ни стояла
+  if (z - a < size){ a = screenA; z = screenZ; }
+  const lo = a + size/2 - base, hi = z - size/2 - base;
+  // шире самого экрана — посередине, без дёрганья к краю
+  return lo <= hi ? [lo, hi] : [(lo + hi)/2, (lo + hi)/2];
+}
+function setDockOffset(v){
+  // доска ещё не на экране (список досок) — у дока нулевой прямоугольник,
+  // и пределы по нему вышли бы мусорные: сдвинули бы сохранённое смещение
+  const r = dockEl.getBoundingClientRect();
+  if (!r.width && !r.height){ dockOffset = v; dockEl.style.setProperty('--dock-offset', v + 'px'); return; }
+  const [lo, hi] = dockOffsetRange();
+  dockOffset = clamp(v, lo, hi);
+  dockEl.style.setProperty('--dock-offset', dockOffset + 'px');
+}
+function clampDockOffset(){ setDockOffset(dockOffset); }
+
+function beginDockMove(handle, e){
+  const hr = handle.getBoundingClientRect();
+  dockDrag = {
+    handle, x0: e.clientX, y0: e.clientY,
+    fx: hr.width ? clamp((e.clientX - hr.left) / hr.width, 0, 1) : 0.5,
+    fy: hr.height ? clamp((e.clientY - hr.top) / hr.height, 0, 1) : 0.5,
+  };
+}
+function moveDockTo(e){
+  const W = window.innerWidth, EDGE = 110, x = e.clientX;
+  const grabX = () => { const hr = dockDrag.handle.getBoundingClientRect(); return hr.left + dockDrag.fx * hr.width; };
+  const grabY = () => { const hr = dockDrag.handle.getBoundingClientRect(); return hr.top + dockDrag.fy * hr.height; };
+  let newPos = dockPos;
   if (dockPos === 'bottom'){
-    const half = Math.max(0, W/2 - 140);
-    dockOffset = clamp(e.clientX - W/2, -half, half);
-    dockEl.style.setProperty('--dock-offset', dockOffset + 'px');
-    layoutOptbar();
+    const want = dockOffset + (x - grabX());
+    const [lo, hi] = dockOffsetRange();
+    /* К боковому краю — только когда панель уже упёрлась в стенку и её
+       продолжают туда давить: курсор у края, дальше, чем панель может
+       пойти, и сдвинут к краю от точки захвата. Раньше хватало «курсор ближе
+       110 px к краю», но с ручкой у правого конца курсор оказывается там,
+       когда панель ещё далеко от края, — её было бы не довести до края по
+       низу. А без порога DOCK_SNAP_MIN прижатую к краю панель перебрасывало
+       вбок от дрожания руки в момент захвата. */
+    if (x < EDGE && want < lo - 0.5 && x <= dockDrag.x0 - DOCK_SNAP_MIN) newPos = 'left';
+    else if (x > W - EDGE && want > hi + 0.5 && x >= dockDrag.x0 + DOCK_SNAP_MIN) newPos = 'right';
+    else { setDockOffset(want); layoutOptbar(); return; }
+  } else if (x >= EDGE && x <= W - EDGE){
+    newPos = 'bottom';
   }
-});
-function endDockDrag(){ if (dockDragActive){ dockDragActive = false; saveDockPrefs(); } }
-dockGrip.addEventListener('pointerup', endDockDrag);
-dockGrip.addEventListener('pointercancel', endDockDrag);
+  if (newPos !== dockPos){ dockPos = newPos; applyDockLayout(); }
+  // после смены края ручка на новом месте и другой формы — ставим панель
+  // так, чтобы та же доля ручки снова была под курсором
+  if (dockPos === 'bottom') setDockOffset(dockOffset + (x - grabX()));
+  else setDockOffset(dockOffset + (e.clientY - grabY()));
+  layoutOptbar();
+}
+function endDockMove(){ if (dockDrag){ dockDrag = null; saveDockPrefs(); } }
 
-// ── перетаскивание за границу панели: масштаб иконок, как у Dock в macOS ──
+[dockGrip, dockGripEnd].forEach(grip => {
+  grip.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    grip.setPointerCapture(e.pointerId);
+    beginDockMove(grip, e);
+  });
+  grip.addEventListener('pointermove', (e) => { if (dockDrag && dockDrag.handle === grip) moveDockTo(e); });
+  grip.addEventListener('pointerup', endDockMove);
+  grip.addEventListener('pointercancel', endDockMove);
+});
+
+/* ── прямоугольничек: поперёк края — масштаб иконок, как у Dock в macOS;
+   вдоль края — перемещение, как за три точки. Что именно — решают первые
+   DOCK_AXIS_LOCK пикселей движения, и до отпускания режим не меняется:
+   иначе тяга «вверх и чуть вбок» то росла бы, то ехала. У нижнего дока
+   поперёк — это вверх-вниз, у бокового — влево-вправо (прямоугольничек там
+   стоит на внутреннем ребре, и размер по-прежнему тянется от ребра). */
 let dockResizeStart = null;
 dockResizeHandle.addEventListener('pointerdown', (e) => {
   e.preventDefault(); e.stopPropagation();
   dockResizeHandle.setPointerCapture(e.pointerId);
-  dockResizeStart = { x:e.clientX, y:e.clientY, scale:dockScale };
+  dockResizeStart = { x:e.clientX, y:e.clientY, scale:dockScale, mode:null, down:e };
 });
 dockResizeHandle.addEventListener('pointermove', (e) => {
   if (!dockResizeStart) return;
+  const st = dockResizeStart;
+  if (!st.mode){
+    const dx = e.clientX - st.x, dy = e.clientY - st.y;
+    if (Math.hypot(dx, dy) < DOCK_AXIS_LOCK) return;
+    const across = dockPos === 'bottom' ? Math.abs(dy) : Math.abs(dx);
+    const along = dockPos === 'bottom' ? Math.abs(dx) : Math.abs(dy);
+    // ничья — в пользу размера: это исходное назначение прямоугольничка
+    st.mode = along > across ? 'move' : 'resize';
+    if (st.mode === 'move'){
+      // точку захвата берём по месту НАЖАТИЯ, а не по месту решения: панель
+      // догоняет эти несколько пикселей и дальше идёт ровно за точкой захвата
+      beginDockMove(dockResizeHandle, st.down);
+      dockResizeHandle.classList.add('moving');
+    }
+  }
+  if (st.mode === 'move'){ moveDockTo(e); return; }
   let delta;
-  if (dockPos === 'bottom') delta = dockResizeStart.y - e.clientY; // тянешь вверх от нижней границы — крупнее
-  else if (dockPos === 'left') delta = e.clientX - dockResizeStart.x; // тянешь вправо, от левого края — крупнее
-  else delta = dockResizeStart.x - e.clientX; // pos-right: тянешь влево, от правого края — крупнее
-  dockScale = clamp(dockResizeStart.scale + delta/140, 0.7, 1.6);
+  if (dockPos === 'bottom') delta = st.y - e.clientY; // тянешь вверх от нижней границы — крупнее
+  else if (dockPos === 'left') delta = e.clientX - st.x; // тянешь вправо, от левого края — крупнее
+  else delta = st.x - e.clientX; // pos-right: тянешь влево, от правого края — крупнее
+  dockScale = clamp(st.scale + delta/140, 0.7, 1.6);
   dockEl.style.setProperty('--dock-scale', dockScale);
   optbar.style.setProperty('--dock-scale', dockScale);
+  // панель выросла — не даём ей вылезти за край экрана
+  clampDockOffset();
   layoutOptbar();
 });
-function endDockResize(){ if (dockResizeStart){ dockResizeStart = null; saveDockPrefs(); } }
+function endDockResize(){
+  if (!dockResizeStart) return;
+  const mode = dockResizeStart.mode;
+  dockResizeStart = null;
+  dockResizeHandle.classList.remove('moving');
+  if (mode === 'move') endDockMove();
+  else if (mode === 'resize') saveDockPrefs();
+}
 dockResizeHandle.addEventListener('pointerup', endDockResize);
 dockResizeHandle.addEventListener('pointercancel', endDockResize);
 
@@ -4523,6 +4652,9 @@ function applyBoardInset(){
   const d = next - boardInset;
   boardInset = next;
   screenBoardEl.style.setProperty('--bd-inset', next + 'px');
+  // док снизу привязан к середине участка правее панели — при её открытии
+  // сдвинутый к краю док мог уехать за экран
+  clampDockOffset(); layoutOptbar();
   if (B && boardActive){
     // то, что было на экране, остаётся на месте: холст съехал вправо на d,
     // камера — на столько же. Иначе при каждом открытии панели доска
