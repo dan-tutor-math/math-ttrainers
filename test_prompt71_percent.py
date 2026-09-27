@@ -14,6 +14,8 @@ percent-bank.js.
      видимых плиток и стоят на паузе у плиток за экраном; на экране задания
      не идёт ни одна; при «уменьшить движение» — ни одной анимации, а
      рисунок стоит в конечном кадре (видим); наведение поднимает плитку;
+     «круги на воде» (промпт №72) — круглые на плитках 1×1, 2×1 и 2×2,
+     расходятся от точки наведения, скорость одинаковая;
   D. плитка открывает тренажёр прототипа (?p= в адресе), назад к плиткам,
      соседние типы; два режима — «Тренировка» с кнопкой «Показать решение и
      ответ» и «Экзамен» без неё, интерфейс одинаковый;
@@ -326,6 +328,33 @@ def test_tiles(browser):
     page.wait_for_timeout(450)
     lifted = page.evaluate("() => new DOMMatrix(getComputedStyle(document.querySelector('.tile[data-pid=\"pct-dec\"]')).transform).m42")
     check("C: при наведении плитка поднимается", lifted < -3, str(lifted))
+    # промпт №72: «круги на воде» — круглые на плитках любого размера,
+    # расходятся от точки наведения, скорость одинаковая
+    rip = []
+    for pid in ("pct-dec", "share-fig", "of-num", "pie", "chain"):
+        page.mouse.move(5, 5)
+        page.locator(f'.tile[data-pid="{pid}"]').scroll_into_view_if_needed()
+        page.wait_for_timeout(350)
+        box = page.locator(f'.tile[data-pid="{pid}"]').bounding_box()
+        page.wait_for_timeout(150)
+        hx, hy = box["x"] + box["width"] * 0.3, box["y"] + box["height"] * 0.7
+        page.mouse.move(hx, hy)
+        page.wait_for_timeout(700)
+        r = page.evaluate(f"""() => {{ const t = document.querySelector('.tile[data-pid="{pid}"]');
+            return [...t.querySelectorAll('.tile-ripple i')].map(i => {{ const cs = getComputedStyle(i), b = i.getBoundingClientRect();
+              const m = new DOMMatrix(cs.transform);
+              return {{ w: parseFloat(cs.width), h: parseFloat(cs.height), sx: Math.hypot(m.a, m.b), sy: Math.hypot(m.c, m.d),
+                       dur: cs.animationDuration, run: i.getAnimations().some(a => a.playState === 'running'),
+                       cx: b.left + b.width / 2, cy: b.top + b.height / 2, tw: t.getBoundingClientRect().width, th: t.getBoundingClientRect().height }}; }}); }}""")
+        rip.append((pid, hx, hy, r))
+    ok_round = all(abs(x["w"] - x["h"]) < 0.5 and abs(x["sx"] - x["sy"]) < 1e-6 and x["w"] == 220 for _, _, _, r in rip for x in r)
+    ok_speed = len({x["dur"] for _, _, _, r in rip for x in r}) == 1 and all(x["run"] for _, _, _, r in rip for x in r)
+    # плитка при наведении поднимается на 6 px — кольца едут вместе с ней
+    ok_origin = all(abs(x["cx"] - hx) < 4 and abs(x["cy"] - hy) < 9 for _, hx, hy, r in rip for x in r)
+    sizes = {pid: (round(r[0]["tw"]), round(r[0]["th"])) for pid, _, _, r in rip}
+    check("C: круги при наведении круглые на плитках 1×1, 2×1 и 2×2 (220 px по обеим осям)", ok_round, str(sizes))
+    check("C: скорость кругов одинаковая на всех плитках, все три кольца идут", ok_speed, str({x["dur"] for _, _, _, r in rip for x in r}))
+    check("C: круги расходятся от точки наведения", ok_origin, str([(p, round(h), round(v), round(r[0]["cx"]), round(r[0]["cy"])) for p, h, v, r in rip]))
     # экран задания — ни одной анимации плиток
     page.click('.tile[data-pid="of-num"]')
     page.wait_for_timeout(300)
@@ -349,6 +378,8 @@ def test_tiles(browser):
     page.wait_for_timeout(300)
     t = page.evaluate("() => getComputedStyle(document.querySelector('.tile[data-pid=\"pct-dec\"]')).transform")
     check("C: «уменьшить движение» — плитка при наведении не прыгает", t == "none", t)
+    rd = page.evaluate("() => getComputedStyle(document.querySelector('.tile[data-pid=\"pct-dec\"] .tile-ripple')).display")
+    check("C: «уменьшить движение» — кругов на воде нет", rd == "none", rd)
     ctx.close()
 
 

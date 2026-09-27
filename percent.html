@@ -462,11 +462,21 @@ html[data-theme="dark"] .tile:hover{box-shadow:inset 0 1px 0 var(--glass-inset),
 .tile:hover .tile-badges{opacity:0}
 .tile.l .tile-title{font-size:19px}
 .tile.l .tile-ex{font-size:14.5px}
-/* пульс-кольцо вокруг рисунка — вторая «выразительная» часть наведения */
-.tile-art::after{content:'';position:absolute;left:50%;top:50%;width:70%;padding-top:70%;max-width:140px;max-height:140px;border-radius:50%;
-  border:2px solid var(--acc);transform:translate(-50%,-50%) scale(.6);opacity:0;pointer-events:none}
-.tile:hover .tile-art::after{animation:tilePulse 1.1s ease-out infinite}
-@keyframes tilePulse{0%{transform:translate(-50%,-50%) scale(.55);opacity:.45}100%{transform:translate(-50%,-50%) scale(1.25);opacity:0}}
+/* «Круги на воде» при наведении (промпт №72): три кольца расходятся от
+   точки, где курсор вошёл в плитку. Размер кольца задан в ПИКСЕЛЯХ и
+   одинаков по обеим осям: раньше кольцо было в процентах от плитки
+   (ширина — 70 % ширины, высота — padding-top от той же ширины, но с
+   max-width) и на широких и больших плитках вытягивалось в овал. Теперь
+   круг один и тот же на любой плитке, скорость тоже, а что выходит за
+   край — обрезает overflow:hidden самой плитки. Точку ставит JS
+   (--rx/--ry, см. watchRipples), без него — центр плитки */
+.tile-ripple{position:absolute;left:var(--rx,50%);top:var(--ry,50%);width:0;height:0;pointer-events:none;z-index:0}
+.tile-ripple i{position:absolute;left:-110px;top:-110px;width:220px;height:220px;border-radius:50%;
+  border:2px solid var(--acc);opacity:0;transform:scale(.08)}
+.tile:hover .tile-ripple i{animation:tileRipple 1.8s cubic-bezier(.2,.6,.35,1) infinite}
+.tile:hover .tile-ripple i:nth-child(2){animation-delay:.6s}
+.tile:hover .tile-ripple i:nth-child(3){animation-delay:1.2s}
+@keyframes tileRipple{0%{transform:scale(.08);opacity:.55}70%{opacity:.18}100%{transform:scale(1.5);opacity:0}}
 
 /* ── рисунки плиток ──
    Правило всех анимаций ниже: исходный стиль элемента — это КОНЕЧНЫЙ кадр
@@ -719,7 +729,8 @@ html[data-theme="dark"] .tile:hover{box-shadow:inset 0 1px 0 var(--glass-inset),
 
 /* «уменьшить движение»: рисунки стоят в конечном кадре, плитки не прыгают */
 @media (prefers-reduced-motion: reduce){
-  .a, .a *, .tile-art::after{animation:none !important}
+  .a, .a *{animation:none !important}
+  .tile-ripple{display:none}
   .tile, .tile-art, .tile-go{transition:none !important}
   .tile:hover, .tile:focus-visible{transform:none}
   .tile:hover .tile-art{transform:none}
@@ -1222,14 +1233,41 @@ function renderTiles(){
       '<span class="tile-title">' + p.title + '</span>' +
       '<span class="tile-ex">' + p.example + '</span>' +
       '<span class="tile-go" aria-hidden="true">→</span>' +
+      '<span class="tile-ripple" aria-hidden="true"><i></i><i></i><i></i></span>' +
     '</div>';
   }).join('');
   els.tiles.querySelectorAll('.tile').forEach(t => {
     const open = guard('switchTask', () => openProto(t.dataset.pid));
     t.addEventListener('click', open);
     t.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } });
+    watchRipples(t);
   });
   watchTiles();
+}
+/* Центр «кругов на воде» — точка, где курсор вошёл в плитку. Пока курсор
+   двигается, новая точка только запоминается, а переносит её каждое кольцо
+   само, когда начинает новый круг (animationiteration): уже бегущие кольца
+   не прыгают вслед за мышью, а следующие расходятся от нового места, как
+   на воде. На каждое движение мыши — одна запись в переменную, без
+   перерисовки */
+function watchRipples(t){
+  const box = t.querySelector('.tile-ripple');
+  if (!box) return;
+  let px = null, py = null;
+  const at = e => { const r = t.getBoundingClientRect(); px = e.clientX - r.left; py = e.clientY - r.top; };
+  t.addEventListener('pointerenter', e => {
+    at(e);
+    box.style.setProperty('--rx', px + 'px'); box.style.setProperty('--ry', py + 'px');
+    box.querySelectorAll('i').forEach(i => { i.style.left = ''; i.style.top = ''; });
+  });
+  t.addEventListener('pointermove', at);
+  box.querySelectorAll('i').forEach(i => i.addEventListener('animationiteration', () => {
+    if (px == null) return;
+    // кольцо сдвигаем относительно общего центра: его left/top — от --rx/--ry
+    const base = box.getBoundingClientRect(), tr = t.getBoundingClientRect();
+    i.style.left = (px - (base.left - tr.left) - 110) + 'px';
+    i.style.top = (py - (base.top - tr.top) - 110) + 'px';
+  }));
 }
 // числа «решено» и уровень на плитках меняются по ходу — перерисовываем
 // только значки, а не плитки: иначе анимации начинались бы заново
