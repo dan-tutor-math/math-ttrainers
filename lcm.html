@@ -1,0 +1,2308 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B0E1A">
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тренажёр: наименьшее общее кратное (НОК)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font-ui:'Onest',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,-apple-system,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#EEF1F7;
+  --blob-1:rgba(120,150,255,.16);
+  --blob-2:rgba(190,150,230,.14);
+  --card:rgba(255,255,255,.8);
+  --glass:rgba(255,255,255,.55);
+  --glass-strong:rgba(255,255,255,.72);
+  --glass-border:rgba(255,255,255,.85);
+  --glass-inset:rgba(255,255,255,.55);
+  --hl:var(--hl-14);
+  --muted-1:#8E8E93;
+  --muted-2:#6E6E73;
+  --muted-3:#48484A;
+  --muted-4:#3A3A3C;
+  --muted-5:#1D1D1F;
+  --muted-6:#8E8E93;
+  --muted-7:#C7C7CC;
+  --muted-8:#8E8E93;
+  --paper:#FDFCF7;
+  --grid:#DCE4F0;
+  --margin-red:#FF9F0A;
+  --ink:#004C99;
+  --ink-active:#003A75;
+  --pencil:#1D1D1F;
+  --teacher:#FF3B30;
+  --ok:#248A3D;
+  --ok-tint:rgba(36,138,61,.1);
+  --ok-shadow:rgba(36,138,61,.3);
+  --moved:#5AC8FA;
+  --shadow:0 10px 34px rgba(20,30,60,.08);
+  --cell:38px;
+  --hl-14:var(--hl);
+  --hl-18:rgba(0,76,153,.18);
+  --hl-28:rgba(0,76,153,.28);
+  --hl-35:rgba(0,76,153,.35);
+}
+
+html[data-theme="dark"]{
+  --bg:#0B0E1A;
+  --blob-1:rgba(90,110,255,.22);
+  --blob-2:rgba(150,90,220,.18);
+  --paper:#151A2C;
+  --card:rgba(30,37,64,.82);
+  --glass:rgba(40,46,74,.5);
+  --glass-strong:rgba(46,53,84,.65);
+  --glass-border:rgba(255,255,255,.12);
+  --glass-inset:rgba(255,255,255,.07);
+  --hl:rgba(40,110,214,.26);
+  --grid:#232A44;
+  --margin-red:#FF9F0A;
+  --ink:#2E7DE0;
+  --ink-active:#4A93F0;
+  --pencil:#F2F3F5;
+  --teacher:#FF6961;
+  --ok:#3E8E5B;
+  --ok-tint:rgba(62,142,91,.14);
+  --ok-shadow:rgba(62,142,91,.35);
+  --moved:#64D2FF;
+  --shadow:0 10px 40px rgba(0,0,0,.55);
+  --hl-14:var(--hl);
+  --hl-18:rgba(46,125,224,.29);
+  --hl-28:rgba(46,125,224,.45);
+  --hl-35:rgba(46,125,224,.5);
+  --muted-1:#9A9AA2;
+  --muted-2:#9A9AA2;
+  --muted-3:#AEAEB4;
+  --muted-4:#C7C7CC;
+  --muted-5:#F2F3F5;
+  --muted-6:#9A9AA2;
+  --muted-7:#3A3F55;
+  --muted-8:#9A9AA2;
+  --hover-1:rgba(127,160,255,.08);
+  --hover-2:rgba(127,160,255,.14);
+}
+html[data-theme="dark"] input{background:var(--card)}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--bg);
+  background-size:auto,auto,24px 24px,24px 24px,auto;
+  font-family:var(--font-ui);
+  color:var(--pencil);
+  min-height:100vh;
+  padding:18px 12px 60px;
+}
+.wrap{max-width:1040px;margin:0 auto;position:relative;z-index:1;pointer-events:none}
+.wrap > *{pointer-events:auto}
+h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(26px,5vw,38px);color:var(--pencil);text-align:center;}
+.sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 18px;}
+.levels{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-bottom:16px}
+.lvl{font-family:var(--font-ui);font-weight:600;font-size:14px;border:1px solid var(--glass-border);background:var(--glass);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border-radius:999px;padding:8px 16px;cursor:pointer;color:var(--muted-3);transition:transform .15s, all .15s;}
+.lvl:active{transform:scale(.96)}
+.lvl:hover{border-color:var(--ink)}
+.lvl.active{background:var(--ink);border-color:var(--ink);color:#fff;box-shadow:0 6px 16px var(--hl-35);}
+.lvl .done-mark{color:#FFB800;margin-left:4px;}
+.sheet{
+  position:relative;
+  background:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--paper);
+  background-size:var(--cell) var(--cell);
+  border:1px solid var(--glass-border);
+  border-radius:20px;
+  box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);
+  padding:calc(var(--cell)*2) calc(var(--cell)*.7) calc(var(--cell)*2.6) calc(var(--cell)*1.4);
+  overflow-x:auto;
+  min-height:calc(var(--cell)*8);
+}
+.sheet::before{
+  content:'';
+  position:absolute;
+  top:0;bottom:0;
+  left:calc(var(--cell)*1);
+  width:2px;
+  background:var(--margin-red);
+  opacity:.55;
+}
+.corner{font-family:var(--font-ui);font-weight:500;position:absolute;top:6px;right:12px;color:var(--muted-1);font-size:13px;display:flex;align-items:center;gap:8px;}
+.refresh-btn{width:28px;height:28px;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}
+.refresh-btn:hover{border-color:var(--ink);transform:rotate(80deg)}
+.refresh-btn:active{transform:scale(.9)}
+.basket-add-btn{width:28px;height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:13px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .15s, border-color .12s, background .2s, color .2s;}
+.basket-add-btn:hover{border-color:var(--ink)}
+.basket-add-btn:active{transform:scale(.9)}
+.basket-add-btn.ok{background:var(--ok, #34c759);border-color:var(--ok, #34c759);color:#fff;}
+.corner-left{
+  position:absolute;
+  top:6px;left:12px;
+  z-index:2;
+}
+.undo-btn{
+  width:26px;height:26px;
+  border:1.5px solid var(--grid);
+  border-radius:7px;
+  background:var(--card);
+  color:var(--ink);
+  font-size:16px;
+  line-height:1;
+  cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;
+  transition:transform .12s, border-color .12s, opacity .15s;
+}
+.undo-btn:hover{border-color:var(--ink)}
+.undo-btn:active{transform:scale(.9)}
+.undo-btn:disabled{opacity:.3;cursor:default}
+.undo-btn:disabled:hover{border-color:var(--grid)}
+.frow{
+  display:flex;
+  align-items:flex-start;
+  justify-content:center;
+  gap:0;
+  row-gap:calc(var(--cell)*.3);
+  flex-wrap:wrap;
+  padding:0 4px;
+  font-family:var(--font-mono);
+}
+.whole-part{
+  color:var(--ink);
+  display:flex;align-items:center;justify-content:center;
+  width:var(--cell);
+  height:calc(var(--cell)*2 + 3px);
+  font-size:calc(var(--cell)*.58);
+}
+.frac{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  position:relative;
+}
+.frac .fnum, .frac .fden{
+  position:relative;
+  color:var(--ink);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  height:var(--cell);
+}
+.fdigit{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:var(--cell);
+  height:var(--cell);
+  font-size:calc(var(--cell)*.6);
+}
+.frac .fbar{
+  width:100%;
+  height:3px;
+  background:var(--ink);
+  border-radius:1.5px;
+}
+.op-sign, .eq-sign{
+  color:var(--pencil);
+  font-size:calc(var(--cell)*.5);
+  display:flex;align-items:center;justify-content:center;
+  width:var(--cell);
+  height:calc(var(--cell)*2 + 3px);
+}
+.fnum.tappable, .fden.tappable{
+  outline:2px dashed var(--teacher);
+  outline-offset:-3px;
+  border-radius:8px;
+  cursor:pointer;
+}
+.fnum.tappable:not(.struck):hover, .fden.tappable:not(.struck):hover{background:rgba(201,58,43,.08)}
+.fnum.struck .newval:hover, .fden.struck .newval:hover{background:rgba(201,58,43,.14);border-radius:6px;padding:2px 6px}
+.fnum.hl, .fden.hl{
+  background:var(--hl-14);
+  border-radius:8px;
+  animation:pulse 1s infinite;
+}
+@keyframes pulse{50%{background:var(--hl-28)}}
+.fnum.selected, .fden.selected{
+  background:rgba(201,58,43,.16);
+  border-radius:8px;
+  color:var(--teacher-active,var(--teacher));
+  font-weight:700;
+}
+.fnum.struck, .fden.struck{color:var(--muted-7);position:relative}
+.fnum.struck::after, .fden.struck::after{
+  content:'';
+  position:absolute;
+  left:-4px;right:-4px;top:50%;
+  height:2.5px;
+  background:var(--teacher);
+  transform:rotate(-16deg);
+  border-radius:2px;
+}
+.newval{
+  position:absolute;
+  top:-22px; left:50%;
+  transform:translateX(-50%);
+  font-size:calc(var(--cell)*.38);
+  color:var(--teacher);
+  font-family:var(--font-ui);
+  font-weight:700;
+  line-height:1;
+  white-space:nowrap;
+}
+.newval.stale{
+  color:var(--muted-7);
+  position:absolute;
+}
+.newval.stale::after{
+  content:'';
+  position:absolute;
+  left:-4px;right:-4px;top:50%;
+  height:2px;
+  background:var(--teacher);
+  transform:rotate(-16deg);
+  border-radius:2px;
+}
+.newval.mark-hl{
+  background:var(--hl-18);
+  border-radius:6px;
+  padding:2px 6px;
+  animation:pulse 1s infinite;
+}
+.newval.below{
+  top:auto;
+  bottom:-22px;
+}
+.inline-input{
+  position:absolute;
+  top:-30px; left:50%;
+  transform:translateX(-50%);
+  width:42px;
+  font-family:var(--font-mono);
+  font-size:calc(var(--cell)*.38);
+  text-align:center;
+  border:2px solid var(--teacher);
+  border-radius:7px;
+  padding:2px 0;
+  color:var(--teacher);
+  background:var(--card);
+}
+.inline-input.below{
+  top:auto;
+  bottom:-30px;
+}
+.inline-input:focus{outline:none;border-color:var(--ink);color:var(--ink)}
+.inline-input.shake{animation:shake .35s}
+.inline-arrow{
+  position:absolute;
+  top:-30px; left:50%;
+  transform:translateX(-50%);
+  font-size:calc(var(--cell)*.4);
+  color:var(--teacher);
+  line-height:1;
+}
+.frac.answer .fnum, .frac.answer .fden{color:var(--ok)}
+.frac.answer .fbar{background:var(--ok)}
+.divider-note{
+  width:100%;
+  text-align:center;
+  font-family:var(--font-ui);
+  font-size:16px;
+  color:var(--muted-1);
+  margin-top:4px;
+}
+.panel{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:20px;margin-top:16px;}
+.prompt{font-family:var(--font-ui);font-weight:500;font-size:clamp(17px,3.2vw,20px);color:var(--muted-5);margin-bottom:12px;line-height:1.4;}
+.prompt b{color:var(--ink)}
+.inrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+input.num{
+  font-family:var(--font-mono);
+  font-size:24px;
+  padding:9px 12px;
+  border:1px solid var(--glass-border);
+  background:var(--card);
+  border-radius:14px 0 0 14px;
+  border-right:none;
+  color:var(--ink);
+  width:100px;
+}
+input.num:focus{outline:none;border-color:var(--ink)}
+input.num.shake{animation:shake .35s}
+@keyframes shake{
+  20%{transform:translateX(-7px)}40%{transform:translateX(7px)}
+  60%{transform:translateX(-5px)}80%{transform:translateX(5px)}
+}
+.num-wrap{display:inline-flex;align-items:stretch;vertical-align:middle}
+.spin{display:flex;flex-direction:column;border:1px solid var(--glass-border);background:var(--card);border-radius:0 14px 14px 0;overflow:hidden;}
+.spin-btn{flex:1;width:32px;border:none;background:transparent;color:var(--ink);font-size:11px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;touch-action:manipulation;}
+.spin-btn:first-child{border-bottom:1px solid var(--glass-border);}
+.spin-btn:active{background:var(--hl);}
+button.go{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ink);color:#fff;border:none;border-radius:14px;padding:11px 26px;cursor:pointer;box-shadow:0 6px 18px var(--hl-35);}
+button.go:active{transform:scale(.96)}
+button.go.no{background:var(--teacher)}
+button.go.secondary{background:var(--ok)}
+.hint{font-family:var(--font-ui);font-weight:500;color:var(--teacher);font-size:15px;margin-top:12px;min-height:20px;line-height:1.4;}
+.hint.good{color:var(--ok)}
+.next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:8px;box-shadow:0 6px 18px var(--ok-shadow);transition:transform .15s;}
+.next-btn:active{transform:scale(.98)}
+.stats{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+/* плашки статистики без тени, как кнопки калькулятора над ними: у .stats
+   overflow:hidden (плавное сворачивание), он срезал тень снизу и по углам,
+   и оставались только полоски по бокам */
+.stat{flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;padding:12px 14px;text-align:center;}
+/* Промпт №63: на экране меньше 360px три карточки счёта с min-width:110px не
+   помещались в ряд, третья уходила на вторую строку и обрезалась (у .stats
+   max-height и overflow:hidden). Там им разрешено сжиматься */
+@media(max-width:359px){.stat{min-width:0}}
+.stat .v{font-family:var(--font-ui);font-weight:700;font-size:22px;color:var(--ink);}
+.stat .l{font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-6);}
+.stars{color:#FFB800;font-size:20px;letter-spacing:2px;}
+.theory{display:flex;gap:14px;margin-top:16px;flex-wrap:wrap;align-items:stretch}
+.tcard{flex:1;min-width:290px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:18px 20px;}
+.tt{font-family:var(--font-ui);font-weight:700;font-size:17px;color:var(--pencil);margin-bottom:10px;}
+.talg{font-family:var(--font-ui);font-weight:400;font-size:14px;color:var(--muted-4);padding-left:20px;line-height:1.6;}
+.talg li{margin:5px 0;}
+.ttrap{font-family:var(--font-ui);font-weight:500;font-size:13px;color:var(--teacher);margin-top:8px;line-height:1.45;}
+.keypad{display:grid;grid-template-columns:repeat(3, 44px);gap:6px;}
+.keypad button{width:44px;height:40px;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-mono);font-size:18px;cursor:pointer;touch-action:manipulation;}
+.keypad button:active{background:var(--hl);}
+.keypad button.kp-minus{color:var(--teacher);font-weight:700;}
+.keypad button.kp-back{font-size:15px;color:var(--muted-6);}
+.keypad button.kp-enter{grid-column:span 3;width:auto;height:38px;font-family:var(--font-ui);font-weight:600;font-size:14px;background:var(--ink);color:#fff;border-color:var(--ink);}
+.keypad button.kp-enter:active{background:var(--ink-active);}
+.keypad-float{position:fixed;top:160px;right:16px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:50;}
+.keypad-close{position:absolute;top:-11px;right:-11px;width:26px;height:26px;border-radius:50%;background:var(--teacher);color:#fff;border:2px solid #fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s;}
+.keypad-close:active{transform:scale(.9)}
+.keypad-drag-handle{position:absolute;top:-11px;left:-11px;width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;border:2px solid #fff;font-size:12px;line-height:1;cursor:grab;display:flex;align-items:center;justify-content:center;touch-action:none;}
+.keypad-drag-handle:active{cursor:grabbing;}
+.keypad-toggle{position:fixed;top:160px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50;transition:transform .15s;}
+.keypad-toggle:active{transform:scale(.92)}
+@media(max-width:720px){.keypad-float,.keypad-toggle{top:auto;bottom:16px;right:16px}}
+
+/* ─── калькулятор в столбик (свой пример) — встраивает настоящие тренажёры через iframe ─── */
+.calc-tools{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;margin-bottom:14px;}
+.calc-tool-btn{flex:1;min-width:130px;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:11px 8px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s, border-color .12s, background .12s, color .12s;}
+.calc-tool-btn:active{transform:scale(.96)}
+.calc-tool-btn:hover{border-color:var(--ink)}
+.calc-tool-btn.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.calc-panel{display:none;position:relative;padding:18px;}
+.calc-panel-close{position:absolute;top:12px;right:12px;width:28px;height:28px;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass-strong);color:var(--muted-3);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;transition:transform .15s;}
+.calc-panel-close:active{transform:scale(.9)}
+.calc-panel-close:hover{border-color:var(--ink)}
+.calc-panel-title{font-family:var(--font-ui);font-weight:700;font-size:15px;color:var(--pencil);margin-bottom:14px;padding-right:32px;}
+.calc-iframe{display:block;width:100%;border:none;border-radius:14px;background:transparent;}
+.calc-history-panel{display:none;position:relative;padding:18px;margin-bottom:14px;}
+.calc-history-filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding-right:32px;}
+.calc-history-filter{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:10px;padding:6px 12px;cursor:pointer;transition:transform .15s, border-color .12s, background .12s, color .12s;}
+.calc-history-filter:active{transform:scale(.96)}
+.calc-history-filter:hover{border-color:var(--ink)}
+.calc-history-filter.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.calc-history-list{display:flex;flex-direction:column;}
+.calc-history-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--glass-border);}
+.calc-history-row:first-child{border-top:none;}
+.calc-history-num{font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-6);min-width:20px;}
+.calc-history-expr{font-family:var(--font-mono);font-size:15px;color:var(--pencil);flex:1;}
+.calc-history-copy{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:10px;padding:6px 10px;cursor:pointer;white-space:nowrap;transition:border-color .12s, background .12s;}
+.calc-history-copy:hover{border-color:var(--ink)}
+.calc-history-copy:active{transform:scale(.96)}
+.calc-history-empty{font-family:var(--font-ui);font-size:14px;color:var(--muted-6);text-align:center;padding:16px 0;}
+
+/* ─── интерактивная доска на фоне вокруг примера ─── */
+#boardCanvas{position:fixed;top:0;left:0;z-index:2;touch-action:none;cursor:crosshair;border-radius:20px;}
+#boardCanvasBg{position:fixed;top:0;left:0;z-index:0;touch-action:none;cursor:crosshair;}
+#boardSpace{height:0;pointer-events:none;transition:height .2s ease;}
+.board-toolbar{position:fixed;right:18px;bottom:18px;z-index:50;display:flex;gap:8px;align-items:center;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;padding:9px 11px;box-shadow:var(--shadow);}
+.toolbar-sep{width:1px;align-self:stretch;background:var(--glass-border);margin:2px 0;}
+.board-tool-btn{width:34px;height:34px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s, border-color .15s, background .15s;}
+.board-tool-btn:active{transform:scale(.92)}
+.board-tool-btn:hover{border-color:var(--ink);}
+.board-tool-btn.active{background:var(--ink);border-color:var(--ink);}
+.board-tool-btn .dot{border-radius:50%;background:var(--pencil);display:block;}
+.board-tool-btn.active .dot{background:#fff;}
+.board-tool-btn.eraser{font-size:15px;}
+.board-tool-btn.pen-main{font-size:15px;}
+.board-tool-btn.color-btn.active{background:var(--glass);border-color:var(--ink);box-shadow:0 0 0 2px var(--ink);}
+.tool-group{position:relative;}
+/* всплывающее окошко с размерами (для ручки и ластика) — управляется из JS через
+   класс .open, а не через :hover, потому что чистый CSS-hover рвётся, стоит
+   курсору чуть отклониться от прямой линии между кнопкой и окошком */
+.size-flyout{position:absolute;bottom:100%;right:0;margin-bottom:10px;display:none;gap:8px;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;padding:8px;box-shadow:var(--shadow);}
+.size-flyout.open{display:flex;}
+/* невидимый мостик над кнопкой, чтобы курсор не «выпадал» из зоны наведения,
+   пока едет от кнопки к окошку */
+.tool-group::after{content:'';position:absolute;left:0;right:0;bottom:100%;height:14px;}
+
+/* ─── всплывающая палитра для «своего» цвета ─── */
+.board-tool-btn.custom-color-btn{overflow:hidden;}
+.color-picker-flyout{flex-direction:column;align-items:stretch;width:200px;padding:12px;gap:10px;}
+.cp-sv-wrap{position:relative;width:100%;height:120px;border-radius:12px;overflow:hidden;cursor:crosshair;touch-action:none;}
+.cp-sv{display:block;width:100%;height:100%;}
+.cp-sv-thumb{position:absolute;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35),0 1px 3px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none;top:0;left:0;}
+.cp-row{display:flex;align-items:center;gap:8px;}
+.cp-eyedropper{width:28px;height:28px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--pencil);transition:transform .15s;}
+.cp-eyedropper:active{transform:scale(.9)}
+.cp-eyedropper:hover{border-color:var(--ink);}
+.cp-swatch{width:26px;height:26px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);box-shadow:inset 0 0 0 2px rgba(255,255,255,.5);}
+.cp-hue-wrap{position:relative;flex:1;height:16px;touch-action:none;}
+.cp-hue{position:absolute;inset:0;border-radius:8px;background:linear-gradient(to right,#ff0000,#ffff00,#00ff00,#00ffff,#0000ff,#ff00ff,#ff0000);cursor:pointer;}
+.cp-hue-thumb{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35),0 1px 3px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none;}
+.cp-rgb-row{display:flex;gap:6px;}
+.cp-field{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;}
+.cp-field input{width:100%;box-sizing:border-box;text-align:center;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);color:var(--pencil);font-family:var(--font-mono);font-size:12px;padding:5px 2px;}
+.cp-field label{font-size:10px;color:var(--muted-3);font-family:var(--font-ui);}
+
+.board-view-toolbar{position:fixed;left:18px;bottom:18px;z-index:50;display:flex;gap:8px;align-items:center;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;padding:9px 11px;box-shadow:var(--shadow);}
+.board-zoom-label{min-width:44px;height:34px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-3);padding:0 6px;transition:transform .15s;}
+.board-zoom-label:active{transform:scale(.92)}
+.board-zoom-label:hover{border-color:var(--ink);}
+.board-tool-btn.hand-tool{font-size:16px;}
+.board-tool-btn.clear-btn{font-size:15px;}
+
+/* ─── доска изначально выключена — включается отдельной кнопкой под переключателем темы ─── */
+/* ─── Промпт №32 (по образцу Промпта №23 в ОГЭ №8): сами записи на доске
+   (холсты) видны ВСЕГДА, независимо от того, включён ли у ЭТОГО участника
+   инструмент рисования — если записи оставил учитель, ученик должен видеть
+   их поверх тренажёра постоянно. Скрываем при data-board!="on" только
+   панели инструментов: их незачем показывать, пока рисование не включено
+   именно на этом устройстве. ─── */
+html:not([data-board="on"]) .board-toolbar,
+html:not([data-board="on"]) .board-view-toolbar{display:none;}
+/* холст не должен перехватывать клики, пока перо не включено — иначе
+   выключенная доска накрыла бы собой кнопки и поля тренажёра */
+html:not([data-board="on"]) #boardCanvas,
+html:not([data-board="on"]) #boardCanvasBg{pointer-events:none;}
+html[data-board="on"] #boardSpace{height:72vh;transition:height .32s ease;}
+/* при свёрнутых подсказках место под алгоритмами/счётчиками освобождается — отдаём его доске */
+html[data-board="on"][data-focus="on"] #boardSpace{height:90vh;}
+html[data-board="on"] body{background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    var(--bg);}
+
+/* ─── свернуть подсказки: освобождает место для записи на доске ─── */
+.focus-toggle{position:fixed;top:112px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
+.focus-toggle:hover{border-color:var(--ink)}
+.focus-toggle:active{transform:scale(.92)}
+
+/* ─── аккуратное сворачивание: max-height/opacity вместо мгновенного display:none ─── */
+h1,.sub,.levels,.theory,.stats,.hint{overflow:hidden;min-height:0;transition:max-height .32s ease, opacity .22s ease, margin .32s ease;}
+h1{max-height:64px}
+.sub{max-height:50px}
+/* .levels{max-height:Npx} было мало на очень узких экранах — карточки уровней
+   переносятся на 3+ строки, и низ списка обрезался. Значения ниже измерены
+   реальным рендером (тот же щедрый набор, что подтверждён для quadratic.html
+   с 10 уровнями — самый тяжёлый случай, так что тут запас с большим избытком). */
+.levels{max-height:100px}
+@media(max-width:700px){.levels{max-height:160px}}
+@media(max-width:480px){.levels{max-height:220px}}
+@media(max-width:360px){.levels{max-height:270px}}
+.theory{max-height:518px}
+.stats{max-height:90px}
+.hint{max-height:50px}
+@media(max-width:749px){.theory{max-height:654px}}
+/* самые узкие экраны (~320-340px) переносят текст теории ещё сильнее — измерено реальным рендером, с запасом */
+@media(max-width:420px){.theory{max-height:950px}}
+html[data-focus="on"] h1,
+html[data-focus="on"] .sub,
+html[data-focus="on"] .levels,
+html[data-focus="on"] .theory,
+html[data-focus="on"] .stats,
+html[data-focus="on"] .hint{
+  max-height:0;
+  min-height:0;
+  padding:0;
+  border-width:0;
+  opacity:0;
+  margin-top:0;
+  margin-bottom:0;
+  pointer-events:none;
+}
+
+.theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
+.theme-toggle:hover{border-color:var(--ink)}
+.theme-toggle:active{transform:scale(.92)}
+.board-visibility-toggle{top:64px;transition:transform .15s;}
+.board-visibility-toggle:active{transform:scale(.92)}
+.board-visibility-toggle.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+.home-btn{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
+.home-btn:hover{border-color:var(--ink)}
+.home-btn:active{transform:scale(.92)}
+/* ═══ Промпт №74: тренажёр «НОК» — всё, чего нет в остальных тренажёрах ═══
+   Скелет и вёрстка — как у НОД (gcd.html, промпт №65): тот же лист, панель,
+   клавиатура, доска и статистика, чтобы две соседние темы 6 класса
+   выглядели и вели себя одинаково. */
+
+/* строка разделов стоит над уровнями и выглядит так же, но крупнее —
+   это три разных способа, а не три ступени сложности */
+.sections{margin-bottom:12px}
+.sections .lvl{font-size:15px;padding:10px 18px}
+.sections .lvl .sec-num{opacity:.6;margin-right:6px}
+.lvl-desc{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:14px;margin:-6px 0 14px;max-height:40px}
+html[data-card="1"] .lvl-desc{display:none}
+
+/* краткая теория раздела — над заданиями; общие свойства и ловушки — внизу */
+.sec-theory{margin:0 0 16px}
+.sec-theory .tcard{min-width:0}
+.tintro{font-family:var(--font-ui);font-size:14px;color:var(--muted-4);line-height:1.55;margin-bottom:8px}
+.tintro b{color:var(--ink)}
+.tex{font-family:var(--font-mono);font-size:15px;color:var(--ink);line-height:1.7;margin:8px 0 4px;padding:10px 14px;background:var(--card);border:1px solid var(--glass-border);border-radius:12px;overflow-x:auto}
+.tex .ln{display:block;white-space:nowrap}
+.tex .ok{color:var(--ok);font-weight:700}
+.tex-cols{display:flex;gap:26px;flex-wrap:wrap}
+.tex-tab{border-collapse:collapse;font-family:var(--font-mono);font-size:15px;color:var(--ink)}
+.tex-tab td{padding:0 10px;text-align:right;line-height:1.6}
+.tex-tab td.fr{border-left:2px solid var(--ink);text-align:left;color:var(--teacher)}
+/* формула НОК через НОД — дробью «числитель над знаменателем», как пишут в
+   тетради, а не через косую черту */
+.frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;margin:0 4px;line-height:1.35}
+.frac>span:first-child{border-bottom:2px solid currentColor;padding:0 6px 1px}
+.frac>span:last-child{padding:1px 6px 0}
+.tex .ln.fx{display:flex;align-items:center;gap:4px;padding:4px 0}
+
+/* условие задания: его же уносит «В подборку» и снимок на доску */
+.task-line{font-family:var(--font-ui);font-weight:600;font-size:clamp(20px,4vw,25px);color:var(--pencil);text-align:center;margin-bottom:calc(var(--cell)*.7);line-height:1.35}
+.task-line .tl{display:block;font-family:var(--font-mono);font-weight:500;color:var(--ink);font-size:clamp(17px,3.4vw,22px);margin-top:6px;white-space:nowrap}
+
+#work{font-family:var(--font-mono);color:var(--ink);display:flex;flex-direction:column;gap:14px;align-items:center}
+
+/* раздел 1: строки кратных. Выровнены по левому краю одним блоком — так
+   одинаковые числа в соседних строках легче найти глазами */
+.dv-list{display:flex;flex-direction:column;gap:12px;align-items:flex-start;max-width:100%}
+.dv-row{display:flex;flex-wrap:wrap;align-items:center;gap:8px;justify-content:flex-start;max-width:100%}
+.nw{white-space:nowrap}
+.dv-lbl{font-family:var(--font-ui);font-weight:600;font-size:17px;color:var(--pencil);white-space:nowrap;margin-right:4px}
+.dv-row.active .dv-lbl{color:var(--ink)}
+.dv-row.dim{opacity:.45}
+.dv-more{font-family:var(--font-mono);font-size:20px;color:var(--muted-3)}
+.chips{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{min-width:38px;height:38px;padding:0 8px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;background:var(--card);border:1.5px solid var(--grid);color:var(--ink);font-family:var(--font-mono);font-size:20px;line-height:1;user-select:none;-webkit-user-select:none}
+.chip.tap{cursor:pointer;outline:2px dashed var(--teacher);outline-offset:-3px}
+.chip.tap:hover{background:rgba(201,58,43,.08)}
+.chip.common{background:var(--ok-tint);border-color:var(--ok);color:var(--ok);font-weight:700;outline:none}
+/* множители первого числа в разделе 2 — «уже в НОК»: отмечены, но спокойнее,
+   чем дописанные учеником, чтобы было видно, что он добавил сам */
+.chip.taken{background:var(--ok-tint);border-color:transparent;color:var(--ok);outline:none}
+.chip.ph{color:var(--muted-7);border-style:dashed}
+.chip.bad{animation:shake .35s;border-color:var(--teacher);color:var(--teacher)}
+.common-line{font-family:var(--font-ui);font-weight:500;font-size:18px;color:var(--muted-3);text-align:center}
+.common-line b{font-family:var(--font-mono);color:var(--ok)}
+.lcm-result{font-family:var(--font-ui);font-weight:700;font-size:clamp(20px,4vw,26px);color:var(--ok);text-align:center}
+
+/* раздел 2: разложение «столбиком» — справа от черты простой делитель,
+   слева результат деления, внизу 1 */
+.fcols{display:flex;flex-wrap:wrap;gap:24px 48px;justify-content:center;align-items:flex-start}
+.fcol{display:flex;flex-direction:column;align-items:center}
+.fcol.dim{opacity:.4}
+.ftab{border-collapse:collapse;font-family:var(--font-mono);font-size:22px}
+.ftab td{padding:2px 12px;height:42px;text-align:right;min-width:58px;color:var(--ink)}
+.ftab td.fr{border-left:3px solid var(--ink);text-align:left;color:var(--teacher)}
+.ftab-res{font-family:var(--font-mono);font-size:18px;color:var(--ok);margin-top:8px;text-align:center;white-space:nowrap}
+.inl{width:66px;font-family:var(--font-mono);font-size:20px;text-align:center;border:2px solid var(--teacher);border-radius:8px;padding:3px 0;color:var(--teacher);background:var(--card)}
+.inl.wide{width:92px}
+.inl:focus{outline:none;border-color:var(--ink);color:var(--ink)}
+.inl.shake{animation:shake .35s}
+.fline{display:flex;flex-wrap:wrap;align-items:center;gap:6px;justify-content:center;max-width:100%}
+.fl-lbl{font-family:var(--font-mono);font-size:22px;color:var(--pencil);margin-right:6px;white-space:nowrap}
+.dot-sep{color:var(--muted-1);font-size:20px}
+
+/* раздел 3: НОК через НОД — строки вычисления одна под другой */
+.eu-block{display:flex;flex-direction:column;gap:8px;align-items:flex-start;max-width:100%}
+.eu-title{font-family:var(--font-ui);font-weight:600;font-size:17px;color:var(--pencil)}
+.eu-row{font-family:var(--font-mono);font-size:22px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;color:var(--ink)}
+.eu-row.formula{font-size:16px;color:var(--muted-3)}
+.eu-res{color:var(--ok);font-weight:700}
+
+input.num.solo{border-radius:14px;border-right:1px solid var(--glass-border);width:220px;max-width:100%}
+input.num.solo:focus{border-color:var(--ink)}
+
+@media(max-width:480px){
+  .chip{min-width:32px;height:34px;font-size:17px;padding:0 6px}
+  .ftab{font-size:19px}
+  .ftab td{min-width:46px;height:38px;padding:2px 8px}
+  .eu-row{font-size:19px}
+  .eu-row.formula{font-size:14px}
+  .fl-lbl{font-size:19px}
+  .inl{width:56px;font-size:18px}
+  .inl.wide{width:76px}
+  .sections .lvl{font-size:14px;padding:9px 12px}
+}
+.lvl-desc{overflow:hidden;transition:max-height .32s ease, opacity .22s ease, margin .32s ease}
+html[data-focus="on"] .lvl-desc{max-height:0;opacity:0;margin:0;pointer-events:none}
+
+</style>
+</head>
+<body>
+<a class="home-btn" id="homeBtn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
+<button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<button class="theme-toggle board-visibility-toggle" id="boardVisibilityToggle" title="Показать доску" aria-label="Показать/скрыть доску">🖊️</button>
+<script>(function(){
+  var btn=document.getElementById('themeToggle');
+  function apply(t, persist){
+    document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = t === 'dark' ? '\u2600\uFE0F' : '\uD83C\uDF19';
+    if (persist) { try{ localStorage.setItem('theme', t); }catch(e){} }
+  }
+  apply(document.documentElement.getAttribute('data-theme') || 'light', false);
+  btn.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur, true);
+  });
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onSystemChange = function(e){
+      var explicit = false;
+      try{ explicit = !!localStorage.getItem('theme'); }catch(err){}
+      if (explicit) return;
+      apply(e.matches ? 'dark' : 'light', false);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
+    else if (mq.addListener) mq.addListener(onSystemChange);
+  }
+})();</script>
+<script>(function(){
+  var btn = document.getElementById('boardVisibilityToggle');
+  function apply(on){
+    document.documentElement.setAttribute('data-board', on ? 'on' : 'off');
+    btn.classList.toggle('active', on);
+    btn.title = on ? 'Скрыть доску' : 'Показать доску';
+  }
+  apply(false); // доска изначально выключена
+  btn.addEventListener('click', function(){
+    apply(document.documentElement.getAttribute('data-board') !== 'on');
+  });
+})();</script>
+
+<!-- кнопка "свернуть подсказки" намеренно лежит здесь, СНАРУЖИ .wrap, а не внутри
+     него: у .wrap свой контекст наложения (нужен для доски), и любой position:fixed
+     элемент ВНУТРИ .wrap не смог бы пробиться выше #boardCanvas по z-index -->
+<button class="focus-toggle" id="focusToggle" title="Свернуть подсказки" aria-label="Свернуть/показать подсказки и алгоритм">⛶</button>
+  <script>(function(){
+    var btn = document.getElementById('focusToggle');
+    function apply(on){
+      document.documentElement.setAttribute('data-focus', on ? 'on' : 'off');
+      btn.title = on ? 'Показать подсказки' : 'Свернуть подсказки';
+    }
+    apply(false);
+    btn.addEventListener('click', function(){
+      apply(document.documentElement.getAttribute('data-focus') !== 'on');
+    });
+  })();</script>
+
+
+<canvas id="boardCanvasBg"></canvas>
+<canvas id="boardCanvas"></canvas>
+<div class="board-toolbar" id="boardToolbar">
+  <div class="tool-group">
+    <button class="board-tool-btn pen-main active" data-tool="pen" title="Ручка">✏️</button>
+    <div class="size-flyout">
+      <button class="board-tool-btn" data-tool="pen" data-width="1" title="Самая тонкая"><span class="dot" style="width:4px;height:4px"></span></button>
+      <button class="board-tool-btn active" data-tool="pen" data-width="2" title="Тонкая"><span class="dot" style="width:6px;height:6px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="3" title="Тонкая+"><span class="dot" style="width:8px;height:8px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="4" title="Средняя"><span class="dot" style="width:11px;height:11px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="6" title="Средняя+"><span class="dot" style="width:15px;height:15px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="9" title="Толстая"><span class="dot" style="width:20px;height:20px"></span></button>
+    </div>
+  </div>
+  <span class="toolbar-sep"></span>
+  <button class="board-tool-btn color-btn active" data-color="#000000" title="Чёрный"><span class="dot" style="width:14px;height:14px;background:#000000"></span></button>
+  <button class="board-tool-btn color-btn" data-color="#FF3B30" title="Красный"><span class="dot" style="width:14px;height:14px;background:#FF3B30"></span></button>
+  <button class="board-tool-btn color-btn" data-color="#0A84FF" title="Синий"><span class="dot" style="width:14px;height:14px;background:#0A84FF"></span></button>
+  <div class="tool-group">
+    <button class="board-tool-btn color-btn custom-color-btn" data-color="#AF52DE" title="Свой цвет" id="customColorBtn">
+      <span class="dot custom-color-dot" id="customColorDot" style="width:16px;height:16px;background:conic-gradient(from 180deg,#ff0000,#ffff00,#00ff00,#00ffff,#0000ff,#ff00ff,#ff0000)"></span>
+    </button>
+    <div class="size-flyout color-picker-flyout">
+      <div class="cp-sv-wrap">
+        <canvas id="cpSvCanvas" class="cp-sv" width="176" height="120"></canvas>
+        <div class="cp-sv-thumb" id="cpSvThumb"></div>
+      </div>
+      <div class="cp-row">
+        <button class="cp-eyedropper" id="cpEyedropper" title="Пипетка — взять цвет с экрана" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19.2 3.8a2.7 2.7 0 0 1 0 3.8l-1.4 1.4-3.8-3.8L15.4 3.8a2.7 2.7 0 0 1 3.8 0Z" fill="currentColor"></path>
+            <path d="M12.6 6.6l3.8 3.8L6 20.8l-4 1 1-4L12.6 6.6Z" fill="currentColor"></path>
+          </svg>
+        </button>
+        <div class="cp-swatch" id="cpSwatch"></div>
+        <div class="cp-hue-wrap">
+          <div class="cp-hue" id="cpHue"></div>
+          <div class="cp-hue-thumb" id="cpHueThumb"></div>
+        </div>
+      </div>
+      <div class="cp-rgb-row">
+        <div class="cp-field"><input type="text" inputmode="numeric" maxlength="3" id="cpR" value="0"><label>R</label></div>
+        <div class="cp-field"><input type="text" inputmode="numeric" maxlength="3" id="cpG" value="0"><label>G</label></div>
+        <div class="cp-field"><input type="text" inputmode="numeric" maxlength="3" id="cpB" value="0"><label>B</label></div>
+      </div>
+    </div>
+  </div>
+  <span class="toolbar-sep"></span>
+  <button class="board-tool-btn" data-tool="line" title="Прямая линия">╱</button>
+  <div class="tool-group">
+    <button class="board-tool-btn eraser" data-tool="eraser" title="Ластик">🧽</button>
+    <div class="size-flyout">
+      <button class="board-tool-btn" data-tool="eraser" data-size="14" title="Маленький ластик"><span class="dot" style="width:6px;height:6px"></span></button>
+      <button class="board-tool-btn" data-tool="eraser" data-size="26" title="Средний ластик"><span class="dot" style="width:10px;height:10px"></span></button>
+      <button class="board-tool-btn" data-tool="eraser" data-size="44" title="Большой ластик"><span class="dot" style="width:16px;height:16px"></span></button>
+    </div>
+  </div>
+</div>
+
+<div class="board-view-toolbar" id="boardViewToolbar">
+  <button class="board-tool-btn" id="zoomOutBtn" title="Уменьшить">−</button>
+  <button class="board-zoom-label" id="zoomResetBtn" title="Сбросить вид">100%</button>
+  <button class="board-tool-btn" id="zoomInBtn" title="Увеличить">+</button>
+  <span class="toolbar-sep"></span>
+  <button class="board-tool-btn hand-tool" data-tool="hand" title="Рука — перемещать доску">✋</button>
+  <button class="board-tool-btn clear-btn" id="clearBoardBtn" title="Стереть всё">🗑️</button>
+</div>
+
+<div class="wrap">
+  <h1>Наименьшее общее кратное</h1>
+  <div class="sub">три способа найти НОК — перебором кратных, разложением на простые множители и через НОД</div>
+
+  <!-- разделы идут по порядку: сначала самый наглядный способ, потом всё
+       быстрее и «взрослее». Класс levels — чтобы в карточке «+» строка
+       пряталась тем же правилом trainer-multi.js, что и уровни -->
+  <div class="levels sections" id="sections"></div>
+
+  <div class="theory sec-theory" id="secTheory"></div>
+
+  <div class="levels" id="levels"></div>
+  <div class="lvl-desc" id="lvlDesc"></div>
+
+  <div class="sheet">
+    <div class="corner-left">
+      <button class="undo-btn" id="undoBtn" title="Отменить последний шаг" disabled>←</button>
+    </div>
+    <div class="corner">
+      <button class="basket-add-btn" id="basketAddBtn" title="В подборку">📥</button>
+      <button class="refresh-btn" id="refreshBtn" title="Обновить пример">⟳</button>
+      <span id="taskNum">пример №1</span>
+    </div>
+    <div class="task-line" id="taskLine"></div>
+    <div id="work"></div>
+  </div>
+
+  <div class="panel">
+    <div class="prompt" id="prompt"></div>
+    <div class="inrow" id="inputArea"></div>
+    <button class="next-btn" id="nextBtn" style="display:none">Следующий пример →</button>
+    <div class="hint" id="hint"></div>
+  </div>
+
+  <div class="calc-tools" id="calcTools">
+      <button class="calc-tool-btn" data-op="add">+ Сложить</button>
+      <button class="calc-tool-btn" data-op="sub">− Вычесть</button>
+      <button class="calc-tool-btn" data-op="mul">× Умножить</button>
+      <button class="calc-tool-btn" data-op="div">÷ Поделить</button>
+      <button class="calc-tool-btn" id="calcHistoryBtn">🕓 История</button>
+    </div>
+    <div class="panel calc-history-panel" id="calcHistoryPanel">
+      <button class="calc-panel-close" id="calcHistoryClose" title="Закрыть">✕</button>
+      <div class="calc-panel-title">История решений</div>
+      <div class="calc-history-filters" id="calcHistoryFilters">
+        <button class="calc-history-filter active" data-filter="all">Все</button>
+        <button class="calc-history-filter" data-filter="add">+</button>
+        <button class="calc-history-filter" data-filter="sub">−</button>
+        <button class="calc-history-filter" data-filter="mul">×</button>
+        <button class="calc-history-filter" data-filter="div">÷</button>
+      </div>
+      <div class="calc-history-list" id="calcHistoryList"></div>
+      <div class="calc-history-empty" id="calcHistoryEmpty">Пока пусто — реши что-нибудь в калькуляторе.</div>
+    </div>
+    <div class="panel calc-panel" id="calcPanel">
+      <button class="calc-panel-close" id="calcPanelClose" title="Закрыть">✕</button>
+      <div class="calc-panel-title" id="calcPanelTitle"></div>
+      <iframe class="calc-iframe" id="calcIframe" title="Калькулятор в столбик"></iframe>
+    </div>
+
+    <div class="stats">
+    <div class="stat"><div class="v" id="stSolved">0</div><div class="l">решено</div></div>
+    <div class="stat"><div class="v" id="stStreak">0</div><div class="l">серия без ошибок</div></div>
+    <div class="stat"><div class="v stars" id="stStars">—</div><div class="l">этот пример</div></div>
+  </div>
+
+  <div class="theory">
+    <div class="tcard">
+      <div class="tt">Четыре важных свойства</div>
+      <ol class="talg">
+        <li><b>НОК(a, a) = a</b> — НОК числа с самим собой равен этому числу.</li>
+        <li>Если <b>a делится на b</b>, то <b>НОК(a, b) = a</b>. Например, НОК(24, 8) = 24.</li>
+        <li>Если числа <b>взаимно простые</b> (НОД = 1), то <b>НОК = a · b</b>. Например, НОК(8, 15) = 120.</li>
+        <li><b>НОД(a, b) · НОК(a, b) = a · b</b>. Например, НОД(4, 6) · НОК(4, 6) = 2 · 12 = 24 = 4 · 6.</li>
+      </ol>
+    </div>
+    <div class="tcard">
+      <div class="tt">Ловушки</div>
+      <div class="ttrap">⚠ Не путай НОК и НОД. НОК — кратное (больше или равно каждому из чисел), НОД — делитель (меньше или равен). НОК нужен, чтобы приводить дроби к общему знаменателю, НОД — чтобы сокращать.</div>
+      <div class="ttrap">⚠ НОК не может быть меньше большего из чисел. Получилось меньше — где-то ошибка.</div>
+      <div class="ttrap">⚠ При разложении одинаковый множитель берём в большей степени: если у одного числа 2³, а у другого 2², берём 2³, а не 2² и не 2⁵.</div>
+      <div class="ttrap">⚠ Формула НОК = a · b : НОД работает для двух чисел. Для трёх считаем по очереди: НОК(a, b, c) = НОК(НОК(a, b), c).</div>
+    </div>
+  </div>
+  
+<div id="boardSpace" aria-hidden="true"></div></div>
+
+<button class="keypad-toggle" id="kpToggle" title="Показать клавиатуру" style="display:none">⌨</button>
+<div class="keypad-float" id="keypadFloat" style="display:none">
+  <button class="keypad-drag-handle" id="kpDragHandle" title="Перетащить клавиатуру" aria-label="Переместить клавиатуру">✋</button>
+  <button class="keypad-close" id="kpClose" title="Скрыть клавиатуру">✕</button>
+  <div class="keypad" id="keypadButtons"></div>
+</div>
+
+<script src="basket-core.js"></script>
+<script src="supabase-config.js"></script>
+<script src="supabase-js.umd.js"></script>
+<script src="session-share.js"></script>
+<script src="quick-answer.js"></script>
+<script src="trainer-multi.js"></script>
+<script>
+const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
+const pick = a=>a[ri(0,a.length-1)];
+function gcd(a,b){ while(b){ [a,b]=[b,a%b]; } return a; }
+function gcdAll(arr){ return arr.reduce((g,x)=>gcd(g,x)); }
+function lcm(a,b){ return a / gcd(a,b) * b; }
+function lcmAll(arr){ return arr.reduce((l,x)=>lcm(l,x)); }
+function isPrime(n){ if(!Number.isInteger(n) || n<2) return false; for(let d=2; d*d<=n; d++) if(n%d===0) return false; return true; }
+function factorize(n){ const f=[]; let m=n; for(let p=2; p*p<=m; p++) while(m%p===0){ f.push(p); m/=p; } if(m>1) f.push(m); return f; }
+const maxPrime = n => { const f=factorize(n); return f[f.length-1]; };
+const prod = a => a.reduce((x,y)=>x*y, 1);
+const countOf = (list, p) => list.filter(x=>x===p).length;
+// сколько множителей p нужно дописать из строки r: столько, на сколько их там
+// больше, чем в любой строке выше. Строки выше к этому моменту уже дают в НОК
+// p в наибольшей из своих степеней — это и есть правило «берём в большей степени»
+function needExtra(facts, r, p){
+  let cov = 0;
+  for(let j=0; j<r; j++) cov = Math.max(cov, countOf(facts[j], p));
+  return Math.max(0, countOf(facts[r], p) - cov);
+}
+function extrasOf(facts){
+  const out = [];
+  for(let r=1; r<facts.length; r++){
+    [...new Set(facts[r])].sort((a,b)=>a-b).forEach(p=>{ for(let i=0; i<needExtra(facts, r, p); i++) out.push(p); });
+  }
+  return out.sort((a,b)=>a-b);
+}
+// 2 · 2 · 3 · 7 → 2² · 3 · 7: так разложение записано в теории
+const SUP = {'0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹'};
+function powForm(list){
+  const m = new Map(); list.slice().sort((a,b)=>a-b).forEach(p=>m.set(p,(m.get(p)||0)+1));
+  return [...m].map(([p,k])=> k>1 ? p+String(k).split('').map(c=>SUP[c]).join('') : String(p)).join(' · ');
+}
+function plural(n, one, few, many){
+  const m10=n%10, m100=n%100;
+  if(m10===1 && m100!==11) return one;
+  if(m10>=2 && m10<=4 && (m100<10 || m100>=20)) return few;
+  return many;
+}
+// «6», «6 и 9», «6, 9 и 10» — для подсказок, где перечисляются другие числа
+function andList(a){ return a.length<2 ? a.join('') : a.slice(0,-1).join(', ') + ' и ' + a[a.length-1]; }
+
+/* ───────── генерация ─────────
+   У НОК главный враг — размер: НОК двух трёхзначных легко уходит за сотню
+   тысяч, а у перебора кратных строка меньшего числа растягивается на
+   НОК/число клеток. Поэтому, кроме диапазона чисел, у уровней есть потолок
+   самого НОК (maxL) и длины строки кратных (maxK).
+   Случаи «одно число делится на другое» и «взаимно простые» — ловушки со
+   своим правилом (НОК — большее число; НОК — произведение), поэтому по
+   умолчанию их нет, а на отдельных уровнях они выпадают с заданной долей. */
+function genNums(o){
+  const r = Math.random();
+  const mode = r < (o.coprimeChance||0) ? 'coprime' : (r < (o.coprimeChance||0) + (o.multipleChance||0) ? 'multiple' : 'plain');
+  for(let guard=0; guard<200000; guard++){
+    const nums = [];
+    while(nums.length < o.count){ const v = ri(o.min, o.max); if(!nums.includes(v)) nums.push(v); }
+    // порядок чисел важен для проверки «третье число что-то меняет» ниже,
+    // поэтому сортируем до проверок, а не после
+    if(o.desc) nums.sort((a,b)=>b-a);
+    const g = gcdAll(nums), L = lcmAll(nums);
+    // у трёх чисел общий делитель всех сразу не нужен (minG: 1): НОК(6, 8, 9)
+    // не хуже НОК(6, 8, 10), а требование общего делителя оставило бы почти
+    // одни чётные тройки
+    if(mode==='coprime' ? g!==1 : (mode==='plain' && g < (o.minG || 2))) continue;
+    const divides = nums.some((x,i)=>nums.some((y,j)=>i!==j && y%x===0));
+    if(mode==='multiple' ? !divides : divides) continue;
+    if(o.maxL && L > o.maxL) continue;
+    if(o.maxK && L/Math.min(...nums) > o.maxK) continue;
+    // у трёх чисел НОК первых двух обязан быть меньше общего — иначе третье
+    // число ничего не меняло бы в решении
+    if(o.count===3 && lcm(nums[0], nums[1]) === L) continue;
+    if(o.ok && !o.ok(nums, L, g)) continue;
+    return { nums };
+  }
+  throw 'genNums: не удалось сгенерировать';
+}
+// раздел 2, уровень 1 — как в задании из учебника: числа уже разложены
+function genGiven(){
+  const SMALL = [2,3,5], ALL = [2,3,5,7,11];
+  for(let guard=0; guard<50000; guard++){
+    const common = Array.from({length: ri(1,2)}, ()=>pick(SMALL));
+    const aEx = Array.from({length: ri(1,3)}, ()=>pick(ALL));
+    const bEx = Array.from({length: ri(1,2)}, ()=>pick(ALL));
+    const a = common.concat(aEx).sort((x,y)=>x-y), b = common.concat(bEx).sort((x,y)=>x-y);
+    if(a.length<3 || b.length<2 || a.length>5 || b.length>4) continue;
+    const A = prod(a), B = prod(b), L = lcm(A, B);
+    // дописывать должно быть что — иначе ученику нечего выбирать; и не
+    // слишком много — иначе произведение уходит в пятизначные числа
+    if(A===B || B%A===0 || A%B===0 || L > 6000) continue;
+    return { nums:[A, B], given:[a, b] };
+  }
+  throw 'genGiven: не удалось сгенерировать';
+}
+// раздел 3, уровень 3 — обратная задача: по формуле НОД · НОК = a · b найти
+// второе число (чаще) или НОД
+function genInverse(){
+  const P = genNums({count:2, min:6, max:60, minG:2, maxL:600});
+  P.inv = Math.random() < .65 ? 'b' : 'g';
+  return P;
+}
+// три числа через НОД: в обоих звеньях НОД больше 1 — иначе формула
+// вырождается в простое умножение и НОД искать незачем
+const pairsShare = n => gcd(n[0], n[1]) > 1 && gcd(lcm(n[0], n[1]), n[2]) > 1;
+const factorsOk = (k, pmax) => nums => nums.every(x=>factorize(x).length>=k && maxPrime(x)<=pmax);
+
+const SECTIONS = [
+  { id:0, title:'Перебор кратных', short:'Перебор',
+    levels:[
+      { name:'Уровень 1', desc:'Два числа до 12, кратные выписываем по одному', gen:()=>genNums({count:2, min:2, max:12, maxK:6, maxL:60}) },
+      { name:'Уровень 2', desc:'Два числа до 20 — бывают взаимно простые и кратные друг другу', gen:()=>genNums({count:2, min:3, max:20, maxK:10, coprimeChance:.15, multipleChance:.15}) },
+      { name:'Уровень 3', desc:'Два числа до 40 — кратных больше', gen:()=>genNums({count:2, min:12, max:40, maxK:12, maxL:250}) },
+      { name:'Уровень 4', desc:'Три числа до 15', gen:()=>genNums({count:3, min:2, max:15, minG:1, maxK:12, maxL:120}) },
+    ],
+    theory:`<div class="tcard">
+      <div class="tt">Способ 1. Перебор кратных</div>
+      <div class="tintro"><b>Кратное</b> числа — число, которое делится на него без остатка: 6, 12, 18, 24… — кратные 6. Выписываем кратные каждого числа по порядку, пока не встретится <b>общее</b>. Наименьшее общее кратное — это НОК.</div>
+      <div class="tex">
+        <span class="ln">Кратные 4: 4, 8, 12, 16, 20, 24</span>
+        <span class="ln">Кратные 6: 6, 12, 18, 24</span>
+        <span class="ln">Общие: 12, 24 → <span class="ok">НОК(4, 6) = 12</span></span>
+      </div>
+      <div class="tintro">Можно быстрее: выписывай кратные большего числа и проверяй, делится ли каждое на меньшее. 6 на 4 не делится, 12 делится — значит, НОК = 12. Способ хорош для небольших чисел, с большими становится долгим.</div>
+    </div>` },
+  { id:1, title:'Разложение на простые множители', short:'Разложение',
+    levels:[
+      { name:'Уровень 1', desc:'Числа уже разложены — допиши недостающие множители', gen:genGiven },
+      { name:'Уровень 2', desc:'Два числа до 150', gen:()=>genNums({count:2, min:12, max:150, coprimeChance:.1, maxL:3000, desc:true, ok:factorsOk(3, 13)}) },
+      { name:'Уровень 3', desc:'Два трёхзначных числа', gen:()=>genNums({count:2, min:100, max:999, minG:20, maxL:20000, desc:true, ok:factorsOk(3, 17)}) },
+      { name:'Уровень 4', desc:'Три числа', gen:()=>genNums({count:3, min:12, max:200, minG:1, maxL:6000, desc:true, ok:factorsOk(3, 7)}) },
+    ],
+    theory:`<div class="tcard">
+      <div class="tt">Способ 2. Разложение на простые множители</div>
+      <div class="tintro">Раскладываем числа «столбиком». Берём <b>все</b> множители одного числа (удобнее — большего) и <b>дописываем</b> множители другого, которых не хватает. Одинаковый множитель берём в <b>большей</b> степени. Потом перемножаем.</div>
+      <div class="tex"><div class="tex-cols">
+        <table class="tex-tab"><tr><td>90</td><td class="fr">2</td></tr><tr><td>45</td><td class="fr">3</td></tr><tr><td>15</td><td class="fr">3</td></tr><tr><td>5</td><td class="fr">5</td></tr><tr><td>1</td><td class="fr"></td></tr></table>
+        <table class="tex-tab"><tr><td>84</td><td class="fr">2</td></tr><tr><td>42</td><td class="fr">2</td></tr><tr><td>21</td><td class="fr">3</td></tr><tr><td>7</td><td class="fr">7</td></tr><tr><td>1</td><td class="fr"></td></tr></table>
+      </div>
+        <span class="ln">90 = 2 · 3 · 3 · 5</span>
+        <span class="ln">84 = 2 · 2 · 3 · 7</span>
+        <span class="ln">Не хватает: 2 · 7 → <span class="ok">НОК = 90 · 2 · 7 = 1260</span></span>
+      </div>
+      <div class="tintro">У 90 одна двойка, у 84 — две: дописываем одну. Тройка у 84 одна, а у 90 их две — дописывать не нужно. Семёрки у 90 нет — дописываем.</div>
+    </div>` },
+  { id:2, title:'НОК через НОД', short:'Через НОД',
+    levels:[
+      { name:'Уровень 1', desc:'НОД известен — НОК по формуле', gen:()=>Object.assign(genNums({count:2, min:10, max:99, minG:4, maxL:1000}), { gGiven:true }) },
+      { name:'Уровень 2', desc:'Сначала найди НОД, потом НОК', gen:()=>genNums({count:2, min:12, max:100, coprimeChance:.1, maxL:2500}) },
+      { name:'Уровень 3', desc:'Обратная задача: НОД · НОК = a · b', gen:genInverse },
+      { name:'Уровень 4', desc:'Три числа: НОК(a, b, c) = НОК(НОК(a, b), c)', gen:()=>genNums({count:3, min:4, max:40, minG:1, maxL:1000, ok:pairsShare}) },
+    ],
+    theory:`<div class="tcard">
+      <div class="tt">Способ 3. НОК через НОД</div>
+      <div class="tintro">Произведение двух чисел равно произведению их НОД и НОК: <b>НОД(a, b) · НОК(a, b) = a · b</b>. Отсюда формула:</div>
+      <div class="tex">
+        <span class="ln fx">НОК(a, b) = <span class="frac"><span>a · b</span><span>НОД(a, b)</span></span></span>
+      </div>
+      <div class="tintro">Удобнее не перемножать числа сразу, а сначала разделить одно из них на НОД, а потом умножить на другое — числа получаются меньше.</div>
+      <div class="tex">
+        <span class="ln">НОД(24, 36) = 12</span>
+        <span class="ln">24 : 12 = 2</span>
+        <span class="ln"><span class="ok">НОК(24, 36) = 2 · 36 = 72</span></span>
+      </div>
+      <div class="tintro">НОД можно найти любым способом — удобнее всего алгоритмом Евклида. Формула работает и в обратную сторону: зная НОД, НОК и одно число, найдём второе. Для трёх чисел — по очереди: НОК(a, b, c) = НОК(НОК(a, b), c).</div>
+    </div>` },
+];
+const EXAM_LEVEL = { name:'Экзамен', desc:'Вперемешку все уровни, подсказки короче' };
+const LEVELS_OF = sec => SECTIONS[sec].levels.concat([EXAM_LEVEL]);
+
+let curSection = 0, curLevel = 0;
+const solvedByLevel = SECTIONS.map(()=>[0,0,0,0,0]);
+let totalSolved = 0, streak = 0, taskCounter = 0;
+
+function makeProblem(sec, lvl){
+  const base = lvl===4 ? ri(0,3) : lvl;
+  const P = SECTIONS[sec].levels[base].gen();
+  return Object.assign(P, { sec, lvl, base });
+}
+// звено цепочки «НОК через НОД»: для трёх чисел их два — НОК(a, b), потом
+// НОК(результата, c)
+function mkChain(a, b, gKnown){
+  return { a, b, g: gKnown ? gcd(a,b) : null, k:null, l:null };
+}
+function initState(P){
+  const S = { phase:'solve', errTotal:0, exam:P.lvl===4, history:[] };
+  if(P.sec===0){
+    S.step = 'mults'; S.cur = 0; S.mults = P.nums.map(()=>[]); S.common = [];
+  } else if(P.sec===1){
+    S.picks = [];
+    if(P.given){ S.step = 'pick'; S.facts = P.given.map(a=>a.slice()); }
+    else { S.step = 'fact'; S.cur = 0; S.sub = 'div'; S.cols = P.nums.map(n=>({ rows:[n], divs:[] })); S.facts = P.nums.map(()=>null); }
+  } else if(P.inv){
+    S.step = 'prod'; S.ab = null; S.res = null;
+  } else {
+    S.ch = 0; S.chains = [mkChain(P.nums[0], P.nums[1], P.gGiven)];
+    S.step = P.gGiven ? 'div' : 'gcd';
+  }
+  return S;
+}
+
+// что ищем в задании: обычно НОК, а в обратной задаче — второе число или НОД.
+// Одно место на всё: подпись и значение нужны и панели «ответ сразу», и доске
+function answerOf(P){
+  if(P.inv) return P.inv==='b' ? P.nums[1] : gcd(P.nums[0], P.nums[1]);
+  return lcmAll(P.nums);
+}
+function answerLabel(P){
+  if(P.inv) return P.inv==='b' ? 'b =' : 'НОД =';
+  return 'НОК =';
+}
+
+let P=null, S=null;
+
+function newProblem(){
+  P = makeProblem(curSection, curLevel);
+  S = initState(P);
+  taskCounter++;
+  document.getElementById('taskNum').textContent = 'пример №'+taskCounter;
+  document.getElementById('nextBtn').style.display='none';
+  document.getElementById('stStars').textContent='—';
+  setHint('');
+  renderAll();
+}
+document.getElementById('refreshBtn').onclick = newProblem;
+const basketAddBtn = document.getElementById('basketAddBtn');
+if (basketAddBtn) basketAddBtn.onclick = () => {
+  const rich = window.Basket ? window.Basket.extractFromSelectorsRich(['#taskLine']) : null;
+  if (!rich || !rich.text) return;
+  window.Basket.add({ trainerId: 'lcm', modeTitle: 'НОК: ' + SECTIONS[curSection].title.toLowerCase(), text: rich.text, html: rich.html });
+  basketAddBtn.classList.add('ok');
+  basketAddBtn.textContent = '✓';
+  setTimeout(() => { basketAddBtn.classList.remove('ok'); basketAddBtn.textContent = '📥'; }, 900);
+};
+
+/* ───────── отмена последнего шага ─────────
+   Снимок — всё состояние решения, кроме самой истории: шаги у трёх разделов
+   разные, и перечислять поля каждого значило бы забыть одно при следующей
+   правке (так же, как в НОД) */
+function pushHistory(){
+  const snap = JSON.parse(JSON.stringify(Object.assign({}, S, { history: undefined })));
+  S.history.push(snap);
+  syncUndoButton();
+}
+function undoStep(){
+  if(!S || !S.history || S.history.length===0 || S.phase!=='solve') return;
+  const prev = S.history.pop();
+  const hist = S.history;
+  Object.keys(S).forEach(k=>{ if(k!=='history') delete S[k]; });
+  Object.assign(S, prev, { history: hist });
+  setHint('');
+  renderAll();
+}
+function syncUndoButton(){
+  const btn = document.getElementById('undoBtn');
+  if(!btn) return;
+  btn.disabled = !S || S.phase!=='solve' || !S.history || S.history.length===0;
+}
+document.getElementById('undoBtn').onclick = undoStep;
+
+/* ───────── отрисовка ───────── */
+const labelOf = r => P.given ? 'abc'[r] : String(P.nums[r]);
+const nokOf = () => P.given ? 'НОК(a, b)' : `НОК(${P.nums.join(', ')})`;
+const answerL = () => lcmAll(P.nums);
+
+function renderAll(){ renderTask(); renderWork(); setPrompt(); renderInputs(); }
+
+function renderTask(){
+  const t = document.getElementById('taskLine');
+  const [a, b] = P.nums;
+  if(P.given){
+    t.innerHTML = `Найдите НОК(a, b), если<span class="tl">a = ${P.given[0].join(' · ')}</span><span class="tl">b = ${P.given[1].join(' · ')}</span>`;
+  } else if(P.inv==='b'){
+    // условие столбиком, по одной величине в строке — так его удобно
+    // переписать в тетрадь и сразу видно, что дано
+    t.innerHTML = `Найдите b, если<span class="tl">a = ${a}</span><span class="tl">НОД(a, b) = ${gcd(a,b)}</span><span class="tl">НОК(a, b) = ${lcm(a,b)}</span>`;
+  } else if(P.inv==='g'){
+    t.innerHTML = `Найдите НОД(a, b), если<span class="tl">a = ${a}</span><span class="tl">b = ${b}</span><span class="tl">НОК(a, b) = ${lcm(a,b)}</span>`;
+  } else if(P.gGiven){
+    t.innerHTML = `Известно, что <span class="nw">НОД(${a}, ${b}) = ${gcd(a,b)}</span>. Найдите <span class="nw">НОК(${a}, ${b})</span>`;
+  } else if(P.sec===2){
+    t.innerHTML = `Найдите <span class="nw">НОК(${P.nums.join(', ')})</span> через НОД`;
+  } else {
+    t.innerHTML = `Найдите <span class="nw">НОК(${P.nums.join(', ')})</span>`;
+  }
+}
+
+function renderWork(){
+  const w = document.getElementById('work');
+  if(P.sec===0) w.innerHTML = workList();
+  else if(P.sec===1) w.innerHTML = workFactor();
+  else w.innerHTML = P.inv ? workInverse() : workFormula();
+  // множители первой строки не выбираются, но касание по ним напоминает
+  // правило — поэтому обработчик и на них
+  w.querySelectorAll('.chip.tap, .chip.taken').forEach(el=>{
+    el.onclick = ()=> P.sec===0 ? onTapMultiple(Number(el.dataset.v), el) : onTapFactor(Number(el.dataset.r), Number(el.dataset.k), el);
+  });
+}
+
+function workList(){
+  const solving = S.phase==='solve';
+  const tap = solving && S.step==='common';
+  let h = '<div class="dv-list">';
+  P.nums.forEach((n,i)=>{
+    const started = S.step!=='mults' || i<=S.cur;
+    const active = solving && S.step==='mults' && i===S.cur;
+    const list = S.mults[i].slice().sort((a,b)=>a-b);
+    let chips = list.map(v=>`<span class="chip${S.common.includes(v)?' common':''}${tap?' tap':''}" data-v="${v}">${v}</span>`).join('');
+    if(active) chips += `<span class="chip ph">?</span>`;
+    else if(started) chips += `<span class="dv-more">…</span>`;
+    if(!started) chips = `<span class="chip ph">…</span>`;
+    h += `<div class="dv-row${active?' active':''}${started?'':' dim'}"><span class="dv-lbl">Кратные ${n}:</span><span class="chips">${chips}</span></div>`;
+  });
+  h += '</div>';
+  if(S.step==='answer' || S.phase==='done'){
+    h += `<div class="common-line">Общие: <b>${S.common.slice().sort((a,b)=>a-b).join(', ')}</b></div>`;
+  }
+  if(S.phase==='done') h += `<div class="lcm-result">${nokOf()} = ${answerL()}</div>`;
+  return h;
+}
+
+// дописанные учеником множители по возрастанию и всё выражение для НОК:
+// «90 · 2 · 7» (первое число целиком) или, если числа даны разложенными, все
+// множители подряд — само число там ученику не дано
+const pickedVals = () => S.picks.map(p=>S.facts[p.r][p.k]).sort((a,b)=>a-b);
+function productExpr(){
+  const head = P.given ? S.facts[0].slice() : [P.nums[0]];
+  return head.concat(pickedVals()).join(' · ');
+}
+
+function workFactor(){
+  const solving = S.phase==='solve';
+  if(S.step==='fact'){
+    let h = '<div class="fcols">';
+    S.cols.forEach((c,i)=>{
+      const active = solving && i===S.cur;
+      const future = i > S.cur;
+      let rows = '';
+      c.rows.forEach((v,r)=>{
+        let right = c.divs[r] !== undefined ? c.divs[r] : '';
+        if(active && S.sub==='div' && r===c.rows.length-1) right = `<input class="inl" id="fdiv" type="text" inputmode="none" autocomplete="off" placeholder="?">`;
+        rows += `<tr><td>${v}</td><td class="fr">${right}</td></tr>`;
+      });
+      if(active && S.sub==='quot') rows += `<tr><td><input class="inl" id="fquot" type="text" inputmode="none" autocomplete="off" placeholder="?"></td><td class="fr"></td></tr>`;
+      const done = c.rows[c.rows.length-1]===1;
+      const res = done ? `<div class="ftab-res">${c.rows[0]} = ${c.divs.join(' · ')}</div>` : '';
+      h += `<div class="fcol${future?' dim':''}"><table class="ftab">${rows}</table>${res}</div>`;
+    });
+    return h + '</div>';
+  }
+  // первая строка целиком «уже в НОК», в остальных ученик отмечает недостающие
+  const tap = solving && S.step==='pick';
+  let h = '';
+  S.facts.forEach((f,r)=>{
+    const chips = f.map((v,k)=>{
+      if(r===0) return `<span class="chip taken" data-r="0" data-k="${k}">${v}</span>`;
+      const on = S.picks.some(p=>p.r===r && p.k===k);
+      return `<span class="chip${on?' common':''}${tap?' tap':''}" data-r="${r}" data-k="${k}">${v}</span>`;
+    }).join('<span class="dot-sep">·</span>');
+    h += `<div class="fline"><span class="fl-lbl">${labelOf(r)} =</span>${chips}</div>`;
+  });
+  const vals = pickedVals();
+  if(S.step==='pick') h += `<div class="common-line">Не хватает: <b>${vals.length ? vals.join(' · ') : '—'}</b></div>`;
+  else if(S.phase==='solve') h += `<div class="common-line">НОК = <b>${productExpr()}</b> = ?</div>`;
+  else {
+    const e = productExpr();
+    h += `<div class="lcm-result">${nokOf()} = ${e.includes('·') ? e+' = ' : ''}${answerL()}</div>`;
+  }
+  return h;
+}
+
+const inl = (id, wide) => `<input class="inl${wide?' wide':''}" id="${id}" type="text" inputmode="none" autocomplete="off" placeholder="?">`;
+
+function workFormula(){
+  const solving = S.phase==='solve';
+  const three = P.nums.length===3;
+  let h = '';
+  S.chains.forEach((c,ci)=>{
+    const act = solving && ci===S.ch;
+    let b = '';
+    if(three) b += `<div class="eu-title">Шаг ${ci+1}: НОК(${c.a}, ${c.b})</div>`;
+    b += `<div class="eu-row formula">НОК(${c.a}, ${c.b}) = ${c.a} · ${c.b} : НОД(${c.a}, ${c.b})</div>`;
+    if(c.g!==null) b += `<div class="eu-row">НОД(${c.a}, ${c.b}) = ${c.g}</div>`;
+    else if(act && S.step==='gcd') b += `<div class="eu-row">НОД(${c.a}, ${c.b}) = ${inl('lg')}</div>`;
+    if(c.k!==null) b += `<div class="eu-row">${c.a} : ${c.g} = ${c.k}</div>`;
+    else if(act && S.step==='div') b += `<div class="eu-row">${c.a} : ${c.g} = ${inl('lk')}</div>`;
+    if(c.l!==null) b += `<div class="eu-row eu-res">НОК(${c.a}, ${c.b}) = ${c.k} · ${c.b} = ${c.l}</div>`;
+    else if(act && S.step==='mul') b += `<div class="eu-row">НОК(${c.a}, ${c.b}) = ${c.k} · ${c.b} = ${inl('ll', true)}</div>`;
+    h += `<div class="eu-block">${b}</div>`;
+  });
+  if(S.phase==='done') h += `<div class="lcm-result">${nokOf()} = ${answerL()}</div>`;
+  return h;
+}
+
+function workInverse(){
+  const solving = S.phase==='solve';
+  const [a, b] = P.nums, g = gcd(a,b), L = lcm(a,b);
+  const isB = P.inv==='b';
+  let h = `<div class="eu-row formula">НОД(a, b) · НОК(a, b) = a · b</div>`;
+  h += `<div class="eu-row">${isB ? `${g} · ${L} = ${a} · b` : `НОД · ${L} = ${a} · ${b}`}</div>`;
+  const [x, y] = isB ? [g, L] : [a, b];
+  if(S.ab!==null) h += `<div class="eu-row">${x} · ${y} = ${S.ab}</div>`;
+  else if(solving && S.step==='prod') h += `<div class="eu-row">${x} · ${y} = ${inl('lp', true)}</div>`;
+  const d = isB ? a : L;
+  if(S.res!==null) h += `<div class="eu-row eu-res">${isB ? 'b' : 'НОД'} = ${S.ab} : ${d} = ${S.res}</div>`;
+  else if(solving && S.step==='div') h += `<div class="eu-row">${isB ? 'b' : 'НОД'} = ${S.ab} : ${d} = ${inl('lr')}</div>`;
+  h = `<div class="eu-block">${h}</div>`;
+  if(S.phase==='done') h += `<div class="lcm-result">${isB ? 'b' : 'НОД(a, b)'} = ${answerOf(P)}</div>`;
+  return h;
+}
+
+function setPrompt(){
+  const p = document.getElementById('prompt');
+  if(S.phase==='done'){ p.innerHTML = 'Пример решён! 🎉'; return; }
+  if(P.sec===0){
+    if(S.step==='mults'){
+      const n = P.nums[S.cur], others = andList(P.nums.filter((_,i)=>i!==S.cur));
+      const seq = `${n}, ${2*n}, ${3*n}…`;
+      const stop = `Когда в строке появится число, которое делится и на ${others}, жми «Хватит».`;
+      p.innerHTML = oneByOne()
+        ? `Выпиши кратные числа <b>${n}</b> по порядку — <b>по одному</b>: ${seq} Впиши и жми «Добавить». ${stop}`
+        : `Выпиши кратные числа <b>${n}</b> по порядку: ${seq} — можно по одному или сразу несколько через запятую. ${stop}`;
+    }
+    else if(S.step==='common') p.innerHTML = `Отметь <b>общие</b> кратные — коснись числа, которое есть в каждой строке. Когда отметишь все, жми «Общие отмечены».`;
+    else p.innerHTML = `Какое из общих кратных <b>наименьшее</b>? <b>${nokOf()} = ?</b>`;
+    return;
+  }
+  if(P.sec===1){
+    if(S.step==='fact'){
+      const c = S.cols[S.cur], m = c.rows[c.rows.length-1];
+      if(S.sub==='div') p.innerHTML = `Раскладываем <b>${c.rows[0]}</b>. На какое <b>простое</b> число делится <b>${m}</b>? Впиши его справа от черты.`;
+      else p.innerHTML = `<b>${m} ÷ ${c.divs[c.divs.length-1]} = ?</b> Впиши результат слева, под числом ${m}.`;
+    } else if(S.step==='pick'){
+      const rest = P.nums.length===3 ? 'остальных строк' : labelOf(1);
+      p.innerHTML = `Все множители <b>${labelOf(0)}</b> уже в НОК. Коснись множителей <b>${rest}</b>, которых <b>не хватает</b>: если двойка у ${labelOf(0)} одна, а в другой строке их две — дописываем одну. Когда всё дописано, жми «Дописаны все».`;
+    } else {
+      p.innerHTML = S.picks.length
+        ? `Перемножь: <b>${productExpr()} = ?</b>`
+        : `Дописывать нечего — всё уже есть у ${labelOf(0)}. <b>Чему равен НОК?</b>`;
+    }
+    return;
+  }
+  if(P.inv){
+    const [a, b] = P.nums, g = gcd(a,b), L = lcm(a,b);
+    if(S.step==='prod') p.innerHTML = P.inv==='b'
+      ? `Произведение чисел равно произведению их НОД и НОК: <b>a · b = НОД · НОК</b>. Сначала посчитай <b>${g} · ${L} = ?</b>`
+      : `НОД и НОК связаны формулой <b>НОД · НОК = a · b</b>. Сначала посчитай <b>${a} · ${b} = ?</b>`;
+    else p.innerHTML = P.inv==='b'
+      ? `${a} · b = ${S.ab}. Значит, <b>b = ${S.ab} : ${a} = ?</b>`
+      : `НОД · ${L} = ${S.ab}. Значит, <b>НОД = ${S.ab} : ${L} = ?</b>`;
+    return;
+  }
+  const c = S.chains[S.ch];
+  let pre = '';
+  if(S.ch>0 && S.step==='gcd') pre = `НОК(${S.chains[0].a}, ${S.chains[0].b}) = ${S.chains[0].l}. Теперь ищем НОК(${c.a}, ${c.b}) тем же способом. `;
+  if(S.step==='gcd') p.innerHTML = pre + `Сначала найди <b>НОД(${c.a}, ${c.b})</b> — любым способом, удобнее всего алгоритмом Евклида.`;
+  else if(S.step==='div') p.innerHTML = (c.g===1 ? `НОД = 1 — числа взаимно простые, их НОК равен произведению. ` : (P.gGiven && S.ch===0 ? 'НОД уже известен. ' : ''))
+    + `Делим одно из чисел на НОД: <b>${c.a} : ${c.g} = ?</b>`;
+  else p.innerHTML = `Умножаем результат на второе число: <b>${c.k} · ${c.b} = ?</b> Это и есть НОК.`;
+}
+
+function numInputHTML(id){
+  return `<div class="num-wrap">
+    <input class="num" id="${id}" type="text" inputmode="none" autocomplete="off" placeholder="?">
+    <div class="spin">
+      <button type="button" class="spin-btn" data-target="${id}" data-dir="1">▲</button>
+      <button type="button" class="spin-btn" data-target="${id}" data-dir="-1">▼</button>
+    </div>
+  </div>`;
+}
+function attachSpinners(area){
+  area.querySelectorAll('.spin-btn').forEach(btn=>{
+    btn.onclick = ()=>{
+      const inp = document.getElementById(btn.dataset.target);
+      if(!inp) return;
+      let v = Number(inp.value);
+      if(!Number.isFinite(v)) v = 0;
+      v += Number(btn.dataset.dir);
+      if(v<0) v=0;
+      if(v>999999) v=999999;
+      inp.value = String(v);
+      inp.focus();
+    };
+  });
+}
+const LBL = t => `<span class="lbl" style="font-family:var(--font-ui);font-size:19px;color:var(--muted-6)">${t}</span>`;
+
+// поля ввода: Enter в первом из пары переводит во второе, в последнем — проверяет
+function wireInputs(ids){
+  const els = ids.map(id=>document.getElementById(id)).filter(Boolean);
+  els.forEach((el,i)=>{
+    el.addEventListener('focus', ()=>{ activeInputId = el.id; });
+    el.addEventListener('keydown', e=>{
+      if(e.key!=='Enter') return;
+      if(i<els.length-1) els[i+1].focus(); else submitAnswer();
+    });
+  });
+  // отложенный фокус не должен забирать курсор, если ввод уже начался в
+  // другом поле: иначе набранное во втором поле попадало в первое
+  if(els[0]){ activeInputId = els[0].id; setTimeout(()=>{
+    const a = document.activeElement;
+    if(a && a.tagName==='INPUT' && els.includes(a)) return;
+    if(document.body.contains(els[0])) els[0].focus();
+  }, 30); }
+}
+
+function renderInputs(){
+  const area = document.getElementById('inputArea');
+  syncKeypadVisibility();
+  syncUndoButton();
+  if(S.phase==='done'){ area.innerHTML=''; return; }
+  const ok = S.exam ? 'Готово' : 'ОК';
+  const single = ()=>{
+    area.innerHTML = `${numInputHTML('ans')}<button class="go" id="goBtn">${ok}</button>`;
+    attachSpinners(area); wireInputs(['ans']);
+    document.getElementById('goBtn').onclick = submitAnswer;
+  };
+  const inline = (ids)=>{
+    area.innerHTML = `${LBL('Впиши прямо на листе выше ↑')}<button class="go" id="goBtn">${ok}</button>`;
+    document.getElementById('goBtn').onclick = submitAnswer;
+    wireInputs(ids);
+  };
+  const tapOnly = (btnText)=>{
+    area.innerHTML = `${LBL('Касайся чисел на листе выше ↑')}<button class="go secondary" id="doneBtn">${btnText}</button>`;
+    document.getElementById('doneBtn').onclick = submitAnswer;
+    activeInputId = null;
+  };
+  if(P.sec===0){
+    if(S.step==='mults'){
+      const n = P.nums[S.cur];
+      area.innerHTML = `<input class="num solo" id="ans" type="text" inputmode="none" autocomplete="off" placeholder="${oneByOne() ? '?' : n+', '+2*n+', '+3*n+'…'}">
+        <button class="go" id="goBtn">Добавить</button>
+        <button class="go secondary" id="doneBtn">Хватит →</button>`;
+      document.getElementById('goBtn').onclick = submitAnswer;
+      // набранное, но не добавленное в строку сначала добавляем — иначе
+      // «Хватит» ругался бы на кратное, которое ученик уже ввёл
+      document.getElementById('doneBtn').onclick = ()=>{
+        const inp = document.getElementById('ans');
+        if(inp && inp.value.trim()){
+          const before = S.errTotal;
+          submitMultiples();
+          if(S.errTotal > before) return;
+        }
+        onEnoughMultiples();
+      };
+      wireInputs(['ans']);
+    } else if(S.step==='common') tapOnly('Общие отмечены →');
+    else single();
+    return;
+  }
+  if(P.sec===1){
+    if(S.step==='fact') inline([S.sub==='div' ? 'fdiv' : 'fquot']);
+    else if(S.step==='pick') tapOnly('Дописаны все →');
+    else single();
+    return;
+  }
+  if(P.inv) inline([S.step==='prod' ? 'lp' : 'lr']);
+  else inline([{ gcd:'lg', div:'lk', mul:'ll' }[S.step]]);
+}
+
+function setHint(t, good=false){
+  const h = document.getElementById('hint');
+  h.innerHTML = t;
+  h.className = 'hint'+(good?' good':'');
+}
+const praise = ()=> setHint(pick(['Верно!','Точно!','Отлично!']), true);
+function shake(el){ if(!el) return; el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake'); }
+function shakeChip(el){ if(!el) return; el.classList.remove('bad'); void el.offsetWidth; el.classList.add('bad'); setTimeout(()=>el.classList.remove('bad'), 600); }
+function miss(msgLearn, msgExam, inputs){
+  S.errTotal++;
+  (inputs||[]).forEach(el=>{ shake(el); el.value=''; });
+  setHint(S.exam ? msgExam : msgLearn);
+}
+
+/* ───────── ввод ответа словами: "тридцать четыре" наравне с "34" ───────── */
+function parseRuNumber(raw){
+  if(raw==null) return NaN;
+  const s=String(raw).trim();
+  if(s==='') return NaN;
+  const plain=s.replace(',','.');
+  if(/^[+-]?\d+(\.\d+)?$/.test(plain)) return Number(plain);
+  return parseRuNumberWords(s);
+}
+function parseRuNumberWords(raw){
+  let s=raw.toLowerCase().replace(/ё/g,'е').replace(/[-−–]/g,' ').replace(/\s+/g,' ').trim();
+  if(s==='') return NaN;
+  let negative=false;
+  if(/^минус\s+/.test(s)){ negative=true; s=s.replace(/^минус\s+/,''); }
+  else if(s==='минус') return NaN;
+  const words=s.split(' ').filter(Boolean);
+  if(!words.length) return NaN;
+  const ones={ноль:0,один:1,одна:1,одно:1,два:2,две:2,три:3,четыре:4,пять:5,шесть:6,семь:7,восемь:8,девять:9,
+    десять:10,одиннадцать:11,двенадцать:12,тринадцать:13,четырнадцать:14,пятнадцать:15,шестнадцать:16,семнадцать:17,восемнадцать:18,девятнадцать:19};
+  const tens={двадцать:20,тридцать:30,сорок:40,пятьдесят:50,шестьдесят:60,семьдесят:70,восемьдесят:80,девяносто:90};
+  const hundreds={сто:100,двести:200,триста:300,четыреста:400,пятьсот:500,шестьсот:600,семьсот:700,восемьсот:800,девятьсот:900};
+  const thousandWords=new Set(['тысяча','тысячи','тысяч']);
+  let total=0, current=0, matched=false;
+  for(const w of words){
+    if(w in hundreds){ current+=hundreds[w]; matched=true; continue; }
+    if(w in tens){ current+=tens[w]; matched=true; continue; }
+    if(w in ones){ current+=ones[w]; matched=true; continue; }
+    if(thousandWords.has(w)){ total+=(current||1)*1000; current=0; matched=true; continue; }
+    return NaN;
+  }
+  total+=current;
+  if(!matched) return NaN;
+  return negative?-total:total;
+}
+const readNum = id => { const el=document.getElementById(id); return el ? parseRuNumber(el.value) : NaN; };
+const isNat = v => Number.isInteger(v) && v>0;
+
+/* ───────── раздел 1: перебор кратных ───────── */
+// уровень 1 (не «Экзамен») — кратные по одному, дальше можно списком
+const oneByOne = () => P && P.sec===0 && P.lvl===0;
+function submitMultiples(){
+  const inp = document.getElementById('ans');
+  if(!inp || !inp.value.trim()) return;
+  const n = P.nums[S.cur], list = S.mults[S.cur];
+  // список через запятую или пробел: «4, 8, 12» — так записывают в тетради
+  const tokens = inp.value.split(/[\s,;]+/).filter(Boolean);
+  // на первом уровне — строго по одному: каждое кратное проверяется отдельно.
+  // Это просьба, а не ошибка — счёт ошибок не растёт
+  if(oneByOne() && tokens.length > 1){
+    setHint('На этом уровне кратные вписываем по одному — впиши одно и жми «Добавить».');
+    shake(inp);
+    return;
+  }
+  const fresh = [], bad = [];
+  let dup = 0;
+  tokens.forEach(t=>{
+    const v = parseRuNumber(t);
+    if(!isNat(v)) return;
+    if(v % n !== 0){ if(!bad.includes(v)) bad.push(v); return; }
+    if(list.includes(v) || fresh.includes(v)){ dup++; return; }
+    fresh.push(v);
+  });
+  inp.value = '';
+  if(fresh.length){ pushHistory(); fresh.forEach(v=>list.push(v)); }
+  if(bad.length){
+    S.errTotal++;
+    shake(inp);
+    const why = bad.map(v=>`${v} ÷ ${n} = ${Math.floor(v/n)} (остаток ${v%n})`).join('; ');
+    const learn = (bad.length===1 ? `${bad[0]} — не кратно ${n}: ` : `${bad.join(', ')} — не кратны ${n}: `) + why + '.';
+    const exam = bad.length===1 ? `${bad[0]} — не кратно ${n}.` : `${bad.join(', ')} — не кратны ${n}.`;
+    setHint((S.exam ? exam : learn) + (fresh.length ? ` Остальное записано.` : ''));
+  } else if(fresh.length) praise();
+  else if(dup) setHint('Это уже выписано.');
+  renderAll();
+}
+// «Хватит» принимается, когда в строке без пропусков выписаны кратные вплоть до
+// НОК: у кратного числа n делимость и на остальные числа наступает впервые
+// ровно на НОК, поэтому «дошёл до числа, которое делится и на остальные» и
+// «дошёл до НОК» — одно и то же, и подсказка говорит об этом без ответа
+function onEnoughMultiples(){
+  const n = P.nums[S.cur], list = S.mults[S.cur], L = answerL();
+  const others = andList(P.nums.filter((_,i)=>i!==S.cur));
+  const missing = [];
+  for(let v=n; v<=L; v+=n) if(!list.includes(v)) missing.push(v);
+  if(missing.length){
+    S.errTotal++;
+    const top = list.length ? Math.max(...list) : 0;
+    let learn, exam;
+    if(missing[0] < top){
+      learn = `Пропущено кратное: ${n} · ${missing[0]/n} = ${missing[0]}. Кратные идут подряд: ${n} · 1, ${n} · 2, ${n} · 3…`;
+      exam = 'Пропущено кратное.';
+    } else {
+      learn = list.length
+        ? `Пока мало: ни одно выписанное кратное ${n} не делится на ${others}. Допиши следующие — общее кратное обязательно встретится.`
+        : `Выпиши сначала хотя бы первые кратные: ${n}, ${2*n}, ${3*n}…`;
+      exam = 'Кратных выписано мало.';
+    }
+    setHint(S.exam ? exam : learn);
+    return;
+  }
+  pushHistory();
+  S.cur++;
+  if(S.cur >= P.nums.length) S.step = 'common';
+  praise();
+  renderAll();
+}
+function onTapMultiple(v, el){
+  if(S.phase!=='solve' || S.step!=='common') return;
+  if(S.common.includes(v)){
+    pushHistory();
+    S.common = S.common.filter(x=>x!==v);
+    setHint('');
+    renderAll();
+    return;
+  }
+  const lacking = P.nums.filter((n,i)=>!S.mults[i].includes(v));
+  if(lacking.length){
+    S.errTotal++;
+    shakeChip(el);
+    setHint(S.exam ? `${v} — не общее кратное.` : `${v} нет среди кратных ${lacking.join(' и ')} — это не общее кратное.`);
+    return;
+  }
+  pushHistory();
+  S.common.push(v);
+  praise();
+  renderAll();
+}
+const commonOfRows = () => S.mults[0].filter(v=>S.mults.every(l=>l.includes(v)));
+function onAllCommon(){
+  const expected = commonOfRows();
+  if(S.common.length < expected.length){
+    S.errTotal++;
+    const left = expected.length - S.common.length;
+    setHint(S.exam ? 'Отмечены не все общие кратные.' : `Отмечены не все: общих кратных ещё ${left} — ищи число, которое есть в каждой строке.`);
+    return;
+  }
+  pushHistory();
+  S.step = 'answer';
+  praise();
+  renderAll();
+}
+function submitListAnswer(){
+  const inp = document.getElementById('ans');
+  if(!inp || inp.value==='') return;
+  const v = parseRuNumber(inp.value), L = answerL();
+  if(v!==L){
+    const learn = S.common.includes(v)
+      ? `${v} — общее кратное, но не наименьшее.`
+      : `Нужно наименьшее из отмеченных: ${S.common.slice().sort((a,b)=>a-b).join(', ')}.`;
+    miss(learn, 'Нужно наименьшее общее кратное.', [inp]);
+    return;
+  }
+  inp.value = '';
+  pushHistory();
+  finish();
+}
+
+/* ───────── раздел 2: разложение на простые множители ───────── */
+function divisibilityWhy(m, p){
+  const digits = String(m).split('').map(Number);
+  if(p===2) return `${m} — нечётное, на 2 не делится.`;
+  if(p===3) return `сумма цифр ${digits.join(' + ')} = ${digits.reduce((a,b)=>a+b,0)} не делится на 3 — значит, и ${m} не делится.`;
+  if(p===5) return `${m} оканчивается на ${digits[digits.length-1]}, а не на 0 или 5 — на 5 не делится.`;
+  return `${m} ÷ ${p} = ${Math.floor(m/p)} (остаток ${m%p}).`;
+}
+function submitFactorStep(){
+  const c = S.cols[S.cur];
+  const m = c.rows[c.rows.length-1];
+  if(S.sub==='div'){
+    const inp = document.getElementById('fdiv');
+    if(!inp || inp.value==='') return;
+    const p = parseRuNumber(inp.value);
+    if(!isNat(p) || p===1){
+      miss('Нужно простое число: 2, 3, 5, 7, 11, 13…', 'Нужно простое число.', [inp]);
+      return;
+    }
+    if(!isPrime(p)){
+      miss(`${p} — составное число (${p} = ${factorize(p).join(' · ')}). Делим только на простые: 2, 3, 5, 7, 11, 13…`, `${p} — не простое число.`, [inp]);
+      return;
+    }
+    if(m % p !== 0){
+      miss(`${divisibilityWhy(m, p)} Попробуй другое простое.`, `${m} не делится на ${p}.`, [inp]);
+      return;
+    }
+    pushHistory();
+    c.divs.push(p);
+    S.sub = 'quot';
+    praise();
+    renderAll();
+    return;
+  }
+  const inp = document.getElementById('fquot');
+  if(!inp || inp.value==='') return;
+  const p = c.divs[c.divs.length-1];
+  const v = parseRuNumber(inp.value);
+  if(v !== m/p){
+    miss(`Проверь деление: ${m} ÷ ${p} = ? — можно посчитать в «÷ Поделить» ниже.`, 'Проверь деление.', [inp]);
+    return;
+  }
+  pushHistory();
+  c.rows.push(v);
+  S.sub = 'div';
+  if(v===1){
+    // число разложено: внизу 1 — переходим к следующему
+    S.facts[S.cur] = c.divs.slice().sort((a,b)=>a-b);
+    S.cur++;
+    if(S.cur >= S.cols.length) S.step = 'pick';
+    setHint(`${c.rows[0]} = ${c.divs.join(' · ')}${c.divs.length>1 && new Set(c.divs).size<c.divs.length ? ' = '+powForm(c.divs) : ''} — разложено!`, true);
+  } else praise();
+  renderAll();
+}
+function onTapFactor(r, k, el){
+  if(S.phase!=='solve' || S.step!=='pick') return;
+  if(r===0){
+    // первая строка целиком уже в НОК — это не ошибка, а напоминание правила
+    setHint(`Множители ${labelOf(0)} уже все в НОК. Дописываем только недостающие из ${P.nums.length===3 ? 'других строк' : labelOf(1)}.`);
+    return;
+  }
+  const pi = S.picks.findIndex(p=>p.r===r && p.k===k);
+  if(pi>=0){
+    pushHistory();
+    S.picks.splice(pi, 1);
+    setHint('');
+    renderAll();
+    return;
+  }
+  const v = S.facts[r][k];
+  const need = needExtra(S.facts, r, v);
+  const have = S.picks.filter(p=>p.r===r && S.facts[r][p.k]===v).length;
+  if(have >= need){
+    S.errTotal++;
+    shakeChip(el);
+    let learn;
+    if(need > 0) learn = `Недостающие множители ${v} из этой строки уже дописаны — больше не нужно.`;
+    else {
+      // строка выше, где этого множителя больше всего, — она его в НОК и дала
+      let j = 0;
+      for(let jj=1; jj<r; jj++) if(countOf(S.facts[jj], v) > countOf(S.facts[j], v)) j = jj;
+      const cj = countOf(S.facts[j], v), cr = countOf(S.facts[r], v);
+      learn = `Этот ${v} дописывать не нужно: у ${labelOf(j)} множитель ${v} встречается ${cj} ${plural(cj,'раз','раза','раз')}, а у ${labelOf(r)} — ${cr} ${plural(cr,'раз','раза','раз')}. Все ${v} из ${labelOf(r)} в НОК уже есть.`;
+    }
+    setHint(S.exam ? `${v} дописывать не нужно.` : learn);
+    return;
+  }
+  pushHistory();
+  S.picks.push({ r, k });
+  praise();
+  renderAll();
+}
+function onAllPicked(){
+  const expected = extrasOf(S.facts).length;
+  if(S.picks.length < expected){
+    S.errTotal++;
+    const left = expected - S.picks.length;
+    setHint(S.exam ? 'Дописаны не все множители.' : `Дописаны не все: не хватает ещё ${left} ${plural(left,'множителя','множителей','множителей')}. Сравни строки — какого множителя в строке ниже больше, чем в НОК уже есть?`);
+    return;
+  }
+  pushHistory();
+  S.step = 'product';
+  if(expected) praise(); else setHint('');
+  renderAll();
+}
+function submitProduct(){
+  const inp = document.getElementById('ans');
+  if(!inp || inp.value==='') return;
+  const v = parseRuNumber(inp.value);
+  if(v!==answerL()){
+    const learn = S.picks.length || P.given
+      ? `Проверь умножение: ${productExpr()} — можно посчитать в «× Умножить» ниже.`
+      : `Дописывать нечего — значит, НОК равен самому числу ${labelOf(0)}.`;
+    miss(learn, 'Проверь умножение.', [inp]);
+    return;
+  }
+  inp.value = '';
+  pushHistory();
+  finish();
+}
+
+/* ───────── раздел 3: НОК через НОД ───────── */
+function submitFormula(){
+  if(P.inv){ submitInverse(); return; }
+  const c = S.chains[S.ch];
+  if(S.step==='gcd'){
+    const inp = document.getElementById('lg');
+    if(!inp || inp.value==='') return;
+    const v = parseRuNumber(inp.value), g = gcd(c.a, c.b);
+    if(v!==g){
+      let learn;
+      if(!isNat(v)) learn = 'НОД — натуральное число.';
+      else if(v > Math.min(c.a, c.b)) learn = `НОД не может быть больше меньшего из чисел (${Math.min(c.a, c.b)}).`;
+      else if(c.a % v || c.b % v){
+        const x = c.a % v ? c.a : c.b;
+        learn = `${v} — не общий делитель: ${x} ÷ ${v} = ${Math.floor(x/v)} (остаток ${x%v}).`;
+      }
+      else learn = `${v} — общий делитель, но не наибольший. Проверь алгоритмом Евклида: ${Math.max(c.a,c.b)} ÷ ${Math.min(c.a,c.b)} = …`;
+      miss(learn, 'НОД найден неверно.', [inp]);
+      return;
+    }
+    pushHistory();
+    c.g = g;
+    S.step = 'div';
+    praise();
+    renderAll();
+    return;
+  }
+  if(S.step==='div'){
+    const inp = document.getElementById('lk');
+    if(!inp || inp.value==='') return;
+    if(parseRuNumber(inp.value)!==c.a/c.g){
+      miss(`Проверь деление: ${c.a} : ${c.g} — можно посчитать в «÷ Поделить» ниже.`, 'Проверь деление.', [inp]);
+      return;
+    }
+    pushHistory();
+    c.k = c.a/c.g;
+    S.step = 'mul';
+    praise();
+    renderAll();
+    return;
+  }
+  const inp = document.getElementById('ll');
+  if(!inp || inp.value==='') return;
+  const v = parseRuNumber(inp.value);
+  if(v!==c.k*c.b){
+    // частая ошибка — перемножить сами числа и забыть разделить на НОД
+    const learn = v===c.a*c.b && c.g>1
+      ? `${c.a} · ${c.b} = ${v} — это произведение самих чисел, его ещё делить на НОД. Умножаем ${c.k}, а не ${c.a}.`
+      : `Проверь умножение: ${c.k} · ${c.b} — можно посчитать в «× Умножить» ниже.`;
+    miss(learn, 'Проверь умножение.', [inp]);
+    return;
+  }
+  pushHistory();
+  c.l = v;
+  if(P.nums.length===3 && S.ch===0){
+    S.chains.push(mkChain(c.l, P.nums[2], false));
+    S.ch = 1;
+    S.step = 'gcd';
+    praise();
+    renderAll();
+    return;
+  }
+  finish();
+}
+function submitInverse(){
+  const [a, b] = P.nums, g = gcd(a,b), L = lcm(a,b);
+  if(S.step==='prod'){
+    const inp = document.getElementById('lp');
+    if(!inp || inp.value==='') return;
+    const [x, y] = P.inv==='b' ? [g, L] : [a, b];
+    if(parseRuNumber(inp.value)!==x*y){
+      miss(`Проверь умножение: ${x} · ${y} — можно посчитать в «× Умножить» ниже.`, 'Проверь умножение.', [inp]);
+      return;
+    }
+    pushHistory();
+    S.ab = x*y;
+    S.step = 'div';
+    praise();
+    renderAll();
+    return;
+  }
+  const inp = document.getElementById('lr');
+  if(!inp || inp.value==='') return;
+  const d = P.inv==='b' ? a : L;
+  if(parseRuNumber(inp.value)!==answerOf(P)){
+    miss(`Проверь деление: ${S.ab} : ${d} — можно посчитать в «÷ Поделить» ниже.`, 'Проверь деление.', [inp]);
+    return;
+  }
+  pushHistory();
+  S.res = answerOf(P);
+  finish();
+}
+
+function submitAnswer(){
+  if(!S || S.phase!=='solve') return;
+  if(P.sec===0){
+    if(S.step==='mults') submitMultiples();
+    else if(S.step==='common') onAllCommon();
+    else submitListAnswer();
+  } else if(P.sec===1){
+    if(S.step==='fact') submitFactorStep();
+    else if(S.step==='pick') onAllPicked();
+    else submitProduct();
+  } else submitFormula();
+}
+
+function finish(){
+  S.phase='done';
+  renderAll();
+  // пример уже закрыт ответом сразу (quick-answer.js) — второй раз не
+  // засчитываем, шаги были разбором
+  if (!QuickAnswer.settled(S)) {
+    let stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
+    document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
+    totalSolved++; solvedByLevel[curSection][curLevel]++;
+    streak = (S.errTotal===0) ? streak+1 : 0;
+  }
+  document.getElementById('stSolved').textContent = totalSolved;
+  document.getElementById('stStreak').textContent = streak;
+  setHint(S.errTotal===0 ? 'Без единой ошибки — блестяще!' : `Решено! Ошибок по пути: ${S.errTotal}.`, S.errTotal===0);
+  document.getElementById('nextBtn').style.display='block';
+  renderLevels();
+}
+
+/* ───────── разделы и уровни ───────── */
+function renderSections(){
+  const el = document.getElementById('sections');
+  el.innerHTML = SECTIONS.map(s=>
+    `<button class="lvl sec ${s.id===curSection?'active':''}" data-sec="${s.id}" title="${s.title}"><span class="sec-num">${s.id+1}.</span>${s.title}</button>`
+  ).join('');
+  el.querySelectorAll('.lvl').forEach(b=>b.onclick=()=>{
+    const sec = Number(b.dataset.sec);
+    if(sec===curSection) return;
+    curSection = sec; curLevel = 0;
+    renderSections(); renderTheory(); renderLevels(); newProblem();
+  });
+}
+function renderTheory(){
+  document.getElementById('secTheory').innerHTML = SECTIONS[curSection].theory;
+}
+function renderLevels(){
+  const el = document.getElementById('levels');
+  const L = LEVELS_OF(curSection);
+  el.innerHTML = L.map((lv,i)=>
+    `<button class="lvl ${i===curLevel?'active':''}" data-id="${i}" title="${lv.desc}">
+      ${lv.name}${solvedByLevel[curSection][i]>=5?'<span class="done-mark">★</span>':''}
+    </button>`
+  ).join('');
+  el.querySelectorAll('.lvl').forEach(b=>b.onclick=()=>{
+    curLevel = Number(b.dataset.id);
+    renderLevels(); newProblem();
+  });
+  document.getElementById('lvlDesc').textContent = L[curLevel] ? L[curLevel].desc : '';
+}
+document.getElementById('nextBtn').onclick = newProblem;
+
+/* ───────── плавающая клавиатура ─────────
+   Вместо минуса — запятая: отрицательных чисел здесь нет, а кратные в
+   первом разделе удобно вводить списком «4, 8, 12» */
+let activeInputId = 'ans';
+let keypadOpen = true;
+function setupFloatingKeypad(){
+  const keys = ['7','8','9','4','5','6','1','2','3',',','0','⌫'];
+  document.getElementById('keypadButtons').innerHTML = keys.map(k=>{
+    const cls = k===',' ? 'kp-comma' : (k==='⌫' ? 'kp-back' : '');
+    const val = k==='⌫' ? 'back' : k;
+    return `<button type="button" class="${cls}" data-key="${val}">${k}</button>`;
+  }).join('') + `<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>`;
+  document.querySelectorAll('#keypadButtons button').forEach(btn=>{
+    btn.onclick = ()=>keypadPress(btn.dataset.key);
+  });
+  document.getElementById('kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(); };
+  document.getElementById('kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(); };
+  makeKeypadDraggable(document.getElementById('keypadFloat'), document.getElementById('kpDragHandle'));
+}
+function makeKeypadDraggable(floatEl, handleEl){
+  if(!floatEl || !handleEl || floatEl._dragReady) return;
+  floatEl._dragReady = true;
+  let dragging = false, offsetX = 0, offsetY = 0;
+  function clamp(x, y){
+    const w = floatEl.offsetWidth, h = floatEl.offsetHeight;
+    const maxX = Math.max(4, window.innerWidth - w - 4);
+    const maxY = Math.max(4, window.innerHeight - h - 4);
+    return { x: Math.min(Math.max(x, 4), maxX), y: Math.min(Math.max(y, 4), maxY) };
+  }
+  function onPointerDown(e){
+    dragging = true;
+    const rect = floatEl.getBoundingClientRect();
+    floatEl.style.left = rect.left + 'px';
+    floatEl.style.top = rect.top + 'px';
+    floatEl.style.right = 'auto';
+    // На телефоне CSS прижимает клавиатуру к низу (bottom:16px). Если его не
+    // сбросить, при заданном top панель растягивается до низа экрана и за ней
+    // остаётся пустой «хвост».
+    floatEl.style.bottom = 'auto';
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    try{ handleEl.setPointerCapture(e.pointerId); }catch(err){}
+    e.preventDefault();
+  }
+  function onPointerMove(e){
+    if(!dragging) return;
+    const pos = clamp(e.clientX - offsetX, e.clientY - offsetY);
+    floatEl.style.left = pos.x + 'px';
+    floatEl.style.top = pos.y + 'px';
+  }
+  function onPointerUp(e){
+    dragging = false;
+    try{ handleEl.releasePointerCapture(e.pointerId); }catch(err){}
+  }
+  handleEl.addEventListener('pointerdown', onPointerDown);
+  handleEl.addEventListener('pointermove', onPointerMove);
+  handleEl.addEventListener('pointerup', onPointerUp);
+  handleEl.addEventListener('pointercancel', onPointerUp);
+  window.addEventListener('resize', ()=>{
+    if(floatEl.style.left && floatEl.style.left!=='auto'){
+      const rect = floatEl.getBoundingClientRect();
+      const pos = clamp(rect.left, rect.top);
+      floatEl.style.left = pos.x + 'px';
+      floatEl.style.top = pos.y + 'px';
+    }
+  });
+}
+function keypadPress(ch){
+  if(ch==='enter'){
+    // Ввод на клавиатуре — как Enter в поле: в паре полей сначала переходит ко второму
+    const inp = document.getElementById(activeInputId);
+    if(inp) inp.dispatchEvent(new KeyboardEvent('keydown', { key:'Enter', bubbles:true }));
+    else document.getElementById('goBtn')?.click();
+    return;
+  }
+  const inp = document.getElementById(activeInputId);
+  if(!inp) return;
+  if(ch==='back') inp.value = inp.value.slice(0,-1);
+  else if(ch===',') inp.value = (inp.value||'').replace(/[\s,]*$/,'') + (inp.value.trim() ? ', ' : '');
+  else inp.value = (inp.value||'') + ch;
+  inp.focus();
+}
+function syncKeypadVisibility(){
+  const needsInput = !!(S && P && S.phase==='solve' && !(P.sec===0 && S.step==='common') && !(P.sec===1 && S.step==='pick'));
+  document.getElementById('keypadFloat').style.display = (needsInput && keypadOpen) ? 'block' : 'none';
+  document.getElementById('kpToggle').style.display = (needsInput && !keypadOpen) ? 'flex' : 'none';
+}
+
+setupFloatingKeypad();
+renderSections();
+renderTheory();
+renderLevels();
+newProblem();
+
+
+/* ═══ Ответ сразу, без решения по шагам (quick-answer.js, как в НОД) ═══
+   Итог лежит в S.quick и уходит собеседнику вместе с S; счёт ведём здесь,
+   как в finish(). Подпись поля не всегда «НОК =»: в обратной задаче ищут b
+   или НОД — поэтому поле берётся из answerLabel/answerOf. */
+QuickAnswer.mount({
+  fields: P => {
+    if (!P || !Array.isArray(P.nums) || !P.nums.length) return null;
+    return [{ id: 'main', label: answerLabel(P), type: 'num', value: String(answerOf(P)) }];
+  },
+  getP: () => P, getS: () => S,
+  onRight(){
+    // засчитываем так же, как finish() после шагов: звёзды по ошибкам, решено, серия
+    const stars = S.errTotal===0 ? 3 : (S.errTotal<=2 ? 2 : 1);
+    document.getElementById('stStars').textContent = '★'.repeat(stars)+'☆'.repeat(3-stars);
+    totalSolved++; solvedByLevel[curSection][curLevel]++;
+    streak = (S.errTotal===0) ? streak+1 : 0;
+    document.getElementById('stSolved').textContent = totalSolved;
+    document.getElementById('stStreak').textContent = streak;
+    renderLevels();
+  },
+  onWrong(){
+    S.errTotal++;
+    streak = 0;
+    document.getElementById('stStreak').textContent = streak;
+  },
+  onFail(){
+    // вторая ошибка: как в ОГЭ — пример закрыт, но не решён
+    streak = 0;
+    document.getElementById('stStreak').textContent = streak;
+    document.getElementById('stStars').textContent = '☆☆☆';
+  },
+});
+
+/* Доска: верный ответ страница отдаёт сама (хук промпта №71) — доске не
+   нужно знать модель задания НОК, а в обратной задаче ответ и не НОК вовсе */
+window.__boardTaskInfo = function(){
+  if (!P || !Array.isArray(P.nums)) return null;
+  return { kind: 'fields', fields: [{ id: 'main', label: answerLabel(P), type: 'num', value: String(answerOf(P)) }] };
+};
+
+/* ═══ Совместная работа — ровно как в НОД (промпты №33, №54, №65) ═══
+   Один пример на экране — синхронизируем его целиком: раздел, уровень, сам
+   пример (P) и ход решения (S). Доска и карточки «+» подмешиваются сюда же. */
+function tsGetState(){
+  const base = {
+    solo: true,                                   // метка: тренажёр без выбора типов
+    curSection: typeof curSection !== 'undefined' ? curSection : null,
+    curLevel: typeof curLevel !== 'undefined' ? curLevel : null,
+    P: typeof P !== 'undefined' ? P : null,
+    S: typeof S !== 'undefined' ? S : null,
+  };
+  if (window.__boardGetState) Object.assign(base, window.__boardGetState());
+  if (window.__cardsGetState) Object.assign(base, window.__cardsGetState());
+  return base;
+}
+function tsApplyState(state){
+  if (!state) return;
+  if (window.__boardApplyState) window.__boardApplyState(state);
+  if (window.__cardsApplyState) window.__cardsApplyState(state);
+  if (!state.solo || typeof state.P === 'undefined' || state.P === null) return;
+  // перерисовываем только при настоящем изменении: снимок прилетает на каждый
+  // штрих собеседника, а лишняя перерисовка сбрасывала бы ввод под пальцами
+  let same = false;
+  try {
+    same = JSON.stringify([curSection, curLevel, P, S]) === JSON.stringify([state.curSection, state.curLevel, state.P, state.S]);
+  } catch (e) {}
+  if (same) return;
+  const secChanged = state.curSection !== curSection;
+  curSection = typeof state.curSection === 'number' ? state.curSection : 0;
+  curLevel = state.curLevel;
+  P = state.P;
+  S = state.S;
+  try {
+    // теорию перерисовываем только при смене раздела: иначе на каждый шаг
+    // собеседника прыгала бы вёрстка над листом
+    renderSections();
+    if (secChanged) renderTheory();
+    renderLevels();
+    document.getElementById('nextBtn').style.display = S && S.phase==='done' ? 'block' : 'none';
+    renderAll();
+  } catch (e) { console.error('[sync] не удалось применить пример:', e); }
+}
+
+/* Эхо и медленное подключение — ровно по схеме промпта №54 (HANDOFF, раздел 4):
+   пришедшее от собеседника назад не рассылаем (tsPeerSig — один раз, до
+   первой своей правки), исходная подпись таймера — то, что уже на экране,
+   а у состояния задания есть версия, чтобы запоздавший снимок со штрихом
+   доски не откатывал свежий шаг решения. */
+function tsWatchSig(s){ return JSON.stringify([s.curSection, s.curLevel, s.P, s.S]); }
+let tsPeerSig = null;
+let tsRev = -1, tsRevBy = '';
+const tsMe = Math.random().toString(36).slice(2, 10);
+function tsGetStateVersioned(){
+  return Object.assign(tsGetState(), { __tsRev: tsRev, __tsBy: tsRevBy });
+}
+function tsIncomingWins(state){
+  if (typeof state.__tsRev !== 'number') return true;
+  if (tsRev < 0) return true;
+  if (state.__tsRev !== tsRev) return state.__tsRev > tsRev;
+  return String(state.__tsBy || '') > tsRevBy;
+}
+function tsApplyStateFromPeer(state){
+  if (!state) return;
+  if (!tsIncomingWins(state)) {
+    if (window.__boardApplyState) window.__boardApplyState(state);
+    if (window.__cardsApplyState) window.__cardsApplyState(state);
+    return;
+  }
+  if (typeof state.__tsRev === 'number') { tsRev = state.__tsRev; tsRevBy = String(state.__tsBy || ''); }
+  tsApplyState(state);
+  try { tsPeerSig = tsWatchSig(tsGetState()); } catch (e) {}
+}
+window.__trainerState = { get: tsGetState, apply: tsApplyState,
+  newTask: function(){ if (typeof newProblem === 'function') newProblem(); } };
+if (window.TrainerSession) {
+  window.TrainerSession.init({ trainer: 'lcm', getState: tsGetStateVersioned, applyState: tsApplyStateFromPeer });
+  (function watchState(){
+    let last = '';
+    try { last = tsWatchSig(tsGetState()); } catch (e) {}
+    setInterval(() => {
+      let sig;
+      try { sig = tsWatchSig(tsGetState()); }
+      catch (e) { return; }
+      if (sig === last) return;
+      last = sig;
+      const echo = sig === tsPeerSig;
+      tsPeerSig = null;
+      if (echo) return;
+      tsRev = Math.max(tsRev, 0) + 1; tsRevBy = tsMe;
+      window.TrainerSession.push();
+    }, 300);
+  })();
+}
+</script>
+<script>
+/* ─── плавная посадка блоков при изменении высоты .panel/.sheet ───
+   Раньше при появлении подсказки/кнопки "дальше" панель ввода мгновенно
+   скачком меняла высоту, а всё что ниже (статистика, теория) так же
+   мгновенно дёргалось следом — расстояния оставались верными, но сам
+   скачок выглядел "криво". ResizeObserver ловит ЛЮБОЕ изменение высоты
+   независимо от того, какая функция его вызвала, и вместо мгновенного
+   скачка красиво анимирует высоту — весь интерфейс ниже плавно
+   "съезжает" на новое место, сохраняя одинаковый отступ всегда. */
+function setupAutoHeightAnimation(el, duration){
+  if(!el || typeof ResizeObserver==='undefined') return;
+  duration = duration || 280;
+  let lastH = null, resizing = false, settleTimer = null;
+  const ro = new ResizeObserver(entries=>{
+    if(resizing) return;
+    const entry = entries[0];
+    const cs = getComputedStyle(el);
+    const newH = (entry.borderBoxSize && entry.borderBoxSize[0])
+      ? entry.borderBoxSize[0].blockSize
+      : entry.contentRect.height + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    if(lastH===null){ lastH=newH; return; }
+    if(Math.abs(newH-lastH)<1) return;
+    const oldH = lastH;
+    lastH = newH;
+    resizing = true;
+    el.style.height = oldH+'px';
+    el.style.overflow = 'hidden';
+    void el.offsetHeight;
+    el.style.transition = 'height '+duration+'ms cubic-bezier(.4,0,.2,1)';
+    requestAnimationFrame(()=>{ el.style.height = newH+'px'; });
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(()=>{
+      el.style.transition = '';
+      el.style.height = '';
+      el.style.overflow = '';
+      resizing = false;
+      lastH = el.getBoundingClientRect().height;
+    }, duration+50);
+  });
+  ro.observe(el);
+}
+const PANEL_ANIM_SELECTOR = '.panel:not(.calc-history-panel):not(.calc-panel):not(.example-history-panel):not(.coming-soon):not(.theory-block)';
+document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimation(p));
+setupAutoHeightAnimation(document.querySelector('.sheet'));
+</script>
+
+<script src="trainer-board.js"></script>
+<script>
+/* ═══════════════ калькулятор в столбик («свой пример») ═══════════════
+   Встраивает через iframe те же тренажёры сложения/вычитания/умножения/
+   деления в столбик (файлы *_embed.html), чтобы часть примеров можно было
+   решать вообще без использования тетради. Самостоятельный блок — не
+   зависит от структуры els этого файла, ищет свои элементы напрямую. */
+(function(){
+  const CALC_OP_META = {
+    add: { title: '➕ Сложение в столбик — свой пример', file: 'addition_embed.html' },
+    sub: { title: '➖ Вычитание в столбик — свой пример', file: 'subtraction_embed.html' },
+    mul: { title: '✖️ Умножение в столбик — свой пример', file: 'multiplication_embed.html' },
+    div: { title: '➗ Деление в столбик — свой пример', file: 'division_embed.html' },
+  };
+
+  const calcPanel = document.getElementById('calcPanel');
+  const calcPanelTitle = document.getElementById('calcPanelTitle');
+  const calcIframe = document.getElementById('calcIframe');
+  const calcPanelClose = document.getElementById('calcPanelClose');
+  const calcHistoryBtn = document.getElementById('calcHistoryBtn');
+  const calcHistoryPanel = document.getElementById('calcHistoryPanel');
+  const calcHistoryClose = document.getElementById('calcHistoryClose');
+  const calcHistoryList = document.getElementById('calcHistoryList');
+  const calcHistoryEmpty = document.getElementById('calcHistoryEmpty');
+  if (!calcPanel || !calcIframe) return; // блока калькулятора на странице нет — выходим тихо
+
+  let calcResizeTimer = null;
+
+  function openCalc(op) {
+    calcPanel.style.display = 'block';
+    calcPanelTitle.textContent = CALC_OP_META[op].title;
+    calcIframe.style.height = '760px';
+    calcIframe.src = `${CALC_OP_META[op].file}?embed=1`;
+    document.querySelectorAll('.calc-tool-btn[data-op]').forEach(b => b.classList.toggle('active', b.dataset.op === op));
+    calcPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    clearInterval(calcResizeTimer);
+    calcResizeTimer = setInterval(fitCalcIframe, 400);
+  }
+  function fitCalcIframe() {
+    if (!calcIframe || calcPanel.style.display === 'none') { clearInterval(calcResizeTimer); return; }
+    try {
+      const doc = calcIframe.contentWindow && calcIframe.contentWindow.document;
+      if (doc && doc.documentElement) {
+      const wrapEl = doc.querySelector('.wrap');
+      const h = wrapEl ? wrapEl.getBoundingClientRect().height : Math.max(doc.documentElement.scrollHeight, doc.body ? doc.body.scrollHeight : 0);
+      if (h > 0) calcIframe.style.height = (Math.ceil(h) + 40) + 'px';
+      }
+    } catch (e) { /* кросс-доменные ограничения — оставляем текущую высоту */ }
+  }
+  function closeCalc() {
+    calcPanel.style.display = 'none';
+    calcIframe.src = 'about:blank';
+    clearInterval(calcResizeTimer);
+    document.querySelectorAll('.calc-tool-btn[data-op]').forEach(b => b.classList.remove('active'));
+  }
+  document.querySelectorAll('.calc-tool-btn[data-op]').forEach(btn => {
+    btn.onclick = () => openCalc(btn.dataset.op);
+  });
+  if (calcPanelClose) calcPanelClose.onclick = closeCalc;
+  calcIframe.addEventListener('load', fitCalcIframe);
+
+  /* ─── история решений: копится за всё время, пока открыта страница ─── */
+  let calcHistory = [];
+  let calcHistoryNextId = 1;
+  let calcHistoryFilter = 'all';
+
+  function addCalcHistoryEntry(op, expr, result) {
+    calcHistory.push({ id: calcHistoryNextId++, op, expr, result });
+    if (calcHistoryPanel.style.display === 'block') renderCalcHistory();
+  }
+  function renderCalcHistory() {
+    const items = calcHistoryFilter === 'all' ? calcHistory : calcHistory.filter(h => h.op === calcHistoryFilter);
+    calcHistoryList.innerHTML = '';
+    calcHistoryEmpty.style.display = items.length ? 'none' : 'block';
+    items.slice().reverse().forEach(h => {
+      const row = document.createElement('div');
+      row.className = 'calc-history-row';
+      const num = document.createElement('span');
+      num.className = 'calc-history-num';
+      num.textContent = '№' + h.id;
+      const expr = document.createElement('span');
+      expr.className = 'calc-history-expr';
+      expr.textContent = h.expr;
+      const copyBtn = document.createElement('button');
+      copyBtn.className = 'calc-history-copy';
+      copyBtn.textContent = '⧉ ' + h.result;
+      copyBtn.title = 'Скопировать результат';
+      copyBtn.onclick = () => copyCalcResult(h.result, copyBtn);
+      row.appendChild(num);
+      row.appendChild(expr);
+      row.appendChild(copyBtn);
+      calcHistoryList.appendChild(row);
+    });
+  }
+  function copyCalcResult(result, btn) {
+    const done = () => {
+      btn.textContent = '✓ скопировано';
+      setTimeout(() => { btn.textContent = '⧉ ' + result; }, 1200);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(String(result)).then(done).catch(done);
+    } else {
+      done();
+    }
+  }
+  function toggleCalcHistory() {
+    const willOpen = calcHistoryPanel.style.display !== 'block';
+    calcHistoryPanel.style.display = willOpen ? 'block' : 'none';
+    calcHistoryBtn.classList.toggle('active', willOpen);
+    if (willOpen) {
+      renderCalcHistory();
+      calcHistoryPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }
+  function closeCalcHistory() {
+    calcHistoryPanel.style.display = 'none';
+    calcHistoryBtn.classList.remove('active');
+  }
+  document.querySelectorAll('.calc-history-filter').forEach(btn => {
+    btn.onclick = () => {
+      calcHistoryFilter = btn.dataset.filter;
+      document.querySelectorAll('.calc-history-filter').forEach(b => b.classList.toggle('active', b === btn));
+      renderCalcHistory();
+    };
+  });
+  if (calcHistoryBtn) calcHistoryBtn.onclick = toggleCalcHistory;
+  if (calcHistoryClose) calcHistoryClose.onclick = closeCalcHistory;
+
+  window.addEventListener('message', (e) => {
+    const d = e.data;
+    if (d && d.source === 'oge-calc-history' && d.op && d.expr && d.result !== undefined) {
+      addCalcHistoryEntry(d.op, d.expr, d.result);
+    }
+  });
+})();
+</script>
+
+<script>
+/* Промпт №30: совместная сессия (подключение по коду, синхронный переход
+   между тренажёрами, блокировка самостоятельного выхода ученика) —
+   реализована один раз в session-share.js, здесь только подключение.
+   Собственное состояние задания этого тренажёра пока не расшаривается
+   (getState/applyState — заглушки), расшаривается сама сессия/навигация. */
+if (window.TrainerSession) {
+  window.TrainerSession.mountShareButton();
+}
+document.getElementById('homeBtn').addEventListener('click', function (e) {
+  e.preventDefault();
+  var go = function () {
+    if (window.TrainerSession && window.TrainerSession.navigateTo) window.TrainerSession.navigateTo('index');
+    else location.href = 'index.html';
+  };
+  if (window.TrainerSession && window.TrainerSession.guardStudentAction) window.TrainerSession.guardStudentAction('navigate', go)();
+  else go();
+});
+</script>
+</body></html>
