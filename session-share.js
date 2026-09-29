@@ -85,8 +85,23 @@
      Поэтому просто поднимаем предел до 100 в секунду. Нам нужно от силы 40
      (штрихи 25 мс + перемещение + снимки), так что запас двойной, а до квот
      самого Supabase отсюда как до луны. */
+  /* Промпт №11 нового списка: живучесть на скачущем интернете и VPN.
+     По умолчанию библиотека проверяет сокет раз в 30 секунд — столько и
+     длилась «тишина», когда связь уже умерла (сменился IP после VPN, моргнул
+     Wi-Fi), а по виду всё на месте. Проверка раз в 10 секунд замечает
+     смерть сокета втрое быстрее, и библиотека сама переподключается.
+     worker — проверки идут из фонового потока: у ученика вкладка с уроком
+     часто в фоне (рядом звонок), а браузер душит таймеры фоновых вкладок,
+     и сервер закрывал канал «за молчание». heartbeatCallback — о смерти
+     сокета узнаём сразу и показываем это в панели, не дожидаясь статуса
+     канала. */
   const SB = window.supabase.createClient(cfg.url, cfg.anonKey, {
-    realtime: { params: { eventsPerSecond: 100 } },
+    realtime: {
+      params: { eventsPerSecond: 100 },
+      heartbeatIntervalMs: 10000,
+      worker: typeof Worker !== 'undefined',
+      heartbeatCallback: (status) => { try { onSocketHeartbeat(status); } catch (e) {} },
+    },
   });
 
   // код читается «безопасным для устной диктовки» алфавитом — без 0/O/1/I/L,
@@ -159,6 +174,9 @@
      синхронизацию всей группы. */
   function studentRestricted(action) {
     if (isLeaderFlag) return false;
+    // Промпт №11 нового списка: сцена сама повторяет у ученика то, что открыл
+    // учитель (калькулятор, колонку «+», доску) — это не действие ученика
+    if (mirrorApplying) return false;
     // Промпт №31: 'boardPan' — перемещение/масштаб доски и прокрутка
     // страницы. Тоже всегда только у главного: если ученик уедет по доске
     // сам, учитель будет писать в одном месте, а ученик смотреть в другое.
@@ -326,7 +344,10 @@
       __autosaveHistory: autosaveHistory,
       __theme: theme,
       __trainer: trainerSlug, // Промпт №30 — какая страница прислала этот снимок
-    }, isLeaderFlag ? { __stage: stageSize() } : {});
+    }, isLeaderFlag ? {
+      __stage: stageSize(), __ui: uiSnapshot(),
+      __scroll: { x: Math.round(window.scrollX), y: Math.round(window.scrollY) },
+    } : {});
   }
 
   function applyIncomingState(state) {
@@ -359,7 +380,12 @@
     if (state.__theme) applyRemoteTheme(state.__theme);
     // Промпт №11 нового списка: размер окна учителя — до проверки «чей снимок»: он нужен
     // сцене на любой странице, даже если снимок пришёл с соседнего тренажёра
-    if (state.__stage) stageFromLeader(state.__stage);
+    if (state.__stage) { stageFromLeader(state.__stage); lastLeaderTrainer = state.__trainer || lastLeaderTrainer; }
+    if (state.__ui) uiFromLeader(state.__ui);
+    // прокрутка страниц без доски (на тренажёрах её ведёт доска, board_view)
+    if (state.__scroll && IN_STAGE && !isLeaderFlag && !window.__boardBroadcastView) {
+      try { window.scrollTo(state.__scroll.x || 0, state.__scroll.y || 0); } catch (e) {}
+    }
 
     // а вот СТРУКТУРНУЮ часть состояния (задания, режимы и т.п.) применяем
     // только если она реально принадлежит ЭТОЙ странице — иначе, в момент
@@ -369,7 +395,7 @@
     // Если метки нет вовсе (старый снимок/другая версия) — применяем как
     // раньше, по умолчанию считая её «своей».
     const belongsHere = !state.__trainer || state.__trainer === trainerSlug;
-    if (!belongsHere) return;
+    if (!belongsHere) { followLeaderPage(state); return; }
 
     applyingRemote = true;
     try {
@@ -501,10 +527,15 @@
       .on('broadcast', { event: 'state' }, ({ payload }) => {
         if (!payload || payload.uid === CLIENT_ID) return;
         incomingStateCount++; // Промпт №31 — признак «на этом коде кто-то живой есть»
+        // размер сцены в снимке кладёт только учитель — так ученик узнаёт его
+        const fromLeader = !!(payload.state && payload.state.__stage);
+        touchPeer(payload.uid, fromLeader ? { leader: true, stage: false } : null);
         applyIncomingState(payload.state);
+        if (fromLeader) stageLiveStateArrived();
       })
       .on('broadcast', { event: 'field' }, ({ payload }) => {
         if (!payload || payload.uid === CLIENT_ID) return;
+        touchPeer(payload.uid, null);
         const entry = fields.get(payload.fieldId);
         if (!entry) return;
         if (recentlyEditedLocally(entry)) return; // сейчас печатает локальный пользователь — не перебиваем
@@ -512,6 +543,12 @@
       })
       .on('broadcast', { event: 'ev' }, ({ payload }) => {
         if (!payload || payload.uid === CLIENT_ID) return;
+        if (payload.name === 'bye') { forgetPeer(payload.uid); return; }
+        touchPeer(payload.uid, payload.name === 'hb' ? payload.data : null);
+        // новый участник спрашивает «кто здесь?» — отвечаем сразу, не через
+        // 5 секунд: учителю, только что перешедшему на другую страницу, иначе
+        // до следующего сигнала казалось бы, что на сцене никого нет
+        if (payload.name === 'hb' && payload.data && payload.data.ask) setTimeout(() => sendHeartbeat(false), 30 + Math.random() * 200);
         const set = eventListeners.get(payload.name);
         if (set) set.forEach(cb => { try { cb(payload.data); } catch (e) { console.error('[session-share] onEvent callback error:', e); } });
       })
@@ -525,6 +562,7 @@
       // «главный»), так это работает и при 3+ участниках
       .on('broadcast', { event: 'sync_request' }, ({ payload }) => {
         if (!payload || payload.uid === CLIENT_ID) return;
+        touchPeer(payload.uid, null);
         // именно ПОЛНЫЙ снимок, без диеты: у просящего может не быть вообще
         // ничего (только подключился) либо он мог пропустить часть штрихов,
         // пока связи не было — здесь как раз тот случай, когда доску нужно
@@ -538,6 +576,9 @@
           reconnectAttempt = 0;
           setConnState(CONN.ONLINE);
           startKeepalive();
+          // Промпт №11 нового списка: сразу заявляем о себе — учитель видит
+          // ученика «на связи», не дожидаясь очередного сигнала через 5 секунд
+          setTimeout(() => sendHeartbeat(true), 30);
           if (onSubscribed) onSubscribed();
           // это переподключение, а не первый вход: пока связи не было, мы
           // могли пропустить и штрихи, и смену задания — просим у остальных
@@ -556,8 +597,14 @@
 
   function scheduleSave() {
     clearTimeout(saveTimer);
+    // Промпт №11 нового списка: сохранение пишет в строку ТОГО кода, для
+    // которого его заказали. Раньше бралось то, что в code на момент записи:
+    // ученик набирал чужой код в панели, и отложенное сохранение его
+    // прежней, своей сессии успевало записать в строку учителя «группа на
+    // моей странице» — и ученика не уводило к учителю
+    const forCode = code;
     saveTimer = setTimeout(() => {
-      if (!code) return;
+      if (!code || code !== forCode) return;
       upsertState(code, trainerSlug, fullState());
     }, 400);
   }
@@ -863,7 +910,7 @@
     if (joinCode) {
       isLeaderFlag = false;
       const res = await activate(joinCode.toUpperCase(), { createIfMissing: false, requestSyncFromLeader: true });
-      if (res.ok) { storeRole('follower'); return; }
+      if (res.ok) { storeRole('follower'); if (!res.redirecting) stageActivated(); return; }
       // ссылка устарела/битая — просто продолжаем со своей обычной сессией,
       // без всплывающих ошибок при обычном заходе на страницу
       isLeaderFlag = true;
@@ -1012,7 +1059,13 @@
   // случай) — он сам управляет своей навигацией и никуда «телепортироваться» не должен
   onEvent('navigate', (data) => {
     if (isLeaderFlag) return;
-    if (data && data.url) { try { location.href = data.url; } catch (e) {} }
+    if (!data || !data.url) return;
+    // Промпт №11 нового списка: на сцене страницу меняет сама сцена — она
+    // грузит новую во второй, скрытый кадр и показывает, когда та уже
+    // нарисовала то же, что у учителя. Сами бы ушли — ученик видел бы
+    // пустой кадр и промежуточный экран (список номеров) до задания
+    if (IN_STAGE) { toStageHost({ type: 'nav', url: data.url }); return; }
+    try { location.href = data.url; } catch (e) {}
   });
 
   /* ═══ Промпт №11 нового списка: «общий экран» — ученик видит страницу учителя целиком ═══
@@ -1094,17 +1147,313 @@
     toStageHost({ type: 'url', href: location.href, title: document.title });
   }
   // учитель поменял окно (растянул, открыл панель, сменил масштаб браузера)
-  // — сцена у учеников меняет размер следом
-  let stageResizeTimer = null;
-  window.addEventListener('resize', () => {
+  // — сцена у учеников меняет размер следом. Кроме resize следим и за самим
+  // <html>: полоса прокрутки (Windows, «всегда показывать» на Mac) появляется
+  // на длинной странице и съедает ширину без всякого resize
+  let stageResizeTimer = null, lastStageKey = '';
+  function checkStageSize() {
     if (!isLeaderFlag || !code) return;
     clearTimeout(stageResizeTimer);
     stageResizeTimer = setTimeout(() => {
-      broadcastEvent('stage_size', stageSize());
+      if (!isLeaderFlag || !code) return;   // за 150 мс мог стать учеником чужой сессии
+      const sz = stageSize(), key = sz.w + 'x' + sz.h;
+      if (key === lastStageKey) return;
+      lastStageKey = key;
+      broadcastEvent('stage_size', sz);
       scheduleSave();   // и в базу: подключившийся позже сразу получит верный размер
     }, 150);
-  });
+  }
+  window.addEventListener('resize', checkStageSize);
+  try { if (window.ResizeObserver) new ResizeObserver(checkStageSize).observe(document.documentElement); } catch (e) {}
   onEvent('stage_size', stageFromLeader);
+
+  /* ── ученик оказался не на той странице, где учитель ──
+     Обычно ученика переводит событие 'navigate'. Но его можно пропустить
+     (связь моргнула в момент перехода), а подключение, прошедшее через
+     «живую пробу» канала без строки в базе, вообще не знает, где группа.
+     Живой снимок учителя с чужой страницы — верный признак: подождав
+     немного (вдруг 'navigate' уже в пути), идём туда же */
+  // Запоздавший снимок со страницы, которую учитель уже покинул, тоже
+  // «чужой» — поэтому идём, только если и последний снимок учителя всё ещё
+  // оттуда: сам учитель на новой странице отвечает на запрос синхронизации
+  // быстрее, чем истекает пауза
+  let followTimer = null, followTarget = '', lastLeaderTrainer = '';
+  function followLeaderPage(state) {
+    if (isLeaderFlag || !code || !state || !state.__stage || !state.__trainer) return;
+    if (followTarget === state.__trainer) return;
+    clearTimeout(followTimer);
+    const target = state.__trainer;
+    followTimer = setTimeout(() => {
+      if (isLeaderFlag || !code || followTarget === target || lastLeaderTrainer !== target) return;
+      followTarget = target;
+      const url = urlForTrainer(target, code);
+      if (IN_STAGE) toStageHost({ type: 'nav', url: url });
+      else { try { location.href = url; } catch (e) {} }
+    }, 1200);
+  }
+
+  /* ── кадр сцены готов: показывает то же, что у учителя ──
+     Сцена держит новую страницу скрытой, пока та не догонит учителя. Снимок
+     из базы может быть старым (учитель пришёл стрелкой и только что открыл
+     прототип — в базе ещё список номеров), поэтому ждём живой снимок
+     учителя, пришедший уже после подключения. Нет его за 1,8 с (учитель
+     молчит или вышел) — показываем то, что есть */
+  let stageActivatedAt = 0, stageReadySent = false;
+  function stageReadyNow() {
+    if (!IN_STAGE || stageReadySent) return;
+    stageReadySent = true;
+    // небольшая пауза — чтобы пришедшее успело лечь на экран. Не через
+    // requestAnimationFrame: кадр, пока ждёт, прозрачен, и браузер вправе
+    // придерживать ему отрисовку
+    setTimeout(() => toStageHost({ type: 'ready' }), 150);
+  }
+  function stageActivated() {
+    if (!IN_STAGE) return;
+    stageActivatedAt = Date.now();
+    setTimeout(stageReadyNow, 1800);
+  }
+  function stageLiveStateArrived() {
+    if (IN_STAGE && stageActivatedAt && !stageReadySent) stageReadyNow();
+  }
+
+  /* ═══ Промпт №11 нового списка: кто на связи ═══
+     Каждый участник раз в 5 секунд шлёт короткий сигнал «я здесь» (кто он:
+     учитель/ученик, на сцене ли). Отсюда:
+     - учитель видит, сколько учеников сейчас на связи;
+     - ученик видит, что учитель пропал (закрыл вкладку, у него упал интернет),
+       а не гадает, почему ничего не происходит;
+     - молчаливую смерть собственной связи: собеседники сигналили, и вдруг
+       тишина дольше трёх сигналов — переспрашиваем, а не ответили — сами
+       переподключаемся, не дожидаясь, пока библиотека заметит обрыв.
+     Уходя со страницы, участник прощается («bye») — иначе при каждом
+     переходе учитель видел бы «на связи» лишнего ученика ещё 15 секунд. */
+  const HB_EVERY_MS = 5000, PEER_TTL_MS = 16000;
+  const peers = new Map();           // uid -> { at, leader, stage }
+  let lastPeerAt = 0, leaderSeenAt = 0;
+  let silentStep = 0, silentAt = 0;  // 1 — переспросили, 2 — переподключились
+  function touchPeer(uid, info) {
+    if (!uid || uid === CLIENT_ID) return;
+    const now = Date.now();
+    const p = peers.get(uid) || { at: 0, leader: false, stage: false };
+    p.at = now;
+    if (info) { p.leader = !!info.leader; p.stage = !!info.stage; }
+    peers.set(uid, p);
+    lastPeerAt = now;
+    if (p.leader) leaderSeenAt = now;
+    silentStep = 0;
+  }
+  function forgetPeer(uid) {
+    peers.delete(uid);
+    if (!peers.size) lastPeerAt = 0;
+  }
+  function livePeers() {
+    const now = Date.now(), out = [];
+    peers.forEach((p) => { if (now - p.at < PEER_TTL_MS) out.push(p); });
+    return out;
+  }
+  function studentsOnline() { return livePeers().filter(p => !p.leader).length; }
+  function stageViewers() { return livePeers().some(p => !p.leader && p.stage); }
+  // учитель молчит дольше трёх сигналов (считая от подключения, если его
+  // ещё не слышали) — для ученика это «учитель не на связи»
+  function teacherSilent() {
+    if (isLeaderFlag || !code || connState !== CONN.ONLINE) return false;
+    const since = leaderSeenAt || stageActivatedAt || joinedAt;
+    return !!since && Date.now() - since > PEER_TTL_MS;
+  }
+  let joinedAt = 0;
+  function sendHeartbeat(ask) {
+    if (!code || !channel) return;
+    if (!joinedAt) joinedAt = Date.now();
+    const data = { leader: !!isLeaderFlag, stage: IN_STAGE };
+    if (ask) data.ask = 1;
+    broadcastEvent('hb', data);
+  }
+  setInterval(() => {
+    sendHeartbeat(false);
+    // молчаливая смерть связи (см. выше)
+    if (!code || connState !== CONN.ONLINE || !lastPeerAt) return;
+    const now = Date.now();
+    if (silentStep === 0 && now - lastPeerAt > PEER_TTL_MS) {
+      silentStep = 1; silentAt = now;
+      requestSyncFromPeers();
+    } else if (silentStep === 1 && now - silentAt > 4000) {
+      // никто не ответил: либо все ушли, либо мертва наша связь. Одно
+      // переподключение ничего не стоит; дальше ждём, пока кто-то появится
+      // Состояние «переподключаемся» ставим честно: связь, скорее всего,
+      // была мёртвой, и после подписки нужно запросить пропущенное (это
+      // делает ветка «wasBroken» в subscribeChannel)
+      silentStep = 2;
+      setConnState(CONN.RECONNECTING);
+      reconnectNow();
+    }
+  }, HB_EVERY_MS);
+  // Кадр сцены не прощается: при смене страницы сцена держит старый кадр,
+  // пока новый не готов, а номер участника у них общий (он в sessionStorage
+  // вкладки) — прощание старого кадра «выписало» бы уже подключившийся новый
+  window.addEventListener('pagehide', () => {
+    if (!IN_STAGE && code && channel) { try { channel.send({ type: 'broadcast', event: 'ev', payload: { uid: CLIENT_ID, name: 'bye', data: {} } }); } catch (e) {} }
+  });
+  function onSocketHeartbeat(status) {
+    if (!code) return;
+    if (status === 'timeout' || status === 'disconnected' || status === 'error') {
+      if (connState === CONN.ONLINE) setConnState(CONN.RECONNECTING);
+      // библиотека переподключит сокет сама; если канал после этого не
+      // вернётся, его поднимет наш keepalive (channelLooksAlive)
+    }
+  }
+  // панель и сцена — раз в секунду: «учитель не на связи» наступает не по
+  // событию, а по отсутствию событий
+  let lastConnSig = '';
+  setInterval(() => {
+    const sig = connState + '|' + (teacherSilent() ? 'silent' : 'ok') + '|' + studentsOnline();
+    if (sig === lastConnSig) return;
+    lastConnSig = sig;
+    notifyUi();
+    toStageHost({ type: 'conn', state: connState, teacher: teacherSilent() ? 'silent' : 'ok' });
+  }, 1000);
+
+  /* ═══ Промпт №11 нового списка: курсор учителя на сцене ═══
+     Учитель водит мышью (или пером по планшету) — у учеников на сцене видно
+     стрелку ровно там же: «вот сюда смотри», даже когда он ничего не пишет.
+     Координаты — окна страницы, у ученика на сцене они те же. Шлём не чаще
+     раз в 50 мс и только если кто-то смотрит на сцене: ученикам в обычном
+     режиме (своя вёрстка) чужие координаты бессмысленны */
+  const CURSOR_MS = 50;
+  let curLast = 0, curTimer = null, curPending = null, curShown = false;
+  function flushCursor() {
+    curTimer = null;
+    if (!curPending) return;
+    curLast = Date.now();
+    broadcastEvent('cursor', curPending);
+    curShown = !curPending.h;
+    curPending = null;
+  }
+  function queueCursor(c, now) {
+    if (!isLeaderFlag || !code || !channel || !stageViewers()) return;
+    curPending = c;
+    if (now) { clearTimeout(curTimer); flushCursor(); return; }
+    if (curTimer) return;
+    curTimer = setTimeout(flushCursor, Math.max(0, CURSOR_MS - (Date.now() - curLast)));
+  }
+  function cursorFromEvent(e, dx, dy, now) {
+    queueCursor({ x: Math.round(e.clientX + dx), y: Math.round(e.clientY + dy), d: e.buttons ? 1 : 0 }, now);
+  }
+  function hideCursor() { if (curShown) queueCursor({ h: 1 }, true); }
+  function hookCursor(win, offset) {
+    const o = offset || (() => [0, 0]);
+    win.addEventListener('pointermove', (e) => { const [dx, dy] = o(); cursorFromEvent(e, dx, dy, false); }, { capture: true, passive: true });
+    win.addEventListener('pointerdown', (e) => { const [dx, dy] = o(); cursorFromEvent(e, dx, dy, true); }, { capture: true, passive: true });
+    win.addEventListener('pointerup', (e) => { const [dx, dy] = o(); cursorFromEvent(e, dx, dy, true); }, { capture: true, passive: true });
+  }
+  if (!IN_ANY_FRAME) {
+    hookCursor(window);
+    window.addEventListener('mouseout', (e) => { if (!e.relatedTarget) hideCursor(); });
+    window.addEventListener('blur', () => setTimeout(() => { if (!document.hasFocus()) hideCursor(); }, 0));
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') hideCursor(); });
+    // Над карточками «+» и калькулятором в столбик мышь уходит в кадры своей
+    // страницы, и родитель её движений не видит — курсор у ученика замирал бы
+    // на краю карточки. Кадры своего сайта подслушиваем тоже, со сдвигом
+    setInterval(() => {
+      if (!isLeaderFlag || !code) return;
+      document.querySelectorAll('iframe').forEach((f) => {
+        let w = null;
+        try { w = f.contentWindow; if (!w || !w.document || w.__tsCursorHooked) return; } catch (e) { return; }
+        w.__tsCursorHooked = true;
+        hookCursor(w, () => { const r = f.getBoundingClientRect(); return [r.left + (f.clientLeft || 0), r.top + (f.clientTop || 0)]; });
+      });
+    }, 1500);
+  }
+  onEvent('cursor', (c) => { if (IN_STAGE && !isLeaderFlag) toStageHost(Object.assign({ type: 'cursor' }, c)); });
+
+  /* ── прокрутка страниц без доски (главная, список номеров) ──
+     На тренажёрах прокрутку повторяет доска (board_view). На главной доски
+     нет, а учитель листает список тренажёров — ученик на сцене листает
+     следом */
+  let scrollTimer = null;
+  window.addEventListener('scroll', () => {
+    if (window.__boardBroadcastView || !isLeaderFlag || !code || scrollTimer || !stageViewers()) return;
+    scrollTimer = setTimeout(() => {
+      scrollTimer = null;
+      broadcastEvent('stage_scroll', { x: Math.round(window.scrollX), y: Math.round(window.scrollY) });
+    }, 80);
+  }, { passive: true });
+  onEvent('stage_scroll', (d) => {
+    if (!IN_STAGE || isLeaderFlag || !d || window.__boardBroadcastView) return;
+    try { window.scrollTo(d.x || 0, d.y || 0); } catch (e) {}
+  });
+
+  /* ═══ Промпт №11 нового списка: всё, что учитель открыл, — открыто и у ученика ═══
+     Калькуляторы «Сложить/Вычесть/…», их история, история примеров,
+     колонка «+», доска, «свернуть подсказки», клавиатура, «свой пример»,
+     тема. Это состояние интерфейса, а не задания: тренажёры его в снимок не
+     кладут, и у ученика на сцене всё это оставалось закрытым. Учитель
+     описывает, что у него открыто (по общим для всех тренажёров кнопкам), а
+     ученик на сцене нажимает те же кнопки у себя, пока не совпадёт. Чего на
+     странице нет — просто пропускается. Только на сцене: ученику в обычном
+     режиме своё открывать и закрывать никто не мешает */
+  let mirrorApplying = false;
+  function byId(id) { return document.getElementById(id); }
+  function shown(el) { return !!el && el.style.display === 'block'; }
+  function uiSnapshot() {
+    const de = document.documentElement;
+    const calcBtn = document.querySelector('.calc-tool-btn[data-op].active');
+    const rail = byId('addRail'), kp = byId('keypadFloat');
+    return {
+      theme: de.getAttribute('data-theme') || 'light',
+      board: de.getAttribute('data-board') === 'on',
+      focus: de.getAttribute('data-focus') === 'on',
+      calc: calcBtn ? calcBtn.dataset.op : '',
+      calcHist: shown(byId('calcHistoryPanel')),
+      exHist: shown(byId('exampleHistoryPanel')),
+      rail: !!(rail && rail.classList.contains('open')),
+      custom: shown(byId('customSheet')),
+      kp: kp ? kp.style.display === 'block' : null,
+    };
+  }
+  let uiWant = null, lastUiSent = '';
+  const uiActedAt = {};
+  function uiFromLeader(ui) {
+    if (!IN_STAGE || isLeaderFlag || !ui) return;
+    uiWant = ui;
+    uiReconcile();
+  }
+  function uiReconcile() {
+    if (!uiWant) return;
+    const want = uiWant, have = uiSnapshot(), now = Date.now();
+    // одна и та же кнопка — не чаще раза в 1,2 с: открытие бывает не
+    // мгновенным (калькулятор грузит свой кадр), и без паузы мы бы
+    // нажимали «открыть-закрыть» по кругу
+    const act = (key, fn) => {
+      if (now - (uiActedAt[key] || 0) < 1200) return;
+      uiActedAt[key] = now;
+      mirrorApplying = true;
+      try { fn(); } catch (e) {} finally { mirrorApplying = false; }
+    };
+    const click = (el) => { if (el) el.click(); };
+    if (want.theme && want.theme !== have.theme) applyRemoteTheme(want.theme);
+    if (want.board !== have.board) act('board', () => click(byId('boardVisibilityToggle')));
+    if (want.focus !== have.focus) act('focus', () => click(byId('focusToggle')));
+    if (want.calc !== have.calc) act('calc', () => click(want.calc
+      ? document.querySelector('.calc-tool-btn[data-op="' + want.calc + '"]') : byId('calcPanelClose')));
+    if (want.calcHist !== have.calcHist) act('calcHist', () => click(byId(want.calcHist ? 'calcHistoryBtn' : 'calcHistoryClose')));
+    if (want.exHist !== have.exHist) act('exHist', () => click(byId(want.exHist ? 'exampleHistoryToggle' : 'exampleHistoryClose')));
+    if (want.rail !== have.rail) act('rail', () => click(byId('addRailToggle')));
+    if (want.custom !== have.custom) act('custom', () => click(byId('customToggle')));
+    if (want.kp != null && have.kp != null && want.kp !== have.kp) act('kp', () => click(byId(want.kp ? 'kpToggle' : 'kpClose')));
+  }
+  onEvent('ui', uiFromLeader);
+  setInterval(() => {
+    if (isLeaderFlag) {
+      if (!code || !channel) return;
+      let sig;
+      try { sig = JSON.stringify(uiSnapshot()); } catch (e) { return; }
+      if (sig === lastUiSent) return;
+      lastUiSent = sig;
+      broadcastEvent('ui', JSON.parse(sig));
+    } else if (IN_STAGE) {
+      uiReconcile();   // страница ученика могла закрыть что-то сама (новое задание)
+    }
+  }, 300);
 
   // ── стандартная плавающая кнопка + панель (одинаковая на всех тренажёрах) ──
   let uiEls = null;
@@ -1128,7 +1477,25 @@
       uiEls.connEl.textContent = label;
       uiEls.connEl.className = 'ts-conn ts-conn-' + connState;
     }
+    // Промпт №11 нового списка: кто на связи
+    if (uiEls.peersEl) {
+      let txt = '';
+      if (code && connState === CONN.ONLINE) {
+        if (isLeaderFlag) {
+          const n = studentsOnline();
+          txt = n ? 'Учеников на связи: ' + n : 'Учеников пока нет — отправьте ссылку';
+        } else {
+          txt = teacherSilent() ? '⚠ Учитель не на связи — ждём, пока он вернётся' : 'Учитель на связи';
+        }
+      }
+      uiEls.peersEl.textContent = txt;
+      uiEls.peersEl.style.display = txt ? '' : 'none';
+    }
     if (uiEls.btn) {
+      const n = isLeaderFlag && code ? studentsOnline() : 0;
+      uiEls.btn.classList.toggle('ts-has-peers', n > 0 && connState === CONN.ONLINE);
+      if (uiEls.badge) uiEls.badge.textContent = String(n);
+      uiEls.btn.classList.toggle('ts-teacher-silent', teacherSilent());
       uiEls.btn.classList.toggle('ts-offline', connState !== CONN.ONLINE);
       uiEls.btn.title = connState === CONN.ONLINE
         ? 'Совместный доступ' : 'Совместный доступ — связь восстанавливается';
@@ -1183,6 +1550,12 @@
       /* Промпт №31: обрыв связи виден прямо на кнопке — не нужно открывать
          панель, чтобы заметить, что синхронизация встала */
       .ts-share-btn.ts-offline{border-color:#e0a03a;color:#e0a03a;}
+      /* Промпт №11 нового списка: сколько учеников на связи — прямо на кнопке */
+      .ts-peers-badge{position:absolute;bottom:-5px;right:-5px;min-width:16px;height:16px;padding:0 4px;
+        border-radius:8px;background:#2e9e5b;color:#fff;font-size:10.5px;font-weight:700;line-height:16px;
+        text-align:center;box-shadow:0 0 0 2px var(--glass-strong);display:none;box-sizing:border-box;}
+      .ts-share-btn.ts-has-peers .ts-peers-badge{display:block;}
+      .ts-share-btn.ts-teacher-silent{border-color:#d9534f;color:#d9534f;}
       .ts-share-btn.ts-offline::after{content:'';position:absolute;top:-2px;right:-2px;
         width:10px;height:10px;border-radius:50%;background:#e0a03a;
         box-shadow:0 0 0 2px var(--glass-strong);animation:tsPulse 1.2s ease-in-out infinite;}
@@ -1234,6 +1607,9 @@
     btn.className = 'ts-share-btn';
     btn.title = 'Совместный доступ';
     btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.6"/><circle cx="17" cy="6" r="2.4" stroke="currentColor" stroke-width="1.6"/><circle cx="17" cy="18" r="2.4" stroke="currentColor" stroke-width="1.6"/><path d="M10.6 9.4L15 6.9M10.6 12.6L15 17.1M3 19c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+    const badge = document.createElement('span');
+    badge.className = 'ts-peers-badge';
+    btn.appendChild(badge);
     document.body.appendChild(btn);
 
     const pop = document.createElement('div');
@@ -1243,6 +1619,7 @@
       <div class="ts-share-hint">Поделитесь кодом или ссылкой — тот, кто откроет её, увидит те же задания и ввод, что и вы, в реальном времени.</div>
       <div class="ts-share-hint" id="tsRole" style="font-weight:600;"></div>
       <div class="ts-conn ts-conn-reconnecting" id="tsConn">На связи</div>
+      <div class="ts-share-hint" id="tsPeers" style="margin-top:-4px"></div>
       <div class="ts-share-code" id="tsCode">—</div>
       <div class="ts-share-row">
         <input id="tsLink" type="text" readonly>
@@ -1275,7 +1652,7 @@
     document.body.appendChild(pop);
 
     uiEls = {
-      btn, pop,
+      btn, pop, badge,
       codeEl: pop.querySelector('#tsCode'),
       linkEl: pop.querySelector('#tsLink'),
       msgEl: pop.querySelector('#tsMsg'),
@@ -1289,6 +1666,7 @@
       historyCountEl: pop.querySelector('#tsHistoryCount'),
       historyDownloadBtn: pop.querySelector('#tsHistoryDownload'),
       stageToggle: pop.querySelector('#tsStageToggle'),
+      peersEl: pop.querySelector('#tsPeers'),
     };
 
     // Промпт №25: «Переключать задание/тип» здесь больше не показываем —

@@ -93,10 +93,13 @@ def participant(ctx, tag, width, height):
 
 
 def stage_frame(page):
-    for f in page.frames:
-        if f.name == "tsStageFrame":
-            return f
-    return None
+    """кадр, который сейчас на экране сцены (во время смены страницы их два)"""
+    try:
+        h = page.evaluate_handle("() => window.__stageActiveFrame && window.__stageActiveFrame()")
+        el = h.as_element()
+        return el.content_frame() if el else None
+    except Exception:
+        return None
 
 
 def wait_stage(page, timeout=15000):
@@ -105,7 +108,7 @@ def wait_stage(page, timeout=15000):
     # кадр открывают, когда размер учителя пришёл, а документ под него
     # сверстан (при необходимости после одной перезагрузки кадра)
     page.wait_for_function("() => window.__stageScale && document.getElementById('bar').title.indexOf('×') > 0"
-                           " && document.getElementById('frame').style.visibility !== 'hidden'",
+                           " && !window.__stageActiveFrame().classList.contains('waiting')",
                            timeout=timeout)
     f = stage_frame(page)
     f.wait_for_function("() => window.TrainerSession && window.TrainerSession.getCode()", timeout=timeout)
@@ -169,7 +172,7 @@ def part_a_to_e(browser):
     scale = student.evaluate("() => window.__stageScale")
     want = min(390 / t_sig["cw"], 844 / t_sig["ih"])
     check("A: экран учителя вписан в телефон целиком", abs(scale - want) < 1e-3, f"{scale} ≠ {want}")
-    box = student.evaluate("""() => { const b = document.getElementById('frame').getBoundingClientRect();
+    box = student.evaluate("""() => { const b = window.__stageActiveFrame().getBoundingClientRect();
         return [b.left, b.top, b.width, b.height]; }""")
     check("A: кадр не вылезает за экран", box[0] >= -0.5 and box[1] >= -0.5 and box[0] + box[2] <= 390.5
           and box[1] + box[3] <= 844.5, str(box))
@@ -256,7 +259,7 @@ def part_a_to_e(browser):
     teacher.wait_for_url("**/oge19.html", timeout=8000)
     t54.wait_code(teacher)
     try:
-        student.wait_for_function("() => { try { return document.getElementById('frame').contentWindow.location.pathname.endsWith('/oge19.html'); } catch (e) { return false; } }", timeout=10000)
+        student.wait_for_function("() => { try { return window.__stageActiveFrame().contentWindow.location.pathname.endsWith('/oge19.html'); } catch (e) { return false; } }", timeout=10000)
         ok = True
     except Exception:
         ok = False
@@ -267,7 +270,7 @@ def part_a_to_e(browser):
     teacher.click("#examPrevBtn")
     teacher.wait_for_url("**/oge15_18.html", timeout=8000)
     try:
-        student.wait_for_function("() => { try { return document.getElementById('frame').contentWindow.location.pathname.endsWith('/oge15_18.html'); } catch (e) { return false; } }", timeout=10000)
+        student.wait_for_function("() => { try { return window.__stageActiveFrame().contentWindow.location.pathname.endsWith('/oge15_18.html'); } catch (e) { return false; } }", timeout=10000)
         ok = True
     except Exception:
         ok = False
@@ -413,7 +416,7 @@ def part_g_h(browser):
     # чужой адрес в ?to= не открывается в кадре
     student.goto(f"{BASE}/stage.html?s={code}&to=https://example.com/x.html")
     student.wait_for_timeout(300)
-    src = student.evaluate("() => document.getElementById('frame').src")
+    src = student.evaluate("() => window.__stageActiveFrame().src")
     check("H: чужой адрес в ?to= не открывается", src.startswith(BASE + "/index.html"), src)
     ctx.close()
 
