@@ -42,10 +42,14 @@
   const params = new URLSearchParams(location.search);
   // в карточке «+» (кадр ?card=1) и в живом задании на доске страница
   // открыта в iframe: там видно только задание, заголовка нет, а своя память
-  // кадра перебивала бы память вкладки
+  // кадра перебивала бы память вкладки.
+  // Промпт №11 нового списка: кадр сцены ученика (stage.html, окно с именем tsStageFrame) —
+  // исключение: это целая страница, и стрелки у заголовка должны стоять как
+  // у учителя, иначе заголовок сверстается иначе и съедет всё, что ниже.
+  // Нажать их ученик всё равно не может — guardStudentAction
   let inFrame = false;
   try { inFrame = window.top !== window.self; } catch (e) { inFrame = true; }
-  if (params.get('card') === '1' || inFrame) return;
+  if (params.get('card') === '1' || (inFrame && window.name !== 'tsStageFrame')) return;
 
   const slug = (location.pathname.split('/').pop() || '').replace(/\.html?$/i, '');
   const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);

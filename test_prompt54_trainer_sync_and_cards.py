@@ -129,6 +129,12 @@ def local_server():
 def new_page(context, errors, latency=0, select_delay=0):
     page = context.new_page()
     page.add_init_script(f"window.__fakeLatency = {latency}; window.__fakeSelectDelay = {select_delay};")
+    # Промпт №11 нового списка: ученик по ссылке ?s= теперь уходит на сцену
+    # stage.html (тренажёр в кадре размером с окно учителя). Эти тесты
+    # проверяют синхронизацию самих тренажёров, где ученик на странице
+    # напрямую, — это «Обычный режим», он у платформы остался. Сцену
+    # проверяет test_prompt11_shared_screen.py
+    page.add_init_script("try { localStorage.setItem('tsStage:pref', 'off'); } catch (e) {}")
     page.route("**/supabase-js.umd.js", lambda route: route.fulfill(
         status=200, content_type="application/javascript", body=FAKE_LIB))
     # шрифты с Google в песочнице не грузятся — не ждём их

@@ -457,6 +457,21 @@
       map.delete(data.sid);
     }
     doRedraw();
+    // Промпт №11 нового списка: на увеличенной сцене ученика (stage.html) держим в поле
+    // зрения место, где учитель сейчас пишет. Точку переводим в координаты
+    // окна кадра — сцена знает только их
+    if (TS.isStageFrame && TS.isStageFrame()) {
+      const pts = data.phase === 'end' ? (data.point ? [data.point] : []) : (data.points || []);
+      const p = pts[pts.length - 1];
+      if (p && typeof p.x === 'number') {
+        if (data.surface === 'bg') {
+          TS.stageFocus((p.x - bgPanX - window.scrollX) * bgViewScale, (p.y - bgPanY - window.scrollY) * bgViewScale);
+        } else {
+          const r = canvas.getBoundingClientRect();
+          TS.stageFocus(r.left + (p.x - panX) * viewScale, r.top + (p.y - panY) * viewScale);
+        }
+      }
+    }
   });
 
   // ── у холста нет pointer-events (см. CSS выше), поэтому сам он больше не

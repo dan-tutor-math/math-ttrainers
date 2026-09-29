@@ -70,6 +70,7 @@
       setPermission(){}, onPermissionsChange(){},
       getAutosaveHistory(){ return true; }, setAutosaveHistory(){}, onAutosaveHistoryChange(){},
       registerHistoryUI(){}, notifyHistoryChanged(){},
+      isStageFrame(){ return false; }, stageFocus(){},
     };
     return;
   }
@@ -325,7 +326,7 @@
       __autosaveHistory: autosaveHistory,
       __theme: theme,
       __trainer: trainerSlug, // Промпт №30 — какая страница прислала этот снимок
-    });
+    }, isLeaderFlag ? { __stage: stageSize() } : {});
   }
 
   function applyIncomingState(state) {
@@ -356,6 +357,9 @@
       if (autosaveChangeCb) { try { autosaveChangeCb(autosaveHistory); } catch (e) {} }
     }
     if (state.__theme) applyRemoteTheme(state.__theme);
+    // Промпт №11 нового списка: размер окна учителя — до проверки «чей снимок»: он нужен
+    // сцене на любой странице, даже если снимок пришёл с соседнего тренажёра
+    if (state.__stage) stageFromLeader(state.__stage);
 
     // а вот СТРУКТУРНУЮ часть состояния (задания, режимы и т.п.) применяем
     // только если она реально принадлежит ЭТОЙ странице — иначе, в момент
@@ -848,6 +852,14 @@
     bindConnectionWatchers(); // Промпт №31 — следим за сетью/возвратом вкладки
 
     const joinCode = urlJoinCode();
+    // Промпт №11 нового списка: пришёл по ссылке учителя в обычном окне — открываем эту
+    // же страницу на сцене (stage.html), а сами к каналу не подключаемся:
+    // подключится кадр сцены, второй участник от того же ученика не нужен
+    if (joinCode && canEnterStage()) {
+      isLeaderFlag = false;
+      enterStage(joinCode.toUpperCase());
+      return;
+    }
     if (joinCode) {
       isLeaderFlag = false;
       const res = await activate(joinCode.toUpperCase(), { createIfMissing: false, requestSyncFromLeader: true });
@@ -855,9 +867,19 @@
       // ссылка устарела/битая — просто продолжаем со своей обычной сессией,
       // без всплывающих ошибок при обычном заходе на страницу
       isLeaderFlag = true;
+      // Промпт №11 нового списка: на сцене смотреть некого (урок кончился,
+      // код старый) — выходим из рамки на обычную страницу, выбор ученика
+      // «сцена/обычный режим» при этом не трогаем
+      if (IN_STAGE) toStageHost({ type: 'leave' });
     }
     const stored = readStoredCode();
     const storedRole = readStoredRole();
+    if (stored && storedRole === 'follower' && canEnterStage()) {
+      // Промпт №11 нового списка: тот же ученик открыл страницу платформы сам, без ссылки
+      isLeaderFlag = false;
+      enterStage(stored);
+      return;
+    }
     if (stored && storedRole === 'follower') {
       // Промпт №30: этот браузер и раньше был присоединившимся к этому же
       // общему коду — обычная загрузка страницы БЕЗ ?s= в адресе (вручную
@@ -927,6 +949,10 @@
     const res = await activate(c, { createIfMissing: false, requestSyncFromLeader: true });
     if (res.ok) storeRole('follower');
     else isLeaderFlag = true; // код не найден — остаёмся при своей сессии
+    // Промпт №11 нового списка: код ввели в обычном окне — дальше смотрим экран учителя
+    // на сцене. Если activate() уже уводит на страницу группы, сцену
+    // откроет та страница: у неё в адресе будет ?s=
+    if (res.ok && !res.redirecting && canEnterStage()) enterStage(c);
     return res;
   }
   // ── лёгкие «эфемерные» события: не сохраняются, не входят в getState —
@@ -989,6 +1015,97 @@
     if (data && data.url) { try { location.href = data.url; } catch (e) {} }
   });
 
+  /* ═══ Промпт №11 нового списка: «общий экран» — ученик видит страницу учителя целиком ═══
+     Раньше каждый участник верстал страницу под СВОЁ окно: на телефоне
+     ученика блоки уже и переносятся иначе, а записи на доске привязаны к
+     координатам документа — и то, что учитель обвёл, у ученика оказывалось
+     рядом, а не на месте.
+     Теперь присоединившийся открывает страницу не напрямую, а внутри
+     stage.html: там она лежит в кадре ровно такого размера, как окно
+     учителя, и кадр целиком масштабируется под экран ученика. Внутри кадра
+     вёрстка, медиазапросы и координаты доски те же, что у учителя, поэтому
+     всё совпадает пропорционально без пересчёта координат — уменьшает
+     картинку браузер. Страница учителя при этом не меняется вообще.
+     Кадр сцены узнаём по имени окна: window.name переживает переходы внутри
+     кадра (учитель ушёл на другой тренажёр — кадр перешёл следом и остался
+     сценой), а метку в адресе пришлось бы протаскивать через каждый переход. */
+  const STAGE_FRAME_NAME = 'tsStageFrame';
+  let IN_ANY_FRAME = false;
+  try { IN_ANY_FRAME = window.top !== window.self; } catch (e) { IN_ANY_FRAME = true; }
+  const IN_STAGE = IN_ANY_FRAME && window.name === STAGE_FRAME_NAME;
+  // Ключ нарочно НЕ начинается с «trainerSession:»: readStoredCode() в браузере
+  // без общего кода берёт первый такой ключ за старый код сессии — и «off»
+  // стал бы кодом (поймано тестом №54).
+  // «off» — ученик сам выбрал обычный режим (своя вёрстка). Хранится у него
+  // в браузере: на телефоне в вертикальном положении экран учителя мелкий,
+  // и это решение ученика, а не повод дёргать учителя
+  const STAGE_PREF_KEY = 'tsStage:pref';
+  function stagePrefOn() { try { return localStorage.getItem(STAGE_PREF_KEY) !== 'off'; } catch (e) { return true; } }
+  function setStagePref(on) { try { localStorage.setItem(STAGE_PREF_KEY, on ? 'on' : 'off'); } catch (e) {} }
+  // карточки «+» и живые задания на доске — тоже кадры, но им сцена не нужна
+  function canEnterStage() { return !IN_ANY_FRAME && stagePrefOn(); }
+  // адрес этой страницы без кода: код сцена добавит сама
+  function stageTarget() {
+    const u = new URL(location.href);
+    u.searchParams.delete('s');
+    return (u.pathname.split('/').pop() || 'index.html') + u.search + u.hash;
+  }
+  function enterStage(c) {
+    const u = new URL('stage.html', location.href);
+    u.searchParams.set('s', c);
+    u.searchParams.set('to', stageTarget());
+    location.replace(u.toString());
+  }
+  // Размер сцены — окно учителя. Ширина без полосы прокрутки (clientWidth):
+  // в кадре ученика полосы нет (прячем ниже), и ширина вёрстки совпадает
+  // точно, даже если у одного Mac с тонкой полосой, а у другого Windows
+  function stageSize() {
+    const de = document.documentElement;
+    return { w: Math.round((de && de.clientWidth) || window.innerWidth), h: Math.round(window.innerHeight) };
+  }
+  function toStageHost(msg) {
+    if (!IN_STAGE) return;
+    try { window.parent.postMessage(Object.assign({ source: 'ts-stage' }, msg), location.origin); } catch (e) {}
+  }
+  function stageFromLeader(sz) {
+    if (isLeaderFlag || !sz || !(sz.w > 0) || !(sz.h > 0)) return;
+    toStageHost({ type: 'size', w: sz.w, h: sz.h });
+  }
+  // где учитель сейчас пишет (координаты окна кадра) — увеличенная сцена
+  // держит это место в поле зрения. Штрих шлёт точки по 30 мс, сцене
+  // столько не нужно: хватает нескольких раз в секунду
+  let stageFocusAt = 0;
+  function stageFocus(x, y) {
+    if (!IN_STAGE || isLeaderFlag) return;
+    const now = Date.now();
+    if (now - stageFocusAt < 120) return;
+    stageFocusAt = now;
+    toStageHost({ type: 'focus', x: Math.round(x), y: Math.round(y) });
+  }
+  if (IN_STAGE) {
+    // полосу прокрутки в кадре прячем: ширина вёрстки = ширина кадра = окно
+    // учителя. Прокручивает кадр всё равно учитель (board_view), не ученик
+    try {
+      const st = document.createElement('style');
+      st.textContent = 'html{scrollbar-width:none}html::-webkit-scrollbar{display:none}';
+      document.head.appendChild(st);
+    } catch (e) {}
+    // адрес — чтобы перезагрузка сцены вернула ученика туда же
+    toStageHost({ type: 'url', href: location.href, title: document.title });
+  }
+  // учитель поменял окно (растянул, открыл панель, сменил масштаб браузера)
+  // — сцена у учеников меняет размер следом
+  let stageResizeTimer = null;
+  window.addEventListener('resize', () => {
+    if (!isLeaderFlag || !code) return;
+    clearTimeout(stageResizeTimer);
+    stageResizeTimer = setTimeout(() => {
+      broadcastEvent('stage_size', stageSize());
+      scheduleSave();   // и в базу: подключившийся позже сразу получит верный размер
+    }, 150);
+  });
+  onEvent('stage_size', stageFromLeader);
+
   // ── стандартная плавающая кнопка + панель (одинаковая на всех тренажёрах) ──
   let uiEls = null;
   function notifyUi() { if (uiEls) renderPanel(); }
@@ -1036,6 +1153,12 @@
     }
 
     uiEls.autosaveToggle.checked = getAutosaveHistory();
+
+    // Промпт №11 нового списка: переключатель сцены — только у ученика и только в окне
+    // платформы или в самой сцене (не в карточке «+» и не в задании на доске)
+    const stageSwitchable = !isLeaderFlag && !!code && (IN_STAGE || !IN_ANY_FRAME);
+    uiEls.stageToggle.style.display = stageSwitchable ? '' : 'none';
+    uiEls.stageToggle.textContent = IN_STAGE ? 'Обычный режим (своя вёрстка)' : 'Смотреть экран учителя целиком';
 
     const count = historyUI && historyUI.getCount ? historyUI.getCount() : 0;
     uiEls.historyCountEl.textContent = count > 0 ? `История: ${count} ` + pluralSnapshots(count) : 'История: пока пусто';
@@ -1133,6 +1256,7 @@
         <button id="tsJoin">Подключиться</button>
       </div>
       <div class="ts-share-msg" id="tsMsg"></div>
+      <button class="ts-share-reset" id="tsStageToggle" style="display:none"></button>
       <div class="ts-share-sep" id="tsPermSep" style="display:none"></div>
       <div id="tsPermSection" style="display:none">
         <div class="ts-section-title">Права ученика</div>
@@ -1164,6 +1288,7 @@
       autosaveToggle: pop.querySelector('#tsAutosaveToggle'),
       historyCountEl: pop.querySelector('#tsHistoryCount'),
       historyDownloadBtn: pop.querySelector('#tsHistoryDownload'),
+      stageToggle: pop.querySelector('#tsStageToggle'),
     };
 
     // Промпт №25: «Переключать задание/тип» здесь больше не показываем —
@@ -1217,6 +1342,13 @@
       try { await navigator.clipboard.writeText(uiEls.linkEl.value); uiEls.msgEl.textContent = 'Ссылка скопирована.'; uiEls.msgEl.classList.remove('err'); }
       catch (e) { uiEls.linkEl.select(); uiEls.msgEl.textContent = 'Скопируйте вручную (Ctrl+C).'; }
     });
+    // Промпт №11 нового списка: ученик сам переключается между экраном учителя (сцена) и
+    // своей обычной вёрсткой — например, на телефоне в вертикальном положении
+    uiEls.stageToggle.addEventListener('click', () => {
+      if (isLeaderFlag || !code) return;
+      if (IN_STAGE) { setStagePref(false); toStageHost({ type: 'exit' }); }
+      else { setStagePref(true); enterStage(code); }
+    });
     pop.querySelector('#tsReset').addEventListener('click', async () => {
       await resetSession();
       uiEls.msgEl.textContent = 'Начата новая сессия.'; uiEls.msgEl.classList.remove('err');
@@ -1240,5 +1372,6 @@
     getPermissions, setPermission, onPermissionsChange,
     getAutosaveHistory, setAutosaveHistory, onAutosaveHistoryChange,
     registerHistoryUI, notifyHistoryChanged,
+    isStageFrame: () => IN_STAGE, stageFocus,
   };
 })();

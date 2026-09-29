@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f2126">
+<title>Экран учителя · Тренажёры</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<!--
+  Промпт №11 нового списка: «сцена» ученика в совместной сессии.
+
+  Зачем. Каждый участник раньше верстал страницу тренажёра под своё окно:
+  у ученика на телефоне блоки уже и переносятся иначе, а записи доски
+  привязаны к координатам документа — обведённое учителем оказывалось у
+  ученика рядом, а не на месте. Здесь страница тренажёра открыта в кадре
+  РОВНО такого размера, как окно учителя (размер присылает сама страница
+  тренажёра, см. session-share.js, «общий экран»), и кадр целиком
+  масштабируется под экран ученика. Внутри кадра всё как у учителя —
+  вёрстка, медиазапросы, координаты доски, прокрутка, — поэтому совпадает
+  без пересчёта координат: уменьшает картинку браузер.
+
+  Что делает эта страница — только рамка: размер и масштаб кадра, адрес для
+  перезагрузки, кнопки масштаба и «Обычный режим». Сессию, задания и доску
+  ведёт страница тренажёра внутри кадра, как у любого присоединившегося.
+
+  Кадр узнаёт, что он на сцене, по имени окна tsStageFrame: имя переживает
+  переходы внутри кадра, когда учитель уводит группу на другой тренажёр.
+-->
+<style>
+:root{
+  --stage-bg:#1f2126;
+  --bar-bg:rgba(24,26,31,.86);
+  --bar-border:rgba(255,255,255,.14);
+  --bar-ink:#f1f2f4;
+  --bar-muted:#a3a8b3;
+  --bar-hover:rgba(255,255,255,.10);
+  --bar-active:rgba(255,255,255,.18);
+}
+html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%;}
+/* окно просмотра: пока сцена целиком помещается, прокрутки нет; увеличили —
+   появляется своя прокрутка сцены (кадр внутри её прокрутить нельзя: у
+   ученика прокрутку ведёт учитель) */
+#vp{position:fixed;inset:0;overflow:hidden;}
+#vp.zoomed{overflow:auto;}
+#box{position:relative;}
+#frame{position:absolute;left:0;top:0;border:0;display:block;transform-origin:0 0;background:#fff;}
+/* «рука»: прозрачная накладка поверх кадра, чтобы увеличенную сцену можно
+   было двигать пальцем — сам кадр жесты прокрутки у ученика гасит */
+#pan{position:absolute;inset:0;display:none;cursor:grab;touch-action:none;z-index:2;}
+#pan.drag{cursor:grabbing;}
+#vp.panning #pan{display:block;}
+
+#bar{position:fixed;z-index:10;display:flex;align-items:center;gap:2px;padding:4px;
+  border-radius:14px;background:var(--bar-bg);border:1px solid var(--bar-border);
+  backdrop-filter:blur(14px) saturate(150%);-webkit-backdrop-filter:blur(14px) saturate(150%);
+  box-shadow:0 6px 24px rgba(0,0,0,.35);color:var(--bar-ink);
+  left:50%;bottom:calc(8px + env(safe-area-inset-bottom));transform:translateX(-50%);}
+/* панель висит поверх сцены (полей по краям нет) — делаем её тише, чтобы не
+   спорила с заданием; при наведении и нажатии возвращаем полную яркость */
+#bar.over{opacity:.5;transition:opacity .15s;}
+#bar.over:hover,#bar.over:focus-within,#bar.over.show{opacity:1;}
+#bar.vertical{flex-direction:column;left:auto;bottom:auto;top:50%;right:calc(8px + env(safe-area-inset-right));transform:translateY(-50%);}
+#bar button{appearance:none;border:0;background:none;color:inherit;font:inherit;font-size:13px;font-weight:600;
+  min-width:34px;height:34px;padding:0 9px;border-radius:10px;cursor:pointer;display:inline-flex;
+  align-items:center;justify-content:center;white-space:nowrap;}
+#bar button:hover{background:var(--bar-hover);}
+#bar button[aria-pressed="true"]{background:var(--bar-active);}
+#bar button:disabled{opacity:.35;cursor:default;background:none;}
+#bar .sep{width:1px;height:20px;background:var(--bar-border);margin:0 3px;}
+#bar.vertical .sep{width:20px;height:1px;margin:3px 0;}
+#zoomLabel{min-width:52px;font-variant-numeric:tabular-nums;}
+/* сбоку поле узкое (телефон лёжа) — подпись «Обычный режим» не влезла бы и
+   легла на задание, там вместо неё значок; полное название — в подсказке */
+#bar .short{display:none;font-size:16px;}
+#bar.vertical .full{display:none;}
+#bar.vertical .short{display:inline;}
+
+#status{position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:11;padding:8px 14px;border-radius:12px;
+  background:var(--bar-bg);border:1px solid var(--bar-border);color:var(--bar-ink);font-size:13px;
+  box-shadow:0 6px 24px rgba(0,0,0,.35);transition:opacity .25s;pointer-events:none;}
+#status.hidden{opacity:0;}
+#status a{color:#9cc3ff;pointer-events:auto;}
+</style>
+</head>
+<body>
+<div id="vp">
+  <div id="box">
+    <iframe id="frame" name="tsStageFrame" title="Экран учителя" allow="clipboard-write; fullscreen"></iframe>
+    <div id="pan"></div>
+  </div>
+</div>
+
+<div id="bar" role="toolbar" aria-label="Экран учителя">
+  <button id="zoomOut" title="Уменьшить" aria-label="Уменьшить">−</button>
+  <button id="zoomLabel" title="Показать экран учителя целиком">100%</button>
+  <button id="zoomIn" title="Увеличить" aria-label="Увеличить">+</button>
+  <button id="panBtn" aria-pressed="false" title="Двигать увеличенный экран" aria-label="Двигать увеличенный экран">✋</button>
+  <span class="sep"></span>
+  <button id="exitBtn" title="Обычный режим: своя вёрстка под этот экран — задания те же, но расположены иначе, чем у учителя" aria-label="Обычный режим"><span class="full">Обычный режим</span><span class="short">⇱</span></button>
+</div>
+<div id="status">Подключаемся к экрану учителя…</div>
+
+<script>
+(function(){
+  'use strict';
+  const params = new URLSearchParams(location.search);
+  const code = (params.get('s') || '').trim().toUpperCase();
+  const vp = document.getElementById('vp');
+  const box = document.getElementById('box');
+  const frame = document.getElementById('frame');
+  const pan = document.getElementById('pan');
+  const bar = document.getElementById('bar');
+  const statusEl = document.getElementById('status');
+  const zoomLabel = document.getElementById('zoomLabel');
+  const zoomInBtn = document.getElementById('zoomIn');
+  const zoomOutBtn = document.getElementById('zoomOut');
+  const panBtn = document.getElementById('panBtn');
+  const exitBtn = document.getElementById('exitBtn');
+
+  function showStatus(html, keep){
+    statusEl.innerHTML = html;
+    statusEl.classList.remove('hidden');
+    clearTimeout(showStatus.t);
+    if (!keep) showStatus.t = setTimeout(() => statusEl.classList.add('hidden'), 2500);
+  }
+
+  if (!code) {
+    showStatus('Нет кода сессии. <a href="index.html">На главную</a>', true);
+    bar.style.display = 'none';
+    return;
+  }
+
+  // адрес страницы в кадре: только наш сайт — сцену нельзя превратить в
+  // рамку для чужой страницы, подставив её адрес в ?to=
+  function targetUrl(raw){
+    let u;
+    try { u = new URL(raw || 'index.html', location.href); } catch (e) { u = null; }
+    if (!u || u.origin !== location.origin || /\/stage\.html$/i.test(u.pathname)) u = new URL('index.html', location.href);
+    u.searchParams.set('s', code);
+    return u;
+  }
+  frame.src = targetUrl(params.get('to')).toString();
+
+  /* ── размер и масштаб ──
+     teacher — окно учителя в CSS-пикселях. Пока его нет (учитель ещё не
+     ответил или у него старая версия страницы), кадр просто во всё окно —
+     обычная вёрстка, без масштаба. zoom — множитель поверх «вписать
+     целиком»: 1 — весь экран учителя виден, больше — крупнее, с прокруткой */
+  let teacher = null;
+  // Размер учителя помним в этой вкладке: при перезагрузке сцены кадр сразу
+  // верстается под него, а не под окно ученика
+  const SIZE_KEY = 'tsStage:size:' + code;
+  try {
+    const c = JSON.parse(sessionStorage.getItem(SIZE_KEY) || 'null');
+    if (c && c.w > 0 && c.h > 0) teacher = { w: c.w, h: c.h };
+  } catch (e) {}
+  let zoom = 1;
+  const ZOOM_STEPS = [1, 1.25, 1.5, 2, 2.5, 3, 4];
+  let scale = 1;
+
+  function layout(keepCenter){
+    const vw = vp.clientWidth, vh = vp.clientHeight;
+    const w = teacher ? teacher.w : vw;
+    const h = teacher ? teacher.h : vh;
+    const fit = teacher ? Math.min(vw / w, vh / h) : 1;
+    // центр видимой области в координатах кадра — чтобы при смене масштаба
+    // остаться на том же месте, а не отъехать в угол
+    let cx = null, cy = null;
+    if (keepCenter && scale > 0) {
+      cx = (vp.scrollLeft + vw / 2 - box.offsetLeft) / scale;
+      cy = (vp.scrollTop + vh / 2 - box.offsetTop) / scale;
+    }
+    scale = fit * zoom;
+    const bw = w * scale, bh = h * scale;
+    frame.style.width = w + 'px';
+    frame.style.height = h + 'px';
+    frame.style.transform = scale === 1 ? '' : 'scale(' + scale + ')';
+    box.style.width = bw + 'px';
+    box.style.height = bh + 'px';
+    // пока сцена меньше окна — по центру, свободное место поровну по краям
+    box.style.marginLeft = Math.max(0, (vw - bw) / 2) + 'px';
+    box.style.marginTop = Math.max(0, (vh - bh) / 2) + 'px';
+    vp.classList.toggle('zoomed', zoom > 1);
+    if (cx != null && zoom > 1) {
+      vp.scrollLeft = cx * scale + box.offsetLeft - vw / 2;
+      vp.scrollTop = cy * scale + box.offsetTop - vh / 2;
+    }
+    placeBar(vw, vh, bw, bh);
+    zoomLabel.textContent = Math.round(zoom * 100) + '%';
+    zoomOutBtn.disabled = zoom <= ZOOM_STEPS[0];
+    zoomInBtn.disabled = zoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1];
+    panBtn.disabled = zoom <= 1;
+    if (zoom <= 1 && panning) setPanning(false);
+    window.__stageScale = scale;   // для теста и отладки
+  }
+
+  // Панель — в свободное поле по краю, если оно есть (так она не закрывает
+  // задание): снизу/сверху — горизонтально, справа — вертикально. Полей нет —
+  // висит поверх, но приглушённая
+  function placeBar(vw, vh, bw, bh){
+    const freeV = (vh - bh) / 2, freeH = (vw - bw) / 2;
+    // вертикальная панель шириной ~62 px (кнопка «100%» плюс поля)
+    const vertical = zoom <= 1 && freeV < 48 && freeH >= 66;
+    bar.classList.toggle('vertical', vertical);
+    bar.classList.toggle('over', zoom > 1 || (freeV < 48 && freeH < 66));
+  }
+
+  function setZoom(z){
+    zoom = Math.min(ZOOM_STEPS[ZOOM_STEPS.length - 1], Math.max(ZOOM_STEPS[0], z));
+    layout(true);
+  }
+  zoomInBtn.onclick = () => setZoom(ZOOM_STEPS.find(z => z > zoom + 1e-6) || zoom);
+  zoomOutBtn.onclick = () => setZoom([...ZOOM_STEPS].reverse().find(z => z < zoom - 1e-6) || ZOOM_STEPS[0]);
+  zoomLabel.onclick = () => setZoom(1);
+
+  window.addEventListener('resize', () => layout(true));
+  window.addEventListener('orientationchange', () => setTimeout(() => layout(true), 250));
+
+  /* ── двигать увеличенную сцену ── */
+  let panning = false, lastManualAt = 0;
+  function setPanning(on){
+    panning = !!on;
+    vp.classList.toggle('panning', panning);
+    panBtn.setAttribute('aria-pressed', panning ? 'true' : 'false');
+  }
+  panBtn.onclick = () => setPanning(!panning);
+  let drag = null;
+  pan.addEventListener('pointerdown', (e) => {
+    drag = { x: e.clientX, y: e.clientY, sl: vp.scrollLeft, st: vp.scrollTop };
+    pan.classList.add('drag');
+    try { pan.setPointerCapture(e.pointerId); } catch (_) {}
+    e.preventDefault();
+  });
+  pan.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    vp.scrollLeft = drag.sl - (e.clientX - drag.x);
+    vp.scrollTop = drag.st - (e.clientY - drag.y);
+    lastManualAt = Date.now();
+  });
+  const endDrag = () => { drag = null; pan.classList.remove('drag'); };
+  pan.addEventListener('pointerup', endDrag);
+  pan.addEventListener('pointercancel', endDrag);
+  // колесо и полосы прокрутки самой сцены — тоже ручное перемещение
+  vp.addEventListener('wheel', () => { lastManualAt = Date.now(); }, { passive: true });
+
+  /* ── следить за тем, где учитель пишет ──
+     Ученик увеличил сцену, а учитель пишет за краем видимой части — сцена
+     сама подъезжает. Если ученик только что двигал её сам, не перебиваем
+     его несколько секунд */
+  const FOLLOW_PAUSE_MS = 3000;
+  function follow(x, y){
+    if (zoom <= 1 || Date.now() - lastManualAt < FOLLOW_PAUSE_MS) return;
+    const vw = vp.clientWidth, vh = vp.clientHeight;
+    const px = box.offsetLeft + x * scale - vp.scrollLeft;
+    const py = box.offsetTop + y * scale - vp.scrollTop;
+    const mx = vw * 0.18, my = vh * 0.18;
+    if (px >= mx && px <= vw - mx && py >= my && py <= vh - my) return;
+    vp.scrollTo({
+      left: box.offsetLeft + x * scale - vw / 2,
+      top: box.offsetTop + y * scale - vh / 2,
+      behavior: 'smooth',
+    });
+  }
+
+  /* ── обычный режим: своя вёрстка, как было до сцены ── */
+  function frameHref(){
+    try { return frame.contentWindow.location.href; } catch (e) { return null; }
+  }
+  function exitToNormal(){
+    try { localStorage.setItem('tsStage:pref', 'off'); } catch (e) {}
+    location.href = targetUrl(frameHref() || params.get('to')).toString();
+  }
+  exitBtn.onclick = exitToNormal;
+
+  /* ── первая вёрстка кадра ──
+     Часть тренажёров считает раскладку скриптом при загрузке по ширине окна
+     (число колонок, ширина условия) и потом не всегда пересчитывает её
+     целиком. Если страница в кадре загрузилась под размер окна ученика, а
+     размер учителя пришёл позже, такая страница так и осталась бы
+     сверстанной «под телефон» внутри кадра учителя. Поэтому: пока размер
+     учителя неизвестен, кадр скрыт; если страница успела загрузиться под
+     другой размер — перезагружаем её один раз, уже под нужный. Дальнейшие
+     изменения окна учителя — обычный resize, как у самого учителя */
+  let docSize = null;       // под какой размер загружен текущий документ кадра
+  let docGotSize = false;   // пришёл ли размер учителя этому документу
+  let reloadedFor = '';
+  function frameLayoutSize(){ return teacher ? teacher.w + 'x' + teacher.h : vp.clientWidth + 'x' + vp.clientHeight; }
+  function reveal(){ frame.style.visibility = ''; }
+  if (!teacher) {
+    frame.style.visibility = 'hidden';
+    // учитель со старой версией страницы размер не пришлёт — не держим
+    // ученика перед пустым экраном: показываем обычную вёрстку
+    setTimeout(() => { if (!teacher) { reveal(); showStatus('Экран учителя не прислал размер — показываю обычную вёрстку'); } }, 5000);
+  }
+
+  /* ── сообщения из кадра ── */
+  let gotUrl = false;
+  window.addEventListener('message', (e) => {
+    if (e.origin !== location.origin || e.source !== frame.contentWindow) return;
+    const d = e.data;
+    if (!d || d.source !== 'ts-stage') return;
+    if (d.type === 'size') {
+      const key = d.w + 'x' + d.h;
+      const firstForDoc = !docGotSize;
+      docGotSize = true;
+      try { sessionStorage.setItem(SIZE_KEY, JSON.stringify({ w: d.w, h: d.h })); } catch (_) {}
+      bar.title = 'Экран учителя: ' + d.w + '×' + d.h;
+      statusEl.classList.add('hidden');
+      const changed = !teacher || teacher.w !== d.w || teacher.h !== d.h;
+      const hadTeacher = !!teacher;
+      teacher = { w: d.w, h: d.h };
+      if (changed) layout(hadTeacher);
+      if (firstForDoc && docSize && docSize !== key && reloadedFor !== key) {
+        reloadedFor = key;
+        frame.style.visibility = 'hidden';
+        try { frame.contentWindow.location.reload(); } catch (_) { reveal(); }
+        return;
+      }
+      reveal();
+    } else if (d.type === 'url') {
+      // новый документ в кадре (первая загрузка, переход учителя, перезагрузка)
+      docSize = frameLayoutSize();
+      docGotSize = false;
+      // адрес сцены повторяет страницу в кадре: перезагрузка или «открыть
+      // ещё раз» вернут ученика туда, где сейчас группа
+      const u = targetUrl(d.href);
+      u.searchParams.delete('s');
+      const next = new URL(location.href);
+      next.searchParams.set('s', code);
+      next.searchParams.set('to', (u.pathname.split('/').pop() || 'index.html') + u.search + u.hash);
+      try { history.replaceState(null, '', next.toString()); } catch (_) {}
+      if (d.title) document.title = 'Экран учителя · ' + d.title;
+      if (!gotUrl) { gotUrl = true; if (!teacher) showStatus('Ждём размер экрана учителя…'); }
+    } else if (d.type === 'focus') {
+      follow(d.x, d.y);
+    } else if (d.type === 'exit') {
+      exitToNormal();
+    } else if (d.type === 'leave') {
+      // сессии с этим кодом нет — страница без кода и без рамки
+      const u = targetUrl(frameHref() || params.get('to'));
+      u.searchParams.delete('s');
+      location.href = u.toString();
+    }
+  });
+
+  layout(false);
+})();
+</script>
+</body>
+</html>
