@@ -757,6 +757,19 @@ if (window.TrainerSession) {
   window.TrainerSession.init({ trainer: 'index', getState: () => ({}), applyState: () => {} });
   window.TrainerSession.mountShareButton();
 }
+// Промпт №11 нового списка: «Доски» — тоже переход группы: ученики уходят
+// следом и видят доску учителя (board-stage.js)
+(function () {
+  const a = document.querySelector('a.boards-toggle[href]');
+  if (!a || !window.TrainerSession) return;
+  a.addEventListener('click', function (e) {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    window.TrainerSession.guardStudentAction('navigate', function () {
+      window.TrainerSession.navigateTo('boards.html');
+    })();
+  });
+})();
 // делегирование на контейнер, а не на каждую карточку по отдельности —
 // список тренажёров перерисовывается заново при каждом renderContent()
 document.getElementById('topics').addEventListener('click', function (e) {

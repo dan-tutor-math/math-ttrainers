@@ -57,8 +57,22 @@
      при старте записал бы в trainer_sessions свой слаг и разослал бы своё
      задание ученику. Поэтому — та же пустышка, что и без настроек Supabase */
   const BD_GEN = /[?&]bdgen=1(&|$)/.test(location.search);
-  if (BD_GEN || !cfg.url || !cfg.anonKey || !window.supabase) {
-    if (!BD_GEN) console.warn('[session-share] SUPABASE_CONFIG или supabase-js не подключены — совместный доступ недоступен на этой странице.');
+  /* Промпт №11 нового списка: и вообще любой кадр нашего же сайта, кроме
+     сцены ученика. Главный случай — панель тренажёров на доске: тренажёр в
+     ней открыт кадром, и он подключался к сессии как ещё один «учитель» —
+     переписывал в базе страницу группы на свою, слал свой размер окна и
+     свои снимки. Ученик, смотревший доску, уезжал на этот тренажёр, а сцена
+     сжималась до размера панели. Карточки «+» глушит trainer-multi.js,
+     кадр «ещё такое же» — BD_GEN, этот случай — здесь. Кадр на чужом сайте
+     (страницу тренажёра встроили куда-то) — обычная страница: туда наш
+     родитель не заглянет, и мешать там некому */
+  let OWN_FRAME = false;
+  try {
+    OWN_FRAME = window.top !== window.self && window.name !== 'tsStageFrame'
+      && window.parent.location.origin === location.origin;
+  } catch (e) { OWN_FRAME = false; }
+  if (BD_GEN || OWN_FRAME || !cfg.url || !cfg.anonKey || !window.supabase) {
+    if (!BD_GEN && !OWN_FRAME) console.warn('[session-share] SUPABASE_CONFIG или supabase-js не подключены — совместный доступ недоступен на этой странице.');
     window.TrainerSession = {
       init: async () => {}, push(){}, registerField(){}, unregisterField(){}, unregisterFieldsWithPrefix(){}, mountShareButton(){},
       broadcastEvent(){}, onEvent(){}, getCode(){ return null; }, getShareUrl(){ return ''; },
@@ -71,6 +85,7 @@
       getAutosaveHistory(){ return true; }, setAutosaveHistory(){}, onAutosaveHistoryChange(){},
       registerHistoryUI(){}, notifyHistoryChanged(){},
       isStageFrame(){ return false; }, stageFocus(){},
+      hasViewers(){ return false; }, holdStageReady(){}, releaseStageReady(){},
     };
     return;
   }
@@ -96,6 +111,14 @@
      сокета узнаём сразу и показываем это в панели, не дожидаясь статуса
      канала. */
   const SB = window.supabase.createClient(cfg.url, cfg.anonKey, {
+    // Промпт №11 нового списка (доска учителя): на странице досок у учителя
+    // есть вход по email (boards-cloud.js, свой клиент). Совместной сессии
+    // вход не нужен — она анонимная, — а второй клиент с настройками по
+    // умолчанию подхватил бы тот же сохранённый вход и стал бы сам его
+    // обновлять наперегонки с первым: одноразовый ключ обновления сгорает у
+    // одного, и учителя выкидывает из аккаунта. Поэтому здесь вход не
+    // читаем, не храним и не обновляем
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: 'ts-session-share-anon' },
     realtime: {
       params: { eventsPerSecond: 100 },
       heartbeatIntervalMs: 10000,
@@ -453,6 +476,9 @@
     if (connState === s) return;
     connState = s;
     notifyUi();
+    // сцене — сразу, а не по секундному таймеру: короткий обрыв (0,7 с до
+    // переподключения) таймер мог и не заметить
+    reportConn();
   }
   function getConnState() { return connState; }
 
@@ -1199,8 +1225,17 @@
      учителя, пришедший уже после подключения. Нет его за 1,8 с (учитель
      молчит или вышел) — показываем то, что есть */
   let stageActivatedAt = 0, stageReadySent = false;
+  // страница может попросить придержать «готово», пока не догрузит своё
+  // (доска учителя приходит частями уже после подключения — board-stage.js)
+  let readyHolds = 0, readyWanted = false;
+  function holdStageReady() { readyHolds++; }
+  function releaseStageReady() {
+    if (readyHolds > 0) readyHolds--;
+    if (!readyHolds && readyWanted) { readyWanted = false; stageReadyNow(); }
+  }
   function stageReadyNow() {
     if (!IN_STAGE || stageReadySent) return;
+    if (readyHolds) { readyWanted = true; return; }
     stageReadySent = true;
     // небольшая пауза — чтобы пришедшее успело лечь на экран. Не через
     // requestAnimationFrame: кадр, пока ждёт, прозрачен, и браузер вправе
@@ -1304,13 +1339,14 @@
   // панель и сцена — раз в секунду: «учитель не на связи» наступает не по
   // событию, а по отсутствию событий
   let lastConnSig = '';
-  setInterval(() => {
+  function reportConn() {
     const sig = connState + '|' + (teacherSilent() ? 'silent' : 'ok') + '|' + studentsOnline();
     if (sig === lastConnSig) return;
     lastConnSig = sig;
     notifyUi();
     toStageHost({ type: 'conn', state: connState, teacher: teacherSilent() ? 'silent' : 'ok' });
-  }, 1000);
+  }
+  setInterval(reportConn, 1000);
 
   /* ═══ Промпт №11 нового списка: курсор учителя на сцене ═══
      Учитель водит мышью (или пером по планшету) — у учеников на сцене видно
@@ -1336,7 +1372,15 @@
     curTimer = setTimeout(flushCursor, Math.max(0, CURSOR_MS - (Date.now() - curLast)));
   }
   function cursorFromEvent(e, dx, dy, now) {
-    queueCursor({ x: Math.round(e.clientX + dx), y: Math.round(e.clientY + dy), d: e.buttons ? 1 : 0 }, now);
+    const x = e.clientX + dx, y = e.clientY + dy;
+    // страница может попросить не показывать курсор в части окна, которой у
+    // ученика нет (панель тренажёров на доске, см. board-stage.js)
+    if (typeof window.__tsCursorMask === 'function') {
+      let masked = false;
+      try { masked = !!window.__tsCursorMask(x, y); } catch (err) {}
+      if (masked) { hideCursor(); return; }
+    }
+    queueCursor({ x: Math.round(x), y: Math.round(y), d: e.buttons ? 1 : 0 }, now);
   }
   function hideCursor() { if (curShown) queueCursor({ h: 1 }, true); }
   function hookCursor(win, offset) {
@@ -1751,5 +1795,8 @@
     getAutosaveHistory, setAutosaveHistory, onAutosaveHistoryChange,
     registerHistoryUI, notifyHistoryChanged,
     isStageFrame: () => IN_STAGE, stageFocus,
+    // есть ли кому показывать (board-stage.js шлёт доску, только если есть)
+    hasViewers: () => studentsOnline() > 0,
+    holdStageReady, releaseStageReady,
   };
 })();

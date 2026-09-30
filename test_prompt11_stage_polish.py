@@ -59,7 +59,12 @@ FAKE = t54.FAKE_LIB.replace(
     "send(msg){ if (ch.__mute || window.__fakeMuteAll || ch.state === 'closed') return Promise.resolve('ok'); const m = clone(msg);",
 ).replace(
     "setTimeout(() => bc.postMessage(m), window.__fakeLatency || 0)",
-    "setTimeout(() => { try { bc.postMessage(m); } catch (e) {} }, window.__fakeLatency || 0)",
+    # __fakeBurstMs — «неровная сеть»: исходящие копятся и уходят залпом раз
+    # в столько-то мс (так мобильный интернет отдаёт пакеты пачками)
+    "setTimeout(() => { try { if (window.__fakeBurstMs) { (window.__fakeBurstQ = window.__fakeBurstQ || []).push([bc, m]);"
+    " if (!window.__fakeBurstT) window.__fakeBurstT = setTimeout(() => { const q = window.__fakeBurstQ; window.__fakeBurstQ = [];"
+    " window.__fakeBurstT = null; q.forEach(([b, x]) => { try { b.postMessage(x); } catch (e) {} }); }, window.__fakeBurstMs); }"
+    " else bc.postMessage(m); } catch (e) {} }, window.__fakeLatency || 0)",
 ).replace(
     "bc.onmessage = (e) => {\n        const m = e.data;",
     "(window.__fakeChans = window.__fakeChans || []).push(ch);\n      bc.onmessage = (e) => {\n        if (ch.__deaf || ch.state === 'closed') return;\n        const m = e.data;",

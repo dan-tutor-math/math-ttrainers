@@ -1239,7 +1239,12 @@ function resolveBasketTexInHtml(html){
 <!-- этот маркер должен выполниться ДО boards-core.js — говорит ему не
      запускать приложение самому, а подождать, пока boards-cloud.js (ниже)
      не подтвердит вход по email -->
-<script>window.__hasCloudGate = true;</script>
+<script>window.__hasCloudGate = true;
+/* Промпт №11 нового списка: ?s=КОД в адресе — сюда пришёл ученик за учителем
+   из совместной сессии. Тогда это не приложение досок, а просмотр доски
+   учителя (board-stage.js): без входа, без своих досок, без записи. Метка
+   нужна до boards-core.js и boards-cloud.js — оба её проверяют */
+window.__boardViewer = /[?&]s=[^&#]/.test(location.search);</script>
 <script src="boards-core.js"></script>
 <!-- вход и общая доска с учеником — необязательный слой поверх обычного
      локального приложения; если supabase-config.js не заполнен, ниже
@@ -1250,5 +1255,9 @@ function resolveBasketTexInHtml(html){
 <script src="supabase-js.umd.js"></script>
 <script src="supabase-config.js"></script>
 <script src="boards-cloud.js"></script>
+<!-- совместная сессия тренажёров и доска учителя у ученика (промпт №11
+     нового списка): учитель показывает открытую доску, ученик смотрит -->
+<script src="session-share.js"></script>
+<script src="board-stage.js"></script>
 </body>
 </html>
