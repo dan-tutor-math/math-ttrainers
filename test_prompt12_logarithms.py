@@ -240,9 +240,16 @@ def prod_frames(page):
     page.mouse.move(box["x"] + box["width"] / 2, box["y"] + 30)
     page.wait_for_timeout(400)
     start = page.evaluate(f"({PROD_ORDER_JS})(300)")
-    end = page.evaluate(f"({PROD_ORDER_JS})(5000)")
+    # цикл 4,5 с: к 4 с итог уже виден, строка ещё не погасла
+    end = page.evaluate(f"({PROD_ORDER_JS})(4000)")
+    # пример начинает двигаться почти сразу после наведения: к 0,9 с «4»
+    # уже в пути (не на месте «откуда» и не на месте «куда»)
+    mid = page.evaluate(f"({PROD_ORDER_JS})(900)")
+    start["moving"] = start["b"] + 1 < mid["b"] or mid["b"] < start["b"] - 1
+    start["mid_b"] = mid["b"]; start["end_b"] = end["b"]
     ok_start = (start["p1"] and start["dot"] and start["p2"] and start["l"] < start["p1"]["x"] < start["b"] < start["dot"]["x"] < start["c"] < start["p2"]["x"]
                 and start["p1"]["o"] > 0.9 and start["pl"] < 0.1 and start["res"] < 0.1 and abs(start["l2"] - start["l"]) < 2)
+    ok_start = ok_start and start["moving"] and abs(start["mid_b"] - end["b"]) > 1
     ok_end = (end["p1"]["o"] < 0.05 and end["pl"] > 0.9 and end["res"] > 0.9 and end["l"] < end["b"] < end["l2"] < end["c"])
     return ok_start, ok_end, start, end
 
@@ -282,7 +289,9 @@ def test_tiles(browser):
     lifted = page.evaluate("() => new DOMMatrix(getComputedStyle(document.querySelector('.tile[data-pid=\"prod\"]')).transform).m42")
     running = page.evaluate("() => document.querySelector('.tile[data-pid=\"prod\"]').getAnimations({ subtree: true }).length")
     check("C: наведение поднимает плитку и запускает пример", lifted < -3 and running >= 5, f"{lifted} {running}")
-    check("C: начало примера — log₂(4·8): части по порядку, скобки видны", ok_start, str(start))
+    dur = page.evaluate("() => getComputedStyle(document.querySelector('.tile[data-pid=prod] .demo .mvk')).animationDuration")
+    check("C: начало примера — log₂(4·8): части по порядку, скобки видны; к 0,9 с части уже в пути", ok_start, str(start))
+    check("C: цикл примера 4,5 с (×1,2 к первой версии)", dur == "4.5s", dur)
     check("C: конец примера — log₂4 + log₂8 = 2 + 3 = 5", ok_end, str(end))
     # ширина окна поменялась — пример не должен «рассыпаться»
     page.set_viewport_size({"width": 1100, "height": 900})
