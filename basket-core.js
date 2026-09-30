@@ -186,6 +186,17 @@
     return { text, html };
   }
 
+  const SUP_CHARS = { '0':'⁰','1':'¹','2':'²','3':'³','4':'⁴','5':'⁵','6':'⁶','7':'⁷','8':'⁸','9':'⁹','−':'⁻','-':'⁻' };
+  const SUB_CHARS = { '0':'₀','1':'₁','2':'₂','3':'₃','4':'₄','5':'₅','6':'₆','7':'₇','8':'₈','9':'₉','−':'₋','-':'₋' };
+  function walkScript(node, isSup){
+    const r = walkChildren(node);
+    const t = r.text.replace(/\s+/g, '');
+    const map = isSup ? SUP_CHARS : SUB_CHARS;
+    const text = t && /^[0-9−-]+$/.test(t) ? t.split('').map(c => map[c]).join('') : (t ? (isSup ? '^(' : '_(') + t + ')' : '');
+    const tag = isSup ? 'sup' : 'sub';
+    return { text, html: r.html ? '<' + tag + '>' + r.html + '</' + tag + '>' : '' };
+  }
+
   // картинка — уже готовый безопасный ресурс (у нас в проекте это всегда
   // data:-URI, зашитый прямо в код тренажёра, не внешняя/пользовательская
   // ссылка), поэтому просто переносим src/alt в свою обёртку с своими же
@@ -235,6 +246,11 @@
       };
     }
 
+    // индексы и показатели (log₂ 8, 2⁵ в «Свойствах логарифмов», промпт №12
+    // нового списка): раньше их текст склеивался с соседним — «log₂ 8»
+    // становилось «log28». В HTML остаются sub/sup, в тексте — юникодные
+    // индексы, а если внутри не только цифры — «_(…)» и «^(…)»
+    if (node.tagName === 'SUB' || node.tagName === 'SUP') return walkScript(node, node.tagName === 'SUP');
     if (node.tagName === 'TABLE') return walkTable(node);
     if (node.tagName === 'IMG') return walkImg(node);
 

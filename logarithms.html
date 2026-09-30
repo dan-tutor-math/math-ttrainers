@@ -1,0 +1,2158 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B0E1A">
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Свойства логарифмов — 10–11 класс</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font-ui:'Onest',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,-apple-system,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#EEF1F7;
+  --blob-1:rgba(120,150,255,.16);
+  --blob-2:rgba(190,150,230,.14);
+  --card:rgba(255,255,255,.8);
+  --glass:rgba(255,255,255,.55);
+  --glass-strong:rgba(255,255,255,.72);
+  --glass-border:rgba(255,255,255,.85);
+  --glass-inset:rgba(255,255,255,.55);
+  --hl:var(--hl-14);
+  --muted-1:#8E8E93;
+  --muted-2:#6E6E73;
+  --muted-3:#48484A;
+  --muted-4:#3A3A3C;
+  --muted-5:#1D1D1F;
+  --muted-6:#8E8E93;
+  --paper:#FDFCF7;
+  --grid:#DCE4F0;
+  --ink:#004C99;
+  --ink-active:#003A75;
+  --pencil:#1D1D1F;
+  --teacher:#FF3B30;
+  --ok:#248A3D;
+  --ok-tint:rgba(36,138,61,.1);
+  --ok-shadow:rgba(36,138,61,.3);
+  --shadow:0 10px 34px rgba(20,30,60,.08);
+  --hl-10:rgba(0,76,153,.10);
+  --hl-14:var(--hl);
+  --hl-35:rgba(0,76,153,.35);
+}
+html[data-theme="dark"]{
+  --bg:#0B0E1A;
+  --blob-1:rgba(90,110,255,.22);
+  --blob-2:rgba(150,90,220,.18);
+  --paper:#151A2C;
+  --card:rgba(30,37,64,.82);
+  --glass:rgba(40,46,74,.5);
+  --glass-strong:rgba(46,53,84,.65);
+  --glass-border:rgba(255,255,255,.12);
+  --glass-inset:rgba(255,255,255,.07);
+  --hl:rgba(40,110,214,.26);
+  --grid:#232A44;
+  --ink:#2E7DE0;
+  --ink-active:#4A93F0;
+  --pencil:#F2F3F5;
+  --teacher:#FF6961;
+  --ok:#3E8E5B;
+  --ok-tint:rgba(62,142,91,.14);
+  --ok-shadow:rgba(62,142,91,.35);
+  --shadow:0 10px 40px rgba(0,0,0,.55);
+  --hl-10:rgba(46,125,224,.16);
+  --hl-14:var(--hl);
+  --hl-35:rgba(46,125,224,.5);
+  --muted-1:#9A9AA2;
+  --muted-2:#9A9AA2;
+  --muted-3:#AEAEB4;
+  --muted-4:#C7C7CC;
+  --muted-5:#F2F3F5;
+  --muted-6:#9A9AA2;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    var(--bg);
+  font-family:var(--font-ui);
+  color:var(--pencil);
+  min-height:100vh;
+  padding:18px 12px 60px;
+}
+.wrap{max-width:860px;margin:0 auto;position:relative;z-index:1;pointer-events:none}
+.wrap > *{pointer-events:auto}
+
+/* ─── крестик и заголовок всплывающих панелей (история решённого) ─── */
+.calc-panel-close{position:absolute;top:12px;right:12px;width:28px;height:28px;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass-strong);color:var(--muted-3);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:2;transition:transform .15s;}
+.calc-panel-close:active{transform:scale(.9)}
+.calc-panel-close:hover{border-color:var(--ink)}
+.calc-panel-title{font-family:var(--font-ui);font-weight:700;font-size:15px;color:var(--pencil);margin-bottom:14px;padding-right:32px;}
+
+/* ─── интерактивная доска на фоне вокруг примера ─── */
+#boardCanvas{position:fixed;top:0;left:0;z-index:2;touch-action:none;cursor:crosshair;border-radius:20px;}
+#boardCanvasBg{position:fixed;top:0;left:0;z-index:0;touch-action:none;cursor:crosshair;}
+/* Промпт №60 (здесь включено всегда, см. начало основного скрипта). trainer-board.js ставит холст
+   листа в координатах ДОКУМЕНТА, а position:fixed считает их от окна — при
+   прокрутке заметки уезжали вместе с экраном, а не с заданием. И холст выше
+   .wrap по z-index перехватывал нажатия: «Проверить» и поле ответа под ним
+   не нажимались. Как в ОГЭ №8: absolute и без pointer-events — рисование
+   запускает document-обработчик в trainer-board.js, а кнопки и поля он
+   пропускает сам (isBoardInteractiveTarget) */
+html[data-board-pinned] #boardCanvas{position:absolute;pointer-events:none;}
+#boardSpace{height:0;pointer-events:none;transition:height .2s ease;}
+.board-toolbar{position:fixed;right:18px;bottom:18px;z-index:50;display:flex;gap:8px;align-items:center;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;padding:9px 11px;box-shadow:var(--shadow);}
+.toolbar-sep{width:1px;align-self:stretch;background:var(--glass-border);margin:2px 0;}
+.board-tool-btn{width:34px;height:34px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .15s, border-color .15s, background .15s;}
+.board-tool-btn:active{transform:scale(.92)}
+.board-tool-btn:hover{border-color:var(--ink);}
+.board-tool-btn.active{background:var(--ink);border-color:var(--ink);}
+.board-tool-btn .dot{border-radius:50%;background:var(--pencil);display:block;}
+.board-tool-btn.active .dot{background:#fff;}
+.board-tool-btn.eraser{font-size:15px;}
+.board-tool-btn.pen-main{font-size:15px;}
+.board-tool-btn.color-btn.active{background:var(--glass);border-color:var(--ink);box-shadow:0 0 0 2px var(--ink);}
+.tool-group{position:relative;}
+/* всплывающее окошко с размерами (для ручки и ластика) — управляется из JS через
+   класс .open, а не через :hover, потому что чистый CSS-hover рвётся, стоит
+   курсору чуть отклониться от прямой линии между кнопкой и окошком */
+.size-flyout{position:absolute;bottom:100%;right:0;margin-bottom:10px;display:none;gap:8px;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;padding:8px;box-shadow:var(--shadow);}
+.size-flyout.open{display:flex;}
+/* невидимый мостик над кнопкой, чтобы курсор не «выпадал» из зоны наведения,
+   пока едет от кнопки к окошку */
+.tool-group::after{content:'';position:absolute;left:0;right:0;bottom:100%;height:14px;}
+
+/* ─── всплывающая палитра для «своего» цвета ─── */
+.board-tool-btn.custom-color-btn{overflow:hidden;}
+.color-picker-flyout{flex-direction:column;align-items:stretch;width:200px;padding:12px;gap:10px;}
+.cp-sv-wrap{position:relative;width:100%;height:120px;border-radius:12px;overflow:hidden;cursor:crosshair;touch-action:none;}
+.cp-sv{display:block;width:100%;height:100%;}
+.cp-sv-thumb{position:absolute;width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35),0 1px 3px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none;top:0;left:0;}
+.cp-row{display:flex;align-items:center;gap:8px;}
+.cp-eyedropper{width:28px;height:28px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--pencil);transition:transform .15s;}
+.cp-eyedropper:active{transform:scale(.9)}
+.cp-eyedropper:hover{border-color:var(--ink);}
+.cp-swatch{width:26px;height:26px;flex:0 0 auto;border-radius:50%;border:1px solid var(--glass-border);box-shadow:inset 0 0 0 2px rgba(255,255,255,.5);}
+.cp-hue-wrap{position:relative;flex:1;height:16px;touch-action:none;}
+.cp-hue{position:absolute;inset:0;border-radius:8px;background:linear-gradient(to right,#ff0000,#ffff00,#00ff00,#00ffff,#0000ff,#ff00ff,#ff0000);cursor:pointer;}
+.cp-hue-thumb{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;border:2px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.35),0 1px 3px rgba(0,0,0,.4);transform:translate(-50%,-50%);pointer-events:none;}
+.cp-rgb-row{display:flex;gap:6px;}
+.cp-field{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;}
+.cp-field input{width:100%;box-sizing:border-box;text-align:center;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);color:var(--pencil);font-family:var(--font-mono);font-size:12px;padding:5px 2px;}
+.cp-field label{font-size:10px;color:var(--muted-3);font-family:var(--font-ui);}
+
+.board-view-toolbar{position:fixed;left:18px;bottom:18px;z-index:50;display:flex;gap:8px;align-items:center;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:20px;padding:9px 11px;box-shadow:var(--shadow);}
+.board-zoom-label{min-width:44px;height:34px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass);display:flex;align-items:center;justify-content:center;cursor:pointer;font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-3);padding:0 6px;transition:transform .15s;}
+.board-zoom-label:active{transform:scale(.92)}
+.board-zoom-label:hover{border-color:var(--ink);}
+.board-tool-btn.hand-tool{font-size:16px;}
+.board-tool-btn.clear-btn{font-size:15px;}
+
+/* ─── доска изначально выключена — включается отдельной кнопкой под переключателем темы ─── */
+html:not([data-board="on"]) .board-toolbar,
+html:not([data-board="on"]) .board-view-toolbar{display:none;}
+html:not([data-board="on"]) #boardCanvas,
+html:not([data-board="on"]) #boardCanvasBg{pointer-events:none;}
+html[data-board="on"] #boardSpace{height:72vh;transition:height .32s ease;}
+html[data-board="on"][data-focus="on"] #boardSpace{height:90vh;}
+html[data-board="on"] body{background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    var(--bg);}
+/* ─── свернуть подсказки: освобождает место для записи на доске ─── */
+.focus-toggle{position:fixed;top:112px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
+.focus-toggle:hover{border-color:var(--ink)}
+.focus-toggle:active{transform:scale(.92)}
+
+/* ─── аккуратное сворачивание: max-height/opacity вместо мгновенного display:none ─── */
+h1,.sub,.stats,.submode-row{overflow:hidden;min-height:0;transition:max-height .32s ease, opacity .22s ease, margin .32s ease;}
+h1{max-height:64px}
+.sub{max-height:50px}
+.stats{max-height:90px}
+.submode-row{max-height:56px}
+html[data-focus="on"] h1,
+html[data-focus="on"] .sub,
+html[data-focus="on"] .stats,
+html[data-focus="on"] .submode-row{
+  max-height:0;
+  min-height:0;
+  padding:0;
+  border-width:0;
+  opacity:0;
+  margin-top:0;
+  margin-bottom:0;
+  pointer-events:none;
+}
+html[data-focus="on"] #pickerArea{display:none!important;}
+h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,5vw,34px);color:var(--pencil);text-align:center;}
+.sub{font-family:var(--font-ui);font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 18px;}
+.submode-tabs{display:flex;gap:8px;}
+.submode-row{margin-bottom:14px;}
+.submode-tab{flex:1;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:10px 6px;cursor:pointer;text-align:center;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s, border-color .15s, color .15s, background .15s;}
+.submode-tab:active{transform:scale(.96)}
+.submode-tab:hover{border-color:var(--ink);}
+.submode-tab.active{color:#fff;background:var(--ink);border-color:var(--ink);}
+.refresh-btn{width:28px;height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}
+.refresh-btn:hover{border-color:var(--ink);transform:rotate(80deg)}
+.refresh-btn:active{transform:scale(.9)}
+.basket-add-btn{width:28px;height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:13px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .15s, border-color .12s, background .2s, color .2s;}
+.basket-add-btn:hover{border-color:var(--ink)}
+.basket-add-btn:active{transform:scale(.9)}
+.basket-add-btn.ok{background:var(--ok, #34c759);border-color:var(--ok, #34c759);color:#fff;}
+.task-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3);}
+.panel{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:20px;margin-bottom:14px;}
+@keyframes revealUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+#mainPanel.reveal{animation:revealUp .38s cubic-bezier(.22,.9,.35,1) both;}
+
+/* ─── экран выбора прототипа (как список типов в ОГЭ №8) ─── */
+.group-title{font-family:var(--font-ui);font-weight:700;font-size:14px;color:var(--muted-2);text-transform:uppercase;letter-spacing:.04em;margin:0 2px 10px;}
+.modes{display:flex;flex-direction:column;gap:8px;margin-bottom:6px;}
+.mode-card{display:flex;align-items:center;flex-wrap:wrap;gap:6px 16px;text-align:left;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:14px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:11px 18px;cursor:pointer;transition:transform .12s, border-color .12s;font-family:var(--font-ui);}
+.mode-card:hover{border-color:var(--ink);transform:translateX(3px)}
+.mode-card .mtitle{font-weight:600;font-size:15px;color:var(--pencil);line-height:1.3;flex:0 0 auto;margin:0;}
+.mode-card .mpeek{font-family:var(--font-ui);font-size:13px;color:var(--muted-6);line-height:1.35;flex:1 1 240px;min-width:0;}
+.mode-card .mdone{font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--ok);flex:0 0 auto;}
+/* шапка задания: слева переходы между прототипами, справа название и «в подборку».
+   flex-wrap — чтобы на телефоне кнопки переносились, а не вылезали за край */
+.task-head{display:flex;flex-wrap:wrap;row-gap:8px;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;padding-right:62px;}
+.type-nav{display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;gap:8px;}
+.type-nav-btn{height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-ui);font-weight:600;font-size:12px;line-height:1;cursor:pointer;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;transition:transform .12s, border-color .12s;}
+.type-nav-btn:hover{border-color:var(--ink)}
+.type-nav-btn:active{transform:scale(.9)}
+.back-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 14px;cursor:pointer;transition:transform .12s, border-color .12s;}
+.back-btn:active{transform:scale(.96)}
+.back-btn:hover{border-color:var(--ink)}
+.corner{display:flex;flex-wrap:wrap;align-items:center;gap:8px;}
+.src-note{font-family:var(--font-ui);font-size:12px;color:var(--muted-6);}
+
+/* ─── поля ответа ─── */
+.answer-area{margin-top:18px;}
+.input-answer-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.answer-input{
+  font-family:var(--font-mono);font-size:18px;color:var(--ink);
+  background:var(--card);border:1.5px solid var(--glass-border);border-radius:14px;
+  padding:11px 14px;width:150px;
+}
+.answer-input.wide{width:min(340px,100%);}
+.answer-input:focus{outline:none;border-color:var(--ink)}
+.answer-input.good{border-color:var(--ok);background:var(--ok-tint);color:var(--ok);}
+.answer-input.bad{border-color:var(--teacher);background:rgba(255,59,48,.1);color:var(--teacher);}
+.answer-input.fixed{border-color:var(--ink);border-style:dashed;background:var(--hl-10);}
+@keyframes shakeInput{20%{transform:translateX(-6px)}40%{transform:translateX(6px)}60%{transform:translateX(-4px)}80%{transform:translateX(4px)}}
+.answer-input.shake{animation:shakeInput .35s;}
+.check-btn{font-family:var(--font-ui);font-weight:600;font-size:15px;background:var(--ink);color:#fff;border:none;border-radius:14px;padding:11px 22px;cursor:pointer;transition:transform .15s;}
+.check-btn:active{transform:scale(.98)}
+.check-btn:disabled{opacity:.5;cursor:default}
+.p2-field{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;}
+.p2-label{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3);min-width:28px;}
+.p2-unit{font-family:var(--font-ui);font-size:14px;color:var(--muted-6);}
+.field-hint{font-family:var(--font-ui);font-size:12px;color:var(--muted-6);flex-basis:100%;margin:-4px 0 0 38px;}
+.answer-msg{font-family:var(--font-ui);font-size:13px;color:var(--teacher);margin-top:8px;min-height:0;}
+.manual-note{font-family:var(--font-ui);font-size:13px;color:var(--muted-6);margin-top:10px;line-height:1.45;}
+.ans-note{font-weight:400;font-size:14px;color:var(--muted-6);}
+.btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;}
+.soft-btn{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--ink);background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:11px;padding:9px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:transform .12s, border-color .12s;}
+.soft-btn:hover{border-color:var(--ink)}
+.soft-btn:active{transform:scale(.96)}
+
+/* ─── несколько заданий на экране (как в ОГЭ №8) ─── */
+.work-zone{position:relative;left:50%;transform:translateX(-50%);max-width:calc(100vw - 24px);width:var(--work-w, 100%);}
+.work-resize-handle{position:absolute;top:0;bottom:0;width:10px;cursor:ew-resize;touch-action:none;z-index:5;}
+.work-resize-handle.left{left:0;}
+.work-resize-handle.right{right:0;}
+.tasks-columns{display:grid;gap:14px;align-items:start;}
+/* без min-width:0 колонка сетки растёт по самому широкому содержимому, и
+   широкое содержимое распирало бы страницу на телефоне */
+.tasks-columns > *{min-width:0;}
+.added-task-card{position:relative;}
+.card-btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.card-btn-row .soft-btn{margin-top:0;}
+.icon-only{font-size:15px;line-height:1;padding:8px 11px;}
+.added-remove-btn{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--teacher);background:none;border:1px solid transparent;border-radius:11px;padding:8px 10px;cursor:pointer;margin-left:auto;transition:border-color .12s;}
+.added-remove-btn:hover{border-color:var(--teacher)}
+.added-explain{margin-top:12px;border-top:1px solid var(--glass-border);padding-top:12px;}
+.add-rail{position:fixed;left:12px;top:50%;transform:translateY(-50%);z-index:120;display:flex;flex-direction:column;align-items:center;gap:8px;}
+.add-rail-toggle{width:44px;height:44px;flex:0 0 auto;border:none;border-radius:50%;background:var(--ink);color:#fff;font-size:24px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 6px 18px rgba(0,0,0,.25);transition:transform .15s;}
+.add-rail-toggle:hover{transform:scale(1.06)}
+.add-rail.open .add-rail-toggle{transform:rotate(45deg)}
+.add-rail-body{display:none;flex-direction:column;gap:6px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;padding:10px 8px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:70vh;overflow-y:auto;}
+.add-rail.open .add-rail-body{display:flex;}
+.add-rail-label{font-family:var(--font-ui);font-weight:600;font-size:11px;color:var(--muted-3);text-align:center;margin-bottom:2px;}
+.add-rail-body .add-qty-btn{min-width:46px;text-align:center;padding:8px 6px;font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--ink);background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:10px;cursor:pointer;}
+.add-rail-body .add-qty-btn:hover{border-color:var(--ink)}
+.add-rail-sep{height:1px;background:var(--glass-border);margin:4px 2px;}
+.add-rail-act{padding:7px 6px;font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--ink);background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:10px;cursor:pointer;}
+.add-rail-act:hover{border-color:var(--ink)}
+
+/* ─── медали за серию без ошибок ─── */
+.medal-badge-row{display:inline-flex;flex-wrap:wrap;row-gap:3px;gap:3px;font-size:15px;vertical-align:middle;}
+.medal-tray{position:fixed;left:0;right:0;bottom:0;z-index:150;display:none;gap:7px;align-items:center;padding:8px 16px;overflow-x:auto;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border-top:1px solid var(--glass-border);}
+.medal-tray.show{display:flex;}
+html[data-medals="on"] .board-toolbar,
+html[data-medals="on"] .board-view-toolbar{bottom:64px;}
+.medal-tray-icon{font-size:20px;filter:drop-shadow(0 2px 4px rgba(0,0,0,.2));animation:medalPop .45s cubic-bezier(.34,1.56,.64,1) both;flex:none;}
+@keyframes medalPop{0%{transform:scale(0);}70%{transform:scale(1.3);}100%{transform:scale(1);}}
+.medal-flyer{position:fixed;z-index:300;pointer-events:none;font-size:44px;filter:drop-shadow(0 4px 14px rgba(0,0,0,.3));transition:transform .85s cubic-bezier(.32,.9,.35,1), opacity .85s ease .1s;}
+.mode-medals{font-family:var(--font-ui);font-size:12px;opacity:.85;flex:0 0 auto;}
+
+/* ─── история решённых заданий ─── */
+/* отступ сверху как в ОГЭ-тренажёрах (18px): у .stats стоит overflow:hidden ради плавного
+   сворачивания, он срезает тень карточек, и при 2px кнопка визуально прилипала к статистике */
+.example-history-toggle{display:block;width:100%;margin:18px 0 14px;font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:10px;cursor:pointer;transition:border-color .12s;}
+.example-history-toggle:hover{border-color:var(--ink)}
+.example-history-panel{display:none;position:relative;padding:18px;}
+.example-history-list{display:flex;flex-direction:column;}
+.example-history-row{display:flex;gap:10px;align-items:flex-start;padding:10px 0;border-top:1px solid var(--glass-border);}
+.example-history-row:first-child{border-top:none;}
+.example-history-num{font-family:var(--font-ui);font-weight:600;font-size:12px;color:var(--muted-6);min-width:26px;}
+.example-history-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px;font-family:var(--font-ui);font-size:14px;color:var(--muted-4);}
+.example-history-answer{font-family:var(--font-mono);font-size:13px;font-weight:600;color:var(--ok);}
+.example-history-answer.bad{color:var(--teacher)}
+.example-history-empty{font-family:var(--font-ui);font-size:14px;color:var(--muted-6);text-align:center;padding:16px 0;}
+
+/* ─── плавающая клавиатура для ввода с телефона ─── */
+.keypad{display:grid;grid-template-columns:repeat(3, 44px);gap:6px}
+.keypad button{width:44px;height:40px;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-mono);font-size:18px;cursor:pointer;touch-action:manipulation}
+.keypad button:active{background:var(--hl)}
+.keypad button.kp-minus{color:var(--teacher);font-weight:700}
+.keypad button.kp-back{grid-column:span 3;width:auto;height:36px;font-size:15px;color:var(--muted-6);}
+.keypad button.kp-enter{grid-column:span 3;width:auto;height:38px;font-family:var(--font-ui);font-weight:600;font-size:14px;background:var(--ink);color:#fff;border-color:var(--ink);}
+.keypad button.kp-enter:active{background:var(--ink-active);}
+.keypad-float{position:fixed;top:160px;right:16px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:20px;padding:12px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:210;}
+.keypad-close{position:absolute;top:-11px;right:-11px;width:26px;height:26px;border-radius:50%;background:var(--teacher);color:#fff;border:2px solid #fff;font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .15s;}
+.keypad-close:active{transform:scale(.9)}
+.keypad-drag-handle{position:absolute;top:-11px;left:-11px;width:26px;height:26px;border-radius:50%;background:var(--ink);color:#fff;border:2px solid #fff;font-size:12px;line-height:1;cursor:grab;display:flex;align-items:center;justify-content:center;touch-action:none;}
+.keypad-toggle{position:fixed;top:160px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s;}
+.keypad-toggle:active{transform:scale(.92)}
+/* на ноутбуке и телефоне справа сверху клавиатура ложится прямо на задание —
+   опускаем её в нижний угол, как в ОГЭ №8 */
+@media(max-width:1250px){.keypad-float,.keypad-toggle{top:auto;bottom:16px;right:16px}}
+/* на узком экране колонка добавления не должна наезжать на задание */
+@media (max-width:760px){
+  .add-rail{left:6px;}
+  .add-rail-toggle{width:38px;height:38px;font-size:20px;}
+  .add-rail-body{padding:8px 6px;}
+  .add-rail-body .add-qty-btn{min-width:38px;font-size:11px;padding:6px 4px;}
+}
+
+/* ─── решение ─── */
+.sol-hint{font-family:var(--font-ui);font-size:15px;line-height:1.55;color:var(--muted-4);background:var(--hl-10);border-radius:14px;padding:12px 14px;margin-bottom:14px;}
+.sol-hint b{color:var(--ink)}
+.sol-step{font-family:var(--font-ui);font-size:15px;line-height:1.6;color:var(--muted-4);border-top:1px solid var(--glass-border);padding:12px 0 2px;display:flex;gap:12px;}
+.sol-step:first-child{border-top:none;padding-top:2px;}
+.sol-step .no{flex:0 0 auto;width:24px;height:24px;border-radius:50%;background:var(--glass-strong);border:1px solid var(--glass-border);color:var(--ink);font-family:var(--font-ui);font-weight:700;font-size:12px;display:flex;align-items:center;justify-content:center;margin-top:2px;}
+.sol-step .body{flex:1;min-width:0;overflow-x:auto;}
+.sol-answer{font-family:var(--font-ui);font-weight:600;font-size:17px;color:var(--ink);border-top:1px solid var(--glass-border);margin-top:12px;padding-top:12px;line-height:1.6;}
+.next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:14px;box-shadow:0 6px 18px var(--ok-shadow);transition:transform .15s;}
+.next-btn:active{transform:scale(.98)}
+.stats{display:flex;gap:10px;flex-wrap:wrap;}
+/* плашки статистики без тени, как кнопки калькулятора над ними: у .stats
+   overflow:hidden (плавное сворачивание), он срезал тень снизу и по углам,
+   и оставались только полоски по бокам */
+.stat{flex:1;min-width:110px;background:var(--glass);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:16px;padding:12px 14px;text-align:center;}
+/* Промпт №63: на экране меньше 360px три карточки счёта с min-width:110px не
+   помещались в ряд, третья уходила на вторую строку и обрезалась (у .stats
+   max-height и overflow:hidden). Там им разрешено сжиматься */
+@media(max-width:359px){.stat{min-width:0}}
+.stat .v{font-family:var(--font-ui);font-weight:700;font-size:22px;color:var(--ink);}
+.stat .l{font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-6);}
+.theme-toggle{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;}
+.theme-toggle:hover{border-color:var(--ink)}
+.theme-toggle:active{transform:scale(.92)}
+.board-visibility-toggle{top:64px;transition:transform .15s;}
+.board-visibility-toggle:active{transform:scale(.92)}
+.board-visibility-toggle.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+.home-btn{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
+.home-btn:hover{border-color:var(--ink)}
+.home-btn:active{transform:scale(.92)}
+
+/* ═══════════════ математический набор ═══════════════
+   Формулы собираются из обычных sub/sup и вертикальной дроби (как в
+   учебнике: числитель над знаменателем), рисует их LOG_BANK.render.
+   line-height:0 у индексов — чтобы log₂ и степени не раздували строку. */
+.mx,.log-expr,.log-inline,.step-math,.mcq-btn,.tile-formula,.demo{font-variant-numeric:lining-nums}
+.lg{font-style:normal;white-space:nowrap}
+.lg sub{font-size:.64em;line-height:0;vertical-align:-.42em;margin-left:1px}
+.la{margin-left:.2em;white-space:nowrap}
+.la.lga{margin-left:.12em}
+.pw{white-space:nowrap}
+.pw > sup{font-size:.64em;line-height:0;vertical-align:.72em;margin-left:1px}
+sup sub,sub sup,sup sup,sub sub{font-size:.82em}
+.mv{font-family:'Times New Roman','STIX Two Text',Georgia,serif;font-style:italic;font-size:1.1em;padding:0 .03em}
+.mo{margin:0 .24em}
+.mo.eq{margin:0 .38em}
+.mp{font-weight:300}
+.rt{display:inline-flex;align-items:flex-start;white-space:nowrap}
+.rt .ri{font-size:.56em;margin-right:-.42em;position:relative;top:-.18em;z-index:1}
+.rt .rs{font-weight:400}
+.rt .rad{border-top:1.5px solid currentColor;padding:0 .12em 0 .08em;margin-left:-.06em;margin-top:.18em;line-height:1.1}
+.frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.12;margin:0 .14em;white-space:nowrap}
+.frac .num{padding:0 .22em .1em;border-bottom:1.5px solid currentColor}
+.frac .den{padding:.1em .22em 0}
+sub .frac,sup .frac{font-size:.9em;margin:0 1px}
+sub .frac .num,sup .frac .num{border-bottom-width:1px}
+.slot{display:inline-flex;align-items:center;justify-content:center;min-width:1.35em;height:1.3em;padding:0 .2em;border:2px dashed var(--ink);border-radius:7px;color:var(--ink);font-weight:700;font-style:normal;line-height:1;vertical-align:middle}
+sub .slot,sup .slot{border-width:1.5px;border-radius:5px;height:1.25em}
+.slot.filled{border-style:solid;border-color:var(--ok);color:var(--ok)}
+.fsep{margin:0 .7em 0 .1em;color:var(--muted-6)}
+
+/* ═══════════════ экран плиток ═══════════════
+   Плитки на всю ширину окна (до 1320px), как у «Процентов»: .wrap на экране
+   выбора расширяется — класс ставит render(). */
+html[data-screen="picker"] .wrap{max-width:1320px}
+.pk-lead{font-family:var(--font-ui);font-size:14px;color:var(--muted-6);text-align:center;margin:-8px auto 18px;max-width:700px;line-height:1.55}
+.pk-lead b{color:var(--muted-3);font-weight:600}
+.pk-lead .mx{color:var(--muted-3);font-weight:600;white-space:nowrap}
+
+/* Сетка: колонки заданы ЯВНО (6 → 4 → 2), а не auto-fill, как у
+   «Процентов». Все плитки здесь двойной ширины и одна 2×2: при нечётном
+   числе колонок в каждом ряду оставалась бы пустая клетка. 24 клетки
+   делятся и на 6, и на 4 — дыр нет ни на широком экране, ни на планшете. */
+.tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:224px;grid-auto-flow:dense;gap:14px;margin-bottom:16px}
+@media (max-width:1180px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.tile{--acc:#2E7DE0;--acc-soft:rgba(46,125,224,.14);position:relative;display:flex;flex-direction:column;text-align:left;grid-column:span 2;
+  font-family:var(--font-ui);color:var(--pencil);cursor:pointer;min-width:0;overflow:hidden;
+  /* без backdrop-filter: размытие фона пересчитывалось бы при каждом подъёме
+     плитки — на слабом ноутбуке это заметно (так же у «Процентов») */
+  background:var(--card);border:1px solid var(--glass-border);border-radius:22px;
+  box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:13px 16px 14px;
+  transition:transform .28s cubic-bezier(.2,.9,.3,1.25), box-shadow .28s ease, border-color .2s ease, background-color .2s ease;
+  -webkit-user-select:none;user-select:none}
+.tile.l{grid-row:span 2;padding:18px 22px 20px}
+.tile::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:radial-gradient(120% 90% at 100% 0%,var(--acc-soft) 0%,transparent 58%);opacity:.55;transition:opacity .3s}
+/* «блик» — полоса света пробегает по плитке при наведении; transform, а не
+   background-position: сдвиг слоя не перерисовывает плитку */
+.tile::after{content:'';position:absolute;top:-20%;bottom:-20%;left:0;width:40%;pointer-events:none;
+  background:linear-gradient(100deg,transparent 0%,rgba(255,255,255,.5) 50%,transparent 100%);
+  transform:translateX(-160%) skewX(-12deg);opacity:0}
+html[data-theme="dark"] .tile::after{background:linear-gradient(100deg,transparent 0%,rgba(255,255,255,.12) 50%,transparent 100%)}
+.tile:hover,.tile:focus-visible{transform:translateY(-6px) scale(1.012);border-color:var(--acc);outline:none;
+  box-shadow:inset 0 1px 0 var(--glass-inset), 0 0 0 1px var(--acc), 0 20px 44px -14px var(--acc), 0 10px 34px rgba(20,30,60,.10)}
+html[data-theme="dark"] .tile:hover{box-shadow:inset 0 1px 0 var(--glass-inset), 0 0 0 1px var(--acc), 0 20px 48px -12px var(--acc), 0 10px 40px rgba(0,0,0,.55)}
+.tile:hover::before,.tile:focus-visible::before{opacity:1}
+.tile:hover::after{opacity:1;transform:translateX(360%) skewX(-12deg);transition:transform 1s cubic-bezier(.3,.6,.3,1),opacity .2s}
+.tile:active{transform:translateY(-2px) scale(.985);transition-duration:.12s}
+/* выбранная плитка: рамка цветом группы, подложка и галочка */
+.tile.sel{border-color:var(--acc);background-color:var(--card);box-shadow:inset 0 0 0 1.5px var(--acc), inset 0 1px 0 var(--glass-inset), 0 14px 34px -16px var(--acc)}
+.tile.sel::before{opacity:1;background:radial-gradient(130% 110% at 100% 0%,var(--acc-soft) 0%,transparent 70%)}
+.tile-top{display:flex;align-items:center;gap:8px;position:relative;z-index:1;min-height:24px}
+.tile-tag{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--acc);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.tile-tag::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--acc)}
+.tile-badges{display:inline-flex;align-items:center;gap:6px;margin-left:auto}
+.tile-done{font-size:11.5px;font-weight:600;color:var(--ok);white-space:nowrap}
+.tile-lvl{font-size:11px;font-weight:700;color:var(--acc);background:var(--acc-soft);border-radius:8px;padding:2px 7px;white-space:nowrap}
+.tile-check{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid var(--acc);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:800;transition:background-color .2s}
+.tile-badges + .tile-check{margin-left:2px}
+.tile-check::after{content:'✓';opacity:0;transform:scale(.3);transition:opacity .18s, transform .3s cubic-bezier(.3,1.6,.5,1)}
+.tile.sel .tile-check{background:var(--acc)}
+.tile.sel .tile-check::after{opacity:1;transform:none}
+.tile-title{position:relative;z-index:1;font-weight:700;font-size:15.5px;line-height:1.25;letter-spacing:-.01em;margin-top:6px}
+.tile.l .tile-title{font-size:20px;margin-top:10px}
+.tile-formula{position:relative;z-index:1;flex:1 1 auto;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  font-size:21px;font-weight:500;color:var(--pencil);white-space:nowrap;transition:transform .35s cubic-bezier(.2,.9,.3,1.3)}
+.tile-formula .f2{font-size:.72em;color:var(--muted-3)}
+.tile.l .tile-formula{font-size:34px;gap:10px}
+.tile.l .tile-formula .f2{font-size:15px;white-space:normal;text-align:center;line-height:1.45;color:var(--muted-2);max-width:340px;font-weight:400}
+.tile:hover .tile-formula{transform:scale(1.04)}
+/* полоса с примером: при наведении пример «разворачивается» по свойству */
+.tile-demo{position:relative;z-index:1;flex:none;height:56px;border-radius:13px;background:var(--acc-soft);overflow:hidden;margin-top:6px}
+.tile.l .tile-demo{height:78px;border-radius:16px}
+.tile-demo::before{content:'пример';position:absolute;left:10px;top:4px;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--acc);opacity:.75}
+.demo{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:17.5px;font-weight:500;color:var(--pencil);white-space:nowrap}
+.tile.l .demo{font-size:26px}
+/* строка примера — обычная inline-разметка, НЕ flex: у элемента flex-контейнера
+   не работает vertical-align, и индексы log₂ и степени вставали посередине строки */
+.demo-line{position:relative;display:inline-block;white-space:nowrap;padding-top:8px;line-height:1.2}
+.demo-measure{position:absolute;padding-top:0;inset:0;display:flex;align-items:center;justify-content:center;visibility:hidden;pointer-events:none}
+.demo-measure [data-at]{display:none}
+/* line-height у индексов 0 (чтобы не раздувать строку), и без своего
+   line-height токен внутри индекса получал нулевую высоту */
+.demo .t{display:inline-block;transform-origin:0 0;line-height:1.15}
+.demo .t.op{margin:0 .22em}
+.demo .t.big{font-weight:700;color:var(--acc)}
+.demo .late{margin-left:.3em;color:var(--acc);font-weight:600}
+.demo .late .op{margin:0 .22em}
+.demo sup,.demo sub{font-size:.62em;line-height:0}
+.demo sup{vertical-align:.8em}
+.demo sub{vertical-align:-.4em}
+.demo .dfrac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.05;margin:0 .1em}
+.demo .dn{display:block;text-align:center;white-space:nowrap;padding:0 .15em}
+.demo .dbar{display:block;align-self:stretch;height:1.6px;background:currentColor;border-radius:1px;margin:.1em 0}
+.demo .ghost{position:absolute;margin:0;opacity:0;pointer-events:none;white-space:nowrap}
+.demo .ghost.dbar{background:currentColor}
+
+/* Анимация примера — только transform и opacity (их браузер двигает без
+   перерисовки). Исходный стиль токена — КОНЕЧНЫЙ кадр: при «уменьшить
+   движение» и без наведения видна законченная запись. Смещения --dx/--dy
+   и масштаб --s измеряет layoutDemo() по начальной записи примера. */
+@keyframes dmMove{0%,24%{transform:translate(var(--dx,0),var(--dy,0)) scale(var(--s,1))}50%,100%{transform:none}}
+@keyframes dmIn{0%,30%{opacity:0;transform:translateY(6px) scale(.6)}50%,100%{opacity:1;transform:none}}
+@keyframes dmLate{0%,58%{opacity:0;transform:translateX(-6px)}72%,100%{opacity:1;transform:none}}
+@keyframes dmOut{0%,22%{opacity:1;transform:none}40%,100%{opacity:0;transform:translateY(-7px) scale(.7)}}
+@keyframes dmLine{0%{opacity:0}5%,93%{opacity:1}100%{opacity:0}}
+.tile:hover .demo-line,.tile:focus-visible .demo-line{animation:dmLine 5.4s linear infinite}
+.tile:hover .demo .mvk,.tile:focus-visible .demo .mvk{animation:dmMove 5.4s cubic-bezier(.55,.05,.25,1) infinite}
+.tile:hover .demo .ink,.tile:focus-visible .demo .ink{animation:dmIn 5.4s cubic-bezier(.3,.8,.3,1.2) infinite}
+.tile:hover .demo .late,.tile:focus-visible .demo .late{animation:dmLate 5.4s ease-out infinite}
+.tile:hover .demo .ghost,.tile:focus-visible .demo .ghost{animation:dmOut 5.4s ease-in-out infinite}
+/* сенсорный экран: наведения нет — пример идёт сам у плиток на экране */
+@media (hover:none){
+  .tile.live .demo-line{animation:dmLine 5.4s linear infinite}
+  .tile.live .demo .mvk{animation:dmMove 5.4s cubic-bezier(.55,.05,.25,1) infinite}
+  .tile.live .demo .ink{animation:dmIn 5.4s cubic-bezier(.3,.8,.3,1.2) infinite}
+  .tile.live .demo .late{animation:dmLate 5.4s ease-out infinite}
+  .tile.live .demo .ghost{animation:dmOut 5.4s ease-in-out infinite}
+  .tile.live .mix-card{animation-name:mixCycle}
+}
+/* плитки за краем экрана и на скрытом экране выбора — на паузе */
+.tile:not(.live) .demo *,.tile:not(.live) .demo-line,.tile:not(.live) .mix-card{animation-play-state:paused !important}
+
+/* плитка «Все свойства вперемешку» */
+.tile.mix{--acc:#D0457A;--acc-soft:rgba(208,69,122,.14)}
+.tile.mix .tile-formula{font-size:14px;color:var(--muted-2);white-space:normal;text-align:center;font-weight:400;line-height:1.45}
+.mix-deck{position:relative;flex:none;height:56px;margin-top:6px;border-radius:13px;background:var(--acc-soft);overflow:hidden}
+.mix-card{position:absolute;top:14px;height:28px;padding:0 10px;border-radius:9px;background:var(--card);border:1px solid var(--glass-border);box-shadow:0 3px 10px rgba(20,30,60,.08);
+  display:flex;align-items:center;font-size:14px;font-weight:600;white-space:nowrap;color:var(--pencil)}
+.mix-card:nth-child(1){left:6%}
+.mix-card:nth-child(2){left:37%}
+.mix-card:nth-child(3){left:68%}
+.tile.mix:hover .mix-card,.tile.mix:focus-visible .mix-card{animation-name:mixCycle}
+.mix-card{animation:none 3.6s cubic-bezier(.5,.1,.3,1) infinite}
+.mix-card:nth-child(2){animation-delay:-1.2s}
+.mix-card:nth-child(3){animation-delay:-2.4s}
+@keyframes mixCycle{0%,20%{transform:none}33%,53%{transform:translate(0,-4px) rotate(-3deg)}66%,86%{transform:translate(0,3px) rotate(2deg)}100%{transform:none}}
+
+/* панель «выбрано … Начать» прилипает к низу экрана выбора */
+.pk-bar{position:sticky;bottom:14px;z-index:30;margin:2px auto 0;max-width:760px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:10px 12px 10px 18px;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
+  border:1px solid var(--glass-border);border-radius:18px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);font-family:var(--font-ui)}
+html[data-medals="on"] .pk-bar{bottom:64px}
+.pk-bar-info{flex:1 1 220px;min-width:0;font-size:14px;color:var(--muted-3);line-height:1.35}
+.pk-bar-info b{color:var(--pencil)}
+.pk-bar-info .pk-names{display:block;font-size:12.5px;color:var(--muted-6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-bar-clear{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--muted-3);background:none;border:1px solid var(--glass-border);border-radius:12px;padding:10px 12px;cursor:pointer}
+.pk-bar-clear:hover{border-color:var(--ink);color:var(--ink)}
+.pk-bar-go{font-family:var(--font-ui);font-weight:700;font-size:15px;color:#fff;background:var(--ink);border:none;border-radius:13px;padding:11px 22px;cursor:pointer;box-shadow:0 6px 18px var(--hl-35);transition:transform .15s, opacity .15s}
+.pk-bar-go:hover{transform:translateY(-1px)}
+.pk-bar-go:active{transform:scale(.97)}
+.pk-bar-go:disabled{opacity:.45;cursor:default;box-shadow:none;transform:none}
+
+/* «уменьшить движение»: всё стоит в конечном кадре, плитки не прыгают */
+@media (prefers-reduced-motion: reduce){
+  .demo *, .demo-line, .mix-card{animation:none !important}
+  .tile, .tile-formula, .tile-check::after{transition:none !important}
+  .tile:hover, .tile:focus-visible, .tile:active{transform:none}
+  .tile:hover .tile-formula{transform:none}
+  .tile::after{display:none}
+  .tile::before{transition:none}
+}
+
+/* на узком экране квадратные кнопки в углах наезжали бы на заголовок */
+@media (max-width:620px){
+  /* заголовок «Свойства логарифмов» длинный — и на экране задания ему нужна
+     своя строка под кнопками */
+  body{padding-top:64px}
+  /* справа под строкой кнопок — ещё кнопки доски и подсказок (до ~150px):
+     заголовок и подпись держатся от краёв, длинный заголовок переносится */
+  h1,.sub{padding-left:48px;padding-right:48px}
+  .pk-lead{padding:0 46px;font-size:13px}
+}
+/* телефон: одна колонка, высота плитки по содержимому */
+@media (max-width:540px){
+  .tiles{grid-template-columns:1fr;grid-auto-rows:auto;gap:10px}
+  .tile,.tile.l{grid-column:auto;grid-row:auto;padding:12px 14px 13px}
+  .tile.l .tile-title{font-size:16px;margin-top:6px}
+  .tile-formula,.tile.l .tile-formula{font-size:19px;margin:10px 0 6px;gap:4px}
+  .tile.l .tile-formula .f2{font-size:13px}
+  .tile.l .tile-demo,.tile-demo,.mix-deck{height:56px}
+  .tile.l .demo{font-size:17.5px}
+  .pk-bar{bottom:10px;padding:9px 10px 9px 14px}
+  .pk-bar-go{padding:10px 16px}
+}
+
+/* ═══════════════ экран задания ═══════════════ */
+.run-row{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:-4px 0 12px}
+.run-chip{font-family:var(--font-ui);font-size:12px;font-weight:600;color:var(--acc);background:var(--acc-soft);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.ref-btn{margin-left:auto;font-family:var(--font-ui);font-weight:600;font-size:12.5px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:11px;padding:6px 11px;cursor:pointer}
+.ref-btn:hover{border-color:var(--ink)}
+.ref-btn.active{background:var(--ink);color:#fff;border-color:var(--ink)}
+.prop-ref{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px;margin:0 0 14px}
+.prop-ref-item{background:var(--glass);border:1px solid var(--glass-border);border-left:3px solid var(--acc);border-radius:12px;padding:8px 12px;font-family:var(--font-ui)}
+.prop-ref-item .nm{font-size:11.5px;font-weight:700;color:var(--acc);margin-bottom:3px}
+.prop-ref-item .fm{font-size:17px;color:var(--pencil);white-space:nowrap;overflow-x:auto;padding:4px 0}
+.log-ask{font-family:var(--font-ui);font-size:15px;color:var(--muted-3);line-height:1.5}
+.log-kind{display:inline-block;font-family:var(--font-ui);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-6);margin-bottom:6px}
+.log-expr{font-family:var(--font-ui);font-size:clamp(22px,3.6vw,28px);color:var(--pencil);text-align:center;margin:16px 0 8px;line-height:1.9;padding:4px 2px}
+.log-inline{font-size:1.18em;color:var(--pencil);white-space:nowrap;margin:0 .15em}
+.log-note{font-family:var(--font-ui);font-size:12.5px;color:var(--muted-6);text-align:center;margin-top:4px}
+.mcq-options{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px;justify-content:center}
+.mcq-btn{text-align:center;font-family:var(--font-ui);font-weight:500;font-size:19px;color:var(--pencil);background:var(--card);border:1.5px solid var(--glass-border);border-radius:14px;padding:12px 18px;min-width:120px;cursor:pointer;line-height:1.7;transition:transform .12s,border-color .12s,background .12s,color .12s}
+.mcq-btn:hover{border-color:var(--ink)}
+.mcq-btn:active{transform:scale(.97)}
+.mcq-btn.good{background:var(--ok);border-color:var(--ok);color:#fff}
+.mcq-btn.bad{background:rgba(255,59,48,.12);border-color:var(--teacher);color:var(--teacher)}
+.mcq-btn.fixed{border-color:var(--ok);border-style:dashed;color:var(--ok)}
+.mcq-btn.shake{animation:shakeInput .35s}
+.level-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;margin-bottom:12px}
+.level-label{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--muted-6)}
+.lvl-chip{min-width:40px;height:34px;padding:0 12px;font-family:var(--font-ui);font-weight:700;font-size:15px;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;cursor:pointer;transition:transform .15s,border-color .15s,background .15s,color .15s}
+.lvl-chip:hover{border-color:var(--ink)}
+.lvl-chip:active{transform:scale(.94)}
+.lvl-chip.active{background:var(--ink);border-color:var(--ink);color:#fff}
+.lvl-chip.done{color:var(--ok);border-color:var(--ok)}
+.lvl-chip.done.active{color:#fff;background:var(--ok)}
+.level-note{font-family:var(--font-ui);font-size:13px;color:var(--muted-6);flex:1 1 220px;min-width:0}
+.lvl-dots{display:inline-flex;gap:4px;vertical-align:middle;margin-left:4px}
+.lvl-dots i{width:8px;height:8px;border-radius:50%;background:var(--glass-border);border:1px solid #C7C7CC}
+.lvl-dots i.on{background:var(--ok);border-color:var(--ok)}
+.level-up{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ok);background:var(--ok-tint);border-radius:12px;padding:10px 14px;margin-top:12px}
+.p2-label{font-size:18px;display:inline-flex;align-items:center;gap:6px}
+.p2-label .slot{font-size:16px}
+/* решение: у каждого шага — какое свойство применено */
+.step-line{display:flex;flex-direction:column;align-items:flex-start;gap:6px}
+.prop-tag{--acc:#8A94A6;display:inline-flex;align-items:center;gap:6px;font-family:var(--font-ui);font-size:11.5px;font-weight:700;color:var(--acc);
+  background:rgba(138,148,166,.12);background:color-mix(in srgb, var(--acc) 13%, transparent);border-radius:8px;padding:3px 9px;line-height:1.3}
+.prop-tag::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--acc)}
+.prop-tag.aux{color:var(--muted-6);background:var(--hl-10)}
+.prop-tag.aux::before{background:var(--muted-6)}
+/* длинная строка решения переносится по знакам, а сами логарифмы, степени и
+   дроби не рвутся (у них nowrap) — на телефоне без прокрутки вбок */
+.step-math{font-size:19px;color:var(--pencil);line-height:2;max-width:100%;white-space:normal;padding:2px 0}
+.sol-step .body{overflow:visible}
+.sol-answer{font-size:18px}
+.answer-input{width:170px}
+html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!important}
+
+</style>
+</head>
+<body>
+<a class="home-btn" id="homeBtn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
+<button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<button class="theme-toggle board-visibility-toggle" id="boardVisibilityToggle" title="Показать доску" aria-label="Показать/скрыть доску">🖊️</button>
+<script>(function(){
+  var btn=document.getElementById('themeToggle');
+  function apply(t, persist){
+    document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    if (persist) { try{ localStorage.setItem('theme', t); }catch(e){} }
+  }
+  apply(document.documentElement.getAttribute('data-theme') || 'light', false);
+  btn.addEventListener('click', function(){
+    var cur = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    apply(cur, true);
+  });
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onSystemChange = function(e){
+      var explicit = false;
+      try{ explicit = !!localStorage.getItem('theme'); }catch(err){}
+      if (explicit) return;
+      apply(e.matches ? 'dark' : 'light', false);
+    };
+    if (mq.addEventListener) mq.addEventListener('change', onSystemChange);
+    else if (mq.addListener) mq.addListener(onSystemChange);
+  }
+})();</script>
+<script>(function(){
+  var btn = document.getElementById('boardVisibilityToggle');
+  function apply(on){
+    document.documentElement.setAttribute('data-board', on ? 'on' : 'off');
+    btn.classList.toggle('active', on);
+    btn.title = on ? 'Скрыть доску' : 'Показать доску';
+  }
+  apply(false); // доска изначально выключена
+  btn.addEventListener('click', function(){
+    apply(document.documentElement.getAttribute('data-board') !== 'on');
+  });
+})();</script>
+
+<!-- кнопка "свернуть подсказки" намеренно лежит здесь, СНАРУЖИ .wrap, а не внутри
+     него: у .wrap свой контекст наложения (нужен для доски), и любой position:fixed
+     элемент ВНУТРИ .wrap не смог бы пробиться выше #boardCanvas по z-index -->
+<button class="focus-toggle" id="focusToggle" title="Свернуть подсказки" aria-label="Свернуть/показать подсказки и алгоритм">⛶</button>
+<script>(function(){
+  var btn = document.getElementById('focusToggle');
+  function apply(on){
+    document.documentElement.setAttribute('data-focus', on ? 'on' : 'off');
+    btn.title = on ? 'Показать подсказки' : 'Свернуть подсказки';
+  }
+  apply(false);
+  btn.addEventListener('click', function(){
+    apply(document.documentElement.getAttribute('data-focus') !== 'on');
+  });
+})();</script>
+
+<canvas id="boardCanvasBg"></canvas>
+<canvas id="boardCanvas"></canvas>
+<div class="board-toolbar" id="boardToolbar">
+  <div class="tool-group">
+    <button class="board-tool-btn pen-main active" data-tool="pen" title="Ручка">✏️</button>
+    <div class="size-flyout">
+      <button class="board-tool-btn" data-tool="pen" data-width="1" title="Самая тонкая"><span class="dot" style="width:4px;height:4px"></span></button>
+      <button class="board-tool-btn active" data-tool="pen" data-width="2" title="Тонкая"><span class="dot" style="width:6px;height:6px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="3" title="Тонкая+"><span class="dot" style="width:8px;height:8px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="4" title="Средняя"><span class="dot" style="width:11px;height:11px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="6" title="Средняя+"><span class="dot" style="width:15px;height:15px"></span></button>
+      <button class="board-tool-btn" data-tool="pen" data-width="9" title="Толстая"><span class="dot" style="width:20px;height:20px"></span></button>
+    </div>
+  </div>
+  <span class="toolbar-sep"></span>
+  <button class="board-tool-btn color-btn active" data-color="#000000" title="Чёрный"><span class="dot" style="width:14px;height:14px;background:#000000"></span></button>
+  <button class="board-tool-btn color-btn" data-color="#FF3B30" title="Красный"><span class="dot" style="width:14px;height:14px;background:#FF3B30"></span></button>
+  <button class="board-tool-btn color-btn" data-color="#0A84FF" title="Синий"><span class="dot" style="width:14px;height:14px;background:#0A84FF"></span></button>
+  <div class="tool-group">
+    <button class="board-tool-btn color-btn custom-color-btn" data-color="#AF52DE" title="Свой цвет" id="customColorBtn">
+      <span class="dot custom-color-dot" id="customColorDot" style="width:16px;height:16px;background:conic-gradient(from 180deg,#ff0000,#ffff00,#00ff00,#00ffff,#0000ff,#ff00ff,#ff0000)"></span>
+    </button>
+    <div class="size-flyout color-picker-flyout">
+      <div class="cp-sv-wrap">
+        <canvas id="cpSvCanvas" class="cp-sv" width="176" height="120"></canvas>
+        <div class="cp-sv-thumb" id="cpSvThumb"></div>
+      </div>
+      <div class="cp-row">
+        <button class="cp-eyedropper" id="cpEyedropper" title="Пипетка — взять цвет с экрана" type="button">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19.2 3.8a2.7 2.7 0 0 1 0 3.8l-1.4 1.4-3.8-3.8L15.4 3.8a2.7 2.7 0 0 1 3.8 0Z" fill="currentColor"></path>
+            <path d="M12.6 6.6l3.8 3.8L6 20.8l-4 1 1-4L12.6 6.6Z" fill="currentColor"></path>
+          </svg>
+        </button>
+        <div class="cp-swatch" id="cpSwatch"></div>
+        <div class="cp-hue-wrap">
+          <div class="cp-hue" id="cpHue"></div>
+          <div class="cp-hue-thumb" id="cpHueThumb"></div>
+        </div>
+      </div>
+      <div class="cp-rgb-row">
+        <div class="cp-field"><input type="text" inputmode="numeric" maxlength="3" id="cpR" value="0"><label>R</label></div>
+        <div class="cp-field"><input type="text" inputmode="numeric" maxlength="3" id="cpG" value="0"><label>G</label></div>
+        <div class="cp-field"><input type="text" inputmode="numeric" maxlength="3" id="cpB" value="0"><label>B</label></div>
+      </div>
+    </div>
+  </div>
+  <span class="toolbar-sep"></span>
+  <button class="board-tool-btn" data-tool="line" title="Прямая линия">╱</button>
+  <div class="tool-group">
+    <button class="board-tool-btn eraser" data-tool="eraser" title="Ластик">🧽</button>
+    <div class="size-flyout">
+      <button class="board-tool-btn" data-tool="eraser" data-size="14" title="Маленький ластик"><span class="dot" style="width:6px;height:6px"></span></button>
+      <button class="board-tool-btn" data-tool="eraser" data-size="26" title="Средний ластик"><span class="dot" style="width:10px;height:10px"></span></button>
+      <button class="board-tool-btn" data-tool="eraser" data-size="44" title="Большой ластик"><span class="dot" style="width:16px;height:16px"></span></button>
+    </div>
+  </div>
+</div>
+
+<div class="board-view-toolbar" id="boardViewToolbar">
+  <button class="board-tool-btn" id="zoomOutBtn" title="Уменьшить">−</button>
+  <button class="board-zoom-label" id="zoomResetBtn" title="Сбросить вид">100%</button>
+  <button class="board-tool-btn" id="zoomInBtn" title="Увеличить">+</button>
+  <span class="toolbar-sep"></span>
+  <button class="board-tool-btn hand-tool" data-tool="hand" title="Рука — перемещать доску">✋</button>
+  <button class="board-tool-btn clear-btn" id="clearBoardBtn" title="Стереть всё">🗑️</button>
+</div>
+
+
+
+<div class="wrap">
+  <h1 id="pageTitle">Свойства логарифмов</h1>
+  <div class="sub" id="pageSub">10–11 класс · выбери свойства для тренировки</div>
+
+  <!-- экран выбора: каждое свойство — плитка с формулой и примером. Плитки
+       выбираются (одна или несколько), «Начать» открывает тренажёр по
+       выбранным; плитка «Все свойства вперемешку» — сразу итоговая отработка -->
+  <div id="pickerArea">
+    <div class="pk-lead">Выбери одно свойство или несколько — задания пойдут вперемешку. Уровни: <b>А</b> — прямое применение, <b>Б</b> — дроби, корни и «спрятанные» степени, <b>В</b> — свойство несколько раз и в обратную сторону. Везде <span class="mx" id="pkCond"></span>.</div>
+    <div class="tiles" id="tiles"></div>
+    <div class="pk-bar" id="pkBar">
+      <div class="pk-bar-info" id="pkBarInfo"></div>
+      <button class="pk-bar-clear" id="pkClear" type="button">Сбросить</button>
+      <button class="pk-bar-go" id="pkStart" type="button">Начать →</button>
+    </div>
+  </div>
+
+  <div id="taskArea" style="display:none">
+    <div class="task-head">
+      <div class="type-nav">
+        <button class="back-btn" id="backBtn">← все свойства</button>
+        <button class="type-nav-btn" id="prevProtoBtn" title="Предыдущее свойство">◀ Предыдущее</button>
+        <button class="type-nav-btn" id="nextProtoBtn" title="Следующее свойство">Следующее ▶</button>
+      </div>
+      <div class="corner">
+        <div class="task-title" id="taskTitle"></div>
+        <span class="medal-badge-row" id="medalBadgeRow"></span>
+        <button class="basket-add-btn" id="basketAddBtn" title="В подборку">📥</button>
+      </div>
+    </div>
+
+    <!-- какие свойства в этой тренировке и шпаргалка с их формулами
+         (шпаргалка только в «Тренировке» — в «Экзамене» её нет) -->
+    <div class="run-row" id="runRow">
+      <span id="runChips"></span>
+      <button class="ref-btn" id="refBtn" type="button">📘 Формулы</button>
+    </div>
+    <div class="prop-ref" id="propRef" style="display:none"></div>
+
+    <!-- уровни А/Б/В: после трёх верных ответов открывается следующий, но
+         перейти на любой можно и вручную -->
+    <div class="level-row levels" id="levelRow">
+      <span class="level-label">Уровень</span>
+      <button class="lvl-chip" data-lvl="1">А</button>
+      <button class="lvl-chip" data-lvl="2">Б</button>
+      <button class="lvl-chip" data-lvl="3">В</button>
+      <span class="level-note" id="levelNote"></span>
+    </div>
+
+    <div class="submode-row">
+      <div class="submode-tabs">
+        <button class="submode-tab active" id="tabPractice">Тренировка</button>
+        <button class="submode-tab" id="tabExam">Экзамен</button>
+      </div>
+    </div>
+
+    <div class="work-zone" id="workZone">
+      <div class="work-resize-handle left" id="workResizeLeft" title="Потяните — расширить рабочую зону"></div>
+      <div class="work-resize-handle right" id="workResizeRight" title="Потяните — расширить рабочую зону"></div>
+      <div class="tasks-columns" id="tasksColumns">
+        <div id="card1Wrapper">
+          <div class="panel" id="questionPanel">
+            <!-- #logQuestion — ровно то, что уходит «В подборку» и снимается на
+                 доску (TRAINER_CAPTURE.logarithms в boards-core.js): условие и
+                 варианты выбора, без полей ответа и кнопок -->
+            <div id="logQuestion"></div>
+            <div class="answer-area" id="answerArea"></div>
+            <div class="card-btn-row" id="card1BtnRow" style="display:none">
+              <button class="soft-btn icon-only" id="basketInlineBtn" title="В подборку">📥</button>
+              <button class="soft-btn" id="showSolutionBtn" style="display:none">Показать решение и ответ</button>
+            </div>
+            <div class="level-up" id="levelUp" style="display:none"></div>
+          </div>
+
+          <div class="panel" id="mainPanel" style="display:none">
+            <div id="solSteps"></div>
+            <div class="sol-answer" id="solAnswer"></div>
+            <button class="next-btn" id="nextBtn" style="display:none">Следующее задание →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat"><div class="v" id="stSolved">0</div><div class="l">решено</div></div>
+      <div class="stat"><div class="v" id="stErrors">0</div><div class="l">ошибок</div></div>
+      <div class="stat"><div class="v" id="stStreak">0</div><div class="l">серия без ошибок</div></div>
+    </div>
+
+    <button class="example-history-toggle" id="exampleHistoryToggle">🕓 История решённого (0)</button>
+    <div class="panel example-history-panel" id="exampleHistoryPanel">
+      <button class="calc-panel-close" id="exampleHistoryClose" title="Закрыть">✕</button>
+      <div class="calc-panel-title">Что уже решали в этой тренировке</div>
+      <div class="example-history-list" id="exampleHistoryList"></div>
+      <div class="example-history-empty" id="exampleHistoryEmpty">Пока пусто — реши что-нибудь.</div>
+    </div>
+  </div>
+<div class="medal-tray" id="medalTray" aria-hidden="true"></div>
+
+<!-- колонка добавления заданий: своя, не из trainer-multi.js — карточки здесь
+     рисуются прямо на странице, как у «Процентов» и ЕГЭ -->
+<div class="add-rail" id="addRail" style="display:none">
+  <button class="add-rail-toggle" id="addRailToggle" title="Добавить задания" aria-expanded="false">+</button>
+  <div class="add-rail-body" id="addRailBody">
+    <span class="add-rail-label">Добавить</span>
+    <button class="add-qty-btn" data-n="1">+1</button>
+    <button class="add-qty-btn" data-n="2">+2</button>
+    <button class="add-qty-btn" data-n="3">+3</button>
+    <button class="add-qty-btn" data-n="5">+5</button>
+    <button class="add-qty-btn" data-n="10">+10</button>
+    <div class="add-rail-sep" id="addRailSep" style="display:none"></div>
+    <button class="add-rail-act" id="addToBasketAllBtn" style="display:none">📥 Все</button>
+    <button class="add-rail-act" id="addClearBtn" style="display:none">Убрать все</button>
+  </div>
+</div>
+
+<button class="keypad-toggle" id="kpToggle" title="Показать клавиатуру" style="display:none">⌨</button>
+<div class="keypad-float" id="keypadFloat" style="display:none">
+  <button class="keypad-drag-handle" id="kpDragHandle" title="Перетащить клавиатуру" aria-label="Переместить клавиатуру">✋</button>
+  <button class="keypad-close" id="kpClose" title="Скрыть клавиатуру">✕</button>
+  <div class="keypad" id="keypadButtons"></div>
+</div>
+  <div id="boardSpace" aria-hidden="true"></div></div>
+
+<script src="basket-core.js"></script>
+<script src="supabase-config.js"></script>
+<script src="supabase-js.umd.js"></script>
+<script src="session-share.js"></script>
+<script src="html2canvas.min.js"></script>
+<script src="jspdf.umd.min.js"></script>
+<script src="lesson-history.js"></script>
+<script src="logarithms-bank.js"></script>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   Свойства логарифмов (10–11 класс) — промпт №12 нового списка.
+
+   Одна страница, два экрана, как у «Процентов» (percent.html): плитки
+   свойств (#pickerArea) и сам тренажёр (#taskArea). Отличие от «Процентов»:
+   плитка не открывает тренажёр сразу, а ВЫБИРАЕТСЯ — можно отметить одно
+   свойство или несколько, и «Начать» даёт задания вперемешку по всем
+   выбранным. Набор выбранных свойств называется здесь «тренировкой»
+   (S.props); уровень, медали и история ведутся по тренировке, число
+   решённых на плитке — по свойству.
+
+   Скелет (доска, клавиатура, карточки «+», медали, история, конспект урока,
+   мост сессии) взят с «Процентов» без изменений в поведении; калькулятора
+   в столбик нет — в 10–11 классе он здесь не нужен. Задания придумывает
+   logarithms-bank.js, страница не знает ни одной формулы решения.
+   ═══════════════════════════════════════════════════════════════════════ */
+const SLUG = 'logarithms';          // имя файла = слаг тренажёра в сессии и на доске
+const BANK = window.LOG_BANK;
+const PROPS = BANK.props, LV = BANK.LEVELS, R = BANK.render;
+const PROP_IDS = PROPS.map(p => p.id);
+// заметки доски приклеены к заданию, кнопки под ними нажимаются — как в ЕГЭ
+// базе после промпта №60 и в «Процентах»
+document.documentElement.setAttribute('data-board-pinned', '');
+
+const propById = id => BANK.propById(id) || PROPS[0];
+const accOf = id => BANK.groupById(propById(id).group).color;
+function hexA(hex, a){
+  const n = parseInt(hex.slice(1), 16);
+  return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')';
+}
+function esc(s){ return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+// набор свойств всегда в порядке плиток: иначе «prod,quot» и «quot,prod»
+// были бы двумя разными тренировками со своим прогрессом
+const normProps = arr => PROP_IDS.filter(id => (arr || []).indexOf(id) >= 0);
+const runKey = props => props.length === PROP_IDS.length ? 'all' : props.join(',');
+const isAll = props => props.length === PROP_IDS.length;
+function plural(n, one, few, many){ const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? one : (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many); }
+function runTitle(props){
+  if (props.length === 1) return propById(props[0]).title;
+  if (isAll(props)) return 'Все свойства вперемешку';
+  return 'Вперемешку: ' + props.length + ' ' + plural(props.length, 'свойство', 'свойства', 'свойств');
+}
+
+/* ═══════════════ прогресс ═══════════════
+   Всё под ключами ogeProg: — их стирает кнопка сброса прогресса на главной.
+   По тренировке: текущий уровень, верных подряд на нём (3 — следующий
+   уровень), до какого дошли, сколько решено. По свойству — сколько задач
+   на него решено (число на плитке, в какой бы тренировке ни решали). */
+const LVL_KEY = 'ogeProg:' + SLUG + ':levels';
+const SOLVED_KEY = 'ogeProg:' + SLUG + ':solved';
+const LEVEL_UP_AT = 3;
+let levelProg = {}, solvedByProp = {};
+try { levelProg = JSON.parse(localStorage.getItem(LVL_KEY) || '{}') || {}; } catch (e) { levelProg = {}; }
+try { solvedByProp = JSON.parse(localStorage.getItem(SOLVED_KEY) || '{}') || {}; } catch (e) { solvedByProp = {}; }
+function progOf(key){ return Object.assign({ lvl: 1, cnt: 0, max: 1, solved: 0 }, levelProg[key] || {}); }
+function saveLevelProg(key, p){
+  levelProg[key] = p;
+  try { localStorage.setItem(LVL_KEY, JSON.stringify(levelProg)); } catch (e) {}
+}
+
+/* медали и история решённого — по тренировке */
+const PROGRESS_NS = 'ogeProg:' + SLUG + ':p:';
+const SESSION_GAP_MS = 3 * 60 * 60 * 1000;
+function freshProg(){ return { solvedInBatch: 0, errorsInBatch: 0, history: [], medals: { gold: 0, silver: 0, bronze: 0 } }; }
+let curProg = freshProg(), progLoadedFor = null;
+function loadProgFor(key){
+  let saved = null;
+  try { saved = JSON.parse(localStorage.getItem(PROGRESS_NS + key) || 'null'); } catch (e) {}
+  if (!saved) return freshProg();
+  if (!saved.lastActiveAt || (Date.now() - saved.lastActiveAt) > SESSION_GAP_MS) {
+    return Object.assign(freshProg(), { medals: saved.medals || { gold: 0, silver: 0, bronze: 0 } });
+  }
+  return Object.assign(freshProg(), saved);
+}
+function saveProg(){
+  curProg.lastActiveAt = Date.now();
+  try { localStorage.setItem(PROGRESS_NS + runKey(S.props), JSON.stringify(curProg)); } catch (e) {}
+}
+function ensureProg(){
+  const key = runKey(S.props);
+  if (progLoadedFor !== key) { curProg = loadProgFor(key); progLoadedFor = key; }
+}
+const MEDAL_EMOJI = { gold: '🥇', silver: '🥈', bronze: '🥉' };
+const MEDAL_TITLE = { gold: 'Золото — пять примеров без ошибок', silver: 'Серебро — пять примеров, 1–2 ошибки', bronze: 'Бронза — пять примеров решено' };
+
+/* ═══════════════ состояние ═══════════════ */
+const S = {
+  screen: 'picker',          // 'picker' — плитки, 'task' — тренажёр
+  sel: [],                   // отмеченные на экране плиток свойства
+  props: [PROP_IDS[0]],      // тренировка: по каким свойствам идут задания
+  lvl: 1,                    // уровень, на котором генерируются задания
+  lvlCnt: 0,                 // верных подряд на этом уровне (до LEVEL_UP_AT)
+  lvlUp: false,              // уровень пройден — следующее задание будет на уровень выше
+  mode: 'practice',          // 'practice' — Тренировка, 'exam' — Экзамен
+  task: null,                // объект задания из logarithms-bank.js (данные, без функций)
+  answered: false, hadWrong: false, correct: false,
+  marks: {},                 // id поля → 'good' | 'bad' | 'fixed'
+  pick: null, wrong: [],     // выбор варианта: последний выбранный и неверные
+  sol: false,                // «Тренировка»: решение раскрыто кнопкой
+  cards: [],                 // добавленные кнопкой «+» задания той же тренировки
+};
+let totalSolved = 0, totalErrors = 0, streak = 0;
+let lastFocusedInput = null;
+let drawnKey = null;           // задание, которое сейчас нарисовано в #taskArea
+let refOpen = false;           // шпаргалка с формулами раскрыта
+
+const els = {};
+['pickerArea','tiles','pkBar','pkBarInfo','pkClear','pkStart','pkCond','taskArea','backBtn','prevProtoBtn','nextProtoBtn','taskTitle','pageTitle','pageSub',
+ 'runRow','runChips','refBtn','propRef','levelRow','levelNote','questionPanel','logQuestion','answerArea','card1BtnRow','basketInlineBtn','showSolutionBtn','levelUp',
+ 'mainPanel','solSteps','solAnswer','nextBtn','tabPractice','tabExam','basketAddBtn','medalBadgeRow',
+ 'workZone','workResizeLeft','workResizeRight','tasksColumns','card1Wrapper',
+ 'addRail','addRailToggle','addRailBody','addRailSep','addToBasketAllBtn','addClearBtn','medalTray',
+ 'exampleHistoryToggle','exampleHistoryPanel','exampleHistoryList','exampleHistoryEmpty','exampleHistoryClose',
+ 'keypadFloat','kpToggle','kpClose','kpDragHandle','keypadButtons','stSolved','stErrors','stStreak'].forEach(id => { els[id] = document.getElementById(id); });
+
+const TS = window.TrainerSession || null;
+function guard(action, fn){ return TS && TS.guardStudentAction ? TS.guardStudentAction(action, fn) : fn; }
+
+/* ═══════════════ формулы на плитках ═══════════════
+   Рисуются тем же наборщиком, что и задания (LOG_BANK.render), — формула
+   на плитке выглядит так же, как в условии и в решении. */
+const v = n => ['v', n];
+const [a_, b_, c_, k_, n_] = ['a', 'b', 'c', 'k', 'n'].map(v);
+const EQ = '<span class="mo eq">=</span>';
+const eqn = (l, r) => R(l) + EQ + R(r);
+const FORMULA = {
+  ident: { f: eqn(['pow', a_, ['log', a_, b_]], b_), f2: 'Логарифм — показатель степени: в какую степень нужно возвести <i class="mv">a</i>, чтобы получить <i class="mv">b</i>' },
+  unit: { f: eqn(['log', a_, 1], 0) + '<span class="fsep">,</span>' + eqn(['log', a_, a_], 1) },
+  prod: { f: eqn(['log', a_, ['*', b_, c_]], ['+', ['log', a_, b_], ['log', a_, c_]]) },
+  quot: { f: eqn(['log', a_, ['/', b_, c_]], ['-', ['log', a_, b_], ['log', a_, c_]]) },
+  pow: { f: eqn(['log', a_, ['pow', b_, n_]], ['*', n_, ['log', a_, b_]]) },
+  basepow: { f: eqn(['log', ['pow', a_, k_], b_], ['*', ['/', 1, k_], ['log', a_, b_]]) },
+  bothpow: { f: eqn(['log', ['pow', a_, k_], ['pow', b_, n_]], ['*', ['/', n_, k_], ['log', a_, b_]]), f2: eqn(['log', ['pow', a_, n_], ['pow', b_, n_]], ['log', a_, b_]) },
+  change: { f: eqn(['log', a_, b_], ['/', ['log', c_, b_], ['log', c_, a_]]) },
+  swap: { f: eqn(['log', a_, b_], ['/', 1, ['log', b_, a_]]), f2: eqn(['*', ['log', a_, b_], ['log', b_, a_]], 1) },
+  expswap: { f: eqn(['pow', a_, ['log', b_, c_]], ['pow', c_, ['log', b_, a_]]) },
+};
+
+/* ═══════════════ пример на плитке ═══════════════
+   Запись примера — две строки разметки: откуда (from) и куда (to).
+   Одинаковые части помечены data-k: «куда» стоит на странице обычной
+   строкой (это конечный кадр), а смещения из положения «откуда» меряет
+   layoutDemo() и кладёт в --dx/--dy/--s. Часть, которой нет в «куда»
+   (скобки, знак «·»), — «призрак», тает; часть, которой нет в «откуда»,
+   проявляется; data-late — итог, появляется последним. data-at="k" —
+   часть вылетает из того же места, что часть k (второй log₂ рождается из
+   первого). Так пример действительно «распадается» по свойству, а не
+   просто сменяется картинкой. */
+const K = (k, h, cls) => '<span class="t' + (cls ? ' ' + cls : '') + '" data-k="' + k + '">' + h + '</span>';
+const AT = (k, at) => '<span data-k="' + k + '" data-at="' + at + '"></span>';
+const LATE = h => '<span class="t" data-k="res" data-late>' + h + '</span>';
+const OP = s => '<span class="op">' + s + '</span>';
+const FR = (n, d) => '<span class="dfrac"><span class="dn">' + n + '</span>' + K('bar', '', 'dbar') + '<span class="dn">' + d + '</span></span>';
+const SFR = (n, d) => '<span class="dfrac"><span class="dn">' + n + '</span><span class="dbar"></span><span class="dn">' + d + '</span></span>';
+const LOG = b => 'log<sub>' + b + '</sub>';
+const DEMOS = {
+  ident: { from: K('a', '3') + '<sup>' + K('lg', LOG(3)) + K('x', '5') + '</sup>' + AT('r', 'x'),
+           to: K('a', '3') + '<sup>' + K('lg', LOG(3)) + K('x', '5') + '</sup>' + K('eq', '=', 'op') + K('r', '5', 'big') },
+  unit: { from: K('b', '7') + '<sup>' + K('z', '0') + '</sup>' + K('eq', '=', 'op') + K('one', '1'),
+          to: K('lg', 'log') + '<sub>' + K('b', '7') + '</sub>' + K('one', '1') + K('eq', '=', 'op') + K('z', '0', 'big') },
+  prod: { from: K('l', LOG(2)) + K('p1', '(') + K('b', '4') + K('op', '·', 'op') + K('c', '8') + K('p2', ')') + AT('l2', 'l'),
+          to: K('l', LOG(2)) + K('b', '4') + K('pl', '+', 'op') + K('l2', LOG(2)) + K('c', '8') + LATE(OP('=') + '2' + OP('+') + '3' + OP('=') + '5') },
+  quot: { from: K('l', LOG(3)) + FR(K('n', '54'), K('d', '2')) + AT('l2', 'l'),
+          to: K('l', LOG(3)) + K('n', '54') + K('mi', '−', 'op') + K('l2', LOG(3)) + K('d', '2') + LATE(OP('=') + LOG(3) + ' 27' + OP('=') + '3') },
+  pow: { from: K('l', LOG(2)) + K('b', '8') + '<sup>' + K('n', '5') + '</sup>',
+         to: K('n', '5', 'big') + K('dot', '·', 'op') + K('l', LOG(2)) + K('b', '8') + LATE(OP('=') + '5' + OP('·') + '3' + OP('=') + '15') },
+  basepow: { from: K('lg', 'log') + '<sub>' + K('a', '2') + '<sup>' + K('k', '3') + '</sup></sub>' + K('b', '64'),
+             to: FR(K('one', '1'), K('k', '3', 'big')) + K('dot', '·', 'op') + K('lg', 'log') + '<sub>' + K('a', '2') + '</sub>' + K('b', '64') + LATE(OP('=') + '2') },
+  bothpow: { from: K('lg', 'log') + '<sub>' + K('a', '2') + '<sup>' + K('k', '3') + '</sup></sub>' + K('b', '5') + '<sup>' + K('n', '6') + '</sup>',
+             to: FR(K('n', '6', 'big'), K('k', '3', 'big')) + K('dot', '·', 'op') + K('lg', 'log') + '<sub>' + K('a', '2') + '</sub>' + K('b', '5') + LATE(OP('=') + '2' + OP('·') + LOG(2) + ' 5') },
+  change: { from: K('lg', 'log') + '<sub>' + K('a', '8') + '</sub>' + K('b', '32'),
+            to: FR(K('l2', LOG(2)) + K('b', '32'), K('l3', LOG(2)) + K('a', '8')) + LATE(OP('=') + SFR('5', '3')) },
+  swap: { from: K('lg', 'log') + '<sub>' + K('a', '4') + '</sub>' + K('b', '2'),
+          to: FR(K('one', '1'), K('lg', 'log') + '<sub>' + K('b', '2') + '</sub>' + K('a', '4')) + LATE(OP('=') + SFR('1', '2')) },
+  expswap: { from: K('a', '9') + '<sup>' + K('lg', LOG(3)) + K('c', '5') + '</sup>',
+             to: K('c', '5') + '<sup>' + K('lg', LOG(3)) + K('a', '9') + '</sup>' + LATE(OP('=') + '5<sup>2</sup>' + OP('=') + '25') },
+};
+function layoutDemo(box){
+  const spec = DEMOS[box.dataset.demo];
+  if (!spec) return;
+  box.innerHTML = '<span class="demo-line">' + spec.to + '</span>';
+  const line = box.firstChild;
+  if (!box.offsetWidth) return;       // экран скрыт — померим, когда покажут
+  const meas = document.createElement('span');
+  meas.className = 'demo-measure';
+  meas.innerHTML = '<span class="demo-line">' + spec.from + '</span>';
+  box.appendChild(meas);
+  // Всё меряем от левого верхнего угла СВОЕЙ строки, а не полосы: обе строки
+  // стоят по центру полосы, поэтому разница их начал — половина разницы
+  // ширин и от ширины полосы не зависит. Ширина полосы меняется и без
+  // resize (появилась полоса прокрутки, сетка перестроилась) — смещения от
+  // края полосы тогда съезжали, и пример в начале анимации «рассыпался»
+  const lf = line.getBoundingClientRect(), l0 = meas.firstChild.getBoundingClientRect();
+  const sc = lf.width / (line.offsetWidth || lf.width) || 1;   // плитка могла быть увеличена наведением
+  const ox = (l0.left - lf.left) / sc, oy = (l0.top - lf.top) / sc;
+  const rel = (r, base) => ({ x: (r.left - base.left) / sc, y: (r.top - base.top) / sc, w: r.width / sc, h: r.height / sc });
+  const fin = {}, from = {};
+  // масштаб — отношение размеров шрифта: цифра из показателя степени
+  // вырастает в полноразмерную и наоборот
+  const fs = el => parseFloat(getComputedStyle(el).fontSize) || 1;
+  line.querySelectorAll('[data-k]').forEach(el => { fin[el.dataset.k] = { el, r: rel(el.getBoundingClientRect(), lf), f: fs(el) }; });
+  meas.querySelectorAll('[data-k]:not([data-at])').forEach(el => {
+    const r = rel(el.getBoundingClientRect(), l0);
+    from[el.dataset.k] = { el, r: { x: r.x + ox, y: r.y + oy, w: r.w, h: r.h }, f: fs(el) };
+  });
+  meas.querySelectorAll('[data-at]').forEach(el => { if (from[el.dataset.at]) from[el.dataset.k] = from[el.dataset.at]; });
+  meas.remove();
+  Object.keys(fin).forEach(k => {
+    const f = fin[k], s0 = from[k], el = f.el;
+    el.classList.remove('mvk', 'ink', 'late');
+    if (s0) {
+      const s = s0.f / f.f;
+      el.classList.add('mvk');
+      el.style.setProperty('--dx', (s0.r.x - f.r.x).toFixed(1) + 'px');
+      el.style.setProperty('--dy', (s0.r.y - f.r.y).toFixed(1) + 'px');
+      el.style.setProperty('--s', Math.abs(s - 1) < 0.08 ? '1' : s.toFixed(3));
+    } else el.classList.add(el.hasAttribute('data-late') ? 'late' : 'ink');
+  });
+  // «призраки» живут внутри строки «куда» — их место считается от неё же
+  Object.keys(from).forEach(k => {
+    if (fin[k]) return;
+    const s0 = from[k], g = document.createElement('span');
+    g.className = s0.el.className + ' ghost';
+    g.innerHTML = s0.el.innerHTML;
+    g.style.left = s0.r.x.toFixed(1) + 'px'; g.style.top = s0.r.y.toFixed(1) + 'px';
+    g.style.width = Math.max(1, s0.r.w).toFixed(1) + 'px'; g.style.height = s0.r.h.toFixed(1) + 'px';
+    line.appendChild(g);
+  });
+}
+let demosAt = 0;                       // ширина сетки, под которую померены примеры
+function layoutDemos(force){
+  const w = els.tiles.offsetWidth;
+  if (!w || (!force && w === demosAt)) return;
+  demosAt = w;
+  els.tiles.querySelectorAll('.demo').forEach(layoutDemo);
+}
+
+/* ═══════════════ плитки ═══════════════ */
+function tileBadges(pid){
+  const n = solvedByProp[pid] || 0, p = progOf(pid);
+  return (n ? '<span class="tile-done">✓ ' + n + '</span>' : '') +
+    (n || p.max > 1 ? '<span class="tile-lvl" title="Уровень при отработке одного этого свойства">' + LV[p.lvl - 1] + '</span>' : '');
+}
+function renderTiles(){
+  els.pkCond.innerHTML = '<i class="mv">a</i> &gt; 0, <i class="mv">a</i> ≠ 1, <i class="mv">b</i> &gt; 0, <i class="mv">c</i> &gt; 0, <i class="mv">c</i> ≠ 1';
+  els.tiles.innerHTML = PROPS.map((p, i) => {
+    const g = BANK.groupById(p.group), F = FORMULA[p.id];
+    return '<div class="tile' + (p.id === 'ident' ? ' l' : '') + '" role="button" tabindex="0" aria-pressed="false" data-pid="' + p.id + '" ' +
+      'style="--acc:' + g.color + ';--acc-soft:' + hexA(g.color, 0.15) + '" aria-label="' + esc(p.title) + '">' +
+      '<span class="tile-top"><span class="tile-tag">' + g.title + '</span><span class="tile-badges">' + tileBadges(p.id) + '</span><span class="tile-check" aria-hidden="true"></span></span>' +
+      '<span class="tile-title">' + p.title + '</span>' +
+      '<span class="tile-formula"><span class="f1">' + F.f + '</span>' + (F.f2 ? '<span class="f2">' + F.f2 + '</span>' : '') + '</span>' +
+      '<span class="tile-demo" aria-hidden="true"><span class="demo" data-demo="' + p.id + '"></span></span>' +
+    '</div>';
+  }).join('') +
+    '<div class="tile mix" role="button" tabindex="0" data-pid="all" aria-label="Все свойства вперемешку">' +
+      '<span class="tile-top"><span class="tile-tag">Итог</span><span class="tile-badges">' + (progOf('all').solved ? '<span class="tile-done">✓ ' + progOf('all').solved + '</span>' : '') + '</span></span>' +
+      '<span class="tile-title">Все свойства вперемешку</span>' +
+      '<span class="tile-formula">Все десять свойств сразу — нужно самому узнать, какое применить</span>' +
+      '<span class="mix-deck" aria-hidden="true"><span class="mix-card">' + R(['log', a_, ['*', b_, c_]]) + '</span><span class="mix-card">' + R(['log', a_, ['pow', b_, n_]]) + '</span><span class="mix-card">' + R(['pow', a_, ['log', a_, b_]]) + '</span></span>' +
+    '</div>';
+  els.tiles.querySelectorAll('.tile').forEach(t => {
+    const act = t.dataset.pid === 'all'
+      ? guard('switchTask', () => startRun(PROP_IDS))
+      : guard('switchTask', () => toggleSel(t.dataset.pid));
+    t.addEventListener('click', act);
+    t.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(); } });
+  });
+  watchTiles();
+  demosAt = 0;
+  layoutDemos();
+}
+// числа «решено» и уровень меняются по ходу — перерисовываем только значки
+// и отметки, а не плитки: иначе примеры пришлось бы мерить заново
+function updateTileBadges(){
+  els.tiles.querySelectorAll('.tile').forEach(t => {
+    const pid = t.dataset.pid;
+    const b = t.querySelector('.tile-badges');
+    const html = pid === 'all' ? (progOf('all').solved ? '<span class="tile-done">✓ ' + progOf('all').solved + '</span>' : '') : tileBadges(pid);
+    if (b && b.innerHTML !== html) b.innerHTML = html;
+    const on = S.sel.indexOf(pid) >= 0;
+    t.classList.toggle('sel', on);
+    if (pid !== 'all') t.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  const n = S.sel.length;
+  els.pkStart.disabled = !n;
+  els.pkClear.style.display = n ? '' : 'none';
+  els.pkStart.textContent = n > 1 ? 'Начать вперемешку →' : 'Начать →';
+  els.pkBarInfo.innerHTML = n
+    ? '<b>Выбрано: ' + n + ' ' + plural(n, 'свойство', 'свойства', 'свойств') + '</b><span class="pk-names">' + S.sel.map(id => propById(id).title.toLowerCase()).join(' · ') + '</span>'
+    : 'Отметь одно или несколько свойств — или возьми <b>все вперемешку</b>';
+}
+function toggleSel(pid){
+  const i = S.sel.indexOf(pid);
+  S.sel = i >= 0 ? S.sel.filter(x => x !== pid) : normProps(S.sel.concat([pid]));
+  updateTileBadges();
+}
+els.pkClear.onclick = guard('switchTask', () => { S.sel = []; updateTileBadges(); });
+els.pkStart.onclick = guard('switchTask', () => { if (S.sel.length) startRun(S.sel); });
+
+/* Анимации только у видимых плиток: IntersectionObserver ставит .live, CSS
+   держит остальные на паузе. На экране задания #pickerArea скрыт — ни одна
+   не идёт. Без IntersectionObserver (очень старый браузер) — у всех. */
+let tileObserver = null;
+function watchTiles(){
+  const tiles = els.tiles.querySelectorAll('.tile');
+  if (!('IntersectionObserver' in window)) { tiles.forEach(t => t.classList.add('live')); return; }
+  if (tileObserver) tileObserver.disconnect();
+  tileObserver = new IntersectionObserver(entries => {
+    entries.forEach(en => en.target.classList.toggle('live', en.isIntersecting));
+  }, { rootMargin: '40px 0px' });
+  tiles.forEach(t => tileObserver.observe(t));
+}
+let demoResizeTimer = null;
+window.addEventListener('resize', () => { clearTimeout(demoResizeTimer); demoResizeTimer = setTimeout(() => { if (S.screen === 'picker') layoutDemos(); }, 180); });
+// веб-шрифт догружается позже — ширины букв меняются, примеры мерим заново
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => layoutDemos(true));
+
+/* ═══════════════ условие ═══════════════
+   #logQuestion (и .added-card-question у карточек) — только условие и
+   варианты выбора: это уходит «В подборку» и снимается на доску. */
+function questionHTML(t){
+  let h = '<span class="log-kind">' + BANK.TYPES[t.type] + ' · уровень ' + LV[t.lvl - 1] + '</span>' + t.text;
+  if (t.choice) h += '<div class="mcq-options">' + t.choice.opts.map((o, i) => '<div class="mcq-btn" role="button" tabindex="0" data-i="' + i + '">' + o + '</div>').join('') + '</div>';
+  return h;
+}
+
+/* ═══════════════ разбор ответа ═══════════════
+   Ответ — число: целое, десятичная дробь, обыкновенная (5/3, −1/2) или
+   смешанное число. Сравниваются ЗНАЧЕНИЯ: 0,5 и 1/2 — одно и то же.
+   Округлённая десятичная вместо «некрасивой» дроби (1,67 вместо 5/3) —
+   просьба записать точно, а не ошибка: счёт при этом не меняется. */
+function normMinus(s){ return String(s).replace(/[−–—‐‑]/g, '-'); }
+function parseAnswer(raw){
+  const s = normMinus(String(raw || '')).replace(/[   ]/g, ' ').trim();
+  if (!s) return null;
+  let m;
+  if ((m = /^(-?)(\d+)\s+(\d+)\s*\/\s*(\d+)$/.exec(s))) {
+    const w = +m[2], n = +m[3], d = +m[4];
+    if (!d || n >= d) return null;
+    return { v: (m[1] ? -1 : 1) * (w + n / d), kind: 'mixed' };
+  }
+  const t = s.replace(/\s+/g, '');
+  if ((m = /^(-?\d+(?:[.,]\d+)?)\/(-?\d+(?:[.,]\d+)?)$/.exec(t))) {
+    const d = parseFloat(m[2].replace(',', '.'));
+    if (!d) return null;
+    return { v: parseFloat(m[1].replace(',', '.')) / d, kind: 'frac' };
+  }
+  if (/^-?\d+(?:[.,]\d+)?$/.test(t)) return { v: parseFloat(t.replace(',', '.')), kind: /[.,]/.test(t) ? 'dec' : 'int' };
+  return null;
+}
+function valueOf(str){ const r = parseAnswer(str); return r ? r.v : NaN; }
+const sameNum = (x, y) => Math.abs(x - y) <= 1e-9 * Math.max(1, Math.abs(y));
+// → true / false, либо строка — просьба записать иначе (счёт не меняется)
+function checkField(f, raw){
+  if (!String(raw || '').trim()) return 'Впиши ответ в поле';
+  const r = parseAnswer(raw);
+  if (!r) return 'Запиши ответ числом: целым, десятичной дробью или обыкновенной через «/», например −3/2';
+  const want = valueOf(f.value);
+  if (sameNum(r.v, want)) return true;
+  // 1,67 вместо 5/3: число верное, но записано приближённо
+  if (r.kind === 'dec' && Math.abs(r.v - want) < 0.01 && !sameNum(Math.round(want * 1e6) / 1e6, want * 1)) return 'Почти: ответ — бесконечная дробь, запиши его точно обыкновенной дробью, например 5/3';
+  if (r.kind === 'dec' && Math.abs(r.v - want) < 0.01) return 'Почти: запиши ответ точно, обыкновенной дробью';
+  return false;
+}
+// эталон в поле — как его пишут в тетради: 5/3, −2
+function fieldShown(f){ return String(f.value).replace('-', '−'); }
+
+/* ═══════════════ поля ответа ═══════════════
+   Одинаковые у основного задания и у карточек: отличаются корнем,
+   объектом состояния и префиксом id в совместной сессии. В id входит key
+   задания — иначе в новое задание подставлялось бы набранное в прошлом. */
+function buildAnswerArea(root, t, st, prefix, onChanged){
+  let html = '';
+  if (t.fields) {
+    t.fields.forEach(f => {
+      html += '<div class="p2-field" data-fid="' + f.id + '">';
+      html += '<span class="p2-label">' + f.label + '</span>';
+      html += '<input type="text" class="answer-input" data-fid="' + f.id + '" inputmode="decimal" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">';
+      html += '<span class="field-hint">целое число или дробь: −3, 5/3, 0,5</span>';
+      html += '</div>';
+    });
+    html += '<div class="input-answer-row"><button class="check-btn">Проверить</button></div>';
+  }
+  html += '<div class="answer-msg"></div>';
+  root.innerHTML = html;
+  if (!t.fields) return;
+  const submit = () => { runCheck(t, st, root); onChanged(); };
+  root.querySelectorAll('input.answer-input').forEach(inp => {
+    inp.addEventListener('focus', () => { lastFocusedInput = inp; syncKeypadVisibility(); });
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+    if (TS && TS.registerField) TS.registerField('log:' + prefix + ':' + t.key + ':' + inp.dataset.fid, inp);
+    if (!lastFocusedInput) lastFocusedInput = inp;
+  });
+  root.querySelector('.check-btn').onclick = submit;
+}
+// варианты выбора живут в условии; нажатие — сразу ответ, как в ОГЭ
+function wireChoice(qRoot, aRoot, t, st, onChanged){
+  qRoot.querySelectorAll('.mcq-btn').forEach(btn => {
+    const go = () => { if (st.answered) return; runChoice(t, st, +btn.dataset.i, qRoot); onChanged(); };
+    btn.addEventListener('click', go);
+    btn.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); go(); } });
+  });
+}
+function applyMarks(qRoot, aRoot, t, st){
+  if (t.fields) {
+    t.fields.forEach(f => {
+      const mark = st.marks[f.id] || '';
+      const inp = aRoot.querySelector('input.answer-input[data-fid="' + f.id + '"]');
+      if (!inp) return;
+      inp.classList.remove('good', 'bad', 'fixed');
+      if (mark) inp.classList.add(mark);
+      inp.disabled = !!st.answered;
+      if (mark === 'fixed') { const shown = fieldShown(f); if (inp.value !== shown) inp.value = shown; }
+    });
+    const btn = aRoot.querySelector('.check-btn');
+    if (btn) { btn.disabled = !!st.answered; btn.style.display = st.answered ? 'none' : 'inline-block'; }
+    // после ответа пропуск в тождестве заполняется верным числом
+    qRoot.querySelectorAll('.log-expr .slot').forEach(s => {
+      const html = st.answered ? t.answer : '?';
+      if (s.innerHTML !== html) s.innerHTML = html;
+      s.classList.toggle('filled', !!st.answered);
+    });
+  }
+  if (t.choice) {
+    qRoot.querySelectorAll('.mcq-btn').forEach(b => {
+      const i = +b.dataset.i;
+      b.classList.remove('good', 'bad', 'fixed');
+      if (st.answered && i === t.choice.correct) b.classList.add(st.correct ? 'good' : 'fixed');
+      else if ((st.wrong || []).indexOf(i) >= 0) b.classList.add('bad');
+    });
+  }
+}
+
+/* ═══════════════ проверка ═══════════════ */
+function runCheck(t, st, root){
+  if (st.answered || !t.fields) return;
+  const results = {};
+  let msg = '';
+  t.fields.forEach(f => {
+    const inp = root.querySelector('input.answer-input[data-fid="' + f.id + '"]');
+    const r = checkField(f, inp ? inp.value : '');
+    results[f.id] = r;
+    if (typeof r === 'string' && !msg) msg = r;
+  });
+  const msgEl = root.querySelector('.answer-msg');
+  if (msg) { if (msgEl) msgEl.textContent = msg; return; }
+  if (msgEl) msgEl.textContent = '';
+  const allOk = t.fields.every(f => results[f.id] === true);
+  t.fields.forEach(f => { st.marks[f.id] = results[f.id] ? 'good' : 'bad'; });
+  settle(t, st, allOk, () => { t.fields.forEach(f => { if (!results[f.id]) st.marks[f.id] = 'fixed'; }); });
+  if (!allOk && !st.answered) {
+    const bad = root.querySelector('.answer-input.bad');
+    if (bad) { bad.classList.remove('shake'); void bad.offsetWidth; bad.classList.add('shake'); }
+  }
+}
+function runChoice(t, st, i, qRoot){
+  if (st.answered || !t.choice) return;
+  st.pick = i;
+  const ok = i === t.choice.correct;
+  if (!ok && (st.wrong || []).indexOf(i) < 0) st.wrong = (st.wrong || []).concat([i]);
+  settle(t, st, ok, () => {});
+  if (!ok && !st.answered) {
+    const b = qRoot.querySelector('.mcq-btn[data-i="' + i + '"]');
+    if (b) { b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); }
+  }
+}
+/* Итог попытки — общий для полей и выбора, основного задания и карточек:
+   первая ошибка — красным и можно исправить, вторая — верный ответ
+   подставлен и открыт разбор (как в ОГЭ, ЕГЭ и «Процентах»). */
+function settle(t, st, ok, reveal){
+  if (ok) {
+    st.answered = true; st.correct = true;
+    totalSolved++; streak++;
+    addHistory(t, st, true);
+    countForLevel(t);
+    awardMedals();
+  } else if (st.hadWrong) {
+    st.answered = true; st.correct = false;
+    reveal();
+    totalErrors++; streak = 0;
+    curProg.errorsInBatch = (curProg.errorsInBatch || 0) + 1;
+    addHistory(t, st, false);
+  } else {
+    st.hadWrong = true;
+    totalErrors++; streak = 0;
+    curProg.errorsInBatch = (curProg.errorsInBatch || 0) + 1;
+    saveProg();
+  }
+}
+// три верных на текущем уровне — уровень пройден. Ошибка серию не
+// сбрасывает: сложность растёт с числом решённых, а не с безупречностью
+function countForLevel(t){
+  const key = runKey(S.props), p = progOf(key);
+  p.solved = (p.solved || 0) + 1;
+  if (t.lvl === S.lvl && !S.lvlUp) {
+    S.lvlCnt = Math.min(LEVEL_UP_AT, S.lvlCnt + 1);
+    if (S.lvlCnt >= LEVEL_UP_AT && S.lvl < 3) S.lvlUp = true;
+  }
+  p.lvl = S.lvl; p.cnt = S.lvlCnt; p.max = Math.max(p.max || 1, S.lvl + (S.lvlUp ? 1 : 0));
+  saveLevelProg(key, p);
+  solvedByProp[t.pid] = (solvedByProp[t.pid] || 0) + 1;
+  try { localStorage.setItem(SOLVED_KEY, JSON.stringify(solvedByProp)); } catch (e) {}
+}
+
+/* ═══════════════ история и медали ═══════════════ */
+function addHistory(t, st, ok){
+  curProg.history.unshift({ lvl: t.lvl, pid: t.pid, peek: t.peek, correct: !!ok, hadError: !!st.hadWrong, answer: t.answer });
+  curProg.history = curProg.history.slice(0, 8);
+  if (ok) curProg.solvedInBatch = (curProg.solvedInBatch || 0) + 1;
+  saveProg();
+}
+function awardMedals(){
+  if ((curProg.solvedInBatch || 0) < 5) return;
+  const errs = curProg.errorsInBatch || 0;
+  const tier = errs === 0 ? 'gold' : (errs <= 2 ? 'silver' : 'bronze');
+  curProg.medals[tier] = (curProg.medals[tier] || 0) + 1;
+  curProg.solvedInBatch = 0;
+  curProg.errorsInBatch = 0;
+  saveProg();
+  playMedalAnimation(tier);
+}
+function renderMedals(){
+  const m = curProg.medals || {};
+  els.medalBadgeRow.textContent = ['gold', 'silver', 'bronze'].filter(t => m[t]).map(t => MEDAL_EMOJI[t] + '×' + m[t]).join(' ');
+}
+function renderExampleHistory(){
+  const items = curProg.history || [];
+  els.exampleHistoryToggle.textContent = '🕓 История решённого (' + items.length + ')';
+  els.exampleHistoryEmpty.style.display = items.length ? 'none' : 'block';
+  // ответ — разметка из банка (дробь, степень), остальное — обычный текст
+  els.exampleHistoryList.innerHTML = items.map(h =>
+    '<div class="example-history-row">' +
+      '<span class="example-history-num">' + (h.correct ? (h.hadError ? '🟡' : '✅') : '❌') + '</span>' +
+      '<div class="example-history-body"><span>' + (h.lvl ? '<b>' + LV[h.lvl - 1] + '.</b> ' : '') + esc(h.peek || '') + '</span>' +
+        (h.answer ? '<span class="example-history-answer' + (h.correct ? '' : ' bad') + '">Ответ: ' + h.answer + '</span>' : '') +
+      '</div></div>').join('');
+}
+function playMedalAnimation(tier){
+  const rect = els.taskTitle.getBoundingClientRect();
+  const flyer = document.createElement('div');
+  flyer.className = 'medal-flyer';
+  flyer.textContent = MEDAL_EMOJI[tier];
+  flyer.style.left = (rect.left + rect.width / 2 - 22) + 'px';
+  flyer.style.top = (rect.top - 10) + 'px';
+  flyer.style.opacity = '0';
+  flyer.style.transform = 'scale(.4)';
+  document.body.appendChild(flyer);
+  requestAnimationFrame(() => {
+    flyer.style.opacity = '1';
+    flyer.style.transform = 'scale(1.3)';
+    setTimeout(() => {
+      els.medalTray.classList.add('show');
+      document.documentElement.setAttribute('data-medals', 'on');
+      const trayRect = els.medalTray.getBoundingClientRect();
+      const curRect = flyer.getBoundingClientRect();
+      flyer.style.transform = 'translate(' + ((trayRect.left + 24) - curRect.left) + 'px, ' +
+        ((trayRect.top + trayRect.height / 2 - 10) - curRect.top) + 'px) scale(.5)';
+      flyer.style.opacity = '0.15';
+      setTimeout(() => {
+        flyer.remove();
+        const icon = document.createElement('span');
+        icon.className = 'medal-tray-icon';
+        icon.textContent = MEDAL_EMOJI[tier];
+        icon.title = MEDAL_TITLE[tier];
+        els.medalTray.appendChild(icon);
+      }, 900);
+    }, 650);
+  });
+}
+els.exampleHistoryToggle.onclick = () => {
+  const open = els.exampleHistoryPanel.style.display !== 'block';
+  els.exampleHistoryPanel.style.display = open ? 'block' : 'none';
+  if (open) els.exampleHistoryPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+els.exampleHistoryClose.onclick = () => { els.exampleHistoryPanel.style.display = 'none'; };
+
+/* ═══ конспект урока: снимок области вместе с заметками поверх неё ═══ */
+function snapshotAndClear(scope, targetEl){
+  if (!targetEl) return;
+  const rect = targetEl.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return;
+  const finish = () => { if (window.__boardClearInScreenRect) window.__boardClearInScreenRect(rect); };
+  if (window.LessonHistory) window.LessonHistory.captureIfEnabled(scope, targetEl).then(finish);
+  else finish();
+}
+
+/* ═══════════════ решение ═══════════════
+   У каждого шага сверху — какое свойство применено (метка цвета плитки). */
+function stepsHTML(t){
+  return (t.steps || []).map((s, i) => '<div class="sol-step"><span class="no">' + (i + 1) + '</span><div class="body">' + s + '</div></div>').join('');
+}
+function answerHTML(t){
+  return 'Ответ: ' + (t.kind === 'slot' ? '<span class="mx">' + t.slotEq + '</span>' : '<span class="mx">' + t.answer + '</span>');
+}
+function solutionHTML(t){ return stepsHTML(t) + '<div class="sol-answer">' + answerHTML(t) + '</div>'; }
+
+/* ═══════════════ открыть тренировку / новое задание ═══════════════ */
+function freshState(st){
+  st.answered = false; st.hadWrong = false; st.correct = false;
+  st.marks = {}; st.pick = null; st.wrong = []; st.sol = false;
+}
+// начать тренировку: уровень — тот, на котором по ней остановились
+function startRun(props, lvl){
+  props = normProps(props);
+  if (!props.length) return;
+  if (S.screen === 'task') snapshotAndClear('whole', els.workZone);
+  S.props = props;
+  S.sel = props.length < PROP_IDS.length ? props.slice() : S.sel;
+  const p = progOf(runKey(props));
+  S.lvl = lvl || p.lvl || 1;
+  S.lvlCnt = lvl && lvl !== p.lvl ? 0 : (p.cnt || 0);
+  S.lvlUp = S.lvlCnt >= LEVEL_UP_AT && S.lvl < 3;
+  S.screen = 'task';
+  ensureProg();
+  drawTask(BANK.generate(S.props, S.lvl), true);
+  window.scrollTo(0, 0);
+}
+// «Следующее задание»: если уровень пройден — сначала поднимаемся на следующий
+function newTask(){
+  const key = runKey(S.props);
+  if (S.lvlUp && S.lvl < 3) { S.lvl++; S.lvlCnt = 0; S.lvlUp = false; saveLevelProg(key, Object.assign(progOf(key), { lvl: S.lvl, cnt: 0 })); }
+  if (S.screen === 'task') snapshotAndClear('whole', els.workZone);
+  S.screen = 'task';
+  drawTask(BANK.generate(S.props, S.lvl), true);
+}
+function setLevel(lvl){
+  if (lvl === S.lvl && S.task) return;
+  const key = runKey(S.props);
+  S.lvl = lvl; S.lvlCnt = 0; S.lvlUp = false;
+  saveLevelProg(key, Object.assign(progOf(key), { lvl, cnt: 0 }));
+  if (S.screen === 'task') snapshotAndClear('whole', els.workZone);
+  drawTask(BANK.generate(S.props, S.lvl), true);
+}
+/* Нарисовать задание t. fresh — задание новое (сбросить ответ и набрать
+   карточки заново); при чужом снимке ответ приходит отдельно. */
+function drawTask(t, fresh){
+  S.task = t;
+  drawnKey = t.key;
+  if (fresh) freshState(S);
+  lastFocusedInput = null;
+  els.taskTitle.textContent = runTitle(S.props);
+  document.title = 'Логарифмы — ' + runTitle(S.props);
+  els.logQuestion.innerHTML = questionHTML(t);
+  if (TS && TS.unregisterFieldsWithPrefix) TS.unregisterFieldsWithPrefix('log:main:');
+  buildAnswerArea(els.answerArea, t, S, 'main', () => render());
+  if (t.choice) wireChoice(els.logQuestion, els.answerArea, t, S, () => render());
+  els.solSteps.innerHTML = stepsHTML(t);
+  els.solAnswer.innerHTML = answerHTML(t);
+  if (fresh) regenCards();
+  renderRunRow();
+  render();
+  syncUrl();
+}
+function renderRunRow(){
+  els.runChips.innerHTML = S.props.length > 1 && !isAll(S.props)
+    ? S.props.map(id => '<span class="run-chip" style="--acc:' + accOf(id) + ';--acc-soft:' + hexA(accOf(id), 0.13) + '">' + propById(id).title + '</span> ').join('')
+    : '';
+  els.propRef.innerHTML = S.props.map(id =>
+    '<div class="prop-ref-item" style="--acc:' + accOf(id) + '"><div class="nm">' + propById(id).title + '</div><div class="fm">' + FORMULA[id].f +
+    (FORMULA[id].f2 && id !== 'ident' ? '<span class="fsep">;</span>' + FORMULA[id].f2 : '') + '</div></div>').join('');
+}
+function syncUrl(){
+  try {
+    const u = new URL(location.href);
+    if (S.screen === 'task') u.searchParams.set('p', isAll(S.props) ? 'all' : S.props.join(',')); else u.searchParams.delete('p');
+    history.replaceState(null, '', u.toString());
+  } catch (e) {}
+}
+function showPicker(){
+  if (S.screen === 'task') snapshotAndClear('whole', els.workZone);
+  S.screen = 'picker';
+  render();
+  syncUrl();
+  window.scrollTo(0, 0);
+}
+
+/* ═══════════════ отрисовка ═══════════════ */
+function levelNoteHTML(){
+  const hint = BANK.LEVEL_HINTS[S.lvl - 1];
+  if (S.lvl >= 3) return LV[S.lvl - 1] + ' — ' + hint;
+  const dots = '<span class="lvl-dots">' + Array.from({ length: LEVEL_UP_AT }, (_, i) => '<i class="' + (i < S.lvlCnt ? 'on' : '') + '"></i>').join('') + '</span>';
+  return LV[S.lvl - 1] + ' — ' + hint + ' · до уровня ' + LV[S.lvl] + ': ' + dots;
+}
+function render(){
+  const onTask = S.screen === 'task' && S.task;
+  document.documentElement.setAttribute('data-screen', onTask ? 'task' : 'picker');
+  els.pickerArea.style.display = onTask ? 'none' : 'block';
+  els.taskArea.style.display = onTask ? 'block' : 'none';
+  els.addRail.style.display = onTask ? '' : 'none';
+  els.pageTitle.textContent = 'Свойства логарифмов';
+  if (!onTask) {
+    els.pageSub.textContent = '10–11 класс · выбери свойства для тренировки';
+    updateTileBadges();
+    layoutDemos();
+    syncKeypadVisibility();
+    return;
+  }
+  const single = S.props.length === 1;
+  els.pageSub.textContent = '10–11 класс · ' + (single ? BANK.groupById(propById(S.props[0]).group).title.toLowerCase() : (isAll(S.props) ? 'итоговая отработка' : 'смешанная тренировка'));
+  const t = S.task;
+  els.tabPractice.classList.toggle('active', S.mode === 'practice');
+  els.tabExam.classList.toggle('active', S.mode === 'exam');
+  // соседние свойства — только когда отрабатывается одно
+  els.prevProtoBtn.style.display = single ? '' : 'none';
+  els.nextProtoBtn.style.display = single ? '' : 'none';
+  if (single) {
+    const i = PROP_IDS.indexOf(S.props[0]);
+    els.prevProtoBtn.title = propById(PROP_IDS[(i - 1 + PROP_IDS.length) % PROP_IDS.length]).title;
+    els.nextProtoBtn.title = propById(PROP_IDS[(i + 1) % PROP_IDS.length]).title;
+  }
+  // шпаргалка — только в «Тренировке»
+  els.refBtn.style.display = S.mode === 'practice' ? '' : 'none';
+  els.refBtn.classList.toggle('active', refOpen);
+  els.propRef.style.display = (S.mode === 'practice' && refOpen) ? '' : 'none';
+  els.runRow.style.display = (els.runChips.innerHTML || S.mode === 'practice') ? '' : 'none';
+  // «пройден» — только уровень, открытый тремя верными ответами
+  const max = progOf(runKey(S.props)).max || 1;
+  els.levelRow.querySelectorAll('.lvl-chip').forEach(b => {
+    const l = +b.dataset.lvl;
+    b.classList.toggle('active', l === S.lvl);
+    b.classList.toggle('done', l < max || (l === 3 && S.lvl === 3 && S.lvlCnt >= LEVEL_UP_AT));
+  });
+  els.levelNote.innerHTML = levelNoteHTML();
+  applyMarks(els.logQuestion, els.answerArea, t, S);
+  const hasCards = S.cards.length > 0;
+  els.card1BtnRow.style.display = (hasCards || (S.mode === 'practice' && !S.answered)) ? 'flex' : 'none';
+  els.basketInlineBtn.style.display = hasCards ? 'inline-flex' : 'none';
+  els.showSolutionBtn.style.display = (S.mode === 'practice' && !S.answered) ? 'inline-flex' : 'none';
+  els.showSolutionBtn.textContent = S.sol ? 'Скрыть решение и ответ' : 'Показать решение и ответ';
+  const show = S.answered || (S.mode === 'practice' && S.sol);
+  const wasHidden = els.mainPanel.style.display === 'none';
+  els.mainPanel.style.display = show ? 'block' : 'none';
+  if (show && wasHidden) { els.mainPanel.classList.remove('reveal'); void els.mainPanel.offsetWidth; els.mainPanel.classList.add('reveal'); }
+  els.nextBtn.style.display = (S.answered && !hasCards) ? 'block' : 'none';
+  els.levelUp.style.display = S.lvlUp ? 'block' : 'none';
+  els.levelUp.textContent = S.lvlUp ? '🎉 Уровень ' + LV[S.lvl - 1] + ' пройден! Следующее задание — уровень ' + LV[S.lvl] + '.' : '';
+  els.stSolved.textContent = totalSolved;
+  els.stErrors.textContent = totalErrors;
+  els.stStreak.textContent = streak;
+  syncAllCards();
+  renderMedals();
+  renderExampleHistory();
+  syncAddUI();
+  applyColumns();
+  syncKeypadVisibility();
+}
+
+/* ═══════════════ кнопки ═══════════════ */
+function switchMode(mode){
+  S.mode = mode;
+  if (mode !== 'practice') S.sol = false;
+  render();
+}
+els.tabPractice.onclick = () => switchMode('practice');
+els.tabExam.onclick = () => switchMode('exam');
+els.refBtn.onclick = () => { refOpen = !refOpen; render(); };
+els.showSolutionBtn.onclick = guard('showSolution', () => { S.sol = !S.sol; render(); });
+els.nextBtn.onclick = guard('switchTask', newTask);
+els.backBtn.onclick = guard('switchTask', showPicker);
+const stepProp = d => { const i = PROP_IDS.indexOf(S.props[0]); startRun([PROP_IDS[(i + d + PROP_IDS.length) % PROP_IDS.length]]); };
+els.prevProtoBtn.onclick = guard('switchTask', () => stepProp(-1));
+els.nextProtoBtn.onclick = guard('switchTask', () => stepProp(1));
+els.levelRow.querySelectorAll('.lvl-chip').forEach(b => { b.onclick = guard('switchTask', () => setLevel(+b.dataset.lvl)); });
+els.basketAddBtn.onclick = () => { if (!window.Basket) return; addAllToBasket(); flashOk(els.basketAddBtn, '📥'); };
+
+/* ═══════════════ несколько заданий на экране ═══════════════
+   Как у «Процентов»: «+1…+10» дописывают карточки в конец, не трогая
+   стоящие. У карточки своё задание той же тренировки и уровня. */
+function freshCard(task){ return { task, answered: false, hadWrong: false, correct: false, marks: {}, pick: null, wrong: [], sol: false }; }
+function cardEl(idx){ return els.tasksColumns.querySelector('.added-task-card[data-idx="' + idx + '"]'); }
+function makeCardEl(c, idx){
+  const t = c.task;
+  const div = document.createElement('div');
+  div.className = 'panel added-task-card';
+  div.dataset.idx = String(idx);
+  div.innerHTML =
+    '<div class="added-card-question">' + questionHTML(t) + '</div>' +
+    '<div class="answer-area"></div>' +
+    '<div class="card-btn-row">' +
+      '<button class="soft-btn icon-only added-refresh-btn" title="Другое задание">⟳</button>' +
+      '<button class="soft-btn icon-only added-basket-btn" title="В подборку">📥</button>' +
+      '<button class="soft-btn added-solution-btn">Показать решение и ответ</button>' +
+      '<button class="added-remove-btn">− Убрать</button>' +
+    '</div>' +
+    '<div class="added-explain" style="display:none"></div>';
+  const q = div.querySelector('.added-card-question'), area = div.querySelector('.answer-area');
+  const changed = () => { syncCard(+div.dataset.idx); render(); };
+  buildAnswerArea(area, t, c, 'card' + idx, changed);
+  if (t.choice) wireChoice(q, area, t, c, changed);
+  div.querySelector('.added-refresh-btn').onclick = guard('refreshOne', () => refreshCard(+div.dataset.idx));
+  div.querySelector('.added-remove-btn').onclick = guard('deleteTask', () => removeCard(+div.dataset.idx));
+  div.querySelector('.added-solution-btn').onclick = guard('showSolution', () => {
+    const cur = S.cards[+div.dataset.idx];
+    if (!cur || cur.answered) return;
+    cur.sol = !cur.sol;
+    syncCard(+div.dataset.idx);
+  });
+  const basketBtn = div.querySelector('.added-basket-btn');
+  basketBtn.onclick = () => { if (addOneToBasket('.added-task-card[data-idx="' + div.dataset.idx + '"] .added-card-question', t)) flashOk(basketBtn, '📥'); };
+  return div;
+}
+function syncCard(idx){
+  const c = S.cards[idx], div = cardEl(idx);
+  if (!c || !div) return;
+  applyMarks(div.querySelector('.added-card-question'), div.querySelector('.answer-area'), c.task, c);
+  if (S.mode !== 'practice' && !c.answered && c.sol) c.sol = false;
+  const solBtn = div.querySelector('.added-solution-btn');
+  solBtn.style.display = (S.mode === 'practice' && !c.answered) ? 'inline-flex' : 'none';
+  solBtn.textContent = c.sol ? 'Скрыть решение и ответ' : 'Показать решение и ответ';
+  const explain = div.querySelector('.added-explain');
+  const show = c.answered || c.sol;
+  explain.style.display = show ? 'block' : 'none';
+  const html = show ? solutionHTML(c.task) : '';
+  if (explain.innerHTML !== html) explain.innerHTML = html;
+}
+function syncAllCards(){ S.cards.forEach((c, i) => syncCard(i)); }
+function renderCards(skipPush){
+  if (TS && TS.unregisterFieldsWithPrefix) TS.unregisterFieldsWithPrefix('log:card');
+  els.tasksColumns.querySelectorAll('.added-task-card').forEach(el => el.remove());
+  S.cards.forEach((c, i) => els.tasksColumns.appendChild(makeCardEl(c, i)));
+  syncAllCards();
+  applyColumns();
+  syncAddUI();
+  if (!skipPush && TS && TS.push) TS.push();
+}
+function appendCards(n){
+  for (let k = 0; k < n; k++) {
+    const c = freshCard(BANK.generate(S.props, S.lvl));
+    S.cards.push(c);
+    els.tasksColumns.appendChild(makeCardEl(c, S.cards.length - 1));
+    syncCard(S.cards.length - 1);
+  }
+  render();
+  if (TS && TS.push) TS.push();
+}
+function removeCard(idx){
+  snapshotAndClear('single', cardEl(idx));
+  S.cards.splice(idx, 1);
+  renderCards();
+  render();
+}
+function clearCards(){
+  snapshotAndClear('whole', els.tasksColumns);
+  S.cards = [];
+  renderCards();
+  render();
+}
+function refreshCard(idx){
+  if (!S.cards[idx]) return;
+  snapshotAndClear('single', cardEl(idx));
+  S.cards[idx] = freshCard(BANK.generate(S.props, S.lvl));
+  const old = cardEl(idx);
+  if (old) { old.replaceWith(makeCardEl(S.cards[idx], idx)); syncCard(idx); }
+  else renderCards(true);
+  render();
+  if (TS && TS.push) TS.push();
+}
+// новое основное задание — карточки набираются заново в прежнем количестве
+function regenCards(){
+  if (!S.cards.length) return;
+  S.cards = S.cards.map(() => freshCard(BANK.generate(S.props, S.lvl)));
+  renderCards(true);
+}
+function applyColumns(){
+  const total = 1 + S.cards.length;
+  let cols = total <= 3 ? 1 : (total <= 6 ? 2 : 3);
+  if (window.innerWidth < 560) cols = 1;
+  else if (window.innerWidth < 820) cols = Math.min(cols, 2);
+  els.tasksColumns.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)';
+  els.tasksColumns.style.gridTemplateRows = 'repeat(' + Math.max(1, Math.ceil(total / cols)) + ', auto)';
+}
+window.addEventListener('resize', () => { if (S.screen === 'task') applyColumns(); });
+
+/* ── «В подборку» ── */
+function addOneToBasket(selector, t){
+  if (!window.Basket) return false;
+  const r = window.Basket.extractFromSelectorsRich([selector]);
+  if (!r || !r.text) return false;
+  const task = t || S.task;
+  window.Basket.add({
+    trainerId: SLUG,
+    modeTitle: propById(task.pid).title + ' · уровень ' + LV[task.lvl - 1],
+    text: r.text, html: r.html,
+  });
+  return true;
+}
+function addAllToBasket(){
+  addOneToBasket('#logQuestion', S.task);
+  S.cards.forEach((c, i) => addOneToBasket('.added-task-card[data-idx="' + i + '"] .added-card-question', c.task));
+}
+function flashOk(btn, back){
+  btn.classList.add('ok');
+  btn.textContent = '✓';
+  setTimeout(() => { btn.classList.remove('ok'); btn.textContent = back; }, 900);
+}
+els.basketInlineBtn.onclick = () => { if (addOneToBasket('#logQuestion', S.task)) flashOk(els.basketInlineBtn, '📥'); };
+
+let addRailOpen = false;
+function syncAddUI(){
+  const has = S.cards.length > 0;
+  els.addRail.classList.toggle('open', addRailOpen);
+  els.addRailToggle.setAttribute('aria-expanded', addRailOpen ? 'true' : 'false');
+  els.addRailToggle.title = addRailOpen ? 'Свернуть' : 'Добавить задания';
+  els.addRailSep.style.display = has ? 'block' : 'none';
+  els.addToBasketAllBtn.style.display = has ? 'inline-flex' : 'none';
+  els.addClearBtn.style.display = has ? 'inline-flex' : 'none';
+}
+els.addRailToggle.onclick = () => { addRailOpen = !addRailOpen; syncAddUI(); };
+els.addRailBody.querySelectorAll('.add-qty-btn').forEach(btn => { btn.onclick = guard('switchTask', () => appendCards(+btn.dataset.n)); });
+els.addClearBtn.onclick = guard('deleteTask', clearCards);
+els.addToBasketAllBtn.onclick = () => { if (!window.Basket) return; addAllToBasket(); flashOk(els.addToBasketAllBtn, '📥 Все'); };
+
+/* ═══ растягиваемая рабочая зона (как в ЕГЭ и «Процентах») ═══ */
+const WORK_W_KEY = SLUG + ':workZoneW';
+function clampWorkW(w){
+  const min = 380;
+  let max = window.innerWidth - 24;
+  try {
+    if (els.keypadFloat && getComputedStyle(els.keypadFloat).display !== 'none') {
+      const byKeypad = 2 * (els.keypadFloat.getBoundingClientRect().left - 16 - window.innerWidth / 2);
+      if (byKeypad > 0) max = Math.min(max, byKeypad);
+    }
+  } catch (e) {}
+  max = Math.max(min, max);
+  return Math.min(max, Math.max(min, w));
+}
+try {
+  const w = parseFloat(localStorage.getItem(WORK_W_KEY));
+  if (w) els.workZone.style.setProperty('--work-w', clampWorkW(w) + 'px');
+} catch (e) {}
+function setupWorkZoneResize(handleEl, side){
+  let start = null;
+  handleEl.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    try { handleEl.setPointerCapture(e.pointerId); } catch (err) {}
+    start = { x: e.clientX, w: els.workZone.getBoundingClientRect().width };
+  });
+  handleEl.addEventListener('pointermove', e => {
+    if (!start) return;
+    const dx = (side === 'right') ? (e.clientX - start.x) : (start.x - e.clientX);
+    els.workZone.style.setProperty('--work-w', clampWorkW(start.w + dx * 2) + 'px');
+  });
+  const end = () => {
+    if (!start) return;
+    start = null;
+    try { localStorage.setItem(WORK_W_KEY, String(parseFloat(getComputedStyle(els.workZone).width))); } catch (e) {}
+    if (TS && TS.push) TS.push();
+  };
+  handleEl.addEventListener('pointerup', end);
+  handleEl.addEventListener('pointercancel', end);
+}
+setupWorkZoneResize(els.workResizeLeft, 'left');
+setupWorkZoneResize(els.workResizeRight, 'right');
+
+/* ═══ плавающая клавиатура ═══
+   Ответы здесь бывают отрицательными и дробными: вместо пробела и
+   смешанных чисел «Процентов» — минус и «/». */
+let keypadOpen = true;
+function renderKeypadKeys(){
+  const keys = ['7','8','9','4','5','6','1','2','3','−','0','/'];
+  let html = keys.map(k => '<button type="button" class="' + (k === '−' ? 'kp-minus' : '') + '" data-key="' + k + '">' + k + '</button>').join('');
+  html += '<button type="button" class="kp-back" data-key=",">, запятая</button>' +
+          '<button type="button" class="kp-back" data-key="back">⌫ Стереть</button>' +
+          '<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>';
+  els.keypadButtons.innerHTML = html;
+  els.keypadButtons.querySelectorAll('button').forEach(btn => { btn.onclick = () => keypadPress(btn.dataset.key); });
+}
+function keypadTarget(){
+  let inp = lastFocusedInput;
+  if (!inp || !els.workZone.contains(inp) || inp.disabled) inp = els.workZone.querySelector('input.answer-input:not([disabled])');
+  return inp;
+}
+function insertText(inp, ch){
+  const pos = inp.selectionStart == null ? inp.value.length : inp.selectionStart;
+  const end = inp.selectionEnd == null ? pos : inp.selectionEnd;
+  inp.value = inp.value.slice(0, pos) + ch + inp.value.slice(end);
+  const caret = pos + ch.length;
+  inp.focus();
+  try { inp.setSelectionRange(caret, caret); } catch (e) {}
+  // событие нужно, чтобы набранное улетело собеседнику в совместной сессии
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+}
+function keypadPress(ch){
+  const inp = keypadTarget();
+  if (!inp) return;
+  lastFocusedInput = inp;
+  const area = inp.closest('.answer-area');
+  if (ch === 'enter') { const btn = area && area.querySelector('.check-btn'); if (btn && !btn.disabled) btn.click(); return; }
+  if (ch === 'back') {
+    const pos = inp.selectionStart == null ? inp.value.length : inp.selectionStart;
+    const end = inp.selectionEnd == null ? pos : inp.selectionEnd;
+    const from = (pos === end) ? Math.max(0, pos - 1) : pos;
+    inp.value = inp.value.slice(0, from) + inp.value.slice(end);
+    inp.focus();
+    try { inp.setSelectionRange(from, from); } catch (e) {}
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    return;
+  }
+  insertText(inp, ch);
+}
+function syncKeypadVisibility(){
+  const free = S.screen === 'task' && els.taskArea.style.display !== 'none' && !!els.workZone.querySelector('input.answer-input:not([disabled])');
+  els.keypadFloat.style.display = (free && keypadOpen) ? 'block' : 'none';
+  els.kpToggle.style.display = (free && !keypadOpen) ? 'flex' : 'none';
+}
+els.kpClose.onclick = () => { keypadOpen = false; syncKeypadVisibility(); };
+els.kpToggle.onclick = () => { keypadOpen = true; syncKeypadVisibility(); };
+(function makeKeypadDraggable(floatEl, handleEl){
+  let dragging = false, offX = 0, offY = 0;
+  function clamp(x, y){
+    const maxX = Math.max(4, window.innerWidth - floatEl.offsetWidth - 4);
+    const maxY = Math.max(4, window.innerHeight - floatEl.offsetHeight - 4);
+    return { x: Math.min(Math.max(x, 4), maxX), y: Math.min(Math.max(y, 4), maxY) };
+  }
+  handleEl.addEventListener('pointerdown', e => {
+    dragging = true;
+    const r = floatEl.getBoundingClientRect();
+    floatEl.style.left = r.left + 'px';
+    floatEl.style.top = r.top + 'px';
+    floatEl.style.right = 'auto';
+    // на телефоне CSS прижимает клавиатуру к низу (bottom:16px) — без сброса
+    // за ней тянулся бы пустой «хвост» (промпт №64)
+    floatEl.style.bottom = 'auto';
+    offX = e.clientX - r.left; offY = e.clientY - r.top;
+    try { handleEl.setPointerCapture(e.pointerId); } catch (err) {}
+    e.preventDefault();
+  });
+  handleEl.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const pos = clamp(e.clientX - offX, e.clientY - offY);
+    floatEl.style.left = pos.x + 'px';
+    floatEl.style.top = pos.y + 'px';
+  });
+  const up = e => { dragging = false; try { handleEl.releasePointerCapture(e.pointerId); } catch (err) {} };
+  handleEl.addEventListener('pointerup', up);
+  handleEl.addEventListener('pointercancel', up);
+  window.addEventListener('resize', () => {
+    if (floatEl.style.left && floatEl.style.left !== 'auto') {
+      const r = floatEl.getBoundingClientRect();
+      const pos = clamp(r.left, r.top);
+      floatEl.style.left = pos.x + 'px';
+      floatEl.style.top = pos.y + 'px';
+    }
+  });
+})(els.keypadFloat, els.kpDragHandle);
+
+/* ═══════════════ запуск ═══════════════ */
+const URL_P = (function(){
+  const raw = new URLSearchParams(location.search).get('p');
+  if (!raw) return null;
+  const list = raw === 'all' ? PROP_IDS : normProps(raw.split(','));
+  return list.length ? list : null;
+})();
+renderTiles();
+renderKeypadKeys();
+if (URL_P) startRun(URL_P);
+else render();
+
+/* ═══ доска (boards.html): ответ задания и «ещё такое же» ═══
+   Доска сама заданий не решает — верный ответ отдаёт тренажёр
+   (trainerTaskInfo в boards-core.js сначала спрашивает этот хук). */
+window.__boardTaskInfo = function(cardIdx){
+  const t = cardIdx >= 0 ? (S.cards[cardIdx] || {}).task : S.task;
+  if (!t) return null;
+  if (t.choice) return { kind: 'choice', n: t.choice.opts.length, correct: t.choice.correct };
+  // доска разбирает ответ своим taEval: −3/2 и −1,5 для неё одно и то же
+  return { kind: 'fields', fields: t.fields.map(f => ({ id: f.id, label: t.kind === 'slot' ? '? =' : 'Ответ:', type: 'num', value: String(f.value), alts: [], unit: '' })) };
+};
+
+/* ═══ общий снимок для совместной сессии и доски ═══
+   Та же схема, что во всех тренажёрах после промпта №54: версия задания
+   (__tsRev/__tsBy), пришедшее назад не рассылается, изменения ловит таймер.
+   Задание уходит ЦЕЛИКОМ (это данные без функций) — генерирует его только
+   тот, кто нажал кнопку; у собеседника оно просто рисуется. Отмеченные на
+   экране плиток свойства (sel) тоже общие: ученик видит, что выбирает
+   учитель. */
+function cardsSnapshot(){
+  return S.cards.map(c => ({ task: c.task, answered: !!c.answered, hadWrong: !!c.hadWrong, correct: !!c.correct,
+    marks: c.marks || {}, pick: c.pick == null ? null : c.pick, wrong: c.wrong || [], sol: !!c.sol }));
+}
+function tsGetState(){
+  const base = {
+    logScreen: S.screen, sel: S.sel.slice(), props: S.props.slice(), lvl: S.lvl, lvlCnt: S.lvlCnt, lvlUp: !!S.lvlUp, curSubMode: S.mode,
+    task: S.task, answered: !!S.answered, hadWrong: !!S.hadWrong, correct: !!S.correct,
+    marks: S.marks, pick: S.pick == null ? null : S.pick, wrong: S.wrong || [], sol: !!S.sol,
+    cards: cardsSnapshot(),
+    workW: parseFloat(getComputedStyle(els.workZone).width) || null,
+    totalSolved, streak, totalErrors,
+  };
+  if (window.__boardGetState) Object.assign(base, window.__boardGetState());
+  return base;
+}
+function tsApplyState(state){
+  if (!state) return;
+  if (window.__boardApplyState) window.__boardApplyState(state);
+  if (!Array.isArray(state.props)) return;   // снимок без тренировки (пустая сессия)
+  S.sel = normProps(state.sel);
+  const props = normProps(state.props);
+  if (props.length) S.props = props;
+  ensureProg();
+  S.lvl = Math.max(1, Math.min(3, state.lvl || 1));
+  S.lvlCnt = state.lvlCnt || 0;
+  S.lvlUp = !!state.lvlUp;
+  if (state.curSubMode === 'practice' || state.curSubMode === 'exam') S.mode = state.curSubMode;
+  if (state.logScreen === 'picker' || !state.task) { S.screen = 'picker'; render(); syncUrl(); return; }
+  S.screen = 'task';
+  // задание перерисовываем только если пришло ДРУГОЕ: снимок прилетает на
+  // каждый штрих доски, и перерисовка стирала бы набираемый ответ
+  if (state.task.key !== drawnKey) drawTask(state.task, false);
+  else renderRunRow();
+  S.answered = !!state.answered;
+  S.hadWrong = !!state.hadWrong;
+  S.correct = !!state.correct;
+  S.marks = state.marks || {};
+  S.pick = state.pick == null ? null : state.pick;
+  S.wrong = state.wrong || [];
+  S.sol = !!state.sol;
+  if (typeof state.workW === 'number' && state.workW > 0) els.workZone.style.setProperty('--work-w', clampWorkW(state.workW) + 'px');
+  const incoming = (state.cards || []).filter(c => c && c.task && c.task.key).map(c => ({
+    task: c.task, answered: !!c.answered, hadWrong: !!c.hadWrong, correct: !!c.correct,
+    marks: c.marks || {}, pick: c.pick == null ? null : c.pick, wrong: c.wrong || [], sol: !!c.sol }));
+  // карточки: список задач поменялся — перерисовываем; поменялось только
+  // состояние ответов — переносим его в СТОЯЩИЕ объекты (на них держат
+  // ссылки обработчики нарисованных карточек, как в ЕГЭ)
+  const keys = arr => arr.map(c => c.task.key).join('|');
+  if (keys(incoming) !== keys(S.cards)) { S.cards = incoming; renderCards(true); }
+  else incoming.forEach((c, i) => { const cur = S.cards[i]; ['answered', 'hadWrong', 'correct', 'marks', 'pick', 'wrong', 'sol'].forEach(k => { cur[k] = c[k]; }); });
+  render();
+  syncUrl();
+}
+function tsWatchSig(s){
+  return JSON.stringify([s.logScreen, s.sel, s.props, s.lvl, s.lvlCnt, s.lvlUp, s.curSubMode, s.task ? s.task.key : null,
+    s.answered, s.hadWrong, s.correct, s.marks, s.pick, s.wrong, s.sol,
+    (s.cards || []).map(c => [c.task.key, c.answered, c.hadWrong, c.correct, c.marks, c.pick, c.wrong, c.sol]), s.workW]);
+}
+let tsPeerSig = null;
+let tsRev = -1, tsRevBy = '';
+const tsMe = Math.random().toString(36).slice(2, 10);
+function tsGetStateVersioned(){ return Object.assign(tsGetState(), { __tsRev: tsRev, __tsBy: tsRevBy }); }
+function tsIncomingWins(state){
+  if (typeof state.__tsRev !== 'number') return true;
+  if (tsRev < 0) return true;
+  if (state.__tsRev !== tsRev) return state.__tsRev > tsRev;
+  return String(state.__tsBy || '') > tsRevBy;
+}
+function tsApplyStateFromPeer(state){
+  if (!state) return;
+  if (!tsIncomingWins(state)) { if (window.__boardApplyState) window.__boardApplyState(state); return; }
+  if (typeof state.__tsRev === 'number') { tsRev = state.__tsRev; tsRevBy = String(state.__tsBy || ''); }
+  tsApplyState(state);
+  try { tsPeerSig = tsWatchSig(tsGetState()); } catch (e) {}
+}
+/* Мост для «ещё такое же» на доске (boards-core.js, genNewTaskInFrame):
+   невидимый кадр доски получает тренировку и уровень и просит новое
+   задание. Снимок — только то, что задаёт тип задания, без самого задания. */
+window.__trainerState = {
+  get(){ return { logScreen: 'task', props: S.props.slice(), lvl: S.lvl, curSubMode: S.mode }; },
+  apply(s){
+    if (!s || !Array.isArray(s.props)) return;
+    const props = normProps(s.props), lvl = Math.max(1, Math.min(3, s.lvl || 1));
+    if (!props.length) return;
+    const same = S.screen === 'task' && S.task && runKey(S.props) === runKey(props) && S.task.lvl === lvl;
+    S.props = props; S.lvl = lvl; S.lvlUp = false;
+    ensureProg();
+    // доска перестраивает задание под новую ширину (промпт №70): ей нужен
+    // открытый экран задания, само условие она подставит из сохранённой
+    // вёрстки. С экрана плиток узла задания просто нет
+    if (!same) { S.screen = 'task'; drawTask(BANK.generate(props, lvl), true); }
+  },
+  newTask(){ S.screen = 'task'; drawTask(BANK.generate(S.props, S.lvl), true); },
+};
+
+if (window.TrainerSession) {
+  if (window.LessonHistory) {
+    window.TrainerSession.registerHistoryUI({ getCount: window.LessonHistory.getCount, onDownload: window.LessonHistory.downloadPdf });
+  }
+  window.TrainerSession.init({ trainer: SLUG, getState: tsGetStateVersioned, applyState: tsApplyStateFromPeer })
+    .then(function(){
+      // тренировка в адресе — выбор учителя; у ведущего она пересиливает снимок из базы
+      if (URL_P && (runKey(URL_P) !== runKey(S.props) || S.screen !== 'task') && window.TrainerSession.isLeader && window.TrainerSession.isLeader()) startRun(URL_P);
+    }, function(){});
+  (function watchState(){
+    let last = '';
+    try { last = tsWatchSig(tsGetState()); } catch (e) {}
+    setInterval(() => {
+      let sig;
+      try { sig = tsWatchSig(tsGetState()); } catch (e) { return; }
+      if (sig === last) return;
+      last = sig;
+      const echo = sig === tsPeerSig;
+      tsPeerSig = null;
+      if (echo) return;
+      tsRev = Math.max(tsRev, 0) + 1; tsRevBy = tsMe;
+      window.TrainerSession.push();
+    }, 300);
+  })();
+}
+</script>
+
+
+<script>
+/* ─── плавная посадка блоков при изменении высоты .panel ───
+   ResizeObserver ловит ЛЮБОЕ изменение высоты независимо от того, какая
+   функция его вызвала, и вместо мгновенного скачка красиво анимирует
+   высоту — всё, что ниже, плавно съезжает на новое место. */
+function setupAutoHeightAnimation(el, duration){
+  if(!el || typeof ResizeObserver==='undefined') return;
+  duration = duration || 280;
+  let lastH = null, resizing = false, settleTimer = null;
+  const ro = new ResizeObserver(entries=>{
+    if(resizing) return;
+    const entry = entries[0];
+    const cs = getComputedStyle(el);
+    const newH = (entry.borderBoxSize && entry.borderBoxSize[0])
+      ? entry.borderBoxSize[0].blockSize
+      : entry.contentRect.height + parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom) + parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+    if(lastH===null){ lastH=newH; return; }
+    if(Math.abs(newH-lastH)<1) return;
+    const oldH = lastH;
+    lastH = newH;
+    resizing = true;
+    el.style.height = oldH+'px';
+    el.style.overflow = 'hidden';
+    void el.offsetHeight;
+    el.style.transition = 'height '+duration+'ms cubic-bezier(.4,0,.2,1)';
+    requestAnimationFrame(()=>{ el.style.height = newH+'px'; });
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(()=>{
+      el.style.transition = '';
+      el.style.height = '';
+      el.style.overflow = '';
+      resizing = false;
+      lastH = el.getBoundingClientRect().height;
+    }, duration+50);
+  });
+  ro.observe(el);
+}
+document.querySelectorAll('.panel:not(.calc-history-panel):not(.calc-panel)').forEach(p=>setupAutoHeightAnimation(p));
+</script>
+
+<script src="trainer-board.js"></script>
+<script>
+/* Совместная сессия (подключение по коду, синхронный переход между
+   тренажёрами, блокировка самостоятельного выхода ученика) реализована один
+   раз в session-share.js — здесь только кнопка. Сам init запускается в конце
+   основного скрипта: мост состояния обязан лежать в том же <script>, где
+   объявлено состояние. */
+if (window.TrainerSession) {
+  window.TrainerSession.mountShareButton();
+}
+document.getElementById('homeBtn').addEventListener('click', function (e) {
+  e.preventDefault();
+  var go = function () {
+    if (window.TrainerSession && window.TrainerSession.navigateTo) window.TrainerSession.navigateTo('index');
+    else location.href = 'index.html';
+  };
+  if (window.TrainerSession && window.TrainerSession.guardStudentAction) window.TrainerSession.guardStudentAction('navigate', go)();
+  else go();
+});
+</script>
+</body></html>

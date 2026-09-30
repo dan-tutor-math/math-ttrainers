@@ -4434,6 +4434,8 @@ const TRAINER_CAPTURE = {
   // Промпт №71: «Проценты» — условие отдельно от полей ответа, как у ЕГЭ;
   // у добавленных «+» карточек — .added-card-question
   percent:   [ { sel:'#pctQuestion' }, { selAll:'.added-task-card .added-card-question' } ],
+  // Промпт №12 нового списка: «Свойства логарифмов» — как «Проценты»
+  logarithms:[ { sel:'#logQuestion' }, { selAll:'.added-task-card .added-card-question' } ],
   powers:    [ { sel:'#questionPanel' }, { selAll:'.added-task-card .added-card-question' } ],
 };
 // Промпт №55: ЕГЭ профиль — одна страница на все 20 позиций (ege_prof.html?n=…),
@@ -4487,6 +4489,7 @@ const TRAINERS_PANEL_GROUPS = [
     { id:'gcd',       name:'Наибольший общий делитель (НОД)', href:'gcd.html',    eq:'НОД(84, 60)' },
     { id:'lcm',       name:'Наименьшее общее кратное (НОК)',  href:'lcm.html',    eq:'НОК(12, 18)' },
     { id:'percent',   name:'Проценты',                href:'percent.html',           eq:'15% от 80' },
+    { id:'logarithms', name:'Свойства логарифмов',    href:'logarithms.html',        eq:'log₂8 = 3' },
   ]},
 ];
 // ЕГЭ профиль вставляем вторым разделом (после ОГЭ) — те же названия, что в
@@ -7818,6 +7821,7 @@ const TRAINER_NAMES = {
   linear:'Линейные уравнения', quadratic:'Квадратные уравнения',
   frac_mul:'Умножение дробей', frac_div:'Деление дробей', neg_pos:'Положительные и отрицательные числа',
   powers:'Действия со степенями', gcd:'Наибольший общий делитель (НОД)', lcm:'Наименьшее общее кратное (НОК)', percent:'Проценты',
+  logarithms:'Свойства логарифмов',
 };
 // подписи для «Подборки» — берём из списка панели тренажёров, чтобы название
 // ЕГЭ-задания было записано на доске один в один как в реестре на главной
