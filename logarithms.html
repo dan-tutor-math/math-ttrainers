@@ -743,6 +743,7 @@ html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!impo
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="keypad.js"></script>
 <script src="html2canvas.min.js"></script>
 <script src="jspdf.umd.min.js"></script>
 <script src="lesson-history.js"></script>
@@ -1625,13 +1626,10 @@ setupWorkZoneResize(els.workResizeRight, 'right');
    смешанных чисел «Процентов» — минус и «/». */
 let keypadOpen = true;
 function renderKeypadKeys(){
-  const keys = ['7','8','9','4','5','6','1','2','3','−','0','/'];
-  let html = keys.map(k => '<button type="button" class="' + (k === '−' ? 'kp-minus' : '') + '" data-key="' + k + '">' + k + '</button>').join('');
-  html += '<button type="button" class="kp-back" data-key=",">, запятая</button>' +
-          '<button type="button" class="kp-back" data-key="back">⌫ Стереть</button>' +
-          '<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>';
-  els.keypadButtons.innerHTML = html;
-  els.keypadButtons.querySelectorAll('button').forEach(btn => { btn.onclick = () => keypadPress(btn.dataset.key); });
+  // раскладка одна на все тренажёры — keypad.js; «/» — для ответов дробью.
+  // Минус в поле — «−», как было до общей раскладки (normMinus понимает оба)
+  els.keypadButtons.innerHTML = Keypad.keys([{ k:'/', label:'/ дробь' }], { minusKey:'−' });
+  Keypad.bind(els.keypadButtons, keypadPress);
 }
 function keypadTarget(){
   let inp = lastFocusedInput;

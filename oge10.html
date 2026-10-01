@@ -764,6 +764,7 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="keypad.js"></script>
 <script src="exam-nav.js"></script>
 <script src="trainer-multi.js"></script>
 <script>
@@ -2228,17 +2229,10 @@ els.nextBtn.onclick = newTask;
 /* ───────── плавающая клавиатура ───────── */
 let keypadOpen = true;
 function setupFloatingKeypad(){
-  const keys = ['7','8','9','4','5','6','1','2','3','−','0','⌫'];
-  document.getElementById('keypadButtons').innerHTML = keys.map(k=>{
-    const cls = k==='−' ? 'kp-minus' : (k==='⌫' ? 'kp-back' : '');
-    const val = k==='⌫' ? 'back' : (k==='−' ? '-' : k);
-    return `<button type="button" class="${cls}" data-key="${val}">${k}</button>`;
-  }).join('')
-    + `<button type="button" class="kp-comma" data-key=",">,</button>`
-    + `<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>`;
-  document.querySelectorAll('#keypadButtons button').forEach(btn=>{
-    btn.onclick = ()=>keypadPress(btn.dataset.key);
-  });
+  // раскладка одна на все тренажёры — keypad.js
+  const kb = document.getElementById('keypadButtons');
+  kb.innerHTML = Keypad.keys([]);
+  Keypad.bind(kb, keypadPress);
   document.getElementById('kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(); };
   document.getElementById('kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(); };
   makeKeypadDraggable(document.getElementById('keypadFloat'), document.getElementById('kpDragHandle'));
@@ -2313,10 +2307,8 @@ function keypadPress(ch){
     if(els.finalPanel.contains(inp)){ els.finalGo.click(); return; }
     els.stepGo.click(); return;
   }
-  if(ch==='back') inp.value = inp.value.slice(0,-1);
-  else inp.value = (inp.value||'') + ch;
-  inp.dispatchEvent(new Event('input', {bubbles:true}));
-  inp.focus({preventScroll:true});
+  // в место курсора и с событием input — набранное видит собеседник в сессии
+  Keypad.press(inp, ch);
 }
 function syncKeypadVisibility(){
   const active = els.taskArea.style.display!=='none' &&

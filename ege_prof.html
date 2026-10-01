@@ -747,6 +747,7 @@ html[data-medals="on"] .board-view-toolbar{bottom:64px;}
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="keypad.js"></script>
 <script src="exam-nav.js"></script>
 <script src="html2canvas.min.js"></script>
 <script src="jspdf.umd.min.js"></script>
@@ -1929,21 +1930,10 @@ window.addEventListener('scroll', () => {
    (там ответ — число с бланка). */
 let keypadOpen = true;
 function renderKeypadKeys(){
-  const digits = ['7','8','9','4','5','6','1','2','3',',','0','−'];
-  let html = digits.map(k => {
-    const cls = k === '−' ? 'kp-minus' : (k === ',' ? 'kp-comma' : '');
-    // на кнопке красивый минус, а в поле вставляем обычный дефис: его понимает
-    // разбор ответа (в normMinus красивый тоже приводится, но лишний шаг ни к чему)
-    return '<button type="button" class="' + cls + '" data-key="' + (k === '−' ? '-' : k) + '">' + k + '</button>';
-  }).join('');
-  if (partOf(S.n) === 2) {
-    html += ['π','√','∞','≤','≥','∪','(',')',';'].map(c =>
-      '<button type="button" data-key="' + c + '">' + c + '</button>').join('');
-  }
-  html += '<button type="button" class="kp-back" data-key="back">⌫ Стереть</button>' +
-          '<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>';
-  els.keypadButtons.innerHTML = html;
-  els.keypadButtons.querySelectorAll('button').forEach(btn => { btn.onclick = () => keypadPress(btn.dataset.key); });
+  // раскладка одна на все тренажёры — keypad.js; во второй части ещё π, √,
+  // ∞ и знаки промежутков
+  els.keypadButtons.innerHTML = Keypad.keys(partOf(S.n) === 2 ? ['π','√','∞','≤','≥','∪','(',')',';'] : []);
+  Keypad.bind(els.keypadButtons, keypadPress);
 }
 // поле, в которое пишет клавиатура: последнее, где стоял курсор — иначе
 // первое свободное; так одна клавиатура обслуживает и основное задание, и карточки

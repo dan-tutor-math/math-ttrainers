@@ -118,8 +118,12 @@ def test_keypad(browser):
     # пока ответ не проверен, клавиатура на экране — меряем раскладку сейчас
     comma = page.eval_on_selector('#keypadButtons .kp-comma', 'e => e.getBoundingClientRect().toJSON()')
     enter = page.eval_on_selector('#keypadButtons .kp-enter', 'e => e.getBoundingClientRect().toJSON()')
-    check("№1–5: запятая и «Ввод» в одном ряду", comma["height"] > 0 and abs(comma["top"] - enter["top"]) < 2
-          and enter["width"] > 80, str((comma, enter)))
+    zero = page.eval_on_selector('#keypadButtons button[data-key="0"]', 'e => e.getBoundingClientRect().toJSON()')
+    # с промпта №14 нового списка раскладка общая (keypad.js): запятая — в ряду
+    # с нулём и минусом, «Ввод» — во всю ширину ниже
+    check("№1–5: запятая в ряду с нулём, «Ввод» во всю ширину ниже", comma["height"] > 0
+          and abs(comma["top"] - zero["top"]) < 2 and enter["top"] > comma["bottom"]
+          and enter["width"] > 80, str((comma, zero, enter)))
     page.click('#keypadButtons button[data-key="enter"]')
     page.wait_for_timeout(400)
     check("№1–5: ответ 107,25 с клавиатуры засчитан", page.evaluate("taskAnswered && totalErrors === 0"))

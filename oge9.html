@@ -990,6 +990,7 @@ html[data-theme="dark"] #quadEngineArea input {background:var(--card)}html[data-
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="keypad.js"></script>
 <script src="exam-nav.js"></script>
 <script src="quick-answer.js"></script>
 <script src="trainer-multi.js"></script>
@@ -2792,8 +2793,9 @@ function syncKeypadVisibility(){
   const area = document.getElementById('inputArea');
   const hasInputs = (live && live.querySelectorAll('input.num').length > 0)
                   || (area && area.querySelectorAll('input.num').length > 0);
-  document.getElementById('lin_keypadFloat').style.display = (hasInputs && keypadOpen) ? 'block' : 'none';
-  document.getElementById('lin_kpToggle').style.display = (hasInputs && !keypadOpen) ? 'flex' : 'none';
+  // и над шагами — поле «ответ сразу»: в него тоже пишут с экранной клавиатуры
+  document.getElementById('lin_keypadFloat').style.display = ((hasInputs || Keypad.hasQa()) && keypadOpen) ? 'block' : 'none';
+  document.getElementById('lin_kpToggle').style.display = ((hasInputs || Keypad.hasQa()) && !keypadOpen) ? 'flex' : 'none';
 }
 
 function setupInputEnhancer(containerId){
@@ -2805,27 +2807,22 @@ function setupInputEnhancer(containerId){
 }
 
 function keypadPress(ch){
+  // поле «ответ сразу» (quick-answer.js) — туда пишет общий модуль, а
+  // ниже своя логика страницы только для полей шагов
+  const qa = Keypad.qaTarget(document.getElementById(activeInputId));
+  if(qa){ Keypad.press(qa, ch); return; }
   if(ch==='enter'){ document.getElementById('goBtn')?.click(); return; }
   const inp = document.getElementById(activeInputId);
   if(!inp) return;
-  if(ch==='back') inp.value = inp.value.slice(0,-1);
-  else inp.value = (inp.value||'') + ch;
-  inp.focus();
+  Keypad.press(inp, ch);
 }
 
 function setupFloatingKeypad(){
-  const keys = ['7','8','9','4','5','6','1','2','3','−','0','⌫','x'];
-  document.getElementById('lin_keypadButtons').innerHTML = keys.map(k=>{
-    let cls = '';
-    if(k==='−') cls='kp-minus';
-    else if(k==='x') cls='kp-x';
-    else if(k==='⌫') cls='kp-back';
-    const val = k==='⌫' ? 'back' : (k==='−' ? '-' : k);
-    return `<button type="button" class="${cls}" data-key="${val}">${k}</button>`;
-  }).join('') + `<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>`;
-  document.querySelectorAll('#keypadButtons button').forEach(btn=>{
-    btn.onclick = ()=>keypadPress(btn.dataset.key);
-  });
+  // раскладка одна на все тренажёры — keypad.js; x — в шагах пишут «12x»
+  const kb = document.getElementById('lin_keypadButtons');
+  kb.innerHTML = Keypad.keys([{ k:'x', cls:'kp-x' }]);
+  Keypad.bind(kb, keypadPress);
+  Keypad.watch(syncKeypadVisibility);
   document.getElementById('lin_kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(); };
   document.getElementById('lin_kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(); };
   makeKeypadDraggable(document.getElementById('lin_keypadFloat'), document.getElementById('lin_kpDragHandle'));
@@ -4135,9 +4132,12 @@ function enhanceNumInputs(container){
 }
 
 function syncKeypadVisibility(container){
+  // без аргумента зовёт Keypad.watch, когда появляется или закрывается «ответ сразу»
+  container = container || document.getElementById('inputArea');
   const hasInputs = container.querySelectorAll('input.num, input.frac-cell').length > 0;
-  document.getElementById('quad_keypadFloat').style.display = (hasInputs && keypadOpen) ? 'block' : 'none';
-  document.getElementById('quad_kpToggle').style.display = (hasInputs && !keypadOpen) ? 'flex' : 'none';
+  // и над шагами — поле «ответ сразу»: в него тоже пишут с экранной клавиатуры
+  document.getElementById('quad_keypadFloat').style.display = ((hasInputs || Keypad.hasQa()) && keypadOpen) ? 'block' : 'none';
+  document.getElementById('quad_kpToggle').style.display = ((hasInputs || Keypad.hasQa()) && !keypadOpen) ? 'flex' : 'none';
 }
 
 function setupInputEnhancer(containerId){
@@ -4149,27 +4149,22 @@ function setupInputEnhancer(containerId){
 }
 
 function keypadPress(ch){
+  // поле «ответ сразу» (quick-answer.js) — туда пишет общий модуль, а
+  // ниже своя логика страницы только для полей шагов
+  const qa = Keypad.qaTarget(document.getElementById(activeInputId));
+  if(qa){ Keypad.press(qa, ch); return; }
   if(ch==='enter'){ document.getElementById('goBtn')?.click(); return; }
   const inp = document.getElementById(activeInputId);
   if(!inp) return;
-  if(ch==='back') inp.value = inp.value.slice(0,-1);
-  else inp.value = (inp.value||'') + ch;
-  inp.focus();
+  Keypad.press(inp, ch);
 }
 
 function setupFloatingKeypad(){
-  const keys = ['7','8','9','4','5','6','1','2','3','−','0','⌫','x'];
-  document.getElementById('quad_keypadButtons').innerHTML = keys.map(k=>{
-    let cls = '';
-    if(k==='−') cls='kp-minus';
-    else if(k==='x') cls='kp-x';
-    else if(k==='⌫') cls='kp-back';
-    const val = k==='⌫' ? 'back' : (k==='−' ? '-' : k);
-    return `<button type="button" class="${cls}" data-key="${val}">${k}</button>`;
-  }).join('') + `<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>`;
-  document.querySelectorAll('#keypadButtons button').forEach(btn=>{
-    btn.onclick = ()=>keypadPress(btn.dataset.key);
-  });
+  // раскладка одна на все тренажёры — keypad.js; x — в шагах «числоX», «;» и «нет» — для корней в ответе сразу
+  const kb = document.getElementById('quad_keypadButtons');
+  kb.innerHTML = Keypad.keys([{ k:'x', cls:'kp-x' }, ';', { k:'none', label:'нет' }]);
+  Keypad.bind(kb, keypadPress);
+  Keypad.watch(syncKeypadVisibility);
   document.getElementById('quad_kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(document.getElementById('inputArea')); };
   document.getElementById('quad_kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(document.getElementById('inputArea')); };
   makeKeypadDraggable(document.getElementById('quad_keypadFloat'), document.getElementById('quad_kpDragHandle'));

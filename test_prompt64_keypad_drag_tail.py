@@ -99,6 +99,9 @@ def main():
     with local_server(), sync_playwright() as p:
         browser = p.chromium.launch()
         page = browser.new_page()
+        # всё наружу обрывается: иначе каждая страница заводит сессию в
+        # настоящей базе (раздел 8 HANDOFF), а клавиатуре сеть не нужна
+        page.route("https://**/*", lambda route: route.abort())
         for name in PAGES:
             if name == "oge9":
                 errors += check(page, name, 375, 800, "lin_")

@@ -783,6 +783,7 @@ html[data-focus="on"] .hint{
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="keypad.js"></script>
 <script src="quick-answer.js"></script>
 <script src="trainer-multi.js"></script>
 <script>
@@ -1628,15 +1629,11 @@ document.getElementById('nextBtn').onclick = newProblem;
 let activeInputId = 'ans';
 let keypadOpen = true;
 function setupFloatingKeypad(){
-  const keys = ['7','8','9','4','5','6','1','2','3','−','0','⌫'];
-  document.getElementById('keypadButtons').innerHTML = keys.map(k=>{
-    const cls = k==='−' ? 'kp-minus' : (k==='⌫' ? 'kp-back' : '');
-    const val = k==='⌫' ? 'back' : (k==='−' ? '-' : k);
-    return `<button type="button" class="${cls}" data-key="${val}">${k}</button>`;
-  }).join('') + `<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>`;
-  document.querySelectorAll('#keypadButtons button').forEach(btn=>{
-    btn.onclick = ()=>keypadPress(btn.dataset.key);
-  });
+  // раскладка одна на все тренажёры — keypad.js; «/» и пробел — для ответа сразу дробью: 3/4, 1 5/8
+  const kb = document.getElementById('keypadButtons');
+  kb.innerHTML = Keypad.keys(['/', { k:' ', label:'␣ пробел' }]);
+  Keypad.bind(kb, keypadPress);
+  Keypad.watch(syncKeypadVisibility);
   document.getElementById('kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(); };
   document.getElementById('kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(); };
   makeKeypadDraggable(document.getElementById('keypadFloat'), document.getElementById('kpDragHandle'));
@@ -1690,17 +1687,20 @@ function makeKeypadDraggable(floatEl, handleEl){
   });
 }
 function keypadPress(ch){
+  // поле «ответ сразу» (quick-answer.js) — туда пишет общий модуль, а
+  // ниже своя логика страницы только для полей шагов
+  const qa = Keypad.qaTarget(document.getElementById(activeInputId));
+  if(qa){ Keypad.press(qa, ch); return; }
   if(ch==='enter'){ document.getElementById('goBtn')?.click(); return; }
   const inp = document.getElementById(activeInputId);
   if(!inp) return;
-  if(ch==='back') inp.value = inp.value.slice(0,-1);
-  else inp.value = (inp.value||'') + ch;
-  inp.focus();
+  Keypad.press(inp, ch);
 }
 function syncKeypadVisibility(){
   const needsInput = S && S.phase==='solve' && ['divisor','fillResults','multiplyNum','multiplyDen','finalDivisor','finalFill','mixedWhole','mixedRemainder'].includes(S.subPhase);
-  document.getElementById('keypadFloat').style.display = (needsInput && keypadOpen) ? 'block' : 'none';
-  document.getElementById('kpToggle').style.display = (needsInput && !keypadOpen) ? 'flex' : 'none';
+  // и над шагами — поле «ответ сразу»: в него тоже пишут с экранной клавиатуры
+  document.getElementById('keypadFloat').style.display = ((needsInput || Keypad.hasQa()) && keypadOpen) ? 'block' : 'none';
+  document.getElementById('kpToggle').style.display = ((needsInput || Keypad.hasQa()) && !keypadOpen) ? 'flex' : 'none';
 }
 
 setupFloatingKeypad();

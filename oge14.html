@@ -587,6 +587,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="keypad.js"></script>
 <script src="exam-nav.js"></script>
 <script src="trainer-multi.js"></script>
 <script>
@@ -1211,19 +1212,10 @@ els.nextBtn.onclick = newTask;
 /* ───────── плавающая клавиатура ───────── */
 let keypadOpen = true;
 function setupFloatingKeypad(){
-  const keys = ['7','8','9','4','5','6','1','2','3',',','0','−'];
-  document.getElementById('keypadButtons').innerHTML = keys.map(k=>{
-    const cls = k==='−' ? 'kp-minus' : (k===',' ? 'kp-comma' : '');
-    // на кнопке — красивый минус «−», но в поле вставляем обычный ASCII-дефис,
-    // иначе parseFloat при проверке ответа его не распознает
-    const val = k==='−' ? '-' : k;
-    return `<button type="button" class="${cls}" data-key="${val}">${k}</button>`;
-  }).join('') +
-    `<button type="button" class="kp-back" data-key="back">⌫ Стереть</button>` +
-    `<button type="button" class="kp-enter" data-key="enter">Ввод ↵</button>`;
-  document.querySelectorAll('#keypadButtons button').forEach(btn=>{
-    btn.onclick = ()=>keypadPress(btn.dataset.key);
-  });
+  // раскладка одна на все тренажёры — keypad.js
+  const kb = document.getElementById('keypadButtons');
+  kb.innerHTML = Keypad.keys([]);
+  Keypad.bind(kb, keypadPress);
   document.getElementById('kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(); };
   document.getElementById('kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(); };
   makeKeypadDraggable(document.getElementById('keypadFloat'), document.getElementById('kpDragHandle'));
@@ -1280,9 +1272,8 @@ function keypadPress(ch){
   const inp = els.answerInput;
   if(!inp || inp.disabled) return;
   if(ch==='enter'){ submitInputAnswer(); return; }
-  if(ch==='back') inp.value = inp.value.slice(0,-1);
-  else inp.value = (inp.value||'') + ch;
-  inp.focus();
+  // в место курсора и с событием input — набранное видит собеседник в сессии
+  Keypad.press(inp, ch);
 }
 function syncKeypadVisibility(){
   const needsInput = els.taskArea.style.display !== 'none' &&
