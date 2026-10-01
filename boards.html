@@ -394,12 +394,25 @@ html[data-theme="dark"] .bd-ref-panel{box-shadow:var(--shadow), inset 0 1px 0 rg
 .bd-trainers-item-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .bd-trainers-item-eq{flex:none;font-family:var(--font-mono);font-size:10.5px;color:var(--muted-2);max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .bd-trainers-empty{padding:10px 4px;color:var(--muted-2);font-family:var(--font-ui);font-size:12.5px;}
-.bd-trainers-frame-wrap{flex:1 1 auto;min-height:0;position:relative;display:none;}
+.bd-trainers-frame-wrap{flex:1 1 auto;min-height:0;position:relative;display:none;container:bdtp / inline-size;}
 .bd-trainers-panel.bd-trainers-in-frame .bd-trainers-frame-wrap{display:flex;}
 .bd-trainers-iframe{flex:1;width:100%;height:100%;border:none;background:var(--card);}
-.bd-trainers-add{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:3;border:none;border-radius:12px;padding:10px 16px;font-family:var(--font-ui);font-size:13px;font-weight:700;background:var(--ink);color:#fff;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.28);}
+/* Промпт №15 нового списка: «Добавить на доску» и «Обновить пример» — рядом,
+   в одном ряду: сценарий урока «добавил → новый пример → добавил», и рука
+   ходит между ними на пару сантиметров, а не к ⟳ в шапке тренажёра */
+.bd-trainers-actions{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:3;display:flex;gap:6px;align-items:stretch;white-space:nowrap;}
+.bd-trainers-add{border:none;border-radius:12px;padding:10px 16px;font-family:var(--font-ui);font-size:13px;font-weight:700;background:var(--ink);color:#fff;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.28);}
 .bd-trainers-add:hover{opacity:.9;}
 .bd-trainers-add:disabled{opacity:.6;cursor:default;}
+.bd-trainers-refresh{border:1.5px solid var(--ink);border-radius:12px;padding:10px 14px;font-family:var(--font-ui);font-size:13px;font-weight:700;background:var(--card);color:var(--ink);cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.28);display:inline-flex;align-items:center;gap:6px;}
+.bd-trainers-refresh:hover{background:var(--hover-2);}
+.bd-trainers-refresh:disabled{opacity:.6;cursor:default;}
+.bd-trainers-refresh .bd-rf-ic{display:inline-block;font-size:15px;line-height:1;}
+.bd-trainers-refresh.spin .bd-rf-ic{animation:bdRfSpin .45s ease-out;}
+@keyframes bdRfSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){ .bd-trainers-refresh.spin .bd-rf-ic{animation:none;} }
+/* узкая панель: подписи короче, чтобы обе кнопки помещались в ряд */
+@container bdtp (max-width: 360px){ .bd-trainers-add .bd-btn-long,.bd-trainers-refresh .bd-btn-long{display:none;} }
 .bd-trainers-toast{position:absolute;left:50%;bottom:62px;transform:translateX(-50%);z-index:3;background:var(--ink);color:#fff;padding:6px 12px;border-radius:9px;font-family:var(--font-ui);font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s;}
 .bd-trainers-toast.show{opacity:1;}
 @media print{ .bd-trainers-panel,.bd-trainers-strip{display:none!important;} }
@@ -1107,7 +1120,10 @@ function resolveBasketTexInHtml(html){
     </div>
     <div class="bd-trainers-frame-wrap" id="bdTrainersFrameWrap">
       <iframe class="bd-trainers-iframe" id="bdTrainersIframe"></iframe>
-      <button class="bd-trainers-add" id="bdTrainersAddBtn">📥 Добавить на доску</button>
+      <div class="bd-trainers-actions" id="bdTrainersActions">
+        <button class="bd-trainers-add" id="bdTrainersAddBtn">📥 Добавить<span class="bd-btn-long"> на доску</span></button>
+        <button class="bd-trainers-refresh" id="bdTrainersRefreshBtn" title="Обновить пример — то же, что ⟳ в самом тренажёре"><span class="bd-rf-ic">⟳</span><span>Обновить<span class="bd-btn-long"> пример</span></span></button>
+      </div>
       <div class="bd-trainers-toast" id="bdTrainersToast"></div>
     </div>
   </div>

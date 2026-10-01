@@ -4551,6 +4551,7 @@ const trainersSearchEl = document.getElementById('bdTrainersSearch');
 const trainersGroupsEl = document.getElementById('bdTrainersGroups');
 const trainersIframe = document.getElementById('bdTrainersIframe');
 const trainersAddBtn = document.getElementById('bdTrainersAddBtn');
+const trainersRefreshBtn = document.getElementById('bdTrainersRefreshBtn');
 const trainersToastEl = document.getElementById('bdTrainersToast');
 let trainersOpenId = null;     // id открытого сейчас тренажёра (null — список)
 let trainersInsertOffset = 0;  // запасной каскад, если свободного места на экране нет совсем
@@ -5140,6 +5141,8 @@ trainersAddBtn.addEventListener('click', async () => {
   const nodes = collectTrainerCaptureNodes(doc, trainersOpenId);
   if (!nodes.length){ showTrainersToast('Не нашли текущее задание — попробуйте сгенерировать заново'); return; }
   trainersAddBtn.disabled = true;
+  // пока снимаем, пример в кадре менять нельзя — снялось бы полузаменённое
+  trainersRefreshBtn.disabled = true;
   let added = 0;
   try {
     const win = trainersIframe.contentWindow;
@@ -5161,12 +5164,81 @@ trainersAddBtn.addEventListener('click', async () => {
     console.error('[trainers panel] capture failed', err);
   }
   trainersAddBtn.disabled = false;
+  trainersRefreshBtn.disabled = false;
   if (added){
     saveDB(); scheduleRedraw();
     showTrainersToast(added === 1 ? 'Добавлено на доску' : `Добавлено на доску: ${added}`);
   } else {
     showTrainersToast('Не получилось добавить задание');
   }
+});
+
+/* ── Промпт №15 нового списка: «Обновить пример» рядом с «Добавить на доску» ──
+   Урок идёт так: добавил задание → новый пример → добавил ещё. Кнопка ⟳
+   живёт в шапке тренажёра, далеко от «Добавить», — эта кнопка нажимает ту
+   же самую, без своей логики: что делает ⟳ в тренажёре (правила сессии,
+   уровень, «Экзамен», история примеров), то и здесь. Порядок:
+   1) видимая ⟳ самого тренажёра — #refreshBtn (арифметика, уравнения, ОГЭ,
+      движки №9) или #mcqRefreshBtn (типы №9 с выбором ответа);
+   2) где ⟳ у основного задания нет (деление в столбик, «Проценты»,
+      логарифмы, тригонометрия) — __trainerState.newTask(), тот же новый
+      пример того же типа, что у «+1» и у «ещё такое же» на доске;
+   3) ЕГЭ и ОГЭ ч. 2: задания там — готовые прототипы, новый пример — это
+      следующий прототип номера, кнопка «Следующий прототип ▶».
+   Во 2) и 3) — только когда в кадре открыто задание: с экрана выбора типа
+   newTask() открыл бы задание сам, а это уже не «обновить». */
+function visibleBtn(doc, id){
+  const b = doc.getElementById(id);
+  return b && !b.disabled && b.getClientRects().length > 0 ? b : null;
+}
+function trainerHasTask(doc){
+  const nodes = collectTrainerCaptureNodes(doc, trainersOpenId);
+  nodes.forEach(n => { if (n.restore) n.restore(); });
+  return nodes.some(n => n.el.id !== 'theoryContent');
+}
+// → 'ok' | 'notask' (в кадре экран выбора) | 'single' (у номера ЕГЭ один прототип)
+function refreshTrainerInPanel(){
+  if (!trainersOpenId) return 'notask';
+  let doc, win;
+  try { doc = trainersIframe.contentDocument; win = trainersIframe.contentWindow; } catch (e) { doc = null; }
+  if (!doc || !win) return 'notask';
+  const own = visibleBtn(doc, 'refreshBtn') || visibleBtn(doc, 'mcqRefreshBtn');
+  if (own){ own.click(); return 'ok'; }
+  if (!trainerHasTask(doc)) return 'notask';
+  const api = win.__trainerState;
+  if (api && typeof api.newTask === 'function'){ api.newTask(); return 'ok'; }
+  const next = visibleBtn(doc, 'nextProtoBtn');
+  if (next){ next.click(); return 'ok'; }
+  return 'single';
+}
+// В узкой панели тренажёр живёт в «телефонной» вёрстке, и его плавающая
+// клавиатура прижата к низу кадра справа — ровно туда, где ряд «Добавить /
+// Обновить». С двумя кнопками ряд стал шире и закрывал «Ввод» клавиатуры.
+// Поднимаем её в кадре над рядом: margin у fixed-панели с bottom сдвигает её
+// вверх, а на широкой вёрстке (там top) ничего не меняет. Файлы тренажёров
+// не трогаем — стиль кладётся только в кадр панели
+trainersIframe.addEventListener('load', () => {
+  let doc = null;
+  try { doc = trainersIframe.contentDocument; } catch (e) {}
+  if (!doc || !doc.head || doc.getElementById('bdPanelKpLift')) return;
+  const st = doc.createElement('style');
+  st.id = 'bdPanelKpLift';
+  st.textContent = '.keypad-float,.keypad-toggle{margin-bottom:58px !important;}';
+  doc.head.appendChild(st);
+});
+trainersRefreshBtn.addEventListener('click', () => {
+  let res = 'notask';
+  try { res = refreshTrainerInPanel(); } catch (err) { console.error('[trainers panel] refresh failed', err); }
+  if (res !== 'ok'){
+    showTrainersToast(res === 'single' ? 'У этого номера один прототип — другого примера нет' : 'Сначала откройте задание в тренажёре');
+    return;
+  }
+  hideTrainersToast();
+  // короткий оборот значка — видно, что нажатие дошло, даже если новый
+  // пример похож на старый
+  trainersRefreshBtn.classList.remove('spin');
+  void trainersRefreshBtn.offsetWidth;
+  trainersRefreshBtn.classList.add('spin');
 });
 
 /* ═══════════════════════════════════════════════════════════════════════
