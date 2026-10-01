@@ -161,7 +161,9 @@ def more(page, o, dir_key=None, via_enter=False):
     else:
         page.evaluate(f"() => document.querySelector('{sel} .bd-task-dirs button[data-dir=\"{dir_key}\"]').click()")
     page.wait_for_function(f"() => getCurrentBoard().objects.length > {n}", timeout=40000)
-    page.wait_for_function(f"() => !document.querySelector('{sel} .bd-task-more').classList.contains('busy')", timeout=40000)
+    # камера могла уехать к новому заданию так, что исходное ушло с экрана
+    # и его кнопки убраны из слоя заданий — это тоже «уже не занято»
+    page.wait_for_function(f"() => {{ const b = document.querySelector('{sel} .bd-task-more'); return !b || !b.classList.contains('busy'); }}", timeout=40000)
     page.wait_for_timeout(250)
     return obj(page)
 
@@ -333,11 +335,18 @@ def run():
         check("4. Esc закрывает выбор", closed)
 
         # освобождаем низ и бока у o1 от других заданий, чтобы проверить «вплотную»
+        # и отодвигаем его от края доски: с промпта №13 «раскладка заданий»
+        # первое задание ложится в левый верхний угол экрана, и слева от
+        # него иначе не хватило бы доски для «влево» с препятствием
         page.evaluate(f"""() => {{ const B = getCurrentBoard();
             B.objects = B.objects.filter(x => x.id === {json.dumps(o1['id'])});
+            const o = B.objects[0]; o.points[0] = {{ x: 1800, y: 1400 }};
+            setZoom(1, o.points[0].x + o.w / 2, o.points[0].y + o.h / 2, cssW / 2, cssH / 2);
             boardsRedraw(); }}""")
         n1 = more(page, o1, via_enter=True)
-        GAP = 12
+        # отступ — у каждого задания свой (промпт №13 «раскладка заданий»:
+        # доля высоты задания), «ещё такое же» берёт отступ исходного
+        GAP = page.evaluate(f"() => taskGapOf(getCurrentBoard().objects.find(x => x.id === {json.dumps(o1['id'])}))")
         r1, rn = rect(obj(page, 0)), rect(n1)
         check("4. Enter — новое задание вплотную снизу, по левому краю",
               abs(rn[0] - r1[0]) < 0.5 and abs(rn[1] - (r1[1] + r1[3] + GAP)) < 0.5)
@@ -356,11 +365,11 @@ def run():
         check("4. вверх — вплотную сверху", abs(rn4[1] + rn4[3] + GAP - r1[1]) < 0.5 and abs(rn4[0] - r1[0]) < 0.5)
         # слева препятствие вплотную — новое встаёт левее него
         page.evaluate(f"""() => {{ const B = getCurrentBoard();
-            B.objects.push({{ id: 'obstL', type: 'image', src: {json.dumps(PIX)}, points: [{{ x: {r1[0]} - 12 - 200, y: {r1[1]} }}], w: 200, h: 100, natW: 1, natH: 1 }});
+            B.objects.push({{ id: 'obstL', type: 'image', src: {json.dumps(PIX)}, points: [{{ x: {r1[0]} - {GAP} - 200, y: {r1[1]} }}], w: 200, h: 100, natW: 1, natH: 1 }});
             boardsRedraw(); }}""")
         n5 = more(page, o1, "left")
         rn5 = rect(n5)
-        check("4. влево, место занято — сдвиг левее препятствия", abs(rn5[0] + rn5[2] + GAP - (r1[0] - 12 - 200)) < 0.5 and abs(rn5[1] - r1[1]) < 0.5)
+        check("4. влево, место занято — сдвиг левее препятствия", abs(rn5[0] + rn5[2] + GAP - (r1[0] - GAP - 200)) < 0.5 and abs(rn5[1] - r1[1]) < 0.5)
         allr = [rect(x) for x in page.evaluate("() => JSON.parse(JSON.stringify(getCurrentBoard().objects, (k, v) => k === 'src' ? '…' : v))")]
         check("4. ни одно новое задание не легло внахлёст", all(not overlap(allr[i], allr[j]) for i in range(len(allr)) for j in range(i + 1, len(allr))))
         sr = screen_rect(page, n5)
@@ -442,6 +451,11 @@ def run():
         check("4. кадров генерации не больше трёх", nframes <= 3)
 
         # ── 5. только просмотр ──────────────────────────────────────────
+        # камера могла уехать к последнему «ещё такому же» — возвращаемся к g8,
+        # иначе его кнопок нет в слое заданий вовсе (стопка, промпт №13)
+        page.evaluate(f"""() => {{ const o = getCurrentBoard().objects.find(x => x.id === {json.dumps(g8['id'])});
+            setZoom(1, o.points[0].x + o.w / 2, o.points[0].y + o.h / 2, cssW / 2, cssH / 2); boardsRedraw(); }}""")
+        page.wait_for_timeout(200)
         page.evaluate("() => document.documentElement.setAttribute('data-access', 'view')")
         hidden = page.evaluate(f"() => getComputedStyle(document.querySelector('.bd-task[data-id=\"{g8['id']}\"] .bd-task-more')).display === 'none'")
         check("5. только просмотр — кнопки «ещё» нет", hidden)

@@ -4999,14 +4999,15 @@ function visibleBoardRect(){
   return { x: cam.x + sx0 / cam.zoom, y: cam.y + sy0 / cam.zoom, w: (sx1 - sx0) / cam.zoom, h: (sy1 - sy0) / cam.zoom };
 }
 // ближайшее к центру области свободное место (перебор по сетке), или null
-function nearestFreeSpot(area, w, h, obs, cx, cy){
+function nearestFreeSpot(area, w, h, obs, cx, cy, gap){
   const step = Math.max(8, 16 / cam.zoom);
+  const G = gap > 0 ? gap : TASK_GAP;
   let best = null, bestD = Infinity;
   for (let x = area.x; x + w <= area.x + area.w + 0.01; x += step){
     for (let y = area.y; y + h <= area.y + area.h + 0.01; y += step){
       const d = (x + w / 2 - cx) ** 2 + (y + h / 2 - cy) ** 2;
       if (d >= bestD) continue;
-      if (!rectHits({ x, y, w, h }, obs, TASK_GAP)){ best = { x, y, w, h }; bestD = d; }
+      if (!rectHits({ x, y, w, h }, obs, G)){ best = { x, y, w, h }; bestD = d; }
     }
   }
   return best;
@@ -5041,18 +5042,21 @@ function findFreeSpotInView(w, h){
 function findSpotBeside(src, w, h, dir){
   const bb = objectBBox(src);
   const obs = taskObstacles(src.id);
+  // отступ — как у исходного задания (промпт №13 «раскладка заданий»: у заданий
+  // стопки он зависит от их размера, у старых — прежний TASK_GAP)
+  const G = taskGapOf(src);
   let r;
-  if (dir === 'up') r = { x: bb.minX, y: bb.minY - TASK_GAP - h, w, h };
-  else if (dir === 'left') r = { x: bb.minX - TASK_GAP - w, y: bb.minY, w, h };
-  else if (dir === 'right') r = { x: bb.maxX + TASK_GAP, y: bb.minY, w, h };
-  else r = { x: bb.minX, y: bb.maxY + TASK_GAP, w, h };
+  if (dir === 'up') r = { x: bb.minX, y: bb.minY - G - h, w, h };
+  else if (dir === 'left') r = { x: bb.minX - G - w, y: bb.minY, w, h };
+  else if (dir === 'right') r = { x: bb.maxX + G, y: bb.minY, w, h };
+  else r = { x: bb.minX, y: bb.maxY + G, w, h };
   for (let guard = 0; guard < 500; guard++){
-    const hit = rectHits(r, obs, TASK_GAP - 0.5);
+    const hit = rectHits(r, obs, G - 0.5);
     if (!hit) break;
-    if (dir === 'up') r.y = hit.y0 - TASK_GAP - h;
-    else if (dir === 'left') r.x = hit.x0 - TASK_GAP - w;
-    else if (dir === 'right') r.x = hit.x1 + TASK_GAP;
-    else r.y = hit.y1 + TASK_GAP;
+    if (dir === 'up') r.y = hit.y0 - G - h;
+    else if (dir === 'left') r.x = hit.x0 - G - w;
+    else if (dir === 'right') r.x = hit.x1 + G;
+    else r.y = hit.y1 + G;
   }
   return r;
 }
@@ -5084,40 +5088,167 @@ async function taskImageSize(dataUrl){
   return { w, h, natW: size.w, natH: size.h };
 }
 
+/* ── Промпт №13 «размер и раскладка заданий» (после №15 нового списка) ──
+   Было (№70): новое задание — в масштабе последнего добавленного, а самое
+   первое — до 520 единиц по большей стороне. При сильном приближении доски
+   два таких задания закрывали весь экран, и вообще задания выходили крупными.
+
+   Стало — «стопка». Задания, добавленные подряд из панели тренажёров, —
+   одна стопка: столбики по три друг под другом (STACK_ROWS), четвёртое
+   начинает новый столбик справа от первого, отступы одинаковые.
+   - Первое задание новой стопки подбирается под ЭКРАН: высота — чуть меньше
+     трети видимой высоты (три задания с отступами помещаются друг под
+     другом с запасом), но не больше шестой части листа (2 столбика по 3 на
+     листе, taskMaxBox) — поэтому при сильном отдалении задание дальше не
+     растёт.
+   - Следующие в стопке — в масштабе последнего добавленного в неё, а не
+     экрана: масштаб доски между добавлениями мог меняться (приблизили, чтобы
+     решить), а стопка должна остаться ровной. Изменили размер последнего
+     руками — следующие берут новый.
+   - Стопка продолжается, пока хоть одно её задание видно на экране. Ушли в
+     другое место доски — там начинается новая стопка: учитель продолжает
+     работать там, куда смотрит, а не где-то за краем экрана.
+   - «Ещё такое же» («+») — всегда в масштабе и ширине исходного задания: оно
+     ставится вплотную к нему, и разный размер соседей выглядел бы ошибкой.
+     Такое задание помечается стопкой исходного (без номера), чтобы оно
+     считалось её частью для «видна ли стопка» и «последнее добавленное»,
+     но в раскладку столбиков не вмешивалось.
+   В объекте: stack = { id, i?, x0, y0 } (i — место в раскладке, x0/y0 —
+   левый верхний угол стопки), gap — отступ между заданиями этой стопки. */
+const STACK_ROWS = 3;           // заданий в столбике стопки
+// «в целом немного меньше»: не впритык три на экран, а с запасом в десятую
+// часть — между стопкой и краем экрана остаётся воздух
+const TASK_VIEW_K = 0.9;
+const TASK_GAP_K = 0.06;        // отступ — доля высоты задания: на любом масштабе он «на глаз» одинаковый
+function taskGapFor(h){ return Math.max(4, Math.min(24, Math.round(TASK_GAP_K * h))); }
+// задания до этой правки отступа не знают — у них прежний постоянный
+function taskGapOf(o){ return (o && o.gap > 0) ? o.gap : TASK_GAP; }
+function taskScaleOf(o){ return o.w / o.css.w; }
+// предел размера: шестая часть листа — на листе помещаются 2 столбика по 3
+function taskMaxBox(){
+  const sw = sheetWpx(), sh = sheetHpx();
+  const g = taskGapFor(sh / STACK_ROWS);
+  return { w: (sw - 3 * g) / 2, h: (sh - (STACK_ROWS + 1) * g) / STACK_ROWS };
+}
+// масштаб первого задания новой стопки (css — размер карточки в CSS-пикселях)
+function scaleForNewStack(css){
+  const v = visibleBoardRect();
+  const max = taskMaxBox();
+  // три задания высотой h и четыре отступа (сверху, два между, снизу) по
+  // TASK_GAP_K·h — видимая высота (с запасом TASK_VIEW_K). Отдалили так, что
+  // видна страница целиком, — упираемся в предел и дальше не растём
+  const h = Math.min(TASK_VIEW_K * v.h / (STACK_ROWS + (STACK_ROWS + 1) * TASK_GAP_K), max.h);
+  // и по ширине на экран помещается хотя бы один столбик
+  const w = Math.min(max.w, v.w - 2 * taskGapFor(h));
+  const s = Math.min(h / css.h, w / css.w);
+  return Math.max(TASK_MIN_S, Math.min(TASK_MAX_S, s));
+}
+function bbVisible(bb, v){ return bb.maxX > v.x && bb.minX < v.x + v.w && bb.maxY > v.y && bb.minY < v.y + v.h; }
+// стопка, в которую пойдёт новое задание из панели, или null — начать новую.
+// «Последнее» — по времени добавления (addedAt), а не по месту в списке:
+// порядок в B.objects меняют «на передний план» и отмена
+function currentTaskStack(){
+  if (!B || !Array.isArray(B.objects)) return null;
+  let last = null;
+  B.objects.forEach(o => {
+    if (o.type !== 'image' || !o.stack || !o.css || !o.css.w || !o.addedAt) return;
+    if (!last || o.addedAt > last.addedAt) last = o;
+  });
+  if (!last) return null;
+  const members = B.objects.filter(o => o.type === 'image' && o.stack && o.stack.id === last.stack.id && o.points && o.points[0]);
+  const v = visibleBoardRect();
+  if (!members.some(o => bbVisible(objectBBox(o), v))) return null;
+  return { id: last.stack.id, last, members, x0: last.stack.x0, y0: last.stack.y0 };
+}
+// ширина узла cw переносится только на узел того же вида: ширину условия
+// ЕГЭ на столбик переносить бессмысленно
+function widthLike(ref, gen){
+  return (ref && ref.css && ref.css.cw && gen && gen.node && ref.gen && ref.gen.node === gen.node) ? ref.css.cw : null;
+}
+// ширина для задания из панели — до снимка (снимок делается сразу нужной ширины)
+function widthForNewTask(gen){
+  const st = currentTaskStack();
+  return st ? widthLike(st.last, gen) : null;
+}
+// куда в стопке st ложится следующее задание размером w×h
+function stackSlot(st, w, h){
+  const flow = st.members.filter(o => Number.isFinite(o.stack.i));
+  const g = taskGapOf(flow[0] || st.last);
+  const i = flow.length ? Math.max(...flow.map(o => o.stack.i)) + 1 : 0;
+  const col = Math.floor(i / STACK_ROWS);
+  const colOf = o => Math.floor(o.stack.i / STACK_ROWS);
+  const inCol = flow.filter(o => colOf(o) === col).map(objectBBox);
+  let x, y;
+  if (inCol.length){
+    // под нижним заданием своего столбика, по его левому краю
+    x = Math.min(...inCol.map(b => b.minX));
+    y = Math.max(...inCol.map(b => b.maxY)) + g;
+  } else {
+    // новый столбик: справа от самого широкого задания предыдущего
+    let c = col - 1, prev = [];
+    while (c >= 0 && !(prev = flow.filter(o => colOf(o) === c).map(objectBBox)).length) c--;
+    x = prev.length ? Math.max(...prev.map(b => b.maxX)) + g + (col - 1 - c) * (w + g) : st.x0 + col * (w + g);
+    y = st.y0;
+  }
+  // на месте чужое задание (другая стопка, «+») — сдвигаемся дальше в том же
+  // направлении, как «ещё такое же»: вниз по столбику или вправо для нового
+  const obs = taskObstacles();
+  const r = { x, y, w, h };
+  for (let guard = 0; guard < 500; guard++){
+    const hit = rectHits(r, obs, g - 0.5);
+    if (!hit) break;
+    if (inCol.length) r.y = hit.y1 + g; else r.x = hit.x1 + g;
+  }
+  return { slot: r, i, gap: g };
+}
+// первое задание новой стопки — в левом верхнем углу видимой части;
+// сначала ищем место, где поместится весь столбик, потом — хотя бы задание
+function newStackSpot(w, h, g){
+  const v = visibleBoardRect();
+  const obs = taskObstacles();
+  const area = { x: v.x + g, y: v.y + g, w: Math.max(0, v.w - 2 * g), h: Math.max(0, v.h - 2 * g) };
+  const colH = Math.min(area.h, STACK_ROWS * h + (STACK_ROWS - 1) * g);
+  let r = nearestFreeSpot(area, w, colH, obs, area.x + w / 2, area.y + colH / 2, g);
+  if (r) return { x: r.x, y: r.y, w, h };
+  r = nearestFreeSpot(area, w, h, obs, area.x + w / 2, area.y + h / 2, g);
+  if (r) return r;
+  return findFreeSpotInView(w, h);
+}
+
 // вставка одной готовой картинки задания на доску — тот же формат объекта,
 // что и у обычной вставленной картинки (см. imgModalInsert выше).
-// place(w, h) → {x, y} — куда класть (по умолчанию — свободное место на экране)
-/* ── Промпт №70: размер новых заданий ──
-   Новое задание — в том же масштабе, что последнее добавленное (s — сколько
-   единиц доски на CSS-пиксель тренажёра), и, если у последнего меняли
-   ширину, — той же ширины (только для того же вида узла: ширину условия
-   ЕГЭ на столбик переносить бессмысленно). Заданий ещё нет — обычный размер.
-   «Последнее» — по времени добавления (addedAt), а не по месту в списке:
-   порядок в B.objects меняют «на передний план» и отмена. */
-function lastTaskLook(){
-  if (!B || !Array.isArray(B.objects)) return null;
-  let best = null;
-  B.objects.forEach(o => {
-    if (o.type !== 'image' || !o.css || !o.css.w || !o.addedAt) return;
-    if (!best || o.addedAt > best.addedAt) best = o;
-  });
-  if (!best) return null;
-  return { s: best.w / best.css.w, cw: best.css.cw || null, node: best.gen ? best.gen.node : null };
-}
-function widthForNewTask(gen){
-  const look = lastTaskLook();
-  return (look && look.cw && gen && gen.node && gen.node === look.node) ? look.cw : null;
-}
+// beside — исходное задание для «ещё такое же» и сторона (src, dir); без
+// него задание идёт в стопку (из панели тренажёров).
 // shot — результат captureTrainerNode (card, css); cw — заданная ширина узла
-async function insertTaskImage(dataUrl, task, gen, place, shot, cw){
+async function insertTaskImage(dataUrl, task, gen, beside, shot, cw){
   const card = shot && shot.card;
   const sz = await taskImageSize(dataUrl);
-  const look = lastTaskLook();
-  if (shot && shot.css && look){
-    sz.w = shot.css.w * look.s; sz.h = shot.css.h * look.s;
+  const css = shot && shot.css;
+  let pt, gap, stack = null;
+  if (beside){
+    const src = beside.src;
+    if (css && src.css && src.css.w){ const s = taskScaleOf(src); sz.w = css.w * s; sz.h = css.h * s; }
+    gap = taskGapOf(src);
+    const spot = findSpotBeside(src, sz.w, sz.h, beside.dir);
+    pt = { x: spot.x, y: spot.y };
+    if (src.stack) stack = { id: src.stack.id, x0: src.stack.x0, y0: src.stack.y0 };
+  } else {
+    const st = currentTaskStack();
+    if (css){
+      const s = st ? taskScaleOf(st.last) : scaleForNewStack(css);
+      sz.w = css.w * s; sz.h = css.h * s;
+    }
+    if (st){
+      const p = stackSlot(st, sz.w, sz.h);
+      pt = { x: p.slot.x, y: p.slot.y }; gap = p.gap;
+      stack = { id: st.id, i: p.i, x0: st.x0, y0: st.y0 };
+    } else {
+      gap = taskGapFor(sz.h);
+      const spot = newStackSpot(sz.w, sz.h, gap);
+      pt = { x: spot.x, y: spot.y };
+      stack = { id: 'st' + uid(), i: 0, x0: pt.x, y0: pt.y };
+    }
   }
-  const spot = place ? place(sz.w, sz.h) : findFreeSpotInView(sz.w, sz.h);
-  const pt = { x: spot.x, y: spot.y };
   // Промпт №66: задание с тренажёра сразу закреплено — ластиком его не
   // стереть и случайным касанием не сдвинуть (двигают его после двойного
   // клика, как любую закреплённую картинку; открепить — из меню)
@@ -5125,7 +5256,9 @@ async function insertTaskImage(dataUrl, task, gen, place, shot, cw){
   if (task) obj.task = task;
   if (gen) obj.gen = gen;   // Промпт №68: из чего делать «ещё такое же»
   if (card && card.r > 0) obj.card = card;   // Промпт №70: скругление карточки (renderImageObject)
-  if (shot && shot.css) obj.css = Object.assign({}, shot.css, cw ? { cw } : {});
+  if (css) obj.css = Object.assign({}, css, cw ? { cw } : {});
+  if (stack) obj.stack = stack;
+  obj.gap = gap;
   obj.addedAt = Date.now();
   pushUndo();
   B.objects.push(obj);
@@ -5573,13 +5706,15 @@ function makeSimilarTask(srcId, dir){
       const info = trainerTaskInfo(win, g.tid, el);
       const gen = trainerGenInfo(win, g.tid, g.href, el) || plainCopy(g);
       if (g.vw) gen.vw = g.vw;
-      const cw = widthForNewTask(gen);
+      // Промпт №13 «раскладка заданий»: ширина и масштаб — исходного задания, а не
+      // последнего добавленного на доску (insertTaskImage, beside)
+      const cw = widthLike(src, gen);
       const shot = await captureTrainerNode(el, info, { width: cw });
       // пока снимали, могли уйти с доски или удалить исходное задание
       const srcNow = taskObjById(srcId);
       if (B !== boardAtStart || !srcNow) throw new Error('доска сменилась');
       const task = (info && shot.hot) ? Object.assign({ v: 1 }, info, { hot: shot.hot }) : null;
-      const obj = await insertTaskImage(shot.dataUrl, task, gen, (w, h) => findSpotBeside(srcNow, w, h, dir), shot, cw);
+      const obj = await insertTaskImage(shot.dataUrl, task, gen, { src: srcNow, dir }, shot, cw);
       saveDB();
       scheduleRedraw();
       return obj;
@@ -5601,7 +5736,11 @@ function makeSimilarTask(srcId, dir){
    занимает доли секунды, делать его на каждое движение мыши нельзя.
    Отмена — как у любой правки: pushUndo был в начале перетаскивания. */
 const TASK_MIN_CW = 220, TASK_MAX_CW = 1400;   // ширина карточки, CSS-пиксели тренажёра
-const TASK_MIN_S = 0.45, TASK_MAX_S = 3.5;     // масштаб: единиц доски на CSS-пиксель
+// масштаб: единиц доски на CSS-пиксель. Нижний предел был 0,45 — с
+// промпта №13 «раскладка заданий» задание подбирается под экран, и при сильном
+// приближении доски (до 400 %) три задания на экране — это масштаб около
+// 0,2; с прежним пределом угол маркера «прыгал» бы вверх при первом касании
+const TASK_MIN_S = 0.15, TASK_MAX_S = 3.5;
 const taskWidthPreview = new Map();            // id → { w (доска), side, busy }
 function taskCanReflow(o){ return !!(o && o.type === 'image' && o.css && o.css.w && o.gen && o.gen.html != null); }
 function reflowTaskWidth(id, worldW, side){
@@ -6092,6 +6231,8 @@ function taskLayer(){
       padding:0;pointer-events:auto;cursor:pointer;background:var(--glass-strong);color:var(--pencil);
       box-shadow:0 1px 5px rgba(0,0,0,.28);font-size:18px;font-weight:700;line-height:28px;opacity:.72;}
     .bd-task-more:hover,.bd-task-more.on{opacity:1;background:var(--ink);color:#fff;}
+    .bd-task.more-in .bd-task-more{left:auto;right:8px;top:8px;}
+    .bd-task.more-in .bd-task-dirs{left:auto;right:8px;top:42px;}
     .bd-task-more.busy{opacity:1;cursor:progress;animation:bdTaskBusy 1s linear infinite;}
     @keyframes bdTaskBusy{to{transform:rotate(360deg);}}
     .bd-task-dirs{position:absolute;left:calc(100% + 8px);top:52px;display:none;grid-template-columns:repeat(3,30px);
@@ -6407,6 +6548,23 @@ function taskReset(id){
   scheduleRedraw();
 }
 
+// Промпт №13 «раскладка заданий»: кнопка «ещё такое же» стоит справа от
+// задания, за его краем. В стопке столбики идут через небольшой отступ, и
+// кнопка левого столбика ложилась на текст правого. Отступ под кнопку не
+// заложить: она в экранных пикселях, а задания масштабируются с доской. Поэтому
+// когда справа вплотную другое задание — кнопка переезжает в правый верхний
+// угол своей карточки (там у заданий пусто).
+function taskMoreBlocked(o){
+  const z = cam.zoom;
+  const bx0 = o.points[0].x + o.w, bx1 = bx0 + 40 / z;
+  const by0 = o.points[0].y + 14 / z, by1 = o.points[0].y + 50 / z;
+  for (const q of B.objects){
+    if (q === o || q.type !== 'image' || !q.points || !q.points[0]) continue;
+    const qx = q.points[0].x, qy = q.points[0].y;
+    if (qx < bx1 && qx + q.w > bx0 && qy < by1 && qy + q.h > by0) return true;
+  }
+  return false;
+}
 // вызывается на каждый кадр перерисовки: создать/подвинуть/убрать живые
 // элементы у заданий, которые сейчас в кадре
 function syncTaskOverlays(){
@@ -6447,6 +6605,7 @@ function syncTaskOverlays(){
       // пока тянут ширину, поля старого снимка не на своих местах — прячем
       root.style.visibility = taskWidthPreview.has(o.id) ? 'hidden' : '';
       root.style.width = sw + 'px'; root.style.height = sh + 'px';
+      if (o.gen) root.classList.toggle('more-in', taskMoreBlocked(o));
       // шрифт и скругления — в масштабе картинки: сколько экранных пикселей
       // приходится на один CSS-пиксель тренажёра
       if (!live) continue;
@@ -8436,6 +8595,9 @@ function pasteClipboard(clientPt){
     obj.points = obj.points.map(p => ({ x:p.x+dx, y:p.y+dy }));
     if (obj.ctrl) obj.ctrl = { x:obj.ctrl.x+dx, y:obj.ctrl.y+dy };
     delete obj.groupId; // вставленная копия — самостоятельный объект, а не часть старой группы
+    // и не часть стопки заданий (промпт №13 «раскладка заданий»): иначе копия
+    // заняла бы чужое место в раскладке столбиков
+    delete obj.stack;
     B.objects.push(obj);
     newIds.push(obj.id);
   });

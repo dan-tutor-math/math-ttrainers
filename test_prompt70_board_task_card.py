@@ -182,8 +182,10 @@ def run():
         T68.open_trainer(page, "oge6", "oge6.html", "document.querySelectorAll('.mode-card:not(.soon)')[1].click()")
         T68.add_to_board(page)
         a = T68.obj(page)
-        nat = page.evaluate(f"() => {{ const o = getCurrentBoard().objects.find(x => x.id === {json.dumps(a['id'])}); return [o.natW, o.natH]; }}")
-        check("8. пустая доска — обычный размер (не крупнее 520)", abs(max(a["w"], a["h"]) - min(520, max(nat))) < 1)
+        # с промпта №13 «раскладка заданий» первое задание подбирается под
+        # экран: три друг под другом в видимой части (подробно — в его тесте)
+        vh = page.evaluate("() => visibleBoardRect().h")
+        check("8. пустая доска — первое задание: три помещаются в видимой высоте", a["h"] * 3 <= vh + 0.5 and a["h"] * 3 > vh * 0.8)
         page.evaluate("() => setTrainersPanel('closed')")
         page.wait_for_timeout(250)
 
@@ -287,7 +289,7 @@ def run():
         drag(hs["se"], -2000, -2000)
         page.wait_for_timeout(200)
         a6 = get(a)
-        check("7. минимальный масштаб при уменьшении за угол", abs(a6["w"] / a6["css"]["w"] - 0.45) < 0.01)
+        check("7. минимальный масштаб при уменьшении за угол", abs(a6["w"] / a6["css"]["w"] - page.evaluate("() => TASK_MIN_S")) < 0.01)
         select(a)
         hs = handles(a)
         drag(hs["se"], 300, 300)
