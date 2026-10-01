@@ -10,10 +10,12 @@
      тренажёра в узком кадре поднята над рядом — «Ввод» не закрыт.
   2. Нажимает ту же кнопку, что ⟳ в самом тренажёре: сложение, ОГЭ №6,
      движок линейных ОГЭ №9 (#refreshBtn), дробно-рациональные ОГЭ №9
-     (#mcqRefreshBtn) — ловим нажатие на кнопку тренажёра и смену примера.
+     (#mcqRefreshBtn), а с промпта №14 «логарифмы и тригонометрия» — и
+     логарифмы с тригонометрией (у них появилась своя ⟳; уровень, вид
+     задания и тип уравнения те же) — ловим нажатие и смену примера.
   3. Где ⟳ у основного задания нет — новый пример того же типа через
-     __trainerState.newTask(): деление в столбик, «Проценты», логарифмы,
-     тригонометрия; тип и уровень те же.
+     __trainerState.newTask(): деление в столбик, «Проценты»; тип и
+     уровень те же.
   4. ЕГЭ база — следующий прототип того же номера; у номера с одним
      прототипом (ЕГЭ профиль №6) — подсказка, задание не меняется.
   5. Экран выбора типа — подсказка «Сначала откройте задание», ничего не
@@ -215,14 +217,25 @@ def test_own_button(browser):
         ("ОГЭ №6", "oge6", "oge6.html", "document.querySelectorAll('.mode-card:not(.soon):not(.demo)')[1].click()", "refreshBtn"),
         ("ОГЭ №9, линейные", "oge9", "oge9.html", "openModeById('linear')", "refreshBtn"),
         ("ОГЭ №9, дробно-рациональные", "oge9", "oge9.html", "openModeById('rational')", "mcqRefreshBtn"),
+        # промпт №14 «логарифмы и тригонометрия»: своя ⟳ — тот же уровень и вид / тип
+        ("Логарифмы", "logarithms", "logarithms.html",
+         "document.querySelector('.tile[data-pid=\"prod\"]').click(); document.querySelector('.tile[data-pid=\"quot\"]').click(); document.getElementById('pkStart').click(); setLevel(2)",
+         "refreshBtn"),
+        ("Тригонометрия", "trig_equations", "trig_equations.html",
+         "document.querySelector('.tile[data-pid=\"egeArg\"]').click(); document.querySelector('.tile[data-pid=\"kx\"]').click(); document.getElementById('pkStart').click()",
+         "refreshBtn"),
     ]
+    kinds = {"logarithms": "S.props.join() + '/' + S.task.lvl + '/' + S.task.type", "trig_equations": "S.props.join() + '/' + S.task.pid"}
     for name, tid, href, prep, btn in cases:
         open_trainer(page, tid, href, prep)
         page.evaluate(SPY_JS, btn)
+        kind0 = fx(page, kinds[tid]) if tid in kinds else None
         before, after = refresh_changes(page)
         spy = fx(page, "window.__spy || 0")
         check(f"2. {name}: нажата ⟳ самого тренажёра (#{btn})", spy >= 1, str(spy))
         check(f"2. {name}: пример сменился", bool(before) and after != before, f"{before!r} → {after!r}")
+        if tid in kinds:
+            check(f"2. {name}: тип и уровень те же", fx(page, kinds[tid]) == kind0, f"{kind0} → {fx(page, kinds[tid])}")
     check("2. без ошибок JS", not errors, "; ".join(errors[:2]))
     ctx.close()
 
@@ -232,12 +245,6 @@ def test_new_task(browser):
     cases = [
         ("Деление в столбик", "div_col", "division.html", None, "curLevel"),
         ("Проценты", "percent", "percent.html", "openProto('parts', 2)", "S.pid + '/' + S.lvl"),
-        ("Логарифмы", "logarithms", "logarithms.html",
-         "document.querySelector('.tile[data-pid=\"prod\"]').click(); document.getElementById('pkStart').click()",
-         "S.props.join() + '/' + S.lvl"),
-        ("Тригонометрия", "trig_equations", "trig_equations.html",
-         "document.querySelector('.tile[data-pid=\"egeArg\"]').click(); document.getElementById('pkStart').click()",
-         "S.props.join()"),
     ]
     for name, tid, href, prep, kind_expr in cases:
         open_trainer(page, tid, href, prep)

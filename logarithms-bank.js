@@ -81,7 +81,7 @@
      сотни килобайт и «Подборка» разбирает его вёрстку только через
      скрытую TeX-аннотацию. Здесь — обычные sub/sup и вертикальная дробь
      .frac/.num/.den, которую понимают и «Подборка», и снимок на доску.
-     <wbr> после «+», «−» и «=» — места, где длинная строка может
+     <wbr> после «+», «−», «·» и «=» — места, где длинная строка может
      перенестись на телефоне (логарифм, степень и дробь не рвутся). */
   const PREC = { '+': 1, '-': 1, '*': 2, 'neg': 2, 'log': 3, 'lg': 3, 'pow': 4 };
   function prec(t){
@@ -121,11 +121,16 @@
       // отступ: иначе в тексте «Подборки» выходило «lg4» вместо «lg 4»
       case 'lg': return '<span class="lg">lg</span>&#8202;' + argHTML(t[1]).replace('<span class="la">', '<span class="la lga">');
       case 'neg': return '<span class="mo">−</span>' + wrapIf(t[1], prec(t[1]) <= 2 && !(Array.isArray(t[1]) && t[1][0] === '*'));
-      case '*': return t.slice(1).map((x, i) => wrapIf(x, prec(x) < 2 || (i > 0 && isNegative(x)))).join('<span class="mo">·</span>');
+      // <wbr> и после «·»: на уровне Г бывает log₂ 7·log₇ 11·log₁₁ 8 — на
+      // телефоне такое произведение одним куском шире экрана
+      case '*': return t.slice(1).map((x, i) => wrapIf(x, prec(x) < 2 || (i > 0 && isNegative(x)))).join('<span class="mo">·</span><wbr>');
       case '+': return t.slice(1).map((x, i) => {
         if (i === 0) return render(x);
-        if (typeof x === 'number' && x < 0) return '<span class="mo">−</span>' + numHTML(-x);
-        if (Array.isArray(x) && x[0] === 'neg') return '<span class="mo">−</span>' + wrapIf(x[1], prec(x[1]) <= 1);
+        // <wbr> и после вычитания: в длинном примере уровня Г строка рвётся
+        // и по минусам, иначе на телефоне выходила за экран
+        if (typeof x === 'number' && x < 0) return '<span class="mo">−</span><wbr>' + numHTML(-x);
+        // «− (−8)» в итоговой строке уровня Г: минус перед отрицательным — в скобках
+        if (Array.isArray(x) && x[0] === 'neg') return '<span class="mo">−</span><wbr>' + wrapIf(x[1], prec(x[1]) <= 1 || isNegative(x[1]));
         return '<span class="mo">+</span><wbr>' + render(x);
       }).join('');
       case '-': return render(t[1]) + '<span class="mo">−</span><wbr>' + wrapIf(t[2], prec(t[2]) <= 1 || isNegative(t[2]));
@@ -150,7 +155,13 @@
       case 'lg': { const a = t[1], needs = Array.isArray(a) && a[0] !== 'v' && a[0] !== 'pow'; return 'lg' + (needs ? pp(a) : ' ' + plain(a)); }
       case 'neg': return '−' + (prec(t[1]) <= 2 ? pp(t[1]) : plain(t[1]));
       case '*': return t.slice(1).map((x, i) => (prec(x) < 2 || (i > 0 && isNegative(x))) ? pp(x) : plain(x)).join('·');
-      case '+': return t.slice(1).map((x, i) => i === 0 ? plain(x) : (isNegative(x) ? ' − ' + plain(typeof x === 'number' ? -x : x[1]) : ' + ' + plain(x))).join('');
+      // вычитаемое-сумма — в скобках, как на экране: «− (lg 70 − lg 7)»
+      case '+': return t.slice(1).map((x, i) => {
+        if (i === 0) return plain(x);
+        if (!isNegative(x)) return ' + ' + plain(x);
+        const y = typeof x === 'number' ? -x : x[1];
+        return ' − ' + (prec(y) <= 1 || isNegative(y) ? pp(y) : plain(y));
+      }).join('');
       case '-': return plain(t[1]) + ' − ' + (prec(t[2]) <= 1 || isNegative(t[2]) ? pp(t[2]) : plain(t[2]));
     }
     return '';
@@ -728,35 +739,239 @@
     },
   };
 
+  /* ═══════════════ уровень Г — длинные примеры (промпт №14 «логарифмы и тригонометрия») ═══════════════
+     Самый сложный уровень собирается из «кирпичей»: у каждого свойства есть
+     несколько маленьких выражений, которые это свойство применяют и дают
+     «школьное» число (log₆ 4 + log₆ 9 = 2, 2^(log₂ 7) = 7, log₄ 32 = 5/2).
+     Пример уровня Г — сумма (иногда с минусами) таких кирпичей:
+       одно свойство — три кирпича этого свойства, оно применяется подряд;
+       несколько — по кирпичу на КАЖДОЕ выбранное свойство (и добор до трёх),
+       так что в каждом примере задействованы все выбранные.
+     Почему кирпичи, а не готовые формы на каждое сочетание: сочетаний из
+     десяти свойств больше тысячи, а кирпичи складываются в любое. И
+     проверка остаётся честной: решение кирпича — та же цепочка деревьев с
+     подписью свойства на каждом шаге, тест вычисляет и каждую строку
+     кирпича, и всю цепочку целиком (meta.blocks, meta.chain).
+
+     Кирпич: { tree, steps: [[подпись, дерево]…], val: [p, q] } — последнее
+     дерево шагов равно значению val. */
+  // основание 10 в школе пишут как lg
+  const Lb = (p, v) => p === 10 ? LG(v) : L(p, v);
+  const BLK = {
+    ident: [
+      () => { const p = pick([2, 3, 5, 6, 7, 11]), n = plainNum(2, 15, p, v => v !== p);
+        return { tree: Pw(p, Lb(p, n)), steps: [['ident', n]], val: [n, 1] }; },
+      () => { const n = tryGen(() => ri(2, 30), v => v % 10 !== 0);
+        return { tree: Pw(10, LG(n)), steps: [['ident', n]], val: [n, 1] }; },
+      // 3^(2·log₃ 5) = (3^(log₃ 5))² = 25 — свойство степеней и тождество
+      () => { const p = pick([2, 3, 5, 7]), n = plainNum(2, 7, p);
+        return { tree: Pw(p, Mul(2, Lb(p, n))), steps: [['powrule', Pw(Pw(p, Lb(p, n)), 2)], ['ident', Pw(n, 2)], ['arith', n * n]], val: [n * n, 1] }; },
+    ],
+    unit: [
+      () => { const p = ri(2, 20); return { tree: Lb(p, p), steps: [['unit', 1]], val: [1, 1] }; },
+      () => { const p = ri(2, 15), k = ri(2, 9); return { tree: Mul(k, Lb(p, p)), steps: [['unit', Mul(k, 1)], ['arith', k]], val: [k, 1] }; },
+      // log₅(log₇ 7) — свойство дважды подряд: сначала log₇ 7 = 1, потом log₅ 1 = 0
+      () => { const p = ri(2, 9), q = ri(2, 13); return { tree: Lb(p, Lb(q, q)), steps: [['unit', Lb(p, 1)], ['unit', 0]], val: [0, 1] }; },
+    ],
+    prod: [
+      () => tryGen(() => { const p = pick([6, 10, 12, 14, 15, 18, 20]), k = p <= 10 ? pick([2, 3]) : 2, N = Math.pow(p, k);
+          const ds = divisors(N).filter(d => !isPowOf(d, p) && !isPowOf(N / d, p) && d < N / d);
+          if (!ds.length) return null;
+          const m = pick(ds), n = N / m;
+          return { tree: Add(Lb(p, m), Lb(p, n)), steps: [['prod', Lb(p, Mul(m, n))], ['arith', Lb(p, N)], ['def', k]], val: [k, 1] }; }, () => true),
+      () => tryGen(() => { const p = pick([6, 10, 12, 15]), k = 2, N = p * p;
+          const m = pick(divisors(N)), rest = N / m, n = pick(divisors(rest).concat([0]));
+          if (!n || rest / n < 2) return null;
+          const r = rest / n;
+          if ([m, n, r].some(v => v === p) || new Set([m, n, r]).size < 3) return null;
+          return { tree: Add(Lb(p, m), Lb(p, n), Lb(p, r)), steps: [['prod', Lb(p, Mul(m, n, r))], ['arith', Lb(p, N)], ['def', k]], val: [k, 1] }; }, () => true),
+    ],
+    quot: [
+      () => { const o = powPick([2, 3, 5], 1, 4, 81), m = plainNum(3, 9, o.p, v => v * o.v <= 500), n = m * o.v;
+        return { tree: Sub(Lb(o.p, n), Lb(o.p, m)), steps: [['quot', Lb(o.p, Fr(n, m))], ['arith', Lb(o.p, o.v)], ['def', o.k]], val: [o.k, 1] }; },
+      () => { const m = pick([2, 3, 4, 5, 7, 8]), k = ri(1, 2), n = m * Math.pow(10, k);
+        return { tree: Sub(LG(n), LG(m)), steps: [['quot', LG(Fr(n, m))], ['arith', LG(Math.pow(10, k))], ['def', k]], val: [k, 1] }; },
+    ],
+    pow: [
+      () => { const o = powPick([2, 3, 5], 1, 3, 27), n = ri(2, 6);
+        return { tree: Lb(o.p, Pw(o.v, n)), steps: [['pow', Mul(n, Lb(o.p, o.v))], ['def', Mul(n, o.k)], ['arith', n * o.k]], val: [n * o.k, 1] }; },
+      // log₂ (1/4)³ — свойство дважды: показатель вперёд, потом ещё раз у 2⁻²
+      () => { const o = powPick([2, 3, 5], 1, 2, 25), n = ri(2, 4);
+        return { tree: Lb(o.p, Pw(Fr(1, o.v), n)), steps: [['pow', Mul(n, Lb(o.p, Fr(1, o.v)))], ['rewrite', Mul(n, Lb(o.p, Pw(o.p, -o.k)))], ['pow', Mul(n, -o.k, Lb(o.p, o.p))], ['unit', Mul(n, -o.k)], ['arith', -n * o.k]], val: [-n * o.k, 1] }; },
+    ],
+    basepow: [
+      () => tryGen(() => { const p = pick([2, 3, 5]), k = ri(2, 3), B = Math.pow(p, k), j = ri(1, 6), P = Math.pow(p, j);
+          if (B > 125 || P > 729 || j === k) return null;
+          return { tree: Lb(B, P), steps: [['rewrite', Lb(Pw(p, k), P)], ['basepow', Mul(Fr(1, k), Lb(p, P))], ['def', Mul(Fr(1, k), j)], ['arith', ratTree(j, k)]], val: [j, k] }; }, () => true),
+      () => { const o = powPick([2, 3, 5], 1, 4, 81);
+        return { tree: Lb(Rt(2, o.p), o.v), steps: [['rewrite', Lb(Pw(o.p, Fr(1, 2)), o.v)], ['basepow', Mul(2, Lb(o.p, o.v))], ['def', Mul(2, o.k)], ['arith', 2 * o.k]], val: [2 * o.k, 1] }; },
+    ],
+    bothpow: [
+      () => tryGen(() => { const p = pick([2, 3, 5]), k = ri(2, 4), n = ri(2, 6), B = Math.pow(p, k), P = Math.pow(p, n);
+          if (B > 81 || P > 729 || n % k === 0) return null;
+          return { tree: Lb(B, P), steps: [['rewrite', Lb(Pw(p, k), Pw(p, n))], ['bothpow', Mul(ratTree(n, k), Lb(p, p))], ['unit', ratTree(n, k)]], val: [n, k] }; }, () => true),
+      () => tryGen(() => { const p = pick([2, 3]), k = ri(2, 3), n = ri(1, 5), B = Math.pow(p, k), P = Math.pow(p, n);
+          if (B > 27 || P > 243 || n % k === 0) return null;
+          return { tree: Lb(Fr(1, B), P), steps: [['rewrite', Lb(Pw(p, -k), Pw(p, n))], ['bothpow', Mul(ratTree(-n, k), Lb(p, p))], ['unit', ratTree(-n, k)]], val: [-n, k] }; }, () => true),
+    ],
+    change: [
+      () => { const o = powPick([2, 3, 5], 2, 5, 243), c0 = pick([3, 5, 7, 10, 11].filter(v => v !== o.p));
+        return { tree: Fr(Lb(c0, o.v), Lb(c0, o.p)), steps: [['change', Lb(o.p, o.v)], ['def', o.k]], val: [o.k, 1] }; },
+      () => { const o = powPick([2, 3, 5], 2, 5, 243), m = plainNum(3, 11, o.p);
+        return { tree: Mul(Lb(o.p, m), Lb(m, o.v)), steps: [['change', Mul(Lb(o.p, m), Fr(Lb(o.p, o.v), Lb(o.p, m)))], ['arith', Lb(o.p, o.v)], ['def', o.k]], val: [o.k, 1] }; },
+      // log₂ 5 · log₅ 7 · log₇ 16 — переход дважды в одном произведении
+      () => { const o = powPick([2, 3], 2, 5, 243), m = plainNum(3, 7, o.p), n = plainNum(3, 11, o.p, v => v !== m);
+        return { tree: Mul(Lb(o.p, m), Lb(m, n), Lb(n, o.v)), steps: [['change', Mul(Lb(o.p, m), Fr(Lb(o.p, n), Lb(o.p, m)), Fr(Lb(o.p, o.v), Lb(o.p, n)))], ['arith', Lb(o.p, o.v)], ['def', o.k]], val: [o.k, 1] }; },
+    ],
+    swap: [
+      () => { const o = powPick([2, 3, 5], 2, 5, 243);
+        return { tree: Fr(1, Lb(o.v, o.p)), steps: [['swap', Lb(o.p, o.v)], ['def', o.k]], val: [o.k, 1] }; },
+      () => { const p = ri(2, 12), q = tryGen(() => ri(2, 12), v => v !== p);
+        return { tree: Mul(Lb(p, q), Lb(q, p)), steps: [['swap', 1]], val: [1, 1] }; },
+    ],
+    expswap: [
+      () => { const o = powPick([2, 3, 5], 2, 3, 125), m = plainNum(3, 9, o.p, v => Math.pow(v, o.k) <= 64);
+        return { tree: Pw(o.v, Lb(o.p, m)), steps: [['expswap', Pw(m, Lb(o.p, o.v))], ['def', Pw(m, o.k)], ['arith', Math.pow(m, o.k)]], val: [Math.pow(m, o.k), 1] }; },
+    ],
+  };
+  // основания логарифмов в кирпиче (lg — 10)
+  function basesOf(t, out){
+    out = out || new Set();
+    if (Array.isArray(t)){
+      if (t[0] === 'log' && typeof t[1] === 'number') out.add(t[1]);
+      if (t[0] === 'lg') out.add(10);
+      t.forEach(x => basesOf(x, out));
+    }
+    return out;
+  }
+  const isSum = b => b.tree[0] === '+' || b.tree[0] === '-';
+  function hardSpec(list){
+    // одно свойство — три кирпича; несколько — по одному на каждое
+    // выбранное в случайном порядке и добор до трёх
+    const ids = list.length === 1 ? [list[0], list[0], list[0]] : shuffle(list.slice());
+    while (ids.length < 3) ids.push(pick(list));
+    for (let attempt = 0; attempt < 200; attempt++){
+      const blocks = ids.map(id => pick(BLK[id])());
+      // одинаковые кирпичи в одном примере выглядели бы опечаткой
+      const keys = blocks.map(b => JSON.stringify(b.tree));
+      if (new Set(keys).size < keys.length) continue;
+      // кирпич-сумма (log₁₂ 2 + log₁₂ 72) в общей сумме не отделён
+      // скобками — с тем же основанием в соседнем кирпиче два кирпича
+      // читались бы как один. Поэтому у сумм — свои основания
+      const bs = blocks.map(b => basesOf(b.tree));
+      if (blocks.some((b, i) => isSum(b) && bs.some((o, j) => j !== i && [...bs[i]].some(x => o.has(x))))) continue;
+      // первый — со знаком «+», остальные изредка с «−»
+      const signs = blocks.map((b, i) => i > 0 && Math.random() < 0.3 ? -1 : 1);
+      let P = 0, Q = 1;
+      blocks.forEach((b, i) => { const p = signs[i] * b.val[0], q = b.val[1]; [P, Q] = rat(P * q + p * Q, Q * q); });
+      // ответ — число, которое пишут в поле без мучений: целое или дробь
+      // со знаменателем до 4, и не огромное
+      if (Q > 4 || Math.abs(P / Q) > 60) continue;
+      return { blocks, signs, ans: [P, Q] };
+    }
+    return null;
+  }
+  function buildHard(list, spec){
+    const { blocks, signs, ans } = spec;
+    const pid = list[0];
+    const t = { pid, pids: list.slice(), lvl: 4, type: 'calc', kind: 'calc', key: 'hard-' + list.join('.') + '-' + Date.now().toString(36) + '-' + (++serial) + '-' + Math.random().toString(36).slice(2, 6) };
+    const term = (tree, i) => signs[i] < 0 ? Neg(tree) : tree;
+    const expr = Add(...blocks.map((b, i) => term(b.tree, i)));
+    t.text = '<div class="log-ask">' + ASK.calc + '</div><div class="log-expr">' + render(expr) + '</div>';
+    const v = ratStr(ans[0], ans[1]);
+    t.fields = [{ id: 'a', label: 'Ответ:', type: 'num', value: v }];
+    t.answer = render(ratTree(ans[0], ans[1]));
+    // решение: каждый кирпич отдельно — «кирпич = … = число» с подписью
+    // свойства у каждого шага, в конце — сумма значений. Целиком выражение в
+    // каждой строке не повторяем: на уровне Г оно длинное, и за шагом было
+    // бы не уследить. Полная цепочка — в meta.chain, для теста
+    const cur = blocks.map(b => b.tree);
+    const chain = [expr];
+    t.steps = [];
+    blocks.forEach((b, i) => {
+      b.steps.forEach((s, j) => {
+        cur[i] = s[1];
+        chain.push(Add(...cur.map(term)));
+        t.steps.push('<div class="step-line">' + stepTag(s[0]) + '<div class="step-math">' +
+          (j === 0 ? '<span class="blk-no">' + (i + 1) + '</span>' + render(b.tree) : '') + '<span class="mo eq">=</span><wbr>' + render(s[1]) + '</div></div>');
+      });
+    });
+    // итог — значения кирпичей с теми же знаками: «2 − (−8) + 2»
+    const sum = Add(...blocks.map((b, i) => term(ratTree(b.val[0], b.val[1]), i)));
+    chain[chain.length - 1] = sum;
+    chain.push(ratTree(ans[0], ans[1]));
+    t.steps.push('<div class="step-line">' + stepTag('arith') + '<div class="step-math">' + render(sum) + '<span class="mo eq">=</span><wbr>' + render(ratTree(ans[0], ans[1])) + '</div></div>');
+    t.props = [...new Set([].concat(...blocks.map(b => b.steps.map(s => s[0]))).filter(p => propById(p)))];
+    t.meta = { expr, ans: v, chain, blocks: blocks.map((b, i) => ({ sign: signs[i], chain: [b.tree].concat(b.steps.map(s => s[1])), val: ratStr(b.val[0], b.val[1]) })) };
+    t.peek = plain(expr);
+    return t;
+  }
+
   /* ═══════════════ выдача задания ═══════════════
-     generate(props, lvl) — задание одного из выбранных свойств. Подряд одно
-     и то же свойство (при нескольких выбранных) и одно и то же условие не
-     выпадают: при смешанной тренировке ученик должен каждый раз заново
-     узнавать свойство, а не решать по инерции. */
+     generate(props, lvl, opt) — задание одного из выбранных свойств. Подряд
+     одно и то же свойство (при нескольких выбранных) и одно и то же условие
+     не выпадают: при смешанной тренировке ученик должен каждый раз заново
+     узнавать свойство, а не решать по инерции.
+     opt — строка (какое свойство взять) или { prefer, type }: type — вид
+     задания (вычислить / упростить / в обратную сторону / формула). Его
+     передают «⟳ Обновить задание» и «ещё такое же» на доске (промпт №14 «логарифмы и тригонометрия»):
+     новое задание — того же уровня и того же вида, что на экране, иначе
+     «ещё такое же» к «Вычислите» могло оказаться выбором формулы. */
   let lastPid = null;
   const lastText = {};
-  function generate(props, lvl, prefer){
+  const LEVEL_MAX = 4;
+  function generate(props, lvl, opt){
     const list = (Array.isArray(props) ? props : [props]).filter(p => GEN[p]);
     if (!list.length) list.push(PROPS[0].id);
-    lvl = Math.max(1, Math.min(3, lvl || 1));
-    let pid = prefer && list.indexOf(prefer) >= 0 ? prefer : pick(list);
-    if (!prefer && list.length > 1 && pid === lastPid) pid = pick(list.filter(p => p !== lastPid));
-    lastPid = pid;
-    let t = null;
-    for (let i = 0; i < 8; i++){
-      t = build(pid, lvl, pick(GEN[pid][lvl])());
-      if (t.text !== lastText[pid]) break;
+    lvl = Math.max(1, Math.min(LEVEL_MAX, lvl || 1));
+    const o = typeof opt === 'string' ? { prefer: opt } : (opt || {});
+    if (lvl === 4){
+      let t = null;
+      for (let i = 0; i < 8; i++){
+        const spec = hardSpec(list) || hardSpec(list);
+        if (!spec) continue;
+        t = buildHard(list, spec);
+        if (t.text !== lastText['hard:' + list.join()]) break;
+      }
+      // запасной путь — на случай, если кирпичи ни разу не сложились
+      // в удобный ответ (на практике не случается)
+      if (t){ lastText['hard:' + list.join()] = t.text; return t; }
+      lvl = 3;
     }
-    lastText[pid] = t.text;
-    return t;
+    let pid = o.prefer && list.indexOf(o.prefer) >= 0 ? o.prefer : pick(list);
+    if (!o.prefer && list.length > 1 && pid === lastPid) pid = pick(list.filter(p => p !== lastPid));
+    // нужен вид задания — ищем его сначала у выбранного свойства, потом у
+    // остальных из тренировки (у «Логарифма единицы» на уровне В, например,
+    // нет выбора формулы)
+    let order = [pid];
+    if (o.type) order = order.concat(shuffle(list.filter(p => p !== pid)));
+    for (const cand of order){
+      for (let i = 0; i < 8; i++){
+        let spec = null;
+        if (o.type){
+          for (let k = 0; k < 40 && (!spec || spec.type !== o.type); k++) spec = pick(GEN[cand][lvl])();
+          if (spec.type !== o.type) break;
+        } else spec = pick(GEN[cand][lvl])();
+        const t = build(cand, lvl, spec);
+        if (t.text !== lastText[cand] || i === 7){
+          lastPid = cand;
+          lastText[cand] = t.text;
+          return t;
+        }
+      }
+    }
+    // такого вида нет ни у одного свойства тренировки на этом уровне —
+    // задание того же уровня любого вида
+    return generate(list, lvl, { prefer: pid });
   }
 
   window.LOG_BANK = {
     props: PROPS, groups: GROUPS, propById, groupById,
     generate, render, plain, ratTree, stepTag,
     TYPES,
-    LEVELS: ['А', 'Б', 'В'],
-    LEVEL_HINTS: ['прямое применение, простые числа', 'дроби, корни, отрицательные и «спрятанные» степени', 'свойство несколько раз и в обратную сторону'],
-    _gen: GEN,
+    LEVELS: ['А', 'Б', 'В', 'Г'],
+    LEVEL_HINTS: ['прямое применение, простые числа', 'дроби, корни, отрицательные и «спрятанные» степени', 'свойство несколько раз и в обратную сторону',
+      'длинные примеры: свойство несколько раз подряд, а в смешанной тренировке — все выбранные свойства в каждом примере'],
+    _gen: GEN, _blk: BLK,
   };
 })();

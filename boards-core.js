@@ -5585,7 +5585,12 @@ function trainerGenInfo(win, tid, href, el){
       return Object.assign(base, { kind: 'engine', mode, lvl: lvlBtn ? Number(lvlBtn.dataset.id) : null });
     }
     const api = win.__trainerState;
-    const snap = stripTrainerSnap(api && api.get ? api.get() : (typeof win.tsGetState === 'function' ? win.tsGetState() : null));
+    // Промпт №14 «логарифмы и тригонометрия»: снимали карточку «+» — тренажёр отдаёт уровень и вид ЕЁ
+    // задания (логарифмы, тригонометрия), а не основного; остальные
+    // тренажёры номер карточки просто не читают
+    const card = el.closest ? el.closest('.added-task-card[data-idx]') : null;
+    const cardIdx = card ? Number(card.dataset.idx) : -1;
+    const snap = stripTrainerSnap(api && api.get ? api.get(cardIdx) : (typeof win.tsGetState === 'function' ? win.tsGetState() : null));
     return snap ? Object.assign(base, { kind: 'state', snap }) : null;
   } catch (e) {
     console.warn('[доска] не удалось запомнить тип задания', e);

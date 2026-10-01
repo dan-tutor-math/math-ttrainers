@@ -481,6 +481,11 @@ sub .slot,sup .slot{border-width:1.5px;border-radius:5px;height:1.25em}
 .sol-step .body{overflow:visible}
 .sol-answer{font-size:18px}
 .answer-input{width:170px}
+/* уровень Г: номер слагаемого у первой строки его решения */
+.blk-no{display:inline-flex;align-items:center;justify-content:center;width:1.25em;height:1.25em;border-radius:50%;background:var(--hl-10);color:var(--muted-3);font-family:var(--font-ui);font-size:.62em;font-weight:700;margin-right:.45em;vertical-align:.2em}
+/* «Показать свойство» — подсказка, а не ответ: кнопка спокойнее «Показать решение» */
+.prop-show-btn{color:var(--muted-3)}
+.prop-show-btn.on{background:var(--ink);border-color:var(--ink);color:#fff}
 html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!important}
 
 </style>
@@ -623,7 +628,7 @@ html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!impo
        выбираются (одна или несколько), «Начать» открывает тренажёр по
        выбранным; плитка «Все свойства вперемешку» — сразу итоговая отработка -->
   <div id="pickerArea">
-    <div class="pk-lead">Выбери одно свойство или несколько — задания пойдут вперемешку. Уровни: <b>А</b> — прямое применение, <b>Б</b> — дроби, корни и «спрятанные» степени, <b>В</b> — свойство несколько раз и в обратную сторону. Везде <span class="mx" id="pkCond"></span>.</div>
+    <div class="pk-lead">Выбери одно свойство или несколько — задания пойдут вперемешку. Уровни: <b>А</b> — прямое применение, <b>Б</b> — дроби, корни и «спрятанные» степени, <b>В</b> — свойство несколько раз и в обратную сторону, <b>Г</b> — длинные примеры: свойство применяется несколько раз подряд, а при нескольких выбранных в каждом примере нужны все. Везде <span class="mx" id="pkCond"></span>.</div>
     <div class="tiles" id="tiles"></div>
     <div class="pk-bar" id="pkBar">
       <div class="pk-bar-info" id="pkBarInfo"></div>
@@ -643,6 +648,10 @@ html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!impo
         <div class="task-title" id="taskTitle"></div>
         <span class="medal-badge-row" id="medalBadgeRow"></span>
         <button class="basket-add-btn" id="basketAddBtn" title="В подборку">📥</button>
+        <!-- промпт №14 «логарифмы и тригонометрия»: новое задание того же уровня и вида на те же свойства,
+             как ⟳ у остальных тренажёров (её же нажимает «Обновить пример»
+             в панели тренажёров на доске) -->
+        <button class="refresh-btn" id="refreshBtn" title="Обновить задание">⟳</button>
       </div>
     </div>
 
@@ -661,6 +670,7 @@ html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!impo
       <button class="lvl-chip" data-lvl="1">А</button>
       <button class="lvl-chip" data-lvl="2">Б</button>
       <button class="lvl-chip" data-lvl="3">В</button>
+      <button class="lvl-chip" data-lvl="4" title="Длинные примеры">Г</button>
       <span class="level-note" id="levelNote"></span>
     </div>
 
@@ -685,7 +695,11 @@ html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!impo
             <div class="card-btn-row" id="card1BtnRow" style="display:none">
               <button class="soft-btn icon-only" id="basketInlineBtn" title="В подборку">📥</button>
               <button class="soft-btn" id="showSolutionBtn" style="display:none">Показать решение и ответ</button>
+              <!-- промпт №14 «логарифмы и тригонометрия»: анимация свойства, на которое задание, — как на
+                   плитке; только в «Тренировке» -->
+              <button class="soft-btn prop-show-btn" id="propShowBtn" style="display:none">▶ Показать свойство</button>
             </div>
+            <div id="propShow" style="display:none"></div>
             <div class="level-up" id="levelUp" style="display:none"></div>
           </div>
 
@@ -770,6 +784,8 @@ const SLUG = 'logarithms';          // имя файла = слаг тренаж
 const BANK = window.LOG_BANK;
 const PROPS = BANK.props, LV = BANK.LEVELS, R = BANK.render;
 const PROP_IDS = PROPS.map(p => p.id);
+// уровней четыре с промпта №14 (Г — длинные примеры); число — из банка
+const LEVEL_MAX = LV.length;
 // заметки доски приклеены к заданию, кнопки под ними нажимаются — как в ЕГЭ
 // базе после промпта №60 и в «Процентах»
 document.documentElement.setAttribute('data-board-pinned', '');
@@ -850,6 +866,7 @@ const S = {
   pick: null, wrong: [],     // выбор варианта: последний выбранный и неверные
   sol: false,                // «Тренировка»: решение раскрыто кнопкой
   cards: [],                 // добавленные кнопкой «+» задания той же тренировки
+  show: null,                // «Показать свойство»: { key задания, mode, items, start, n } или null
 };
 let totalSolved = 0, totalErrors = 0, streak = 0;
 let lastFocusedInput = null;
@@ -859,7 +876,7 @@ let refOpen = false;           // шпаргалка с формулами ра�
 const els = {};
 ['pickerArea','tiles','pkBar','pkBarInfo','pkClear','pkStart','pkCond','taskArea','backBtn','prevProtoBtn','nextProtoBtn','taskTitle','pageTitle','pageSub',
  'runRow','runChips','refBtn','propRef','levelRow','levelNote','questionPanel','logQuestion','answerArea','card1BtnRow','basketInlineBtn','showSolutionBtn','levelUp',
- 'mainPanel','solSteps','solAnswer','nextBtn','tabPractice','tabExam','basketAddBtn','medalBadgeRow',
+ 'mainPanel','solSteps','solAnswer','nextBtn','tabPractice','tabExam','basketAddBtn','medalBadgeRow','propShowBtn','propShow',
  'workZone','workResizeLeft','workResizeRight','tasksColumns','card1Wrapper',
  'addRail','addRailToggle','addRailBody','addRailSep','addToBasketAllBtn','addClearBtn','medalTray',
  'exampleHistoryToggle','exampleHistoryPanel','exampleHistoryList','exampleHistoryEmpty','exampleHistoryClose',
@@ -918,6 +935,209 @@ const DEMOS = {
 // меряет и запускает примеры модуль; экран плиток виден — только когда не открыто задание
 const tileDemo = window.TileDemo.mount({ root: els.tiles, demos: DEMOS, isShown: () => S.screen === 'picker' });
 const layoutDemos = force => tileDemo.relayout(force);
+
+/* ═══════════════ «Показать свойство» в задании (промпт №14 «логарифмы и тригонометрия») ═══════════════
+   Кнопка под заданием в «Тренировке» показывает, как работает свойство, на
+   которое это задание, — той же анимацией, что пример на плитке (общий
+   showcase из tile-demo.js). Два вида: на случайных числах и в общем виде
+   на буквах. Числа подбираются заново при каждом показе и НЕ берутся из
+   задания: ни одно число примера (основание, аргументы, итог) не совпадает
+   с числами условия, решения и ответа — иначе анимация подсказывала бы
+   ответ. Если в задании задействовано несколько свойств (метки шагов
+   решения, t.props), показываются все по очереди.
+
+   Разметка примера — одна функция на свойство с местами под числа или
+   буквы (SPEC), поэтому вид «на буквах» и «на числах» анимируется одинаково
+   и так же, как плитка. */
+const LG_ = b => 'log<sub>' + b + '</sub>';
+const MV = l => '<i class="mv">' + l + '</i>';
+// «log₃ 27», а не «log₃27»: тонкий пробел между логарифмом и аргументом
+const LGs = b => LG_(b) + '&#8201;';
+const SPEC = {
+  ident: (a, b) => ({ from: K('a', a) + '<sup>' + K('lg', LGs(a)) + K('x', b) + '</sup>' + AT('r', 'x'),
+                      to: K('a', a) + '<sup>' + K('lg', LGs(a)) + K('x', b) + '</sup>' + K('eq', '=', 'op') + K('r', b, 'big') }),
+  // a⁰ = 1 ⇒ log_a 1 = 0;  a¹ = a ⇒ log_a a = 1
+  unit: (b, one) => one
+    ? { from: K('b', b) + '<sup>' + K('o', '1') + '</sup>' + K('eq', '=', 'op') + K('b2', b),
+        to: K('lg', 'log') + '<sub>' + K('b', b) + '</sub>&#8201;' + K('b2', b) + K('eq', '=', 'op') + K('o', '1', 'big') }
+    : { from: K('b', b) + '<sup>' + K('z', '0') + '</sup>' + K('eq', '=', 'op') + K('one', '1'),
+        to: K('lg', 'log') + '<sub>' + K('b', b) + '</sub>&#8201;' + K('one', '1') + K('eq', '=', 'op') + K('z', '0', 'big') },
+  prod: (a, b, c, late) => ({ from: K('l', LGs(a)) + K('p1', '(') + K('b', b) + K('op', '·', 'op') + K('c', c) + K('p2', ')') + AT('l2', 'l'),
+                              to: K('l', LGs(a)) + K('b', b) + K('pl', '+', 'op') + K('l2', LGs(a)) + K('c', c) + (late || '') }),
+  quot: (a, b, c, late) => ({ from: K('l', LGs(a)) + FR(K('n', b), K('d', c)) + AT('l2', 'l'),
+                              to: K('l', LGs(a)) + K('n', b) + K('mi', '−', 'op') + K('l2', LGs(a)) + K('d', c) + (late || '') }),
+  pow: (a, b, n, late) => ({ from: K('l', LGs(a)) + K('b', b) + '<sup>' + K('n', n) + '</sup>',
+                             to: K('n', n, 'big') + K('dot', '·', 'op') + K('l', LGs(a)) + K('b', b) + (late || '') }),
+  basepow: (a, k, b, late) => ({ from: K('lg', 'log') + '<sub>' + K('a', a) + '<sup>' + K('k', k) + '</sup></sub>&#8201;' + K('b', b),
+                                 to: FR(K('one', '1'), K('k', k, 'big')) + K('dot', '·', 'op') + K('lg', 'log') + '<sub>' + K('a', a) + '</sub>&#8201;' + K('b', b) + (late || '') }),
+  bothpow: (a, k, b, n, late) => ({ from: K('lg', 'log') + '<sub>' + K('a', a) + '<sup>' + K('k', k) + '</sup></sub>&#8201;' + K('b', b) + '<sup>' + K('n', n) + '</sup>',
+                                    to: FR(K('n', n, 'big'), K('k', k, 'big')) + K('dot', '·', 'op') + K('lg', 'log') + '<sub>' + K('a', a) + '</sub>&#8201;' + K('b', b) + (late || '') }),
+  change: (a, b, c, late) => ({ from: K('lg', 'log') + '<sub>' + K('a', a) + '</sub>&#8201;' + K('b', b),
+                                to: FR(K('l2', LGs(c)) + K('b', b), K('l3', LGs(c)) + K('a', a)) + (late || '') }),
+  swap: (a, b, late) => ({ from: K('lg', 'log') + '<sub>' + K('a', a) + '</sub>&#8201;' + K('b', b),
+                           to: FR(K('one', '1'), K('lg', 'log') + '<sub>' + K('b', b) + '</sub>&#8201;' + K('a', a)) + (late || '') }),
+  expswap: (a, b, c, late) => ({ from: K('a', a) + '<sup>' + K('lg', LGs(b)) + K('c', c) + '</sup>',
+                                 to: K('c', c) + '<sup>' + K('lg', LGs(b)) + K('a', a) + '</sup>' + (late || '') }),
+};
+// общий вид — на буквах (как формула на плитке)
+const DEMO_LET = {
+  ident: () => SPEC.ident(MV('a'), MV('b')),
+  unit: () => SPEC.unit(MV('a'), false),
+  prod: () => SPEC.prod(MV('a'), MV('b'), MV('c')),
+  quot: () => SPEC.quot(MV('a'), MV('b'), MV('c')),
+  pow: () => SPEC.pow(MV('a'), MV('b'), MV('n')),
+  basepow: () => SPEC.basepow(MV('a'), MV('k'), MV('b')),
+  bothpow: () => SPEC.bothpow(MV('a'), MV('k'), MV('b'), MV('n')),
+  change: () => SPEC.change(MV('a'), MV('b'), MV('c')),
+  swap: () => SPEC.swap(MV('a'), MV('b')),
+  expswap: () => SPEC.expswap(MV('a'), MV('b'), MV('c')),
+};
+/* На числах: gen() — случайные числа (обычный объект: он уходит
+   собеседнику в совместной сессии, и у него рисуется тот же пример); key()
+   — что в примере не должно совпасть с заданием: основание, аргументы
+   логарифмов и итог; spec() — разметка. Малые показатели и коэффициенты
+   (2, 3) совпадать могут — без них пример свойства не построить, и
+   подсказкой к ответу они не служат. Числа подобраны так, чтобы итог был
+   «школьным». */
+const rnd = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const any = arr => arr[Math.floor(Math.random() * arr.length)];
+const isPow = (n, p) => { if (n < p) return n === 1; while (n % p === 0) n /= p; return n === 1; };
+const gcdN = (a, b) => { while (b) [a, b] = [b, a % b]; return a; };
+const pw = Math.pow;
+// основания пошире, чем в заданиях (11, 13): в длинном примере уровня Г
+// малые основания бывают заняты все, а пример обязан быть на других числах
+const BASES = [2, 3, 5, 7, 11, 13];
+const DEMO_NUM = {
+  ident: { gen(){ const p = any([2, 3, 5, 6, 7, 11, 13]); let n; do { n = rnd(2, 20); } while (n === p || isPow(n, p)); return { p, n }; },
+           key: o => ({ base: o.p, args: [o.n], res: o.n }), spec: o => SPEC.ident(String(o.p), String(o.n)) },
+  unit: { gen(){ return { b: rnd(2, 20), one: Math.random() < 0.5 }; },
+          key: o => ({ base: o.b, args: [], res: null }), spec: o => SPEC.unit(String(o.b), o.one) },
+  prod: { gen(){ const p = any(BASES); let i, j; do { i = rnd(1, 4); j = rnd(1, 4); } while (i === j || pw(p, i) > 400 || pw(p, j) > 400); return { p, i, j }; },
+          key: o => ({ base: o.p, args: [pw(o.p, o.i), pw(o.p, o.j)], res: o.i + o.j }),
+          spec: o => SPEC.prod(String(o.p), String(pw(o.p, o.i)), String(pw(o.p, o.j)), LATE(OP('=') + o.i + OP('+') + o.j + OP('=') + (o.i + o.j))) },
+  quot: { gen(){ const p = any(BASES); let k, d; do { k = rnd(1, 3); d = rnd(2, 19); } while (gcdN(d, p) !== 1 || pw(p, k) * d > 300); return { p, k, d }; },
+          key: o => ({ base: o.p, args: [pw(o.p, o.k) * o.d, o.d, pw(o.p, o.k)], res: o.k }),
+          spec: o => SPEC.quot(String(o.p), String(pw(o.p, o.k) * o.d), String(o.d), LATE(OP('=') + LG_(o.p) + '&#8202;' + pw(o.p, o.k) + OP('=') + o.k)) },
+  pow: { gen(){ const p = any(BASES); let i; do { i = rnd(2, 3); } while (pw(p, i) > 200); return { p, i, n: rnd(2, 7) }; },
+         key: o => ({ base: o.p, args: [pw(o.p, o.i)], res: o.n * o.i }),
+         spec: o => SPEC.pow(String(o.p), String(pw(o.p, o.i)), String(o.n), LATE(OP('=') + o.n + OP('·') + o.i + OP('=') + o.n * o.i)) },
+  basepow: { gen(){ const p = any(BASES); let k, q; do { k = rnd(2, 3); q = rnd(1, 3); } while (pw(p, k * q) > 729); return { p, k, q }; },
+             key: o => ({ base: o.p, args: [pw(o.p, o.k * o.q)], res: o.q }),
+             spec: o => SPEC.basepow(String(o.p), String(o.k), String(pw(o.p, o.k * o.q)), LATE(OP('=') + o.q)) },
+  bothpow: { gen(){ const p = any(BASES), k = rnd(2, 3), q = rnd(2, 3); let b; do { b = rnd(2, 13); } while (b === p || isPow(b, p)); return { p, k, q, b }; },
+             key: o => ({ base: o.p, args: [o.b], res: null }),
+             spec: o => SPEC.bothpow(String(o.p), String(o.k), String(o.b), String(o.k * o.q), LATE(OP('=') + o.q + OP('·') + LG_(o.p) + '&#8202;' + o.b)) },
+  change: { gen(){ const p = any([2, 3, 5, 7, 11, 13]); let m, n; do { m = rnd(2, 4); n = rnd(1, 7); } while (n % m === 0 || pw(p, m) > 200 || pw(p, n) > 2200); return { p, m, n }; },
+            key: o => ({ base: pw(o.p, o.m), args: [pw(o.p, o.n), o.p], res: o.n / o.m }),
+            spec: o => { const g = gcdN(o.n, o.m); return SPEC.change(String(pw(o.p, o.m)), String(pw(o.p, o.n)), String(o.p), LATE(OP('=') + SFR(o.n / g, o.m / g))); } },
+  swap: { gen(){ const p = any(BASES); let k; do { k = rnd(2, 4); } while (pw(p, k) > 625); return { p, k }; },
+          key: o => ({ base: pw(o.p, o.k), args: [o.p], res: 1 / o.k }),
+          spec: o => SPEC.swap(String(pw(o.p, o.k)), String(o.p), LATE(OP('=') + SFR(1, o.k))) },
+  expswap: { gen(){ const p = any([2, 3, 5, 7, 11, 13]); let k, c; do { k = rnd(2, 3); c = rnd(2, 13); } while (pw(p, k) > 200 || c === p || isPow(c, p) || pw(c, k) > 1000); return { p, k, c }; },
+             key: o => ({ base: o.p, args: [pw(o.p, o.k), o.c], res: pw(o.c, o.k) }),
+             spec: o => SPEC.expswap(String(pw(o.p, o.k)), String(o.p), String(o.c), LATE(OP('=') + o.c + '<sup>' + o.k + '</sup>' + OP('=') + pw(o.c, o.k))) },
+};
+// все числа задания: условие, каждая строка решения, варианты, ответ.
+// 0 и 1 не в счёт — они в самих свойствах (log_a 1 = 0), а не в задании
+function taskNums(t){
+  const out = new Set();
+  const walk = x => { if (typeof x === 'number') out.add(Math.abs(x)); else if (Array.isArray(x)) x.forEach(walk); };
+  const m = t.meta || {};
+  [m.chain, m.expr, m.lhs, m.rhs, m.opts].forEach(walk);
+  (t.fields || []).forEach(f => {
+    String(f.value).split('/').concat([String(valueOf(f.value))]).forEach(z => { const k = Math.abs(parseFloat(z)); if (isFinite(k)) out.add(k); });
+  });
+  out.delete(0); out.delete(1);
+  return out;
+}
+const taskAnswer = t => t.fields ? valueOf(t.fields[0].value) : NaN;
+// пример совпадает с заданием, если у него основание или аргумент из
+// задания или итог равен ответу (итог из чисел задания — тоже нежелательно)
+function demoClash(key, avoid, ans){
+  const hit = v => v != null && v !== 0 && v !== 1 && avoid.has(Math.abs(v));
+  return {
+    resEq: key.res != null && isFinite(ans) && Math.abs(key.res - ans) < 1e-9,   // итог = ответ задания
+    hard: (hit(key.base) ? 1 : 0) + key.args.filter(hit).length,                // основание и аргументы из задания
+    soft: hit(key.res) ? 1 : 0,                                                  // итог — одно из чисел задания
+  };
+}
+// пример на числах, которых нет в задании (основание, аргументы, итог); если
+// так не выходит (длинный пример уровня Г занял почти все малые числа) —
+// с наименьшим числом совпадений
+const plainText = h => String(h).replace(/<[^>]+>/g, '').replace(/&#8202;|\s+/g, '');
+function pickDemo(pid, t){
+  const D = DEMO_NUM[pid], avoid = taskNums(t), ans = taskAnswer(t), text = plainText(t.text);
+  let best = null, bestScore = Infinity;
+  for (let i = 0; i < 600; i++){
+    const o = D.gen(), c = demoClash(D.key(o), avoid, ans);
+    // сама запись примера есть в задании (log₈₁ 3 — кирпич длинного примера)
+    const inTask = text.indexOf(plainText(D.spec(o).from)) >= 0;
+    if (!c.resEq && !inTask && !c.hard && !c.soft) return o;
+    // итог, равный ответу, и запись из задания недопустимы — это и есть подсказка
+    const score = (c.resEq || inTask ? 1000 : 0) + c.hard * 10 + c.soft;
+    if (score < bestScore) { best = o; bestScore = score; }
+  }
+  return best;
+}
+const showPids = t => (t.props && t.props.length ? t.props : [t.pid]).filter(id => DEMO_NUM[id]);
+function showItems(t, mode){
+  return showPids(t).map(pid => ({ pid, p: mode === 'num' ? pickDemo(pid, t) : null }));
+}
+function showView(it, mode){
+  const pr = propById(it.pid), g = BANK.groupById(pr.group), F = FORMULA[it.pid];
+  const num = mode === 'num' && it.p;
+  return {
+    tag: g.title, color: g.color, title: pr.title,
+    // на буквах сама анимация и есть формула — второй раз её не пишем
+    formula: num ? F.f + (F.f2 && it.pid !== 'ident' ? '<span class="fsep">;</span>' + F.f2 : '') : '',
+    spec: num ? DEMO_NUM[it.pid].spec(it.p) : DEMO_LET[it.pid](),
+    cap: num ? 'пример на других числах' : 'общий вид',
+  };
+}
+let showMode = 'num';          // последний выбор «на числах / на буквах» в этой вкладке
+let showCtl = null, shownSig = null;
+function openShow(){
+  if (!S.task) return;
+  S.show = { key: S.task.key, mode: showMode, items: showItems(S.task, showMode), start: 0, n: 0 };
+  render();
+}
+// S.show — общий в сессии (как раскрытое решение): ученик видит тот же
+// пример, а «на буквах», «другой пример», «ещё раз» и выбор свойства у
+// обоих срабатывают одновременно. Номер прохода n — чтобы «ещё раз» тоже
+// было изменением состояния
+const showSet = patch => { S.show = Object.assign({}, S.show, patch, { n: (S.show.n || 0) + 1 }); render(); };
+function renderShow(){
+  const st = S.show;
+  const ok = !!(st && S.task && st.key === S.task.key && S.mode === 'practice' && S.screen === 'task');
+  const k = S.task ? showPids(S.task).length : 0;
+  els.propShowBtn.style.display = S.mode === 'practice' && k ? 'inline-flex' : 'none';
+  els.propShowBtn.classList.toggle('on', ok);
+  els.propShowBtn.textContent = ok ? (k > 1 ? 'Скрыть свойства' : 'Скрыть свойство') : (k > 1 ? '▶ Показать свойства (' + k + ')' : '▶ Показать свойство');
+  if (!ok){
+    if (showCtl) { showCtl.stop(); showCtl = null; }
+    shownSig = null;
+    if (els.propShow.style.display !== 'none') { els.propShow.style.display = 'none'; els.propShow.innerHTML = ''; }
+    return;
+  }
+  const sig = JSON.stringify(st);
+  if (sig === shownSig && showCtl) return;     // render() зовут часто — проход не перезапускаем
+  shownSig = sig;
+  els.propShow.style.display = 'block';
+  showCtl = window.TileDemo.showcase(els.propShow, {
+    items: st.items.map(it => showView(it, st.mode)),
+    start: st.start || 0,
+    label: 'Свойство',
+    toggle: { value: st.mode, options: [['num', 'на числах'], ['let', 'на буквах']] },
+    reroll: st.mode === 'num',
+    on: {
+      close: guard('showSolution', () => { S.show = null; render(); }),
+      pick: guard('showSolution', i => showSet({ start: i })),
+      toggle: guard('showSolution', v => { showMode = v; showSet({ mode: v, items: showItems(S.task, v), start: 0 }); }),
+      reroll: guard('showSolution', () => showSet({ items: showItems(S.task, 'num'), start: 0 })),
+      replay: guard('showSolution', () => showSet({ start: 0 })),
+    },
+  });
+}
 
 /* ═══════════════ плитки ═══════════════ */
 function tileBadges(pid){
@@ -1163,11 +1383,12 @@ function countForLevel(t){
   p.solved = (p.solved || 0) + 1;
   if (t.lvl === S.lvl && !S.lvlUp) {
     S.lvlCnt = Math.min(LEVEL_UP_AT, S.lvlCnt + 1);
-    if (S.lvlCnt >= LEVEL_UP_AT && S.lvl < 3) S.lvlUp = true;
+    if (S.lvlCnt >= LEVEL_UP_AT && S.lvl < LEVEL_MAX) S.lvlUp = true;
   }
   p.lvl = S.lvl; p.cnt = S.lvlCnt; p.max = Math.max(p.max || 1, S.lvl + (S.lvlUp ? 1 : 0));
   saveLevelProg(key, p);
-  solvedByProp[t.pid] = (solvedByProp[t.pid] || 0) + 1;
+  // пример уровня Г в смешанной тренировке — на все выбранные свойства сразу
+  (t.pids || [t.pid]).forEach(id => { solvedByProp[id] = (solvedByProp[id] || 0) + 1; });
   try { localStorage.setItem(SOLVED_KEY, JSON.stringify(solvedByProp)); } catch (e) {}
 }
 
@@ -1278,7 +1499,7 @@ function startRun(props, lvl){
   const p = progOf(runKey(props));
   S.lvl = lvl || p.lvl || 1;
   S.lvlCnt = lvl && lvl !== p.lvl ? 0 : (p.cnt || 0);
-  S.lvlUp = S.lvlCnt >= LEVEL_UP_AT && S.lvl < 3;
+  S.lvlUp = S.lvlCnt >= LEVEL_UP_AT && S.lvl < LEVEL_MAX;
   S.screen = 'task';
   ensureProg();
   drawTask(BANK.generate(S.props, S.lvl), true);
@@ -1287,11 +1508,24 @@ function startRun(props, lvl){
 // «Следующее задание»: если уровень пройден — сначала поднимаемся на следующий
 function newTask(){
   const key = runKey(S.props);
-  if (S.lvlUp && S.lvl < 3) { S.lvl++; S.lvlCnt = 0; S.lvlUp = false; saveLevelProg(key, Object.assign(progOf(key), { lvl: S.lvl, cnt: 0 })); }
+  if (S.lvlUp && S.lvl < LEVEL_MAX) { S.lvl++; S.lvlCnt = 0; S.lvlUp = false; saveLevelProg(key, Object.assign(progOf(key), { lvl: S.lvl, cnt: 0 })); }
   if (S.screen === 'task') snapshotAndClear('whole', els.workZone);
   S.screen = 'task';
   drawTask(BANK.generate(S.props, S.lvl), true);
 }
+/* «⟳ Обновить задание» (промпт №14 «логарифмы и тригонометрия»): другое задание того же уровня, того
+   же вида (вычислить / упростить / в обратную сторону / формула) и на те же
+   выбранные свойства. Уровень — задания на экране, а не следующий: ⟳ — это
+   «другой пример такого же», а не «дальше», поэтому пройденный уровень
+   (S.lvlUp) не поднимает. Этой же функцией пользуется доска — «ещё такое
+   же» и «Обновить пример» в панели тренажёров. */
+function refreshTask(){
+  if (!S.task) return;
+  if (S.screen === 'task') snapshotAndClear('whole', els.workZone);
+  S.screen = 'task';
+  drawTask(sameKindTask(S.task), true);
+}
+function sameKindTask(t){ return BANK.generate(S.props, t ? t.lvl : S.lvl, t ? { type: t.type } : null); }
 function setLevel(lvl){
   if (lvl === S.lvl && S.task) return;
   const key = runKey(S.props);
@@ -1305,7 +1539,7 @@ function setLevel(lvl){
 function drawTask(t, fresh){
   S.task = t;
   drawnKey = t.key;
-  if (fresh) freshState(S);
+  if (fresh) { freshState(S); S.show = null; }
   lastFocusedInput = null;
   els.taskTitle.textContent = runTitle(S.props);
   document.title = 'Логарифмы — ' + runTitle(S.props);
@@ -1346,12 +1580,13 @@ function showPicker(){
 /* ═══════════════ отрисовка ═══════════════ */
 function levelNoteHTML(){
   const hint = BANK.LEVEL_HINTS[S.lvl - 1];
-  if (S.lvl >= 3) return LV[S.lvl - 1] + ' — ' + hint;
+  if (S.lvl >= LEVEL_MAX) return LV[S.lvl - 1] + ' — ' + hint;
   const dots = '<span class="lvl-dots">' + Array.from({ length: LEVEL_UP_AT }, (_, i) => '<i class="' + (i < S.lvlCnt ? 'on' : '') + '"></i>').join('') + '</span>';
   return LV[S.lvl - 1] + ' — ' + hint + ' · до уровня ' + LV[S.lvl] + ': ' + dots;
 }
 function render(){
   const onTask = S.screen === 'task' && S.task;
+  renderShow();
   document.documentElement.setAttribute('data-screen', onTask ? 'task' : 'picker');
   els.pickerArea.style.display = onTask ? 'none' : 'block';
   els.taskArea.style.display = onTask ? 'block' : 'none';
@@ -1387,12 +1622,12 @@ function render(){
   els.levelRow.querySelectorAll('.lvl-chip').forEach(b => {
     const l = +b.dataset.lvl;
     b.classList.toggle('active', l === S.lvl);
-    b.classList.toggle('done', l < max || (l === 3 && S.lvl === 3 && S.lvlCnt >= LEVEL_UP_AT));
+    b.classList.toggle('done', l < max || (l === LEVEL_MAX && S.lvl === LEVEL_MAX && S.lvlCnt >= LEVEL_UP_AT));
   });
   els.levelNote.innerHTML = levelNoteHTML();
   applyMarks(els.logQuestion, els.answerArea, t, S);
   const hasCards = S.cards.length > 0;
-  els.card1BtnRow.style.display = (hasCards || (S.mode === 'practice' && !S.answered)) ? 'flex' : 'none';
+  els.card1BtnRow.style.display = (hasCards || S.mode === 'practice') ? 'flex' : 'none';
   els.basketInlineBtn.style.display = hasCards ? 'inline-flex' : 'none';
   els.showSolutionBtn.style.display = (S.mode === 'practice' && !S.answered) ? 'inline-flex' : 'none';
   els.showSolutionBtn.textContent = S.sol ? 'Скрыть решение и ответ' : 'Показать решение и ответ';
@@ -1417,14 +1652,20 @@ function render(){
 /* ═══════════════ кнопки ═══════════════ */
 function switchMode(mode){
   S.mode = mode;
-  if (mode !== 'practice') S.sol = false;
+  // в «Экзамене» ни решения, ни анимации свойства
+  if (mode !== 'practice') { S.sol = false; S.show = null; }
   render();
 }
 els.tabPractice.onclick = () => switchMode('practice');
 els.tabExam.onclick = () => switchMode('exam');
 els.refBtn.onclick = () => { refOpen = !refOpen; render(); };
 els.showSolutionBtn.onclick = guard('showSolution', () => { S.sol = !S.sol; render(); });
+els.propShowBtn.onclick = guard('showSolution', () => {
+  if (S.show && S.task && S.show.key === S.task.key) { S.show = null; render(); }
+  else openShow();
+});
 els.nextBtn.onclick = guard('switchTask', newTask);
+document.getElementById('refreshBtn').onclick = guard('refreshOne', refreshTask);
 els.backBtn.onclick = guard('switchTask', showPicker);
 const stepProp = d => { const i = PROP_IDS.indexOf(S.props[0]); startRun([PROP_IDS[(i + d + PROP_IDS.length) % PROP_IDS.length]]); };
 els.prevProtoBtn.onclick = guard('switchTask', () => stepProp(-1));
@@ -1517,7 +1758,9 @@ function clearCards(){
 function refreshCard(idx){
   if (!S.cards[idx]) return;
   snapshotAndClear('single', cardEl(idx));
-  S.cards[idx] = freshCard(BANK.generate(S.props, S.lvl));
+  // ⟳ у карточки — как у основного задания: тот же уровень и вид (промпт №14 «логарифмы и тригонометрия»)
+  const was = S.cards[idx].task;
+  S.cards[idx] = freshCard(BANK.generate(S.props, was.lvl, { type: was.type }));
   const old = cardEl(idx);
   if (old) { old.replaceWith(makeCardEl(S.cards[idx], idx)); syncCard(idx); }
   else renderCards(true);
@@ -1548,7 +1791,7 @@ function addOneToBasket(selector, t){
   const task = t || S.task;
   window.Basket.add({
     trainerId: SLUG,
-    modeTitle: propById(task.pid).title + ' · уровень ' + LV[task.lvl - 1],
+    modeTitle: (task.pids && task.pids.length > 1 ? runTitle(task.pids) : propById(task.pid).title) + ' · уровень ' + LV[task.lvl - 1],
     text: r.text, html: r.html,
   });
   return true;
@@ -1749,6 +1992,7 @@ function tsGetState(){
     logScreen: S.screen, sel: S.sel.slice(), props: S.props.slice(), lvl: S.lvl, lvlCnt: S.lvlCnt, lvlUp: !!S.lvlUp, curSubMode: S.mode,
     task: S.task, answered: !!S.answered, hadWrong: !!S.hadWrong, correct: !!S.correct,
     marks: S.marks, pick: S.pick == null ? null : S.pick, wrong: S.wrong || [], sol: !!S.sol,
+    show: S.show || null,
     cards: cardsSnapshot(),
     workW: parseFloat(getComputedStyle(els.workZone).width) || null,
     totalSolved, streak, totalErrors,
@@ -1764,7 +2008,7 @@ function tsApplyState(state){
   const props = normProps(state.props);
   if (props.length) S.props = props;
   ensureProg();
-  S.lvl = Math.max(1, Math.min(3, state.lvl || 1));
+  S.lvl = Math.max(1, Math.min(LEVEL_MAX, state.lvl || 1));
   S.lvlCnt = state.lvlCnt || 0;
   S.lvlUp = !!state.lvlUp;
   if (state.curSubMode === 'practice' || state.curSubMode === 'exam') S.mode = state.curSubMode;
@@ -1781,6 +2025,7 @@ function tsApplyState(state){
   S.pick = state.pick == null ? null : state.pick;
   S.wrong = state.wrong || [];
   S.sol = !!state.sol;
+  S.show = state.show && state.show.key === state.task.key ? state.show : null;
   if (typeof state.workW === 'number' && state.workW > 0) els.workZone.style.setProperty('--work-w', clampWorkW(state.workW) + 'px');
   const incoming = (state.cards || []).filter(c => c && c.task && c.task.key).map(c => ({
     task: c.task, answered: !!c.answered, hadWrong: !!c.hadWrong, correct: !!c.correct,
@@ -1796,7 +2041,7 @@ function tsApplyState(state){
 }
 function tsWatchSig(s){
   return JSON.stringify([s.logScreen, s.sel, s.props, s.lvl, s.lvlCnt, s.lvlUp, s.curSubMode, s.task ? s.task.key : null,
-    s.answered, s.hadWrong, s.correct, s.marks, s.pick, s.wrong, s.sol,
+    s.answered, s.hadWrong, s.correct, s.marks, s.pick, s.wrong, s.sol, s.show || null,
     (s.cards || []).map(c => [c.task.key, c.answered, c.hadWrong, c.correct, c.marks, c.pick, c.wrong, c.sol]), s.workW]);
 }
 let tsPeerSig = null;
@@ -1820,20 +2065,28 @@ function tsApplyStateFromPeer(state){
    невидимый кадр доски получает тренировку и уровень и просит новое
    задание. Снимок — только то, что задаёт тип задания, без самого задания. */
 window.__trainerState = {
-  get(){ return { logScreen: 'task', props: S.props.slice(), lvl: S.lvl, curSubMode: S.mode }; },
+  // Промпт №14 «логарифмы и тригонометрия»: уровень и вид берутся у САМОГО задания, которое кладут на
+  // доску (cardIdx — карточка «+», её задание своё), а не у тренировки:
+  // «ещё такое же» должно быть того же уровня и того же вида, а в снимке
+  // раньше был только уровень тренировки, вид же выпадал случайно
+  get(cardIdx){
+    const t = cardIdx >= 0 && S.cards[cardIdx] ? S.cards[cardIdx].task : S.task;
+    return { logScreen: 'task', props: S.props.slice(), lvl: t ? t.lvl : S.lvl, type: t ? t.type : null, curSubMode: S.mode };
+  },
   apply(s){
     if (!s || !Array.isArray(s.props)) return;
-    const props = normProps(s.props), lvl = Math.max(1, Math.min(3, s.lvl || 1));
+    const props = normProps(s.props), lvl = Math.max(1, Math.min(LEVEL_MAX, s.lvl || 1)), type = s.type || null;
     if (!props.length) return;
-    const same = S.screen === 'task' && S.task && runKey(S.props) === runKey(props) && S.task.lvl === lvl;
+    const same = S.screen === 'task' && S.task && runKey(S.props) === runKey(props) && S.task.lvl === lvl && (!type || S.task.type === type);
     S.props = props; S.lvl = lvl; S.lvlUp = false;
     ensureProg();
     // доска перестраивает задание под новую ширину (промпт №70): ей нужен
     // открытый экран задания, само условие она подставит из сохранённой
     // вёрстки. С экрана плиток узла задания просто нет
-    if (!same) { S.screen = 'task'; drawTask(BANK.generate(props, lvl), true); }
+    if (!same) { S.screen = 'task'; drawTask(BANK.generate(props, lvl, type ? { type } : null), true); }
   },
-  newTask(){ S.screen = 'task'; drawTask(BANK.generate(S.props, S.lvl), true); },
+  // новое задание — того же уровня и вида, что на экране (как ⟳)
+  newTask(){ S.screen = 'task'; drawTask(sameKindTask(S.task), true); },
 };
 
 if (window.TrainerSession) {

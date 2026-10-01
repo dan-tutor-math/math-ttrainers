@@ -604,6 +604,9 @@ sub .slot,sup .slot{border-width:1.5px;border-radius:5px;height:1.25em}
 .sol-step .body{overflow:visible}
 .sol-answer{font-size:18px}
 .answer-input{width:170px}
+/* «Показать формулу» — подсказка, а не ответ: кнопка спокойнее «Показать решение» */
+.prop-show-btn{color:var(--muted-3)}
+.prop-show-btn.on{background:var(--ink);border-color:var(--ink);color:#fff}
 html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!important}
 
 </style>
@@ -766,6 +769,9 @@ html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!impo
         <div class="task-title" id="taskTitle"></div>
         <span class="medal-badge-row" id="medalBadgeRow"></span>
         <button class="basket-add-btn" id="basketAddBtn" title="В подборку">📥</button>
+        <!-- промпт №14 «логарифмы и тригонометрия»: новое уравнение того же типа, как ⟳ у остальных
+             тренажёров (её же нажимает «Обновить пример» на доске) -->
+        <button class="refresh-btn" id="refreshBtn" title="Обновить задание">⟳</button>
       </div>
     </div>
 
@@ -798,7 +804,11 @@ html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!impo
             <div class="card-btn-row" id="card1BtnRow" style="display:none">
               <button class="soft-btn icon-only" id="basketInlineBtn" title="В подборку">📥</button>
               <button class="soft-btn" id="showSolutionBtn" style="display:none">Показать решение и ответ</button>
+              <!-- промпт №14 «логарифмы и тригонометрия»: анимация формулы этого типа — как на плитке;
+                   только в «Тренировке» -->
+              <button class="soft-btn prop-show-btn" id="propShowBtn" style="display:none">▶ Показать формулу</button>
             </div>
+            <div id="propShow" style="display:none"></div>
           </div>
 
           <div class="panel" id="mainPanel" style="display:none">
@@ -958,6 +968,7 @@ const S = {
   pick: null, wrong: [],     // выбор варианта: последний выбранный и неверные
   sol: false,                // «Тренировка»: решение раскрыто кнопкой
   cards: [],                 // добавленные кнопкой «+» задания той же тренировки
+  show: null,                // «Показать формулу»: { key задания, items, start, n } или null
 };
 let totalSolved = 0, totalErrors = 0, streak = 0;
 let lastFocusedInput = null;
@@ -967,7 +978,7 @@ let refOpen = false;           // шпаргалка с формулами ра�
 const els = {};
 ['pickerArea','levels','pkBar','pkBarInfo','pkClear','pkStart','taskArea','backBtn','prevProtoBtn','nextProtoBtn','taskTitle','pageTitle','pageSub',
  'runRow','runChips','refBtn','propRef','questionPanel','trigQuestion','answerArea','card1BtnRow','basketInlineBtn','showSolutionBtn',
- 'mainPanel','solSteps','solAnswer','nextBtn','tabPractice','tabExam','basketAddBtn','medalBadgeRow',
+ 'mainPanel','solSteps','solAnswer','nextBtn','tabPractice','tabExam','basketAddBtn','medalBadgeRow','propShowBtn','propShow',
  'workZone','workResizeLeft','workResizeRight','tasksColumns','card1Wrapper',
  'addRail','addRailToggle','addRailBody','addRailSep','addToBasketAllBtn','addClearBtn','medalTray',
  'exampleHistoryToggle','exampleHistoryPanel','exampleHistoryList','exampleHistoryEmpty','exampleHistoryClose',
@@ -1150,6 +1161,262 @@ const VIZ = {
 // меряет и запускает примеры модуль; экран плиток виден — только когда не открыто задание
 const tileDemo = window.TileDemo.mount({ root: els.levels, demos: DEMOS, isShown: () => S.screen === 'picker' });
 const layoutDemos = force => tileDemo.relayout(force);
+
+/* ═══════════════ «Показать формулу» в задании (промпт №14 «логарифмы и тригонометрия») ═══════════════
+   Кнопка под уравнением в «Тренировке» — та же анимация, что пример на
+   плитке типа (общий showcase из tile-demo.js), но так, чтобы она не
+   подсказывала ответ ЭТОГО уравнения:
+     — у простейших и у приёмов (замена, однородные, разложение, ОДЗ) —
+       общий вид на буквах: sin x = a ⇒ x = (−1)ⁿ arcsin a + πn; функция в
+       примере — та же, что в уравнении (cos, tg…);
+     — где буквами не покажешь (частные случаи, формулы приведения, отбор
+       корней, аргумент π(x − a)/b) — числовой пример из небольшого набора
+       или со случайными числами, выбранный так, чтобы не совпасть с
+       заданием: другие значение, угол, отрезок, корни.
+   Описание примера (p) — обычные данные: оно уходит собеседнику в
+   совместной сессии, и у него рисуется тот же пример. */
+const ML = l => '<i class="mv">' + l + '</i>';
+const A_ = ML('a'), PHI = ML('φ'), T_ = ML('t'), EQK = K('eq', '=', 'op');
+// буква-множитель перед функцией или t: с волосяным пробелом, иначе «atg x»
+const MS = l => ML(l) + '&#8202;';
+// правая часть простейшего в общем виде; часть «arc» вылетает из функции
+const SIMPLE_TO = {
+  sin: () => K('s', ALTN + '&#8202;') + K('arc', FN('arcsin'), 'big') + K('v', A_) + K('per', OP('+') + 'π' + N),
+  cos: () => K('pm', '±', 'op') + K('arc', FN('arccos'), 'big') + K('v', A_) + K('per', OP('+') + '2π' + N),
+  tg: () => K('arc', FN('arctg'), 'big') + K('v', A_) + K('per', OP('+') + 'π' + N),
+  ctg: () => K('arc', FN('arcctg'), 'big') + K('v', A_) + K('per', OP('+') + 'π' + N),
+};
+// какая функция в уравнении (ctg раньше tg: у «ctg» внутри есть «tg»)
+const fnOf = t => ((String(t.peek || '').match(/ctg|sin|cos|tg/) || ['sin'])[0]);
+const pq = (k, d, neg) => (neg ? '−' : '') + (d > 1 ? SFR((k > 1 ? k : '') + 'π', d) : (k > 1 ? k : '') + 'π');
+const simpleDemo = (f, late) => ({ from: K('f', FN(f)) + K('x', X) + EQK + K('v', A_) + AT('arc', 'f'),
+                                   to: K('x', X) + EQK + SIMPLE_TO[f]() + (late || '') });
+const argDemo = (f, lhsFrom, lhsTo, late) => ({ from: K('f', FN(f)) + lhsFrom + EQK + K('v', A_) + AT('arc', 'f'),
+                                                to: lhsTo + EQK + SIMPLE_TO[f]() + LATE(late) });
+const isTrig = f => f === 'sin' || f === 'cos';
+// числа уравнения (в долях π для корней и отрезка) — с ними пример не должен совпасть
+const near = (u, v) => Math.abs(u - v) < 1e-6;
+function taskRoots(t){ return ((t.meta && t.meta.good && t.meta.good.roots) || []).slice(); }
+function taskSeg(t){ return (t.meta && t.meta.seg) || null; }
+const sameSeg = (a, b) => !!(a && b && near(a[0], b[0]) && near(a[1], b[1]));
+// из набора — пример с другим отрезком и без общих корней (а если такого
+// нет — с наименьшим числом общих)
+function pickFrom(list, t){
+  const roots = taskRoots(t), seg = taskSeg(t);
+  let best = 0, bestBad = Infinity;
+  shuffleIdx(list.length).forEach(i => {
+    const ex = list[i];
+    const bad = (sameSeg(ex.seg, seg) ? 10 : 0) + ex.roots.filter(r => roots.some(q => near(q, r))).length;
+    if (bad < bestBad) { best = i; bestBad = bad; }
+  });
+  return { i: best };
+}
+function shuffleIdx(n){ const a = Array.from({ length: n }, (_, i) => i); for (let i = n - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+const segHTML = (a, b) => '[' + a + '; ' + b + ']';
+// отбор корней: серия и отрезок «сворачиваются» в корни
+const SEL_DEMOS = {
+  circ: [
+    { ser: '±' + pq(1, 3) + OP('+') + '2π' + N, seg: [-1, 2], segH: segHTML('−π', '2π'), roots: [-1 / 3, 1 / 3, 5 / 3], rootsH: [pq(1, 3, 1), pq(1, 3), pq(5, 3)] },
+    { ser: '±' + pq(1, 4) + OP('+') + '2π' + N, seg: [0, 3], segH: segHTML('0', '3π'), roots: [1 / 4, 7 / 4, 9 / 4], rootsH: [pq(1, 4), pq(7, 4), pq(9, 4)] },
+    { ser: pq(1, 6) + OP('+') + 'π' + N, seg: [-1, 1], segH: segHTML('−π', 'π'), roots: [-5 / 6, 1 / 6], rootsH: [pq(5, 6, 1), pq(1, 6)] },
+    { ser: '±' + pq(2, 3) + OP('+') + '2π' + N, seg: [1, 3], segH: segHTML('π', '3π'), roots: [4 / 3, 8 / 3], rootsH: [pq(4, 3), pq(8, 3)] },
+  ],
+  enum: [
+    { ser: pq(1, 6) + OP('+') + '2π' + N, seg: [0, 3], segH: segHTML('0', '3π'), roots: [1 / 6, 13 / 6], rootsH: [pq(1, 6), pq(13, 6)], n: '0; 1' },
+    { ser: '−' + pq(1, 4) + OP('+') + 'π' + N, seg: [0, 2], segH: segHTML('0', '2π'), roots: [3 / 4, 7 / 4], rootsH: [pq(3, 4), pq(7, 4)], n: '1; 2' },
+    { ser: pq(1, 3) + OP('+') + '2π' + N, seg: [-2, 1], segH: segHTML('−2π', 'π'), roots: [-5 / 3, 1 / 3], rootsH: [pq(5, 3, 1), pq(1, 3)], n: '−1; 0' },
+    { ser: pq(2, 3) + OP('+') + 'π' + N, seg: [-1, 1], segH: segHTML('−π', 'π'), roots: [-1 / 3, 2 / 3], rootsH: [pq(1, 3, 1), pq(2, 3)], n: '−1; 0' },
+  ],
+  ab: [
+    { ser: '±' + pq(1, 3) + OP('+') + '2π' + N, seg: [0, 2], segH: segHTML('0', '2π'), roots: [1 / 3, 5 / 3], rootsH: [pq(1, 3), pq(5, 3)] },
+    { ser: ALTN + pq(1, 6) + OP('+') + 'π' + N, seg: [1, 3], segH: segHTML('π', '3π'), roots: [13 / 6, 17 / 6], rootsH: [pq(13, 6), pq(17, 6)] },
+    { ser: pq(1, 4) + OP('+') + 'π' + N, seg: [-2, -0.5], segH: segHTML('−2π', '−' + SFR('π', 2)), roots: [-7 / 4, -3 / 4], rootsH: [pq(7, 4, 1), pq(3, 4, 1)] },
+  ],
+};
+// двойное неравенство: a ≤ α + 2πn ≤ b ⇒ границы для n
+const INEQ_DEMOS = [
+  { l: '0', a: pq(1, 6) + OP('+') + '2π', r: '3π', lo: SFR('−1', 12), hi: SFR(17, 12), n: '0; 1', seg: [0, 3], roots: [1 / 6, 13 / 6] },
+  { l: '−π', a: pq(1, 4) + OP('+') + '2π', r: '2π', lo: SFR('−5', 8), hi: SFR(7, 8), n: '0', seg: [-1, 2], roots: [1 / 4] },
+  { l: 'π', a: pq(1, 3) + OP('+') + 'π', r: '4π', lo: SFR(2, 3), hi: SFR(11, 3), n: '1; 2; 3', seg: [1, 4], roots: [4 / 3, 7 / 3, 10 / 3] },
+  { l: '−2π', a: '−' + pq(1, 6) + OP('+') + '2π', r: 'π', lo: SFR('−11', 12), hi: SFR(7, 12), n: '0', seg: [-2, 1], roots: [-1 / 6] },
+];
+// серия и отрезок остаются на месте (на них смотрят, пока ищут корни), а
+// корни вылетают из серии
+function selDemo(ex, withN){
+  const head = K('s', X + OP('=') + ex.ser) + K('seg', OP(',') + X + ' ∈ ' + ex.segH);
+  let from = head, to = head + K('ar', '⇒', 'op');
+  ex.rootsH.forEach((h, i) => { from += AT('r' + i, 's'); to += (i ? K('c' + i, ';', 'op') : '') + K('r' + i, h, 'big'); });
+  return { from, to: to + (withN ? LATE('<span class="op">' + N + ' = ' + ex.n + '</span>') : '') };
+}
+// частные случаи: значение, ответ и сама серия (доли π) — для сравнения с заданием
+const SPEC_CASES = [
+  { f: 'sin', v: '0', ans: 'π' + N, a: 0, p: 1 },
+  { f: 'sin', v: '1', ans: pq(1, 2) + OP('+') + '2π' + N, a: 0.5, p: 2 },
+  { f: 'sin', v: '−1', ans: '−' + pq(1, 2) + OP('+') + '2π' + N, a: -0.5, p: 2 },
+  { f: 'cos', v: '0', ans: pq(1, 2) + OP('+') + 'π' + N, a: 0.5, p: 1 },
+  { f: 'cos', v: '1', ans: '2π' + N, a: 0, p: 2 },
+  { f: 'cos', v: '−1', ans: 'π' + OP('+') + '2π' + N, a: 1, p: 2 },
+];
+const modP = (x, p) => ((x % p) + p) % p;
+// формулы приведения: ключ — левая часть без пробелов, как в записи задания
+const RED_CASES = [
+  { f: 'sin', a: pq(1, 2), m: '−', g: FN('cos'), key: 'sin(π/2−x)' },
+  { f: 'sin', a: pq(3, 2), m: '−', g: '−' + FN('cos'), key: 'sin(3π/2−x)' },
+  { f: 'cos', a: pq(1, 2), m: '+', g: '−' + FN('sin'), key: 'cos(π/2+x)' },
+  { f: 'cos', a: 'π', m: '−', g: '−' + FN('cos'), key: 'cos(π−x)' },
+  { f: 'sin', a: 'π', m: '+', g: '−' + FN('sin'), key: 'sin(π+x)' },
+  { f: 'cos', a: pq(3, 2), m: '−', g: '−' + FN('sin'), key: 'cos(3π/2−x)' },
+  { f: 'sin', a: pq(3, 2), m: '+', g: '−' + FN('cos'), key: 'sin(3π/2+x)' },
+  { f: 'cos', a: pq(1, 2), m: '−', g: FN('sin'), key: 'cos(π/2−x)' },
+];
+// аргумент π(x − s)/d: cos … = ½ ⇒ x − s = ±d/3 + 2dn; ответ — наименьший положительный корень
+function egeArgRoot(s, d){
+  let best = Infinity;
+  for (let n = -12; n <= 12; n++) [1, -1].forEach(sg => { const x = s + sg * d / 3 + 2 * d * n; if (x > 0 && x < best) best = x; });
+  return best;
+}
+const TRIG_SHOW = {
+  sin: { pick: () => ({}), spec: () => simpleDemo('sin') },
+  cos: { pick: () => ({}), spec: () => simpleDemo('cos') },
+  tg: { pick: () => ({}), spec: () => simpleDemo('tg') },
+  ctg: { pick: () => ({}), spec: () => simpleDemo('ctg') },
+  arc: { pick: t => ({ f: fnOf(t) }), spec: p => simpleDemo(p.f, isTrig(p.f) ? LATE(OP(',') + '|' + A_ + '|' + OP('≤') + '1') : '') },
+  neg: { pick: t => ({ f: fnOf(t) === 'cos' ? 'cos' : 'sin' }),
+         spec: p => p.f === 'cos'
+           ? { from: K('f', FN('arccos')) + K('p1', '(') + K('m', '−') + K('v', A_) + K('p2', ')'),
+               to: K('pi', 'π', 'big') + K('m', '−', 'op') + K('f', FN('arccos')) + K('v', A_) }
+           : { from: K('f', FN('arcsin')) + K('p1', '(') + K('m', '−') + K('v', A_) + K('p2', ')'),
+               to: K('m', '−', 'big') + K('f', FN('arcsin')) + K('v', A_) } },
+  spec: { num: true,
+          pick(t){
+            const g = t.meta && t.meta.good && t.meta.good.list && t.meta.good.list[0];
+            const ga = g ? (g.c + g.a) / Math.PI : null, gp = g ? g.p / Math.PI : null;
+            const ok = SPEC_CASES.map((c, i) => i).filter(i => { const c = SPEC_CASES[i]; return ga == null || !(near(c.p, gp) && near(modP(c.a, c.p), modP(ga, gp))); });
+            return { i: ok[Math.floor(Math.random() * ok.length)] };
+          },
+          spec: p => { const c = SPEC_CASES[p.i]; return { from: K('f', FN(c.f)) + K('x', X) + EQK + K('v', c.v) + AT('r', 'v'), to: K('x', X) + EQK + K('r', c.ans, 'big') }; } },
+  shift: { pick: t => ({ f: fnOf(t) }), spec: p => argDemo(p.f, K('p1', '(') + K('x', X) + K('mi', '−', 'op') + K('b', PHI) + K('p2', ')'), K('x', X) + K('mi', '−', 'op') + K('b', PHI), OP('⇒') + X + OP('=') + PHI + OP('+') + '…') },
+  // «⇒ x = … : k» — что делать дальше с правой частью «…» (короче словами
+  // не помещалось в полосу на телефоне)
+  kx: { pick: t => ({ f: fnOf(t) }), spec: p => argDemo(p.f, K('k', ML('k')) + K('x', X), K('k', ML('k')) + K('x', X), OP('⇒') + X + OP('=') + SFR('…', ML('k'))) },
+  tc2: { pick: t => ({ f: fnOf(t) }), spec: p => argDemo(p.f, K('k', ML('k')) + K('x', X), K('k', ML('k')) + K('x', X), OP('⇒') + X + OP('=') + SFR('…', ML('k'))) },
+  xk: { pick: t => ({ f: fnOf(t) }), spec: p => argDemo(p.f, FR(K('x', X), K('k', ML('k'))), FR(K('x', X), K('k', ML('k'))), OP('⇒') + X + OP('=') + ML('k') + OP('·') + '…') },
+  lin: { pick: t => ({ f: fnOf(t) }), spec: p => argDemo(p.f, K('p1', '(') + K('k', ML('k')) + K('x', X) + K('pl', '+', 'op') + K('b', PHI) + K('p2', ')'), K('k', ML('k')) + K('x', X) + K('pl', '+', 'op') + K('b', PHI), OP('⇒') + X + OP('=') + SFR('…' + OP('−') + PHI, ML('k'))) },
+  egeArg: { num: true,
+            pick(t){
+              const used = new Set((String(t.peek || '').match(/\d+/g) || []).map(Number));
+              const ans = t.meta && t.meta.good ? t.meta.good.num : null;
+              // сдвиг s и знаменатель d — не из уравнения, ответ — не его ответ;
+              // если так не выходит — с наименьшим числом совпадений
+              let best = null, bestBad = Infinity;
+              for (let i = 0; i < 300; i++){
+                const s = 1 + Math.floor(Math.random() * 9), d = [3, 6, 9, 12][Math.floor(Math.random() * 4)];
+                const bad = (used.has(s) ? 1 : 0) + (used.has(d) ? 1 : 0) + (egeArgRoot(s, d) === ans ? 100 : 0);
+                if (!bad) return { s, d };
+                if (bad < bestBad) { best = { s, d }; bestBad = bad; }
+              }
+              return best;
+            },
+            spec: p => ({
+              from: K('f', FN('cos')) + '<span class="dfrac"><span class="dn">' + K('pi', 'π(') + K('x', X) + K('mi', '−', 'op') + K('s', String(p.s)) + K('p2', ')') + '</span>' + K('bar', '', 'dbar') + '<span class="dn">' + K('d', String(p.d)) + '</span></span>' + EQK + K('v', SFR(1, 2)) + AT('r', 'v'),
+              to: K('x', X) + K('mi', '−', 'op') + K('s', String(p.s)) + EQK + K('r', '±' + (p.d / 3) + OP('+') + (2 * p.d) + N, 'big') + LATE(OP('⇒') + X + OP('=') + egeArgRoot(p.s, p.d)) }) },
+  quad: { pick: t => ({ f: fnOf(t) }),
+          spec: p => ({ from: K('c1', MS('a')) + K('s1', SUP(FN(p.f), 2) + X) + K('m', '+', 'op') + K('c2', MS('b')) + K('s2', FN(p.f) + X) + K('p', '+', 'op') + K('c3', ML('c')) + EQK + K('z', '0') + AT('t1', 's1') + AT('t2', 's2'),
+                        to: K('c1', MS('a')) + K('t1', SUP(T_, 2), 'big') + K('m', '+', 'op') + K('c2', MS('b')) + K('t2', T_, 'big') + K('p', '+', 'op') + K('c3', ML('c')) + EQK + K('z', '0') +
+                          LATE(OP(',') + T_ + OP('=') + FN(p.f) + X + (isTrig(p.f) ? OP(',') + '|' + T_ + '|' + OP('≤') + '1' : '')) }) },
+  hom: { pick: () => ({}),
+         spec: () => ({ from: K('a', MS('a')) + K('s', FN('sin')) + K('x', X) + K('pl', '+', 'op') + K('b', MS('b')) + K('c', FN('cos') + X) + EQK + K('z', '0') + AT('tg', 's'),
+                        to: K('a', MS('a')) + K('tg', FN('tg'), 'big') + K('x', X) + K('pl', '+', 'op') + K('b', ML('b')) + EQK + K('z', '0') + LATE(OP(',') + 'делим на ' + FN('cos') + X + OP('≠') + '0') }) },
+  fac: { pick: () => ({}),
+         spec: () => ({ from: K('A', ML('A')) + K('dot', '·', 'op') + K('B', ML('B')) + EQK + K('z', '0') + AT('z2', 'z'),
+                        to: K('A', ML('A')) + EQK + K('z', '0') + K('or', 'или', 'op') + K('B', ML('B')) + K('eq2', '=', 'op') + K('z2', '0') }) },
+  ident: { pick: () => ({}),
+           spec: () => ({ from: K('two', MS('a')) + K('c', SUP(FN('cos'), 2) + X) + K('p', '+', 'op') + K('s', MS('b') + FN('sin') + X) + EQK + K('r', ML('c')) + AT('in', 'c'),
+                          to: K('two', MS('a')) + K('in', '(1' + OP('−') + SUP(FN('sin'), 2) + X + ')', 'big') + K('p', '+', 'op') + K('s', MS('b') + FN('sin') + X) + EQK + K('r', ML('c')) }) },
+  dbl: { pick: t => ({ f: /sin\s*2/.test(String(t.peek || '')) ? 'sin' : 'cos' }),
+         spec: p => p.f === 'sin'
+           ? { from: K('c', FN('sin') + '2' + X) + AT('in', 'c'), to: K('in', '2' + FN('sin') + X + FN('cos') + X, 'big') }
+           : { from: K('c', FN('cos') + '2' + X) + AT('in', 'c'), to: K('in', '1' + OP('−') + '2' + SUP(FN('sin'), 2) + X, 'big') + LATE(OP('=') + '2' + SUP(FN('cos'), 2) + X + OP('−') + '1') } },
+  red: { num: true,
+         pick(t){
+           const peek = String(t.peek || '').replace(/\s+/g, '');
+           const ok = RED_CASES.map((c, i) => i).filter(i => peek.indexOf(RED_CASES[i].key) < 0);
+           return { i: ok[Math.floor(Math.random() * ok.length)] };
+         },
+         spec: p => { const c = RED_CASES[p.i]; return { from: K('f', FN(c.f)) + K('p1', '(') + K('a', c.a) + K('m', c.m, 'op') + K('x', X) + K('p2', ')') + AT('g', 'f'), to: K('g', c.g, 'big') + K('x', X) }; } },
+  tgctg: { pick: () => ({}),
+           spec: () => ({ from: K('t1', FN('tg') + X) + K('p', '+', 'op') + K('k', MS('a')) + K('c', FN('ctg') + X) + EQK + K('m', ML('b')) + AT('t2', 'c'),
+                          to: K('t1', T_, 'big') + K('p', '+', 'op') + FR(K('k', ML('a')), K('t2', T_, 'big')) + EQK + K('m', ML('b')) + LATE(OP(',') + T_ + OP('=') + FN('tg') + X + OP('≠') + '0') }) },
+  circ: { num: true, pick: t => pickFrom(SEL_DEMOS.circ, t), spec: p => selDemo(SEL_DEMOS.circ[p.i], false) },
+  enum: { num: true, pick: t => pickFrom(SEL_DEMOS.enum, t), spec: p => selDemo(SEL_DEMOS.enum[p.i], true) },
+  ab: { num: true, pick: t => pickFrom(SEL_DEMOS.ab, t), spec: p => selDemo(SEL_DEMOS.ab[p.i], false) },
+  ineq: { num: true, pick: t => pickFrom(INEQ_DEMOS, t),
+          spec: p => { const e = INEQ_DEMOS[p.i];
+            return { from: K('l', e.l) + K('le1', '≤', 'op') + K('a', e.a) + K('n', N) + K('le2', '≤', 'op') + K('r', e.r),
+                     to: K('l', e.lo) + K('le1', '≤', 'op') + K('n', N, 'big') + K('le2', '≤', 'op') + K('r', e.hi) + LATE('<span class="op">' + N + ' = ' + e.n + '</span>') }; } },
+  frac: { pick: () => ({}),
+          spec: () => ({ from: '<span class="dfrac"><span class="dn">' + K('A', ML('A')) + '</span>' + K('bar', '', 'dbar') + '<span class="dn">' + K('B', ML('B')) + '</span></span>' + EQK + K('z', '0'),
+                         to: K('A', ML('A')) + EQK + K('z', '0') + K('cm', ',', 'op') + K('B', ML('B')) + K('ne', '≠', 'op') + K('z2', '0') }) },
+  root: { pick: () => ({}),
+          spec: () => ({ from: K('rt', '√') + K('A', ML('A')) + K('dot', '·', 'op') + K('B', ML('B')) + EQK + K('z', '0'),
+                         to: K('A', ML('A')) + EQK + K('z', '0') + K('or', 'или', 'op') + K('B', ML('B')) + K('eq2', '=', 'op') + K('z2', '0') + LATE(OP(',') + ML('A') + OP('≥') + '0') }) },
+  expo: { pick: () => ({}),
+          spec: () => ({ from: K('a', SUP(ML('a'), FN('cos') + X)) + K('p', '+', 'op') + K('b', SUP(ML('a'), '−' + FN('cos') + X)) + EQK + K('r', ML('c')) + AT('t1', 'a') + AT('t2', 'b'),
+                         to: K('t1', T_, 'big') + K('p', '+', 'op') + K('t2', SFR(1, T_), 'big') + EQK + K('r', ML('c')) + LATE(OP(',') + T_ + OP('=') + SUP(ML('a'), FN('cos') + X) + OP('>') + '0') }) },
+};
+function showItemsFor(t){
+  const D = TRIG_SHOW[t.pid];
+  return D ? [{ pid: t.pid, p: D.pick(t) }] : [];
+}
+function showView(it){
+  const tile = tileById(it.pid), g = BANK.groupById(tile.group), F = FORMULA[it.pid] || { f: '' }, D = TRIG_SHOW[it.pid];
+  return {
+    tag: g.title, color: g.color, title: tile.title,
+    formula: D.num ? F.f : '',
+    spec: D.spec(it.p || {}),
+    cap: D.num ? 'пример на других числах' : 'общий вид',
+  };
+}
+let showCtl = null, shownSig = null;
+function openShow(){
+  if (!S.task || !TRIG_SHOW[S.task.pid]) return;
+  S.show = { key: S.task.key, items: showItemsFor(S.task), start: 0, n: 0 };
+  render();
+}
+// S.show — общий в сессии (как раскрытое решение); n — номер прохода,
+// чтобы и «ещё раз» было изменением состояния
+const showSet = patch => { S.show = Object.assign({}, S.show, patch, { n: (S.show.n || 0) + 1 }); render(); };
+function renderShow(){
+  const st = S.show;
+  const ok = !!(st && S.task && st.key === S.task.key && S.mode === 'practice' && S.screen === 'task');
+  const can = !!(S.task && TRIG_SHOW[S.task.pid]);
+  els.propShowBtn.style.display = S.mode === 'practice' && can ? 'inline-flex' : 'none';
+  els.propShowBtn.classList.toggle('on', ok);
+  els.propShowBtn.textContent = ok ? 'Скрыть формулу' : '▶ Показать формулу';
+  if (!ok){
+    if (showCtl) { showCtl.stop(); showCtl = null; }
+    shownSig = null;
+    if (els.propShow.style.display !== 'none') { els.propShow.style.display = 'none'; els.propShow.innerHTML = ''; }
+    return;
+  }
+  const sig = JSON.stringify(st);
+  if (sig === shownSig && showCtl) return;     // render() зовут часто — проход не перезапускаем
+  shownSig = sig;
+  els.propShow.style.display = 'block';
+  const num = st.items.some(it => TRIG_SHOW[it.pid] && TRIG_SHOW[it.pid].num);
+  showCtl = window.TileDemo.showcase(els.propShow, {
+    items: st.items.map(showView),
+    start: st.start || 0,
+    label: 'Формула',
+    reroll: num,
+    on: {
+      close: guard('showSolution', () => { S.show = null; render(); }),
+      pick: guard('showSolution', i => showSet({ start: i })),
+      reroll: guard('showSolution', () => showSet({ items: showItemsFor(S.task), start: 0 })),
+      replay: guard('showSolution', () => showSet({ start: 0 })),
+    },
+  });
+}
 
 /* ═══════════════ плашки и плитки ═══════════════
    Сколько клеток нужно плитке «вперемешку», чтобы закрыть последний ряд
@@ -1550,12 +1817,23 @@ function newTask(){
   S.screen = 'task';
   drawTask(BANK.generate(S.props), true);
 }
+/* «⟳ Обновить задание» (промпт №14 «логарифмы и тригонометрия»): другое уравнение ТОГО ЖЕ типа (плитки),
+   что на экране, — и в смешанной тренировке тоже: ⟳ — это «другой пример
+   такого же», а не «следующее задание вперемешку». Этой же функцией
+   пользуется доска — «ещё такое же» и «Обновить пример». */
+function sameKindTask(t){ return BANK.generate(S.props, null, t ? t.pid : null); }
+function refreshTask(){
+  if (!S.task) return;
+  if (S.screen === 'task') snapshotAndClear('whole', els.workZone);
+  S.screen = 'task';
+  drawTask(sameKindTask(S.task), true);
+}
 /* Нарисовать задание t. fresh — задание новое (сбросить ответ и набрать
    карточки заново); при чужом снимке ответ приходит отдельно. */
 function drawTask(t, fresh){
   S.task = t;
   drawnKey = t.key;
-  if (fresh) freshState(S);
+  if (fresh) { freshState(S); S.show = null; }
   lastFocusedInput = null;
   els.taskTitle.textContent = runTitle(S.props);
   document.title = 'Тригонометрия — ' + runTitle(S.props);
@@ -1597,6 +1875,7 @@ function showPicker(){
 /* ═══════════════ отрисовка ═══════════════ */
 function render(){
   const onTask = S.screen === 'task' && S.task;
+  renderShow();
   document.documentElement.setAttribute('data-screen', onTask ? 'task' : 'picker');
   els.pickerArea.style.display = onTask ? 'none' : 'block';
   els.taskArea.style.display = onTask ? 'block' : 'none';
@@ -1630,7 +1909,7 @@ function render(){
   els.runRow.style.display = (els.runChips.innerHTML || S.mode === 'practice') ? '' : 'none';
   applyMarks(els.trigQuestion, els.answerArea, t, S);
   const hasCards = S.cards.length > 0;
-  els.card1BtnRow.style.display = (hasCards || (S.mode === 'practice' && !S.answered)) ? 'flex' : 'none';
+  els.card1BtnRow.style.display = (hasCards || S.mode === 'practice') ? 'flex' : 'none';
   els.basketInlineBtn.style.display = hasCards ? 'inline-flex' : 'none';
   els.showSolutionBtn.style.display = (S.mode === 'practice' && !S.answered) ? 'inline-flex' : 'none';
   els.showSolutionBtn.textContent = S.sol ? 'Скрыть решение и ответ' : 'Показать решение и ответ';
@@ -1653,13 +1932,19 @@ function render(){
 /* ═══════════════ кнопки ═══════════════ */
 function switchMode(mode){
   S.mode = mode;
-  if (mode !== 'practice') S.sol = false;
+  // в «Экзамене» ни решения, ни анимации формулы
+  if (mode !== 'practice') { S.sol = false; S.show = null; }
   render();
 }
 els.tabPractice.onclick = () => switchMode('practice');
 els.tabExam.onclick = () => switchMode('exam');
 els.refBtn.onclick = () => { refOpen = !refOpen; render(); };
 els.showSolutionBtn.onclick = guard('showSolution', () => { S.sol = !S.sol; render(); });
+els.propShowBtn.onclick = guard('showSolution', () => {
+  if (S.show && S.task && S.show.key === S.task.key) { S.show = null; render(); }
+  else openShow();
+});
+document.getElementById('refreshBtn').onclick = guard('refreshOne', refreshTask);
 els.nextBtn.onclick = guard('switchTask', newTask);
 els.backBtn.onclick = guard('switchTask', showPicker);
 const stepProp = d => { const i = TILE_IDS.indexOf(S.props[0]); startRun([TILE_IDS[(i + d + TILE_IDS.length) % TILE_IDS.length]]); };
@@ -1752,7 +2037,8 @@ function clearCards(){
 function refreshCard(idx){
   if (!S.cards[idx]) return;
   snapshotAndClear('single', cardEl(idx));
-  S.cards[idx] = freshCard(BANK.generate(S.props));
+  // ⟳ у карточки — как у основного задания: тот же тип (промпт №14 «логарифмы и тригонометрия»)
+  S.cards[idx] = freshCard(sameKindTask(S.cards[idx].task));
   const old = cardEl(idx);
   if (old) { old.replaceWith(makeCardEl(S.cards[idx], idx)); syncCard(idx); }
   else renderCards(true);
@@ -1984,6 +2270,7 @@ function tsGetState(){
     trigScreen: S.screen, sel: S.sel.slice(), props: S.props.slice(), curSubMode: S.mode,
     task: S.task, answered: !!S.answered, hadWrong: !!S.hadWrong, correct: !!S.correct,
     marks: S.marks, pick: S.pick == null ? null : S.pick, wrong: S.wrong || [], sol: !!S.sol,
+    show: S.show || null,
     cards: cardsSnapshot(),
     workW: parseFloat(getComputedStyle(els.workZone).width) || null,
     totalSolved, streak, totalErrors,
@@ -2013,6 +2300,7 @@ function tsApplyState(state){
   S.pick = state.pick == null ? null : state.pick;
   S.wrong = state.wrong || [];
   S.sol = !!state.sol;
+  S.show = state.show && state.show.key === state.task.key ? state.show : null;
   if (typeof state.workW === 'number' && state.workW > 0) els.workZone.style.setProperty('--work-w', clampWorkW(state.workW) + 'px');
   const incoming = (state.cards || []).filter(c => c && c.task && c.task.key).map(c => ({
     task: c.task, answered: !!c.answered, hadWrong: !!c.hadWrong, correct: !!c.correct,
@@ -2028,7 +2316,7 @@ function tsApplyState(state){
 }
 function tsWatchSig(s){
   return JSON.stringify([s.trigScreen, s.sel, s.props, s.curSubMode, s.task ? s.task.key : null,
-    s.answered, s.hadWrong, s.correct, s.marks, s.pick, s.wrong, s.sol,
+    s.answered, s.hadWrong, s.correct, s.marks, s.pick, s.wrong, s.sol, s.show || null,
     (s.cards || []).map(c => [c.task.key, c.answered, c.hadWrong, c.correct, c.marks, c.pick, c.wrong, c.sol]), s.workW]);
 }
 let tsPeerSig = null;
@@ -2051,19 +2339,26 @@ function tsApplyStateFromPeer(state){
 /* Мост для «ещё такое же» на доске (boards-core.js, genNewTaskInFrame):
    невидимый кадр доски получает тренировку и просит новое задание. */
 window.__trainerState = {
-  get(){ return { trigScreen: 'task', props: S.props.slice(), curSubMode: S.mode }; },
+  // Промпт №14 «логарифмы и тригонометрия»: в снимке — тип (плитка) того задания, которое кладут на
+  // доску (cardIdx — карточка «+»): «ещё такое же» из смешанной тренировки
+  // раньше выпадало любым типом из тренировки, а не тем же
+  get(cardIdx){
+    const t = cardIdx >= 0 && S.cards[cardIdx] ? S.cards[cardIdx].task : S.task;
+    return { trigScreen: 'task', props: S.props.slice(), pid: t ? t.pid : null, curSubMode: S.mode };
+  },
   apply(s){
     if (!s || !Array.isArray(s.props)) return;
-    const props = normProps(s.props);
+    const props = normProps(s.props), pid = s.pid && props.indexOf(s.pid) >= 0 ? s.pid : null;
     if (!props.length) return;
-    const same = S.screen === 'task' && S.task && runKey(S.props) === runKey(props);
+    const same = S.screen === 'task' && S.task && runKey(S.props) === runKey(props) && (!pid || S.task.pid === pid);
     S.props = props;
     ensureProg();
     // доска перестраивает задание под новую ширину (промпт №70): ей нужен
     // открытый экран задания, с экрана плиток узла задания просто нет
-    if (!same) { S.screen = 'task'; drawTask(BANK.generate(props), true); }
+    if (!same) { S.screen = 'task'; drawTask(BANK.generate(props, null, pid), true); }
   },
-  newTask(){ S.screen = 'task'; drawTask(BANK.generate(S.props), true); },
+  // новое задание — того же типа, что на экране (как ⟳)
+  newTask(){ S.screen = 'task'; drawTask(sameKindTask(S.task), true); },
 };
 
 if (window.TrainerSession) {
