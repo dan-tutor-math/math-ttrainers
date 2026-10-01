@@ -1,0 +1,173 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   tile-demo.css — экран выбора плитками с примером (стандарт платформы,
+   HANDOFF раздел 4 «Плитки с примером»). Вынесено из logarithms.html, когда
+   появился второй тренажёр на этих плитках (тригонометрические уравнения):
+   чтобы время анимации, подъём при наведении и правила «уменьшить
+   движение» не расходились между страницами.
+
+   Здесь только то, что одинаково у всех: плитка, метка группы, отметка,
+   полоса примера и её анимация, плитка «вперемешку», панель «Начать».
+   Сетку (сколько колонок, высота ряда, размеры плиток) задаёт страница —
+   она подбирается под набор плиток так, чтобы не было дыр. На телефоне
+   сетка одна для всех — одна колонка, высота по содержимому.
+   ═══════════════════════════════════════════════════════════════════════ */
+/* ═══════════════ экран плиток ═══════════════
+   Плитки на всю ширину окна (до 1320px), как у «Процентов»: .wrap на экране
+   выбора расширяется — класс ставит render(). */
+html[data-screen="picker"] .wrap{max-width:1320px}
+
+.tile{--acc:#2E7DE0;--acc-soft:rgba(46,125,224,.14);position:relative;display:flex;flex-direction:column;text-align:left;grid-column:span 2;
+  font-family:var(--font-ui);color:var(--pencil);cursor:pointer;min-width:0;overflow:hidden;
+  /* без backdrop-filter: размытие фона пересчитывалось бы при каждом подъёме
+     плитки — на слабом ноутбуке это заметно (так же у «Процентов») */
+  background:var(--card);border:1px solid var(--glass-border);border-radius:22px;
+  box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:13px 16px 14px;
+  transition:transform .28s cubic-bezier(.2,.9,.3,1.25), box-shadow .28s ease, border-color .2s ease, background-color .2s ease;
+  -webkit-user-select:none;user-select:none}
+.tile.l{grid-row:span 2;padding:18px 22px 20px}
+.tile::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:radial-gradient(120% 90% at 100% 0%,var(--acc-soft) 0%,transparent 58%);opacity:.55;transition:opacity .3s}
+/* «блик» — полоса света пробегает по плитке при наведении; transform, а не
+   background-position: сдвиг слоя не перерисовывает плитку */
+.tile::after{content:'';position:absolute;top:-20%;bottom:-20%;left:0;width:40%;pointer-events:none;
+  background:linear-gradient(100deg,transparent 0%,rgba(255,255,255,.5) 50%,transparent 100%);
+  transform:translateX(-160%) skewX(-12deg);opacity:0}
+html[data-theme="dark"] .tile::after{background:linear-gradient(100deg,transparent 0%,rgba(255,255,255,.12) 50%,transparent 100%)}
+.tile:hover,.tile:focus-visible{transform:translateY(-6px) scale(1.012);border-color:var(--acc);outline:none;
+  box-shadow:inset 0 1px 0 var(--glass-inset), 0 0 0 1px var(--acc), 0 20px 44px -14px var(--acc), 0 10px 34px rgba(20,30,60,.10)}
+html[data-theme="dark"] .tile:hover{box-shadow:inset 0 1px 0 var(--glass-inset), 0 0 0 1px var(--acc), 0 20px 48px -12px var(--acc), 0 10px 40px rgba(0,0,0,.55)}
+.tile:hover::before,.tile:focus-visible::before{opacity:1}
+.tile:hover::after{opacity:1;transform:translateX(360%) skewX(-12deg);transition:transform 1s cubic-bezier(.3,.6,.3,1),opacity .2s}
+.tile:active{transform:translateY(-2px) scale(.985);transition-duration:.12s}
+/* выбранная плитка: рамка цветом группы, подложка и галочка */
+.tile.sel{border-color:var(--acc);background-color:var(--card);box-shadow:inset 0 0 0 1.5px var(--acc), inset 0 1px 0 var(--glass-inset), 0 14px 34px -16px var(--acc)}
+.tile.sel::before{opacity:1;background:radial-gradient(130% 110% at 100% 0%,var(--acc-soft) 0%,transparent 70%)}
+.tile-top{display:flex;align-items:center;gap:8px;position:relative;z-index:1;min-height:24px}
+.tile-tag{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--acc);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.tile-tag::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--acc)}
+.tile-badges{display:inline-flex;align-items:center;gap:6px;margin-left:auto}
+.tile-done{font-size:11.5px;font-weight:600;color:var(--ok);white-space:nowrap}
+.tile-lvl{font-size:11px;font-weight:700;color:var(--acc);background:var(--acc-soft);border-radius:8px;padding:2px 7px;white-space:nowrap}
+.tile-check{flex:none;width:24px;height:24px;border-radius:50%;border:2px solid var(--acc);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:800;transition:background-color .2s}
+.tile-badges + .tile-check{margin-left:2px}
+.tile-check::after{content:'✓';opacity:0;transform:scale(.3);transition:opacity .18s, transform .3s cubic-bezier(.3,1.6,.5,1)}
+.tile.sel .tile-check{background:var(--acc)}
+.tile.sel .tile-check::after{opacity:1;transform:none}
+.tile-title{position:relative;z-index:1;font-weight:700;font-size:15.5px;line-height:1.25;letter-spacing:-.01em;margin-top:6px}
+.tile.l .tile-title{font-size:20px;margin-top:10px}
+.tile-formula{position:relative;z-index:1;flex:1 1 auto;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  font-size:21px;font-weight:500;color:var(--pencil);white-space:nowrap;transition:transform .35s cubic-bezier(.2,.9,.3,1.3)}
+.tile-formula .f2{font-size:.72em;color:var(--muted-3)}
+.tile.l .tile-formula{font-size:34px;gap:10px}
+.tile.l .tile-formula .f2{font-size:15px;white-space:normal;text-align:center;line-height:1.45;color:var(--muted-2);max-width:340px;font-weight:400}
+.tile:hover .tile-formula{transform:scale(1.04)}
+/* полоса с примером: при наведении пример «разворачивается» по свойству */
+.tile-demo{position:relative;z-index:1;flex:none;height:56px;border-radius:13px;background:var(--acc-soft);overflow:hidden;margin-top:6px}
+.tile.l .tile-demo{height:78px;border-radius:16px}
+.tile-demo::before{content:'пример';position:absolute;left:10px;top:4px;font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--acc);opacity:.75}
+.demo{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:17.5px;font-weight:500;color:var(--pencil);white-space:nowrap}
+.tile.l .demo{font-size:26px}
+/* строка примера — обычная inline-разметка, НЕ flex: у элемента flex-контейнера
+   не работает vertical-align, и индексы log₂ и степени вставали посередине строки */
+.demo-line{position:relative;display:inline-block;white-space:nowrap;padding-top:8px;line-height:1.2}
+.demo-measure{position:absolute;padding-top:0;inset:0;display:flex;align-items:center;justify-content:center;visibility:hidden;pointer-events:none}
+.demo-measure [data-at]{display:none}
+/* line-height у индексов 0 (чтобы не раздувать строку), и без своего
+   line-height токен внутри индекса получал нулевую высоту */
+.demo .t{display:inline-block;transform-origin:0 0;line-height:1.15}
+.demo .t.op{margin:0 .22em}
+.demo .t.big{font-weight:700;color:var(--acc)}
+.demo .late{margin-left:.3em;color:var(--acc);font-weight:600}
+.demo .late .op{margin:0 .22em}
+.demo sup,.demo sub{font-size:.62em;line-height:0}
+.demo sup{vertical-align:.8em}
+.demo sub{vertical-align:-.4em}
+.demo .dfrac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.05;margin:0 .1em}
+.demo .dn{display:block;text-align:center;white-space:nowrap;padding:0 .15em}
+.demo .dbar{display:block;align-self:stretch;height:1.6px;background:currentColor;border-radius:1px;margin:.1em 0}
+.demo .ghost{position:absolute;margin:0;opacity:0;pointer-events:none;white-space:nowrap}
+.demo .ghost.dbar{background:currentColor}
+
+/* Анимация примера — только transform и opacity (их браузер двигает без
+   перерисовки). Исходный стиль токена — КОНЕЧНЫЙ кадр: при «уменьшить
+   движение» и без наведения видна законченная запись. Смещения --dx/--dy
+   и масштаб --s измеряет layoutDemo() по начальной записи примера. */
+/* Время (правка после №12): цикл 4,5 с (было 5,4 — ×1,2 быстрее), пример
+   начинает разворачиваться через 0,45 с после наведения (было 1,3 с —
+   курсор успевал уйти с плитки, и анимацию не замечали). Итог держится
+   дольше — его успевают прочитать. Эти же проценты — стандарт для новых
+   тренажёров (HANDOFF, раздел 4, «Плитки с примером»). */
+@keyframes dmMove{0%,10%{transform:translate(var(--dx,0),var(--dy,0)) scale(var(--s,1))}36%,100%{transform:none}}
+@keyframes dmIn{0%,16%{opacity:0;transform:translateY(6px) scale(.6)}36%,100%{opacity:1;transform:none}}
+@keyframes dmLate{0%,42%{opacity:0;transform:translateX(-6px)}56%,100%{opacity:1;transform:none}}
+@keyframes dmOut{0%,8%{opacity:1;transform:none}26%,100%{opacity:0;transform:translateY(-7px) scale(.7)}}
+@keyframes dmLine{0%{opacity:0}4%,94%{opacity:1}100%{opacity:0}}
+.tile:hover .demo-line,.tile:focus-visible .demo-line{animation:dmLine 4.5s linear infinite}
+.tile:hover .demo .mvk,.tile:focus-visible .demo .mvk{animation:dmMove 4.5s cubic-bezier(.55,.05,.25,1) infinite}
+.tile:hover .demo .ink,.tile:focus-visible .demo .ink{animation:dmIn 4.5s cubic-bezier(.3,.8,.3,1.2) infinite}
+.tile:hover .demo .late,.tile:focus-visible .demo .late{animation:dmLate 4.5s ease-out infinite}
+.tile:hover .demo .ghost,.tile:focus-visible .demo .ghost{animation:dmOut 4.5s ease-in-out infinite}
+/* сенсорный экран: наведения нет — пример идёт сам у плиток на экране */
+@media (hover:none){
+  .tile.live .demo-line{animation:dmLine 4.5s linear infinite}
+  .tile.live .demo .mvk{animation:dmMove 4.5s cubic-bezier(.55,.05,.25,1) infinite}
+  .tile.live .demo .ink{animation:dmIn 4.5s cubic-bezier(.3,.8,.3,1.2) infinite}
+  .tile.live .demo .late{animation:dmLate 4.5s ease-out infinite}
+  .tile.live .demo .ghost{animation:dmOut 4.5s ease-in-out infinite}
+  .tile.live .mix-card{animation-name:mixCycle}
+}
+/* плитки за краем экрана и на скрытом экране выбора — на паузе */
+.tile:not(.live) .demo *,.tile:not(.live) .demo-line,.tile:not(.live) .mix-card{animation-play-state:paused !important}
+
+/* плитка «Все свойства вперемешку» */
+.tile.mix{--acc:#D0457A;--acc-soft:rgba(208,69,122,.14)}
+.tile.mix .tile-formula{font-size:14px;color:var(--muted-2);white-space:normal;text-align:center;font-weight:400;line-height:1.45}
+.mix-deck{position:relative;flex:none;height:56px;margin-top:6px;border-radius:13px;background:var(--acc-soft);overflow:hidden}
+.mix-card{position:absolute;top:14px;height:28px;padding:0 10px;border-radius:9px;background:var(--card);border:1px solid var(--glass-border);box-shadow:0 3px 10px rgba(20,30,60,.08);
+  display:flex;align-items:center;font-size:14px;font-weight:600;white-space:nowrap;color:var(--pencil)}
+.mix-card:nth-child(1){left:6%}
+.mix-card:nth-child(2){left:37%}
+.mix-card:nth-child(3){left:68%}
+.tile.mix:hover .mix-card,.tile.mix:focus-visible .mix-card{animation-name:mixCycle}
+.mix-card{animation:none 3s cubic-bezier(.5,.1,.3,1) infinite}
+.mix-card:nth-child(2){animation-delay:-1s}
+.mix-card:nth-child(3){animation-delay:-2s}
+@keyframes mixCycle{0%,20%{transform:none}33%,53%{transform:translate(0,-4px) rotate(-3deg)}66%,86%{transform:translate(0,3px) rotate(2deg)}100%{transform:none}}
+
+/* панель «выбрано … Начать» прилипает к низу экрана выбора */
+.pk-bar{position:sticky;bottom:14px;z-index:30;margin:2px auto 0;max-width:760px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  padding:10px 12px 10px 18px;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
+  border:1px solid var(--glass-border);border-radius:18px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);font-family:var(--font-ui)}
+html[data-medals="on"] .pk-bar{bottom:64px}
+.pk-bar-info{flex:1 1 220px;min-width:0;font-size:14px;color:var(--muted-3);line-height:1.35}
+.pk-bar-info b{color:var(--pencil)}
+.pk-bar-info .pk-names{display:block;font-size:12.5px;color:var(--muted-6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pk-bar-clear{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--muted-3);background:none;border:1px solid var(--glass-border);border-radius:12px;padding:10px 12px;cursor:pointer}
+.pk-bar-clear:hover{border-color:var(--ink);color:var(--ink)}
+.pk-bar-go{font-family:var(--font-ui);font-weight:700;font-size:15px;color:#fff;background:var(--ink);border:none;border-radius:13px;padding:11px 22px;cursor:pointer;box-shadow:0 6px 18px var(--hl-35);transition:transform .15s, opacity .15s}
+.pk-bar-go:hover{transform:translateY(-1px)}
+.pk-bar-go:active{transform:scale(.97)}
+.pk-bar-go:disabled{opacity:.45;cursor:default;box-shadow:none;transform:none}
+
+/* «уменьшить движение»: всё стоит в конечном кадре, плитки не прыгают */
+@media (prefers-reduced-motion: reduce){
+  .demo *, .demo-line, .mix-card{animation:none !important}
+  .tile, .tile-formula, .tile-check::after{transition:none !important}
+  .tile:hover, .tile:focus-visible, .tile:active{transform:none}
+  .tile:hover .tile-formula{transform:none}
+  .tile::after{display:none}
+  .tile::before{transition:none}
+}
+
+/* телефон: одна колонка, высота плитки по содержимому */
+@media (max-width:540px){
+  .tiles{grid-template-columns:1fr;grid-auto-rows:auto;gap:10px}
+  .tile,.tile.l{grid-column:auto;grid-row:auto;padding:12px 14px 13px}
+  .tile.l .tile-title{font-size:16px;margin-top:6px}
+  .tile-formula,.tile.l .tile-formula{font-size:19px;margin:10px 0 6px;gap:4px}
+  .tile.l .tile-formula .f2{font-size:13px}
+  .tile.l .tile-demo,.tile-demo,.mix-deck{height:56px}
+  .tile.l .demo{font-size:17.5px}
+  .pk-bar{bottom:10px;padding:9px 10px 9px 14px}
+  .pk-bar-go{padding:10px 16px}
+}

@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#0B0E1A">
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Свойства логарифмов — 10–11 класс</title>
+<title>Тригонометрические уравнения — 10–11 класс</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
@@ -375,7 +375,7 @@ html[data-medals="on"] .board-view-toolbar{bottom:64px;}
 
 /* ═══════════════ математический набор ═══════════════
    Формулы собираются из обычных sub/sup и вертикальной дроби (как в
-   учебнике: числитель над знаменателем), рисует их LOG_BANK.render.
+   учебнике: числитель над знаменателем), рисует их TRIG_BANK.render.
    line-height:0 у индексов — чтобы log₂ и степени не раздували строку. */
 .mx,.log-expr,.log-inline,.step-math,.mcq-btn,.tile-formula,.demo{font-variant-numeric:lining-nums}
 .lg{font-style:normal;white-space:nowrap}
@@ -405,23 +405,146 @@ sub .slot,sup .slot{border-width:1.5px;border-radius:5px;height:1.25em}
 
 /* ═══════════════ экран плиток ═══════════════
    Плитка, пример и их анимация — общие, в tile-demo.css (подключён в
-   конце <head>, после этого <style>). Здесь — вводный текст и сетка
-   этой страницы. */
-.pk-lead{font-family:var(--font-ui);font-size:14px;color:var(--muted-6);text-align:center;margin:-8px auto 18px;max-width:700px;line-height:1.55}
+   конце <head>, после этого <style>). Здесь — плашки-уровни, сетка каждой
+   плашки, рисунки на больших плитках и появление экрана. */
+.pk-lead{font-family:var(--font-ui);font-size:14px;color:var(--muted-6);text-align:center;margin:-8px auto 22px;max-width:720px;line-height:1.55}
 .pk-lead b{color:var(--muted-3);font-weight:600}
-.pk-lead .mx{color:var(--muted-3);font-weight:600;white-space:nowrap}
-/* Сетка: колонки заданы ЯВНО (6 → 4 → 2), а не auto-fill, как у
-   «Процентов». Все плитки здесь двойной ширины и одна 2×2: при нечётном
-   числе колонок в каждом ряду оставалась бы пустая клетка. 24 клетки
-   делятся и на 6, и на 4 — дыр нет ни на широком экране, ни на планшете. */
-.tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:224px;grid-auto-flow:dense;gap:14px;margin-bottom:16px}
-@media (max-width:1180px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}}
-@media (max-width:760px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
+/* плашка-уровень: номер, название, что в ней. Уровни идут сверху вниз по
+   сложности — это и есть разделение по уровням, отдельных А/Б/В внутри
+   плиток нет */
+.lvl{margin:0 0 26px}
+.lvl-head{--acc:#2E7DE0;display:flex;align-items:center;gap:14px;margin:0 2px 12px;font-family:var(--font-ui)}
+.lvl-num{flex:none;width:42px;height:42px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:19px;color:#fff;
+  background:linear-gradient(135deg,var(--acc),color-mix(in srgb,var(--acc) 55%,#fff));box-shadow:0 8px 20px -8px var(--acc)}
+.lvl-text{flex:1;min-width:0}
+.lvl-title{font-weight:700;font-size:19px;letter-spacing:-.01em;color:var(--pencil);line-height:1.2}
+.lvl-lead{font-size:13.5px;color:var(--muted-6);margin-top:2px;line-height:1.35}
+.lvl-steps{display:flex;gap:4px;flex:none}
+.lvl-steps i{width:18px;height:6px;border-radius:3px;background:var(--glass-border);border:1px solid rgba(142,142,147,.35)}
+.lvl-steps i.on{background:var(--acc);border-color:var(--acc)}
+/* линия-«лестница» слева от плашек: уровни — ступени одного пути */
+.lvl-head::after{content:'';flex:0 0 60px;height:1px;background:linear-gradient(90deg,var(--acc),transparent);opacity:.5}
 
+/* Сетка каждой плашки: явные 6 → 4 → 2 колонки, плитки 2×1 и большие 2×2
+   (.l). Плитка «вперемешку» замыкает плашку и тянется на остаток ряда:
+   сколько клеток ей нужно, зависит от числа колонок — --s6 и --s4 ставит
+   страница по набору плиток плашки, так что дыр нет ни на широком экране,
+   ни на планшете (тест это проверяет). */
+.tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));grid-auto-rows:224px;grid-auto-flow:dense;gap:14px}
+.tile.mix{grid-column:span var(--s6,2)}
+@media (max-width:1180px){.tiles{grid-template-columns:repeat(4,minmax(0,1fr))}.tile.mix{grid-column:span var(--s4,2)}}
+@media (max-width:760px){.tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.tile.mix{grid-column:span 2}}
+
+/* текст формулы на плитке: пояснение мельче и переносится */
+.tile-formula .f2{white-space:normal;text-align:center;line-height:1.4;max-width:100%}
+.tile-formula .f1{white-space:nowrap}
+.tile.l .tile-formula{flex:0 0 auto;margin:10px 0 4px}
+.tile.l .tile-formula .f1{font-size:27px}
+.tile.l .tile-formula .f1.sm{font-size:21px}
+/* в строке примера функция стоит отдельной частью — отступ до x */
+.demo .fn{margin-right:.16em}
+
+/* рисунок на большой плитке (окружность, числовая прямая) — SVG, цвета из
+   переменных, анимируются только transform и opacity, исходный стиль —
+   законченный рисунок, как у примера */
+.viz{position:relative;z-index:1;flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;margin:2px 0 6px}
+.viz svg{height:100%;max-height:190px;width:auto;max-width:100%;overflow:visible}
+.viz .ax{stroke:var(--muted-1);stroke-width:1;opacity:.55}
+.viz .ring{fill:none;stroke:var(--muted-2);stroke-width:1.6;opacity:.8}
+.viz .cut{stroke:var(--acc);stroke-width:1.8;stroke-dasharray:5 4}
+.viz .ray{stroke:var(--acc);stroke-width:2.2;stroke-linecap:round}
+.viz .pt{fill:var(--acc);stroke:var(--card);stroke-width:2}
+.viz .pt.off{fill:var(--card);stroke:var(--muted-1);stroke-width:1.6}
+.viz .arcseg{fill:none;stroke:var(--acc);stroke-width:6;stroke-linecap:round;opacity:.35}
+.viz .lbl{fill:var(--muted-3);font:600 12px var(--font-ui)}
+.viz .lbl.acc{fill:var(--acc);font-weight:700}
+.viz .lbl.i{font-family:'Times New Roman',Georgia,serif;font-style:italic;font-size:14px}
+.viz .band{fill:var(--acc);opacity:.13}
+.viz .cross{stroke:var(--teacher);stroke-width:2;stroke-linecap:round}
+.viz .anim,.viz .pulse,.viz .spin,.viz .fade{transform-box:view-box}
+
+/* время рисунка — то же, что у примера (цикл 4,5 с, старт через 0,45 с):
+   луч поворачивается, пока пример переезжает, точки вспыхивают к итогу */
+@keyframes vzSpin{0%,10%{transform:rotate(0deg)}36%,100%{transform:rotate(var(--ang,0deg))}}
+@keyframes vzPulse{0%,30%{opacity:0;transform:scale(.2)}44%{opacity:1;transform:scale(1.5)}56%,100%{opacity:1;transform:scale(1)}}
+@keyframes vzFade{0%,12%{opacity:0}34%,100%{opacity:1}}
+@keyframes vzSlide{0%,10%{transform:translateX(var(--from,0px))}36%,100%{transform:none}}
+.viz .spin{transform:rotate(var(--ang,0deg))}
+.tile:hover .viz .spin,.tile:focus-visible .viz .spin{animation:vzSpin 4.5s cubic-bezier(.55,.05,.25,1) infinite}
+.tile:hover .viz .pulse,.tile:focus-visible .viz .pulse{animation:vzPulse 4.5s cubic-bezier(.3,.8,.3,1.2) infinite}
+.tile:hover .viz .fade,.tile:focus-visible .viz .fade{animation:vzFade 4.5s ease-out infinite}
+.tile:hover .viz .slide,.tile:focus-visible .viz .slide{animation:vzSlide 4.5s cubic-bezier(.55,.05,.25,1) infinite}
+@media (hover:none){
+  .tile.live .viz .spin{animation:vzSpin 4.5s cubic-bezier(.55,.05,.25,1) infinite}
+  .tile.live .viz .pulse{animation:vzPulse 4.5s cubic-bezier(.3,.8,.3,1.2) infinite}
+  .tile.live .viz .fade{animation:vzFade 4.5s ease-out infinite}
+  .tile.live .viz .slide{animation:vzSlide 4.5s cubic-bezier(.55,.05,.25,1) infinite}
+}
+.tile:not(.live) .viz *{animation-play-state:paused !important}
+
+/* плитка «вперемешку» во всю ширину ряда: колода раскладывается шире */
+.tile.mix .tile-formula{font-size:13.5px}
+.mix-card .mx{font-size:14px}
+.tile.mix.wide .mix-card:nth-child(1){left:4%}
+.tile.mix.wide .mix-card:nth-child(2){left:36%}
+.tile.mix.wide .mix-card:nth-child(3){left:68%}
+
+/* появление экрана выбора: плашки и плитки выезжают по очереди. fill-mode
+   backwards — после появления анимация ничего не держит, и подъём плитки
+   при наведении (transform) работает как обычно */
+@keyframes tileIn{from{opacity:0;transform:translateY(18px) scale(.965)}to{opacity:1;transform:none}}
+@keyframes headIn{from{opacity:0;transform:translateX(-14px)}to{opacity:1;transform:none}}
+#levels.enter .tile{animation:tileIn .56s cubic-bezier(.2,.9,.3,1.12) backwards;animation-delay:calc(var(--d,0) * 38ms)}
+#levels.enter .lvl-head{animation:headIn .5s cubic-bezier(.2,.9,.3,1) backwards;animation-delay:calc(var(--d,0) * 38ms)}
+/* переход к заданию: панели выезжают снизу одна за другой */
+#taskArea.enter .panel,#taskArea.enter .run-row,#taskArea.enter .submode-row{animation:revealUp .42s cubic-bezier(.22,.9,.35,1) backwards}
+#taskArea.enter .submode-row{animation-delay:.05s}
+#taskArea.enter #questionPanel{animation-delay:.1s}
+
+@media (prefers-reduced-motion: reduce){
+  .viz *{animation:none !important}
+  #levels.enter .tile,#levels.enter .lvl-head,#taskArea.enter *{animation:none !important}
+}
+@media (max-width:540px){
+  /* одна колонка: «вперемешку» тоже в одну клетку — со span 2 сетка
+     достраивала бы невидимую вторую колонку и всё сужалось вдвое */
+  .tile.mix{grid-column:auto}
+  .lvl-head::after{display:none}
+  .lvl-steps{display:none}
+  .viz{height:150px;flex:none}
+  .tile.l .tile-formula .f1{font-size:21px}
+}
+
+/* ═══════════════ набор тригонометрии ═══════════════ */
+.fn{font-style:normal;white-space:nowrap;margin-right:.12em}
+.fn sup{font-size:.64em;line-height:0;vertical-align:.72em;margin-left:1px}
+.mn{white-space:nowrap}
+.mo.neg{margin:0 .08em 0 0}
+.mo.pm{margin:0 .12em 0 0}
+.alt{white-space:nowrap}
+.alt sup{font-size:.64em;line-height:0;vertical-align:.72em;margin-left:1px}
+.seg{white-space:nowrap}
+.seg .mo{margin:0 .2em 0 .05em}
+/* серия — своей строкой: несколько серий в варианте ответа идут столбиком */
+.ser{display:block;white-space:nowrap;line-height:2.05}
+.ser.roots{white-space:normal}
+.ser.none{font-family:var(--font-ui);font-weight:500}
+.mcq-options{flex-direction:column;align-items:stretch;max-width:520px;margin-left:auto;margin-right:auto}
+.mcq-btn{text-align:left;padding:8px 18px;font-size:18px}
+.sol-answer .mx{display:inline-block;vertical-align:middle}
+.sol-answer .ser{display:block}
+/* в строке решения серия переносится по знакам — на телефоне без прокрутки вбок */
+.sol-step .mx .ser{display:inline;line-height:inherit;white-space:normal}
+.sol-step .mx .ser + .ser::before{content:';';margin:0 .4em 0 .05em}
+.log-expr .frac .num,.log-expr .frac .den{padding-left:.3em;padding-right:.3em}
+
+/* «Тригонометрические» — длинное слово: на самом узком телефоне при
+   обычном размере оно залезало под кнопки в углах */
+@media (max-width:360px){h1{font-size:18px}}
 /* на узком экране квадратные кнопки в углах наезжали бы на заголовок */
 @media (max-width:620px){
-  /* заголовок «Свойства логарифмов» длинный — и на экране задания ему нужна
+  /* заголовок «Тригонометрические уравнения» длинный — и на экране задания ему нужна
      своя строка под кнопками */
   body{padding-top:64px}
   /* справа под строкой кнопок — ещё кнопки доски и подсказок (до ~150px):
@@ -616,15 +739,15 @@ html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!impo
 
 
 <div class="wrap">
-  <h1 id="pageTitle">Свойства логарифмов</h1>
-  <div class="sub" id="pageSub">10–11 класс · выбери свойства для тренировки</div>
+  <h1 id="pageTitle">Тригонометрические уравнения</h1>
+  <div class="sub" id="pageSub">10–11 класс · от простейших до №14 ЕГЭ</div>
 
-  <!-- экран выбора: каждое свойство — плитка с формулой и примером. Плитки
-       выбираются (одна или несколько), «Начать» открывает тренажёр по
-       выбранным; плитка «Все свойства вперемешку» — сразу итоговая отработка -->
+  <!-- экран выбора: плашки-уровни сверху вниз по сложности, в каждой —
+       плитки типов уравнений (одну или несколько можно отметить и «Начать»)
+       и плитка «вперемешку» на весь уровень -->
   <div id="pickerArea">
-    <div class="pk-lead">Выбери одно свойство или несколько — задания пойдут вперемешку. Уровни: <b>А</b> — прямое применение, <b>Б</b> — дроби, корни и «спрятанные» степени, <b>В</b> — свойство несколько раз и в обратную сторону. Везде <span class="mx" id="pkCond"></span>.</div>
-    <div class="tiles" id="tiles"></div>
+    <div class="pk-lead">Пять уровней — от <b>sin x = a</b> до уравнений второй части ЕГЭ. Отметь один или несколько типов (можно из разных уровней) — задания пойдут вперемешку, или возьми уровень целиком.</div>
+    <div id="levels"></div>
     <div class="pk-bar" id="pkBar">
       <div class="pk-bar-info" id="pkBarInfo"></div>
       <button class="pk-bar-clear" id="pkClear" type="button">Сбросить</button>
@@ -635,9 +758,9 @@ html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!impo
   <div id="taskArea" style="display:none">
     <div class="task-head">
       <div class="type-nav">
-        <button class="back-btn" id="backBtn">← все свойства</button>
-        <button class="type-nav-btn" id="prevProtoBtn" title="Предыдущее свойство">◀ Предыдущее</button>
-        <button class="type-nav-btn" id="nextProtoBtn" title="Следующее свойство">Следующее ▶</button>
+        <button class="back-btn" id="backBtn">← все типы</button>
+        <button class="type-nav-btn" id="prevProtoBtn" title="Предыдущий тип">◀ Предыдущий</button>
+        <button class="type-nav-btn" id="nextProtoBtn" title="Следующий тип">Следующий ▶</button>
       </div>
       <div class="corner">
         <div class="task-title" id="taskTitle"></div>
@@ -646,23 +769,13 @@ html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!impo
       </div>
     </div>
 
-    <!-- какие свойства в этой тренировке и шпаргалка с их формулами
+    <!-- какие типы в этой тренировке и шпаргалка с их формулами
          (шпаргалка только в «Тренировке» — в «Экзамене» её нет) -->
     <div class="run-row" id="runRow">
       <span id="runChips"></span>
       <button class="ref-btn" id="refBtn" type="button">📘 Формулы</button>
     </div>
     <div class="prop-ref" id="propRef" style="display:none"></div>
-
-    <!-- уровни А/Б/В: после трёх верных ответов открывается следующий, но
-         перейти на любой можно и вручную -->
-    <div class="level-row levels" id="levelRow">
-      <span class="level-label">Уровень</span>
-      <button class="lvl-chip" data-lvl="1">А</button>
-      <button class="lvl-chip" data-lvl="2">Б</button>
-      <button class="lvl-chip" data-lvl="3">В</button>
-      <span class="level-note" id="levelNote"></span>
-    </div>
 
     <div class="submode-row">
       <div class="submode-tabs">
@@ -677,16 +790,15 @@ html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!impo
       <div class="tasks-columns" id="tasksColumns">
         <div id="card1Wrapper">
           <div class="panel" id="questionPanel">
-            <!-- #logQuestion — ровно то, что уходит «В подборку» и снимается на
-                 доску (TRAINER_CAPTURE.logarithms в boards-core.js): условие и
-                 варианты выбора, без полей ответа и кнопок -->
-            <div id="logQuestion"></div>
+            <!-- #trigQuestion — ровно то, что уходит «В подборку» и снимается на
+                 доску (TRAINER_CAPTURE.trig_equations в boards-core.js):
+                 условие и варианты выбора, без полей ответа и кнопок -->
+            <div id="trigQuestion"></div>
             <div class="answer-area" id="answerArea"></div>
             <div class="card-btn-row" id="card1BtnRow" style="display:none">
               <button class="soft-btn icon-only" id="basketInlineBtn" title="В подборку">📥</button>
               <button class="soft-btn" id="showSolutionBtn" style="display:none">Показать решение и ответ</button>
             </div>
-            <div class="level-up" id="levelUp" style="display:none"></div>
           </div>
 
           <div class="panel" id="mainPanel" style="display:none">
@@ -747,67 +859,66 @@ html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!impo
 <script src="jspdf.umd.min.js"></script>
 <script src="lesson-history.js"></script>
 <script src="tile-demo.js"></script>
-<script src="logarithms-bank.js"></script>
+<script src="trig-bank.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════
-   Свойства логарифмов (10–11 класс) — промпт №12 нового списка.
+   Тригонометрические уравнения (10–11 класс) — промпт №13 нового списка.
 
-   Одна страница, два экрана, как у «Процентов» (percent.html): плитки
-   свойств (#pickerArea) и сам тренажёр (#taskArea). Отличие от «Процентов»:
-   плитка не открывает тренажёр сразу, а ВЫБИРАЕТСЯ — можно отметить одно
-   свойство или несколько, и «Начать» даёт задания вперемешку по всем
-   выбранным. Набор выбранных свойств называется здесь «тренировкой»
-   (S.props); уровень, медали и история ведутся по тренировке, число
-   решённых на плитке — по свойству.
+   Устроен как «Свойства логарифмов» (logarithms.html): одна страница, два
+   экрана — плитки типов (#pickerArea) и тренажёр (#taskArea). Отличие:
+   плитки разложены по ПЛАШКАМ-уровням (простейшие → составной аргумент →
+   сводятся к простейшим → отбор корней → №14 ЕГЭ), внутри плашки плитки
+   разного размера, у каждой плашки своя плитка «вперемешку». Отдельных
+   уровней А/Б/В внутри плитки нет — уровень задаёт плашка.
 
-   Скелет (доска, клавиатура, карточки «+», медали, история, конспект урока,
-   мост сессии) взят с «Процентов» без изменений в поведении; калькулятора
-   в столбик нет — в 10–11 классе он здесь не нужен. Задания придумывает
-   logarithms-bank.js, страница не знает ни одной формулы решения.
+   Плитку можно отметить (одну или несколько, из разных плашек), «Начать»
+   даёт задания вперемешку по отмеченным. Скелет (доска, клавиатура,
+   карточки «+», медали, история, конспект урока, мост сессии) — с
+   логарифмов без изменений в поведении. Задания придумывает
+   trig-bank.js, страница не знает ни одной формулы решения.
    ═══════════════════════════════════════════════════════════════════════ */
-const SLUG = 'logarithms';          // имя файла = слаг тренажёра в сессии и на доске
-const BANK = window.LOG_BANK;
-const PROPS = BANK.props, LV = BANK.LEVELS, R = BANK.render;
-const PROP_IDS = PROPS.map(p => p.id);
-// заметки доски приклеены к заданию, кнопки под ними нажимаются — как в ЕГЭ
-// базе после промпта №60 и в «Процентах»
+const SLUG = 'trig_equations';      // имя файла = слаг тренажёра в сессии и на доске
+const BANK = window.TRIG_BANK;
+const TILES = BANK.tiles, LEVELS = BANK.levels, R = BANK.render;
+const TILE_IDS = TILES.map(t => t.id);
 document.documentElement.setAttribute('data-board-pinned', '');
 
-const propById = id => BANK.propById(id) || PROPS[0];
-const accOf = id => BANK.groupById(propById(id).group).color;
+const tileById = id => BANK.tileById(id) || TILES[0];
+const accOf = id => BANK.groupById(tileById(id).group).color;
+const LVL_COLOR = ['#2E7DE0', '#1B98B8', '#16A34A', '#0891B2', '#BE123C'];
 function hexA(hex, a){
   const n = parseInt(hex.slice(1), 16);
   return 'rgba(' + (n >> 16 & 255) + ',' + (n >> 8 & 255) + ',' + (n & 255) + ',' + a + ')';
 }
 function esc(s){ return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-// набор свойств всегда в порядке плиток: иначе «prod,quot» и «quot,prod»
-// были бы двумя разными тренировками со своим прогрессом
-const normProps = arr => PROP_IDS.filter(id => (arr || []).indexOf(id) >= 0);
-const runKey = props => props.length === PROP_IDS.length ? 'all' : props.join(',');
-const isAll = props => props.length === PROP_IDS.length;
+// набор типов всегда в порядке плиток: иначе «sin,cos» и «cos,sin» были бы
+// двумя разными тренировками со своим прогрессом
+const normProps = arr => TILE_IDS.filter(id => (arr || []).indexOf(id) >= 0);
+const levelIds = lvl => TILES.filter(t => t.lvl === lvl).map(t => t.id);
+// тренировка ровно из всех плиток одной плашки — это её «вперемешку»
+function levelOfRun(props){
+  const l = tileById(props[0]).lvl, ids = levelIds(l);
+  return props.length === ids.length && props.every(id => tileById(id).lvl === l) ? l : 0;
+}
+const runKey = props => { const l = props.length > 1 ? levelOfRun(props) : 0; return l ? 'lvl' + l : props.join(','); };
 function plural(n, one, few, many){ const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? one : (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many); }
 function runTitle(props){
-  if (props.length === 1) return propById(props[0]).title;
-  if (isAll(props)) return 'Все свойства вперемешку';
-  return 'Вперемешку: ' + props.length + ' ' + plural(props.length, 'свойство', 'свойства', 'свойств');
+  if (props.length === 1) return tileById(props[0]).title;
+  const l = levelOfRun(props);
+  if (l) return 'Уровень ' + l + ' вперемешку';
+  return 'Вперемешку: ' + props.length + ' ' + plural(props.length, 'тип', 'типа', 'типов');
 }
 
 /* ═══════════════ прогресс ═══════════════
    Всё под ключами ogeProg: — их стирает кнопка сброса прогресса на главной.
-   По тренировке: текущий уровень, верных подряд на нём (3 — следующий
-   уровень), до какого дошли, сколько решено. По свойству — сколько задач
-   на него решено (число на плитке, в какой бы тренировке ни решали). */
-const LVL_KEY = 'ogeProg:' + SLUG + ':levels';
+   По тренировке — сколько решено (число на плитке «вперемешку»), по типу —
+   сколько задач этого типа решено в любых тренировках (число на плитке). */
+const RUNS_KEY = 'ogeProg:' + SLUG + ':runs';
 const SOLVED_KEY = 'ogeProg:' + SLUG + ':solved';
-const LEVEL_UP_AT = 3;
-let levelProg = {}, solvedByProp = {};
-try { levelProg = JSON.parse(localStorage.getItem(LVL_KEY) || '{}') || {}; } catch (e) { levelProg = {}; }
+let runProg = {}, solvedByProp = {};
+try { runProg = JSON.parse(localStorage.getItem(RUNS_KEY) || '{}') || {}; } catch (e) { runProg = {}; }
 try { solvedByProp = JSON.parse(localStorage.getItem(SOLVED_KEY) || '{}') || {}; } catch (e) { solvedByProp = {}; }
-function progOf(key){ return Object.assign({ lvl: 1, cnt: 0, max: 1, solved: 0 }, levelProg[key] || {}); }
-function saveLevelProg(key, p){
-  levelProg[key] = p;
-  try { localStorage.setItem(LVL_KEY, JSON.stringify(levelProg)); } catch (e) {}
-}
+const runSolved = key => (runProg[key] && runProg[key].solved) || 0;
 
 /* медали и история решённого — по тренировке */
 const PROGRESS_NS = 'ogeProg:' + SLUG + ':p:';
@@ -837,13 +948,10 @@ const MEDAL_TITLE = { gold: 'Золото — пять примеров без �
 /* ═══════════════ состояние ═══════════════ */
 const S = {
   screen: 'picker',          // 'picker' — плитки, 'task' — тренажёр
-  sel: [],                   // отмеченные на экране плиток свойства
-  props: [PROP_IDS[0]],      // тренировка: по каким свойствам идут задания
-  lvl: 1,                    // уровень, на котором генерируются задания
-  lvlCnt: 0,                 // верных подряд на этом уровне (до LEVEL_UP_AT)
-  lvlUp: false,              // уровень пройден — следующее задание будет на уровень выше
+  sel: [],                   // отмеченные на экране плиток типы
+  props: [TILE_IDS[0]],      // тренировка: по каким типам идут задания
   mode: 'practice',          // 'practice' — Тренировка, 'exam' — Экзамен
-  task: null,                // объект задания из logarithms-bank.js (данные, без функций)
+  task: null,                // объект задания из trig-bank.js (данные, без функций)
   answered: false, hadWrong: false, correct: false,
   marks: {},                 // id поля → 'good' | 'bad' | 'fixed'
   pick: null, wrong: [],     // выбор варианта: последний выбранный и неверные
@@ -856,8 +964,8 @@ let drawnKey = null;           // задание, которое сейчас н
 let refOpen = false;           // шпаргалка с формулами раскрыта
 
 const els = {};
-['pickerArea','tiles','pkBar','pkBarInfo','pkClear','pkStart','pkCond','taskArea','backBtn','prevProtoBtn','nextProtoBtn','taskTitle','pageTitle','pageSub',
- 'runRow','runChips','refBtn','propRef','levelRow','levelNote','questionPanel','logQuestion','answerArea','card1BtnRow','basketInlineBtn','showSolutionBtn','levelUp',
+['pickerArea','levels','pkBar','pkBarInfo','pkClear','pkStart','taskArea','backBtn','prevProtoBtn','nextProtoBtn','taskTitle','pageTitle','pageSub',
+ 'runRow','runChips','refBtn','propRef','questionPanel','trigQuestion','answerArea','card1BtnRow','basketInlineBtn','showSolutionBtn',
  'mainPanel','solSteps','solAnswer','nextBtn','tabPractice','tabExam','basketAddBtn','medalBadgeRow',
  'workZone','workResizeLeft','workResizeRight','tasksColumns','card1Wrapper',
  'addRail','addRailToggle','addRailBody','addRailSep','addToBasketAllBtn','addClearBtn','medalTray',
@@ -868,83 +976,237 @@ const TS = window.TrainerSession || null;
 function guard(action, fn){ return TS && TS.guardStudentAction ? TS.guardStudentAction(action, fn) : fn; }
 
 /* ═══════════════ формулы на плитках ═══════════════
-   Рисуются тем же наборщиком, что и задания (LOG_BANK.render), — формула
-   на плитке выглядит так же, как в условии и в решении. */
-const v = n => ['v', n];
-const [a_, b_, c_, k_, n_] = ['a', 'b', 'c', 'k', 'n'].map(v);
-const EQ = '<span class="mo eq">=</span>';
-const eqn = (l, r) => R(l) + EQ + R(r);
+   Правило плитки — в том же наборе, что условие и решение: sin, cos, дроби
+   вертикально, индексы и степени. */
+const x_ = '<i class="mv">x</i>', n_ = '<i class="mv">n</i>', a_ = '<i class="mv">a</i>', t_ = '<i class="mv">t</i>';
+const fn = (name, pw) => '<span class="fn">' + name + (pw ? '<sup>' + pw + '</sup>' : '') + '</span>&#8201;';
+const fr = (n, d) => '<span class="frac"><span class="num">' + n + '</span><span class="den">' + d + '</span></span>';
+const EQ = '<span class="mo eq">=</span>', NE = '<span class="mo eq">≠</span>', PL = '<span class="mo">+</span>', MI = '<span class="mo">−</span>', PM = '<span class="mo">±</span>';
+const ALT = '<span class="alt">(−1)<sup>' + n_ + '</sup></span>&#8201;';
+const IMP = '<span class="mo eq">⇒</span>';
 const FORMULA = {
-  ident: { f: eqn(['pow', a_, ['log', a_, b_]], b_), f2: 'Логарифм — показатель степени: в какую степень нужно возвести <i class="mv">a</i>, чтобы получить <i class="mv">b</i>' },
-  unit: { f: eqn(['log', a_, 1], 0) + '<span class="fsep">,</span>' + eqn(['log', a_, a_], 1) },
-  prod: { f: eqn(['log', a_, ['*', b_, c_]], ['+', ['log', a_, b_], ['log', a_, c_]]) },
-  quot: { f: eqn(['log', a_, ['/', b_, c_]], ['-', ['log', a_, b_], ['log', a_, c_]]) },
-  pow: { f: eqn(['log', a_, ['pow', b_, n_]], ['*', n_, ['log', a_, b_]]) },
-  basepow: { f: eqn(['log', ['pow', a_, k_], b_], ['*', ['/', 1, k_], ['log', a_, b_]]) },
-  bothpow: { f: eqn(['log', ['pow', a_, k_], ['pow', b_, n_]], ['*', ['/', n_, k_], ['log', a_, b_]]), f2: eqn(['log', ['pow', a_, n_], ['pow', b_, n_]], ['log', a_, b_]) },
-  change: { f: eqn(['log', a_, b_], ['/', ['log', c_, b_], ['log', c_, a_]]) },
-  swap: { f: eqn(['log', a_, b_], ['/', 1, ['log', b_, a_]]), f2: eqn(['*', ['log', a_, b_], ['log', b_, a_]], 1) },
-  expswap: { f: eqn(['pow', a_, ['log', b_, c_]], ['pow', c_, ['log', b_, a_]]) },
+  sin: { f: x_ + EQ + ALT + fn('arcsin') + a_ + PL + 'π' + n_, f2: '|<i class="mv">a</i>| ≤ 1; при |<i class="mv">a</i>| &gt; 1 корней нет' },
+  cos: { f: x_ + EQ + PM + fn('arccos') + a_ + PL + '2π' + n_, f2: '|<i class="mv">a</i>| ≤ 1; при |<i class="mv">a</i>| &gt; 1 корней нет' },
+  spec: { f: fn('sin') + x_ + EQ + '0' + IMP + x_ + EQ + 'π' + n_, f2: fn('cos') + x_ + EQ + '0' + IMP + x_ + EQ + fr('π', 2) + PL + 'π' + n_ },
+  neg: { f: fn('arcsin') + '(−' + a_ + ')' + EQ + '−' + fn('arcsin') + a_, f2: fn('arccos') + '(−' + a_ + ')' + EQ + 'π' + MI + fn('arccos') + a_ },
+  arc: { f: x_ + EQ + ALT + fn('arcsin') + fr(1, 3) + PL + 'π' + n_, f2: '|<i class="mv">a</i>| &gt; 1 — корней нет' },
+  tg: { f: x_ + EQ + fn('arctg') + a_ + PL + 'π' + n_, f2: 'корни есть при любом <i class="mv">a</i>' },
+  ctg: { f: x_ + EQ + fn('arcctg') + a_ + PL + 'π' + n_, f2: fn('ctg') + x_ + EQ + '0' + IMP + x_ + EQ + fr('π', 2) + PL + 'π' + n_ },
+  shift: { f: fn('cos') + '(' + x_ + MI + 'φ)' + EQ + a_, f2: 'решаем относительно всей скобки, потом переносим φ' },
+  egeArg: { f: fn('cos') + fr('π(' + x_ + MI + '7)', 3) + EQ + fr(1, 2), f2: 'в ответ — наименьший положительный или наибольший отрицательный корень' },
+  kx: { f: fn('sin') + '<i class="mv">k</i>' + x_ + EQ + a_, f2: 'решаем для kx, потом делим на k — и период тоже' },
+  xk: { f: fn('cos') + fr(x_, '<i class="mv">k</i>') + EQ + a_, f2: 'умножаем на k — период растёт в k раз' },
+  lin: { f: fn('sin') + '(<i class="mv">k</i>' + x_ + PL + 'φ)' + EQ + a_, f2: 'сначала переносим φ, потом делим на k' },
+  tc2: { f: fn('tg') + '<i class="mv">k</i>' + x_ + EQ + a_, f2: x_ + EQ + fr(fn('arctg') + a_, '<i class="mv">k</i>') + PL + fr('π' + n_, '<i class="mv">k</i>') },
+  quad: { f: '2' + fn('sin', 2) + x_ + MI + '3' + fn('sin') + x_ + PL + '1' + EQ + '0', f2: 'замена <i class="mv">t</i> = sin <i class="mv">x</i>, |<i class="mv">t</i>| ≤ 1 — корни вне отрезка отбрасываем' },
+  hom: { f: '<i class="mv">a</i>' + fn('sin') + x_ + PL + '<i class="mv">b</i>' + fn('cos') + x_ + EQ + '0', f2: 'cos <i class="mv">x</i> ≠ 0 — делим на него и получаем уравнение с tg <i class="mv">x</i>' },
+  fac: { f: '<i class="mv">A</i>·<i class="mv">B</i>' + EQ + '0' + IMP + '<i class="mv">A</i>' + EQ + '0 или <i class="mv">B</i>' + EQ + '0', f2: 'делить на выражение с x нельзя — потеряем корни' },
+  ident: { f: fn('sin', 2) + x_ + PL + fn('cos', 2) + x_ + EQ + '1', f2: 'оставляем одну функцию и делаем замену' },
+  dbl: { f: fn('cos') + '2' + x_ + EQ + '1' + MI + '2' + fn('sin', 2) + x_, f2: fn('cos') + '2' + x_ + EQ + '2' + fn('cos', 2) + x_ + MI + '1' },
+  red: { f: fn('sin') + '(' + fr('π', 2) + MI + x_ + ')' + EQ + fn('cos') + x_, f2: 'у π/2 и 3π/2 функция меняется, знак — по четверти' },
+  tgctg: { f: fn('tg') + x_ + '·' + fn('ctg') + x_ + EQ + '1', f2: 'замена <i class="mv">t</i> = tg <i class="mv">x</i>, <i class="mv">t</i> ≠ 0' },
+  circ: { sm: true, f: x_ + ' ∈ [<i class="mv">a</i>; <i class="mv">b</i>]', f2: 'отмечаем концы отрезка и идём по окружности' },
+  enum: { f: '<i class="mv">n</i> = …, −1, 0, 1, 2, …', f2: 'подставляем n, пока корни попадают в отрезок' },
+  ineq: { f: '<i class="mv">a</i> ≤ α + 2π' + n_ + ' ≤ <i class="mv">b</i>', f2: 'решаем неравенство относительно n, берём целые' },
+  ab: { sm: true, f: 'а) серии; б) корни на [<i class="mv">a</i>; <i class="mv">b</i>]', f2: 'как задание 14 второй части ЕГЭ' },
+  frac: { f: fr('<i class="mv">A</i>', '<i class="mv">B</i>') + EQ + '0' + IMP + '<i class="mv">A</i>' + EQ + '0, <i class="mv">B</i>' + NE + '0' },
+  root: { f: '<span class="rt"><span class="rs">√</span><span class="rad"><i class="mv">A</i></span></span>·<i class="mv">B</i>' + EQ + '0', f2: '<i class="mv">A</i> = 0, или <i class="mv">B</i> = 0 при <i class="mv">A</i> ≥ 0' },
+  expo: { f: t_ + EQ + '4<sup>' + fn('cos') + x_ + '</sup>' + ' &gt; 0', f2: 'показательная замена — и снова простейшие' },
 };
-
 /* ═══════════════ пример на плитке ═══════════════
    Движок примера (две строки «откуда»/«куда», части с data-k, «призраки»,
-   итог data-late) — общий, в tile-demo.js; здесь только сами примеры. */
+   итог data-late) — общий, в tile-demo.js; здесь только сами примеры: у
+   каждой плитки уравнение на глазах «переводится» в ответ — функция
+   тает, x выезжает вперёд, число превращается в угол. */
 const { K, AT, LATE, OP, FR, SFR } = window.TileDemo;
-const LOG = b => 'log<sub>' + b + '</sub>';
+const X = '<i class="mv">x</i>', N = '<i class="mv">n</i>';
+const FN = s => '<span class="fn">' + s + '</span>';
+const SUP = (b, e) => b + '<sup>' + e + '</sup>';
+const pi = (k, d) => d ? SFR((k || '') + 'π', d) : (k || '') + 'π';
+const ALTN = '(−1)<sup>' + N + '</sup>';
 const DEMOS = {
-  ident: { from: K('a', '3') + '<sup>' + K('lg', LOG(3)) + K('x', '5') + '</sup>' + AT('r', 'x'),
-           to: K('a', '3') + '<sup>' + K('lg', LOG(3)) + K('x', '5') + '</sup>' + K('eq', '=', 'op') + K('r', '5', 'big') },
-  unit: { from: K('b', '7') + '<sup>' + K('z', '0') + '</sup>' + K('eq', '=', 'op') + K('one', '1'),
-          to: K('lg', 'log') + '<sub>' + K('b', '7') + '</sub>' + K('one', '1') + K('eq', '=', 'op') + K('z', '0', 'big') },
-  prod: { from: K('l', LOG(2)) + K('p1', '(') + K('b', '4') + K('op', '·', 'op') + K('c', '8') + K('p2', ')') + AT('l2', 'l'),
-          to: K('l', LOG(2)) + K('b', '4') + K('pl', '+', 'op') + K('l2', LOG(2)) + K('c', '8') + LATE(OP('=') + '2' + OP('+') + '3' + OP('=') + '5') },
-  quot: { from: K('l', LOG(3)) + FR(K('n', '54'), K('d', '2')) + AT('l2', 'l'),
-          to: K('l', LOG(3)) + K('n', '54') + K('mi', '−', 'op') + K('l2', LOG(3)) + K('d', '2') + LATE(OP('=') + LOG(3) + ' 27' + OP('=') + '3') },
-  pow: { from: K('l', LOG(2)) + K('b', '8') + '<sup>' + K('n', '5') + '</sup>',
-         to: K('n', '5', 'big') + K('dot', '·', 'op') + K('l', LOG(2)) + K('b', '8') + LATE(OP('=') + '5' + OP('·') + '3' + OP('=') + '15') },
-  basepow: { from: K('lg', 'log') + '<sub>' + K('a', '2') + '<sup>' + K('k', '3') + '</sup></sub>' + K('b', '64'),
-             to: FR(K('one', '1'), K('k', '3', 'big')) + K('dot', '·', 'op') + K('lg', 'log') + '<sub>' + K('a', '2') + '</sub>' + K('b', '64') + LATE(OP('=') + '2') },
-  bothpow: { from: K('lg', 'log') + '<sub>' + K('a', '2') + '<sup>' + K('k', '3') + '</sup></sub>' + K('b', '5') + '<sup>' + K('n', '6') + '</sup>',
-             to: FR(K('n', '6', 'big'), K('k', '3', 'big')) + K('dot', '·', 'op') + K('lg', 'log') + '<sub>' + K('a', '2') + '</sub>' + K('b', '5') + LATE(OP('=') + '2' + OP('·') + LOG(2) + ' 5') },
-  change: { from: K('lg', 'log') + '<sub>' + K('a', '8') + '</sub>' + K('b', '32'),
-            to: FR(K('l2', LOG(2)) + K('b', '32'), K('l3', LOG(2)) + K('a', '8')) + LATE(OP('=') + SFR('5', '3')) },
-  swap: { from: K('lg', 'log') + '<sub>' + K('a', '4') + '</sub>' + K('b', '2'),
-          to: FR(K('one', '1'), K('lg', 'log') + '<sub>' + K('b', '2') + '</sub>' + K('a', '4')) + LATE(OP('=') + SFR('1', '2')) },
-  expswap: { from: K('a', '9') + '<sup>' + K('lg', LOG(3)) + K('c', '5') + '</sup>',
-             to: K('c', '5') + '<sup>' + K('lg', LOG(3)) + K('a', '9') + '</sup>' + LATE(OP('=') + '5<sup>2</sup>' + OP('=') + '25') },
+  sin: { from: K('f', FN('sin')) + K('x', X) + K('eq', '=', 'op') + K('v', SFR(1, 2)) + AT('a', 'v'),
+         to: K('x', X) + K('eq', '=', 'op') + K('s', ALTN) + K('a', pi('', 6), 'big') + LATE(OP('+') + 'π' + N) },
+  cos: { from: K('f', FN('cos')) + K('x', X) + K('eq', '=', 'op') + K('v', SFR('√2', 2)) + AT('a', 'v'),
+         to: K('x', X) + K('eq', '=', 'op') + K('pm', '±', 'op') + K('a', pi('', 4), 'big') + LATE(OP('+') + '2π' + N) },
+  spec: { from: K('f', FN('sin')) + K('x', X) + K('eq', '=', 'op') + K('v', '0') + AT('r', 'v'),
+          to: K('x', X) + K('eq', '=', 'op') + K('r', 'π' + N, 'big') },
+  neg: { from: K('f', FN('cos')) + K('x', X) + K('eq', '=', 'op') + K('v', '−' + SFR(1, 2)) + AT('a', 'v'),
+         to: K('x', X) + K('eq', '=', 'op') + K('pm', '±', 'op') + K('a', pi(2, 3), 'big') + LATE(OP('+') + '2π' + N) },
+  arc: { from: K('f', FN('sin')) + K('x', X) + K('eq', '=', 'op') + K('v', SFR(1, 3)),
+         to: K('x', X) + K('eq', '=', 'op') + K('s', ALTN) + K('arc', 'arc', 'big') + K('f', FN('sin')) + K('v', SFR(1, 3)) + LATE(OP('+') + 'π' + N) },
+  tg: { from: K('f', FN('tg')) + K('x', X) + K('eq', '=', 'op') + K('v', '√3') + AT('a', 'v'),
+        to: K('x', X) + K('eq', '=', 'op') + K('a', pi('', 3), 'big') + LATE(OP('+') + 'π' + N) },
+  ctg: { from: K('f', FN('ctg')) + K('x', X) + K('eq', '=', 'op') + K('v', '−1') + AT('a', 'v'),
+         to: K('x', X) + K('eq', '=', 'op') + K('a', pi(3, 4), 'big') + LATE(OP('+') + 'π' + N) },
+
+  shift: { from: K('f', FN('cos')) + K('p1', '(') + K('x', X) + K('mi', '−', 'op') + K('b', pi('', 3)) + K('p2', ')') + K('eq', '=', 'op') + K('v', '1') + AT('r', 'v'),
+           to: K('x', X) + K('mi', '−', 'op') + K('b', pi('', 3)) + K('eq', '=', 'op') + K('r', '2π' + N, 'big') + LATE(OP(',') + X + OP('=') + pi('', 3) + OP('+') + '2π' + N) },
+  egeArg: { from: K('f', FN('cos')) + '<span class="dfrac"><span class="dn">' + K('pi', 'π(') + K('x', X) + K('mi', '−', 'op') + K('s', '7') + K('p2', ')') + '</span>' + K('bar', '', 'dbar') + '<span class="dn">' + K('d', '3') + '</span></span>' + K('eq', '=', 'op') + K('v', SFR(1, 2)) + AT('r', 'v'),
+            to: K('x', X) + K('mi', '−', 'op') + K('s', '7') + K('eq', '=', 'op') + K('r', '±1' + OP('+') + '6' + N, 'big') + LATE(OP('⇒') + X + OP('=') + '2') },
+  kx: { from: K('f', FN('cos')) + K('k', '2') + K('x', X) + K('eq', '=', 'op') + K('v', SFR(1, 2)) + AT('a', 'v'),
+        to: K('k', '2') + K('x', X) + K('eq', '=', 'op') + K('a', '±' + pi('', 3) + OP('+') + '2π' + N, 'big') + LATE(OP(',') + X + OP('=') + '±' + pi('', 6) + OP('+') + 'π' + N) },
+  xk: { from: K('f', FN('sin')) + FR(K('x', X), K('k', '2')) + K('eq', '=', 'op') + K('v', '1') + AT('a', 'v'),
+        to: FR(K('x', X), K('k', '2')) + K('eq', '=', 'op') + K('a', pi('', 2) + OP('+') + '2π' + N, 'big') + LATE(OP(',') + X + OP('=') + 'π' + OP('+') + '4π' + N) },
+  lin: { from: K('f', FN('tg')) + K('p1', '(') + K('k', '3') + K('x', X) + K('mi', '−', 'op') + K('b', pi('', 6)) + K('p2', ')') + K('eq', '=', 'op') + K('v', '√3') + AT('a', 'v'),
+         to: K('k', '3') + K('x', X) + K('mi', '−', 'op') + K('b', pi('', 6)) + K('eq', '=', 'op') + K('a', pi('', 3) + OP('+') + 'π' + N, 'big') + LATE(OP(',') + X + OP('=') + pi('', 6) + OP('+') + SFR('π' + N, 3)) },
+  tc2: { from: K('f', FN('ctg')) + FR(K('x', X), K('k', '3')) + K('eq', '=', 'op') + K('v', '0') + AT('a', 'v'),
+         to: FR(K('x', X), K('k', '3')) + K('eq', '=', 'op') + K('a', pi('', 2) + OP('+') + 'π' + N, 'big') + LATE(OP(',') + X + OP('=') + pi(3, 2) + OP('+') + '3π' + N) },
+
+  quad: { from: K('c1', '2') + K('s1', SUP(FN('sin'), 2) + X) + K('m', '−', 'op') + K('c2', '3') + K('s2', FN('sin') + X) + K('p', '+', 'op') + K('c3', '1') + K('eq', '=', 'op') + K('z', '0') + AT('t1', 's1') + AT('t2', 's2'),
+          to: K('c1', '2') + K('t1', SUP('<i class="mv">t</i>', 2), 'big') + K('m', '−', 'op') + K('c2', '3') + K('t2', '<i class="mv">t</i>', 'big') + K('p', '+', 'op') + K('c3', '1') + K('eq', '=', 'op') + K('z', '0') + LATE(OP(',') + '<i class="mv">t</i>' + OP('=') + '1' + OP(';') + SFR(1, 2)) },
+  hom: { from: K('s', FN('sin')) + K('x', X) + K('eq', '=', 'op') + K('r', '√3') + K('c', FN('cos') + X) + AT('tg', 's'),
+         to: K('tg', FN('tg'), 'big') + K('x', X) + K('eq', '=', 'op') + K('r', '√3') + LATE(OP(',') + X + OP('=') + pi('', 3) + OP('+') + 'π' + N) },
+  fac: { from: K('two', '2') + K('s', FN('sin') + X) + K('c1', FN('cos') + X) + K('eq', '=', 'op') + K('c2', FN('cos') + X),
+         to: K('c2', FN('cos') + X, 'big') + K('p1', '(') + K('two', '2') + K('s', FN('sin') + X) + K('m', '−', 'op') + K('one', '1') + K('p2', ')') + K('eq', '=', 'op') + K('z', '0') },
+  ident: { from: K('two', '2') + K('c', SUP(FN('cos'), 2) + X) + K('p', '+', 'op') + K('s', '3' + FN('sin') + X) + K('eq', '=', 'op') + K('r', '3') + AT('in', 'c'),
+           to: K('two', '2') + K('in', '(1' + OP('−') + SUP(FN('sin'), 2) + X + ')', 'big') + K('p', '+', 'op') + K('s', '3' + FN('sin') + X) + K('eq', '=', 'op') + K('r', '3') },
+  dbl: { from: K('c', FN('cos') + '2' + X) + K('eq', '=', 'op') + K('s', FN('sin') + X) + AT('in', 'c'),
+         to: K('in', '1' + OP('−') + '2' + SUP(FN('sin'), 2) + X, 'big') + K('eq', '=', 'op') + K('s', FN('sin') + X) },
+  red: { from: K('f', FN('sin')) + K('p1', '(') + K('a', pi(3, 2)) + K('m', '−', 'op') + K('x', X) + K('p2', ')') + K('eq', '=', 'op') + K('v', SFR(1, 2)) + AT('g', 'f'),
+         to: K('g', '−' + FN('cos'), 'big') + K('x', X) + K('eq', '=', 'op') + K('v', SFR(1, 2)) },
+  tgctg: { from: K('t1', FN('tg') + X) + K('p', '+', 'op') + K('k', '3') + K('c', FN('ctg') + X) + K('eq', '=', 'op') + K('m', '4') + AT('t2', 'c'),
+           to: K('t1', '<i class="mv">t</i>', 'big') + K('p', '+', 'op') + FR(K('k', '3'), K('t2', '<i class="mv">t</i>', 'big')) + K('eq', '=', 'op') + K('m', '4') },
+
+  circ: { from: K('s', X + OP('=') + '±' + pi('', 3) + OP('+') + '2π' + N) + AT('r1', 's') + AT('r2', 's') + AT('r3', 's'),
+          to: K('r1', '−' + pi('', 3), 'big') + K('c1', ';', 'op') + K('r2', pi('', 3), 'big') + K('c2', ';', 'op') + K('r3', pi(5, 3), 'big') },
+  enum: { from: K('x', X) + K('eq', '=', 'op') + K('a', pi('', 6)) + K('p', OP('+') + '2π' + N) + AT('b', 'p'),
+          to: K('a', pi('', 6), 'big') + K('c1', ';', 'op') + K('b', pi(13, 6), 'big') + LATE('<span class="op">n = 0; 1</span>') },
+  ineq: { from: K('l', '0') + K('le1', '≤', 'op') + K('a', pi('', 6) + OP('+') + '2π') + K('n', N) + K('le2', '≤', 'op') + K('r', '3π'),
+          to: K('l', '−' + SFR(1, 12)) + K('le1', '≤', 'op') + K('n', N, 'big') + K('le2', '≤', 'op') + K('r', SFR(17, 12)) + LATE(OP(',') + N + OP('=') + '0; 1') },
+
+  ab: { from: K('s', X + OP('=') + '±' + pi('', 3) + OP('+') + '2π' + N) + K('seg', '[0; 2π]') + AT('r1', 's') + AT('r2', 's'),
+        to: K('r1', pi('', 3), 'big') + K('c1', ';', 'op') + K('r2', pi(5, 3), 'big') },
+  frac: { from: '<span class="dfrac"><span class="dn">' + K('num', '2' + SUP(FN('sin'), 2) + X + OP('−') + FN('sin') + X) + '</span>' + K('bar', '', 'dbar') + '<span class="dn">' + K('den', '2' + FN('cos') + X + OP('−') + '√3') + '</span></span>' + K('eq', '=', 'op') + K('z', '0'),
+          to: K('num', '2' + SUP(FN('sin'), 2) + X + OP('−') + FN('sin') + X) + K('eq', '=', 'op') + K('z', '0') + LATE(OP(',') + FN('cos') + X + OP('≠') + SFR('√3', 2)) },
+  root: { from: K('rt', '√') + K('s', FN('sin') + X) + K('dot', '·', 'op') + K('p1', '(') + K('g', '2' + FN('cos') + X + OP('−') + '1') + K('p2', ')') + K('eq', '=', 'op') + K('z', '0'),
+          to: K('s', FN('sin') + X) + K('eq', '=', 'op') + K('z', '0') + K('or', 'или', 'op') + K('g', '2' + FN('cos') + X + OP('−') + '1') + K('eq2', '= 0', 'op') + LATE(OP(',') + FN('sin') + X + OP('≥') + '0') },
+  expo: { from: K('a', SUP('4', FN('cos') + X)) + K('p', '+', 'op') + K('b', SUP('4', '−' + FN('cos') + X)) + K('eq', '=', 'op') + K('r', SFR(5, 2)) + AT('t1', 'a') + AT('t2', 'b'),
+          to: K('t1', '<i class="mv">t</i>', 'big') + K('p', '+', 'op') + K('t2', SFR(1, '<i class="mv">t</i>'), 'big') + K('eq', '=', 'op') + K('r', SFR(5, 2)) + LATE(OP(',') + '<i class="mv">t</i>' + OP('=') + '2; ' + SFR(1, 2)) },
 };
+
+/* ═══════════════ рисунки на больших плитках ═══════════════
+   Окружность 200×200, центр (100; 100), радиус 70. Луч поворачивается на
+   угол ответа (--ang), точки ответа вспыхивают — в такт примеру. */
+const CX = 100, CY = 100, RR = 70;
+const pt = deg => [CX + RR * Math.cos(deg * Math.PI / 180), CY - RR * Math.sin(deg * Math.PI / 180)];
+const P2 = deg => pt(deg).map(v => v.toFixed(1));
+function circleBase(){
+  return '<line class="ax" x1="14" y1="100" x2="186" y2="100"/><line class="ax" x1="100" y1="14" x2="100" y2="186"/>' +
+    '<circle class="ring" cx="100" cy="100" r="70"/>';
+}
+const dot = (deg, cls) => { const [x, y] = P2(deg); return '<circle class="pt ' + (cls || 'pulse') + '" cx="' + x + '" cy="' + y + '" r="5.5" style="transform-origin:' + x + 'px ' + y + 'px"/>'; };
+const ray = deg => '<g class="spin" style="--ang:' + (-deg) + 'deg;transform-origin:100px 100px"><line class="ray" x1="100" y1="100" x2="170" y2="100"/></g>';
+const lbl = (x, y, t, cls) => '<text class="lbl ' + (cls || '') + '" x="' + x + '" y="' + y + '" text-anchor="middle">' + t + '</text>';
+function arcPath(d0, d1, r){
+  r = r || RR;
+  const [x0, y0] = [CX + r * Math.cos(d0 * Math.PI / 180), CY - r * Math.sin(d0 * Math.PI / 180)];
+  const [x1, y1] = [CX + r * Math.cos(d1 * Math.PI / 180), CY - r * Math.sin(d1 * Math.PI / 180)];
+  const large = Math.abs(d1 - d0) > 180 ? 1 : 0;
+  return 'M' + x0.toFixed(1) + ' ' + y0.toFixed(1) + ' A' + r + ' ' + r + ' 0 ' + large + ' 0 ' + x1.toFixed(1) + ' ' + y1.toFixed(1);
+}
+const svg = (inner, vb) => '<svg viewBox="' + (vb || '0 0 200 200') + '" aria-hidden="true">' + inner + '</svg>';
+const VIZ = {
+  // sin x = ½: прямая y = ½ режет окружность в π/6 и 5π/6
+  sin: () => svg(circleBase() + '<line class="cut fade" x1="16" y1="65" x2="184" y2="65"/>' + ray(30) + dot(30) + dot(150) +
+    lbl(170, 58, 'π/6', 'acc') + lbl(30, 58, '5π/6', 'acc') + lbl(192, 69, '½', 'i')),
+  // cos x = √2/2: прямая x = √2/2 — точки ±π/4
+  cos: () => svg(circleBase() + '<line class="cut fade" x1="149.5" y1="16" x2="149.5" y2="184"/>' + ray(45) + dot(45) + dot(-45) +
+    lbl(172, 44, 'π/4', 'acc') + lbl(172, 166, '−π/4', 'acc')),
+  // сдвиг: точка x − π/3 = 0 поворачивается на π/3
+  shift: () => svg(circleBase() + '<path class="arcseg fade" d="' + arcPath(0, 60, 82) + '"/>' + ray(60) + dot(0, 'off') + dot(60) +
+    lbl(186, 96, '0', '') + lbl(146, 30, 'π/3', 'acc')),
+  // π(x − 7)/3: корни на числовой прямой, наименьший положительный — 2
+  egeArg: () => {
+    const xs = [-4, 0, 2, 6, 8], X0 = 100, S = 12;
+    let h = '<line class="ax" x1="4" y1="110" x2="196" y2="110"/>' + '<line class="ax" x1="' + X0 + '" y1="102" x2="' + X0 + '" y2="118"/>' + lbl(X0, 132, '0', '');
+    xs.forEach(v => { const x = X0 + v * S; h += '<circle class="pt ' + (v === 2 ? 'pulse' : 'off fade') + '" cx="' + x + '" cy="110" r="' + (v === 2 ? 6.5 : 5) + '" style="transform-origin:' + x + 'px 110px"/>' + lbl(x, v === 2 ? 92 : 132, String(v).replace('-', '−'), v === 2 ? 'acc' : ''); });
+    h += '<g class="slide" style="--from:-60px"><path class="ray" d="M' + (X0 + 2 * S) + ' 62 L' + (X0 + 2 * S) + ' 78" /><path class="ray" d="M' + (X0 + 2 * S - 5) + ' 72 L' + (X0 + 2 * S) + ' 79 L' + (X0 + 2 * S + 5) + ' 72" fill="none"/></g>';
+    return svg(h, '0 40 200 110');
+  },
+  // замена t = sin x: на отрезке [−1; 1] два корня, t = 2 — за краем
+  quad: () => {
+    const X0 = 100, S = 60;
+    let h = '<rect class="band fade" x="' + (X0 - S) + '" y="96" width="' + (2 * S) + '" height="28" rx="6"/>' +
+      '<line class="ax" x1="4" y1="110" x2="196" y2="110"/>';
+    [-1, 0, 1].forEach(v => { h += '<line class="ax" x1="' + (X0 + v * S) + '" y1="104" x2="' + (X0 + v * S) + '" y2="116"/>' + lbl(X0 + v * S, 138, String(v).replace('-', '−'), ''); });
+    [[0.5, '½'], [1, '1']].forEach(([v, t]) => { const x = X0 + v * S; h += '<circle class="pt pulse" cx="' + x + '" cy="110" r="6" style="transform-origin:' + x + 'px 110px"/>' + lbl(x, 90, t, 'acc'); });
+    const xb = X0 + 1.55 * S;
+    h += '<g class="fade"><path class="cross" d="M' + (xb - 6) + ' 104 L' + (xb + 6) + ' 116 M' + (xb + 6) + ' 104 L' + (xb - 6) + ' 116"/>' + lbl(xb, 90, '2', '') + '</g>' + lbl(100, 76, 't = sin x', 'i');
+    return svg(h, '-30 58 260 96');
+  },
+  // tg x = √3: луч и его продолжение — две точки через π
+  hom: () => svg(circleBase() + '<line class="cut fade" x1="' + P2(240)[0] + '" y1="' + P2(240)[1] + '" x2="' + P2(60)[0] + '" y2="' + P2(60)[1] + '"/>' + ray(60) + dot(60) + dot(240) +
+    lbl(146, 30, 'π/3', 'acc') + lbl(50, 180, '4π/3', 'acc')),
+  // отбор по окружности: дуга отрезка и точки серий на ней
+  circ: () => svg(circleBase() + '<path class="arcseg fade" d="' + arcPath(-60, 300, 82) + '"/>' + dot(60) + dot(-60) + dot(300, 'pulse') + ray(60) +
+    lbl(146, 30, 'π/3', 'acc') + lbl(150, 180, '−π/3; 5π/3', 'acc')),
+  // №14: серии ±π/3 + 2πn и отрезок [0; 2π]
+  ab: () => svg(circleBase() + '<path class="arcseg fade" d="' + arcPath(0, 359, 82) + '"/>' + ray(60) + dot(60) + dot(-60) +
+    lbl(146, 30, 'π/3', 'acc') + lbl(146, 178, '5π/3', 'acc') + lbl(190, 96, '0', '')),
+};
+
 // меряет и запускает примеры модуль; экран плиток виден — только когда не открыто задание
-const tileDemo = window.TileDemo.mount({ root: els.tiles, demos: DEMOS, isShown: () => S.screen === 'picker' });
+const tileDemo = window.TileDemo.mount({ root: els.levels, demos: DEMOS, isShown: () => S.screen === 'picker' });
 const layoutDemos = force => tileDemo.relayout(force);
 
-/* ═══════════════ плитки ═══════════════ */
+/* ═══════════════ плашки и плитки ═══════════════
+   Сколько клеток нужно плитке «вперемешку», чтобы закрыть последний ряд
+   плашки: на 6 и на 4 колонках считаем по набору плиток (маленькая — 2
+   клетки, большая — 4). Ряд из одной «вперемешку» во всю ширину — это
+   «итог» плашки, так и задумано. */
+function mixSpan(ids, cols){
+  const cells = ids.reduce((s, id) => s + (tileById(id).size === 'l' ? 4 : 2), 0);
+  const rest = cells % cols;
+  return rest ? cols - rest : cols;
+}
+const MIX_CARDS = {
+  1: [BANK.Eq(BANK.F('sin'), BANK.Fr(1, 2)), BANK.Eq(BANK.F('tg'), BANK.SQ(3)), BANK.Eq(BANK.F('cos'), -1)],
+  2: [BANK.Eq(BANK.F('cos', BANK.Mul(2, BANK.X)), 0), BANK.Eq(BANK.F('tg', BANK.Fr(BANK.X, 3)), 1), BANK.Eq(BANK.F('sin', BANK.Add(BANK.X, BANK.PI(BANK.Q(1, 4)))), 1)],
+  3: [BANK.Eq(BANK.Add(BANK.Mul(2, BANK.F('sin', BANK.X, 2)), BANK.F('sin')), 0), BANK.Eq(BANK.F('sin'), BANK.F('cos')), BANK.Eq(BANK.F('cos', BANK.Mul(2, BANK.X)), BANK.F('sin'))],
+  4: [BANK.Eq(BANK.F('sin'), 0), BANK.Eq(BANK.F('cos'), BANK.Fr(1, 2)), BANK.Eq(BANK.F('tg'), 1)],
+  5: [BANK.Eq(BANK.Fr(BANK.F('sin'), BANK.Sub(BANK.F('cos'), 1)), 0), BANK.Eq(['pow', 3, BANK.F('cos')], 3), BANK.Eq(BANK.SQ(BANK.F('sin')), 0)],
+};
 function tileBadges(pid){
-  const n = solvedByProp[pid] || 0, p = progOf(pid);
-  return (n ? '<span class="tile-done">✓ ' + n + '</span>' : '') +
-    (n || p.max > 1 ? '<span class="tile-lvl" title="Уровень при отработке одного этого свойства">' + LV[p.lvl - 1] + '</span>' : '');
+  const n = solvedByProp[pid] || 0;
+  return n ? '<span class="tile-done">✓ ' + n + '</span>' : '';
+}
+function tileHTML(t, d){
+  const g = BANK.groupById(t.group), F = FORMULA[t.id] || { f: '' };
+  const big = t.size === 'l';
+  return '<div class="tile' + (big ? ' l' : '') + '" role="button" tabindex="0" aria-pressed="false" data-pid="' + t.id + '" ' +
+    'style="--acc:' + g.color + ';--acc-soft:' + hexA(g.color, 0.15) + ';--d:' + d + '" aria-label="' + esc(t.title) + '">' +
+    '<span class="tile-top"><span class="tile-tag">' + g.title + '</span><span class="tile-badges">' + tileBadges(t.id) + '</span><span class="tile-check" aria-hidden="true"></span></span>' +
+    '<span class="tile-title">' + t.title + '</span>' +
+    '<span class="tile-formula"><span class="f1' + (F.sm ? ' sm' : '') + '">' + F.f + '</span>' + (F.f2 ? '<span class="f2">' + F.f2 + '</span>' : '') + '</span>' +
+    (big && VIZ[t.id] ? '<span class="viz" aria-hidden="true">' + VIZ[t.id]() + '</span>' : '') +
+    '<span class="tile-demo" aria-hidden="true"><span class="demo" data-demo="' + t.id + '"></span></span>' +
+  '</div>';
 }
 function renderTiles(){
-  els.pkCond.innerHTML = '<i class="mv">a</i> &gt; 0, <i class="mv">a</i> ≠ 1, <i class="mv">b</i> &gt; 0, <i class="mv">c</i> &gt; 0, <i class="mv">c</i> ≠ 1';
-  els.tiles.innerHTML = PROPS.map((p, i) => {
-    const g = BANK.groupById(p.group), F = FORMULA[p.id];
-    return '<div class="tile' + (p.id === 'ident' ? ' l' : '') + '" role="button" tabindex="0" aria-pressed="false" data-pid="' + p.id + '" ' +
-      'style="--acc:' + g.color + ';--acc-soft:' + hexA(g.color, 0.15) + '" aria-label="' + esc(p.title) + '">' +
-      '<span class="tile-top"><span class="tile-tag">' + g.title + '</span><span class="tile-badges">' + tileBadges(p.id) + '</span><span class="tile-check" aria-hidden="true"></span></span>' +
-      '<span class="tile-title">' + p.title + '</span>' +
-      '<span class="tile-formula"><span class="f1">' + F.f + '</span>' + (F.f2 ? '<span class="f2">' + F.f2 + '</span>' : '') + '</span>' +
-      '<span class="tile-demo" aria-hidden="true"><span class="demo" data-demo="' + p.id + '"></span></span>' +
+  let d = 0;
+  els.levels.innerHTML = LEVELS.map(L => {
+    const ids = levelIds(L.id), col = LVL_COLOR[L.id - 1];
+    const s6 = mixSpan(ids, 6), s4 = mixSpan(ids, 4);
+    const head = '<div class="lvl-head" style="--acc:' + col + ';--d:' + (d++) + '">' +
+      '<span class="lvl-num">' + L.id + '</span>' +
+      '<div class="lvl-text"><div class="lvl-title">' + L.title + '</div><div class="lvl-lead">' + L.lead + '</div></div>' +
+      '<span class="lvl-steps" aria-hidden="true">' + LEVELS.map(x => '<i class="' + (x.id <= L.id ? 'on' : '') + '"></i>').join('') + '</span></div>';
+    const tiles = TILES.filter(t => t.lvl === L.id).map(t => tileHTML(t, d++)).join('');
+    const mixKey = 'lvl' + L.id;
+    const mix = '<div class="tile mix' + (s6 >= 4 ? ' wide' : '') + '" role="button" tabindex="0" data-pid="' + mixKey + '" data-lvl="' + L.id + '" ' +
+      'style="--acc:' + col + ';--acc-soft:' + hexA(col, 0.15) + ';--s6:' + s6 + ';--s4:' + s4 + ';--d:' + (d++) + '" aria-label="Уровень ' + L.id + ' вперемешку">' +
+      '<span class="tile-top"><span class="tile-tag">Уровень ' + L.id + ' · итог</span><span class="tile-badges">' + (runSolved(mixKey) ? '<span class="tile-done">✓ ' + runSolved(mixKey) + '</span>' : '') + '</span></span>' +
+      '<span class="tile-title">Всё из уровня ' + L.id + ' вперемешку</span>' +
+      '<span class="tile-formula">Все ' + ids.length + ' ' + plural(ids.length, 'тип', 'типа', 'типов') + ' сразу — нужно самому узнать, какой перед тобой</span>' +
+      '<span class="mix-deck" aria-hidden="true">' + MIX_CARDS[L.id].map(e => '<span class="mix-card"><span class="mx">' + R(e) + '</span></span>').join('') + '</span>' +
     '</div>';
-  }).join('') +
-    '<div class="tile mix" role="button" tabindex="0" data-pid="all" aria-label="Все свойства вперемешку">' +
-      '<span class="tile-top"><span class="tile-tag">Итог</span><span class="tile-badges">' + (progOf('all').solved ? '<span class="tile-done">✓ ' + progOf('all').solved + '</span>' : '') + '</span></span>' +
-      '<span class="tile-title">Все свойства вперемешку</span>' +
-      '<span class="tile-formula">Все десять свойств сразу — нужно самому узнать, какое применить</span>' +
-      '<span class="mix-deck" aria-hidden="true"><span class="mix-card">' + R(['log', a_, ['*', b_, c_]]) + '</span><span class="mix-card">' + R(['log', a_, ['pow', b_, n_]]) + '</span><span class="mix-card">' + R(['pow', a_, ['log', a_, b_]]) + '</span></span>' +
-    '</div>';
-  els.tiles.querySelectorAll('.tile').forEach(t => {
-    const act = t.dataset.pid === 'all'
-      ? guard('switchTask', () => startRun(PROP_IDS))
+    return '<section class="lvl" data-lvl="' + L.id + '">' + head + '<div class="tiles" data-lvl="' + L.id + '">' + tiles + mix + '</div></section>';
+  }).join('');
+  els.levels.querySelectorAll('.tile').forEach(t => {
+    const lvl = +t.dataset.lvl;
+    const act = t.classList.contains('mix')
+      ? guard('switchTask', () => startRun(levelIds(lvl)))
       : guard('switchTask', () => toggleSel(t.dataset.pid));
     t.addEventListener('click', act);
     t.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); act(); } });
@@ -952,25 +1214,26 @@ function renderTiles(){
   tileDemo.watch();
   layoutDemos(true);
 }
-// числа «решено» и уровень меняются по ходу — перерисовываем только значки
-// и отметки, а не плитки: иначе примеры пришлось бы мерить заново
+// числа «решено» меняются по ходу — перерисовываем только значки и
+// отметки, а не плитки: иначе примеры пришлось бы мерить заново
 function updateTileBadges(){
-  els.tiles.querySelectorAll('.tile').forEach(t => {
-    const pid = t.dataset.pid;
+  els.levels.querySelectorAll('.tile').forEach(t => {
+    const pid = t.dataset.pid, mix = t.classList.contains('mix');
     const b = t.querySelector('.tile-badges');
-    const html = pid === 'all' ? (progOf('all').solved ? '<span class="tile-done">✓ ' + progOf('all').solved + '</span>' : '') : tileBadges(pid);
+    const html = mix ? (runSolved(pid) ? '<span class="tile-done">✓ ' + runSolved(pid) + '</span>' : '') : tileBadges(pid);
     if (b && b.innerHTML !== html) b.innerHTML = html;
+    if (mix) return;
     const on = S.sel.indexOf(pid) >= 0;
     t.classList.toggle('sel', on);
-    if (pid !== 'all') t.setAttribute('aria-pressed', on ? 'true' : 'false');
+    t.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
   const n = S.sel.length;
   els.pkStart.disabled = !n;
   els.pkClear.style.display = n ? '' : 'none';
   els.pkStart.textContent = n > 1 ? 'Начать вперемешку →' : 'Начать →';
   els.pkBarInfo.innerHTML = n
-    ? '<b>Выбрано: ' + n + ' ' + plural(n, 'свойство', 'свойства', 'свойств') + '</b><span class="pk-names">' + S.sel.map(id => propById(id).title.toLowerCase()).join(' · ') + '</span>'
-    : 'Отметь одно или несколько свойств — или возьми <b>все вперемешку</b>';
+    ? '<b>Выбрано: ' + n + ' ' + plural(n, 'тип', 'типа', 'типов') + '</b><span class="pk-names">' + S.sel.map(id => tileById(id).title).join(' · ') + '</span>'
+    : 'Отметь один или несколько типов — можно из разных уровней — или возьми <b>весь уровень вперемешку</b>';
 }
 function toggleSel(pid){
   const i = S.sel.indexOf(pid);
@@ -980,14 +1243,20 @@ function toggleSel(pid){
 els.pkClear.onclick = guard('switchTask', () => { S.sel = []; updateTileBadges(); });
 els.pkStart.onclick = guard('switchTask', () => { if (S.sel.length) startRun(S.sel); });
 
-/* Какие плитки на экране (.live — их пример идёт, остальные на паузе),
-   перемер при смене ширины и после загрузки шрифта — в tile-demo.js. */
+/* появление экрана выбора: плашки и плитки выезжают по очереди (CSS,
+   #levels.enter). Класс снимаем, когда всё приехало, — иначе при следующем
+   показе анимация не перезапустилась бы */
+function playEnter(el, ms){
+  el.classList.remove('enter'); void el.offsetWidth; el.classList.add('enter');
+  clearTimeout(el._enterTimer);
+  el._enterTimer = setTimeout(() => el.classList.remove('enter'), ms);
+}
 
 /* ═══════════════ условие ═══════════════
-   #logQuestion (и .added-card-question у карточек) — только условие и
+   #trigQuestion (и .added-card-question у карточек) — только условие и
    варианты выбора: это уходит «В подборку» и снимается на доску. */
 function questionHTML(t){
-  let h = '<span class="log-kind">' + BANK.TYPES[t.type] + ' · уровень ' + LV[t.lvl - 1] + '</span>' + t.text;
+  let h = '<span class="log-kind">Уровень ' + t.lvl + ' · ' + tileById(t.pid).title + '</span>' + t.text;
   if (t.choice) h += '<div class="mcq-options">' + t.choice.opts.map((o, i) => '<div class="mcq-btn" role="button" tabindex="0" data-i="' + i + '">' + o + '</div>').join('') + '</div>';
   return h;
 }
@@ -1056,7 +1325,7 @@ function buildAnswerArea(root, t, st, prefix, onChanged){
   root.querySelectorAll('input.answer-input').forEach(inp => {
     inp.addEventListener('focus', () => { lastFocusedInput = inp; syncKeypadVisibility(); });
     inp.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
-    if (TS && TS.registerField) TS.registerField('log:' + prefix + ':' + t.key + ':' + inp.dataset.fid, inp);
+    if (TS && TS.registerField) TS.registerField('trig:' + prefix + ':' + t.key + ':' + inp.dataset.fid, inp);
     if (!lastFocusedInput) lastFocusedInput = inp;
   });
   root.querySelector('.check-btn').onclick = submit;
@@ -1155,17 +1424,12 @@ function settle(t, st, ok, reveal){
     saveProg();
   }
 }
-// три верных на текущем уровне — уровень пройден. Ошибка серию не
-// сбрасывает: сложность растёт с числом решённых, а не с безупречностью
+// решено: по тренировке (число на плитке «вперемешку» уровня) и по типу
+// задания (число на плитке типа), в какой бы тренировке ни решали
 function countForLevel(t){
-  const key = runKey(S.props), p = progOf(key);
-  p.solved = (p.solved || 0) + 1;
-  if (t.lvl === S.lvl && !S.lvlUp) {
-    S.lvlCnt = Math.min(LEVEL_UP_AT, S.lvlCnt + 1);
-    if (S.lvlCnt >= LEVEL_UP_AT && S.lvl < 3) S.lvlUp = true;
-  }
-  p.lvl = S.lvl; p.cnt = S.lvlCnt; p.max = Math.max(p.max || 1, S.lvl + (S.lvlUp ? 1 : 0));
-  saveLevelProg(key, p);
+  const key = runKey(S.props);
+  runProg[key] = { solved: runSolved(key) + 1 };
+  try { localStorage.setItem(RUNS_KEY, JSON.stringify(runProg)); } catch (e) {}
   solvedByProp[t.pid] = (solvedByProp[t.pid] || 0) + 1;
   try { localStorage.setItem(SOLVED_KEY, JSON.stringify(solvedByProp)); } catch (e) {}
 }
@@ -1199,7 +1463,7 @@ function renderExampleHistory(){
   els.exampleHistoryList.innerHTML = items.map(h =>
     '<div class="example-history-row">' +
       '<span class="example-history-num">' + (h.correct ? (h.hadError ? '🟡' : '✅') : '❌') + '</span>' +
-      '<div class="example-history-body"><span>' + (h.lvl ? '<b>' + LV[h.lvl - 1] + '.</b> ' : '') + esc(h.peek || '') + '</span>' +
+      '<div class="example-history-body"><span>' + (h.lvl ? '<b>' + h.lvl + '.</b> ' : '') + esc(h.peek || '') + '</span>' +
         (h.answer ? '<span class="example-history-answer' + (h.correct ? '' : ' bad') + '">Ответ: ' + h.answer + '</span>' : '') +
       '</div></div>').join('');
 }
@@ -1252,13 +1516,12 @@ function snapshotAndClear(scope, targetEl){
   else finish();
 }
 
-/* ═══════════════ решение ═══════════════
-   У каждого шага сверху — какое свойство применено (метка цвета плитки). */
+/* ═══════════════ решение ═══════════════ */
 function stepsHTML(t){
   return (t.steps || []).map((s, i) => '<div class="sol-step"><span class="no">' + (i + 1) + '</span><div class="body">' + s + '</div></div>').join('');
 }
 function answerHTML(t){
-  return 'Ответ: ' + (t.kind === 'slot' ? '<span class="mx">' + t.slotEq + '</span>' : '<span class="mx">' + t.answer + '</span>');
+  return 'Ответ: <span class="mx">' + t.answer + '</span>' + (t.kind === 'choice' && /π<i class="mv">n/.test(t.answer) ? '<span class="ans-note">, <i class="mv">n</i> ∈ ℤ</span>' : '');
 }
 function solutionHTML(t){ return stepsHTML(t) + '<div class="sol-answer">' + answerHTML(t) + '</div>'; }
 
@@ -1267,37 +1530,24 @@ function freshState(st){
   st.answered = false; st.hadWrong = false; st.correct = false;
   st.marks = {}; st.pick = null; st.wrong = []; st.sol = false;
 }
-// начать тренировку: уровень — тот, на котором по ней остановились
-function startRun(props, lvl){
+function startRun(props){
   props = normProps(props);
   if (!props.length) return;
   if (S.screen === 'task') snapshotAndClear('whole', els.workZone);
+  const wasPicker = S.screen !== 'task';
   S.props = props;
-  S.sel = props.length < PROP_IDS.length ? props.slice() : S.sel;
-  const p = progOf(runKey(props));
-  S.lvl = lvl || p.lvl || 1;
-  S.lvlCnt = lvl && lvl !== p.lvl ? 0 : (p.cnt || 0);
-  S.lvlUp = S.lvlCnt >= LEVEL_UP_AT && S.lvl < 3;
+  // «вперемешку» целой плашки выбор на плитках не трогает
+  if (!levelOfRun(props) || props.length === 1) S.sel = props.slice();
   S.screen = 'task';
   ensureProg();
-  drawTask(BANK.generate(S.props, S.lvl), true);
+  drawTask(BANK.generate(S.props), true);
   window.scrollTo(0, 0);
+  if (wasPicker) playEnter(els.taskArea, 900);
 }
-// «Следующее задание»: если уровень пройден — сначала поднимаемся на следующий
 function newTask(){
-  const key = runKey(S.props);
-  if (S.lvlUp && S.lvl < 3) { S.lvl++; S.lvlCnt = 0; S.lvlUp = false; saveLevelProg(key, Object.assign(progOf(key), { lvl: S.lvl, cnt: 0 })); }
   if (S.screen === 'task') snapshotAndClear('whole', els.workZone);
   S.screen = 'task';
-  drawTask(BANK.generate(S.props, S.lvl), true);
-}
-function setLevel(lvl){
-  if (lvl === S.lvl && S.task) return;
-  const key = runKey(S.props);
-  S.lvl = lvl; S.lvlCnt = 0; S.lvlUp = false;
-  saveLevelProg(key, Object.assign(progOf(key), { lvl, cnt: 0 }));
-  if (S.screen === 'task') snapshotAndClear('whole', els.workZone);
-  drawTask(BANK.generate(S.props, S.lvl), true);
+  drawTask(BANK.generate(S.props), true);
 }
 /* Нарисовать задание t. fresh — задание новое (сбросить ответ и набрать
    карточки заново); при чужом снимке ответ приходит отдельно. */
@@ -1307,11 +1557,11 @@ function drawTask(t, fresh){
   if (fresh) freshState(S);
   lastFocusedInput = null;
   els.taskTitle.textContent = runTitle(S.props);
-  document.title = 'Логарифмы — ' + runTitle(S.props);
-  els.logQuestion.innerHTML = questionHTML(t);
-  if (TS && TS.unregisterFieldsWithPrefix) TS.unregisterFieldsWithPrefix('log:main:');
+  document.title = 'Тригонометрия — ' + runTitle(S.props);
+  els.trigQuestion.innerHTML = questionHTML(t);
+  if (TS && TS.unregisterFieldsWithPrefix) TS.unregisterFieldsWithPrefix('trig:main:');
   buildAnswerArea(els.answerArea, t, S, 'main', () => render());
-  if (t.choice) wireChoice(els.logQuestion, els.answerArea, t, S, () => render());
+  if (t.choice) wireChoice(els.trigQuestion, els.answerArea, t, S, () => render());
   els.solSteps.innerHTML = stepsHTML(t);
   els.solAnswer.innerHTML = answerHTML(t);
   if (fresh) regenCards();
@@ -1320,17 +1570,17 @@ function drawTask(t, fresh){
   syncUrl();
 }
 function renderRunRow(){
-  els.runChips.innerHTML = S.props.length > 1 && !isAll(S.props)
-    ? S.props.map(id => '<span class="run-chip" style="--acc:' + accOf(id) + ';--acc-soft:' + hexA(accOf(id), 0.13) + '">' + propById(id).title + '</span> ').join('')
+  const l = levelOfRun(S.props);
+  els.runChips.innerHTML = S.props.length > 1 && !l
+    ? S.props.map(id => '<span class="run-chip" style="--acc:' + accOf(id) + ';--acc-soft:' + hexA(accOf(id), 0.13) + '">' + tileById(id).title + '</span> ').join('')
     : '';
   els.propRef.innerHTML = S.props.map(id =>
-    '<div class="prop-ref-item" style="--acc:' + accOf(id) + '"><div class="nm">' + propById(id).title + '</div><div class="fm">' + FORMULA[id].f +
-    (FORMULA[id].f2 && id !== 'ident' ? '<span class="fsep">;</span>' + FORMULA[id].f2 : '') + '</div></div>').join('');
+    '<div class="prop-ref-item" style="--acc:' + accOf(id) + '"><div class="nm">' + tileById(id).title + '</div><div class="fm">' + (FORMULA[id] ? FORMULA[id].f : '') + '</div></div>').join('');
 }
 function syncUrl(){
   try {
     const u = new URL(location.href);
-    if (S.screen === 'task') u.searchParams.set('p', isAll(S.props) ? 'all' : S.props.join(',')); else u.searchParams.delete('p');
+    if (S.screen === 'task') u.searchParams.set('p', runKey(S.props)); else u.searchParams.delete('p');
     history.replaceState(null, '', u.toString());
   } catch (e) {}
 }
@@ -1340,56 +1590,44 @@ function showPicker(){
   render();
   syncUrl();
   window.scrollTo(0, 0);
+  playEnter(els.levels, 1600);
 }
 
 /* ═══════════════ отрисовка ═══════════════ */
-function levelNoteHTML(){
-  const hint = BANK.LEVEL_HINTS[S.lvl - 1];
-  if (S.lvl >= 3) return LV[S.lvl - 1] + ' — ' + hint;
-  const dots = '<span class="lvl-dots">' + Array.from({ length: LEVEL_UP_AT }, (_, i) => '<i class="' + (i < S.lvlCnt ? 'on' : '') + '"></i>').join('') + '</span>';
-  return LV[S.lvl - 1] + ' — ' + hint + ' · до уровня ' + LV[S.lvl] + ': ' + dots;
-}
 function render(){
   const onTask = S.screen === 'task' && S.task;
   document.documentElement.setAttribute('data-screen', onTask ? 'task' : 'picker');
   els.pickerArea.style.display = onTask ? 'none' : 'block';
   els.taskArea.style.display = onTask ? 'block' : 'none';
   els.addRail.style.display = onTask ? '' : 'none';
-  els.pageTitle.textContent = 'Свойства логарифмов';
+  els.pageTitle.textContent = 'Тригонометрические уравнения';
   if (!onTask) {
-    els.pageSub.textContent = '10–11 класс · выбери свойства для тренировки';
+    els.pageSub.textContent = '10–11 класс · от простейших до №14 ЕГЭ';
     updateTileBadges();
     layoutDemos();
     syncKeypadVisibility();
     return;
   }
-  const single = S.props.length === 1;
-  els.pageSub.textContent = '10–11 класс · ' + (single ? BANK.groupById(propById(S.props[0]).group).title.toLowerCase() : (isAll(S.props) ? 'итоговая отработка' : 'смешанная тренировка'));
+  const single = S.props.length === 1, l = levelOfRun(S.props);
+  els.pageSub.textContent = '10–11 класс · ' + (single ? 'уровень ' + tileById(S.props[0]).lvl + ': ' + LEVELS[tileById(S.props[0]).lvl - 1].title.toLowerCase()
+    : (l ? 'уровень ' + l + ': ' + LEVELS[l - 1].title.toLowerCase() : 'смешанная тренировка'));
   const t = S.task;
   els.tabPractice.classList.toggle('active', S.mode === 'practice');
   els.tabExam.classList.toggle('active', S.mode === 'exam');
-  // соседние свойства — только когда отрабатывается одно
+  // соседние типы — только когда отрабатывается один
   els.prevProtoBtn.style.display = single ? '' : 'none';
   els.nextProtoBtn.style.display = single ? '' : 'none';
   if (single) {
-    const i = PROP_IDS.indexOf(S.props[0]);
-    els.prevProtoBtn.title = propById(PROP_IDS[(i - 1 + PROP_IDS.length) % PROP_IDS.length]).title;
-    els.nextProtoBtn.title = propById(PROP_IDS[(i + 1) % PROP_IDS.length]).title;
+    const i = TILE_IDS.indexOf(S.props[0]);
+    els.prevProtoBtn.title = tileById(TILE_IDS[(i - 1 + TILE_IDS.length) % TILE_IDS.length]).title;
+    els.nextProtoBtn.title = tileById(TILE_IDS[(i + 1) % TILE_IDS.length]).title;
   }
   // шпаргалка — только в «Тренировке»
   els.refBtn.style.display = S.mode === 'practice' ? '' : 'none';
   els.refBtn.classList.toggle('active', refOpen);
   els.propRef.style.display = (S.mode === 'practice' && refOpen) ? '' : 'none';
   els.runRow.style.display = (els.runChips.innerHTML || S.mode === 'practice') ? '' : 'none';
-  // «пройден» — только уровень, открытый тремя верными ответами
-  const max = progOf(runKey(S.props)).max || 1;
-  els.levelRow.querySelectorAll('.lvl-chip').forEach(b => {
-    const l = +b.dataset.lvl;
-    b.classList.toggle('active', l === S.lvl);
-    b.classList.toggle('done', l < max || (l === 3 && S.lvl === 3 && S.lvlCnt >= LEVEL_UP_AT));
-  });
-  els.levelNote.innerHTML = levelNoteHTML();
-  applyMarks(els.logQuestion, els.answerArea, t, S);
+  applyMarks(els.trigQuestion, els.answerArea, t, S);
   const hasCards = S.cards.length > 0;
   els.card1BtnRow.style.display = (hasCards || (S.mode === 'practice' && !S.answered)) ? 'flex' : 'none';
   els.basketInlineBtn.style.display = hasCards ? 'inline-flex' : 'none';
@@ -1400,8 +1638,6 @@ function render(){
   els.mainPanel.style.display = show ? 'block' : 'none';
   if (show && wasHidden) { els.mainPanel.classList.remove('reveal'); void els.mainPanel.offsetWidth; els.mainPanel.classList.add('reveal'); }
   els.nextBtn.style.display = (S.answered && !hasCards) ? 'block' : 'none';
-  els.levelUp.style.display = S.lvlUp ? 'block' : 'none';
-  els.levelUp.textContent = S.lvlUp ? '🎉 Уровень ' + LV[S.lvl - 1] + ' пройден! Следующее задание — уровень ' + LV[S.lvl] + '.' : '';
   els.stSolved.textContent = totalSolved;
   els.stErrors.textContent = totalErrors;
   els.stStreak.textContent = streak;
@@ -1425,15 +1661,14 @@ els.refBtn.onclick = () => { refOpen = !refOpen; render(); };
 els.showSolutionBtn.onclick = guard('showSolution', () => { S.sol = !S.sol; render(); });
 els.nextBtn.onclick = guard('switchTask', newTask);
 els.backBtn.onclick = guard('switchTask', showPicker);
-const stepProp = d => { const i = PROP_IDS.indexOf(S.props[0]); startRun([PROP_IDS[(i + d + PROP_IDS.length) % PROP_IDS.length]]); };
+const stepProp = d => { const i = TILE_IDS.indexOf(S.props[0]); startRun([TILE_IDS[(i + d + TILE_IDS.length) % TILE_IDS.length]]); };
 els.prevProtoBtn.onclick = guard('switchTask', () => stepProp(-1));
 els.nextProtoBtn.onclick = guard('switchTask', () => stepProp(1));
-els.levelRow.querySelectorAll('.lvl-chip').forEach(b => { b.onclick = guard('switchTask', () => setLevel(+b.dataset.lvl)); });
 els.basketAddBtn.onclick = () => { if (!window.Basket) return; addAllToBasket(); flashOk(els.basketAddBtn, '📥'); };
 
 /* ═══════════════ несколько заданий на экране ═══════════════
-   Как у «Процентов»: «+1…+10» дописывают карточки в конец, не трогая
-   стоящие. У карточки своё задание той же тренировки и уровня. */
+   Как у логарифмов: «+1…+10» дописывают карточки в конец, не трогая
+   стоящие. У карточки своё задание той же тренировки. */
 function freshCard(task){ return { task, answered: false, hadWrong: false, correct: false, marks: {}, pick: null, wrong: [], sol: false }; }
 function cardEl(idx){ return els.tasksColumns.querySelector('.added-task-card[data-idx="' + idx + '"]'); }
 function makeCardEl(c, idx){
@@ -1483,7 +1718,7 @@ function syncCard(idx){
 }
 function syncAllCards(){ S.cards.forEach((c, i) => syncCard(i)); }
 function renderCards(skipPush){
-  if (TS && TS.unregisterFieldsWithPrefix) TS.unregisterFieldsWithPrefix('log:card');
+  if (TS && TS.unregisterFieldsWithPrefix) TS.unregisterFieldsWithPrefix('trig:card');
   els.tasksColumns.querySelectorAll('.added-task-card').forEach(el => el.remove());
   S.cards.forEach((c, i) => els.tasksColumns.appendChild(makeCardEl(c, i)));
   syncAllCards();
@@ -1493,7 +1728,7 @@ function renderCards(skipPush){
 }
 function appendCards(n){
   for (let k = 0; k < n; k++) {
-    const c = freshCard(BANK.generate(S.props, S.lvl));
+    const c = freshCard(BANK.generate(S.props));
     S.cards.push(c);
     els.tasksColumns.appendChild(makeCardEl(c, S.cards.length - 1));
     syncCard(S.cards.length - 1);
@@ -1516,7 +1751,7 @@ function clearCards(){
 function refreshCard(idx){
   if (!S.cards[idx]) return;
   snapshotAndClear('single', cardEl(idx));
-  S.cards[idx] = freshCard(BANK.generate(S.props, S.lvl));
+  S.cards[idx] = freshCard(BANK.generate(S.props));
   const old = cardEl(idx);
   if (old) { old.replaceWith(makeCardEl(S.cards[idx], idx)); syncCard(idx); }
   else renderCards(true);
@@ -1526,7 +1761,7 @@ function refreshCard(idx){
 // новое основное задание — карточки набираются заново в прежнем количестве
 function regenCards(){
   if (!S.cards.length) return;
-  S.cards = S.cards.map(() => freshCard(BANK.generate(S.props, S.lvl)));
+  S.cards = S.cards.map(() => freshCard(BANK.generate(S.props)));
   renderCards(true);
 }
 function applyColumns(){
@@ -1547,13 +1782,13 @@ function addOneToBasket(selector, t){
   const task = t || S.task;
   window.Basket.add({
     trainerId: SLUG,
-    modeTitle: propById(task.pid).title + ' · уровень ' + LV[task.lvl - 1],
+    modeTitle: 'Уровень ' + task.lvl + ' · ' + tileById(task.pid).title,
     text: r.text, html: r.html,
   });
   return true;
 }
 function addAllToBasket(){
-  addOneToBasket('#logQuestion', S.task);
+  addOneToBasket('#trigQuestion', S.task);
   S.cards.forEach((c, i) => addOneToBasket('.added-task-card[data-idx="' + i + '"] .added-card-question', c.task));
 }
 function flashOk(btn, back){
@@ -1561,7 +1796,7 @@ function flashOk(btn, back){
   btn.textContent = '✓';
   setTimeout(() => { btn.classList.remove('ok'); btn.textContent = back; }, 900);
 }
-els.basketInlineBtn.onclick = () => { if (addOneToBasket('#logQuestion', S.task)) flashOk(els.basketInlineBtn, '📥'); };
+els.basketInlineBtn.onclick = () => { if (addOneToBasket('#trigQuestion', S.task)) flashOk(els.basketInlineBtn, '📥'); };
 
 let addRailOpen = false;
 function syncAddUI(){
@@ -1712,17 +1947,19 @@ els.kpToggle.onclick = () => { keypadOpen = true; syncKeypadVisibility(); };
   });
 })(els.keypadFloat, els.kpDragHandle);
 
-/* ═══════════════ запуск ═══════════════ */
-const URL_P = (function(){
-  const raw = new URLSearchParams(location.search).get('p');
+/* ═══════════════ запуск ═══════════════
+   Адрес: ?p=sin,cos — отмеченные типы; ?p=lvl2 — вся плашка вперемешку */
+function parseRun(raw){
   if (!raw) return null;
-  const list = raw === 'all' ? PROP_IDS : normProps(raw.split(','));
+  const m = /^lvl([1-5])$/.exec(raw);
+  const list = m ? levelIds(+m[1]) : normProps(raw.split(','));
   return list.length ? list : null;
-})();
+}
+const URL_P = parseRun(new URLSearchParams(location.search).get('p'));
 renderTiles();
 renderKeypadKeys();
 if (URL_P) startRun(URL_P);
-else render();
+else { render(); playEnter(els.levels, 1600); }
 
 /* ═══ доска (boards.html): ответ задания и «ещё такое же» ═══
    Доска сама заданий не решает — верный ответ отдаёт тренажёр
@@ -1731,24 +1968,22 @@ window.__boardTaskInfo = function(cardIdx){
   const t = cardIdx >= 0 ? (S.cards[cardIdx] || {}).task : S.task;
   if (!t) return null;
   if (t.choice) return { kind: 'choice', n: t.choice.opts.length, correct: t.choice.correct };
-  // доска разбирает ответ своим taEval: −3/2 и −1,5 для неё одно и то же
-  return { kind: 'fields', fields: t.fields.map(f => ({ id: f.id, label: t.kind === 'slot' ? '? =' : 'Ответ:', type: 'num', value: String(f.value), alts: [], unit: '' })) };
+  return { kind: 'fields', fields: t.fields.map(f => ({ id: f.id, label: 'Ответ:', type: 'num', value: String(f.value), alts: [], unit: '' })) };
 };
 
 /* ═══ общий снимок для совместной сессии и доски ═══
-   Та же схема, что во всех тренажёрах после промпта №54: версия задания
-   (__tsRev/__tsBy), пришедшее назад не рассылается, изменения ловит таймер.
-   Задание уходит ЦЕЛИКОМ (это данные без функций) — генерирует его только
-   тот, кто нажал кнопку; у собеседника оно просто рисуется. Отмеченные на
-   экране плиток свойства (sel) тоже общие: ученик видит, что выбирает
-   учитель. */
+   Та же схема, что в «Свойствах логарифмов»: версия задания
+   (__tsRev/__tsBy), пришедшее назад не рассылается, изменения ловит
+   таймер. Задание уходит ЦЕЛИКОМ (это данные без функций) — генерирует его
+   только тот, кто нажал кнопку. Отмеченные плитки (sel) тоже общие:
+   ученик видит, что выбирает учитель. */
 function cardsSnapshot(){
   return S.cards.map(c => ({ task: c.task, answered: !!c.answered, hadWrong: !!c.hadWrong, correct: !!c.correct,
     marks: c.marks || {}, pick: c.pick == null ? null : c.pick, wrong: c.wrong || [], sol: !!c.sol }));
 }
 function tsGetState(){
   const base = {
-    logScreen: S.screen, sel: S.sel.slice(), props: S.props.slice(), lvl: S.lvl, lvlCnt: S.lvlCnt, lvlUp: !!S.lvlUp, curSubMode: S.mode,
+    trigScreen: S.screen, sel: S.sel.slice(), props: S.props.slice(), curSubMode: S.mode,
     task: S.task, answered: !!S.answered, hadWrong: !!S.hadWrong, correct: !!S.correct,
     marks: S.marks, pick: S.pick == null ? null : S.pick, wrong: S.wrong || [], sol: !!S.sol,
     cards: cardsSnapshot(),
@@ -1766,11 +2001,8 @@ function tsApplyState(state){
   const props = normProps(state.props);
   if (props.length) S.props = props;
   ensureProg();
-  S.lvl = Math.max(1, Math.min(3, state.lvl || 1));
-  S.lvlCnt = state.lvlCnt || 0;
-  S.lvlUp = !!state.lvlUp;
   if (state.curSubMode === 'practice' || state.curSubMode === 'exam') S.mode = state.curSubMode;
-  if (state.logScreen === 'picker' || !state.task) { S.screen = 'picker'; render(); syncUrl(); return; }
+  if (state.trigScreen === 'picker' || !state.task) { S.screen = 'picker'; render(); syncUrl(); return; }
   S.screen = 'task';
   // задание перерисовываем только если пришло ДРУГОЕ: снимок прилетает на
   // каждый штрих доски, и перерисовка стирала бы набираемый ответ
@@ -1797,7 +2029,7 @@ function tsApplyState(state){
   syncUrl();
 }
 function tsWatchSig(s){
-  return JSON.stringify([s.logScreen, s.sel, s.props, s.lvl, s.lvlCnt, s.lvlUp, s.curSubMode, s.task ? s.task.key : null,
+  return JSON.stringify([s.trigScreen, s.sel, s.props, s.curSubMode, s.task ? s.task.key : null,
     s.answered, s.hadWrong, s.correct, s.marks, s.pick, s.wrong, s.sol,
     (s.cards || []).map(c => [c.task.key, c.answered, c.hadWrong, c.correct, c.marks, c.pick, c.wrong, c.sol]), s.workW]);
 }
@@ -1819,23 +2051,21 @@ function tsApplyStateFromPeer(state){
   try { tsPeerSig = tsWatchSig(tsGetState()); } catch (e) {}
 }
 /* Мост для «ещё такое же» на доске (boards-core.js, genNewTaskInFrame):
-   невидимый кадр доски получает тренировку и уровень и просит новое
-   задание. Снимок — только то, что задаёт тип задания, без самого задания. */
+   невидимый кадр доски получает тренировку и просит новое задание. */
 window.__trainerState = {
-  get(){ return { logScreen: 'task', props: S.props.slice(), lvl: S.lvl, curSubMode: S.mode }; },
+  get(){ return { trigScreen: 'task', props: S.props.slice(), curSubMode: S.mode }; },
   apply(s){
     if (!s || !Array.isArray(s.props)) return;
-    const props = normProps(s.props), lvl = Math.max(1, Math.min(3, s.lvl || 1));
+    const props = normProps(s.props);
     if (!props.length) return;
-    const same = S.screen === 'task' && S.task && runKey(S.props) === runKey(props) && S.task.lvl === lvl;
-    S.props = props; S.lvl = lvl; S.lvlUp = false;
+    const same = S.screen === 'task' && S.task && runKey(S.props) === runKey(props);
+    S.props = props;
     ensureProg();
     // доска перестраивает задание под новую ширину (промпт №70): ей нужен
-    // открытый экран задания, само условие она подставит из сохранённой
-    // вёрстки. С экрана плиток узла задания просто нет
-    if (!same) { S.screen = 'task'; drawTask(BANK.generate(props, lvl), true); }
+    // открытый экран задания, с экрана плиток узла задания просто нет
+    if (!same) { S.screen = 'task'; drawTask(BANK.generate(props), true); }
   },
-  newTask(){ S.screen = 'task'; drawTask(BANK.generate(S.props, S.lvl), true); },
+  newTask(){ S.screen = 'task'; drawTask(BANK.generate(S.props), true); },
 };
 
 if (window.TrainerSession) {
@@ -1864,8 +2094,6 @@ if (window.TrainerSession) {
   })();
 }
 </script>
-
-
 <script>
 /* ─── плавная посадка блоков при изменении высоты .panel ───
    ResizeObserver ловит ЛЮБОЕ изменение высоты независимо от того, какая
