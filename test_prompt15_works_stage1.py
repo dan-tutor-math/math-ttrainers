@@ -164,6 +164,11 @@ FAKE_SB_JS = r"""
           db.work_answers = db.work_answers.filter(r => !at.has(r.attempt_id));
         }
         if (this.t === 'work_attempts') db.work_answers = db.work_answers.filter(r => !ids.has(r.attempt_id));
+        if (this.t === 'work_variants'){
+          const at = new Set(db.work_attempts.filter(r => ids.has(r.variant_id)).map(r => r.id));
+          db.work_attempts = db.work_attempts.filter(r => !ids.has(r.variant_id));
+          db.work_answers = db.work_answers.filter(r => !at.has(r.attempt_id));
+        }
         out = gone;
       } else {
         out = db[this.t].filter(match);

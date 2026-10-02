@@ -116,24 +116,30 @@
       .select('id, title, kind, settings, closed, created_at, work_variants(id, num, code, blocks)')
       .eq('id', id).single());
   }
-  // w: { id?, variantId?, title, kind, settings, blocks } → { id, variantId, code }
+  // w: { id?, title, kind, settings, variants: [{ id?, num, blocks }], deleted: [id варианта] }
+  //   → { id, variants: [{ id, num, code }] } в том же порядке, что w.variants
   async function saveWork(w){
     const c = client();
     const head = { title: w.title || '', kind: w.kind || 'hw', settings: w.settings || {} };
-    let id = w.id, variantId = w.variantId, code = w.code;
+    let id = w.id;
     if (!id){
       id = check(await c.from('works').insert(head).select('id').single()).id;
     } else {
       check(await c.from('works').update(head).eq('id', id).select('id'));
     }
-    if (!variantId){
-      const v = check(await c.from('work_variants').insert({ work_id: id, num: 1, blocks: w.blocks || [] }).select('id, code').single());
-      variantId = v.id; code = v.code;
-    } else {
-      const v = check(await c.from('work_variants').update({ blocks: w.blocks || [] }).eq('id', variantId).select('id, code'));
-      if (v && v[0]) code = v[0].code;
+    // удалённые варианты — ДО записи новых: номер удалённого может достаться
+    // новому, а (work_id, num) в базе уникальны
+    for (const vid of (w.deleted || [])) check(await c.from('work_variants').delete().eq('id', vid));
+    const out = [];
+    for (const v of (w.variants || [])){
+      if (!v.id){
+        out.push(check(await c.from('work_variants').insert({ work_id: id, num: v.num, blocks: v.blocks || [] }).select('id, num, code').single()));
+      } else {
+        const r = check(await c.from('work_variants').update({ blocks: v.blocks || [] }).eq('id', v.id).select('id, num, code'));
+        out.push(r && r[0] ? r[0] : { id: v.id, num: v.num, code: v.code });
+      }
     }
-    return { id, variantId, code };
+    return { id, variants: out };
   }
   async function setClosed(id, closed){ check(await client().from('works').update({ closed: !!closed }).eq('id', id).select('id')); }
   async function deleteWork(id){ check(await client().from('works').delete().eq('id', id)); }
