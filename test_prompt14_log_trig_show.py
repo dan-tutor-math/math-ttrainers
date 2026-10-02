@@ -36,6 +36,9 @@ logarithms-bank.js, trig_equations.html, tile-demo.js/.css, boards-core.js.
      Г), тот же вид и те же свойства, и у задания из карточки «+» — вид
      карточки; тригонометрия в смешанной тренировке — тот же тип уравнения;
      «Обновить пример» в панели — та же ⟳;
+  H. таблица степеней в логарифмах: «🔢 Степени» рядом с «📘 Формулы»
+     только в «Тренировке», числа 1–20, у выбранного — степени до десятой
+     (значения верные, большие — по три цифры), телефон 375/320;
   G. «+» во всех остальных тренажёрах панели (ОГЭ, основа, НОД/НОК,
      «Проценты», движки ОГЭ №9): новое задание того же типа и уровня, и
      после второго задания другого уровня (кадр доски один на тренажёр).
@@ -749,7 +752,44 @@ def test_all_trainers(browser):
     check("G: без ошибок JS", not errs, str(errs[:1]))
 
 
-BLOCKS = {"A": test_bank, "B": test_page, "C": test_show, "D": test_trig, "E": test_session, "F": test_board, "G": test_all_trainers}
+# ─── H. таблица степеней ───
+def test_powers(browser):
+    ctx, page, errors = open_page(browser, "logarithms.html")
+    page.evaluate("() => startRun(['pow'], 1)")
+    vis = page.evaluate("() => { const b = document.getElementById('powBtn'), r = document.getElementById('refBtn'); return !!b.getClientRects().length && b.previousElementSibling === r && Math.abs(b.getBoundingClientRect().top - r.getBoundingClientRect().top) < 2; }")
+    check("H: «🔢 Степени» — рядом с «📘 Формулы», в той же строке", vis)
+    page.click("#powBtn")
+    r = page.evaluate("""() => ({ open: !!document.getElementById('powRef').getClientRects().length,
+        nums: [...document.querySelectorAll('#powRef .pow-num')].map(b => +b.textContent), on: (document.querySelector('#powRef .pow-num.on') || {}).textContent })""")
+    check("H: по кнопке — числа от 1 до 20, выбрано 2", r["open"] and r["nums"] == list(range(1, 21)) and r["on"] == "2", str(r))
+    bad = []
+    for n in (1, 2, 7, 13, 20):
+        page.click(f'#powRef .pow-num[data-n="{n}"]')
+        rows = page.evaluate("() => [...document.querySelectorAll('#powRef .pow-row')].map(r => [r.querySelector('sup').textContent, r.querySelector('.v').textContent.replace(/\\D/g, ''), r.textContent.split(/\\d/)[0]])")
+        want = [[str(e), str(n ** e)] for e in range(1, 11)]
+        if [x[:2] for x in rows] != want:
+            bad.append(f"{n}: {rows[:3]}…")
+    check("H: у выбранного числа — степени с первой по десятую, значения верные (и 20¹⁰)", not bad, "; ".join(bad))
+    grouped = page.evaluate("() => document.querySelector('#powRef .pow-row:last-child .v').innerHTML")
+    check("H: большие значения — по три цифры через пробел", "\u2009" in grouped or "&thinsp;" in grouped or "&#8201;" in grouped, grouped)
+    page.click("#tabExam")
+    ex = page.evaluate("() => [!!document.getElementById('powBtn').getClientRects().length, !!document.getElementById('powRef').getClientRects().length]")
+    check("H: в «Экзамене» ни кнопки, ни таблицы", ex == [False, False], str(ex))
+    page.click("#tabPractice")
+    check("H: обратно в «Тренировку» — таблица на месте", page.evaluate("() => !!document.getElementById('powRef').getClientRects().length"))
+    page.click("#powBtn")
+    check("H: повторное нажатие закрывает", not page.evaluate("() => !!document.getElementById('powRef').getClientRects().length"))
+    check("H: без ошибок JS", not errors, str(errors[:1]))
+    ctx.close()
+    for w in (375, 320):
+        ctx, page, errors = open_page(browser, "logarithms.html", width=w, height=800)
+        page.evaluate("() => { startRun(['pow'], 1); document.getElementById('powBtn').click(); document.querySelector('#powRef .pow-num[data-n=\"20\"]').click(); }")
+        m = page.evaluate("() => ({ over: document.documentElement.scrollWidth - innerWidth, cut: [...document.querySelectorAll('#powRef .pow-row, #powRef .pow-num')].filter(e => { const r = e.getBoundingClientRect(); return r.right > innerWidth + 1 || r.left < -1; }).length })")
+        check(f"H: {w} px — таблица степеней без прокрутки вбок", m["over"] <= 0 and m["cut"] == 0, str(m))
+        ctx.close()
+
+
+BLOCKS = {"A": test_bank, "B": test_page, "C": test_show, "D": test_trig, "E": test_session, "F": test_board, "G": test_all_trainers, "H": test_powers}
 
 
 def run():

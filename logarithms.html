@@ -440,6 +440,22 @@ sub .slot,sup .slot{border-width:1.5px;border-radius:5px;height:1.25em}
 .prop-ref-item{background:var(--glass);border:1px solid var(--glass-border);border-left:3px solid var(--acc);border-radius:12px;padding:8px 12px;font-family:var(--font-ui)}
 .prop-ref-item .nm{font-size:11.5px;font-weight:700;color:var(--acc);margin-bottom:3px}
 .prop-ref-item .fm{font-size:17px;color:var(--pencil);white-space:nowrap;overflow-x:auto;padding:4px 0}
+/* таблица степеней: margin-left:auto у «Формул» уже прижал кнопки вправо —
+   «Степени» встают сразу за ней */
+.ref-btn.pow-btn{margin-left:0}
+.pow-ref{background:var(--glass);border:1px solid var(--glass-border);border-radius:14px;padding:10px 12px 12px;margin:0 0 14px;font-family:var(--font-ui)}
+.pow-nums{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:6px}
+.pow-num{font-family:var(--font-ui);font-weight:700;font-size:14px;color:var(--muted-3);background:var(--card);border:1px solid var(--glass-border);border-radius:10px;height:34px;cursor:pointer;font-variant-numeric:lining-nums tabular-nums;transition:transform .12s,border-color .12s,background .12s,color .12s}
+.pow-num:hover{border-color:var(--ink)}
+.pow-num:active{transform:scale(.94)}
+.pow-num.on{background:var(--ink);border-color:var(--ink);color:#fff}
+/* степени — столбиком сверху вниз (7¹, 7², 7³ … в колонку), как пишут в
+   тетради; на широком экране две колонки по пять, на телефоне одна */
+.pow-table{columns:2 220px;column-gap:28px;margin-top:12px;font-size:18px;color:var(--pencil);font-variant-numeric:lining-nums tabular-nums}
+.pow-row{display:flex;align-items:baseline;gap:.1em;white-space:nowrap;padding:3px 2px;border-bottom:1px dashed var(--glass-border);break-inside:avoid}
+.pow-row sup{font-size:.64em;line-height:0;vertical-align:.72em}
+.pow-row .v{font-weight:600}
+@media (max-width:540px){ .pow-nums{grid-template-columns:repeat(5,minmax(0,1fr))} .pow-table{font-size:16px} }
 .log-ask{font-family:var(--font-ui);font-size:15px;color:var(--muted-3);line-height:1.5}
 .log-kind{display:inline-block;font-family:var(--font-ui);font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-6);margin-bottom:6px}
 .log-expr{font-family:var(--font-ui);font-size:clamp(22px,3.6vw,28px);color:var(--pencil);text-align:center;margin:16px 0 8px;line-height:1.9;padding:4px 2px}
@@ -486,7 +502,7 @@ sub .slot,sup .slot{border-width:1.5px;border-radius:5px;height:1.25em}
 /* «Показать свойство» — подсказка, а не ответ: кнопка спокойнее «Показать решение» */
 .prop-show-btn{color:var(--muted-3)}
 .prop-show-btn.on{background:var(--ink);border-color:var(--ink);color:#fff}
-html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!important}
+html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref,html[data-focus="on"] .pow-ref{display:none!important}
 
 </style>
 <!-- после стилей страницы: телефонная сетка модуля (одна колонка) должна
@@ -660,8 +676,12 @@ html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!impo
     <div class="run-row" id="runRow">
       <span id="runChips"></span>
       <button class="ref-btn" id="refBtn" type="button">📘 Формулы</button>
+      <!-- таблица степеней: число от 1 до 20 → его степени до десятой; как и
+           формулы — только в «Тренировке» -->
+      <button class="ref-btn pow-btn" id="powBtn" type="button">🔢 Степени</button>
     </div>
     <div class="prop-ref" id="propRef" style="display:none"></div>
+    <div class="pow-ref" id="powRef" style="display:none"></div>
 
     <!-- уровни А/Б/В: после трёх верных ответов открывается следующий, но
          перейти на любой можно и вручную -->
@@ -872,11 +892,12 @@ let totalSolved = 0, totalErrors = 0, streak = 0;
 let lastFocusedInput = null;
 let drawnKey = null;           // задание, которое сейчас нарисовано в #taskArea
 let refOpen = false;           // шпаргалка с формулами раскрыта
+let powOpen = false, powN = 2; // таблица степеней раскрыта и чья (у каждого своя, как шпаргалка)
 
 const els = {};
 ['pickerArea','tiles','pkBar','pkBarInfo','pkClear','pkStart','pkCond','taskArea','backBtn','prevProtoBtn','nextProtoBtn','taskTitle','pageTitle','pageSub',
  'runRow','runChips','refBtn','propRef','levelRow','levelNote','questionPanel','logQuestion','answerArea','card1BtnRow','basketInlineBtn','showSolutionBtn','levelUp',
- 'mainPanel','solSteps','solAnswer','nextBtn','tabPractice','tabExam','basketAddBtn','medalBadgeRow','propShowBtn','propShow',
+ 'mainPanel','solSteps','solAnswer','nextBtn','tabPractice','tabExam','basketAddBtn','medalBadgeRow','propShowBtn','propShow','powBtn','powRef',
  'workZone','workResizeLeft','workResizeRight','tasksColumns','card1Wrapper',
  'addRail','addRailToggle','addRailBody','addRailSep','addToBasketAllBtn','addClearBtn','medalTray',
  'exampleHistoryToggle','exampleHistoryPanel','exampleHistoryList','exampleHistoryEmpty','exampleHistoryClose',
@@ -1631,6 +1652,9 @@ function render(){
   els.refBtn.style.display = S.mode === 'practice' ? '' : 'none';
   els.refBtn.classList.toggle('active', refOpen);
   els.propRef.style.display = (S.mode === 'practice' && refOpen) ? '' : 'none';
+  els.powBtn.style.display = S.mode === 'practice' ? '' : 'none';
+  els.powBtn.classList.toggle('active', powOpen);
+  els.powRef.style.display = (S.mode === 'practice' && powOpen) ? '' : 'none';
   els.runRow.style.display = (els.runChips.innerHTML || S.mode === 'practice') ? '' : 'none';
   // «пройден» — только уровень, открытый тремя верными ответами
   const max = progOf(runKey(S.props)).max || 1;
@@ -1674,6 +1698,21 @@ function switchMode(mode){
 els.tabPractice.onclick = () => switchMode('practice');
 els.tabExam.onclick = () => switchMode('exam');
 els.refBtn.onclick = () => { refOpen = !refOpen; render(); };
+/* Таблица степеней: числа 1–20 кнопками, под ними степени выбранного с
+   первой по десятую. Большие значения — с пробелами по три цифры
+   (20¹⁰ = 10 240 000 000 000): так их читают в тетради. Все значения
+   целые и меньше 2⁵³ — в числах JavaScript они точные. */
+const groupDigits = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '&#8201;');
+function renderPowRef(){
+  let h = '<div class="pow-nums">';
+  for (let k = 1; k <= 20; k++) h += '<button type="button" class="pow-num' + (k === powN ? ' on' : '') + '" data-n="' + k + '">' + k + '</button>';
+  h += '</div><div class="pow-table">';
+  let v = 1;
+  for (let e = 1; e <= 10; e++) { v *= powN; h += '<div class="pow-row"><span>' + powN + '<sup>' + e + '</sup></span><span class="mo eq">=</span><span class="v">' + groupDigits(v) + '</span></div>'; }
+  els.powRef.innerHTML = h + '</div>';
+  els.powRef.querySelectorAll('.pow-num').forEach(b => { b.onclick = () => { powN = +b.dataset.n; renderPowRef(); }; });
+}
+els.powBtn.onclick = () => { powOpen = !powOpen; if (powOpen) renderPowRef(); render(); };
 els.showSolutionBtn.onclick = guard('showSolution', () => { S.sol = !S.sol; render(); });
 els.propShowBtn.onclick = guard('showSolution', () => {
   if (S.show && S.task && S.show.key === S.task.key) { S.show = null; render(); }
