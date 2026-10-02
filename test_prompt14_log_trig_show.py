@@ -301,26 +301,34 @@ def test_show(browser):
     p2 = page.evaluate(PANEL_JS)
     check("C: фишка — сразу к своему свойству", p2["on"] == 0 and p2["show"]["start"] == 0, str(p2["show"]))
 
-    # «на буквах», «другой пример», «ещё раз», закрыть
+    # «на буквах», «другой пример», «ещё раз» — про выбранное свойство, а не
+    # с первого (так было до правки: выбрал второе — показывало первое)
+    page.click('#propShow .pshow-chip[data-i="1"]')
+    page.wait_for_timeout(150)
     page.click('#propShow .pshow-seg button[data-v="let"]')
     page.wait_for_timeout(150)
     p3 = page.evaluate(PANEL_JS)
     check("C: «на буквах» — общий вид буквами, без чисел примера", p3["show"]["mode"] == "let" and p3["mv"] and not p3["formula"] and all(it["p"] is None for it in p3["show"]["items"]), str(p3["show"]))
+    check("C: «на буквах» — остаётся выбранное (второе) свойство", p3["on"] == 1 and p3["label"].startswith("Свойство 2"), f"{p3['on']} {p3['label']}")
     page.click('#propShow .pshow-seg button[data-v="num"]')
     page.wait_for_timeout(150)
-    a1 = page.evaluate("() => JSON.stringify(S.show.items)")
-    changed = False
+    check("C: «на числах» — тоже второе свойство", page.evaluate(PANEL_JS)["on"] == 1)
+    a1 = page.evaluate("() => S.show.items.map(it => JSON.stringify(it))")
+    changed, kept, stays = False, True, True
     for _ in range(6):
         page.click("#propShow .pshow-reroll")
         page.wait_for_timeout(80)
-        if page.evaluate("() => JSON.stringify(S.show.items)") != a1:
+        a2 = page.evaluate("() => S.show.items.map(it => JSON.stringify(it))")
+        stays = stays and page.evaluate(PANEL_JS)["on"] == 1
+        kept = kept and all(a2[k] == a1[k] for k in range(len(a1)) if k != 1)
+        if a2[1] != a1[1]:
             changed = True
             break
-    check("C: «Другой пример» — новые числа", changed)
+    check("C: «Другой пример» — новые числа у выбранного свойства, остальные не тронуты, на экране оно же", changed and kept and stays, f"{changed} {kept} {stays}")
     n0 = page.evaluate("() => S.show.n")
     page.click("#propShow .pshow-replay")
     page.wait_for_timeout(100)
-    check("C: «Ещё раз» — проход заново (с первого свойства)", page.evaluate("() => S.show.n") == n0 + 1 and page.evaluate(PANEL_JS)["on"] == 0)
+    check("C: «Ещё раз» — проход заново того же свойства", page.evaluate("() => S.show.n") == n0 + 1 and page.evaluate(PANEL_JS)["on"] == 1)
     page.click("#propShow .pshow-x")
     check("C: ✕ закрывает", not page.evaluate(PANEL_JS)["open"])
     open_show(page)

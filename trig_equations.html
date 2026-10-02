@@ -1378,6 +1378,7 @@ function showView(it){
   };
 }
 let showCtl = null, shownSig = null;
+const showCur = () => (showCtl && showCtl.cur ? showCtl.cur() : (S.show && S.show.start) || 0);
 function openShow(){
   if (!S.task || !TRIG_SHOW[S.task.pid]) return;
   S.show = { key: S.task.key, items: showItemsFor(S.task), start: 0, n: 0 };
@@ -1412,8 +1413,9 @@ function renderShow(){
     on: {
       close: guard('showSolution', () => { S.show = null; render(); }),
       pick: guard('showSolution', i => showSet({ start: i })),
-      reroll: guard('showSolution', () => showSet({ items: showItemsFor(S.task), start: 0 })),
-      replay: guard('showSolution', () => showSet({ start: 0 })),
+      // «другой пример» и «ещё раз» — про то, что сейчас на экране, а не с начала
+      reroll: guard('showSolution', () => showSet({ items: showItemsFor(S.task), start: showCur() })),
+      replay: guard('showSolution', () => showSet({ start: showCur() })),
     },
   });
 }

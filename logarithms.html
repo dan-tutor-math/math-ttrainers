@@ -1096,6 +1096,8 @@ function showView(it, mode){
 }
 let showMode = 'num';          // последний выбор «на числах / на буквах» в этой вкладке
 let showCtl = null, shownSig = null;
+// какое свойство сейчас на экране: очередь листает их сама, в S.show этого нет
+const showCur = () => (showCtl && showCtl.cur ? showCtl.cur() : (S.show && S.show.start) || 0);
 function openShow(){
   if (!S.task) return;
   S.show = { key: S.task.key, mode: showMode, items: showItems(S.task, showMode), start: 0, n: 0 };
@@ -1132,9 +1134,13 @@ function renderShow(){
     on: {
       close: guard('showSolution', () => { S.show = null; render(); }),
       pick: guard('showSolution', i => showSet({ start: i })),
-      toggle: guard('showSolution', v => { showMode = v; showSet({ mode: v, items: showItems(S.task, v), start: 0 }); }),
-      reroll: guard('showSolution', () => showSet({ items: showItems(S.task, 'num'), start: 0 })),
-      replay: guard('showSolution', () => showSet({ start: 0 })),
+      // «на буквах», «другой пример» и «ещё раз» — про то свойство, что
+      // сейчас на экране (выбранное фишкой или дошедшее по очереди), а не
+      // про первое: раньше всё начиналось с первого свойства заново
+      toggle: guard('showSolution', v => { showMode = v; showSet({ mode: v, items: showItems(S.task, v), start: showCur() }); }),
+      reroll: guard('showSolution', () => { const i = showCur(), fresh = showItems(S.task, 'num');
+        showSet({ items: S.show.items.map((it, k) => k === i ? fresh[k] : it), start: i }); }),
+      replay: guard('showSolution', () => showSet({ start: showCur() })),
     },
   });
 }
