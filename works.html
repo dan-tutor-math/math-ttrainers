@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0B0E1A">
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Работы — Mathh</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="works.css">
+<style>
+/* Вкладка «Работы» — конструктор домашних, самостоятельных и контрольных
+   (промпт №15 «работы»). Задания берутся из тех же тренажёров, что на
+   досках: каталог слева, тренажёр в кадре, «Добавить в работу» снимает
+   текущее задание картинкой (общий trainer-tasks.js), справа — лист
+   работы. Ученик получает ссылку на work.html. */
+.wrap{max-width:1040px;margin:0 auto;}
+body.editing .wrap{max-width:1440px;}
+/* в конструкторе круглые кнопки в углах уезжают вместе со страницей: иначе
+   они ложатся поверх прилипшей панели тренажёра и листа работы */
+body.editing .corner-btn{position:absolute;}
+.acct{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;color:var(--muted-2);font-size:14px;margin-bottom:16px;}
+.acct b{color:var(--pencil);}
+.auth-card{max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:12px;}
+.auth-note{font-size:13.5px;color:var(--muted-2);line-height:1.45;}
+.auth-note a{color:var(--ink);}
+.form-msg{color:var(--teacher);font-size:13.5px;min-height:1em;}
+
+/* ── список работ ── */
+.list-head{display:flex;justify-content:center;margin-bottom:16px;}
+.wlist{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+.wcard{display:flex;flex-direction:column;gap:8px;margin:0;}
+.wcard .wk{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-2);}
+.wcard .wt{font-size:18px;font-weight:700;line-height:1.25;}
+.wcard .wm{font-size:13.5px;color:var(--muted-2);line-height:1.45;}
+.wcard .wb{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+.wcard.closed{opacity:.75;}
+.badge{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:8px;background:var(--warn-tint);color:var(--warn);margin-left:6px;vertical-align:2px;}
+.empty{text-align:center;color:var(--muted-2);padding:30px 10px;line-height:1.5;}
+
+/* ── конструктор ── */
+.ed-top{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+.ed-top h2{font-size:20px;flex:1;min-width:200px;}
+.ed{display:grid;grid-template-columns:minmax(380px,1.15fr) minmax(360px,1fr);gap:14px;align-items:start;}
+.ed-left{position:sticky;top:12px;height:calc(100vh - 140px);min-height:520px;display:flex;flex-direction:column;padding:12px;margin:0;}
+.cat-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.cat-title{font-weight:700;font-size:16px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cat-search{max-width:220px;padding:8px 12px;font-size:14px;border-radius:12px;}
+.cat-list{overflow:auto;flex:1;display:flex;flex-direction:column;gap:12px;padding-right:2px;}
+.cat-group-title{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-2);margin:2px 4px 6px;}
+.cat-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:12px;
+  padding:9px 10px;cursor:pointer;font-family:var(--font-ui);color:var(--pencil);font-size:14.5px;}
+.cat-item:hover{background:var(--hover-1);border-color:var(--glass-border);}
+.cat-item .n{font-family:var(--font-mono);font-size:12px;color:var(--muted-1);width:20px;}
+.cat-item .nm{flex:1;font-weight:600;}
+.cat-item .eq{font-size:12.5px;color:var(--muted-2);white-space:nowrap;}
+.frame-wrap{position:relative;flex:1;min-height:0;border-radius:14px;overflow:hidden;border:1px solid var(--glass-border);background:var(--bg);}
+.frame-wrap iframe{display:block;width:100%;height:100%;border:0;}
+.frame-cover{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);color:var(--muted-2);font-weight:600;font-size:15px;z-index:2;}
+.frame-actions{display:flex;gap:8px;margin-top:10px;}
+.frame-actions .btn{flex:1;}
+.frame-actions .btn.quiet{flex:0 0 auto;}
+.ed-right{margin:0;}
+.sheet-row{margin-bottom:14px;}
+.seg{display:flex;gap:6px;flex-wrap:wrap;}
+.seg button{flex:1 1 auto;font-family:var(--font-ui);font-weight:600;font-size:13.5px;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);
+  border-radius:12px;padding:9px 10px;cursor:pointer;transition:background .15s, color .15s, border-color .15s;white-space:nowrap;}
+.seg button:hover:not(:disabled){border-color:var(--ink);}
+.seg button.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+.seg button:disabled{opacity:.45;cursor:default;}
+.seg.tiny button{font-size:12.5px;padding:5px 9px;border-radius:10px;flex:0 0 auto;}
+/* ползунок: слева — «после каждого задания», справа — «только в конце» */
+.switch{display:flex;align-items:center;gap:10px;flex-wrap:wrap;user-select:none;}
+.switch .side{font-size:14px;font-weight:600;color:var(--muted-2);cursor:pointer;}
+.switch .side.on{color:var(--pencil);}
+.switch .track{position:relative;width:52px;height:30px;border-radius:15px;background:var(--muted-7);border:none;cursor:pointer;flex:0 0 auto;transition:background .15s;}
+.switch .track::after{content:'';position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:12px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.25);transition:transform .18s;}
+.switch .track.right{background:var(--ink);}
+.switch .track.right::after{transform:translateX(22px);}
+.hint{font-size:12.5px;color:var(--muted-2);margin-top:6px;line-height:1.4;}
+.tasks{display:flex;flex-direction:column;gap:10px;margin:6px 0 14px;}
+.ti{display:grid;grid-template-columns:28px 1fr;gap:10px;padding:10px;border-radius:16px;background:var(--card);border:1px solid var(--glass-border);}
+.ti-num{font-weight:700;color:var(--muted-2);text-align:center;padding-top:4px;}
+.ti-img{border-radius:10px;overflow:hidden;background:var(--glass);}
+.ti-img img{display:block;max-width:100%;max-height:220px;margin:0 auto;}
+.ti-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;}
+.ti-name{font-size:13.5px;font-weight:600;color:var(--muted-3);flex:1;min-width:140px;}
+.ti-btns{display:flex;gap:4px;}
+.ti-btns button{width:32px;height:32px;border-radius:10px;border:1px solid var(--glass-border);background:var(--glass-strong);color:var(--pencil);cursor:pointer;font-size:15px;}
+.ti-btns button:hover:not(:disabled){border-color:var(--ink);}
+.ti-btns button:disabled{opacity:.35;cursor:default;}
+.ti-btns .rm{color:var(--teacher);}
+.ti-up{font-size:12px;color:var(--warn);}
+.sheet-foot{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.saved{font-size:13px;color:var(--muted-2);}
+.link-box{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;padding:12px;border-radius:14px;background:var(--hl-10);}
+.link-box .field{flex:1;min-width:200px;font-family:var(--font-mono);font-size:13.5px;padding:9px 12px;}
+.link-box a{color:var(--ink);font-size:14px;font-weight:600;}
+.warn-note{font-size:13px;color:var(--warn);background:var(--warn-tint);border-radius:12px;padding:8px 12px;margin-bottom:12px;}
+
+/* ── результаты ── */
+.res-head{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px;}
+.res-head h2{flex:1;min-width:200px;font-size:20px;}
+.res-scroll{overflow:auto;}
+table.res{border-collapse:separate;border-spacing:0;width:100%;font-size:14px;}
+table.res th, table.res td{padding:8px 8px;border-bottom:1px solid var(--glass-border);text-align:center;white-space:nowrap;}
+table.res th{font-size:12px;color:var(--muted-2);font-weight:700;text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;background:var(--glass-strong);}
+table.res td.nm, table.res th.nm{text-align:left;}
+table.res td.nm b{font-size:14.5px;}
+table.res td.nm small{display:block;color:var(--muted-2);font-size:12px;}
+.cell{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:28px;padding:0 5px;border-radius:9px;font-weight:700;cursor:pointer;border:1px solid transparent;background:var(--glass);color:var(--muted-1);position:relative;}
+.cell.ok{background:var(--ok);color:#fff;}
+.cell.bad{background:var(--teacher);color:#fff;}
+.cell.skipped{border:1.5px dashed var(--muted-1);background:none;}
+.cell.pending{border:1.5px solid var(--warn);color:var(--warn);background:none;}
+.cell.seen{border:1.5px dashed var(--muted-7);background:none;}   /* открывал, но не отвечал */
+.cell sup{font-size:10px;margin-left:1px;}
+.cell .aid{position:absolute;top:-6px;right:-6px;font-size:11px;}
+.detail{margin-top:12px;font-size:14px;line-height:1.55;}
+.detail b{color:var(--pencil);}
+.score{font-weight:700;}
+@media (max-width:980px){
+  .ed{grid-template-columns:1fr;}
+  .ed-left{position:relative;top:0;height:78vh;}
+}
+</style>
+</head>
+<body>
+<a class="corner-btn left" href="index.html" title="К тренажёрам" aria-label="К тренажёрам">←</a>
+<button class="corner-btn right" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<div class="wrap">
+  <h1 id="pageTitle">Работы</h1>
+  <div class="sub" id="pageSub">Домашние, самостоятельные и контрольные из заданий тренажёров — ученику ссылкой</div>
+  <div class="acct" id="acct" hidden></div>
+
+  <section id="scrLoading" class="empty">Загружаем…</section>
+
+  <section id="scrAuth" hidden>
+    <div class="panel auth-card">
+      <div><label class="label" for="auEmail">Почта</label><input class="field" id="auEmail" type="email" autocomplete="email"></div>
+      <div><label class="label" for="auPass">Пароль</label><input class="field" id="auPass" type="password" autocomplete="current-password"></div>
+      <button class="btn" id="auGo">Войти</button>
+      <div class="form-msg" id="auMsg"></div>
+      <div class="auth-note">Тот же вход, что на «Досках». Если пароля нет — войдите на <a href="boards.html">Досках</a> по ссылке из письма и вернитесь сюда: вход сохранится.</div>
+    </div>
+  </section>
+
+  <section id="scrList" hidden>
+    <div class="list-head"><button class="btn" id="newWork">+ Новая работа</button></div>
+    <div class="wlist" id="workList"></div>
+  </section>
+
+  <section id="scrEdit" hidden>
+    <div class="ed-top">
+      <button class="btn quiet small" id="edBack">← Все работы</button>
+      <h2 id="edHead">Новая работа</h2>
+    </div>
+    <div class="ed">
+      <div class="ed-left panel">
+        <div class="cat-head">
+          <button class="btn quiet small" id="catBack" hidden>← Тренажёры</button>
+          <div class="cat-title" id="catTitle">Тренажёры</div>
+          <input class="field cat-search" id="catSearch" placeholder="Поиск">
+        </div>
+        <div class="cat-list" id="catList"></div>
+        <div class="frame-wrap" id="frameWrap" hidden>
+          <iframe id="trFrame" title="Тренажёр"></iframe>
+          <div class="frame-cover" id="frameCover" hidden>Снимаю задание…</div>
+        </div>
+        <div class="frame-actions" id="frameActions" hidden>
+          <button class="btn" id="addBtn">＋ Добавить в работу</button>
+          <button class="btn quiet" id="refreshBtn2" title="Другой пример того же типа — как ⟳ в тренажёре">⟳ Обновить пример</button>
+        </div>
+      </div>
+      <div class="ed-right panel">
+        <div class="warn-note" id="edWarn" hidden></div>
+        <div class="sheet-row">
+          <label class="label" for="wkTitle">Название</label>
+          <input class="field" id="wkTitle" maxlength="200" placeholder="Например: Проценты, 6 класс">
+        </div>
+        <div class="sheet-row">
+          <span class="label">Тип работы</span>
+          <div class="seg" id="wkKind">
+            <button data-k="hw">Домашняя</button><button data-k="sr">Самостоятельная</button><button data-k="kr">Контрольная</button><button data-k="custom">Другое</button>
+          </div>
+          <input class="field" id="wkKindName" maxlength="60" placeholder="Своё название: зачёт, диагностика…" hidden style="margin-top:8px">
+        </div>
+        <div class="sheet-row">
+          <span class="label">Результат ученику</span>
+          <div class="switch">
+            <span class="side" data-v="each">после каждого задания</span>
+            <button class="track" id="wkFeedback" role="switch" aria-label="Результат: после каждого задания или только в конце"></button>
+            <span class="side" data-v="end">только в конце</span>
+          </div>
+        </div>
+        <div class="sheet-row" id="triesRow">
+          <span class="label">Попыток на задание</span>
+          <div class="seg" id="wkTries">
+            <button data-t="1">1</button><button data-t="2">2</button><button data-t="3">3</button><button data-t="5">5</button><button data-t="inf">∞</button>
+          </div>
+          <div class="hint" id="triesHint"></div>
+        </div>
+        <span class="label">Задания <span id="wkCount"></span></span>
+        <div class="tasks" id="wkTasks"></div>
+        <div class="sheet-foot">
+          <button class="btn" id="wkSave">Сохранить</button>
+          <span class="saved" id="wkSaved"></span>
+        </div>
+        <div class="link-box" id="wkLinkBox" hidden>
+          <input class="field" id="wkLink" readonly>
+          <button class="btn small" id="wkCopy">Скопировать ссылку</button>
+          <a id="wkOpen" href="#" target="_blank" rel="noopener">Открыть как ученик ↗</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="scrResults" hidden>
+    <div class="res-head">
+      <button class="btn quiet small" id="rsBack">← Все работы</button>
+      <h2 id="rsTitle"></h2>
+      <button class="btn quiet small" id="rsRefresh">⟳ Обновить</button>
+      <button class="btn quiet small" id="rsEdit">Изменить работу</button>
+    </div>
+    <div class="panel">
+      <div class="link-box" id="rsLinkBox" style="margin:0 0 12px">
+        <input class="field" id="rsLink" readonly>
+        <button class="btn small" id="rsCopy">Скопировать ссылку</button>
+        <button class="btn quiet small" id="rsClose">Закрыть приём</button>
+      </div>
+      <div class="res-scroll"><table class="res" id="rsTable"></table></div>
+      <div class="detail" id="rsDetail"></div>
+    </div>
+  </section>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="supabase-config.js"></script>
+<script src="supabase-js.umd.js"></script>
+<script src="html2canvas.min.js"></script>
+<script src="trainer-tasks.js"></script>
+<script src="works-cloud.js"></script>
+<script>
+(function(){
+'use strict';
+const C = window.WorksCloud;
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+const themeBtn = $('themeToggle');
+function curTheme(){ return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
+function applyTheme(t, persist){
+  document.documentElement.setAttribute('data-theme', t);
+  themeBtn.textContent = t === 'dark' ? '☀️' : '🌙';
+  if (persist) { try { localStorage.setItem('theme', t); } catch (e) {} }
+}
+applyTheme(curTheme(), false);
+themeBtn.addEventListener('click', () => { applyTheme(curTheme() === 'dark' ? 'light' : 'dark', true); if (!$('scrEdit').hidden) renderTasks(); });
+
+function toast(msg){
+  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2800);
+}
+function show(id){
+  ['scrLoading', 'scrAuth', 'scrList', 'scrEdit', 'scrResults'].forEach(s => { $(s).hidden = s !== id; });
+  document.body.classList.toggle('editing', id === 'scrEdit');
+  const titled = id === 'scrList' || id === 'scrAuth' || id === 'scrLoading';
+  $('pageTitle').hidden = !titled; $('pageSub').hidden = !titled;
+}
+const fmtDate = s => { try { return new Date(s).toLocaleString('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return ''; } };
+const fmtMin = ms => { const m = Math.round((ms || 0) / 60000); return m < 1 ? (ms > 0 ? '<1 мин' : '—') : m + ' мин'; };
+
+// каталог — тот же, что в панели тренажёров на досках (trainer-tasks.js)
+function trainerName(tid){
+  for (const g of TRAINERS_PANEL_GROUPS) for (const it of g.items) if (it.id === tid) return it.name;
+  return tid;
+}
+
+/* ── вход ── */
+let user = null;
+async function boot(){
+  if (!C.client()){ show('scrAuth'); $('auMsg').textContent = 'Нет настроек подключения к серверу (supabase-config.js)'; $('auGo').disabled = true; return; }
+  user = await C.currentUser();
+  C.client().auth.onAuthStateChange((ev, session) => {
+    const u = session ? session.user : null;
+    if (!!u !== !!user){ user = u; route(); }
+    user = u;
+  });
+  route();
+}
+function renderAcct(){
+  const a = $('acct');
+  if (!user){ a.hidden = true; return; }
+  a.innerHTML = 'Вы вошли: <b>' + esc(user.email || '') + '</b> <button class="btn quiet small" id="auOut">Выйти</button>';
+  a.hidden = false;
+  $('auOut').addEventListener('click', async () => { await C.signOut(); user = null; route(); });
+}
+$('auGo').addEventListener('click', async () => {
+  const email = $('auEmail').value.trim(), pw = $('auPass').value;
+  if (!email || !pw){ $('auMsg').textContent = 'Введите почту и пароль'; return; }
+  $('auGo').disabled = true; $('auMsg').textContent = '';
+  try { user = await C.signIn(email, pw); route(); }
+  catch (e) { $('auMsg').textContent = /invalid|credentials/i.test(String(e.raw && e.raw.message)) ? 'Не подошли почта или пароль' : e.message; }
+  finally { $('auGo').disabled = false; }
+});
+$('auPass').addEventListener('keydown', e => { if (e.key === 'Enter') $('auGo').click(); });
+
+/* ── маршруты: #/ — список, #/new, #/edit/<id>, #/results/<id> ── */
+window.addEventListener('hashchange', () => route());
+function go(hash){ if (location.hash === hash) route(); else location.hash = hash; }
+async function route(){
+  renderAcct();
+  if (!user){ show('scrAuth'); return; }
+  const h = location.hash.replace(/^#\/?/, '');
+  const [what, id] = h.split('/');
+  if (E.dirty && !(what === 'edit' && id === E.id) && what !== 'new'){
+    if (!confirm('В работе есть несохранённые изменения. Уйти без сохранения?')){
+      history.replaceState(null, '', E.id ? '#/edit/' + E.id : '#/new');
+      return;
+    }
+    E.dirty = false;
+  }
+  if (what === 'new') return openEditor(null);
+  if (what === 'edit' && id) return openEditor(id);
+  if (what === 'results' && id) return openResults(id);
+  return openList();
+}
+
+/* ── список работ ── */
+let worksCache = [];
+async function openList(){
+  show('scrLoading');
+  try { worksCache = await C.listWorks(); }
+  catch (e) { show('scrList'); $('workList').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; return; }
+  show('scrList');
+  const box = $('workList');
+  if (!worksCache.length){ box.innerHTML = '<div class="empty">Работ пока нет. Нажмите «Новая работа», выберите тренажёр и добавляйте задания.</div>'; return; }
+  box.innerHTML = '';
+  worksCache.forEach(w => {
+    const v = (w.work_variants || []).find(x => x.num === 1) || (w.work_variants || [])[0];
+    const n = v ? (v.blocks || []).filter(b => (b.type || 'task') === 'task').length : 0;
+    const atts = w.work_attempts || [];
+    const fin = atts.filter(a => a.finished_at).length;
+    const el = document.createElement('div');
+    el.className = 'panel wcard' + (w.closed ? ' closed' : '');
+    el.dataset.id = w.id;
+    el.innerHTML = '<div class="wk">' + esc(C.kindLabel(w.kind, w.settings)) + (w.closed ? '<span class="badge">приём закрыт</span>' : '') + '</div>'
+      + '<div class="wt">' + esc(w.title || 'Без названия') + '</div>'
+      + '<div class="wm">Заданий: ' + n + ' · ' + (w.settings && w.settings.feedback === 'end' ? 'результат в конце' : 'результат сразу')
+      + '<br>Начали: ' + atts.length + ' · сдали: ' + fin + ' · создана ' + esc(fmtDate(w.created_at)) + '</div>'
+      + '<div class="wb"><button class="btn small" data-a="res">Результаты</button><button class="btn quiet small" data-a="edit">Изменить</button>'
+      + (v ? '<button class="btn quiet small" data-a="copy">Ссылка</button>' : '') + '<button class="btn danger small" data-a="del">Удалить</button></div>';
+    el.querySelector('[data-a="res"]').addEventListener('click', () => go('#/results/' + w.id));
+    el.querySelector('[data-a="edit"]').addEventListener('click', () => go('#/edit/' + w.id));
+    if (v) el.querySelector('[data-a="copy"]').addEventListener('click', () => copyText(C.linkFor(v.code)));
+    el.querySelector('[data-a="del"]').addEventListener('click', async () => {
+      if (!confirm('Удалить «' + (w.title || 'работу') + '» вместе со всеми результатами учеников? Это не отменить.')) return;
+      try { await C.deleteWork(w.id); toast('Работа удалена'); openList(); } catch (e) { toast(e.message); }
+    });
+    box.appendChild(el);
+  });
+}
+$('newWork').addEventListener('click', () => go('#/new'));
+async function copyText(t){
+  try { await navigator.clipboard.writeText(t); toast('Ссылка скопирована'); }
+  catch (e) { prompt('Скопируйте ссылку:', t); }
+}
+
+/* ── конструктор ── */
+const E = { id: null, variantId: null, code: null, title: '', kind: 'hw', settings: { feedback: 'each', attempts: 2 }, blocks: [], dirty: false, attempts: 0 };
+function markDirty(){ E.dirty = true; $('wkSaved').textContent = 'Есть несохранённые изменения'; }
+window.addEventListener('beforeunload', e => { if (E.dirty){ e.preventDefault(); e.returnValue = ''; } });
+
+async function openEditor(id){
+  show('scrLoading');
+  Object.assign(E, { id: null, variantId: null, code: null, title: '', kind: 'hw', settings: { feedback: 'each', attempts: 2 }, blocks: [], dirty: false, attempts: 0 });
+  if (id){
+    try {
+      const w = await C.getWork(id);
+      const v = (w.work_variants || []).find(x => x.num === 1) || (w.work_variants || [])[0] || null;
+      Object.assign(E, { id: w.id, title: w.title || '', kind: w.kind || 'hw', settings: Object.assign({ feedback: 'each', attempts: 2 }, w.settings || {}),
+        variantId: v ? v.id : null, code: v ? v.code : null, blocks: v ? (v.blocks || []) : [] });
+      const cached = worksCache.find(x => x.id === id);
+      E.attempts = cached ? (cached.work_attempts || []).length : 0;
+    } catch (e) { toast(e.message); go('#/'); return; }
+  }
+  show('scrEdit');
+  $('edHead').textContent = E.id ? 'Работа' : 'Новая работа';
+  $('edWarn').hidden = !E.attempts;
+  $('edWarn').textContent = E.attempts ? 'Эту работу уже начали ученики (' + E.attempts + '). Правки увидят те, кто откроет ссылку после сохранения; ответы на удалённые задания пропадут из итогов.' : '';
+  $('wkTitle').value = E.title;
+  $('wkKindName').value = E.settings.kindName || '';
+  renderSettings(); renderTasks(); renderLink();
+  $('wkSaved').textContent = E.id ? 'Сохранено' : '';
+  if (!$('catList').childElementCount) renderCatalog('');
+}
+function renderSettings(){
+  $('wkKind').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.k === E.kind));
+  $('wkKindName').hidden = E.kind !== 'custom';
+  const end = E.settings.feedback === 'end';
+  $('wkFeedback').classList.toggle('right', end);
+  $('wkFeedback').setAttribute('aria-checked', end ? 'true' : 'false');
+  document.querySelectorAll('.switch .side').forEach(s => s.classList.toggle('on', s.dataset.v === (end ? 'end' : 'each')));
+  const t = E.settings.attempts == null ? 'inf' : String(E.settings.attempts);
+  $('wkTries').querySelectorAll('button').forEach(b => { b.classList.toggle('active', !end && b.dataset.t === t); b.disabled = end; });
+  // при «только в конце» ученик не знает, ошибся ли, — повторять ему нечего
+  $('triesHint').textContent = end ? 'При «только в конце» попыток нет: ответ можно менять до «Завершить работу».' : 'Кончились попытки — ученик видит верный ответ. «Пропустить» есть всегда.';
+}
+$('wkKind').addEventListener('click', e => {
+  const b = e.target.closest('button[data-k]'); if (!b) return;
+  E.kind = b.dataset.k; renderSettings(); markDirty();
+  if (E.kind === 'custom') $('wkKindName').focus();
+});
+$('wkKindName').addEventListener('input', () => { E.settings.kindName = $('wkKindName').value; markDirty(); });
+$('wkTitle').addEventListener('input', () => { E.title = $('wkTitle').value; markDirty(); });
+function setFeedback(v){ E.settings.feedback = v; renderSettings(); markDirty(); }
+$('wkFeedback').addEventListener('click', () => setFeedback(E.settings.feedback === 'end' ? 'each' : 'end'));
+document.querySelectorAll('.switch .side').forEach(s => s.addEventListener('click', () => setFeedback(s.dataset.v)));
+$('wkTries').addEventListener('click', e => {
+  const b = e.target.closest('button[data-t]'); if (!b || b.disabled) return;
+  E.settings.attempts = b.dataset.t === 'inf' ? null : Number(b.dataset.t);
+  renderSettings(); markDirty();
+});
+
+function renderTasks(){
+  const box = $('wkTasks');
+  const tasks = E.blocks;
+  $('wkCount').textContent = tasks.length ? '(' + tasks.length + ')' : '';
+  if (!tasks.length){
+    box.innerHTML = '<div class="empty">Слева выберите тренажёр, откройте нужное задание и нажмите «Добавить в работу».</div>';
+    return;
+  }
+  box.innerHTML = '';
+  tasks.forEach((b, i) => {
+    const im = (b.img || {})[curTheme()] || (b.img || {}).light || {};
+    const el = document.createElement('div');
+    el.className = 'ti'; el.dataset.id = b.id;
+    el.innerHTML = '<div class="ti-num">' + (i + 1) + '</div><div><div class="ti-img"><img alt="Задание ' + (i + 1) + '"></div>'
+      + '<div class="ti-row"><span class="ti-name">' + esc(b.name || trainerName(b.tid)) + '</span>'
+      + '<div class="seg tiny"><button data-m="train" title="В работе у задания будет кнопка с подсказками и решением в тренажёре">Тренировка</button><button data-m="exam" title="Только поле для ответа">Экзамен</button></div>'
+      + '<div class="ti-btns"><button data-a="up" title="Выше">↑</button><button data-a="down" title="Ниже">↓</button><button data-a="rm" class="rm" title="Убрать из работы">✕</button></div></div>'
+      + (b._up ? '<div class="ti-up">Картинка ещё загружается…</div>' : '') + '</div>';
+    el.querySelector('img').src = im.url || '';
+    el.querySelectorAll('[data-m]').forEach(m => {
+      m.classList.toggle('active', (b.mode || 'exam') === m.dataset.m);
+      m.addEventListener('click', () => { b.mode = m.dataset.m; markDirty(); renderTasks(); });
+    });
+    const up = el.querySelector('[data-a="up"]'), down = el.querySelector('[data-a="down"]');
+    up.disabled = i === 0; down.disabled = i === tasks.length - 1;
+    up.addEventListener('click', () => { [tasks[i - 1], tasks[i]] = [tasks[i], tasks[i - 1]]; markDirty(); renderTasks(); });
+    down.addEventListener('click', () => { [tasks[i + 1], tasks[i]] = [tasks[i], tasks[i + 1]]; markDirty(); renderTasks(); });
+    el.querySelector('[data-a="rm"]').addEventListener('click', () => { tasks.splice(i, 1); markDirty(); renderTasks(); });
+    box.appendChild(el);
+  });
+}
+function renderLink(){
+  const has = !!E.code;
+  $('wkLinkBox').hidden = !has;
+  if (has){ const l = C.linkFor(E.code); $('wkLink').value = l; $('wkOpen').href = l; }
+}
+$('wkCopy').addEventListener('click', () => copyText($('wkLink').value));
+$('edBack').addEventListener('click', () => go('#/'));
+
+/* ── сохранение ── */
+let saving = false;
+$('wkSave').addEventListener('click', save);
+async function save(){
+  if (saving) return;
+  if (!E.blocks.length){ toast('Добавьте хотя бы одно задание'); return; }
+  saving = true; $('wkSave').disabled = true; $('wkSaved').textContent = 'Сохраняем…';
+  try {
+    await uploadPending();
+    const r = await C.saveWork({ id: E.id, variantId: E.variantId, title: E.title.trim(), kind: E.kind, settings: E.settings, blocks: E.blocks.map(cleanBlock) });
+    const isNew = !E.id;
+    Object.assign(E, { id: r.id, variantId: r.variantId, code: r.code, dirty: false });
+    $('wkSaved').textContent = 'Сохранено ' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    $('edHead').textContent = 'Работа';
+    renderLink();
+    if (isNew){ history.replaceState(null, '', '#/edit/' + r.id); toast('Работа сохранена — ссылку можно отправлять ученикам'); }
+  } catch (e) {
+    $('wkSaved').textContent = 'Не сохранилось: ' + e.message;
+  } finally { saving = false; $('wkSave').disabled = false; }
+}
+// в базу — без служебных полей (_up, _data — картинка до загрузки)
+function cleanBlock(b){
+  const out = {};
+  Object.keys(b).forEach(k => { if (k[0] !== '_') out[k] = b[k]; });
+  return JSON.parse(JSON.stringify(out));
+}
+
+/* ── каталог и тренажёр в кадре ── */
+let openTid = null, openHref = null;
+function renderCatalog(q){
+  q = (q || '').trim().toLowerCase();
+  const html = TRAINERS_PANEL_GROUPS.map(g => {
+    const items = g.items.filter(it => !q || it.name.toLowerCase().includes(q));
+    if (!items.length) return '';
+    return '<div><div class="cat-group-title">' + esc(g.title) + '</div>' + items.map((it, i) =>
+      '<button class="cat-item" data-id="' + esc(it.id) + '" data-href="' + esc(it.href) + '" data-name="' + esc(it.name) + '">'
+      + '<span class="n">' + String(i + 1).padStart(2, '0') + '</span><span class="nm">' + esc(it.name) + '</span><span class="eq">' + esc(it.eq) + '</span></button>').join('') + '</div>';
+  }).join('');
+  $('catList').innerHTML = html || '<div class="empty">Ничего не нашлось</div>';
+}
+$('catSearch').addEventListener('input', () => renderCatalog($('catSearch').value));
+$('catList').addEventListener('click', e => {
+  const b = e.target.closest('.cat-item'); if (!b) return;
+  openTrainer(b.dataset.id, b.dataset.href, b.dataset.name);
+});
+function openTrainer(id, href, name){
+  openTid = id; openHref = href;
+  $('catTitle').textContent = name;
+  $('catBack').hidden = false; $('catSearch').hidden = true;
+  $('catList').hidden = true; $('frameWrap').hidden = false; $('frameActions').hidden = false;
+  $('trFrame').src = href;
+}
+// в кадре могли перейти в другой тренажёр (главная внутри кадра, стрелки
+// между номерами ЕГЭ меняют ?n= без перезагрузки) — какой тренажёр открыт
+// на самом деле, берём из адреса кадра, а не из того, что выбрали в каталоге
+function frameTrainer(){
+  let loc;
+  try { loc = $('trFrame').contentWindow.location; } catch (e) { return null; }
+  if (!loc || loc.href === 'about:blank') return null;
+  const file = loc.pathname.split('/').pop();
+  const n = new URLSearchParams(loc.search).get('n');
+  for (const g of TRAINERS_PANEL_GROUPS) for (const it of g.items){
+    const [f, q] = it.href.split('?');
+    if (f !== file) continue;
+    if (!q) return it;
+    if (n && q === 'n=' + n) return it;
+  }
+  return null;
+}
+function syncFrameTrainer(){
+  const it = frameTrainer();
+  if (!it){ return false; }
+  if (it.id !== openTid){ openTid = it.id; openHref = it.href; $('catTitle').textContent = it.name; }
+  return true;
+}
+$('trFrame').addEventListener('load', () => { if (openTid) syncFrameTrainer(); });
+function closeTrainer(){
+  openTid = null; openHref = null;
+  $('catTitle').textContent = 'Тренажёры';
+  $('catBack').hidden = true; $('catSearch').hidden = false;
+  $('catList').hidden = false; $('frameWrap').hidden = true; $('frameActions').hidden = true;
+  $('trFrame').src = 'about:blank';
+}
+$('catBack').addEventListener('click', closeTrainer);
+$('refreshBtn2').addEventListener('click', () => {
+  syncFrameTrainer();
+  let res = 'notask';
+  try { res = refreshTrainerIn($('trFrame').contentWindow, openTid); } catch (e) { console.error('[работы] обновить пример', e); }
+  if (res !== 'ok') toast(res === 'single' ? 'У этого номера один прототип — другого примера нет' : 'Сначала откройте задание в тренажёре');
+});
+
+/* ── «Добавить в работу» ──
+   Снимок — тот же, что «Добавить на доску» (captureTrainerNode: чистая
+   карточка, места полей и вариантов), только ДВАЖДЫ: в светлой и тёмной
+   теме — у ученика задание того же цвета, что и вся страница. Тему
+   кадра переключаем на миг под заслонкой, чтобы мигание не было видно;
+   анимации переходов на это время выключены — иначе снимок поймал бы
+   цвета на полпути. Ширина карточки — не шире CAP_W: снимок смотрят и с
+   телефона, и широкое задание там превратилось бы в мелкий текст.
+
+   exact — снимок моста сессии (tsGetState) того же задания: по нему
+   «Подсказки и решение» у ученика открывают в тренажёре ТО ЖЕ задание
+   (tsApplyState — тем же путём ученик в совместной сессии видит экран
+   учителя). Рецепт gen для этого не годится: у «Процентов», логарифмов,
+   тригонометрии он хранит только прототип и уровень — «такое же», а не
+   «то же». Из снимка убираются следы ответа учителя (решал в кадре до
+   «Добавить» — у ученика разбор не должен открыться сам) и счётчики. */
+const EXACT_DROP = ['answered', 'hadWrong', 'correct', 'marks', 'pick', 'picks', 'wrong', 'sol', 'taskAnswered', 'hadWrongPick',
+  'yn', 'step', 'show', 'totalSolved', 'streak', 'totalErrors', 'lvlUp', 'quick', 'solShown', 'wrongShown', 'wrongIndex'];
+function exactSnap(win, el){
+  if (el.closest && el.closest('.added-task-card')) return null;   // карточка «+» — не основное задание страницы
+  if (typeof win.tsGetState !== 'function') return null;
+  let s;
+  try { s = stripTrainerSnap(win.tsGetState()); } catch (e) { return null; }
+  if (!s) return null;
+  EXACT_DROP.forEach(k => { delete s[k]; });
+  if (Array.isArray(s.cards)) s.cards = [];
+  return JSON.stringify(s).length <= 60000 ? s : null;
+}
+const CAP_W = 440;
+const raf2 = w => new Promise(r => w.requestAnimationFrame(() => w.requestAnimationFrame(() => setTimeout(r, 60))));
+async function setFrameTheme(win, t){
+  const doc = win.document;
+  doc.documentElement.setAttribute('data-theme', t);
+  await raf2(win);
+}
+async function dataUrlToBlob(dataUrl){
+  const img = new Image(); img.src = dataUrl;
+  await img.decode();
+  const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+  c.getContext('2d').drawImage(img, 0, 0);
+  // WebP с прозрачностью вдвое-втрое легче PNG; браузер без WebP-кодировщика
+  // (старый Safari) молча отдаст PNG — это тоже годится
+  return await new Promise(res => c.toBlob(b => res(b), 'image/webp', 0.92));
+}
+let adding = false;
+$('addBtn').addEventListener('click', addFromFrame);
+async function addFromFrame(){
+  if (adding || !openTid) return;
+  if (!syncFrameTrainer()){ toast('В кадре не тренажёр — выберите тренажёр в каталоге'); return; }
+  const fr = $('trFrame');
+  let win, doc;
+  try { win = fr.contentWindow; doc = fr.contentDocument; } catch (e) {}
+  if (!doc){ toast('Не удалось получить доступ к тренажёру'); return; }
+  const nodes = collectTrainerCaptureNodes(doc, openTid).filter(n => n.el.id !== 'theoryContent');
+  if (!nodes.length){ toast('Откройте задание в тренажёре — на экране выбора его ещё нет'); return; }
+  adding = true;
+  $('addBtn').disabled = true; $('refreshBtn2').disabled = true;
+  $('frameCover').hidden = false;
+  const was = doc.documentElement.getAttribute('data-theme') || 'light';
+  const noAnim = doc.createElement('style');
+  noAnim.textContent = '*,*::before,*::after{transition:none!important;animation-duration:0s!important;animation-delay:0s!important;}';
+  doc.head.appendChild(noAnim);
+  let added = 0, noAnswer = 0;
+  const fresh = [];
+  try {
+    for (const { el, restore } of nodes){
+      try {
+        // ответ — до снимка, пока на странице то же задание
+        const info = trainerTaskInfo(win, openTid, el);
+        if (!info){ noAnswer++; continue; }
+        const gen = trainerGenInfo(win, openTid, openHref, el);
+        const exact = exactSnap(win, el);
+        // вёрстка задания для перестройки на доске здесь не нужна, а весит до 300 КБ
+        if (gen) delete gen.html;
+        const w0 = el.getBoundingClientRect().width;
+        const opts = w0 > CAP_W ? { width: CAP_W } : {};
+        const shots = {};
+        for (const t of ['light', 'dark']){
+          await setFrameTheme(win, t);
+          shots[t] = await captureTrainerNode(el, info, opts);
+        }
+        const L = shots.light;
+        const block = {
+          id: 't' + ttUid(),
+          type: 'task',
+          mode: 'exam',
+          tid: openTid,
+          name: trainerName(openTid),
+          href: openHref,
+          gen,
+          exact,
+          task: Object.assign({}, info),
+          hot: L.hot ? { w: L.hot.w, h: L.hot.h, fields: L.hot.fields, opts: L.hot.opts, check: L.hot.check, checkText: L.hot.checkText || null, style: { font: (L.hot.style || {}).font || null } } : null,
+          css: L.css,
+          img: {
+            light: { url: L.dataUrl, style: L.hot ? L.hot.style : null },
+            dark: { url: shots.dark.dataUrl, style: shots.dark.hot ? shots.dark.hot.style : null },
+          },
+          _up: true,
+        };
+        E.blocks.push(block);
+        fresh.push(block);
+        added++;
+      } finally { if (restore) restore(); }
+    }
+  } catch (err) {
+    console.error('[работы] снимок задания не получился', err);
+  } finally {
+    try { await setFrameTheme(win, was); } catch (e) {}
+    noAnim.remove();
+    $('frameCover').hidden = true;
+    $('addBtn').disabled = false; $('refreshBtn2').disabled = false;
+    adding = false;
+  }
+  if (added){
+    markDirty(); renderTasks();
+    toast(added === 1 ? 'Задание добавлено' : 'Добавлено заданий: ' + added);
+    const list = $('wkTasks'); list.lastElementChild && list.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    fresh.forEach(b => uploadBlock(b).catch(() => {}));
+  } else {
+    toast(noAnswer ? 'У этого задания нет ответа для проверки (теория, доказательство) — в работу его не добавить' : 'Не получилось снять задание — попробуйте ещё раз');
+  }
+}
+// картинки — в хранилище сразу после добавления, в фоне; сохранение ждёт
+const uploads = new Map();   // id задания → обещание
+function uploadBlock(b){
+  if (!b._up) return Promise.resolve();
+  if (uploads.has(b.id)) return uploads.get(b.id);
+  const p = (async () => {
+    for (const t of ['light', 'dark']){
+      const im = b.img && b.img[t];
+      if (!im || !/^data:/.test(im.url)) continue;
+      const blob = await dataUrlToBlob(im.url);
+      im.url = await C.uploadImage(blob);
+    }
+    delete b._up;
+    if (!$('scrEdit').hidden) renderTasks();
+  })();
+  uploads.set(b.id, p);
+  p.finally(() => uploads.delete(b.id)).catch(() => {});
+  return p;
+}
+async function uploadPending(){
+  const left = E.blocks.filter(b => b._up);
+  for (const b of left) await uploadBlock(b);
+}
+
+/* ── результаты ── */
+let RS = { id: null, work: null, rows: [] };
+async function openResults(id){
+  show('scrLoading');
+  try {
+    const [w, rows] = await Promise.all([C.getWork(id), C.results(id)]);
+    RS = { id, work: w, rows: rows || [] };
+  } catch (e) { toast(e.message); go('#/'); return; }
+  show('scrResults');
+  renderResults();
+}
+function renderResults(){
+  const w = RS.work;
+  const v = (w.work_variants || []).find(x => x.num === 1) || (w.work_variants || [])[0];
+  const tasks = v ? (v.blocks || []).filter(b => (b.type || 'task') === 'task') : [];
+  $('rsTitle').textContent = C.kindLabel(w.kind, w.settings) + (w.title ? ' · ' + w.title : '');
+  $('rsLink').value = v ? C.linkFor(v.code) : '';
+  $('rsClose').textContent = w.closed ? 'Открыть приём' : 'Закрыть приём';
+  const t = $('rsTable');
+  if (!RS.rows.length){
+    t.innerHTML = '<tr><td class="empty">Пока никто не начинал. Отправьте ученикам ссылку.</td></tr>';
+    $('rsDetail').textContent = '';
+    return;
+  }
+  let html = '<thead><tr><th class="nm">Ученик</th><th>Итог</th><th>Время</th>' + tasks.map((b, i) => '<th title="' + esc(b.name || '') + '">' + (i + 1) + '</th>').join('') + '<th></th></tr></thead><tbody>';
+  RS.rows.forEach((r, ri) => {
+    const by = {}; (r.work_answers || []).forEach(a => { by[a.task_id] = a; });
+    const ok = tasks.filter(b => (by[b.id] || {}).status === 'ok').length;
+    html += '<tr data-r="' + ri + '"><td class="nm"><b>' + esc(r.student_name) + '</b><small>' + esc(fmtDate(r.started_at)) + (r.finished_at ? ' · сдал(а)' : ' · решает') + '</small></td>'
+      + '<td class="score">' + ok + ' / ' + tasks.length + '</td><td>' + fmtMin(r.active_ms) + '</td>';
+    tasks.forEach((b, ti) => {
+      const a = by[b.id];
+      let st = a ? a.status : 'none';
+      if (st === 'pending' && !a.tries) st = 'seen';
+      const sym = st === 'ok' ? '✓' : st === 'bad' ? '✗' : st === 'skipped' ? '⏭' : st === 'pending' && a.tries ? '…' : '·';
+      const sup = a && a.tries > 1 ? '<sup>' + a.tries + '</sup>' : '';
+      const aid = a && (a.solution_shown || a.hint_used) ? '<span class="aid" title="' + (a.solution_shown ? 'Смотрел(а) решение' : 'Открывал(а) подсказки') + '">💡</span>' : '';
+      html += '<td><span class="cell ' + st + '" data-r="' + ri + '" data-t="' + ti + '">' + sym + sup + aid + '</span></td>';
+    });
+    html += '<td><button class="btn danger small" data-del="' + ri + '" title="Удалить этот заход">🗑</button></td></tr>';
+  });
+  t.innerHTML = html + '</tbody>';
+  t.querySelectorAll('.cell').forEach(c => c.addEventListener('click', () => showDetail(+c.dataset.r, +c.dataset.t, tasks)));
+  t.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
+    const r = RS.rows[+b.dataset.del];
+    if (!confirm('Удалить заход «' + r.student_name + '» (' + fmtDate(r.started_at) + ')? Его ответы пропадут.')) return;
+    try { await C.deleteAttempt(r.id); RS.rows.splice(+b.dataset.del, 1); renderResults(); } catch (e) { toast(e.message); }
+  }));
+}
+function answerText(t, v){
+  if (!v || !t) return '—';
+  if (t.kind === 'fields') return (t.fields || []).map(f => (v.vals || {})[f.id] || '—').join('; ');
+  if (t.kind === 'choice') return v.pick != null ? 'вариант ' + (v.pick + 1) : '—';
+  if (t.kind === 'multi') return (v.picks || []).length ? v.picks.map(i => i + 1).join(', ') : '—';
+  return '—';
+}
+function correctText(t){
+  if (!t) return '';
+  if (t.kind === 'fields') return (t.fields || []).map(f => String(f.value == null ? '' : f.value) || 'нет корней').join('; ');
+  if (t.kind === 'choice') return 'вариант ' + (t.correct + 1);
+  if (t.kind === 'multi') return (t.correct || []).map(i => i + 1).join(', ') || 'ни одного';
+  return '';
+}
+function showDetail(ri, ti, tasks){
+  const r = RS.rows[ri], b = tasks[ti];
+  const a = (r.work_answers || []).find(x => x.task_id === b.id);
+  const names = { ok: 'верно', bad: 'неверно', skipped: 'пропущено', pending: a && a.tries ? 'не решено до конца' : 'открывал(а), но не отвечал(а)' };
+  $('rsDetail').innerHTML = '<b>' + esc(r.student_name) + ' · задание ' + (ti + 1) + '</b> (' + esc(b.name || '') + ')<br>'
+    + (a ? 'Итог: <b>' + (names[a.status] || a.status) + '</b> · ответ: <b>' + esc(answerText(b.task, a.value)) + '</b> · верный: ' + esc(correctText(b.task))
+      + '<br>Попыток: ' + (a.tries || 0) + ' · время на задании: ' + fmtMin(a.time_ms)
+      + ' · подсказки в тренажёре: ' + (a.hint_used ? 'открывал(а)' : 'нет') + ' · решение: ' + (a.solution_shown ? 'смотрел(а)' : 'нет')
+      : 'Не открывал(а) это задание');
+}
+$('rsBack').addEventListener('click', () => go('#/'));
+$('rsRefresh').addEventListener('click', () => openResults(RS.id));
+$('rsEdit').addEventListener('click', () => go('#/edit/' + RS.id));
+$('rsCopy').addEventListener('click', () => copyText($('rsLink').value));
+$('rsClose').addEventListener('click', async () => {
+  const to = !RS.work.closed;
+  try { await C.setClosed(RS.id, to); RS.work.closed = to; renderResults(); toast(to ? 'Приём закрыт: новые ответы не принимаются' : 'Приём снова открыт'); }
+  catch (e) { toast(e.message); }
+});
+
+window.__works = { E, addFromFrame, openTrainer, save, route };   // для тестов и отладки из консоли
+boot();
+})();
+</script>
+</body>
+</html>

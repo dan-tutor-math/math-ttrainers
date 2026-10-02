@@ -1252,6 +1252,10 @@ function resolveBasketTexInHtml(html){
 <script src="jspdf.umd.min.js"></script>
 <script src="html2canvas.min.js"></script>
 <script src="basket-core.js"></script>
+<!-- задания тренажёров снаружи тренажёра: каталог панели, снимок, ответ,
+     «ещё такое же» — общий модуль с конструктором работ (промпт №15
+     «работы»); обязательно ДО boards-core.js, который его зовёт -->
+<script src="trainer-tasks.js"></script>
 <!-- этот маркер должен выполниться ДО boards-core.js — говорит ему не
      запускать приложение самому, а подождать, пока boards-cloud.js (ниже)
      не подтвердит вход по email -->

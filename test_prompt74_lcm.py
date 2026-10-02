@@ -729,7 +729,8 @@ def test_catalog(browser):
         check("G: ссылка с главной открывает тренажёр", page.url.endswith("lcm.html"))
     ctx.close()
 
-    src = open(os.path.join(HERE, "boards-core.js"), encoding="utf-8").read()
+    # каталог панели и карта узлов задания с промпта №15 «работы» — в trainer-tasks.js
+    src = "".join(open(os.path.join(HERE, f), encoding="utf-8").read() for f in ("boards-core.js", "trainer-tasks.js"))
     check("G: доски — НОК в панели тренажёров, снимке задания и названиях",
           "href:'lcm.html'" in src and re.search(r"lcm:\s*\[ \{ sel:'#taskLine' \} \]", src) is not None
           and "lcm:'Наименьшее общее кратное (НОК)'" in src)

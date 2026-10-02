@@ -1,0 +1,104 @@
+/* ==========================================================
+   works.css — общий вид конструктора работ (works.html) и страницы
+   ученика (work.html), промпт №15 «работы».
+
+   Это оформление основных тренажёров (цвета, стекло, сетка на фоне, шрифт
+   Onest, круглые кнопки в углах), а не досок: ученик по ссылке должен
+   попасть «к тренажёрам» (решение Даниила). Переменные — те же имена и
+   значения, что в index.html и тренажёрах: правите тему там — поправьте и
+   здесь, иначе работа будет выглядеть чужой.
+   ========================================================== */
+:root{
+  --font-ui:'Onest',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,-apple-system,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#EEF1F7;
+  --blob-1:rgba(120,150,255,.16);
+  --blob-2:rgba(190,150,230,.14);
+  --card:rgba(255,255,255,.8);
+  --glass:rgba(255,255,255,.55);
+  --glass-strong:rgba(255,255,255,.72);
+  --glass-border:rgba(255,255,255,.85);
+  --glass-inset:rgba(255,255,255,.55);
+  --muted-1:#8E8E93; --muted-2:#6E6E73; --muted-3:#48484A; --muted-6:#8E8E93; --muted-7:#C7C7CC;
+  --grid:#DCE4F0;
+  --ink:#004C99;
+  --pencil:#1D1D1F;
+  --teacher:#FF3B30;
+  --ok:#248A3D;
+  --ok-tint:rgba(36,138,61,.12);
+  --ok-shadow:rgba(36,138,61,.3);
+  --warn:#B25000;
+  --warn-tint:rgba(255,159,10,.16);
+  --shadow:0 10px 34px rgba(20,30,60,.08);
+  --hover-1:rgba(0,76,153,.06);
+  --hl-10:rgba(0,76,153,.10);
+}
+html[data-theme="dark"]{
+  --bg:#0B0E1A;
+  --blob-1:rgba(90,110,255,.22);
+  --blob-2:rgba(150,90,220,.18);
+  --card:rgba(30,37,64,.82);
+  --glass:rgba(40,46,74,.5);
+  --glass-strong:rgba(46,53,84,.65);
+  --glass-border:rgba(255,255,255,.12);
+  --glass-inset:rgba(255,255,255,.07);
+  --muted-1:#9A9AA2; --muted-2:#9A9AA2; --muted-3:#AEAEB4; --muted-6:#9A9AA2; --muted-7:#3A3F55;
+  --grid:#232A44;
+  --ink:#2E7DE0;
+  --pencil:#F2F3F5;
+  --teacher:#FF6961;
+  --ok:#3E8E5B;
+  --ok-tint:rgba(62,142,91,.18);
+  --ok-shadow:rgba(62,142,91,.35);
+  --warn:#FFB340;
+  --warn-tint:rgba(255,179,64,.14);
+  --shadow:0 10px 40px rgba(0,0,0,.55);
+  --hover-1:rgba(127,160,255,.08);
+  --hl-10:rgba(46,125,224,.16);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;}
+body{
+  background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--bg);
+  background-size:auto,auto,24px 24px,24px 24px,auto;
+  font-family:var(--font-ui);
+  color:var(--pencil);
+  min-height:100vh;
+  padding:32px 16px 60px;
+}
+[hidden]{display:none !important;}
+h1{font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,4.6vw,34px);text-align:center;}
+.sub{font-weight:500;text-align:center;color:var(--muted-2);font-size:15px;margin:4px 0 16px;}
+.panel{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);
+  border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:20px;margin-bottom:14px;}
+.btn{font-family:var(--font-ui);font-weight:600;font-size:15px;background:var(--ink);color:#fff;border:none;border-radius:14px;
+  padding:11px 20px;cursor:pointer;transition:transform .15s, opacity .15s;}
+.btn:active{transform:scale(.97)}
+.btn:disabled{opacity:.5;cursor:default;transform:none;}
+.btn.quiet{background:var(--glass-strong);color:var(--ink);border:1px solid var(--glass-border);}
+.btn.quiet:hover:not(:disabled){border-color:var(--ink);}
+.btn.ok{background:var(--ok);box-shadow:0 6px 18px var(--ok-shadow);}
+.btn.danger{background:none;color:var(--teacher);border:1px solid var(--glass-border);}
+.btn.small{font-size:13px;padding:7px 12px;border-radius:11px;}
+.field{font-family:var(--font-ui);font-size:16px;color:var(--pencil);background:var(--card);border:1.5px solid var(--glass-border);
+  border-radius:14px;padding:11px 14px;width:100%;}
+.field:focus{outline:none;border-color:var(--ink);}
+.label{display:block;font-weight:600;font-size:14px;color:var(--muted-3);margin:0 0 6px;}
+.corner-btn{position:fixed;top:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);
+  backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:17px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;
+  transition:transform .15s, border-color .12s;text-decoration:none;}
+.corner-btn:hover{border-color:var(--ink)}
+.corner-btn:active{transform:scale(.92)}
+.corner-btn.left{left:16px;} .corner-btn.right{right:16px;}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:#1c1c1e;color:#fff;font-size:14px;
+  padding:10px 16px;border-radius:12px;opacity:0;pointer-events:none;transition:opacity .2s, transform .2s;z-index:500;max-width:calc(100vw - 32px);text-align:center;}
+.toast.show{opacity:.94;transform:translateX(-50%) translateY(0);}
+@media (max-width:620px){
+  body{padding-top:64px;}
+}
