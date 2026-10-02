@@ -261,10 +261,12 @@ def run():
         base = page.evaluate("() => B.recentColors.slice()")
         check("2. исходная палитра — 5 цветов", len(base) == 5, str(base))
         # «+» открывает системную пипетку; в тесте её не открываем, а шлём
-        # события сами — ровно как это делает поле выбора цвета при протяжке
+        # события сами — ровно как это делает поле выбора цвета при протяжке.
+        # С промпта №76 нажимают прямо на поле цвета (оно прозрачным слоем
+        # поверх «+»), поэтому и клик здесь — по #bdColorInput
         page.evaluate("() => { document.getElementById('bdColorInput').click = () => {}; }")
         pick_tool(page, "pen")
-        page.click("#bdSwatchAdd")
+        page.click("#bdColorInput")
         page.evaluate("""() => {
             const inp = document.getElementById('bdColorInput');
             ['#101010', '#402020', '#803030', '#b04040', '#d05030', '#e06020', '#f07010', '#ff8000', '#ff8800', '#ff9900'].forEach(h => {
@@ -280,7 +282,7 @@ def run():
         swatches = page.evaluate("() => Array.from(document.querySelectorAll('#bdSwatches .bd-swatch')).map(s => s.dataset.tok)")
         check("2. на панели 6 кружков в том же порядке", swatches == pal)
         # второй цвет — ещё одна ячейка, первые шесть на месте
-        page.click("#bdSwatchAdd")
+        page.click("#bdColorInput")
         page.evaluate("""() => { const inp = document.getElementById('bdColorInput');
             ['#00aa00', '#00bb11', '#00cc22'].forEach(h => { inp.value = h; inp.dispatchEvent(new Event('input', { bubbles: true })); });
             inp.dispatchEvent(new Event('change', { bubbles: true })); }""")
@@ -292,7 +294,7 @@ def run():
         pal3 = page.evaluate("() => B.recentColors.slice()")
         check("2. штрих не переставляет и не режет палитру", pal3 == pal2, str(pal3))
         # повтор существующего цвета не плодит дубль
-        page.click("#bdSwatchAdd")
+        page.click("#bdColorInput")
         page.evaluate("""() => { const inp = document.getElementById('bdColorInput');
             inp.value = '#ff9900'; inp.dispatchEvent(new Event('input', { bubbles: true }));
             inp.dispatchEvent(new Event('change', { bubbles: true })); }""")
@@ -300,7 +302,7 @@ def run():
         check("2. уже имеющийся цвет не дублируется", pal4 == pal2, str(pal4))
         # палитра до 12, дальше «+» выключен, а не вытесняет старые
         page.evaluate("""() => { const inp = document.getElementById('bdColorInput');
-            for (let k = 0; k < 8; k++){ document.getElementById('bdSwatchAdd').click();
+            for (let k = 0; k < 8; k++){ document.getElementById('bdColorInput').click();
               inp.value = '#1234' + (10 + k); inp.dispatchEvent(new Event('input', { bubbles: true }));
               inp.dispatchEvent(new Event('change', { bubbles: true })); } }""")
         pal5 = page.evaluate("() => B.recentColors.slice()")

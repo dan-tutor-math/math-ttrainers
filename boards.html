@@ -483,6 +483,25 @@ html[data-theme="dark"] .bd-optbar{box-shadow:var(--shadow), inset 0 1px 0 rgba(
 
 /* нативный color-input прячем визуально, но держим кликабельным */
 .bd-hidden-color{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;}
+/* Промпт №76: «свой цвет» на планшете. Раньше кнопка «+» звала .click() у
+   спрятанного (1px, opacity 0, pointer-events:none) <input type="color">.
+   На компьютере браузер открывает палитру и так, а мобильный Safari и
+   часть Android-браузеров на такой «ненастоящий» клик по невидимому полю
+   палитру не показывают — у ученицы на планшете «+» просто ничего не делал.
+   Теперь само поле лежит прозрачным слоем ПОВЕРХ кнопки: палец попадает в
+   настоящий <input>, и палитру открывает сам браузер — так работает везде.
+   Кнопка под ним только рисует кружок с «+» (из табуляции убрана — фокус
+   берёт поле) */
+.bd-color-hit{position:relative;display:inline-flex;flex:none;}
+.bd-color-over{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;cursor:pointer;-webkit-appearance:none;appearance:none;}
+.bd-color-over:disabled{cursor:not-allowed;}
+.bd-color-hit:hover .bd-swatch-add:not(:disabled){border-color:var(--ink);color:var(--ink);}
+.bd-color-hit:focus-within .bd-swatch-add{outline:2px solid var(--ink);outline-offset:2px;}
+.bd-grid-presets{display:contents;}
+/* на сенсорном экране наведения нет, а крестик «убрать цвет» был только по
+   наведению — палитра забивалась до 12 цветов, и «+» выключался навсегда.
+   Здесь крестик виден у выбранного цвета */
+@media (hover:none){ .bd-swatch.active .bd-swatch-x{display:flex;} }
 
 /* ── всплывающий выбор источника изображения (кнопка «Вставить изображение») ── */
 .bd-imgsrc-pop{position:fixed;z-index:400;display:none;flex-direction:column;gap:2px;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:12px;box-shadow:var(--shadow);padding:5px;min-width:216px;}
@@ -862,9 +881,8 @@ function resolveBasketTexInHtml(html){
     </div>
     <div class="bd-set-row bd-set-row-wrap">
       <label>Цвет клетки</label>
-      <div class="bd-grid-swatches" id="bdGridSwatches"></div>
+      <div class="bd-grid-swatches" id="bdGridSwatches"><span id="bdGridPresets" class="bd-grid-presets"></span><span class="bd-color-hit"><button class="bd-swatch-add" id="bdGridSwatchAdd" title="Свой цвет — выбрать из палитры" tabindex="-1">+</button><input type="color" id="bdGridColorInput" class="bd-color-over" title="Свой цвет — выбрать из палитры"></span></div>
     </div>
-    <input type="color" id="bdGridColorInput" class="bd-hidden-color">
     <label class="bd-modal-toggle-row bd-set-pagenum-row">
       <span><b>Нумерация страниц</b></span>
       <input type="checkbox" id="bdPageNumbersToggle">
@@ -899,8 +917,7 @@ function resolveBasketTexInHtml(html){
   <div class="bd-optbar" id="bdOptbar">
     <div class="bd-swatch-row">
       <div class="bd-swatches" id="bdSwatches"></div>
-      <button class="bd-swatch-add" id="bdSwatchAdd" title="Свой цвет">+</button>
-      <input type="color" id="bdColorInput" class="bd-hidden-color">
+      <span class="bd-color-hit"><button class="bd-swatch-add" id="bdSwatchAdd" title="Свой цвет" tabindex="-1">+</button><input type="color" id="bdColorInput" class="bd-color-over" title="Свой цвет"></span>
     </div>
     <div class="bd-optsep"></div>
     <div class="bd-width">
@@ -942,8 +959,7 @@ function resolveBasketTexInHtml(html){
       <div class="bd-optsep"></div>
       <div class="bd-swatch-row">
         <div class="bd-swatches" id="bdBgSwatches"></div>
-        <button class="bd-swatch-add" id="bdBgSwatchAdd" title="Свой цвет фона">+</button>
-        <input type="color" id="bdBgColorInput" class="bd-hidden-color">
+        <span class="bd-color-hit"><button class="bd-swatch-add" id="bdBgSwatchAdd" title="Свой цвет фона" tabindex="-1">+</button><input type="color" id="bdBgColorInput" class="bd-color-over" title="Свой цвет фона"></span>
       </div>
       <div class="bd-optsep"></div>
       <button class="bd-toggle" id="bdTextLockBtn" title="Закрепить — защитить от случайного удаления ластиком (перемещать можно всегда)">

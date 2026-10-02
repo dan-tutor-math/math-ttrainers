@@ -27,45 +27,93 @@ let DB = { folders: [], boards: [] };
 const IDB_NAME = 'ogeBoardsDB';
 const IDB_STORE = 'state';
 let idbPromise = null;
+let idbCurrentDb = null;   // Промпт №77: какое соединение сейчас в кэше
 function idbOpen(){
   if (idbPromise) return idbPromise;
-  idbPromise = new Promise((resolve, reject) => {
+  const p = new Promise((resolve, reject) => {
     if (!window.indexedDB) { reject(new Error('IndexedDB недоступен')); return; }
     const req = indexedDB.open(IDB_NAME, 1);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(IDB_STORE)) db.createObjectStore(IDB_STORE);
     };
-    req.onsuccess = () => resolve(req.result);
+    req.onsuccess = () => {
+      const db = req.result;
+      // Промпт №77: соединение может умереть само (см. idbRun ниже) —
+      // тогда следующее обращение должно открыть новое, а не брать мёртвое
+      db.onclose = () => { if (idbPromise === p) idbPromise = null; };
+      db.onversionchange = () => { try { db.close(); } catch (e) {} if (idbPromise === p) idbPromise = null; };
+      idbCurrentDb = db;
+      resolve(db);
+    };
     req.onerror = () => reject(req.error);
-  }).catch(err => { idbPromise = null; throw err; });
-  return idbPromise;
+  }).catch(err => { if (idbPromise === p) idbPromise = null; throw err; });
+  idbPromise = p;
+  return p;
+}
+/* Промпт №77: «Доска не сохраняется (UnknownError)» у ученицы на iPad, при
+   свободных десятках гигабайт. Safari (и на iPad, и на Mac) держит
+   IndexedDB в отдельном процессе; когда вкладка постоит в фоне, а система
+   этот процесс выгрузит или перезапустит, открытое соединение молча
+   умирает: каждая транзакция на нём падает с UnknownError («Connection to
+   Indexed Database server lost») или InvalidStateError, а событие close
+   Safari при этом не шлёт. Соединение раньше открывалось один раз и
+   держалось до перезагрузки страницы — значит, после такого обрыва не
+   проходило уже НИ ОДНО сохранение, и красная плашка висела до конца
+   урока. Chromium (Яндекс у учителя) так соединения не теряет, поэтому у
+   него плашки и не было. Теперь при такой ошибке мёртвое соединение
+   выбрасывается, открывается новое и та же операция повторяется один раз.
+   Повторять безопасно: все операции здесь — целиком одна транзакция,
+   упавшая транзакция ничего не записала */
+function idbConnectionLost(err){
+  if (!err) return false;
+  const name = err.name || '', msg = String(err.message || '');
+  return name === 'UnknownError' || name === 'InvalidStateError'
+    || /connection.*(lost|clos)|database.*clos/i.test(msg);
+}
+function idbRun(work){
+  let used = null;   // соединение, на котором шла попытка
+  const attempt = () => idbOpen().then(db => { used = db; return new Promise((resolve, reject) => {
+    // db.transaction на умершем соединении бросает сразу, а не через onerror
+    try { work(db, resolve, reject); } catch (e) { reject(e); }
+  }); });
+  return attempt().catch(err => {
+    if (!idbConnectionLost(err) || !used) throw err;
+    console.warn('[boards] соединение с хранилищем потеряно, открываю заново:', (err && err.name) || err);
+    const dead = used;
+    try { dead.close(); } catch (e) {}
+    // сбрасываем, только если общий кэш всё ещё держит это же мёртвое
+    // соединение: параллельная операция могла уже открыть новое
+    if (idbPromise && idbCurrentDb === dead) idbPromise = null;
+    return attempt();
+  });
 }
 function idbGet(key){
-  return idbOpen().then(db => new Promise((resolve, reject) => {
+  return idbRun((db, resolve, reject) => {
     const tx = db.transaction(IDB_STORE, 'readonly');
     const req = tx.objectStore(IDB_STORE).get(key);
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
-  }));
+    tx.onabort = () => reject(tx.error || new Error('чтение прервано'));
+  });
 }
 function idbPut(key, value){
-  return idbOpen().then(db => new Promise((resolve, reject) => {
+  return idbRun((db, resolve, reject) => {
     const tx = db.transaction(IDB_STORE, 'readwrite');
     tx.objectStore(IDB_STORE).put(value, key);
     tx.oncomplete = () => resolve(true);
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error('запись прервана'));
-  }));
+  });
 }
 function idbDelete(key){
-  return idbOpen().then(db => new Promise((resolve, reject) => {
+  return idbRun((db, resolve, reject) => {
     const tx = db.transaction(IDB_STORE, 'readwrite');
     tx.objectStore(IDB_STORE).delete(key);
     tx.oncomplete = () => resolve(true);
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error('удаление прервано'));
-  })).catch(() => {});   // это только уборка мусора — сбой здесь не критичен
+  }).catch(() => {});   // это только уборка мусора — сбой здесь не критичен
 }
 
 /* ═══ Промпт №45: доски — отдельными записями ═══
@@ -383,10 +431,15 @@ function showSaveFailedWarning(err){
     document.body.appendChild(bar);
 
     // дополняем оценкой браузера, когда она посчитается
+    // Промпт №77: у общей доски главная копия — в облаке, штрихи уходят туда
+    // мимо локального сохранения. Пугать ученицу «работа потеряется» там
+    // незачем: не пишется только копия на этом устройстве
+    const cloud = !!(boardActive && B && B.cloudBoardId);
     storageEstimateText().then(extra => {
-      if (extra && document.getElementById('saveFailText')) {
-        document.getElementById('saveFailText').textContent += extra
-          + ' Сначала выгрузите эту доску в файл кнопкой ниже — так работа точно не потеряется.';
+      if (document.getElementById('saveFailText') && (extra || cloud)) {
+        document.getElementById('saveFailText').textContent += (extra || '') + (cloud
+          ? ' Доска общая: записи уходят в облако и не потеряются — не сохраняется только копия на этом устройстве. Если плашка не уйдёт сама, перезагрузите страницу.'
+          : ' Сначала выгрузите эту доску в файл кнопкой ниже — так работа точно не потеряется.');
       }
     });
   } catch (e) {}
@@ -479,7 +532,7 @@ function mergeDbs(stored, mine){
    (тогда её содержимое устарело и его нужно перечитать, а не переписывать
    своим). */
 function idbSaveIndexMerged(){
-  return idbOpen().then(db => new Promise((resolve, reject) => {
+  return idbRun((db, resolve, reject) => {
     const tx = db.transaction(IDB_STORE, 'readwrite');
     const store = tx.objectStore(IDB_STORE);
     const req = store.get('db');
@@ -508,7 +561,7 @@ function idbSaveIndexMerged(){
     tx.oncomplete = () => resolve({ activeLost });
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error('запись прервана'));
-  }));
+  });
 }
 // проиграла ли МОЯ открытая доска слияние (в другой вкладке её продвинули
 // дальше) — тогда мои несохранённые правки по ней уже не главные
@@ -6128,11 +6181,15 @@ function updateSwatchAddState(){
   const full = B.recentColors.length >= PALETTE_MAX;
   add.disabled = full;
   add.title = full ? 'Палитра заполнена — уберите ненужный цвет (×), чтобы добавить новый' : 'Свой цвет';
+  // Промпт №76: палитру открывает само поле поверх кнопки — выключать надо его
+  const inp = document.getElementById('bdColorInput');
+  inp.disabled = full; inp.title = add.title;
 }
-document.getElementById('bdSwatchAdd').addEventListener('click', () => {
-  if (B && B.recentColors.length >= PALETTE_MAX) return;
+// Промпт №76: нажимают теперь прямо на поле цвета (оно поверх «+», см.
+// .bd-color-over в boards.html) — новое открытие палитры начинается здесь
+document.getElementById('bdColorInput').addEventListener('click', (e) => {
+  if (B && B.recentColors.length >= PALETTE_MAX){ e.preventDefault(); return; }
   colorPickSlot = -1;
-  document.getElementById('bdColorInput').click();
 });
 document.getElementById('bdColorInput').addEventListener('input', (e) => {
   if (!B) return;
@@ -6311,7 +6368,6 @@ function renderBgSwatches(){
     });
   });
 }
-document.getElementById('bdBgSwatchAdd').addEventListener('click', () => document.getElementById('bdBgColorInput').click());
 document.getElementById('bdBgColorInput').addEventListener('input', (e) => {
   const hex = e.target.value;
   curBgTok = hex;
@@ -6349,8 +6405,13 @@ const GRID_PALETTE = [
   { tok: null,      name: 'По теме (авто)' },
 ];
 function renderGridSwatches(){
-  const wrap = document.getElementById('bdGridSwatches');
-  if (!wrap || !B) return;
+  // Промпт №76: перерисовываются только готовые цвета; «+» с полем цвета
+  // поверх стоит в разметке постоянно — пересоздавать поле, пока у
+  // человека открыта палитра (renderGridSwatches зовётся на каждое 'input'),
+  // значило бы закрыть ему палитру на первом же движении
+  const wrap = document.getElementById('bdGridPresets');
+  const add = document.getElementById('bdGridSwatchAdd');
+  if (!wrap || !add || !B) return;
   const cur = B.gridColor || null;
   // свой цвет (не входящий в пресеты, т.е. не "по теме") — есть, если
   // B.gridColor вообще задан: показываем его прямо на кнопке палитры
@@ -6358,16 +6419,17 @@ function renderGridSwatches(){
   wrap.innerHTML = GRID_PALETTE.map(p => {
     const bg = p.tok ? p.tok : 'linear-gradient(135deg, #fdfcf7 50%, #232a44 50%)';
     return `<button class="bd-grid-swatch${cur===p.tok?' active':''}" data-tok="${p.tok?escHtml(p.tok):''}" title="${escHtml(p.name)}" style="background:${bg}"></button>`;
-  }).join('') + `<button class="bd-swatch-add${customTok?' active':''}" id="bdGridSwatchAdd" title="Свой цвет — выбрать из палитры"` +
-    (customTok ? ` style="background:${resolveColor(customTok)};color:transparent;"` : '') +
-    `>${customTok ? '' : '+'}</button>`;
+  }).join('');
+  add.classList.toggle('active', !!customTok);
+  add.style.background = customTok ? resolveColor(customTok) : '';
+  add.style.color = customTok ? 'transparent' : '';
+  add.textContent = customTok ? '' : '+';
   wrap.querySelectorAll('.bd-grid-swatch').forEach(sw => {
     sw.addEventListener('click', () => {
       B.gridColor = sw.dataset.tok || null;
       saveDB(); renderGridSwatches(); scheduleRedraw();
     });
   });
-  document.getElementById('bdGridSwatchAdd').addEventListener('click', () => document.getElementById('bdGridColorInput').click());
 }
 document.getElementById('bdGridColorInput').addEventListener('input', (e) => {
   if (!B) return;

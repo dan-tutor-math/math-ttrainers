@@ -66,6 +66,22 @@
       backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
       box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);color:var(--muted-2);font-size:14px;}
     .ag-pill-handle:hover{color:var(--pencil);}
+    /* Промпт №76: плашка состояния загрузки общей доски — сверху по центру,
+       под строкой с названием доски; клики сквозь неё на доску не нужны,
+       поэтому она обычный блок, а не pointer-events:none */
+    #bdCloudLoad{display:none;position:fixed;top:64px;left:calc(50% + var(--bd-inset,0px) / 2);
+      transform:translateX(-50%);z-index:420;max-width:min(620px, calc(100vw - 24px));
+      align-items:center;gap:10px;padding:8px 14px;border-radius:12px;font-size:13.5px;line-height:1.4;
+      background:var(--glass-strong);border:1px solid var(--glass-border);color:var(--pencil);
+      backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+      box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);}
+    #bdCloudLoad.open{display:flex;}
+    #bdCloudLoad.warn{background:#fff4d6;border-color:#e0a800;color:#5a4300;}
+    #bdCloudLoad.bad{background:#c0392b;border-color:#c0392b;color:#fff;font-weight:600;}
+    #bdCloudLoad .bd-cl-retry{flex:none;font:inherit;font-weight:700;border:0;border-radius:8px;
+      padding:5px 12px;cursor:pointer;background:#fff;color:#c0392b;}
+    #bdCloudLoad .bd-cl-retry:disabled{opacity:.7;cursor:default;}
+    #bdCloudLoad .bd-cl-retry[hidden]{display:none;}
   `;
   document.head.appendChild(style);
 
@@ -856,6 +872,92 @@
   const IN_CHUNK = 150;          // номеров в одном .in() — длинный адрес сервер не примет
   const LOAD_RETRY_MS = [1500, 4000, 10000];
 
+  /* Промпт №76: плашка «доска загружена не полностью».
+     Живой случай (доска Юли, 19 и 25 сентября): до промпта №10 база отдавала
+     при входе только первую тысячу объектов, последние 325 штрихов урока
+     19-го не показывались, низ доски выглядел пустым — и 25-го там же
+     написали новый урок. Когда загрузка починилась, два урока легли друг на
+     друга. Сам потолок в 1000 строк №10 снял, но неполная загрузка возможна
+     и сейчас (связь, сбой базы) — а знала об этом только консоль. Человек
+     видел пустое место и писал поверх невидимого. Поэтому состояние загрузки
+     теперь видно на самой доске:
+     - первая загрузка идёт дольше LOAD_BANNER_DELAY_MS — спокойная плашка
+       (короткую не показываем: мелькание на каждом входе приучит плашку не
+       замечать);
+     - ответ неполный, идут повторы — жёлтая, «часть записей может быть не
+       видна»;
+     - повторы кончились — красная с кнопкой «Повторить». Держится, пока
+       загрузка не пройдёт целиком (сама, сверкой раз в полминуты, или по
+       кнопке), и НЕ сменяется спокойной на время очередной попытки — иначе
+       раз в полминуты казалось бы, что всё в порядке */
+  const LOAD_BANNER_DELAY_MS = 700;
+  let cloudLoadTrouble = null;   // null | 'warn' | 'bad' — худшее с начала этого открытия, пока не загрузилось целиком
+  let loadBannerTimer = null;
+  function setLoadState(s) {
+    cloudLoadState = s;
+    if (s === 'retry' && cloudLoadTrouble !== 'bad') cloudLoadTrouble = 'warn';
+    if (s === 'failed') cloudLoadTrouble = 'bad';
+    if (s === 'done') cloudLoadTrouble = null;
+    renderLoadBanner();
+  }
+  function loadBannerEl() {
+    let el = document.getElementById('bdCloudLoad');
+    if (el) return el;
+    el = document.createElement('div');
+    el.id = 'bdCloudLoad';
+    el.setAttribute('role', 'status');
+    el.innerHTML = '<span class="bd-cl-text"></span><button type="button" class="bd-cl-retry">Повторить</button>';
+    el.querySelector('.bd-cl-retry').addEventListener('click', retryLoadNow);
+    // внутри экрана доски: на списке досок плашки не видно в любом случае
+    (document.getElementById('screenBoard') || document.body).appendChild(el);
+    return el;
+  }
+  function hideLoadBanner() {
+    clearTimeout(loadBannerTimer); loadBannerTimer = null;
+    const el = document.getElementById('bdCloudLoad');
+    if (el) el.className = '';
+  }
+  function showLoadBanner(kind, text, retry) {
+    const el = loadBannerEl();
+    el.className = 'open ' + kind;
+    el.querySelector('.bd-cl-text').textContent = text;
+    const btn = el.querySelector('.bd-cl-retry');
+    btn.hidden = !retry;
+    // пока попытка идёт, вторую по кнопке не запускаем — просто видно, что пробуем
+    const busy = cloudLoadState === 'loading';
+    btn.disabled = busy;
+    btn.textContent = busy ? 'Пробую…' : 'Повторить';
+  }
+  function renderLoadBanner() {
+    const s = cloudLoadState;
+    if (!cloudBoardId || s === 'idle' || s === 'done') { hideLoadBanner(); return; }
+    if (cloudLoadTrouble === 'bad') {
+      clearTimeout(loadBannerTimer); loadBannerTimer = null;
+      showLoadBanner('bad', 'Доска загружена не полностью — часть записей может быть не видна. '
+        + 'Не пишите на пустых местах, пока не догрузится.', true);
+      return;
+    }
+    if (cloudLoadTrouble === 'warn') {
+      clearTimeout(loadBannerTimer); loadBannerTimer = null;
+      showLoadBanner('warn', 'Связь с базой сбоит — догружаю доску. Пока не догрузится, часть записей может быть не видна.', false);
+      return;
+    }
+    // обычная первая загрузка: показываем, только если затянулась
+    if (loadBannerTimer) return;
+    loadBannerTimer = setTimeout(() => {
+      loadBannerTimer = null;
+      if (cloudLoadState === 'loading' && cloudBoardId && !cloudLoadTrouble) {
+        showLoadBanner('wait', 'Доска загружается из облака…', false);
+      }
+    }, LOAD_BANNER_DELAY_MS);
+  }
+  function retryLoadNow() {
+    const board = window.getCurrentBoard && window.getCurrentBoard();
+    if (!cloudBoardId || !board || board.cloudBoardId !== cloudBoardId) return;
+    if (cloudLoadState === 'loading' || cloudLoadState === 'done') return;
+    cloudInitialLoad(cloudBoardId, board, cloudLoadGen, LOAD_RETRY_MS.length);
+  }
+
   function chunksOf(arr, n) {
     const out = [];
     for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
@@ -1148,6 +1250,7 @@
     writesIdle: () => cloudWriteChain,
     // Промпт №10
     loadState: () => cloudLoadState,
+    retryLoad: () => retryLoadNow(),   // Промпт №76
     seen: () => Array.from(cloudSeen),
     reconcileNow: () => reconcileOnce(cloudBoardId),
   };
@@ -1699,7 +1802,7 @@
   async function cloudInitialLoad(boardId, board, gen, attempt) {
     const alive = () => gen === cloudLoadGen && boardId === cloudBoardId && window.getCurrentBoard() === board;
     if (!alive()) return;
-    cloudLoadState = 'loading';
+    setLoadState('loading');
     if (attempt === 0) {
       // версия того, что лежит на этом устройстве, — до того, как база
       // хоть что-то на доске поменяет: если сверка ошибётся, отсюда всё
@@ -1794,12 +1897,12 @@
       console.info('[облачная доска] дописываю в базу то, что туда не дошло:', upAdded.length + upUpdated.length);
       pushDiffToSupabase(boardId, { added: upAdded, updated: upUpdated, removed: [] });
     }
-    if (complete) { cloudLoadState = 'done'; return; }
+    if (complete) { setLoadState('done'); return; }
     if (attempt < LOAD_RETRY_MS.length) {
-      cloudLoadState = 'retry';
+      setLoadState('retry');
       setTimeout(() => cloudInitialLoad(boardId, board, gen, attempt + 1), LOAD_RETRY_MS[attempt]);
     } else {
-      cloudLoadState = 'failed';
+      setLoadState('failed');
       console.warn('[облачная доска] доска загрузилась не полностью — недостающее докачает сверка');
     }
   }
@@ -1876,7 +1979,8 @@
     cloudTombs = new Map();
     // Промпт №10: всё, что относится к прошлому открытию, — забыть
     cloudLoadGen++;
-    cloudLoadState = 'idle';
+    cloudLoadTrouble = null;
+    setLoadState('idle');
     cloudSeen = new Set(); cloudSeenKnown = false;
     cloudMine = new Set(); cloudUnsynced = new Set(); cloudUnsyncedDel = new Set();
     srcHashCache.clear();
@@ -1897,6 +2001,7 @@
     flushSeen();
     cloudLoadGen++;
     cloudBoardId = null; cloudRole = null;
+    setLoadState('idle');
     if (window.setBoardAccess) window.setBoardAccess('full', window.CURRENT_USER && window.CURRENT_USER.id);
   };
 
