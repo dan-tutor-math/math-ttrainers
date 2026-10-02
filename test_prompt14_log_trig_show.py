@@ -255,6 +255,20 @@ ANIM_JS = """() => { const anims = document.querySelector('#propShow .pshow-stri
     a.effect.getKeyframes().forEach(k => Object.keys(k).forEach(x => { if (!['offset', 'computedOffset', 'easing', 'composite'].includes(x)) props.add(x); })); });
   return { n: anims.length, names: [...names], props: [...props], iters: [...iters] }; }"""
 
+# «обе части»: неподвижная левая часть, «=» и результат
+KEEP_JS = """() => { const line = document.querySelector('#propShow .demo-line'); const keep = line.querySelector('.keep');
+  const eq = keep && keep.nextElementSibling;
+  return { left: keep ? keep.textContent.replace(/\\s+/g, '') : '', eq: eq ? eq.textContent : '', text: line.textContent.replace(/\\s+/g, '') }; }"""
+# первый кадр: каждая едущая часть стоит поверх такой же части левой половины
+START_JS = """() => { const strip = document.querySelector('#propShow .pshow-strip');
+  strip.getAnimations({ subtree: true }).forEach(a => { a.pause(); a.currentTime = 0; });
+  const line = strip.querySelector('.demo-line'), stat = [...line.querySelector('.keep').children];
+  const bad = []; let n = 0;
+  line.querySelectorAll(':scope > .mvk').forEach(e => { n++; const r = e.getBoundingClientRect();
+    const ok = stat.some(x => { const q = x.getBoundingClientRect(); return x.textContent === e.textContent && Math.abs(q.left - r.left) < 1.5 && Math.abs(q.top - r.top) < 1.5; });
+    if (!ok) bad.push(e.textContent); });
+  strip.getAnimations({ subtree: true }).forEach(a => a.finish());
+  return { n, bad }; }"""
 TR_JS = """() => [...document.querySelectorAll('#propShow .demo .mvk')].map(e => getComputedStyle(e).transform)"""
 
 
@@ -279,6 +293,10 @@ def test_show(browser):
     end = page.evaluate(TR_JS)
     check("C: в начале части в пути, после прохода запись законченная",
           any(t != "none" for t in mid) and all(t == "none" for t in end), f"{mid} / {end}")
+    fin = page.evaluate(KEEP_JS)
+    check("C: после прохода видна вся формула: левая часть, «=», правая", fin["left"] and fin["eq"] == "=" and fin["text"].startswith(fin["left"]) and len(fin["text"]) > len(fin["left"]) + 2, str(fin))
+    st = page.evaluate(START_JS)
+    check("C: в первом кадре части стоят точно на левой части и выезжают из неё", st["n"] > 0 and st["bad"] == [], str(st))
     check("C: кнопка теперь «Скрыть свойство»", "Скрыть" in page.evaluate("() => document.getElementById('propShowBtn').textContent"))
     page.click("#tabExam")
     p = page.evaluate(PANEL_JS)
@@ -357,6 +375,20 @@ def test_show(browser):
         if (!v.spec.from || !v.spec.to || v.spec.from === v.spec.to || /undefined|NaN/.test(v.spec.from + v.spec.to)) bad.push(id + m); }
       return bad; }""")
     check("C: пример каждого из 10 свойств — и на числах, и на буквах", not bad, str(bad))
+    # логика формулы после прохода: «левая часть = результат», результат не
+    # повторяет левую часть (так было у основного тождества: «… = … = b») и
+    # в строке ровно одна левая часть
+    bad = []
+    for pid in ["ident", "unit", "prod", "quot", "pow", "basepow", "bothpow", "change", "swap", "expswap"]:
+        for mode in ("num", "let"):
+            r = page.evaluate(f"""() => {{ startRun(['{pid}'], 1); S.show = {{ key: S.task.key, mode: '{mode}', items: showItems(S.task, '{mode}'), start: 0, n: 0 }}; render();
+                document.querySelector('#propShow .pshow-strip').getAnimations({{ subtree: true }}).forEach(a => a.finish());
+                const line = document.querySelector('#propShow .demo-line'), keep = line.querySelector('.keep');
+                const right = [...line.children].filter(e => e !== keep && !e.classList.contains('ghost')).slice(1).map(e => e.textContent).join('').replace(/\\s+/g, '');
+                return {{ left: keep.textContent.replace(/\\s+/g, ''), right }}; }}""")
+            if not r["right"] or r["right"].startswith(r["left"]) or r["left"] in r["right"]:
+                bad.append(f"{pid}/{mode}: {r}")
+    check("C: после прохода — «левая часть = результат», результат не повторяет левую часть", not bad, "; ".join(bad[:3]))
     check("C: без ошибок JS", not errors, str(errors[:1]))
     ctx.close()
 

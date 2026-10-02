@@ -954,14 +954,19 @@ const MV = l => '<i class="mv">' + l + '</i>';
 // «log₃ 27», а не «log₃27»: тонкий пробел между логарифмом и аргументом
 const LGs = b => LG_(b) + '&#8201;';
 const SPEC = {
-  ident: (a, b) => ({ from: K('a', a) + '<sup>' + K('lg', LGs(a)) + K('x', b) + '</sup>' + AT('r', 'x'),
-                      to: K('a', a) + '<sup>' + K('lg', LGs(a)) + K('x', b) + '</sup>' + K('eq', '=', 'op') + K('r', b, 'big') }),
-  // a⁰ = 1 ⇒ log_a 1 = 0;  a¹ = a ⇒ log_a a = 1
+  // a^(log_a b) = b: число выезжает из показателя — это и есть результат.
+  // Строка «куда» — только результат: левую часть (то, к чему применяем)
+  // showcase ставит сам перед «=» (keep), иначе выходило «… = … = b»
+  ident: (a, b) => ({ from: K('a', a) + '<sup>' + K('lg', LGs(a)) + K('x', b) + '</sup>',
+                      to: K('x', b, 'big') }),
+  // log_a 1 = 0 (ведь a⁰ = 1);  log_a a = 1 (ведь a¹ = a). Раньше пример шёл
+  // от степени к логарифму — «7⁰ = 1» и «log₇ 1 = 0» в одной строке через
+  // «=» читались как 1 = 0
   unit: (b, one) => one
-    ? { from: K('b', b) + '<sup>' + K('o', '1') + '</sup>' + K('eq', '=', 'op') + K('b2', b),
-        to: K('lg', 'log') + '<sub>' + K('b', b) + '</sub>&#8201;' + K('b2', b) + K('eq', '=', 'op') + K('o', '1', 'big') }
-    : { from: K('b', b) + '<sup>' + K('z', '0') + '</sup>' + K('eq', '=', 'op') + K('one', '1'),
-        to: K('lg', 'log') + '<sub>' + K('b', b) + '</sub>&#8201;' + K('one', '1') + K('eq', '=', 'op') + K('z', '0', 'big') },
+    ? { from: K('lg', 'log') + '<sub>' + K('b', b) + '</sub>&#8201;' + K('b2', b),
+        to: K('o', '1', 'big') + LATE(OP(',') + 'ведь ' + b + '<sup>1</sup>' + OP('=') + b) }
+    : { from: K('lg', 'log') + '<sub>' + K('b', b) + '</sub>&#8201;' + K('one', '1'),
+        to: K('z', '0', 'big') + LATE(OP(',') + 'ведь ' + b + '<sup>0</sup>' + OP('=') + '1') },
   prod: (a, b, c, late) => ({ from: K('l', LGs(a)) + K('p1', '(') + K('b', b) + K('op', '·', 'op') + K('c', c) + K('p2', ')') + AT('l2', 'l'),
                               to: K('l', LGs(a)) + K('b', b) + K('pl', '+', 'op') + K('l2', LGs(a)) + K('c', c) + (late || '') }),
   quot: (a, b, c, late) => ({ from: K('l', LGs(a)) + FR(K('n', b), K('d', c)) + AT('l2', 'l'),
@@ -1092,6 +1097,10 @@ function showView(it, mode){
     formula: num ? F.f + (F.f2 && it.pid !== 'ident' ? '<span class="fsep">;</span>' + F.f2 : '') : '',
     spec: num ? DEMO_NUM[it.pid].spec(it.p) : DEMO_LET[it.pid](),
     cap: num ? 'пример на других числах' : 'общий вид',
+    // свойство — равенство из двух частей: после анимации видна вся формула
+    // «где применяем = что получаем», а не только правая часть (Даниил после
+    // промпта №14 «логарифмы и тригонометрия»)
+    keep: true,
   };
 }
 let showMode = 'num';          // последний выбор «на числах / на буквах» в этой вкладке

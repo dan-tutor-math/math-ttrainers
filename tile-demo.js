@@ -127,7 +127,8 @@
      здесь только отрисовка и таймер очереди.
 
      showcase(root, {
-       items: [{ tag, color, title, formula, spec, cap }],  // spec — { from, to }
+       items: [{ tag, color, title, formula, spec, cap, keep }],  // spec — { from, to };
+                                  // keep — после прохода видны обе части: «откуда = куда»
        start,                     // с какого начать
        label,                     // «Свойство» / «Формула»
        toggle: { value, options: [[значение, подпись]…] } | null,
@@ -135,6 +136,25 @@
        on: { close, pick(i), toggle(v), reroll, replay },
      }) → { stop() } */
   const CYCLE_MS = 4500, HOLD_MS = 900;
+  /* «Обе части свойства» (keep): после прохода на полосе стоит формула
+     целиком — «откуда = куда». Левая часть стоит на месте с самого начала,
+     появляется «=», а части примера выезжают из левой части вправо и
+     складываются в результат. Сделано тем же layoutDemo: строка «куда» —
+     неподвижная копия «откуда» (без data-k, поэтому её части не двигаются)
+     + «=» + «куда»; строка «откуда» для замера — «откуда» и невидимый хвост
+     той же ширины, что «= куда», чтобы части замерялись ровно там, где в
+     строке стоит неподвижная копия, а не по центру полосы. */
+  // без data-k/data-at/data-late: такие части layoutDemo не двигает и не
+  // красит. Класс .late итогу НЕ добавлять: в строке «куда» он появляется
+  // уже после замера, и хвост с его отступом сдвигал бы замер на полотступа
+  const plainCopy = h => String(h).replace(/ data-(?:k|at)="[^"]*"/g, '').replace(/ data-late/g, '');
+  function keepSpec(spec){
+    const eq = '<span class="t op" data-k="__eq">=</span>';
+    return {
+      from: spec.from + '<span style="visibility:hidden">' + plainCopy('<span class="t op">=</span>' + spec.to) + '</span>',
+      to: '<span class="keep">' + plainCopy(spec.from) + '</span>' + eq + spec.to,
+    };
+  }
   const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   function hexA(hex, a){
     const n = parseInt(String(hex || '#2E7DE0').slice(1), 16);
@@ -202,7 +222,8 @@
       // строка «куда» ставится сразу (она же конечный кадр), смещения
       // меряются по ней; анимация перезапускается снятием класса
       strip.classList.remove('play');
-      fit(it.spec);
+      demo.classList.toggle('keeping', !!it.keep);
+      fit(it.keep ? keepSpec(it.spec) : it.spec);
       void strip.offsetWidth;
       strip.classList.add('play');
       // «уменьшить движение» — ничего не едет и само не листается
@@ -217,7 +238,7 @@
     // ширина поменялась — пример перемеряем, иначе части «рассыпались» бы
     // (как у плиток); проход при этом не повторяем — стоит конечный кадр
     let rt = null;
-    const onResize = () => { clearTimeout(rt); rt = setTimeout(() => { if (alive && demo.offsetWidth) { strip.classList.remove('play'); fit(items[cur].spec); } }, 180); };
+    const onResize = () => { clearTimeout(rt); rt = setTimeout(() => { if (alive && demo.offsetWidth) { const it = items[cur]; strip.classList.remove('play'); fit(it.keep ? keepSpec(it.spec) : it.spec); } }, 180); };
     window.addEventListener('resize', onResize);
     const ctl = {
       stop(){ alive = false; clearTimeout(timer); clearTimeout(rt); window.removeEventListener('resize', onResize); if (root._pshow === ctl) root._pshow = null; },
