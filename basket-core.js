@@ -21,14 +21,37 @@
    пронумерованным списком, а не сплошным текстом.
    ========================================================== */
 (function(){
-  const KEY = 'ogeBasket:v1';
+  /* Промпт №75: подборка своя у каждой совместной сессии. Учитель ведёт
+     параллельные занятия в разных вкладках, и задания, собранные для Вани,
+     не должны оказываться в подборке Пети. Ключ — по коду сессии вкладки
+     (session-share.js хранит его в sessionStorage, вкладки сайта видят его
+     все, включая кадры тренажёров на доске). Вкладка, у которой своего кода
+     ещё нет (только открыли), смотрит в последнюю сессию браузера — её она,
+     как правило, и продолжит. Ключ считается при каждом обращении, а не раз
+     при загрузке: код вкладки появляется чуть позже, чем страница */
+  const LEGACY_KEY = 'ogeBasket:v1';
+  function key(){
+    let c = null;
+    try { c = sessionStorage.getItem('tsTab:code') || localStorage.getItem('trainerSession:global'); } catch(e){}
+    if (!c) return LEGACY_KEY;
+    const k = LEGACY_KEY + ':' + c;
+    // общая подборка от прежней версии — переносится один раз, в ту сессию,
+    // которая заглянет в подборку первой, а не копируется в каждую
+    try {
+      if (localStorage.getItem(k) === null) {
+        const old = localStorage.getItem(LEGACY_KEY);
+        if (old !== null) { localStorage.setItem(k, old); localStorage.removeItem(LEGACY_KEY); }
+      }
+    } catch(e){}
+    return k;
+  }
 
   function all(){
-    try { const raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : []; }
+    try { const raw = localStorage.getItem(key()); return raw ? JSON.parse(raw) : []; }
     catch(e){ return []; }
   }
   function save(items){
-    try { localStorage.setItem(KEY, JSON.stringify(items)); } catch(e){}
+    try { localStorage.setItem(key(), JSON.stringify(items)); } catch(e){}
   }
   function add(item){
     const items = all();

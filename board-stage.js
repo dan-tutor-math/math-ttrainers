@@ -84,8 +84,10 @@
     // email. Совместную сессию здесь не запускаем вовсе: иначе init() увёл
     // бы его на сцену учителя (так ведут себя страницы тренажёров), и до
     // своих досок он бы не добрался. Показывать доску может только учитель
+    // Промпт №75: роль — сначала своя у вкладки (в соседней вкладке учитель
+    // мог подключиться к чужой сессии, и общий ключ говорит «ученик»)
     let role = null;
-    try { role = localStorage.getItem('trainerSession:global:role'); } catch (e) {}
+    try { role = sessionStorage.getItem('tsTab:role') || localStorage.getItem('trainerSession:global:role'); } catch (e) {}
     if (role === 'follower') return;
     TS.init({ trainer: 'boards', getState: () => ({}), applyState: () => {} });
 

@@ -48,6 +48,11 @@
      onEvent(name, cb)               — подписаться на такие события от
                      собеседника (свои собственные не приходят — фильтруются
                      по uid, как и во всех остальных каналах)
+     openNewSessionTab()             — Промпт №75: новая независимая сессия
+                     в новой вкладке (своя у каждой вкладки, см. ниже)
+     goToSession(code)               — перейти к сессии из списка: открытая —
+                     переключиться на её вкладку, закрытая — переоткрыть
+     getSessionName() / renameSession(name) — имя сессии этой вкладки
    ═══════════════════════════════════════════════════════════════════════ */
 (function () {
   const cfg = window.SUPABASE_CONFIG || {};
@@ -86,6 +91,7 @@
       registerHistoryUI(){}, notifyHistoryChanged(){},
       isStageFrame(){ return false; }, stageFocus(){},
       hasViewers(){ return false; }, holdStageReady(){}, releaseStageReady(){},
+      openNewSessionTab(){ return null; }, goToSession(){}, getSessionName(){ return ''; }, renameSession(){},
     };
     return;
   }
@@ -138,6 +144,59 @@
     for (let i = 0; i < len; i++) s += CODE_ALPHABET[arr[i] % CODE_ALPHABET.length];
     return s;
   }
+
+  /* ═══ Промпт №75: несколько независимых сессий в одном браузере ═══
+     Учитель ведёт параллельные занятия с одного компьютера: Ваня в одной
+     вкладке, Петя в другой. Раньше код сессии был один на весь браузер
+     (trainerSession:global), и вторая вкладка просто подключалась к той же
+     сессии, а «Начать новую» в ней перебивала код первой.
+     Теперь код и роль живут ВО ВКЛАДКЕ (sessionStorage). Браузер держит это
+     хранилище за вкладкой, пока она открыта: переходы между страницами
+     сайта (ОГЭ → ЕГЭ → основы → доски и обратно) и перезагрузка его не
+     сбрасывают — поэтому сессия держится на любых переходах, как и раньше,
+     и при этом не видна соседней вкладке. Общий ключ trainerSession:global
+     остался: по нему вкладка, у которой своей сессии ещё нет, продолжает
+     последнюю (если та не открыта в другой вкладке), а ученик, открывший
+     сайт сам, возвращается на сцену учителя. */
+  const TAB_CODE_KEY = 'tsTab:code';
+  const TAB_ROLE_KEY = 'tsTab:role';
+  // «семья» вкладок: те, что открыты нашими кнопками друг из друга. Только
+  // в пределах семьи браузер даёт переключиться на вкладку по её имени
+  // окна — по этой метке решаем, пробовать ли переключение (см. goToSession)
+  const TAB_GROUP_KEY = 'tsTab:group';
+  // время ухода прошлой страницы ЭТОЙ вкладки (см. pagehide ниже)
+  const TAB_LEFT_KEY = 'tsTab:leftAt';
+  function ssGet(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
+  function ssSet(k, v) { try { sessionStorage.setItem(k, v); } catch (e) {} }
+  function ssDel(k) { try { sessionStorage.removeItem(k); } catch (e) {} }
+
+  // ?tsnew=КОД — вкладку открыла кнопка «Новая сессия», ?tsresume=КОД —
+  // строка списка сессий (переоткрыть закрытую). Разбираем сразу при
+  // загрузке: браузер копирует в открытую так вкладку хранилище той, что её
+  // открыла (код, роль, номер участника), и их надо заменить раньше, чем
+  // кто-то успеет их прочитать — подборка, номер участника чуть ниже
+  let TAB_NEW_CODE = null, TAB_RESUME_CODE = null;
+  (function takeTabParams() {
+    let u;
+    try { u = new URL(location.href); } catch (e) { return; }
+    const n = u.searchParams.get('tsnew'), r = u.searchParams.get('tsresume');
+    if (!n && !r) return;
+    const clean = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16) || null;
+    TAB_NEW_CODE = clean(n);
+    TAB_RESUME_CODE = TAB_NEW_CODE ? null : clean(r);
+    // метку из адреса убираем: перезагрузка такой вкладки — это уже обычная
+    // перезагрузка своей сессии, а не «создать ещё одну»
+    u.searchParams.delete('tsnew'); u.searchParams.delete('tsresume');
+    try { history.replaceState(history.state, '', u.toString()); } catch (e) {}
+    const c = TAB_NEW_CODE || TAB_RESUME_CODE;
+    if (!c) return;
+    ssSet(TAB_CODE_KEY, c);
+    ssSet(TAB_ROLE_KEY, 'leader');
+    ssDel(TAB_LEFT_KEY);
+    ssDel('tsClientId'); // номер участника — свой, а не скопированный у соседней вкладки
+  })();
+  if (!ssGet(TAB_GROUP_KEY)) ssSet(TAB_GROUP_KEY, generateCode(10));
+
   function myClientId() {
     let id = sessionStorage.getItem('tsClientId');
     if (!id) { id = generateCode(12); sessionStorage.setItem('tsClientId', id); }
@@ -153,7 +212,8 @@
   let saveTimer = null;
   const fields = new Map(); // fieldId -> {el, onInput}
   const eventListeners = new Map(); // name -> Set<cb>
-  const CLIENT_ID = myClientId();
+  // let, а не const: вкладка-дубль получает новый номер (см. freshTabIdentity)
+  let CLIENT_ID = myClientId();
 
   // ── Промпт №23: права ученика и переключатель автосохранения истории —
   // общие для ЛЮБОГО тренажёра (не завязаны на конкретную структуру getState
@@ -301,7 +361,10 @@
       return null;
     } catch (e) { return null; }
   }
+  // Промпт №75: код — и во вкладку (главное: по нему живёт эта вкладка), и в
+  // общий ключ (по нему новая вкладка без своей сессии продолжит последнюю)
   function storeCode(c) {
+    ssSet(TAB_CODE_KEY, c);
     try { localStorage.setItem(GLOBAL_CODE_KEY, c); } catch (e) {}
   }
   // последний код, который вводили в поле «Подключиться по коду» — не сам
@@ -327,7 +390,10 @@
   // страницы без ?s=, вместо того чтобы каждый раз считать себя главным.
   const ROLE_KEY = 'trainerSession:global:role';
   function readStoredRole() { try { return localStorage.getItem(ROLE_KEY); } catch (e) { return null; } }
-  function storeRole(role) { try { localStorage.setItem(ROLE_KEY, role); } catch (e) {} }
+  function storeRole(role) {
+    ssSet(TAB_ROLE_KEY, role);
+    try { localStorage.setItem(ROLE_KEY, role); } catch (e) {}
+  }
 
   function urlJoinCode() {
     try {
@@ -908,6 +974,7 @@
     }
     storeCode(c);
     notifyUi();
+    if (isLeaderFlag) onLeaderActivated(c); // Промпт №75: список сессий, имя вкладки, заголовок
     if (opts.requestSyncFromLeader) {
       // догоняем то, что снимок из БД мог не успеть отразить (см. комментарий
       // у обработчика 'sync_request' в subscribeChannel) — как только канал
@@ -945,8 +1012,35 @@
       // «сцена/обычный режим» при этом не трогаем
       if (IN_STAGE) toStageHost({ type: 'leave' });
     }
-    const stored = readStoredCode();
-    const storedRole = readStoredRole();
+    // Промпт №75: вкладку открыла кнопка «Новая сессия» или строка списка
+    // («открыть закрытую сессию») — код уже лежит во вкладке (takeTabParams)
+    if (TAB_NEW_CODE || TAB_RESUME_CODE) {
+      let c = TAB_NEW_CODE || TAB_RESUME_CODE;
+      if (TAB_RESUME_CODE && await heldByOtherTab(c)) {
+        // пока вкладка грузилась, эту сессию уже открыли в другой вкладке —
+        // второй «учитель» одной сессии перебивал бы первого. Показываем
+        // ту вкладку, эту закрываем (её открыл наш скрипт — браузер разрешит);
+        // если закрыть не дали — здесь будет новая, своя сессия
+        tabsPost({ t: 'flash', code: c });
+        try { window.close(); } catch (e) {}
+        await new Promise(r => setTimeout(r, 250));
+        if (window.closed) return;
+        c = generateCode();
+        ssSet(TAB_CODE_KEY, c);
+      }
+      isLeaderFlag = true;
+      await activate(c, { createIfMissing: true });
+      storeRole('leader');
+      wantPanelOpen = !!TAB_NEW_CODE; // новая сессия — сразу показываем код и ссылку
+      maybeOpenPanel();
+      return;
+    }
+    // своя сессия этой вкладки важнее общего ключа: в соседней вкладке может
+    // идти другая. Общий — только для вкладки, у которой своей ещё нет
+    const tabCode = ssGet(TAB_CODE_KEY);
+    const fromTab = !!tabCode;
+    const stored = tabCode || readStoredCode();
+    const storedRole = fromTab ? (ssGet(TAB_ROLE_KEY) || 'leader') : readStoredRole();
     if (stored && storedRole === 'follower' && canEnterStage()) {
       // Промпт №11 нового списка: тот же ученик открыл страницу платформы сам, без ссылки
       isLeaderFlag = false;
@@ -966,7 +1060,19 @@
       if (res.ok) return;
       isLeaderFlag = true;
     }
-    const own = stored || generateCode();
+    let own = stored;
+    // Промпт №75: этим кодом уже ведёт урок другая вкладка. Так бывает у
+    // дубля вкладки (браузер копирует ему хранилище вместе с кодом) и у
+    // новой вкладки, открытой вручную, — общий ключ указывает на сессию,
+    // которая идёт рядом. Два «учителя» одной сессии перебивали бы друг
+    // друга и уводили учеников, поэтому такая вкладка заводит свою сессию.
+    // Переход по страницам внутри вкладки и перезагрузку не проверяем: там
+    // прежняя страница этой же вкладки только что ушла (см. pagehide)
+    if (own && !cameFromSameTab() && await heldByOtherTab(own)) {
+      if (fromTab) freshTabIdentity();
+      own = null;
+    }
+    own = own || generateCode();
     isLeaderFlag = true;
     await activate(own, { createIfMissing: true });
     storeRole('leader');
@@ -1009,6 +1115,14 @@
     // тренажёр захочет как-то отреагировать на «пустую» сессию — у oge8.html
     // это осознанно no-op (см. проверку typeof state.picker в tsApplyState).
     const c = generateCode();
+    // Промпт №75: это та же вкладка и, как правило, тот же ученик — новый
+    // только код. Имя в списке сессий и подборка переезжают на новый код,
+    // а не теряются (подборка теперь своя у каждой сессии)
+    const prev = isLeaderFlag ? code : null;
+    // код вкладки — сразу, вместе с переездом подборки: activate() запишет
+    // его только после запроса к базе, и всё это время подборка читалась бы
+    // по старому коду — пустой
+    if (prev) { regRecode(prev, c); moveBasket(prev, c); ssSet(TAB_CODE_KEY, c); }
     isLeaderFlag = true; // новая своя сессия — снова главный в ней
     await activate(c, { createIfMissing: true });
     storeRole('leader');
@@ -1020,7 +1134,13 @@
     storeLastJoinCode(c);
     isLeaderFlag = false; // подключаемся к чужому коду — дальше синхронизируемся к нему
     const res = await activate(c, { createIfMissing: false, requestSyncFromLeader: true });
-    if (res.ok) storeRole('follower');
+    if (res.ok) {
+      storeRole('follower');
+      // Промпт №75: своей сессии в этой вкладке больше нет — соседи должны
+      // увидеть её «закрытой», а из заголовка уходит её имя
+      tabsPost({ t: 'bye' });
+      applyTitle();
+    }
     else isLeaderFlag = true; // код не найден — остаёмся при своей сессии
     // Промпт №11 нового списка: код ввели в обычном окне — дальше смотрим экран учителя
     // на сцене. Если activate() уже уводит на страницу группы, сцену
@@ -1499,6 +1619,463 @@
     }
   }, 300);
 
+  /* ═══ Промпт №75: список сессий и связь между вкладками ═══
+     Список сессий этого компьютера лежит в localStorage (общий для вкладок):
+     имя, номер, на какой странице сессия была в последний момент и когда.
+     Вкладка обновляет свою строку при каждом переходе, раз в 10 с и уходя,
+     поэтому закрытую по ошибке сессию можно открыть там же, где остановились:
+     состояние тренажёра подтянется из базы (как при обычной перезагрузке),
+     доска — из своего хранилища по #board= в адресе.
+     Какие сессии открыты прямо сейчас, вкладки узнают друг у друга через
+     BroadcastChannel: «кто здесь?» → «я, код такой-то». Отвечают только
+     вкладки, где идёт своя сессия (учитель), и только верхнее окно. */
+  // Ключ НЕ «trainerSession:…»: readStoredCode() принял бы его за старый код
+  const REG_KEY = 'tsSessions:v1';
+  const REG_MAX = 30;
+  const REG_TTL_MS = 30 * 24 * 3600 * 1000;
+  // номер «Сессия N» — наименьший свободный среди сессий последних 12 часов:
+  // каждый учебный день счёт идёт снова с 1, а не растёт до «Сессии 47»
+  const REG_NUM_WINDOW_MS = 12 * 3600 * 1000;
+  // подборка своя у каждой сессии — ключ тот же, что в basket-core.js
+  const BASKET_KEY = 'ogeBasket:v1';
+  function basketKey(c) { return BASKET_KEY + ':' + c; }
+  function moveBasket(from, to) {
+    try {
+      const v = localStorage.getItem(basketKey(from));
+      if (v === null) return;
+      if (localStorage.getItem(basketKey(to)) === null) localStorage.setItem(basketKey(to), v);
+      localStorage.removeItem(basketKey(from));
+    } catch (e) {}
+  }
+  function dropBasket(c) { try { localStorage.removeItem(basketKey(c)); } catch (e) {} }
+
+  function regRead() {
+    try {
+      const v = JSON.parse(localStorage.getItem(REG_KEY) || '[]');
+      return Array.isArray(v) ? v.filter(e => e && typeof e.code === 'string') : [];
+    } catch (e) { return []; }
+  }
+  function regWrite(list) {
+    const now = Date.now();
+    const keep = list.filter(e => now - (e.updatedAt || 0) < REG_TTL_MS)
+      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+      .slice(0, REG_MAX);
+    // у выпавших из списка сессий подборка больше никому не видна — убираем,
+    // чтобы не копить её в localStorage (у него потолок около 5 МБ на сайт)
+    const kept = new Set(keep.map(e => e.code));
+    list.forEach(e => { if (!kept.has(e.code) && e.code !== code) dropBasket(e.code); });
+    try { localStorage.setItem(REG_KEY, JSON.stringify(keep)); } catch (e) {}
+  }
+  function regGet(c) { return regRead().find(e => e.code === c) || null; }
+  function regNextNumber(list) {
+    const now = Date.now(), used = new Set();
+    list.forEach(e => { if (e.n && now - (e.updatedAt || 0) < REG_NUM_WINDOW_MS) used.add(e.n); });
+    openTabCodes().forEach(c => { const e = list.find(x => x.code === c); if (e && e.n) used.add(e.n); });
+    let k = 1;
+    while (used.has(k)) k++;
+    return k;
+  }
+  function regTouch(c, patch) {
+    if (!c) return null;
+    const list = regRead(), now = Date.now();
+    let e = list.find(x => x.code === c);
+    if (!e) { e = { code: c, n: regNextNumber(list), createdAt: now }; list.push(e); }
+    Object.assign(e, patch || {}, { updatedAt: now });
+    regWrite(list);
+    return e;
+  }
+  function regRename(c, name) {
+    const v = String(name || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    regTouch(c, { name: v || null });
+    tabsPost({ t: 'renamed', code: c });
+    applyTitle();
+  }
+  function regRemove(c) {
+    regWrite(regRead().filter(e => e.code !== c));
+    if (c !== code) dropBasket(c);
+  }
+  function regRecode(from, to) {
+    const list = regRead(), e = list.find(x => x.code === from);
+    if (!e) return;
+    e.code = to; e.updatedAt = Date.now();
+    regWrite(list);
+  }
+  function sessionLabel(e) { return (e && e.name) || ('Сессия ' + ((e && e.n) || 1)); }
+
+  // адрес, куда вернуть переоткрытую сессию: без кода (?s= — признак
+  // ученика) и без наших меток новой вкладки
+  function currentUrl() {
+    try {
+      const u = new URL(location.href);
+      ['s', 'tsnew', 'tsresume'].forEach(k => u.searchParams.delete(k));
+      return u.toString();
+    } catch (e) { return location.href; }
+  }
+
+  const PAGE_ID = generateCode(10);
+  function tabGroup() { return ssGet(TAB_GROUP_KEY) || ''; }
+  let tabsBC = null;
+  try { if (window.BroadcastChannel) tabsBC = new BroadcastChannel('ts-tabs'); } catch (e) { tabsBC = null; }
+  function tabsPost(m) {
+    if (!tabsBC) return;
+    try { tabsBC.postMessage(Object.assign({ from: PAGE_ID }, m)); } catch (e) {}
+  }
+  // своя сессия идёт в этой вкладке — только такие отвечают «я здесь»
+  function amTabHolder() { return !!code && isLeaderFlag && !IN_ANY_FRAME; }
+  const TAB_TTL_MS = 45000;
+  const knownTabs = new Map();      // номер страницы -> { code, group, at }
+  const pongWaiters = new Set();
+  function noteTab(from, c, group) {
+    const prev = knownTabs.get(from);
+    knownTabs.set(from, { code: c, group: group || '', at: Date.now() });
+    if (!prev || prev.code !== c) tabsChanged();
+  }
+  function openTabCodes() {
+    const now = Date.now(), out = new Set();
+    knownTabs.forEach((t, id) => { if (now - t.at < TAB_TTL_MS) out.add(t.code); else knownTabs.delete(id); });
+    return out;
+  }
+  function openTabInfo(c) {
+    const now = Date.now();
+    let found = null;
+    knownTabs.forEach((t) => { if (t.code === c && now - t.at < TAB_TTL_MS) found = t; });
+    return found;
+  }
+  function tabsChanged() { applyTitle(); renderSessionsSoon(); }
+  if (tabsBC) tabsBC.onmessage = (ev) => {
+    const m = ev.data;
+    if (!m || !m.from || m.from === PAGE_ID) return;
+    if (m.t === 'ping' || m.t === 'hello') {
+      if (m.code) noteTab(m.from, m.code, m.group);
+      if (amTabHolder()) tabsPost({ t: 'pong', to: m.from, code: code, group: tabGroup() });
+    } else if (m.t === 'pong') {
+      if (m.code) noteTab(m.from, m.code, m.group);
+      if (m.to === PAGE_ID) pongWaiters.forEach(fn => { try { fn(m); } catch (e) {} });
+    } else if (m.t === 'bye') {
+      if (knownTabs.delete(m.from)) tabsChanged();
+    } else if (m.t === 'renamed') {
+      tabsChanged();
+    } else if (m.t === 'flash') {
+      if (amTabHolder() && m.code === code) flashTitle();
+    }
+  };
+  // спросить вкладки «кто здесь?» и собрать ответы за ms миллисекунд.
+  // Ответ приходит за единицы миллисекунд — окно берём с запасом на фоновые
+  function askTabs(ms) {
+    return new Promise((resolve) => {
+      if (!tabsBC) { resolve([]); return; }
+      const got = [];
+      const fn = (m) => got.push(m);
+      pongWaiters.add(fn);
+      tabsPost({ t: 'ping', code: amTabHolder() ? code : null, group: tabGroup() });
+      setTimeout(() => { pongWaiters.delete(fn); resolve(got); }, ms);
+    });
+  }
+  async function heldByOtherTab(c) {
+    const got = await askTabs(150);
+    return got.some(m => m.code === c);
+  }
+  // прошлая страница ЭТОЙ вкладки ушла только что — это переход по сайту или
+  // перезагрузка, а не дубль. Метку ставит pagehide, читаем один раз при загрузке
+  const CAME_FROM_SAME_TAB = (() => {
+    const t = +ssGet(TAB_LEFT_KEY) || 0;
+    ssDel(TAB_LEFT_KEY);
+    return t > 0 && Date.now() - t < 15000;
+  })();
+  function cameFromSameTab() { return CAME_FROM_SAME_TAB; }
+  // дубль вкладки: браузер скопировал ему номер участника и «семью» — номер
+  // нужен свой (иначе собеседники примут его сообщения за свои), а в семью
+  // открывшей вкладки дубль не входит (у него нет opener)
+  function freshTabIdentity() {
+    ssDel('tsClientId');
+    CLIENT_ID = myClientId();
+    if (!window.opener) ssSet(TAB_GROUP_KEY, generateCode(10));
+  }
+
+  function onLeaderActivated(c) {
+    if (IN_ANY_FRAME) return;
+    // имя окна — по нему другая вкладка переключается сюда (window.open('', имя)).
+    // window.name переживает переходы по страницам сайта внутри вкладки
+    try { window.name = 'tsSess:' + c; } catch (e) {}
+    regTouch(c, { url: currentUrl(), title: baseTitle() });
+    tabsPost({ t: 'hello', code: c, group: tabGroup() });
+    applyTitle();
+    renderSessionsSoon();
+  }
+  // строку списка держим свежей: страница (в т.ч. #board= на досках), заголовок,
+  // были ли ученики. Пишем, только если что-то поменялось, или раз в минуту —
+  // по времени последней записи считается «закрыта N минут назад»
+  function regUpkeep(force) {
+    if (!amTabHolder()) return;
+    const e = regGet(code);
+    const patch = { url: currentUrl(), title: baseTitle() };
+    if (studentsOnline() > 0) patch.students = true;
+    const changed = !e || e.url !== patch.url || e.title !== patch.title || (patch.students && !e.students);
+    if (force || changed || Date.now() - (e.updatedAt || 0) > 60000) regTouch(code, patch);
+  }
+  setInterval(() => {
+    regUpkeep(false);
+    if (amTabHolder()) tabsPost({ t: 'ping', code: code, group: tabGroup() });
+  }, 10000);
+  window.addEventListener('hashchange', () => regUpkeep(false));
+  window.addEventListener('popstate', () => regUpkeep(false));
+  window.addEventListener('pagehide', () => {
+    ssSet(TAB_LEFT_KEY, String(Date.now()));
+    if (!amTabHolder()) return;
+    regUpkeep(true);
+    tabsPost({ t: 'bye' });
+  });
+  // другая вкладка переименовала сессию или открыла/закрыла свою
+  window.addEventListener('storage', (e) => { if (e.key === REG_KEY) tabsChanged(); });
+
+  /* ── заголовок вкладки: «Ваня · ОГЭ №8» ──
+     Имя показываем, когда открыто больше одной сессии (или сессию
+     переименовали) — иначе у учителя с одним учеником в каждой вкладке
+     висело бы лишнее «Сессия 1 ·». Страница может менять свой заголовок
+     сама (номер задания) — следим за этим и держим приставку */
+  let titleBaseVal = null, titleApplied = null, titleObserved = null, flashTimer = null;
+  function baseTitle() {
+    if (titleBaseVal === null || document.title !== titleApplied) titleBaseVal = document.title;
+    return titleBaseVal;
+  }
+  function titlePrefix() {
+    if (!amTabHolder()) return '';
+    const e = regGet(code);
+    if (!e) return '';
+    const others = Array.from(openTabCodes()).filter(c => c !== code).length;
+    return (others || e.name) ? sessionLabel(e) + ' · ' : '';
+  }
+  function watchTitle() {
+    const el = document.querySelector('head > title');
+    if (!el || el === titleObserved || !window.MutationObserver) return;
+    titleObserved = el;
+    try { new MutationObserver(() => applyTitle()).observe(el, { childList: true, characterData: true, subtree: true }); } catch (e) {}
+  }
+  function applyTitle() {
+    if (IN_ANY_FRAME) return;
+    const base = baseTitle();
+    if (flashTimer) return;
+    const want = titlePrefix() + base;
+    if (document.title !== want) document.title = want;
+    titleApplied = document.title; // браузер мог нормализовать пробелы — берём как есть
+    watchTitle();
+  }
+  // «вот эта вкладка»: заголовок мигает, пока на неё не переключатся
+  // (или ~15 с). Сама вкладка вывести себя на передний план не может —
+  // браузер не даёт сайтам перехватывать фокус
+  function flashTitle() {
+    if (IN_ANY_FRAME) return;
+    stopFlash();
+    const base = baseTitle();
+    const label = '● ' + sessionLabel(regGet(code)) + ' — сюда';
+    let on = false, ticks = 0;
+    flashTimer = setInterval(() => {
+      ticks++;
+      if ((document.visibilityState === 'visible' && document.hasFocus()) || ticks > 25) { stopFlash(); return; }
+      on = !on;
+      document.title = on ? label : titlePrefix() + base;
+      titleApplied = document.title;
+    }, 600);
+  }
+  function stopFlash() {
+    if (!flashTimer) return;
+    clearInterval(flashTimer);
+    flashTimer = null;
+    titleApplied = document.title; // мигание — не смена заголовка страницей
+    applyTitle();
+  }
+
+  // переход к сессии из списка: открытая — переключиться на её вкладку,
+  // закрытая — открыть там, где остановились
+  function goToSession(c) {
+    const e = regGet(c);
+    if (!e || c === code) return;
+    const info = openTabInfo(c);
+    if (info) {
+      // Браузер переключает на вкладку по имени окна, только если она из
+      // той же «семьи» (открыта нашими кнопками из этой или из общей
+      // предшественницы) и только по нажатию человека — поэтому без await
+      // до window.open. Чужую вкладку он не найдёт и вместо неё откроет
+      // пустую — такую сразу закрываем и просим ту вкладку помигать
+      if (info.group && info.group === tabGroup()) {
+        let w = null;
+        try { w = window.open('', 'tsSess:' + c); } catch (err) { w = null; }
+        let ours = false;
+        try { ours = !!w && w.location.origin === location.origin && w.location.href !== 'about:blank'; } catch (err) { ours = false; }
+        if (ours) {
+          try { w.focus(); } catch (err) {}
+          window.__tsSwitchResult = 'focused';
+          return;
+        }
+        if (w) { try { w.close(); } catch (err) {} }
+      }
+      tabsPost({ t: 'flash', code: c });
+      window.__tsSwitchResult = 'flash';
+      sessionsMsg('«' + sessionLabel(e) + '» открыта в другой вкладке — её заголовок мигает.');
+      return;
+    }
+    let u;
+    try { u = new URL(e.url || 'index.html', location.href); } catch (err) { u = new URL('index.html', location.href); }
+    if (u.origin !== location.origin) u = new URL('index.html', location.href);
+    u.searchParams.delete('s');
+    u.searchParams.set('tsresume', c);
+    const w = window.open(u.toString(), 'tsSess:' + c);
+    window.__tsSwitchResult = w ? 'reopened' : 'blocked';
+    if (!w) sessionsMsg('Браузер не дал открыть вкладку — разрешите всплывающие окна для этого сайта.');
+  }
+  function openNewSessionTab() {
+    const c = generateCode();
+    // номер даём здесь, а не в новой вкладке: так «Сессия N» не совпадёт с
+    // соседней, даже если две вкладки откроют быстро одну за другой
+    regTouch(c, { explicit: true, url: new URL('index.html', location.href).toString(), title: '' });
+    const u = new URL('index.html', location.href);
+    u.searchParams.set('tsnew', c);
+    const w = window.open(u.toString(), 'tsSess:' + c);
+    if (!w) {
+      regRemove(c);
+      sessionsMsg('Браузер не дал открыть вкладку — разрешите всплывающие окна для этого сайта.');
+    }
+    return w ? c : null;
+  }
+  // вкладке, открытой кнопкой «Новая сессия», сразу показываем код и ссылку
+  let wantPanelOpen = false;
+  function maybeOpenPanel() {
+    if (!wantPanelOpen || !uiEls) return;
+    wantPanelOpen = false;
+    uiEls.pop.classList.add('open');
+    renderPanel();
+    refreshPresence();
+  }
+
+  // ── сессии в панели ──
+  function agoText(ts) {
+    const m = Math.round((Date.now() - (ts || 0)) / 60000);
+    if (m < 1) return 'только что';
+    if (m < 60) return m + ' мин назад';
+    const h = Math.round(m / 60);
+    if (h < 24) return h + ' ч назад';
+    const d = Math.round(h / 24);
+    return d === 1 ? 'вчера' : d + ' дн назад';
+  }
+  function sessionsMsg(text) {
+    if (!uiEls || !uiEls.sessMsg) return;
+    uiEls.sessMsg.textContent = text || '';
+    uiEls.sessMsg.style.display = text ? '' : 'none';
+  }
+  // полный опрос: кто не ответил — тот закрыт. Без этого вкладка, закрытая
+  // без прощания (браузер не всегда успевает его отправить), ещё 45 с
+  // числилась бы открытой, и «Открыть» было бы не нажать
+  function refreshPresence() {
+    const started = Date.now();
+    askTabs(250).then(() => {
+      knownTabs.forEach((t, id) => { if (t.at < started) knownTabs.delete(id); });
+      renderSessionsSoon();
+      applyTitle();
+    });
+  }
+  let sessRenderTimer = null;
+  function renderSessionsSoon() {
+    if (sessRenderTimer) return;
+    sessRenderTimer = setTimeout(() => { sessRenderTimer = null; renderSessions(); }, 30);
+  }
+  function renderSessions() {
+    if (!uiEls || !uiEls.sessSection) return;
+    const show = amTabHolder();
+    uiEls.sessSection.style.display = show ? '' : 'none';
+    uiEls.sessSep.style.display = show ? '' : 'none';
+    if (!show) return;
+    // идёт переименование — не перерисовываем, иначе поле пропадёт из-под пальцев
+    if (uiEls.sessList.querySelector('input')) return;
+    const open = openTabCodes();
+    open.add(code);
+    const list = regRead();
+    if (!list.some(e => e.code === code)) list.push(regTouch(code, { url: currentUrl(), title: baseTitle() }));
+    const isOpen = (e) => open.has(e.code);
+    // открытые — в постоянном порядке (по номеру), чтобы «Ваня, Петя, Коля»
+    // не прыгали; закрытые — свежие сверху. Случайные вкладки без учеников,
+    // без имени и не через кнопку, закрывшись, в списке не нужны
+    const openRows = list.filter(isOpen).sort((a, b) => (a.n || 0) - (b.n || 0) || (a.createdAt || 0) - (b.createdAt || 0));
+    const closedRows = list.filter(e => !isOpen(e) && (e.students || e.name || e.explicit))
+      .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0)).slice(0, 6);
+    const box = uiEls.sessList;
+    box.textContent = '';
+    openRows.concat(closedRows).forEach((e) => {
+      const here = e.code === code, on = isOpen(e);
+      const row = document.createElement('div');
+      row.className = 'ts-sess-row' + (here ? ' here' : '');
+      row.dataset.code = e.code;
+      const dot = document.createElement('span');
+      dot.className = 'ts-sess-dot' + (on ? ' on' : '');
+      const main = document.createElement('div');
+      main.className = 'ts-sess-main';
+      const name = document.createElement('button');
+      name.type = 'button';
+      name.className = 'ts-sess-name';
+      name.textContent = sessionLabel(e);
+      name.title = 'Нажмите, чтобы переименовать';
+      name.addEventListener('click', (ev) => { ev.stopPropagation(); startRename(row, e); });
+      const sub = document.createElement('div');
+      sub.className = 'ts-sess-sub';
+      const where = (e.title || '').trim();
+      sub.textContent = (here ? 'эта вкладка' : on ? 'открыта' : 'закрыта · ' + agoText(e.updatedAt)) + (where ? ' · ' + where : '');
+      sub.title = sub.textContent;
+      main.appendChild(name); main.appendChild(sub);
+      row.appendChild(dot); row.appendChild(main);
+      if (!here) {
+        const go = document.createElement('button');
+        go.type = 'button';
+        go.className = 'ts-sess-go';
+        go.textContent = on ? 'Перейти' : 'Открыть';
+        go.title = on ? 'Переключиться на вкладку этой сессии' : 'Открыть сессию там, где остановились';
+        go.addEventListener('click', (ev) => { ev.stopPropagation(); goToSession(e.code); });
+        row.appendChild(go);
+      }
+      if (!on) {
+        const del = document.createElement('button');
+        del.type = 'button';
+        del.className = 'ts-sess-del';
+        del.textContent = '×';
+        del.title = 'Убрать из списка';
+        del.addEventListener('click', (ev) => { ev.stopPropagation(); regRemove(e.code); renderSessions(); });
+        row.appendChild(del);
+      }
+      box.appendChild(row);
+    });
+  }
+  function startRename(row, e) {
+    const btn = row.querySelector('.ts-sess-name');
+    if (!btn) return;
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'ts-sess-input';
+    input.maxLength = 40;
+    input.value = sessionLabel(e);
+    input.placeholder = 'Сессия ' + (e.n || 1);
+    btn.replaceWith(input);
+    input.focus();
+    input.select();
+    let done = false;
+    const finish = (save) => {
+      if (done) return;
+      done = true;
+      // по умолчанию имя «Сессия N» не сохраняем как своё: оставили как
+      // было — значит, не переименовывали
+      if (save) {
+        const v = input.value.trim();
+        regRename(e.code, v && v !== 'Сессия ' + (e.n || 1) ? v : '');
+      }
+      input.remove();
+      renderSessions();
+    };
+    input.addEventListener('keydown', (ev) => {
+      ev.stopPropagation(); // горячие клавиши доски и тренажёра здесь не нужны
+      if (ev.key === 'Enter') { ev.preventDefault(); finish(true); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); finish(false); }
+    });
+    input.addEventListener('blur', () => finish(true));
+    input.addEventListener('click', (ev) => ev.stopPropagation());
+  }
+
   // ── стандартная плавающая кнопка + панель (одинаковая на всех тренажёрах) ──
   let uiEls = null;
   function notifyUi() { if (uiEls) renderPanel(); }
@@ -1574,6 +2151,7 @@
     const count = historyUI && historyUI.getCount ? historyUI.getCount() : 0;
     uiEls.historyCountEl.textContent = count > 0 ? `История: ${count} ` + pluralSnapshots(count) : 'История: пока пусто';
     uiEls.historyDownloadBtn.disabled = count === 0;
+    renderSessions();
   }
   function pluralSnapshots(n) {
     const n10 = n % 10, n100 = n % 100;
@@ -1613,7 +2191,31 @@
       .ts-share-pop{position:fixed;top:60px;right:16px;z-index:400;background:var(--glass-strong);
         backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);
         border:1px solid var(--glass-border);border-radius:16px;box-shadow:var(--shadow);
-        padding:16px;width:290px;display:none;flex-direction:column;gap:10px;}
+        padding:16px;width:290px;display:none;flex-direction:column;gap:10px;
+        max-height:calc(100vh - 76px);overflow-y:auto;box-sizing:border-box;}
+      /* Промпт №75: список сессий этого компьютера */
+      .ts-sess-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+      .ts-sess-new{font-size:12px;font-weight:600;padding:6px 10px;border-radius:9px;border:none;
+        background:var(--ink);color:#fff;cursor:pointer;white-space:nowrap;}
+      .ts-sess-new:hover{background:var(--ink-active);}
+      .ts-sess-list{display:flex;flex-direction:column;gap:4px;margin-top:6px;}
+      .ts-sess-row{display:flex;align-items:center;gap:7px;padding:5px 6px;border-radius:9px;min-height:34px;}
+      .ts-sess-row.here{background:var(--glass);box-shadow:inset 0 0 0 1px var(--glass-border);}
+      .ts-sess-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;background:rgba(128,128,128,.45);}
+      .ts-sess-dot.on{background:#2e9e5b;}
+      .ts-sess-main{flex:1;min-width:0;display:flex;flex-direction:column;}
+      .ts-sess-name{font:inherit;font-size:12.5px;font-weight:600;color:var(--pencil);background:none;border:none;
+        padding:0;text-align:left;cursor:text;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%;}
+      .ts-sess-name:hover{text-decoration:underline dotted;}
+      .ts-sess-input{font:inherit;font-size:12.5px;font-weight:600;color:var(--pencil);padding:2px 5px;margin:-3px 0;
+        border-radius:6px;border:1px solid var(--ink);background:var(--glass);outline:none;width:100%;box-sizing:border-box;}
+      .ts-sess-sub{font-size:11px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+      .ts-sess-go{font-size:11.5px;font-weight:600;padding:5px 8px;border-radius:8px;border:1px solid var(--glass-border);
+        background:var(--glass-strong);color:var(--pencil);cursor:pointer;white-space:nowrap;flex:0 0 auto;}
+      .ts-sess-go:hover{border-color:var(--ink);}
+      .ts-sess-del{font-size:15px;line-height:1;padding:2px 4px;border:none;background:none;color:var(--muted-2);
+        cursor:pointer;flex:0 0 auto;}
+      .ts-sess-del:hover{color:var(--teacher);}
       .ts-share-pop.open{display:flex;}
       .ts-share-title{font-size:13px;font-weight:700;color:var(--pencil);}
       .ts-share-hint{font-size:12px;line-height:1.45;color:var(--muted-2);}
@@ -1660,6 +2262,15 @@
     pop.className = 'ts-share-pop';
     pop.innerHTML = `
       <div class="ts-share-title">Совместный доступ</div>
+      <div id="tsSessSection" style="display:none">
+        <div class="ts-sess-head">
+          <span class="ts-section-title">Сессии</span>
+          <button class="ts-sess-new" id="tsNewSess" title="Отдельная сессия со своим кодом — в новой вкладке">＋ Новая сессия</button>
+        </div>
+        <div class="ts-sess-list" id="tsSessList"></div>
+        <div class="ts-share-hint" id="tsSessMsg" style="display:none;margin-top:6px"></div>
+      </div>
+      <div class="ts-share-sep" id="tsSessSep" style="display:none"></div>
       <div class="ts-share-hint">Поделитесь кодом или ссылкой — тот, кто откроет её, увидит те же задания и ввод, что и вы, в реальном времени.</div>
       <div class="ts-share-hint" id="tsRole" style="font-weight:600;"></div>
       <div class="ts-conn ts-conn-reconnecting" id="tsConn">На связи</div>
@@ -1669,7 +2280,7 @@
         <input id="tsLink" type="text" readonly>
         <button id="tsCopy">Копировать</button>
       </div>
-      <button class="ts-share-reset" id="tsReset">Начать новую сессию</button>
+      <button class="ts-share-reset" id="tsReset" title="Ученики по старой ссылке отключатся; имя сессии и подборка останутся">Сменить код этой сессии</button>
       <div class="ts-share-sep"></div>
       <div class="ts-share-hint">Есть код от другого человека?</div>
       <div class="ts-share-row">
@@ -1711,7 +2322,17 @@
       historyDownloadBtn: pop.querySelector('#tsHistoryDownload'),
       stageToggle: pop.querySelector('#tsStageToggle'),
       peersEl: pop.querySelector('#tsPeers'),
+      sessSection: pop.querySelector('#tsSessSection'),
+      sessSep: pop.querySelector('#tsSessSep'),
+      sessList: pop.querySelector('#tsSessList'),
+      sessMsg: pop.querySelector('#tsSessMsg'),
     };
+    pop.querySelector('#tsNewSess').addEventListener('click', (e) => {
+      e.stopPropagation();
+      sessionsMsg('');
+      openNewSessionTab();
+      renderSessions();
+    });
 
     // Промпт №25: «Переключать задание/тип» здесь больше не показываем —
     // выход из текущего типа заданий (и переключение на другой) теперь
@@ -1753,9 +2374,14 @@
           uiEls.msgEl.textContent = '';
           uiEls.msgEl.classList.remove('err');
         }
+        sessionsMsg('');
         renderPanel();
+        refreshPresence(); // какие сессии открыты — спрашиваем вкладки заново
       }
     });
+    // пока панель открыта, список «открыта/закрыта» держим живым: соседнюю
+    // вкладку могли закрыть или открыть прямо сейчас
+    setInterval(() => { if (pop.classList.contains('open')) refreshPresence(); }, 2000);
     document.addEventListener('click', (e) => {
       const path = e.composedPath ? e.composedPath() : [];
       if (!path.includes(pop) && e.target !== btn && !btn.contains(e.target)) pop.classList.remove('open');
@@ -1773,7 +2399,7 @@
     });
     pop.querySelector('#tsReset').addEventListener('click', async () => {
       await resetSession();
-      uiEls.msgEl.textContent = 'Начата новая сессия.'; uiEls.msgEl.classList.remove('err');
+      uiEls.msgEl.textContent = 'Код сменился — отправьте ученику новую ссылку.'; uiEls.msgEl.classList.remove('err');
     });
     pop.querySelector('#tsJoin').addEventListener('click', async () => {
       const val = uiEls.joinInput.value;
@@ -1783,6 +2409,7 @@
       else { uiEls.msgEl.textContent = 'Сессия с таким кодом не найдена.'; uiEls.msgEl.classList.add('err'); }
     });
     renderPanel();
+    maybeOpenPanel();
   }
 
   window.TrainerSession = {
@@ -1798,5 +2425,9 @@
     // есть ли кому показывать (board-stage.js шлёт доску, только если есть)
     hasViewers: () => studentsOnline() > 0,
     holdStageReady, releaseStageReady,
+    // Промпт №75: несколько сессий в одном браузере
+    openNewSessionTab, goToSession,
+    getSessionName: () => (amTabHolder() ? sessionLabel(regGet(code)) : ''),
+    renameSession: (name) => { if (amTabHolder()) regRename(code, name); },
   };
 })();
