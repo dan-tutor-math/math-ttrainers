@@ -118,6 +118,19 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
 #conn.warn{border-color:var(--warn);}
 #conn.bad{border-color:var(--bad);}
 #conn.good{border-color:var(--good);}
+/* Промпт №79: учитель завершил занятие — надпись поверх последнего экрана */
+#ended{position:fixed;inset:0;z-index:20;display:none;align-items:center;justify-content:center;padding:20px;
+  box-sizing:border-box;background:rgba(15,16,20,.55);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);}
+#ended.on{display:flex;}
+#ended .card{max-width:380px;width:100%;box-sizing:border-box;text-align:center;padding:28px 24px 20px;border-radius:20px;
+  background:var(--bar-bg);border:1px solid var(--bar-border);color:var(--bar-ink);box-shadow:0 12px 40px rgba(0,0,0,.45);
+  backdrop-filter:blur(18px) saturate(150%);-webkit-backdrop-filter:blur(18px) saturate(150%);}
+#ended .icon{font-size:34px;line-height:1;margin-bottom:10px;}
+#ended h2{margin:0 0 6px;font-size:21px;font-weight:700;}
+#ended p{margin:0 0 18px;font-size:15px;color:var(--bar-muted);line-height:1.45;}
+#ended .home{display:block;width:100%;padding:11px 14px;border-radius:12px;border:none;cursor:pointer;
+  background:#f1f2f4;color:#1f2126;font:inherit;font-size:15px;font-weight:600;}
+#ended .stay{margin-top:8px;background:none;border:none;color:var(--bar-muted);font:inherit;font-size:13px;cursor:pointer;padding:6px;}
 </style>
 </head>
 <body>
@@ -142,6 +155,15 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
 </div>
 <div id="status">Подключаемся к экрану учителя…</div>
 <div id="conn" class="hidden" role="status" aria-live="polite"></div>
+<div id="ended" role="dialog" aria-live="polite">
+  <div class="card">
+    <div class="icon">👋</div>
+    <h2 id="endedTitle">Занятие завершено</h2>
+    <p>Спасибо за урок, до свидания!</p>
+    <button class="home" id="endedHome">На главную</button>
+    <button class="stay" id="endedStay">Остаться на этой странице</button>
+  </div>
+</div>
 
 <script>
 (function(){
@@ -451,6 +473,23 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
   active = createFrame(targetUrl(params.get('to')).toString());
   armRevealTimeout(active);
 
+  /* ── занятие завершено ── */
+  let ended = false;
+  const endedEl = document.getElementById('ended');
+  function showEnded(late){
+    if (ended) return;
+    ended = true;
+    if (late) document.getElementById('endedTitle').textContent = 'Это занятие уже завершено';
+    statusEl.classList.add('hidden');
+    connEl.classList.add('hidden');
+    cursorEl.classList.remove('on');
+    // второй кадр (учитель как раз менял страницу) больше не нужен
+    if (pending) { try { pending.remove(); } catch (_) {} pending = null; }
+    endedEl.classList.add('on');
+  }
+  document.getElementById('endedHome').addEventListener('click', () => { location.href = new URL('index.html', location.href).toString(); });
+  document.getElementById('endedStay').addEventListener('click', () => endedEl.classList.remove('on'));
+
   /* ── сообщения из кадров ── */
   function whichFrame(src){
     if (active && src === active.contentWindow) return active;
@@ -463,6 +502,12 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
     if (!f) return;
     const d = e.data;
     if (!d || d.source !== 'ts-stage') return;
+    // Промпт №79: учитель завершил занятие (или ученик открыл ссылку на уже
+    // завершённое). Ученик остаётся на том экране, что был, — поверх
+    // надпись и «На главную». Код в его браузере кадр уже стёр, поэтому
+    // главная откроется обычной страницей, а не сценой старого занятия
+    if (d.type === 'ended') { showEnded(!f._doc || !f._doc.ready); return; }
+    if (ended) return;
     if (d.type === 'size') {
       try { sessionStorage.setItem(SIZE_KEY, JSON.stringify({ w: d.w, h: d.h })); } catch (_) {}
       bar.title = 'Экран учителя: ' + d.w + '×' + d.h;

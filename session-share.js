@@ -91,7 +91,7 @@
       registerHistoryUI(){}, notifyHistoryChanged(){},
       isStageFrame(){ return false; }, stageFocus(){},
       hasViewers(){ return false; }, holdStageReady(){}, releaseStageReady(){}, socketBacklog(){ return 0; },
-      openNewSessionTab(){ return null; }, goToSession(){}, getSessionName(){ return ''; }, renameSession(){},
+      openNewSessionTab(){ return null; }, goToSession(){}, getSessionName(){ return ''; }, renameSession(){}, endSession: async () => false,
     };
     return;
   }
@@ -355,7 +355,11 @@
       // найденный код от старой версии платформы, если общий ещё не заведён
       for (let i = 0; i < localStorage.length; i++) {
         const k = localStorage.key(i);
-        if (k && k.indexOf('trainerSession:') === 0 && k !== GLOBAL_CODE_KEY) {
+        // роль и «последний введённый код» — тоже trainerSession:…, но не код
+        // сессии: без этой проверки ученик, у которого завершили сессию (общий
+        // ключ стёрт, а роль ещё лежит), получил бы «кодом» слово follower
+        if (k && k.indexOf('trainerSession:') === 0 && k !== GLOBAL_CODE_KEY
+            && k !== 'trainerSession:global:role' && k !== 'trainerSession:lastJoinCode') {
           const v = localStorage.getItem(k);
           if (v) return v;
         }
@@ -704,6 +708,14 @@
           // Промпт №37: и, симметрично, досылаем СВОЁ — то, что могло не уйти,
           // пока связи не было (нажатый «Проверить», ответ, новое задание)
           if (wasBroken) setTimeout(push, 150);
+          // Промпт №79: ученик был без связи, а учитель за это время завершил
+          // занятие — событие до него не дошло, но строка в базе помечена
+          if (wasBroken && !isLeaderFlag) {
+            const forCode = c;
+            fetchRow(forCode).then((row) => {
+              if (row && row.state && row.state.__ended && code === forCode) sessionEndedHere(forCode);
+            }).catch(() => {});
+          }
           return;
         }
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
@@ -910,6 +922,23 @@
     const subscribed = new Promise((res) => { resolveSubscribed = res; });
     subscribeChannel(c, resolveSubscribed);
     let row = await fetchRow(c);
+    // Промпт №79: сессию завершили кнопкой — строка в базе помечена __ended
+    if (row && row.state && row.state.__ended) {
+      if (opts.createIfMissing && !opts.followerFallback) {
+        // свой код учителя оказался завершённым (например, его запомнил
+        // общий ключ, а завершали в другой вкладке) — заводим новый
+        const fresh = generateCode();
+        ssSet(TAB_CODE_KEY, fresh);
+        return activate(fresh, opts);
+      }
+      // ученик пришёл в завершённую сессию: забываем код и не подключаемся
+      forgetSessionCode(c);
+      if (channel) { try { SB.removeChannel(channel); } catch (e) {} channel = null; }
+      if (prevCode && prevCode !== c) { await new Promise(resolve => subscribeChannel(prevCode, resolve)); code = prevCode; }
+      else code = null;
+      notifyUi();
+      return { ok: false, reason: 'ended' };
+    }
     if (!row && !opts.createIfMissing) {
       // это попытка ПОДКЛЮЧИТЬСЯ к чужому коду (не создать свой) — прежде чем
       // сообщать "не найдено", даём сети ещё несколько шансов досогласоваться
@@ -1029,6 +1058,11 @@
       isLeaderFlag = false;
       const res = await activate(joinCode.toUpperCase(), { createIfMissing: false, requestSyncFromLeader: true });
       if (res.ok) { storeRole('follower'); if (!res.redirecting) stageActivated(); return; }
+      // Промпт №79: ссылка на завершённое занятие — так и говорим ученику
+      if (res.reason === 'ended') {
+        if (IN_STAGE) { toStageHost({ type: 'ended' }); return; }
+        showEndedScreen(true);
+      }
       // ссылка устарела/битая — просто продолжаем со своей обычной сессией,
       // без всплывающих ошибок при обычном заходе на страницу
       isLeaderFlag = true;
@@ -1153,6 +1187,97 @@
     storeRole('leader');
     applyIncomingState({});
   }
+  /* ═══ Промпт №79: «Завершить сессию» ═══
+     Раньше занятие кончалось только закрытой вкладкой: у ученика сцена
+     висела с «Учитель не на связи», его браузер помнил код и при следующем
+     заходе на сайт снова уводил на сцену старого занятия, а у учителя
+     сессия ещё 30 дней лежала в списке сессий.
+     Теперь учитель жмёт «Завершить» — ученикам уходит session_end (дважды:
+     одно сообщение может потеряться), строка в базе помечается __ended (по
+     ней старую ссылку и переподключившегося ученика встречает «занятие
+     завершено»), сессия уходит из списка вместе с подборкой, а вкладка
+     учителя продолжает уже с новым кодом — как любая страница платформы.
+     У ученика — надпись поверх страницы, на которой он был, и кнопка «На
+     главную»; код и роль из его браузера стираются. */
+  async function endSession() {
+    if (!isLeaderFlag || !code) return false;
+    const old = code;
+    clearTimeout(saveTimer);
+    broadcastEvent('session_end', { code: old });
+    try { await upsertState(old, trainerSlug, { __ended: Date.now(), __trainer: trainerSlug }); } catch (e) {}
+    await new Promise(r => setTimeout(r, 450));
+    broadcastEvent('session_end', { code: old });
+    await new Promise(r => setTimeout(r, 250));
+    tabsPost({ t: 'bye' });
+    forgetSessionCode(old);
+    const fresh = generateCode();
+    ssSet(TAB_CODE_KEY, fresh);
+    isLeaderFlag = true;
+    await activate(fresh, { createIfMissing: true });
+    storeRole('leader');
+    regRemove(old);
+    dropBasket(old);
+    applyTitle();
+    return true;
+  }
+  // стереть этот код из браузера: вкладка, общий ключ, роль, последний
+  // введённый — чтобы следующая страница не подключилась к нему снова
+  function forgetSessionCode(c) {
+    if (ssGet(TAB_CODE_KEY) === c) { ssDel(TAB_CODE_KEY); ssDel(TAB_ROLE_KEY); }
+    try {
+      if (localStorage.getItem(GLOBAL_CODE_KEY) === c) { localStorage.removeItem(GLOBAL_CODE_KEY); localStorage.removeItem(ROLE_KEY); }
+      if (localStorage.getItem(LAST_JOIN_KEY) === c) localStorage.removeItem(LAST_JOIN_KEY);
+    } catch (e) {}
+  }
+  // ученик: учитель завершил занятие
+  function sessionEndedHere(c) {
+    if (isLeaderFlag || !code || code !== c) return;
+    forgetSessionCode(c);
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    clearTimeout(saveTimer);
+    if (channel) { try { SB.removeChannel(channel); } catch (e) {} channel = null; }
+    code = null;
+    notifyUi();
+    // на сцене надпись рисует сама сцена — поверх кадра с последним экраном
+    if (IN_STAGE) toStageHost({ type: 'ended' });
+    else showEndedScreen(false);
+  }
+  onEvent('session_end', (d) => { if (d && d.code) sessionEndedHere(d.code); });
+
+  function showEndedScreen(late) {
+    if (IN_ANY_FRAME || document.getElementById('tsEnded')) return;
+    const st = document.createElement('style');
+    st.textContent = `
+      #tsEnded{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;
+        padding:20px;box-sizing:border-box;background:rgba(20,22,26,.42);
+        backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);font-family:var(--font-ui,system-ui,-apple-system,sans-serif);}
+      #tsEnded .ts-ended-card{max-width:380px;width:100%;box-sizing:border-box;text-align:center;padding:28px 24px 20px;
+        border-radius:20px;background:var(--glass-strong,#fff);border:1px solid var(--glass-border,rgba(0,0,0,.1));
+        box-shadow:var(--shadow,0 12px 40px rgba(0,0,0,.25));color:var(--pencil,#1f2126);
+        backdrop-filter:blur(24px) saturate(170%);-webkit-backdrop-filter:blur(24px) saturate(170%);}
+      #tsEnded .ts-ended-icon{font-size:34px;line-height:1;margin-bottom:10px;}
+      #tsEnded h2{margin:0 0 6px;font-size:21px;font-weight:700;}
+      #tsEnded p{margin:0 0 18px;font-size:15px;color:var(--muted-2,#6b7280);line-height:1.45;}
+      #tsEnded .ts-ended-home{display:block;width:100%;padding:11px 14px;border-radius:12px;border:none;cursor:pointer;
+        background:var(--ink,#2f6fed);color:#fff;font:inherit;font-size:15px;font-weight:600;}
+      #tsEnded .ts-ended-stay{margin-top:8px;background:none;border:none;color:var(--muted-2,#6b7280);font:inherit;
+        font-size:13px;cursor:pointer;padding:6px;}
+    `;
+    document.head.appendChild(st);
+    const el = document.createElement('div');
+    el.id = 'tsEnded';
+    el.innerHTML = `<div class="ts-ended-card" role="dialog" aria-live="polite">
+      <div class="ts-ended-icon">👋</div>
+      <h2>${late ? 'Это занятие уже завершено' : 'Занятие завершено'}</h2>
+      <p>Спасибо за урок, до свидания!</p>
+      <button class="ts-ended-home" id="tsEndedHome">На главную</button>
+      <button class="ts-ended-stay" id="tsEndedStay">Остаться на этой странице</button>
+    </div>`;
+    document.body.appendChild(el);
+    el.querySelector('#tsEndedHome').addEventListener('click', () => { location.href = new URL('index.html', location.href).toString(); });
+    el.querySelector('#tsEndedStay').addEventListener('click', () => el.remove());
+  }
+
   async function joinByCode(rawCode) {
     const c = (rawCode || '').trim().toUpperCase().replace(/\s+/g, '');
     if (!c) return { ok: false, reason: 'empty' };
@@ -2186,6 +2311,13 @@
     // только сам факт (через применённые ограничения в интерфейсе тренажёра),
     // а не эту панель управления
     const showPerm = isLeaderFlag;
+    // завершить может только учитель своей сессии; пока открыто
+    // подтверждение, саму кнопку не показываем
+    if (uiEls.endBtn) {
+      const canEnd = isLeaderFlag && !!code && !IN_ANY_FRAME;
+      if (!canEnd) uiEls.endConfirm.style.display = 'none';
+      uiEls.endBtn.style.display = canEnd && uiEls.endConfirm.style.display === 'none' ? '' : 'none';
+    }
     uiEls.permSep.style.display = showPerm ? '' : 'none';
     uiEls.permSection.style.display = showPerm ? '' : 'none';
     if (showPerm) {
@@ -2286,6 +2418,15 @@
       .ts-share-reset{font-size:12px;background:none;border:none;color:var(--teacher);cursor:pointer;
         text-decoration:underline;padding:0;align-self:flex-start;}
       .ts-share-msg{font-size:11.5px;color:var(--muted-2);min-height:14px;}
+      .ts-share-end{font-size:12.5px;font-weight:600;padding:8px 10px;border-radius:10px;cursor:pointer;
+        background:none;border:1px solid var(--teacher,#d9534f);color:var(--teacher,#d9534f);}
+      .ts-share-end:hover{background:rgba(217,83,79,.08);}
+      .ts-end-confirm{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;
+        background:rgba(217,83,79,.07);border:1px solid rgba(217,83,79,.35);}
+      .ts-share-row button.ts-end-yes{background:var(--teacher,#d9534f);flex:1;}
+      .ts-share-row button.ts-end-yes:hover{background:var(--teacher,#d9534f);filter:brightness(.92);}
+      .ts-share-row button.ts-end-no{background:none;border:1px solid var(--glass-border);color:var(--pencil);flex:1;}
+      .ts-share-row button.ts-end-no:hover{background:var(--glass);}
       .ts-share-msg.err{color:var(--teacher);}
       .ts-section-title{font-size:12px;font-weight:700;color:var(--pencil);}
       .ts-perm-list{display:flex;flex-direction:column;gap:8px;}
@@ -2336,6 +2477,14 @@
         <button id="tsCopy">Копировать</button>
       </div>
       <button class="ts-share-reset" id="tsReset" title="Ученики по старой ссылке отключатся; имя сессии и подборка останутся">Сменить код этой сессии</button>
+      <button class="ts-share-end" id="tsEnd" style="display:none">Завершить сессию</button>
+      <div class="ts-end-confirm" id="tsEndConfirm" style="display:none">
+        <div class="ts-share-hint">Завершить занятие? Ученики увидят «Занятие завершено», ссылка перестанет работать, а сессия уйдёт из списка.</div>
+        <div class="ts-share-row">
+          <button id="tsEndYes" class="ts-end-yes">Завершить</button>
+          <button id="tsEndNo" class="ts-end-no">Отмена</button>
+        </div>
+      </div>
       <div class="ts-share-sep"></div>
       <div class="ts-share-hint">Есть код от другого человека?</div>
       <div class="ts-share-row">
@@ -2377,6 +2526,8 @@
       historyDownloadBtn: pop.querySelector('#tsHistoryDownload'),
       stageToggle: pop.querySelector('#tsStageToggle'),
       peersEl: pop.querySelector('#tsPeers'),
+      endBtn: pop.querySelector('#tsEnd'),
+      endConfirm: pop.querySelector('#tsEndConfirm'),
       sessSection: pop.querySelector('#tsSessSection'),
       sessSep: pop.querySelector('#tsSessSep'),
       sessList: pop.querySelector('#tsSessList'),
@@ -2461,7 +2612,24 @@
       uiEls.msgEl.textContent = 'Подключаемся…'; uiEls.msgEl.classList.remove('err');
       const res = await joinByCode(val);
       if (res.ok) { uiEls.joinInput.value = ''; uiEls.msgEl.textContent = 'Подключено.'; uiEls.msgEl.classList.remove('err'); }
-      else { uiEls.msgEl.textContent = 'Сессия с таким кодом не найдена.'; uiEls.msgEl.classList.add('err'); }
+      else {
+        uiEls.msgEl.textContent = res.reason === 'ended' ? 'Эта сессия уже завершена.' : 'Сессия с таким кодом не найдена.';
+        uiEls.msgEl.classList.add('err');
+      }
+    });
+    // Промпт №79: «Завершить сессию» — с подтверждением прямо в панели
+    // (не системным окном: оно останавливает страницу и на планшете выглядит
+    // чужим)
+    const endBtn = pop.querySelector('#tsEnd'), endConfirm = pop.querySelector('#tsEndConfirm');
+    endBtn.addEventListener('click', () => { endConfirm.style.display = ''; endBtn.style.display = 'none'; });
+    pop.querySelector('#tsEndNo').addEventListener('click', () => { endConfirm.style.display = 'none'; renderPanel(); });
+    pop.querySelector('#tsEndYes').addEventListener('click', async () => {
+      endConfirm.style.display = 'none';
+      uiEls.msgEl.textContent = 'Завершаем занятие…'; uiEls.msgEl.classList.remove('err');
+      const ok = await endSession();
+      uiEls.msgEl.textContent = ok ? 'Сессия завершена. Для следующего занятия — новый код выше.' : 'Не удалось завершить — попробуйте ещё раз.';
+      uiEls.msgEl.classList.toggle('err', !ok);
+      renderPanel();
     });
     renderPanel();
     maybeOpenPanel();
@@ -2469,7 +2637,7 @@
 
   window.TrainerSession = {
     init, push, registerField, unregisterField, unregisterFieldsWithPrefix,
-    getCode, getShareUrl, resetSession, joinByCode, mountShareButton,
+    getCode, getShareUrl, resetSession, joinByCode, mountShareButton, endSession,
     broadcastEvent, onEvent, isLeader, navigateTo,
     guardStudentAction, studentRestricted, flashRestrictedHint,
     getConnState,
