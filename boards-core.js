@@ -2444,7 +2444,11 @@ const imgCache = {};
 function getImg(src){
   if (!imgCache[src]){
     const im = new Image();
-    im.onload = () => scheduleRedraw();
+    // картинка догрузилась — перерисовать и холст справочной панели: её
+    // картинки тоже идут через этот кэш, а без этого панель оставалась
+    // пустой до первого движения в ней (ученик на демонстрации, у которого
+    // картинка приходит позже панели, так её и не видел)
+    im.onload = () => { scheduleRedraw(); rfScheduleRedraw(); };
     im.src = src;
     imgCache[src] = im;
   }

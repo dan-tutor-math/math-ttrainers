@@ -90,7 +90,7 @@
       getAutosaveHistory(){ return true; }, setAutosaveHistory(){}, onAutosaveHistoryChange(){},
       registerHistoryUI(){}, notifyHistoryChanged(){},
       isStageFrame(){ return false; }, stageFocus(){},
-      hasViewers(){ return false; }, holdStageReady(){}, releaseStageReady(){},
+      hasViewers(){ return false; }, holdStageReady(){}, releaseStageReady(){}, socketBacklog(){ return 0; },
       openNewSessionTab(){ return null; }, goToSession(){}, getSessionName(){ return ''; }, renameSession(){},
     };
     return;
@@ -324,6 +324,8 @@
   // ── тема оформления сайта — тоже общая для любого тренажёра вещь: сама
   // применяем data-theme/localStorage, не дожидаясь, пока конкретный
   // tsApplyState() тренажёра об этом узнает ──
+  // тема учителя — последняя, что пришла от него (см. followerThemeTick)
+  let leaderTheme = null;
   function applyRemoteTheme(theme) {
     if (!theme) return;
     try {
@@ -467,6 +469,8 @@
       if (autosaveChangeCb) { try { autosaveChangeCb(autosaveHistory); } catch (e) {} }
     }
     if (state.__theme) applyRemoteTheme(state.__theme);
+    // снимок с размером сцены кладёт только учитель — его тема и есть «правильная»
+    if (state.__theme && state.__stage) leaderTheme = state.__theme;
     // Промпт №11 нового списка: размер окна учителя — до проверки «чей снимок»: он нужен
     // сцене на любой странице, даже если снимок пришёл с соседнего тренажёра
     if (state.__stage) { stageFromLeader(state.__stage); lastLeaderTrainer = state.__trainer || lastLeaderTrainer; }
@@ -547,6 +551,27 @@
     reportConn();
   }
   function getConnState() { return connState; }
+
+  /* Правка «доска не грузится у ученика»: сколько байт лежит в исходящем
+     буфере вебсокета, ещё не отправленных. Нужен тому, кто шлёт много сразу
+     (доска учителя целиком, board-stage.js): channel.send не ждёт сети, а
+     просто кладёт сообщение в буфер сокета. Пачка частей большой доски за
+     секунду клала туда мегабайты — у учителя с обычной домашней отдачей они
+     уходили десятки секунд, и всё это время за ними в той же очереди стоял
+     служебный «пульс» библиотеки. Ответ на пульс не приходил за 10 с
+     (heartbeatIntervalMs ниже), библиотека считала сокет мёртвым и рвала
+     его — вместе со всем, что не успело уйти. Добираемся до сокета через
+     внутренности supabase-js (socketAdapter.socket.conn в сборке 2.112),
+     поэтому осторожно: не нашли — считаем, что буфер пуст */
+  function socketBacklog() {
+    try {
+      const rt = SB.realtime;
+      const sock = (rt && rt.socketAdapter && rt.socketAdapter.socket) || rt;
+      const conn = sock && sock.conn;
+      const n = conn && conn.bufferedAmount;
+      return typeof n === 'number' ? n : 0;
+    } catch (e) { return 0; }
+  }
 
   // канал жив? у RealtimeChannel есть .state: joined | joining | closed | errored | leaving
   function channelLooksAlive() {
@@ -1577,6 +1602,7 @@
   let uiWant = null, lastUiSent = '';
   const uiActedAt = {};
   function uiFromLeader(ui) {
+    if (ui && ui.theme && !isLeaderFlag) leaderTheme = ui.theme;
     if (!IN_STAGE || isLeaderFlag || !ui) return;
     uiWant = ui;
     uiReconcile();
@@ -1617,7 +1643,36 @@
     } else if (IN_STAGE) {
       uiReconcile();   // страница ученика могла закрыть что-то сама (новое задание)
     }
+    followerThemeTick();
   }, 300);
+
+  /* ═══ Правка «оформление как у учителя» ═══
+     Ученик в сессии менял себе светлую/тёмную тему кнопкой 🌙, у учителя
+     ничего не менялось — и они начинали видеть разное: то, что учитель пишет
+     тёмными чернилами на светлом листе, у ученика на тёмном листе выглядит
+     иначе (цвета «по теме» пересчитываются), и они перестают понимать друг
+     друга по цвету. Поэтому у ученика в сессии кнопки темы нет вовсе (и на
+     сцене, и в обычном режиме — тему ему всё равно переписывает каждый
+     снимок учителя), а тема держится учительская: если её что-то сменило
+     (системная тема, старая вкладка), через доли секунды она возвращается.
+     Кадр сцены — всегда ученик, ему класс ставим сразу при загрузке, чтобы
+     кнопка не мелькнула до первого тика */
+  (function () {
+    try {
+      const st = document.createElement('style');
+      st.textContent = 'html.ts-follower #themeToggle{display:none!important;}';
+      (document.head || document.documentElement).appendChild(st);
+      if (IN_STAGE) document.documentElement.classList.add('ts-follower');
+    } catch (e) {}
+  })();
+  function followerThemeTick() {
+    const follower = IN_STAGE || (!isLeaderFlag && !!code);
+    try { document.documentElement.classList.toggle('ts-follower', follower); } catch (e) {}
+    if (!follower || !leaderTheme) return;
+    let have = 'light';
+    try { have = document.documentElement.getAttribute('data-theme') || 'light'; } catch (e) {}
+    if (have !== leaderTheme) applyRemoteTheme(leaderTheme);
+  }
 
   /* ═══ Промпт №75: список сессий и связь между вкладками ═══
      Список сессий этого компьютера лежит в localStorage (общий для вкладок):
@@ -2425,6 +2480,9 @@
     // есть ли кому показывать (board-stage.js шлёт доску, только если есть)
     hasViewers: () => studentsOnline() > 0,
     holdStageReady, releaseStageReady,
+    // сколько байт ещё не ушло в сеть из сокета этой страницы. board-stage.js
+    // по нему держит темп, отдавая доску частями: см. там pumpBulk
+    socketBacklog,
     // Промпт №75: несколько сессий в одном браузере
     openNewSessionTab, goToSession,
     getSessionName: () => (amTabHolder() ? sessionLabel(regGet(code)) : ''),

@@ -53,9 +53,54 @@
   if (!TS || !TS.onEvent) return;
   const VIEWER = !!window.__boardViewer;
 
-  const CHUNK_CHARS = 150000;   // одна часть — заведомо меньше предела 256 КБ
-  const BULK_GAP_MS = 30;       // части подряд — с паузой: сервер не любит залпов
+  /* Правка «доска не грузится у ученика» (после живого урока: учитель
+     перешёл с главной на доску, у ученика минутами крутилась загрузка и
+     доска появилась только после нескольких перезагрузок).
+     Что было. Доска уходила частями по 150 КБ с паузой 30 мс — до 5 МБ в
+     секунду в буфер сокета учителя, а домашняя отдача — от силы 0,1–1 МБ/с.
+     Буфер разбухал, за ним стоял «пульс» библиотеки, ответа на пульс не было
+     10 с — и библиотека сама рвала сокет вместе со всем, что не ушло. Ученик
+     через 6 с без доски просил её заново, и учитель начинал ВСЮ доску с
+     начала — ещё мегабайты в тот же буфер. Круг замыкался: чем больше доска
+     и чем слабее отдача, тем вернее загрузка не кончалась никогда.
+     Что теперь:
+     - доска едет одним сжатым (gzip) куском, порезанным на части: точки
+       штрихов — это в основном цифры, сжимаются в разы (координаты в дорогу
+       ещё и округляются до сотых — на экране это неотличимо);
+     - части уходят в темпе сети учителя: следующая — только когда буфер
+       сокета почти пуст (TS.socketBacklog) и не чаще раза в 120 мс;
+     - потерянную часть ученик дозапрашивает по номеру (bd_need_chunks),
+       а не всю доску; повторная просьба «пришли доску», пока она ещё едет,
+       получает только «шапку», без нового круга;
+     - у ученика видно, сколько уже загружено, в процентах */
+  const CHUNK_CHARS = 120000;   // одна часть — заведомо меньше предела сообщения
+  const DIFF_MAX_CHARS = 150000; // правка больше этого — проще прислать доску заново
+  const BULK_GAP_MS = 120;      // части подряд — не чаще: у тарифа есть предел сообщений в секунду на весь проект
+  const BACKLOG_MAX = 64 * 1024; // в буфере сокета больше этого — следующую часть придержим
   const LIVE_MS = 30;           // живое (штрих, фигура, текст, перетаскивание, камера) — как штрихи на тренажёрах
+  const PROTO = 2;              // версия способа передачи (см. bd_hello)
+
+  /* ── сжатие ──
+     CompressionStream есть во всех нынешних браузерах (Safari — с 16.4).
+     Кто не умеет распаковать, говорит об этом в bd_hello (gz:false) — тогда
+     учитель шлёт доску несжатой */
+  const CAN_GZIP = typeof CompressionStream === 'function';
+  const CAN_GUNZIP = typeof DecompressionStream === 'function';
+  async function gzipToB64(str) {
+    const stream = new Blob([str]).stream().pipeThrough(new CompressionStream('gzip'));
+    const bytes = new Uint8Array(await new Response(stream).arrayBuffer());
+    let bin = '';
+    // по кускам: String.fromCharCode с сотнями тысяч аргументов падает
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  async function b64ToText(b64) {
+    const bin = atob(b64);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return await new Response(stream).text();
+  }
 
   /* ── ключ картинки ──
      Картинки хранятся в объекте строкой data:URL по сотне килобайт и больше.
@@ -99,23 +144,36 @@
       TS.navigateTo('index.html');
     });
 
-    // пачки частей — по одной с паузой; живое идёт мимо очереди, сразу
+    // Части доски и картинок — по одной, в темпе сети (см. вверху файла);
+    // живое (штрих, вид, правки) идёт мимо этой очереди, сразу: оно мелкое.
+    // key — чтобы одна и та же часть, запрошенная дважды, не встала в
+    // очередь второй раз
     const bulk = [];
-    let bulkTimer = null;
-    function sendBulk(name, data) {
-      bulk.push([name, data]);
+    let bulkTimer = null, lastBulkAt = 0;
+    function sendBulk(name, data, key) {
+      if (key && bulk.some(m => m[2] === key)) return;
+      bulk.push([name, data, key]);
       if (!bulkTimer) bulkTimer = setTimeout(pumpBulk, 0);
     }
     function pumpBulk() {
       bulkTimer = null;
+      if (!bulk.length) return;
+      const wait = lastBulkAt + BULK_GAP_MS - Date.now();
+      const backlog = TS.socketBacklog ? TS.socketBacklog() : 0;
+      if (wait > 0 || backlog > BACKLOG_MAX) { bulkTimer = setTimeout(pumpBulk, Math.max(wait, 50)); return; }
       const m = bulk.shift();
-      if (!m) return;
+      lastBulkAt = Date.now();
       TS.broadcastEvent(m[0], m[1]);
       if (bulk.length) bulkTimer = setTimeout(pumpBulk, BULK_GAP_MS);
     }
+    function chunksQueued(sync) { return bulk.some(m => m[0] === 'bd_chunk' && m[1].sync === sync); }
 
     let syncId = 0;            // номер полной рассылки доски
     let ver = 0;               // номер правки внутри неё
+    let pack = null;           // упакованная доска текущей рассылки: { sync, bid, z, chunks, settings, size }
+    let packing = 0;           // номер рассылки, которая сейчас сжимается
+    let noGz = !CAN_GZIP;      // кто-то из учеников не умеет распаковывать
+    let lastFullAt = 0;
     let shownId = undefined;   // какая доска сейчас «в эфире» (null — список)
     let sent = new Map();      // id объекта → подпись того, что ушло
     let sentOrder = [];
@@ -145,8 +203,19 @@
     // gen у задания с тренажёра — рецепт «ещё такого же» с вёрсткой задания
     // (до 300 КБ): ученику он не нужен, а в одно сообщение бы не влез
     function slim(o) {
-      if (!o.src && !o.gen) return o;
       const c = Object.assign({}, o);
+      // точки в дорогу — до сотых: под пером их тысячи, и лишние знаки
+      // после запятой (а их у координат из событий мыши бывает по десять)
+      // были большей частью веса доски. На экране сотая пикселя не видна
+      if (Array.isArray(o.points)) {
+        c.points = o.points.map((p) => {
+          if (!p || typeof p.x !== 'number') return p;
+          const q = Object.assign({}, p);
+          q.x = Math.round(p.x * 100) / 100;
+          q.y = Math.round(p.y * 100) / 100;
+          return q;
+        });
+      }
       if (o.src) {
         const k = srcKey(o.src);
         imgs.set(k, o.src);
@@ -165,39 +234,82 @@
     }
     let lastSettings = '';
 
+    /* Справочные материалы (кнопка в правом нижнем углу доски): ученик
+       видит их так же, как учитель, — что открыто, какая вкладка, картинки,
+       текст, заметки и куда учитель сдвинул/увеличил холст заметок. Хранятся
+       они в самой доске (B.refPanel), поэтому едут вместе с ней и правками;
+       картинки — ключами, как картинки самой доски */
+    function refOf(b) {
+      const rp = (b && b.refPanel) || {};
+      const out = {
+        open: !!rp.open, mode: rp.mode || 'image', textMode: rp.textMode || 'type', text: rp.text || '',
+        w: rp.w || null, h: rp.h || null,
+        imageObjects: (rp.imageObjects || []).map(slim), drawObjects: (rp.drawObjects || []).map(slim),
+      };
+      if (typeof rfCam !== 'undefined' && rfCam) out.cam = { x: +rfCam.x.toFixed(2), y: +rfCam.y.toFixed(2), zoom: +rfCam.zoom.toFixed(4) };
+      return out;
+    }
+    let lastRefSig = '';
+
     function sendClosed() {
+      // номер рассылки — дальше: сжатие, начатое для закрытой доски, не
+      // должно потом разослать её «шапку» (см. проверку после await в sendFull)
+      syncId++; packing = 0; pack = null; bulk.length = 0;
       shownId = null;
       sent = new Map(); sentOrder = [];
       TS.broadcastEvent('bd_meta', { bid: null });
     }
-    function sendFull() {
+    function sendMeta() {
+      if (!pack) return;
+      TS.broadcastEvent('bd_meta', { bid: pack.bid, sync: pack.sync, n: pack.chunks.length, z: pack.z, size: pack.size, settings: pack.settings });
+    }
+    function queueChunks(idx) {
+      if (!pack) return;
+      idx.forEach((i) => {
+        const d = pack.chunks[i];
+        if (d != null) sendBulk('bd_chunk', { sync: pack.sync, i: i, d: d }, 'c' + pack.sync + ':' + i);
+      });
+    }
+    async function sendFull() {
       if (!boardOpen()) { sendClosed(); return; }
       syncId++; ver = 0;
+      const my = syncId;
       shownId = B.id;
       bulk.length = 0;
       imgs.clear();
-      const parts = [];
-      let cur = [], size = 0;
+      pack = null;
+      packing = my;
+      lastFullAt = Date.now();
       sent = new Map();
-      B.objects.forEach((o) => {
-        const s = slim(o);
-        const len = JSON.stringify(s).length;
-        if (cur.length && size + len > CHUNK_CHARS) { parts.push(cur); cur = []; size = 0; }
-        cur.push(s); size += len;
-        sent.set(o.id, sig(o));
-      });
-      if (cur.length || !parts.length) parts.push(cur);
+      const objs = B.objects.map((o) => { sent.set(o.id, sig(o)); return slim(o); });
       sentOrder = B.objects.map(o => o.id);
       const st = settingsOf(B);
       lastSettings = JSON.stringify(st);
+      const ref = refOf(B);
+      lastRefSig = JSON.stringify(ref);
       lastShapeSig = ''; lastTextSig = '';   // новая рассылка — живое заново
-      TS.broadcastEvent('bd_meta', { bid: B.id, sync: syncId, parts: parts.length, settings: st });
-      parts.forEach((objs, i) => sendBulk('bd_part', { sync: syncId, i: i, objs: objs }));
+      const json = JSON.stringify({ objs: objs, ref: ref });
+      let data = json, z = 0;
+      if (!noGz) {
+        try { data = await gzipToB64(json); z = 1; } catch (e) { data = json; z = 0; }
+      }
+      // пока сжимали, учитель открыл другую доску или ушёл к списку — эта
+      // рассылка устарела, новую начал тот, кто это заметил
+      if (my !== syncId) return;
+      packing = 0;
+      const chunks = [];
+      for (let i = 0; i < data.length; i += CHUNK_CHARS) chunks.push(data.slice(i, i + CHUNK_CHARS));
+      if (!chunks.length) chunks.push('');
+      pack = { sync: my, bid: shownId, z: z, chunks: chunks, settings: st, size: json.length };
+      sendMeta();
+      queueChunks(chunks.map((_, i) => i));
       sendView(true);
     }
 
     function sendDiff() {
-      if (!boardOpen() || shownId !== B.id || !viewers()) return;
+      // пока доска сжимается, правки копятся сами: sent — снимок того, что
+      // ушло в упаковку, разница посчитается от него, когда «шапка» уйдёт
+      if (packing || !boardOpen() || shownId !== B.id || !viewers()) return;
       const upd = [], del = [];
       const now = new Map();
       B.objects.forEach((o) => {
@@ -217,15 +329,19 @@
       const orderChanged = expect.length !== order.length || expect.some((id, i) => id !== order[i]);
       const st = JSON.stringify(settingsOf(B));
       const stChanged = st !== lastSettings;
-      if (!upd.length && !del.length && !orderChanged && !stChanged) return;
-      sent = now; sentOrder = order; lastSettings = st;
+      const ref = refOf(B);
+      const refSig = JSON.stringify(ref);
+      const refChanged = refSig !== lastRefSig;
+      if (!upd.length && !del.length && !orderChanged && !stChanged && !refChanged) return;
+      sent = now; sentOrder = order; lastSettings = st; lastRefSig = refSig;
       ver++;
       const msg = { sync: syncId, ver: ver, upd: upd, del: del };
       if (orderChanged) msg.order = order;
       if (stChanged) msg.settings = JSON.parse(st);
+      if (refChanged) msg.ref = ref;
       // крупная правка (вставили пачку картинок, загрузили доску из файла) не
       // влезет в одно сообщение — проще прислать доску заново
-      if (JSON.stringify(msg).length > CHUNK_CHARS) { sendFull(); return; }
+      if (JSON.stringify(msg).length > DIFF_MAX_CHARS) { sendFull(); return; }
       TS.broadcastEvent('bd_diff', msg);
     }
     let diffTimer = null;
@@ -371,10 +487,36 @@
 
     // ученик просит доску целиком (только пришёл, переподключился, пропустил правку)
     let helloTimer = null;
-    TS.onEvent('bd_hello', () => {
+    TS.onEvent('bd_hello', (d) => {
+      // Ученик со старым board-stage.js (страница из кэша браузера) ждёт
+      // доску прежним способом и не понял бы новый — просил бы её снова и
+      // снова, а каждая просьба гнала бы всю доску заново. Ему не отвечаем:
+      // перезагрузка страницы подтянет новую версию
+      if (!d || d.v !== PROTO) return;
+      let repack = false;
+      if (d.gz === false && !noGz) { noGz = true; repack = !!(pack && pack.z); }
       clearTimeout(helloTimer);
       // несколько учеников подряд — одна рассылка на всех
-      helloTimer = setTimeout(() => { if (boardOpen()) sendFull(); else sendClosed(); }, 120);
+      helloTimer = setTimeout(() => {
+        if (!boardOpen()) { sendClosed(); return; }
+        if (packing) return;   // «шапка» уйдёт сама, как только доска сожмётся
+        // доска ещё едет — новому ученику хватит «шапки»: части, что уже
+        // ушли до него, он дозапросит по номерам. Начинать всё заново —
+        // это и был бесконечный круг (см. вверху файла)
+        if (!repack && pack && pack.bid === B.id && chunksQueued(pack.sync)) { sendMeta(); return; }
+        sendFull();
+      }, 120);
+    });
+    // ученик собирает доску и какой-то части у него нет (потерялась в
+    // сети, пришёл посреди рассылки) — шлём только эти части
+    TS.onEvent('bd_need_chunks', (d) => {
+      if (!d || !Array.isArray(d.idx) || !boardOpen()) return;
+      if (!pack || d.sync !== pack.sync) {
+        // ученик собирает старую рассылку — покажем ему, какая сейчас
+        if (pack && pack.bid === B.id) sendMeta();
+        return;
+      }
+      queueChunks(d.idx.slice(0, 60).filter(i => typeof i === 'number'));
     });
     // картинки — по запросу
     TS.onEvent('bd_need', (d) => {
@@ -384,7 +526,7 @@
         if (!src) return;
         const n = Math.max(1, Math.ceil(src.length / CHUNK_CHARS));
         for (let i = 0; i < n; i++) {
-          sendBulk('bd_img', { key: k, i: i, n: n, data: src.slice(i * CHUNK_CHARS, (i + 1) * CHUNK_CHARS) });
+          sendBulk('bd_img', { key: k, i: i, n: n, data: src.slice(i * CHUNK_CHARS, (i + 1) * CHUNK_CHARS) }, 'i' + k + ':' + i);
         }
       });
     });
@@ -408,8 +550,16 @@
       /* просмотр: от интерфейса досок остаются холст и живые поля заданий
          (они показывают ответ ученика учителя, но нажать их нельзя) */
       html.bd-viewer #screenList{display:none!important;}
-      html.bd-viewer #screenBoard > *:not(#boardCv):not(#bdTaskLayer):not(#bdViewerWait){display:none!important;}
+      html.bd-viewer #screenBoard > *:not(#boardCv):not(#bdTaskLayer):not(#bdViewerWait):not(#bdRefToggle):not(#bdRefPanel){display:none!important;}
       html.bd-viewer #screenBoard, html.bd-viewer #screenBoard *{pointer-events:none!important;}
+      /* справочные материалы учителя: кнопка в углу ученику видна и
+         нажимается (открыть/свернуть у себя), текст в панели можно листать;
+         менять в панели ученик ничего не может */
+      html.bd-viewer:not(.bd-viewer-on) #bdRefToggle, html.bd-viewer:not(.bd-viewer-on) #bdRefPanel{display:none!important;}
+      html.bd-viewer #screenBoard #bdRefToggle, html.bd-viewer #screenBoard #bdRefClose,
+      html.bd-viewer #screenBoard #bdRefTextarea{pointer-events:auto!important;}
+      html.bd-viewer #bdRefResize, html.bd-viewer #bdRefResizeN, html.bd-viewer #bdRefResizeW,
+      html.bd-viewer #bdRefImageFill, html.bd-viewer #bdRefUploadBtn{display:none!important;}
       #bdViewerWait{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;z-index:50;
         background:var(--bg);color:var(--muted-2,#888);font-family:var(--font-ui,system-ui);font-size:17px;
         text-align:center;padding:24px;box-sizing:border-box;}
@@ -427,8 +577,16 @@
     function hideWait() { wait.classList.add('hidden'); }
     screenList.style.display = 'none';
 
-    // ученик смотрит, а не управляет: колесо, клавиши, жесты — мимо движка
-    const block = (e) => { e.stopImmediatePropagation(); if (e.cancelable && e.type !== 'keydown') e.preventDefault(); };
+    // ученик смотрит, а не управляет: колесо, клавиши, жесты — мимо движка.
+    // Кроме кнопки справочных материалов и её «свернуть» (на планшете
+    // preventDefault у касания отменил бы и само нажатие) и текста в
+    // справочной панели — его можно листать
+    const REF_FREE = '#bdRefToggle, #bdRefClose, #bdRefTextarea';
+    const block = (e) => {
+      const t = e.target;
+      if (e.type !== 'keydown' && t && t.closest && t.closest(REF_FREE)) return;
+      e.stopImmediatePropagation(); if (e.cancelable && e.type !== 'keydown') e.preventDefault();
+    };
     ['wheel', 'pointerdown', 'mousedown', 'touchstart', 'dblclick', 'contextmenu', 'gesturestart'].forEach((t) => {
       window.addEventListener(t, block, { capture: true, passive: false });
     });
@@ -543,6 +701,55 @@
       c.restore();
     };
 
+    /* ── справочные материалы учителя ──
+       Панель повторяет учительскую: открыта/свёрнута, вкладка, размер,
+       картинки, текст, заметки. Ученик может сам открыть её кнопкой в углу
+       или свернуть — это остаётся у него, пока учитель сам не откроет или не
+       свернёт свою: тогда снова как у учителя */
+    let refLocal = null;            // null — как у учителя, иначе открыта ли у ученика
+    let refTeacherOpen = null;
+    const refTextareaEl = document.getElementById('bdRefTextarea');
+    if (refTextareaEl) { refTextareaEl.readOnly = true; refTextareaEl.placeholder = ''; }
+    function refRefresh() {
+      if (B !== VB || typeof applyRefPanel !== 'function') return;
+      try {
+        applyRefPanel();
+        if (rfVisible()) {
+          const r = refDrawHost.getBoundingClientRect();
+          // холст заметок пересоздаём, только если поменялся размер:
+          // иначе он мигал бы на каждой правке учителя
+          if (Math.round(r.width) !== rfCssW || Math.round(r.height) !== rfCssH) rfResizeCanvas();
+          rfScheduleRedraw();
+        }
+      } catch (e) {}
+    }
+    function applyRef(ref) {
+      if (!ref) return;
+      const open = !!ref.open;
+      if (refLocal !== null && refTeacherOpen !== null && open !== refTeacherOpen) refLocal = null;
+      refTeacherOpen = open;
+      VB.refPanel = {
+        open: refLocal !== null ? refLocal : open,
+        mode: ref.mode === 'text' ? 'text' : 'image', textMode: ref.textMode === 'draw' ? 'draw' : 'type',
+        text: ref.text || '', w: ref.w || null, h: ref.h || null,
+        imageObjects: (ref.imageObjects || []).map(fat), drawObjects: (ref.drawObjects || []).map(fat),
+      };
+      if (ref.cam && typeof rfCam !== 'undefined') { rfCam.x = ref.cam.x; rfCam.y = ref.cam.y; rfCam.zoom = ref.cam.zoom || 1; }
+      refRefresh();
+    }
+    // свои обработчики кнопок движка (он сохранял бы доску) — перехватываем
+    // нажатие раньше них
+    window.addEventListener('click', (e) => {
+      const t = e.target && e.target.closest && e.target.closest('#bdRefToggle, #bdRefClose');
+      if (!t) return;
+      e.stopImmediatePropagation(); e.preventDefault();
+      if (B !== VB) return;
+      refLocal = t.id === 'bdRefClose' ? false : !VB.refPanel.open;
+      VB.refPanel.open = refLocal;
+      refRefresh();
+    }, true);
+    function refObjects() { return VB.refPanel ? [].concat(VB.refPanel.imageObjects || [], VB.refPanel.drawObjects || []) : []; }
+
     // ── сборка доски ──
     const VB = {
       id: '__teacher', name: 'Доска учителя', objects: [], imageLib: [],
@@ -550,7 +757,8 @@
       recentColors: [], colorUsage: {}, refPanel: defaultRefPanel(),
     };
     let curSync = 0, curVer = 0, complete = false;
-    let assembling = null;          // { sync, parts, got: [], settings }
+    let assembling = null;          // { sync, bid, n, z, got: [], count, settings, size, lastAt, needAt }
+    let unpacking = 0;              // рассылка, которая сейчас распаковывается
     let pendingDiffs = [];
     const imgStore = new Map();     // ключ → data:URL
     const imgParts = new Map();     // ключ → { n, got: [] }
@@ -571,7 +779,7 @@
     }
     function askImages() {
       const now = Date.now(), keys = [];
-      VB.objects.forEach((o) => {
+      VB.objects.concat(refObjects()).forEach((o) => {
         if (!o.srcKey || imgStore.has(o.srcKey)) return;
         const at = needAsked.get(o.srcKey) || 0;
         if (now - at < 6000) return;
@@ -598,40 +806,79 @@
       applyView();
       scheduleRedraw();
     }
-    function hello() { TS.broadcastEvent('bd_hello', {}); }
+    let helloAt = 0;
+    function hello() { helloAt = Date.now(); TS.broadcastEvent('bd_hello', { v: PROTO, gz: CAN_GUNZIP }); }
+
+    // сколько доски уже пришло — ученик видит, что загрузка идёт, а не висит
+    function showProgress() {
+      if (complete) return;
+      const a = assembling;
+      if (!a || a.n < 2) { showWait('Загружаем доску учителя…'); return; }
+      showWait('Загружаем доску учителя… ' + Math.floor(a.count / a.n * 100) + ' %');
+    }
+    function setOn(on) { document.documentElement.classList.toggle('bd-viewer-on', !!on); }
 
     TS.onEvent('bd_meta', (m) => {
       if (!m) return;
       if (!m.bid) {
-        complete = false; assembling = null; livePen = null; applyShape(null); liveText = null;
+        complete = false; assembling = null; unpacking = 0; livePen = null; applyShape(null); liveText = null;
         boardActive = false;
+        setOn(false);
         showWait('Учитель выбирает доску…');
         releaseReady();
         return;
       }
-      assembling = { sync: m.sync, parts: m.parts, got: new Array(m.parts), count: 0, settings: m.settings };
-      pendingDiffs = [];
-      if (!complete) showWait('Загружаем доску учителя…');
+      // ту же рассылку уже собираем или собрали («шапку» прислали ещё раз
+      // для другого ученика) — ничего не начинаем заново
+      if (assembling && assembling.sync === m.sync) return;
+      if ((complete && curSync === m.sync) || unpacking === m.sync) return;
+      if (typeof m.n !== 'number') return;   // учитель со старой страницей — дождёмся новой
+      if (m.z && !CAN_GUNZIP) { hello(); return; }   // попросим несжатую (hello скажет gz:false)
+      const now = Date.now();
+      assembling = { sync: m.sync, bid: m.bid, n: m.n, z: m.z, got: new Array(m.n), count: 0, settings: m.settings,
+                     size: m.size, lastAt: now, needAt: now };
+      // правки этой же рассылки могли прийти раньше «шапки» — их оставляем
+      pendingDiffs = pendingDiffs.filter(d => d.sync === m.sync);
+      showProgress();
     });
-    TS.onEvent('bd_part', (p) => {
-      if (!p || !assembling || p.sync !== assembling.sync || assembling.got[p.i]) return;
-      assembling.got[p.i] = p.objs || [];
-      assembling.count++;
-      if (assembling.count < assembling.parts) return;
-      // доска собрана
+    TS.onEvent('bd_chunk', (p) => {
       const a = assembling;
+      if (!p || !a || p.sync !== a.sync || typeof p.i !== 'number' || p.i < 0 || p.i >= a.n || a.got[p.i] != null) return;
+      a.got[p.i] = p.d || '';
+      a.count++;
+      a.lastAt = Date.now();
+      if (a.count < a.n) { showProgress(); return; }
       assembling = null;
+      finishBoard(a);
+    });
+    async function finishBoard(a) {
+      unpacking = a.sync;
+      let data;
+      try {
+        const text = a.got.join('');
+        data = JSON.parse(a.z ? await b64ToText(text) : text);
+      } catch (e) {
+        // часть пришла битой — просим доску заново
+        console.warn('[board-stage] доска учителя не распаковалась:', e);
+        if (unpacking === a.sync) { unpacking = 0; hello(); }
+        return;
+      }
+      // пока распаковывали, учитель ушёл к списку досок
+      if (unpacking !== a.sync) return;
+      unpacking = 0;
       applySettings(a.settings);
-      VB.objects = [].concat.apply([], a.got).map(fat);
+      VB.objects = (data.objs || []).map(fat);
       curSync = a.sync; curVer = 0; complete = true;
       livePen = null; applyShape(null); liveText = null;
       openViewerBoard();
+      setOn(true);
+      applyRef(data.ref);
       hideWait();
       pendingDiffs.filter(d => d.sync === curSync).sort((x, y) => x.ver - y.ver).forEach(applyDiff);
       pendingDiffs = [];
       askImages();
       releaseReady();
-    });
+    }
     function applyDiff(d) {
       if (d.ver <= curVer) return;
       if (d.ver !== curVer + 1) { complete = false; hello(); return; }   // пропустили правку
@@ -647,6 +894,7 @@
       });
       const ids = Array.isArray(d.order) ? d.order : order;
       VB.objects = ids.map(id => byId.get(id)).filter(Boolean);
+      if (d.ref) applyRef(d.ref);
       // штрих, который только что дорисовали, пришёл объектом — живой больше не нужен
       if (livePen && byId.has(livePen.id)) livePen = null;
       // подтверждённый текст пришёл правкой — поле учителя уже закрыто
@@ -656,8 +904,8 @@
     }
     TS.onEvent('bd_diff', (d) => {
       if (!d) return;
-      if (assembling && d.sync === assembling.sync) { pendingDiffs.push(d); return; }
-      if (!complete || d.sync !== curSync) { if (!assembling) hello(); return; }
+      if ((assembling && d.sync === assembling.sync) || unpacking === d.sync) { pendingDiffs.push(d); return; }
+      if (!complete || d.sync !== curSync) { if (!assembling && !unpacking) hello(); return; }
       applyDiff(d);
     });
     TS.onEvent('bd_view', (v) => {
@@ -706,25 +954,46 @@
       imgParts.delete(p.key);
       const src = rec.got.join('');
       imgStore.set(p.key, src);
+      let inRef = false;
       VB.objects.forEach((o) => { if (o.srcKey === p.key) o.src = src; });
+      refObjects().forEach((o) => { if (o.srcKey === p.key) { o.src = src; inRef = true; } });
       scheduleRedraw();
+      if (inRef) refRefresh();
     });
 
-    // Просим доску, пока не соберём: при заходе, после обрыва связи (часть
-    // могла потеряться) и если учитель что-то прислал, а собрать не вышло
-    let helloAt = 0;
+    /* Просим доску, пока не соберём.
+       - Доски нет и она не едет — «пришли доску» раз в 2,5 с.
+       - Доска едет, но части перестали приходить на 2,5 с, а каких-то нет
+         (потерялись, или ученик пришёл посреди рассылки) — просим только
+         недостающие, по номерам. Раньше здесь через 6 с выбрасывалось всё
+         собранное и просилась вся доска заново — на медленной сети учителя
+         это и не давало ей догрузиться никогда.
+       - Совсем тихо 25 с (учитель перезагрузил страницу и забыл рассылку) —
+         тогда уже всю заново */
     setInterval(() => {
       if (!TS.getCode || !TS.getCode()) return;
       const now = Date.now();
-      if (!complete && !assembling && now - helloAt > 2500) { helloAt = now; hello(); }
-      else if (assembling && now - helloAt > 6000) { helloAt = now; assembling = null; hello(); }
+      const a = assembling;
+      if (a) {
+        if (now - a.lastAt > 25000 && now - a.needAt > 2500) { assembling = null; hello(); return; }
+        if (now - a.lastAt > 2500 && now - a.needAt > 2500) {
+          const idx = [];
+          for (let i = 0; i < a.n && idx.length < 40; i++) if (a.got[i] == null) idx.push(i);
+          a.needAt = now;
+          if (idx.length) TS.broadcastEvent('bd_need_chunks', { sync: a.sync, idx: idx });
+        }
+      } else if (!complete && !unpacking && now - helloAt > 2500) hello();
       if (complete) askImages();
     }, 700);
-    // связь восстановилась — всё, что пришло за время обрыва, могло потеряться
+    // связь восстановилась — всё, что пришло за время обрыва, могло потеряться.
+    // Доску, которую собирали, не бросаем: сразу спрашиваем недостающие части
     let wasOnline = true;
     setInterval(() => {
       const on = !TS.getConnState || TS.getConnState() === 'online';
-      if (on && !wasOnline) { helloAt = Date.now(); hello(); }
+      if (on && !wasOnline) {
+        if (assembling) { assembling.lastAt = 0; assembling.needAt = 0; }
+        else hello();
+      }
       wasOnline = on;
     }, 1000);
 
@@ -734,6 +1003,8 @@
       liveQueued: () => (livePen ? livePen.queue.length : 0),
       playout: () => playout,
       liveShape: () => liveShape, liveText: () => liveText,
+      progress: () => (assembling ? { n: assembling.n, count: assembling.count, z: assembling.z } : null),
+      ref: () => VB.refPanel,
     };
 
     TS.init({ trainer: 'boards', getState: () => ({}), applyState: () => {} });
