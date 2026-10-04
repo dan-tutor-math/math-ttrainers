@@ -32,6 +32,9 @@ import sys
 import time
 import contextlib
 import http.client
+import io
+
+from PIL import Image
 
 from playwright.sync_api import sync_playwright
 
@@ -96,6 +99,14 @@ def run():
                     left:r.left, top:r.top, emoji:/[\\u{1F300}-\\u{1FAFF}]/u.test(s.textContent)} }""")
         check(side["n"] == 3 and side["mi"] == 3, f"слева капсула из трёх кнопок со значками-SVG ({side})")
         check(side["left"] == 16 and side["top"] == 16, "капсула в левом верхнем углу")
+        # значки контурные: залитая папка закрашена примерно на 63% площади,
+        # контурная — на 25%
+        page.add_style_tag(content="#tInk{position:fixed;left:0;top:0;width:96px;height:96px;background:#fff;color:#000;z-index:9999}#tInk .mi{width:96px;height:96px}")
+        page.evaluate("document.body.insertAdjacentHTML('beforeend','<div id=\"tInk\">'+MathhIcons.html('folder')+'</div>')")
+        im = Image.open(io.BytesIO(page.locator("#tInk").screenshot())).convert("L")
+        ink = sum(1 for v in im.tobytes() if v < 128) / (im.width * im.height)
+        check(ink < 0.40, f"значки контуром, без заливки (папка закрашена на {ink:.0%})")
+        page.evaluate("document.getElementById('tInk').remove()")
         check(page.evaluate("document.querySelectorAll('.basket-toggle,.boards-toggle,.works-toggle').length") == 3,
               "кнопки сохранили свои классы (на них ссылается код страницы)")
         check(page.evaluate("!!document.querySelector('.lg-menu #themeToggle') && !!document.querySelector('.lg-menu #resetProgressBtn')"),
