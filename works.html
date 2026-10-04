@@ -87,7 +87,17 @@ body.editing .corner-btn{position:absolute;}
 .ti{display:grid;grid-template-columns:28px 1fr;gap:10px;padding:10px;border-radius:16px;background:var(--card);border:1px solid var(--glass-border);}
 .ti-num{font-weight:700;color:var(--muted-2);text-align:center;padding-top:4px;}
 .ti-img{border-radius:10px;overflow:hidden;background:var(--glass);}
-.ti-img img{display:block;max-width:100%;max-height:220px;margin:0 auto;}
+.ti-img img{display:block;max-width:100%;max-height:130px;margin:0 auto;}   /* превью поменьше — меньше листать при проверке */
+.ti-theory{font-size:12px;color:var(--ink);font-weight:600;margin-top:6px;}
+.add-pos{display:flex;gap:2px;padding:3px;border-radius:12px;background:var(--glass);border:1px solid var(--glass-border);flex:0 0 auto;}
+.add-pos button{font-family:var(--font-ui);font-weight:700;font-size:13px;color:var(--muted-3);background:none;border:none;border-radius:9px;padding:0 9px;cursor:pointer;}
+.add-pos button.active{background:var(--ink);color:#fff;}
+#wkTries .own{flex:0 0 74px;width:74px;font-family:var(--font-ui);font-weight:600;font-size:13.5px;text-align:center;color:var(--pencil);
+  background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 6px;}
+#wkTries .own.active{border-color:var(--ink);box-shadow:0 0 0 2px var(--hl-10);}
+#wkTries .own:disabled{opacity:.45;}
+.check-line{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13.5px;color:var(--muted-3);cursor:pointer;user-select:none;}
+.check-line input{width:17px;height:17px;accent-color:var(--ink);}
 .ti-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;}
 .ti-name{font-size:13.5px;font-weight:600;color:var(--muted-3);flex:1;min-width:140px;}
 .ti-btns{display:flex;gap:4px;}
@@ -188,6 +198,9 @@ table.res td.nm small{display:block;color:var(--muted-2);font-size:12px;}
           <div class="frame-cover" id="frameCover" hidden>Снимаю задание…</div>
         </div>
         <div class="frame-actions" id="frameActions" hidden>
+          <div class="add-pos" id="addPos" title="Куда ставить новое задание в списке работы">
+            <button data-p="end" title="Новое задание — в конец списка">↓</button><button data-p="start" title="Новое задание — в начало списка">↑</button>
+          </div>
           <button class="btn" id="addBtn">＋ Добавить в работу</button>
           <button class="btn quiet" id="refreshBtn2" title="Другой пример того же типа — как ⟳ в тренажёре">⟳ Обновить пример</button>
         </div>
@@ -216,9 +229,16 @@ table.res td.nm small{display:block;color:var(--muted-2);font-size:12px;}
         <div class="sheet-row" id="triesRow">
           <span class="label">Попыток на задание</span>
           <div class="seg" id="wkTries">
-            <button data-t="1">1</button><button data-t="2">2</button><button data-t="3">3</button><button data-t="5">5</button><button data-t="inf">∞</button>
+            <button data-t="1">1</button><button data-t="2">2</button><button data-t="3">3</button><button data-t="5">5</button><input class="own" id="wkTriesOwn" type="number" min="1" max="99" inputmode="numeric" placeholder="своё" title="Своё число попыток"><button data-t="inf">∞</button>
           </div>
           <div class="hint" id="triesHint"></div>
+        </div>
+        <div class="sheet-row">
+          <span class="label">Как ученик видит задания</span>
+          <div class="seg" id="wkView">
+            <button data-v="one">По одному</button><button data-v="list">Все списком</button>
+          </div>
+          <label class="check-line"><input type="checkbox" id="wkViewSwitch"> Ученик может переключать сам</label>
         </div>
         <div class="sheet-row">
           <span class="label">Варианты</span>
@@ -414,7 +434,7 @@ const E = { id: null, title: '', kind: 'hw', settings: { feedback: 'each', attem
 Object.defineProperty(E, 'blocks', { get(){ return E.variants[0] ? E.variants[0].blocks : []; } });
 const curVar = () => E.variants[E.cur] || E.variants[0];
 function freshEditor(){
-  Object.assign(E, { id: null, title: '', kind: 'hw', settings: { feedback: 'each', attempts: 2 }, cur: 0, deleted: [], dirty: false, attempts: 0 });
+  Object.assign(E, { id: null, title: '', kind: 'hw', settings: { feedback: 'each', attempts: 2, view: 'one', viewSwitch: true }, cur: 0, deleted: [], dirty: false, attempts: 0 });
   E.variants = [{ id: null, num: 1, code: null, blocks: [] }];
 }
 freshEditor();
@@ -453,6 +473,14 @@ function renderSettings(){
   document.querySelectorAll('.switch .side').forEach(s => s.classList.toggle('on', s.dataset.v === (end ? 'end' : 'each')));
   const t = E.settings.attempts == null ? 'inf' : String(E.settings.attempts);
   $('wkTries').querySelectorAll('button').forEach(b => { b.classList.toggle('active', !end && b.dataset.t === t); b.disabled = end; });
+  // своё число — всё, что не на кнопках (между 5 и ∞)
+  const own = $('wkTriesOwn'), isOwn = E.settings.attempts != null && [1, 2, 3, 5].indexOf(E.settings.attempts) < 0;
+  own.disabled = end;
+  own.classList.toggle('active', !end && isOwn);
+  if (document.activeElement !== own) own.value = isOwn ? String(E.settings.attempts) : '';
+  const view = E.settings.view === 'list' ? 'list' : 'one';
+  $('wkView').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.v === view));
+  $('wkViewSwitch').checked = E.settings.viewSwitch !== false;
   // при «только в конце» ученик не знает, ошибся ли, — повторять ему нечего
   $('triesHint').textContent = end ? 'При «только в конце» попыток нет: ответ можно менять до «Завершить работу».' : 'Кончились попытки — ученик видит верный ответ. «Пропустить» есть всегда.';
 }
@@ -471,6 +499,17 @@ $('wkTries').addEventListener('click', e => {
   E.settings.attempts = b.dataset.t === 'inf' ? null : Number(b.dataset.t);
   renderSettings(); markDirty();
 });
+$('wkTriesOwn').addEventListener('input', () => {
+  const n = Math.round(Number($('wkTriesOwn').value));
+  if (!n || n < 1) return;
+  E.settings.attempts = Math.min(99, n);
+  renderSettings(); markDirty();
+});
+$('wkView').addEventListener('click', e => {
+  const b = e.target.closest('button[data-v]'); if (!b) return;
+  E.settings.view = b.dataset.v; renderSettings(); markDirty();
+});
+$('wkViewSwitch').addEventListener('change', () => { E.settings.viewSwitch = $('wkViewSwitch').checked; markDirty(); });
 
 function renderVariants(){
   const box = $('wkVariants');
@@ -555,6 +594,7 @@ function renderTasks(){
     else if (b._gen === 'fail') note = '<div class="ti-gen fail">Не получилось создать задание — нажмите ⟳</div>';
     else if (b.same) note = '<div class="ti-gen same">У этого задания других чисел нет (одно задание или один прототип) — оно такое же, как в варианте 1</div>';
     else if (b._up) note = '<div class="ti-up">Картинка ещё загружается…</div>';
+    if (b.theory) note = '<div class="ti-theory">📘 с теорией к заданию</div>' + note;
     el.innerHTML = '<div class="ti-num">' + (i + 1) + '</div><div><div class="ti-img">' + (im.url ? '<img alt="Задание ' + (i + 1) + '">' : '<div class="ti-ph">' + (busy ? 'Создаётся…' : 'Нет картинки') + '</div>') + '</div>'
       + '<div class="ti-row"><span class="ti-name">' + esc(b.name || trainerName(b.tid)) + '</span>' + modeUi
       + '<div class="ti-btns">' + btns + '</div></div>' + note + '</div>';
@@ -730,14 +770,9 @@ async function dataUrlToBlob(dataUrl){
 /* Снимок одного задания в обеих темах → поля задания для blocks.
    Общий для «Добавить в работу» (видимый кадр) и для «других чисел»
    (невидимый кадр genFrameFor, как «ещё такое же» на доске). */
-async function shootBlock(win, tid, href, el, info){
+// снимок узла в двух темах (тема кадра на миг, анимации выключены)
+async function shootThemes(win, el, info, opts){
   const doc = win.document;
-  const gen = trainerGenInfo(win, tid, href, el);
-  // вёрстка задания для перестройки на доске здесь не нужна, а весит до 300 КБ
-  if (gen) delete gen.html;
-  const exact = exactSnap(win, el);
-  const w0 = el.getBoundingClientRect().width;
-  const opts = w0 > CAP_W ? { width: CAP_W } : {};
   const was = doc.documentElement.getAttribute('data-theme') || 'light';
   const noAnim = doc.createElement('style');
   noAnim.textContent = '*,*::before,*::after{transition:none!important;animation-duration:0s!important;animation-delay:0s!important;}';
@@ -752,6 +787,28 @@ async function shootBlock(win, tid, href, el, info){
     try { await setFrameTheme(win, was); } catch (e) {}
     noAnim.remove();
   }
+  return shots;
+}
+/* Теория к заданию (ОГЭ №1–5 — «Шина», тарифы и т. п.: узел #theoryContent
+   в TRAINER_CAPTURE). Без неё задачу не решить, поэтому она снимается
+   вместе с заданием отдельной картинкой и у ученика стоит над карточкой.
+   В тренажёре теория бывает свёрнута — collectTrainerCaptureNodes на время
+   снимка её раскрывает (unhide) и потом возвращает как было. */
+async function shootTheory(win, el){
+  const w0 = el.getBoundingClientRect().width;
+  const shots = await shootThemes(win, el, null, w0 > CAP_W ? { width: CAP_W } : {});
+  return {
+    css: shots.light.css,
+    img: { light: { url: shots.light.dataUrl }, dark: { url: shots.dark.dataUrl } },
+  };
+}
+async function shootBlock(win, tid, href, el, info){
+  const gen = trainerGenInfo(win, tid, href, el);
+  // вёрстка задания для перестройки на доске здесь не нужна, а весит до 300 КБ
+  if (gen) delete gen.html;
+  const exact = exactSnap(win, el);
+  const w0 = el.getBoundingClientRect().width;
+  const shots = await shootThemes(win, el, info, w0 > CAP_W ? { width: CAP_W } : {});
   const L = shots.light;
   return {
     tid, href, gen, exact,
@@ -768,6 +825,16 @@ async function shootBlock(win, tid, href, el, info){
 
 let adding = false;
 $('addBtn').addEventListener('click', addFromFrame);
+// куда ставить новое задание — вниз (по умолчанию) или вверх; помнится в браузере
+let addPos = 'end';
+try { addPos = localStorage.getItem('works:addPos') === 'start' ? 'start' : 'end'; } catch (e) {}
+function renderAddPos(){ $('addPos').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.p === addPos)); }
+$('addPos').addEventListener('click', e => {
+  const b = e.target.closest('button[data-p]'); if (!b) return;
+  addPos = b.dataset.p; renderAddPos();
+  try { localStorage.setItem('works:addPos', addPos); } catch (err) {}
+});
+renderAddPos();
 async function addFromFrame(){
   if (adding || !openTid) return;
   if (!syncFrameTrainer()){ toast('В кадре не тренажёр — выберите тренажёр в каталоге'); return; }
@@ -775,14 +842,23 @@ async function addFromFrame(){
   let win, doc;
   try { win = fr.contentWindow; doc = fr.contentDocument; } catch (e) {}
   if (!doc){ toast('Не удалось получить доступ к тренажёру'); return; }
-  const nodes = collectTrainerCaptureNodes(doc, openTid).filter(n => n.el.id !== 'theoryContent');
-  if (!nodes.length){ toast('Откройте задание в тренажёре — на экране выбора его ещё нет'); return; }
+  const all = collectTrainerCaptureNodes(doc, openTid);
+  const thNode = all.find(n => n.el.id === 'theoryContent') || null;
+  const nodes = all.filter(n => n !== thNode);
+  if (!nodes.length){ all.forEach(n => { if (n.restore) n.restore(); }); toast('Откройте задание в тренажёре — на экране выбора его ещё нет'); return; }
   adding = true;
   $('addBtn').disabled = true; $('refreshBtn2').disabled = true;
   $('frameCover').hidden = false;
   let added = 0, noAnswer = 0;
   const fresh = [];
+  let theory = null;
   try {
+    // теория — одна на все задания этого снимка (пакет «+» в №1–5 — по той же теории)
+    if (thNode){
+      try { theory = await shootTheory(win, thNode.el); }
+      catch (e) { console.warn('[работы] теорию снять не получилось', e); }
+      finally { if (thNode.restore) thNode.restore(); }
+    }
     for (const { el, restore } of nodes){
       try {
         // ответ — до снимка, пока на странице то же задание
@@ -792,7 +868,7 @@ async function addFromFrame(){
         // новое задание — всегда в образец (вариант 1); остальные варианты
         // получат своё «такое же» сами (syncVariant)
         const block = Object.assign({ id: 't' + ttUid(), type: 'task', mode: 'exam', name: trainerName(openTid) }, parts);
-        E.variants[0].blocks.push(block);
+        if (theory) block.theory = JSON.parse(JSON.stringify(theory));
         fresh.push(block);
         added++;
       } finally { if (restore) restore(); }
@@ -800,6 +876,11 @@ async function addFromFrame(){
   } catch (err) {
     console.error('[работы] снимок задания не получился', err);
   } finally {
+    // вниз — по порядку в конец; вверх — пакет целиком в начало, в своём порядке
+    if (fresh.length){
+      if (addPos === 'start') E.variants[0].blocks.unshift(...fresh);
+      else E.variants[0].blocks.push(...fresh);
+    }
     $('frameCover').hidden = true;
     $('addBtn').disabled = false; $('refreshBtn2').disabled = false;
     adding = false;
@@ -807,7 +888,8 @@ async function addFromFrame(){
   if (added){
     markDirty(); renderVariants(); renderTasks();
     toast(added === 1 ? 'Задание добавлено' + (E.variants.length > 1 ? ' во все варианты' : '') : 'Добавлено заданий: ' + added);
-    const list = $('wkTasks'); list.lastElementChild && list.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const list = $('wkTasks'); const edge = addPos === 'start' ? list.firstElementChild : list.lastElementChild;
+    if (edge && E.cur === 0) edge.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     fresh.forEach(b => uploadBlock(b).catch(() => {}));
   } else {
     toast(noAnswer ? 'У этого задания нет ответа для проверки (теория, доказательство) — в работу его не добавить' : 'Не получилось снять задание — попробуйте ещё раз');
@@ -826,14 +908,22 @@ function regenFrom(g){
     const win = frame.contentWindow;
     await genNewTaskInFrame(win, g);
     const nodes = collectTrainerCaptureNodes(win.document, g.tid);
-    const main = nodes.filter(n => n.el.id !== 'theoryContent' && !(n.el.closest && n.el.closest('.added-task-card')));
-    nodes.forEach(n => { if (n !== main[0] && n.restore) n.restore(); });
+    const thNode = nodes.find(n => n.el.id === 'theoryContent') || null;
+    const main = nodes.filter(n => n !== thNode && !(n.el.closest && n.el.closest('.added-task-card')));
+    nodes.forEach(n => { if (n !== main[0] && n !== thNode && n.restore) n.restore(); });
+    let theory = null;
+    if (thNode){
+      try { theory = await shootTheory(win, thNode.el); } catch (e) {}
+      finally { if (thNode.restore) thNode.restore(); }
+    }
     if (!main.length) throw new Error('в тренажёре не нашлось задания');
     const { el, restore } = main[0];
     try {
       const info = trainerTaskInfo(win, g.tid, el);
       if (!info) throw new Error('у нового задания нет ответа');
-      return await shootBlock(win, g.tid, g.href, el, info);
+      const parts = await shootBlock(win, g.tid, g.href, el, info);
+      if (theory) parts.theory = theory;
+      return parts;
     } finally { if (restore) restore(); }
   };
   const p = genQ.then(run, run);
@@ -854,6 +944,9 @@ function regenInto(b, recipe, compareWith){
     // других чисел нет (Демоверсия, номер ЕГЭ с одним прототипом) — честно
     // говорим, а не делаем вид, что вариант другой
     if (compareWith && sameTask(b, compareWith)) b.same = true;
+    // в невидимом кадре теория не показалась (её открывают кликом по теме) —
+    // берём теорию образца: тема та же
+    if (!b.theory && compareWith && compareWith.theory) b.theory = JSON.parse(JSON.stringify(compareWith.theory));
     uploadBlock(b).catch(() => {});
   }).catch(err => {
     console.error('[работы] не получилось создать задание по рецепту', err);
@@ -889,9 +982,10 @@ function uploadBlock(b){
   // картинки этого снимка: пока грузились, задание могли заменить
   // («другие числа») — тогда «загружено» к новому снимку не относится
   const imgs = b.img;
+  const th = b.theory && b.theory.img;
   const p = (async () => {
-    for (const t of ['light', 'dark']){
-      const im = imgs && imgs[t];
+    for (const set of [imgs, th]) for (const t of ['light', 'dark']){
+      const im = set && set[t];
       if (!im || !/^data:/.test(im.url)) continue;
       const blob = await dataUrlToBlob(im.url);
       im.url = await C.uploadImage(blob);

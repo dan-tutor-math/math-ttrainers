@@ -366,16 +366,16 @@ def wrong_input(task):
 
 def type_fields(page, vals):
     for fid, v in vals.items():
-        sel = f'#wCard input[data-fid="{fid}"], #wBelow input[data-fid="{fid}"]'
+        sel = f'.titem.cur .tc-wrap input[data-fid="{fid}"], .titem.cur .below input[data-fid="{fid}"]'
         page.fill(sel, str(v))
 
 
 def press_check(page):
     """«Проверить» / «Ответить»: на самой карточке, а если её там нет — под ней."""
-    if page.locator("#wCard .tc-btn:not([disabled])").count():
-        page.click("#wCard .tc-btn")
+    if page.locator(".titem.cur .tc-wrap .tc-btn:not([disabled])").count():
+        page.click(".titem.cur .tc-wrap .tc-btn")
     else:
-        page.click("#wCheck")
+        page.click(".titem.cur .b-check")
 
 
 def cur_task_id(page):
@@ -537,61 +537,61 @@ def run():
         sp.fill("#wName", "  Маша   Иванова ")
         sp.click("#wStart")
         sp.wait_for_selector("#scrTask:not([hidden])")
-        check("C4 задания по одному: «Задание 1 из 6», шесть номеров", sp.inner_text("#wTaskNum") == "Задание 1 из 6" and sp.locator(".num").count() == 6)
-        check("C5 поле ответа — живое поверх картинки", sp.locator("#wCard .tc-in").count() == 1 and sp.locator("#wCard img").count() == 1)
-        check("C5b одна «Проверить»: на карточке, без дубля снизу", sp.locator("#wCard .tc-btn").count() == 1 and sp.is_hidden("#wCheck"))
+        check("C4 задания по одному: «Задание 1 из 6», шесть номеров", sp.inner_text(".titem.cur .tnum") == "Задание 1 из 6" and sp.locator(".num").count() == 6)
+        check("C5 поле ответа — живое поверх картинки", sp.locator(".titem.cur .tc-wrap .tc-in").count() == 1 and sp.locator(".titem.cur .tc-wrap img").count() == 1)
+        check("C5b одна «Проверить»: на карточке, без дубля снизу", sp.locator(".titem.cur .tc-wrap .tc-btn").count() == 1 and sp.is_hidden(".titem.cur .b-check"))
         t1 = tasks[0]["task"]
         # нечитаемая запись — попытка не тратится
         type_fields(sp, {t1["fields"][0]["id"]: "абв"})
         press_check(sp)
-        check("C6 нечитаемая запись — просьба, попытка не потрачена", "разобрать" in sp.inner_text("#wMsg") and ans_of(sp, tasks[0]["id"]) is None)
+        check("C6 нечитаемая запись — просьба, попытка не потрачена", "разобрать" in sp.inner_text(".titem.cur .wmsg") and ans_of(sp, tasks[0]["id"]) is None)
         type_fields(sp, wrong_input(t1)); press_check(sp); sp.wait_for_timeout(200)
-        check("C7 неверно — «попробуй ещё», попыток 1 из 2", "Неверно" in sp.inner_text("#wMsg") and "1 из 2" in sp.inner_text("#wTries"))
+        check("C7 неверно — «попробуй ещё», попыток 1 из 2", "Неверно" in sp.inner_text(".titem.cur .wmsg") and "1 из 2" in sp.inner_text(".titem.cur .tries"))
         type_fields(sp, {t1["fields"][0]["id"]: "123123"}); press_check(sp); sp.wait_for_timeout(200)
         a1 = ans_of(sp, tasks[0]["id"])
-        check("C8 вторая неверная — окончательно, показан верный ответ", a1 and a1["status"] == "bad" and a1["tries"] == 2 and not sp.is_hidden("#wKey")
-              and str(t1["fields"][0]["value"]) in sp.inner_text("#wKey"), str(a1))
-        check("C9 поле заблокировано, номер красный, «Дальше»", sp.is_disabled("#wCard .tc-in") and "bad" in sp.get_attribute(".num[data-i='0']", "class") and sp.is_visible("#wNext"))
-        sp.click("#wNext")
+        check("C8 вторая неверная — окончательно, показан верный ответ", a1 and a1["status"] == "bad" and a1["tries"] == 2 and not sp.is_hidden(".titem.cur .answer-key")
+              and str(t1["fields"][0]["value"]) in sp.inner_text(".titem.cur .answer-key"), str(a1))
+        check("C9 поле заблокировано, номер красный, «Дальше»", sp.is_disabled(".titem.cur .tc-wrap .tc-in") and "bad" in sp.get_attribute(".num[data-i='0']", "class") and sp.is_visible(".titem.cur .b-next"))
+        sp.click(".titem.cur .b-next")
         # 2) выбор варианта — сам ответ
         t2 = tasks[1]["task"]
-        sp.click(f"#wCard .tc-opt[data-i='{t2['correct']}']"); sp.wait_for_timeout(250)
+        sp.click(f".titem.cur .tc-wrap .tc-opt[data-i='{t2['correct']}']"); sp.wait_for_timeout(250)
         a2 = ans_of(sp, tasks[1]["id"])
-        check("C10 выбор верного варианта — сразу «Верно!»", a2 and a2["status"] == "ok" and "Верно" in sp.inner_text("#wMsg"), str(a2))
-        sp.click("#wNext")
+        check("C10 выбор верного варианта — сразу «Верно!»", a2 and a2["status"] == "ok" and "Верно" in sp.inner_text(".titem.cur .wmsg"), str(a2))
+        sp.click(".titem.cur .b-next")
         # 3) утверждения — отметить верные и «Проверить»
         t3 = tasks[2]["task"]
         for i in t3["correct"]:
-            sp.click(f"#wCard .tc-opt[data-i='{i}']")
-        if sp.locator("#wCard .tc-btn").count():
-            sp.click("#wCard .tc-btn")
+            sp.click(f".titem.cur .tc-wrap .tc-opt[data-i='{i}']")
+        if sp.locator(".titem.cur .tc-wrap .tc-btn").count():
+            sp.click(".titem.cur .tc-wrap .tc-btn")
         else:
             press_check(sp)
         sp.wait_for_timeout(250)
         a3 = ans_of(sp, tasks[2]["id"])
         check("C11 утверждения — верно", a3 and a3["status"] == "ok", str(a3))
-        sp.click("#wNext")
+        sp.click(".titem.cur .b-next")
         # 4) Тренировка: подсказки в тренажёре
         check("C12 у задания «Тренировка» — кнопка подсказок, у экзамена её нет",
-              sp.is_visible("#wTrainer") and sp.inner_text("#wMode") == "Тренировка")
-        sp.click("#wTrainer")
-        sp.wait_for_function("""() => { try { const f = document.getElementById('wTrainerFrame');
+              sp.is_visible(".titem.cur .b-trainer") and sp.inner_text(".titem.cur .mode") == "Тренировка")
+        sp.click(".titem.cur .b-trainer")
+        sp.wait_for_function("""() => { try { const f = document.querySelector('.titem.cur .trainer-box iframe');
             return f.contentWindow && typeof f.contentWindow.tsGetState === 'function'; } catch (e) { return false; } }""", timeout=20000)
         sp.wait_for_timeout(1200)
-        same = sp.evaluate("""() => { const w = document.getElementById('wTrainerFrame').contentWindow;
+        same = sp.evaluate("""() => { const w = document.querySelector('.titem.cur .trainer-box iframe').contentWindow;
             return w.eval('[S.task ? S.task.key : null, !!S.answered, S.pctScreen || null]'); }""")
         check("C13 в тренажёре — ТО ЖЕ задание, не отвеченное", tasks[3].get("exact") and same[0] == tasks[3]["exact"]["task"]["key"] and same[1] is False,
               f"{same} / {(tasks[3].get('exact') or {}).get('task', {}).get('key')}")
         a4 = ans_of(sp, tasks[3]["id"])
         check("C14 отметка «открывал подсказки»", a4 and a4["hint_used"] is True, str(a4))
-        sp.click("#wTrainerClose")
+        sp.click(".titem.cur .b-tclose")
         type_fields(sp, correct_input(tasks[3]["task"])); press_check(sp); sp.wait_for_timeout(250)
         check("C15 «Проценты» — верно", (ans_of(sp, tasks[3]["id"]) or {}).get("status") == "ok")
-        sp.click("#wNext")
+        sp.click(".titem.cur .b-next")
         # 5) пропустить
-        check("C16 у экзамена нет кнопки подсказок", sp.is_hidden("#wTrainer"))
-        sp.click("#wSkip"); sp.wait_for_timeout(250)
-        check("C17 «Пропустить» — задание пропущено, следующее", (ans_of(sp, tasks[4]["id"]) or {}).get("status") == "skipped" and sp.inner_text("#wTaskNum") == "Задание 6 из 6")
+        check("C16 у экзамена нет кнопки подсказок", sp.is_hidden(".titem.cur .b-trainer"))
+        sp.click(".titem.cur .b-skip"); sp.wait_for_timeout(250)
+        check("C17 «Пропустить» — задание пропущено, следующее", (ans_of(sp, tasks[4]["id"]) or {}).get("status") == "skipped" and sp.inner_text(".titem.cur .tnum") == "Задание 6 из 6")
         type_fields(sp, correct_input(tasks[5]["task"])); press_check(sp); sp.wait_for_timeout(250)
         check("C18 столбик — верно", (ans_of(sp, tasks[5]["id"]) or {}).get("status") == "ok")
         sp.wait_for_function("() => window.__work.queue.length === 0", timeout=10000)
@@ -599,7 +599,7 @@ def run():
         check("C19 ответы в базе", len(rows) >= 6 and {r["status"] for r in rows} >= {"ok", "bad", "skipped"}, str([(r['task_id'][-4:], r['status']) for r in rows]))
         # вернуться к пропущенному через номер
         sp.click(".num[data-i='4']")
-        check("C20 к пропущенному — по номеру", sp.inner_text("#wTaskNum") == "Задание 5 из 6" and "Пропущено" in sp.inner_text("#wMsg"))
+        check("C20 к пропущенному — по номеру", sp.inner_text(".titem.cur .tnum") == "Задание 5 из 6" and "Пропущено" in sp.inner_text(".titem.cur .wmsg"))
         sp.click("#wFinish")
         check("C21 «Завершить» — подтверждение со счётом нерешённых", "Не решено заданий: 1" in sp.inner_text("#wConfirmText"))
         sp.click("#wConfirmYes")
@@ -608,7 +608,7 @@ def run():
         check("C23 в итоге — верные ответы к ошибкам", str(t1["fields"][0]["value"]) in sp.inner_text("#dList"))
         check("C24 в базе заход завершён", db()["work_attempts"][0]["finished_at"] is not None and db()["work_attempts"][0]["student_name"] == "Маша Иванова")
         sp.locator(".res-item .open").first.click()
-        check("C25 после сдачи задание видно, но поле не изменить", sp.is_disabled("#wCard .tc-in") and sp.is_hidden("#wCheck"))
+        check("C25 после сдачи задание видно, но поле не изменить", sp.is_disabled(".titem.cur .tc-wrap .tc-in") and sp.is_hidden(".titem.cur .b-check"))
 
         # ═══ D. продолжение ═══
         print("\n— D. продолжение")
@@ -631,7 +631,7 @@ def run():
         print("\n— G. нет связи")
         sp.click(".num[data-i='1']")
         sp.evaluate("() => { window.__fakeNetDown = true; }")
-        sp.click(f"#wCard .tc-opt[data-i='{(t2['correct'] + 1) % t2['n']}']"); sp.wait_for_timeout(600)
+        sp.click(f".titem.cur .tc-wrap .tc-opt[data-i='{(t2['correct'] + 1) % t2['n']}']"); sp.wait_for_timeout(600)
         check("G1 нет связи — плашка, ответ в очереди", sp.is_visible("#netBanner") and sp.evaluate("() => window.__work.queue.length") >= 1)
         sp.evaluate("() => { window.__fakeNetDown = false; window.dispatchEvent(new Event('online')); }")
         sp.wait_for_function("() => window.__work.queue.length === 0", timeout=15000)
@@ -644,10 +644,10 @@ def run():
         for wdt in (375, 320):
             sp.set_viewport_size({"width": wdt, "height": 760}); sp.wait_for_timeout(250)
             check(f"H1 телефон {wdt}: без прокрутки вбок", overflow_x(sp) <= 0, str(overflow_x(sp)))
-            box = sp.evaluate("() => { const r = document.getElementById('wCard').getBoundingClientRect(); return [r.left, r.right, innerWidth]; }")
+            box = sp.evaluate("() => { const r = document.querySelector('.titem.cur .tc-wrap').getBoundingClientRect(); return [r.left, r.right, innerWidth]; }")
             check(f"H2 телефон {wdt}: карточка в экране", box[0] >= 0 and box[1] <= box[2] + 0.5, str(box))
         sp.click("#themeToggle"); sp.wait_for_timeout(200)
-        src = sp.evaluate("() => document.querySelector('#wCard img').src")
+        src = sp.evaluate("() => document.querySelector('.titem.cur .tc-wrap img').src")
         b_now = [b for b in tasks if b["id"] == cur_task_id(sp)][0]
         check("H3 тёмная тема — тёмная картинка задания", src == b_now["img"]["dark"]["url"])
         sp.click("#themeToggle")
@@ -665,21 +665,21 @@ def run():
         check("E1 код строчными тоже открывается; сказано «в конце»", "в конце" in ep.inner_text("#startMeta"))
         ep.fill("#wName", "Петя"); ep.click("#wStart")
         ep.wait_for_selector("#scrTask:not([hidden])")
-        check("E2 попыток не показываем", ep.inner_text("#wTries") == "")
+        check("E2 попыток не показываем", ep.inner_text(".titem.cur .tries") == "")
         type_fields(ep, wrong_input(t1)); press_check(ep); ep.wait_for_timeout(300)
-        check("E3 неверный ответ — без вердикта, «Ответ сохранён»", "сохранён" in ep.inner_text("#wMsg") and "Неверно" not in ep.inner_text("#wMsg"))
+        check("E3 неверный ответ — без вердикта, «Ответ сохранён»", "сохранён" in ep.inner_text(".titem.cur .wmsg") and "Неверно" not in ep.inner_text(".titem.cur .wmsg"))
         ep.wait_for_timeout(700)
         check("E4 сам переходит к следующему, номер — «отвечено», не красный",
-              ep.inner_text("#wTaskNum") == "Задание 2 из 6" and "done" in ep.get_attribute(".num[data-i='0']", "class") and "bad" not in ep.get_attribute(".num[data-i='0']", "class"))
+              ep.inner_text(".titem.cur .tnum") == "Задание 2 из 6" and "done" in ep.get_attribute(".num[data-i='0']", "class") and "bad" not in ep.get_attribute(".num[data-i='0']", "class"))
         ep.click(".num[data-i='0']")
-        check("E5 ответ можно изменить — поле открыто", not ep.is_disabled("#wCard .tc-in") and ep.input_value("#wCard .tc-in") == "987654")
+        check("E5 ответ можно изменить — поле открыто", not ep.is_disabled(".titem.cur .tc-wrap .tc-in") and ep.input_value(".titem.cur .tc-wrap .tc-in") == "987654")
         type_fields(ep, correct_input(t1)); press_check(ep); ep.wait_for_timeout(900)
-        ep.click(f"#wCard .tc-opt[data-i='{t2['correct']}']"); ep.wait_for_timeout(900)
+        ep.click(f".titem.cur .tc-wrap .tc-opt[data-i='{t2['correct']}']"); ep.wait_for_timeout(900)
         ep.click("#wFinish"); ep.click("#wConfirmYes")
         ep.wait_for_selector("#scrDone:not([hidden])")
         check("E6 после сдачи — итог (верно 2 из 6)", ep.inner_text("#dScore") == "Верно: 2 из 6", ep.inner_text("#dScore"))
         ep.locator(".res-item .open").first.click()
-        check("E7 после сдачи вердикт виден: верно", "good" in ep.get_attribute("#wCard .tc-in", "class"))
+        check("E7 после сдачи вердикт виден: верно", "good" in ep.get_attribute(".titem.cur .tc-wrap .tc-in", "class"))
 
         # ═══ F. результаты ═══
         print("\n— F. результаты у учителя")

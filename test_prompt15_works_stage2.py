@@ -227,10 +227,10 @@ def run():
         sp.wait_for_selector("#scrStart:not([hidden])")
         sp.fill("#wName", "Вася"); sp.click("#wStart")
         sp.wait_for_selector("#scrTask:not([hidden])")
-        src = sp.evaluate("() => document.querySelector('#wCard img').src")
+        src = sp.evaluate("() => document.querySelector('.titem.cur .tc-wrap img').src")
         check("J1 у ученика — задания варианта 2", src == vs[1]["blocks"][0]["img"]["light"]["url"])
         type_fields(sp, correct_input(vs[1]["blocks"][0]["task"])); press_check(sp); sp.wait_for_timeout(300)
-        check("J2 ответ варианта 2 — верно", "Верно" in sp.inner_text("#wMsg"))
+        check("J2 ответ варианта 2 — верно", "Верно" in sp.inner_text(".titem.cur .wmsg"))
         sp.click("#wFinish"); sp.click("#wConfirmYes")
         sp.wait_for_selector("#scrDone:not([hidden])")
 
