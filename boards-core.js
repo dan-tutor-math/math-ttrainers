@@ -2528,6 +2528,9 @@ function renderImageObject(c, obj, camv){
 
 function renderObject(c, obj, camv, opts){
   if (obj.type === 'image'){ renderImageObject(c, obj, camv); return; }
+  // Промпт №17, этап 2: тело — 'poly' с полем solid, points — его рамка.
+  // Без модуля (старая вкладка) рисуется хотя бы рамка
+  if (obj.solid && typeof figRenderSolid === 'function'){ figRenderSolid(c, obj, camv); return; }
   opts = opts || {};
   const color = resolveColor(obj.color);
   c.save();
@@ -2564,6 +2567,9 @@ function renderObject(c, obj, camv, opts){
     c.closePath();
     if (obj.fill){ c.globalAlpha = 0.16; c.fill(); c.globalAlpha = obj.opacity != null ? obj.opacity : 1; }
     c.stroke();
+    // Промпт №17 «фигуры»: подписи, штрихи, высоты и т. п. — из obj.fig
+    // (board-figures.js); старая вкладка без модуля рисует хотя бы контур
+    if (obj.fig && typeof figDecor === 'function') figDecor(c, obj, wp, camv);
   } else if (obj.type === 'ellipse'){
     const cxy = worldToScreen(obj.points[0]);
     c.beginPath(); c.ellipse(cxy.x, cxy.y, Math.max(1,obj.rx*camv.zoom), Math.max(1,obj.ry*camv.zoom), 0, 0, Math.PI*2);
@@ -2575,6 +2581,7 @@ function renderObject(c, obj, camv, opts){
     if (obj.fill){ c.globalAlpha = 0.16; c.fill(); c.globalAlpha = obj.opacity != null ? obj.opacity : 1; }
     c.stroke();
     c.beginPath(); c.arc(cxy.x, cxy.y, 2, 0, Math.PI*2); c.fill();
+    if (obj.fig && typeof figDecor === 'function') figDecor(c, obj, wp, camv);   // Промпт №17
   } else if (obj.type === 'angle'){
     // вершина угла — ВТОРАЯ поставленная точка (obj.points[1]); лучи идут
     // к первой и третьей точкам
@@ -2635,6 +2642,9 @@ function drawAngleArcAndLabel(c, v, a, b, camv, width){
 }
 
 function getHandles(obj){
+  // Промпт №17 «фигуры»: у готовой фигуры свои ручки — вершины с
+  // сохранением вида, поворот и масштаб (board-figures.js)
+  if ((obj.fig || obj.solid) && typeof figHandles === 'function'){ const fh = figHandles(obj); if (fh) return fh; }
   // Промпт №69: у прямой с центром первая ручка — центр (её ищут первой,
   // чтобы на короткой прямой центр не перехватывался концами)
   if (obj.type === 'line' && obj.pivot){
@@ -2698,6 +2708,7 @@ function getHandles(obj){
 function applyHandle(obj, role, pt){
   const rawPt = pt;
   pt = maybeSnap(pt);
+  if ((obj.fig || obj.solid) && typeof figApplyHandle === 'function' && figApplyHandle(obj, role, pt, rawPt)) return;   // Промпт №17
   // Промпт №69: прямая с закреплённым центром. Центр переносит прямую
   // целиком; конец только задаёт направление — длина и центр не меняются.
   // Для поворота берём точку курсора без прилипания к клеткам: прилипание
@@ -2823,6 +2834,7 @@ function applyHandle(obj, role, pt){
 }
 
 function drawSelection(c, obj, camv){
+  if ((obj.fig || obj.solid) && typeof figDrawSelection === 'function' && figDrawSelection(c, obj, camv)) return;   // Промпт №17
   const handles = getHandles(obj);
   if (obj.type === 'text'){
     // Промпт №69: рамка текста — видно, где он будет переноситься
@@ -3527,7 +3539,9 @@ function hitTestObject(obj, pt, tol){
     return false;
   }
   if (obj.type==='quad' || obj.type==='poly'){
-    if (obj.fill && pointInPolygon(pt,obj.points)) return true;
+    // Промпт №17: готовую фигуру берут за любое место внутри — тянуть за
+    // тонкий контур на планшете неудобно
+    if ((obj.fill || obj.fig || obj.solid) && pointInPolygon(pt,obj.points)) return true;
     for (let i=0;i<obj.points.length;i++){
       const a=obj.points[i], b=obj.points[(i+1)%obj.points.length];
       if (distToSeg(pt,a,b)<=tol) return true;
@@ -7725,7 +7739,7 @@ function updateContextMenu(){
   if (!menu || !B) return;
   if (dragMode === 'marquee' || dragMode === 'pan'){ menu.classList.remove('open'); return; }
   const sel = getSelectedObjects();
-  if (!sel.length){ menu.classList.remove('open'); return; }
+  if (!sel.length){ menu.classList.remove('open'); if (typeof figOnSelection === 'function') figOnSelection(sel); return; }
 
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   sel.forEach(o => { const b=objectBBox(o); minX=Math.min(minX,b.minX); minY=Math.min(minY,b.minY); maxX=Math.max(maxX,b.maxX); maxY=Math.max(maxY,b.maxY); });
@@ -7751,6 +7765,7 @@ function updateContextMenu(){
   pinBtn.style.display = isSingleImage ? '' : 'none';
   pinBtn.textContent = (isSingleImage && sel[0].locked) ? 'Открепить' : 'Закрепить';
   document.getElementById('bdCtxZoomLabel').textContent = Math.round(cam.zoom*100) + '%';
+  if (typeof figOnSelection === 'function') figOnSelection(sel);   // Промпт №17
 }
 document.getElementById('bdCtxMenu').addEventListener('click', (e) => {
   const act = e.target.closest('button') && e.target.closest('button').dataset.act;
@@ -7783,6 +7798,8 @@ document.getElementById('bdCtxMenu').addEventListener('click', (e) => {
     rotateSelectedImage(-1);
   } else if (act === 'rotr'){
     rotateSelectedImage(1);
+  } else if (act === 'fig'){
+    if (sel.length === 1 && (sel[0].fig || sel[0].solid) && typeof figOpenPanel === 'function') figOpenPanel(sel[0].id);
   } else if (act === 'pin'){
     if (sel.length===1 && sel[0].type==='image'){
       pushUndo(); sel[0].locked = !sel[0].locked; saveDB(); scheduleRedraw();
