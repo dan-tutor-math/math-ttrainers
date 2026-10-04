@@ -11,8 +11,11 @@
 - «Эффекты» включают «максимум»: data-fx="full" на <html>, выбор запоминается
   на устройстве, появляется плавающая подсветка, в Chromium у стекла
   включается преломление (url(#…) в backdrop-filter); выключаются обратно;
-- в «максимуме» кнопки увеличиваются под курсором, а при «Уменьшить
-  движение» — нет;
+- в «максимуме» кнопки увеличиваются под курсором и капсула растёт вместе
+  с ними, а при «Уменьшить движение» — нет; стекло без заливки;
+- название кнопки появляется только у той, на которую навели (слева —
+  подсказка у капсулы, справа — подпись в меню); на телефоне в открытом
+  меню видны все подписи;
 - нажатие на <canvas> временно снимает преломление (lg-paused);
 - сброс прогресса из меню вызывает свой старый обработчик;
 - панель совместного доступа открывается слева от капсулы и не закрывает меню;
@@ -60,9 +63,10 @@ def local_server():
         proc.terminate(); proc.wait(timeout=5)
 
 
-def open_page(browser, width=1280, height=800, fx=None, reduced=False):
+def open_page(browser, width=1280, height=800, fx=None, reduced=False, touch=False):
     ctx = browser.new_context(viewport={"width": width, "height": height},
-                              reduced_motion="reduce" if reduced else "no-preference")
+                              reduced_motion="reduce" if reduced else "no-preference",
+                              has_touch=touch, is_mobile=touch)
     page = ctx.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
@@ -107,6 +111,31 @@ def run():
               f"пункты меню и подписи: {labels(page)}")
         h = page.evaluate("document.querySelector('.lg-menu-glass').getBoundingClientRect().height")
         check(h > 200, f"стекло меню вытянулось под список ({h:.0f}px)")
+        check(page.evaluate("document.querySelector('#themeToggle').hasAttribute('title')") is False,
+              "у кнопок меню нет системной подсказки title — есть своя подпись")
+
+        # названия — только у кнопки под курсором
+        op = "[...document.querySelectorAll('.lg-menu .lg-label')].map(e=>+getComputedStyle(e).opacity)"
+        page.mouse.move(640, 500); page.wait_for_timeout(300)
+        check(max(page.evaluate(op)) == 0, "с мышью подписи меню спрятаны, пока ни на что не навели")
+        page.hover("#fxToggle"); page.wait_for_timeout(400)
+        ops = page.evaluate(op)
+        check(ops[2] == 1 and ops[0] == 0 and ops[1] == 0 and ops[3] == 0,
+              f"видна подпись только у кнопки под курсором ({ops})")
+        page.mouse.move(640, 500)
+        top = "[...document.querySelectorAll('.lg-side .lg-tip')].map(e=>[e.textContent, +getComputedStyle(e).opacity])"
+        tips0 = page.evaluate(top)
+        check([t[0] for t in tips0] == ["Подборка", "Доски", "Работы"] and all(t[1] == 0 for t in tips0),
+              f"у левой капсулы есть названия, спрятанные до наведения ({tips0})")
+        page.hover(".works-toggle"); page.wait_for_timeout(400)
+        tips1 = page.evaluate(top)
+        check(tips1[2][1] == 1 and tips1[0][1] == 0 and tips1[1][1] == 0, f"название появляется у кнопки под курсором ({tips1})")
+        tr = page.evaluate("document.querySelector('.works-toggle .lg-tip').getBoundingClientRect().left")
+        sr = page.evaluate("document.querySelector('.lg-side').getBoundingClientRect().right")
+        check(tr > sr, "название — справа от капсулы, не на ней")
+        check(not page.evaluate("document.querySelector('.works-toggle').hasAttribute('title')"),
+              "у кнопок капсулы убрана системная подсказка title")
+        page.mouse.move(640, 500)
 
         # тема
         page.click("#themeToggle"); page.wait_for_timeout(200)
@@ -159,6 +188,9 @@ def run():
         ready = page.evaluate("document.querySelectorAll('.lg-r-ready').length")
         bf = page.evaluate("getComputedStyle(document.querySelector('.lg-side .lg-glass')).backdropFilter")
         check(ready >= 5 and "url(" in bf, f"в Chromium включилось преломление ({ready} элементов, {bf})")
+        page.wait_for_timeout(300)
+        bg = page.evaluate("getComputedStyle(document.querySelector('.lg-side .lg-glass')).backgroundColor")
+        check(bg in ("rgba(0, 0, 0, 0)", "transparent"), f"стекло в максимуме без заливки ({bg})")
         topic_bf = page.evaluate("getComputedStyle(document.querySelector('.topic')).backdropFilter")
         check("url(" in topic_bf, "преломляют и панели страницы (список тем)")
         # список тем пересоздаётся при смене вкладки — новые панели тоже стеклянные
@@ -173,6 +205,9 @@ def run():
         mag = page.evaluate("parseFloat(document.querySelector('.boards-toggle').style.getPropertyValue('--lg-mag'))")
         mag_n = page.evaluate("parseFloat(document.querySelector('.works-toggle').style.getPropertyValue('--lg-mag'))")
         check(mag > 1.25 and 1 < mag_n < mag, f"кнопка под курсором увеличилась сильнее соседней ({mag}, {mag_n})")
+        sz = page.evaluate("[document.querySelector('.boards-toggle').getBoundingClientRect().width, document.querySelector('.lg-side').getBoundingClientRect().width, document.querySelector('.lg-side .lg-glass').getBoundingClientRect().width]")
+        check(sz[0] > 50 and sz[1] >= sz[0] + 6 and abs(sz[2] - sz[1]) < 1,
+              f"капсула и её стекло растут вместе с кнопкой ({sz})")
         page.mouse.move(640, 500); page.wait_for_timeout(200)
         check(page.evaluate("document.querySelector('.boards-toggle').style.getPropertyValue('--lg-mag')") == "",
               "курсор ушёл — кнопки вернулись к обычному размеру")
@@ -220,13 +255,15 @@ def run():
         ctx.close()
 
         # ── телефон ──
-        ctx, page, errors = open_page(b, width=390, height=800)
+        ctx, page, errors = open_page(b, width=390, height=800, touch=True)
         check(page.evaluate("getComputedStyle(document.querySelector('.lg-side')).flexDirection") == "row",
               "на телефоне левая капсула горизонтальная")
         check(page.evaluate("document.documentElement.scrollWidth") <= 390, "на телефоне нет прокрутки вбок")
         page.click("#lgMenuToggle"); page.wait_for_timeout(500)
         lmin = page.evaluate("Math.min(...[...document.querySelectorAll('.lg-menu .lg-label')].map(e=>e.getBoundingClientRect().left))")
         check(lmin >= 0, f"подписи меню помещаются на экране телефона (левый край {lmin:.0f})")
+        check(min(page.evaluate("[...document.querySelectorAll('.lg-menu .lg-label')].map(e=>+getComputedStyle(e).opacity)")) == 1,
+              "на телефоне (без наведения) в открытом меню видны все подписи")
         h1 = page.evaluate("document.querySelector('h1').getBoundingClientRect().top")
         side_bottom = page.evaluate("document.querySelector('.lg-side').getBoundingClientRect().bottom")
         check(side_bottom <= h1, "капсула не налезает на заголовок")

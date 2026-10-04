@@ -123,6 +123,8 @@ body > #resetProgressBtn, body > #themeToggle{display:none}
 @media (max-width:620px){
   body{padding-top:64px;}
   .lg-side{flex-direction:row;}
+  .lg-side .lg-tip{left:50%;top:calc(100% + 10px);transform:translate(-50%,-6px);}
+  .lg-side :hover > .lg-tip,.lg-side :focus-visible > .lg-tip{transform:translate(-50%,0);}
   h1{font-size:clamp(22px,7vw,30px);}
 }
 .nav-bar{position:sticky;top:10px;z-index:100;margin-bottom:16px;}
@@ -380,9 +382,6 @@ body .ts-share-pop{top:16px;right:76px;max-height:calc(100vh - 32px);}
   function fxLabel(m){ return m === 'full' ? 'Эффекты: максимум' : 'Эффекты: обычные'; }
   var fx = menu.add({ id: 'fxToggle', icon: 'effects', label: fxLabel(MathhGlass.mode()), keepOpen: true,
     onClick: function(){ MathhGlass.toggle(); } });
-  fx.el.title = MathhGlass.canRefract
-    ? 'Максимум: стекло преломляет фон, кнопки увеличиваются и пружинят'
-    : 'Максимум: анимации и блики. Преломление фона работает только в Chrome, Edge и Яндекс Браузере';
   function fxSync(m){ fx.setLabel(fxLabel(m)); fx.setActive(m === 'full');
     fx.el.setAttribute('aria-label', fxLabel(m)); fx.el.setAttribute('aria-pressed', m === 'full' ? 'true' : 'false'); }
   fxSync(MathhGlass.mode());
@@ -399,6 +398,8 @@ body .ts-share-pop{top:16px;right:76px;max-height:calc(100vh - 32px);}
   // пересоздаётся при смене вкладки — поэтому слежение, а не разовый поиск
   MathhGlass.autoRefract('.nav-tabs, .nav-subtabs, .topic, .feedback');
   MathhGlass.pressable('.nav-tab, .nav-subtab');
+  // названия у кнопок левой капсулы — при наведении, справа от кнопки
+  MathhGlass.tips('.lg-side > a, .lg-side > button', 'right');
 })();</script>
 <div class="wrap">
   <h1>Тренажёры</h1>

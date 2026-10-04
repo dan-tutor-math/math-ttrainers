@@ -41,18 +41,27 @@
     var items = [];
     if (window.MathhGlass) window.MathhGlass.refract(glass);
 
-    // высоту стекла считаем по факту, а не формулой: кнопка совместного
-    // доступа может появиться позже, а у будущих пунктов может быть другой рост
+    // размер стекла считаем по факту, а не формулой: кнопка совместного
+    // доступа может появиться позже, а в «максимуме» кнопки под курсором
+    // растут — и стекло должно расти вместе с ними
     function measure() {
-      var h = toggle.offsetHeight + 8;
-      if (wrap.classList.contains('is-open')) h = list.offsetTop + list.offsetHeight;
+      var open = wrap.classList.contains('is-open');
+      var h = open ? list.offsetTop + list.offsetHeight : toggle.offsetHeight + 8;
+      var w = open ? wrap.offsetWidth : toggle.offsetWidth + 8;
       wrap.style.setProperty('--lg-h', h + 'px');
+      wrap.style.setProperty('--lg-w', w + 'px');
     }
+    var springT = 0;
     function setOpen(open) {
+      // длинная пружина — только на открытие и закрытие (см. .lg-spring в css)
+      wrap.classList.add('lg-spring');
+      clearTimeout(springT);
+      springT = setTimeout(function () { wrap.classList.remove('lg-spring'); }, 700);
       wrap.classList.toggle('is-open', open);
       toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
       measure();
     }
+    if (window.ResizeObserver) new ResizeObserver(measure).observe(list);
     toggle.addEventListener('click', function () { setOpen(!wrap.classList.contains('is-open')); });
     // клик мимо меню закрывает его; панель совместного доступа считается
     // частью меню — иначе меню схлопывалось бы при каждом нажатии в ней
@@ -77,6 +86,9 @@
       lab.textContent = opts.label || btn.getAttribute('aria-label') || btn.title || '';
       row.appendChild(lab);
       row.appendChild(btn);
+      // подпись уже есть — системная всплывающая подсказка от title
+      // дублировала бы её с задержкой
+      if (btn.title) { btn.setAttribute('data-title', btn.title); btn.removeAttribute('title'); }
       if (opts.before && opts.before.parentNode === list) list.insertBefore(row, opts.before);
       else list.appendChild(row);
       btn.addEventListener('click', function () { if (!opts.keepOpen) setOpen(false); });

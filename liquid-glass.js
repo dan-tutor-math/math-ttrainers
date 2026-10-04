@@ -26,7 +26,8 @@
  *      дополнительные стеклянные панели страницы для преломления;
  *      MathhGlass.autoRefract(селектор) — то же для панелей, которые страница
  *      создаёт и пересоздаёт сама; MathhGlass.pressable(селектор) — добавить
- *      кнопкам страницы упругое нажатие.
+ *      кнопкам страницы упругое нажатие; MathhGlass.tips(селектор, 'left'|'right') —
+ *      название кнопки стеклянной плашкой при наведении.
  */
 (function () {
   'use strict';
@@ -119,6 +120,11 @@
     return cv.toDataURL();
   }
 
+  // Фильтр задаётся в долях элемента (objectBoundingBox), а не в пикселях:
+  // тогда он сам растягивается вслед за элементом. Это важно для капсул —
+  // при наведении кнопки растут, капсула растёт вместе с ними, и преломление
+  // не должно ни пропадать, ни съезжать. Точную карту под новый размер
+  // строим, когда размер успокоится (см. ResizeObserver ниже)
   function buildFilter(el) {
     var rect = el.getBoundingClientRect();
     var w = Math.round(rect.width), h = Math.round(rect.height);
@@ -126,39 +132,53 @@
     if (el._lgSize === w + 'x' + h) { el.classList.add('lg-r-ready'); return; }
     el._lgSize = w + 'x' + h;
     var r = radiusOf(el, w, h);
-    var small = Math.max(w, h) <= 160;
-    // маленьким кнопкам — сильнее и с радужным краем (каналы смещаются
-    // чуть по-разному); большим панелям — мягче, чтобы текст на них читался
+    var small = Math.max(w, h) <= 180;
+    // маленьким кнопкам и капсулам — сильнее и с радужным краем (каналы
+    // смещаются чуть по-разному); большим панелям — мягче, чтобы текст читался
     var band = small ? Math.min(w, h) * 0.42 : Math.min(30, Math.min(w, h) * 0.3);
-    var scale = small ? 22 : 34;
-    var id = el._lgId || (el._lgId = 'lgf' + (++uid));
-    var old = document.getElementById(id); if (old) old.remove();
+    var px = small ? 22 : 34;
+    // в долях элемента сдвиг по x считается от ширины, по y — от высоты;
+    // делим на среднее, чтобы сила в пикселях была примерно как задумано
+    var scale = px / Math.sqrt(w * h);
+    var blur = small ? 1.2 : 2;
+    var map = buildMap(w, h, r, band);
+    var id = 'lgf' + (++uid);
     var f = document.createElementNS(NS, 'filter');
     f.setAttribute('id', id);
-    f.setAttribute('x', '0'); f.setAttribute('y', '0'); f.setAttribute('width', w); f.setAttribute('height', h);
-    f.setAttribute('filterUnits', 'userSpaceOnUse'); f.setAttribute('primitiveUnits', 'userSpaceOnUse');
+    f.setAttribute('x', '0'); f.setAttribute('y', '0'); f.setAttribute('width', '1'); f.setAttribute('height', '1');
+    f.setAttribute('filterUnits', 'objectBoundingBox'); f.setAttribute('primitiveUnits', 'objectBoundingBox');
     f.setAttribute('color-interpolation-filters', 'sRGB');
-    var map = buildMap(w, h, r, band);
     // размытие — внутри фильтра, первым шагом: если писать его в CSS перед
     // url(), Chrome расширяет область под размытие и карта съезжает от края
-    var inner = '<feGaussianBlur in="SourceGraphic" stdDeviation="' + (small ? 1.2 : 2) + '" result="soft"/>' +
-      '<feImage href="' + map + '" x="0" y="0" width="' + w + '" height="' + h + '" preserveAspectRatio="none" result="map"/>';
+    var inner = '<feGaussianBlur in="SourceGraphic" stdDeviation="' + (blur / w).toFixed(5) + ' ' + (blur / h).toFixed(5) + '" result="soft"/>' +
+      '<feImage href="' + map + '" x="0" y="0" width="1" height="1" preserveAspectRatio="none" result="map"/>';
+    var dm = function (k, res) {
+      return '<feDisplacementMap in="soft" in2="map" scale="' + (scale * k).toFixed(5) + '" xChannelSelector="R" yChannelSelector="G"' + (res ? ' result="' + res + '"' : '') + '/>';
+    };
     if (small) {
-      inner +=
-        '<feDisplacementMap in="soft" in2="map" scale="' + scale + '" xChannelSelector="R" yChannelSelector="G" result="dr"/>' +
-        '<feColorMatrix in="dr" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cr"/>' +
-        '<feDisplacementMap in="soft" in2="map" scale="' + (scale * 1.1) + '" xChannelSelector="R" yChannelSelector="G" result="dg"/>' +
-        '<feColorMatrix in="dg" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cg"/>' +
-        '<feDisplacementMap in="soft" in2="map" scale="' + (scale * 1.2) + '" xChannelSelector="R" yChannelSelector="G" result="db"/>' +
-        '<feColorMatrix in="db" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cb"/>' +
+      inner += dm(1, 'dr') + '<feColorMatrix in="dr" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cr"/>' +
+        dm(1.1, 'dg') + '<feColorMatrix in="dg" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="cg"/>' +
+        dm(1.2, 'db') + '<feColorMatrix in="db" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="cb"/>' +
         '<feBlend in="cr" in2="cg" mode="screen" result="rg"/><feBlend in="rg" in2="cb" mode="screen"/>';
     } else {
-      inner += '<feDisplacementMap in="soft" in2="map" scale="' + scale + '" xChannelSelector="R" yChannelSelector="G"/>';
+      inner += dm(1);
     }
     f.innerHTML = inner;
-    ensureDefs().appendChild(f);
-    el.style.setProperty('--lg-refract', 'url(#' + id + ')');
-    el.classList.add('lg-r-ready');
+    // Карту сначала раскодируем и только потом подменяем фильтр: пока
+    // картинка не готова, Chrome считает её пустой, и стекло на один кадр
+    // дёрнулось бы в сторону
+    var swap = function () {
+      if (!el.isConnected) return;
+      ensureDefs().appendChild(f);
+      el.style.setProperty('--lg-refract', 'url(#' + id + ')');
+      el.classList.add('lg-r-ready');
+      var old = el._lgId && document.getElementById(el._lgId);
+      el._lgId = id;
+      if (old) requestAnimationFrame(function () { old.remove(); });
+    };
+    var img = new Image();
+    img.src = map;
+    if (img.decode) img.decode().then(swap, swap); else img.onload = swap;
   }
 
   function refreshRefraction() {
@@ -173,10 +193,9 @@
     if (tracked.has(el)) return;
     tracked.add(el);
     if (!ro && window.ResizeObserver) {
-      // Пока элемент меняет размер (меню «вытекает» с пружиной, окно тянут),
-      // старая карта ему не подходит: на это время оставляем обычное
-      // размытие и строим новую карту, когда размер успокоится. Строить на
-      // каждом кадре анимации — лишняя работа процессору
+      // Фильтр в долях элемента и так тянется вслед за размером; точную
+      // карту (радиус скругления, ширина края) строим заново, когда размер
+      // успокоится — строить её на каждом кадре анимации незачем
       ro = new ResizeObserver(function (entries) {
         if (cur !== 'full' || !canRefract) return;
         entries.forEach(function (e) {
@@ -184,9 +203,8 @@
           if (!el._lgSize) { buildFilter(el); return; }
           var r = el.getBoundingClientRect();
           if (el._lgSize === Math.round(r.width) + 'x' + Math.round(r.height)) return;
-          el.classList.remove('lg-r-ready');
           clearTimeout(el._lgT);
-          el._lgT = setTimeout(function () { el._lgSize = ''; if (cur === 'full') buildFilter(el); }, 140);
+          el._lgT = setTimeout(function () { el._lgSize = ''; if (cur === 'full') buildFilter(el); }, 160);
         });
       });
     }
@@ -222,6 +240,26 @@
         autoMo = new MutationObserver(function () { if (!autoRaf) autoRaf = requestAnimationFrame(autoScan); });
         autoMo.observe(document.body, { childList: true, subtree: true });
       }
+    };
+    if (document.body) run(); else document.addEventListener('DOMContentLoaded', run);
+  }
+
+  /* ── подсказки-названия у кнопок капсул ──────────────────────────────── */
+  // Название берётся из aria-label и показывается стеклянной плашкой рядом
+  // с кнопкой, когда на неё навели (стили .lg-tip). Системный title убираем:
+  // он всплыл бы с задержкой поверх нашей подсказки
+  function tips(sel, side) {
+    var run = function () {
+      document.querySelectorAll(sel).forEach(function (b) {
+        if (b.querySelector(':scope > .lg-tip')) return;
+        var t = document.createElement('span');
+        t.className = 'lg-tip lg' + (side === 'left' ? ' is-left' : '');
+        t.setAttribute('aria-hidden', 'true');
+        t.textContent = b.getAttribute('aria-label') || b.title || '';
+        if (getComputedStyle(b).position === 'static') b.style.position = 'relative';
+        b.appendChild(t);
+        if (b.title) { b.setAttribute('data-title', b.title); b.removeAttribute('title'); }
+      });
     };
     if (document.body) run(); else document.addEventListener('DOMContentLoaded', run);
   }
@@ -334,6 +372,7 @@
     onChange: function (fn) { listeners.push(fn); },
     refract: refract,
     autoRefract: autoRefract,
+    tips: tips,
     // ещё кнопки страницы, которые должны пружинить при нажатии в «максимуме»
     pressable: function (sel) { pressSel.push(sel); },
     canRefract: canRefract

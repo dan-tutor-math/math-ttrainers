@@ -66,12 +66,17 @@ html[data-theme="dark"] .lg::before,html[data-theme="dark"] .lg-s::before{
 .lg-side{position:fixed;top:16px;left:16px;z-index:200;box-shadow:var(--shadow)}
 
 /* ── меню «⋯» ───────────────────────────────────────────────────────── */
-.lg-menu{position:fixed;top:16px;right:16px;z-index:210;width:48px;
-  --lg-h:48px}
-/* само стекло меню — отдельный слой, у которого плавно меняется высота:
-   так капсула «вытекает» вниз, а кнопки внутри не перестраиваются */
-.lg-menu-glass,.lg-menu-shadow{position:absolute;top:0;right:0;width:48px;height:var(--lg-h);border-radius:24px;
-  transition:height .2s ease}
+.lg-menu{position:fixed;top:16px;right:16px;z-index:210;display:flex;flex-direction:column;align-items:center;
+  --lg-h:48px;--lg-w:48px;
+  /* закрытое меню занимает место под список (он спрятан через visibility),
+     и пустая область перехватывала бы клики по странице */
+  pointer-events:none}
+.lg-menu-toggle,.lg-menu.is-open .lg-menu-items{pointer-events:auto}
+/* само стекло меню — отдельный слой, у которого плавно меняются высота и
+   ширина: так капсула «вытекает» вниз и растёт вместе с увеличенными
+   кнопками, а сами кнопки внутри не перестраиваются */
+.lg-menu-glass,.lg-menu-shadow{position:absolute;top:0;right:0;width:var(--lg-w);height:var(--lg-h);border-radius:24px;
+  transition:height .2s ease, width .2s ease}
 .lg-menu-shadow{box-shadow:var(--shadow);pointer-events:none}
 .lg-menu-toggle{position:relative;margin:4px;z-index:1}
 .lg-menu-toggle .mi{transition:transform .25s ease}
@@ -82,14 +87,39 @@ html[data-theme="dark"] .lg::before,html[data-theme="dark"] .lg-s::before{
 .lg-menu:not(.is-open) .lg-item{opacity:0;transform:translateY(-8px)}
 .lg-item{transition:opacity .16s ease, transform .16s ease}
 
-/* подпись слева от кнопки — стеклянная плашка; видна, пока меню открыто,
-   потому что на телефоне нет наведения, а одна иконка «эффектов» неочевидна */
+/* подпись слева от кнопки — стеклянная плашка. С мышью видна только у той
+   кнопки, на которую навели (ниже, @media hover); на телефоне наведения нет,
+   поэтому там видны все подписи, пока меню открыто — одна иконка
+   «эффектов» без подписи неочевидна */
 .lg-label{position:absolute;right:calc(100% + 12px);top:50%;transform:translateY(-50%);
   white-space:nowrap;font-family:var(--font-ui,inherit);font-size:13px;font-weight:600;color:var(--pencil,#1D1D1F);
   padding:7px 12px;border-radius:999px;pointer-events:none;
   transition:opacity .16s ease, transform .16s ease}
 .lg-menu:not(.is-open) .lg-label{opacity:0;transform:translate(8px,-50%)}
 .lg-menu.has-pop .lg-label{opacity:0}
+
+/* подсказка-название у кнопок капсул (MathhGlass.tips): появляется только у
+   кнопки под курсором или с фокусом с клавиатуры */
+.lg-tip{position:absolute;left:calc(100% + 12px);top:50%;transform:translate(-6px,-50%);z-index:5;
+  white-space:nowrap;font-family:var(--font-ui,inherit);font-size:13px;font-weight:600;line-height:1.2;color:var(--pencil,#1D1D1F);
+  padding:7px 12px;border-radius:999px;pointer-events:none;opacity:0;
+  transition:opacity .16s ease, transform .16s ease}
+.lg-tip.is-left{left:auto;right:calc(100% + 12px);transform:translate(6px,-50%)}
+/* горизонтальная капсула (телефон) — подсказка под кнопкой */
+.lg-tip.is-below{left:50%;top:calc(100% + 10px);transform:translate(-50%,-6px)}
+@media (hover:hover){
+  :hover > .lg-tip{opacity:1;transform:translate(0,-50%)}
+  :hover > .lg-tip.is-below{transform:translate(-50%,0)}
+}
+:focus-visible > .lg-tip{opacity:1;transform:translate(0,-50%)}
+:focus-visible > .lg-tip.is-below{transform:translate(-50%,0)}
+
+@media (hover:hover) and (pointer:fine){
+  .lg-menu.is-open .lg-label{opacity:0;transform:translate(8px,-50%)}
+  .lg-menu.is-open .lg-item:hover .lg-label,
+  .lg-menu.is-open .lg-item:focus-within .lg-label{opacity:1;transform:translate(0,-50%);transition-delay:0s}
+  .lg-menu.has-pop .lg-item .lg-label{opacity:0}
+}
 
 /* значок состояния на «⋯»: виден, когда меню закрыто, — чтобы не пропустить
    обрыв связи совместного доступа, спрятанного внутрь меню */
@@ -110,21 +140,29 @@ html[data-theme="dark"] .lg::before,html[data-theme="dark"] .lg-s::before{
 /* ════════════════ режим «максимум» ════════════════ */
 
 /* меню вытекает с пружиной: высота с перелётом, кнопки падают по очереди */
-[data-fx="full"] .lg-menu-glass,[data-fx="full"] .lg-menu-shadow{transition:height .62s cubic-bezier(.34,1.56,.64,1)}
+/* открытие и закрытие — длинная пружина; пока меню просто растёт за
+   увеличенными кнопками — короткая, иначе стекло отставало бы от кнопок */
+[data-fx="full"] .lg-menu-glass,[data-fx="full"] .lg-menu-shadow{transition:height .22s cubic-bezier(.25,1.4,.5,1), width .22s cubic-bezier(.25,1.4,.5,1)}
+[data-fx="full"] .lg-menu.lg-spring .lg-menu-glass,[data-fx="full"] .lg-menu.lg-spring .lg-menu-shadow{transition:height .62s cubic-bezier(.34,1.56,.64,1), width .62s cubic-bezier(.34,1.56,.64,1)}
+[data-fx="full"] .lg-tip{transition:opacity .22s ease, transform .45s cubic-bezier(.34,1.56,.64,1)}
 [data-fx="full"] .lg-menu-toggle .mi{transition:transform .5s cubic-bezier(.34,1.56,.64,1)}
 [data-fx="full"] .lg-item{transition:opacity .3s ease, transform .55s cubic-bezier(.34,1.56,.64,1);transition-delay:calc(var(--i,0) * 45ms)}
 [data-fx="full"] .lg-menu:not(.is-open) .lg-item{transform:translateY(-18px) scale(.55);transition-delay:0s}
 [data-fx="full"] .lg-label{transition:opacity .3s ease, transform .5s cubic-bezier(.34,1.56,.64,1);transition-delay:calc(var(--i,0) * 45ms + 90ms)}
 [data-fx="full"] .lg-menu:not(.is-open) .lg-label{transform:translate(16px,-50%) scale(.9);transition-delay:0s}
 
-/* увеличение при наведении (как Dock на Mac): масштаб считает liquid-glass.js
-   по расстоянию до курсора и кладёт в --lg-mag */
-[data-fx="full"] .lg-side.lg-mag > :not(.lg-glass), [data-fx="full"] .lg-mag .lg-item > .lg-btn,
-[data-fx="full"] .lg-mag .lg-item > .ts-share-btn{
-  transform:scale(var(--lg-mag,1));transition:transform .18s cubic-bezier(.25,1.4,.5,1), background-color .15s;
+/* увеличение при наведении (как Dock на Mac): коэффициент считает
+   liquid-glass.js по расстоянию до курсора и кладёт в --lg-mag. Растёт
+   настоящий размер кнопки, а не transform: так капсула раздвигается вместе
+   с кнопками, как полка Dock, а не остаётся прежней под выросшим значком */
+[data-fx="full"] .lg-mag .lg-btn{
+  width:calc(40px * var(--lg-mag,1));height:calc(40px * var(--lg-mag,1));
+  transition:width .2s cubic-bezier(.25,1.4,.5,1), height .2s cubic-bezier(.25,1.4,.5,1), background-color .15s;
 }
-[data-fx="full"] .lg-side.lg-mag > :not(.lg-glass){transform-origin:left center}
-[data-fx="full"] .lg-menu .lg-mag .lg-btn,[data-fx="full"] .lg-menu .lg-mag .ts-share-btn{transform-origin:right center}
+[data-fx="full"] .lg-mag .lg-btn > .mi{
+  width:calc(20px * var(--lg-mag,1));height:calc(20px * var(--lg-mag,1));
+  transition:width .2s cubic-bezier(.25,1.4,.5,1), height .2s cubic-bezier(.25,1.4,.5,1);
+}
 
 /* упругое нажатие: отдельное свойство scale, чтобы не спорить с увеличением */
 [data-fx="full"] .lg-pressing{scale:.86;transition:scale .12s ease}
@@ -155,7 +193,10 @@ html[data-theme="dark"][data-fx="full"] .lg::before,html[data-theme="dark"][data
    Размытие слабее, чем в обычном режиме: настоящее жидкое стекло прозрачное,
    иначе искажение фона просто не видно */
 [data-fx="full"] .lg-r.lg-r-ready{
-  background-color:color-mix(in srgb,var(--glass-strong) 42%,transparent);
+  /* прозрачное стекло без заливки: виден только преломлённый фон, ободок и
+     блик — как у Liquid Glass. Подписи и подсказки (.lg-label, .lg-tip) не
+     преломляют и остаются с заливкой, чтобы текст читался */
+  background-color:transparent;
   /* внешняя тень сбивает карту искажения (см. .lg-glass выше) — у
      преломляющих панелей страницы остаётся только светлый ободок внутри */
   box-shadow:inset 0 1px 0 var(--glass-inset), inset 0 0 0 1px var(--glass-border);
@@ -181,8 +222,7 @@ html:not([data-fx="full"]) .lg-ambient{display:none}
 /* «Уменьшить движение» в системе — уважаем даже в «максимуме»:
    преломление остаётся (оно неподвижное), всё движущееся отключаем */
 @media (prefers-reduced-motion: reduce){
-  .lg-menu-glass,.lg-menu-shadow,.lg-item,.lg-label,.lg-menu-toggle .mi,.lg-btn{transition:none !important}
-  [data-fx="full"] .lg-side.lg-mag > :not(.lg-glass),[data-fx="full"] .lg-mag .lg-btn,[data-fx="full"] .lg-mag .ts-share-btn{transform:none !important}
+  .lg-menu-glass,.lg-menu-shadow,.lg-item,.lg-label,.lg-tip,.lg-menu-toggle .mi,.lg-btn,.lg-btn > .mi{transition:none !important}
   .lg-jelly,.lg-ripple,.lg-ambient i,.lg-dot{animation:none !important}
 }
 
