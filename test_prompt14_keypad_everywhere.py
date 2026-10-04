@@ -55,7 +55,8 @@ PAGES = {
     "oge1_5": ("cards", [], '-'), "oge6": ("cards", [], '-'), "oge7": ("cards", [], '-'),
     "oge8": ("cards", [], '-'), "oge10": ("cards", [], '-'), "oge12": ("cards", [], '-'),
     "oge14": ("cards", [], '-'), "powers": ("cards", [], '-'),
-    "oge9#lin": ("oge9:linear", X, '-'), "oge9#quad": ("oge9:quadratic", QX, '-'),
+    # Промпт №80: №9 — прототипы, как №6; движков с клавишами x и «;» больше нет
+    "oge9": ("cards", [], '-'),
     "ege_prof.html?n=7": ("cards", [], '-'), "ege_prof.html?n=15": ("cards", PART2, '-'),
     "ege_base.html?n=7": ("cards", [], '-'), "oge_part2.html?n=20": ("cards", PART2, '-'),
     "percent": ("tile", FR, '-'), "logarithms": ("tiles", ['/'], '−'),
@@ -118,10 +119,6 @@ def open_task(page, key, how):
     page.goto(url_of(key))
     page.wait_for_timeout(700)
     if how == "intro":
-        return
-    if how.startswith("oge9:"):
-        page.evaluate("(id) => openModeById(id)", how.split(':')[1])
-        page.wait_for_timeout(700)
         return
     if how.startswith("tile"):
         # в тригонометрии простейшие уравнения — с выбором серии корней, поле
@@ -294,16 +291,6 @@ def test_quick_answer(browser):
     v = page.evaluate("document.querySelector('.qa-panel .qa-input').value")
     check("Квадратные: «нет» пишет «нет корней» вместо набранного", v == 'нет корней', repr(v))
 
-    # ОГЭ №9, движок линейных: «ответ сразу» и шаги — кнопки движка живые
-    page.goto(f"{BASE}/oge9.html")
-    page.wait_for_timeout(700)
-    page.evaluate("openModeById('linear')")
-    page.wait_for_timeout(700)
-    check("ОГЭ №9: у линейных есть «ответ сразу»", page.evaluate("!!document.querySelector('.qa-panel')"))
-    press(page, '4')
-    v = page.evaluate("document.querySelector('.qa-panel .qa-input').value")
-    check("ОГЭ №9: кнопка движка пишет в поле (раньше была не привязана)", v == '4', repr(v))
-
     # НОД: запятая по-прежнему разделяет делители «, »
     page.goto(f"{BASE}/gcd.html")
     page.wait_for_timeout(700)
@@ -370,7 +357,7 @@ def test_choice_only(browser):
 
 # ─── 7. телефон ───
 def test_phone(browser):
-    for key in ["addition", "fraction_multiply", "quadratic", "oge8", "ege_prof.html?n=15", "logarithms", "oge9#quad"]:
+    for key in ["addition", "fraction_multiply", "quadratic", "oge8", "ege_prof.html?n=15", "logarithms", "oge9"]:
         how = PAGES[key][0]
         ctx = new_ctx(browser, viewport={"width": 375, "height": 800}, has_touch=True, is_mobile=True)
         page = ctx.new_page()

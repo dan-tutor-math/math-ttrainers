@@ -715,17 +715,14 @@ MODE = "document.querySelectorAll('.mode-card:not(.soon):not(.demo)')[%d].click(
 OGE_SIG = "(function(){ const m = tsGetState().curMode; return m && typeof m === 'object' ? (m.id || JSON.stringify(m).slice(0, 40)) : String(m); })()"
 LVL = "document.querySelectorAll('#levels .lvl:not(.custom):not(.sec)')[%d].click()"
 ALL_CASES = (
-    [(t, t + ".html", MODE % 2, MODE % 3, OGE_SIG) for t in ["oge1_5", "oge6", "oge7", "oge10", "oge13", "oge14", "oge15_18", "oge8", "oge12", "powers"]]
-    + [(t, t + ".html", MODE % 0, MODE % 1, OGE_SIG) for t in ["oge9", "oge11"]]
+    [(t, t + ".html", MODE % 2, MODE % 3, OGE_SIG) for t in ["oge1_5", "oge6", "oge7", "oge9", "oge10", "oge13", "oge14", "oge15_18", "oge8", "oge12", "powers"]]
+    + [(t, t + ".html", MODE % 0, MODE % 1, OGE_SIG) for t in ["oge11"]]
     + [(tid, href, LVL % 2, LVL % 3, "String(curLevel)") for tid, href in (
         ("add_col", "addition.html"), ("sub_col", "subtraction.html"), ("mul_col", "multiplication.html"), ("div_col", "division.html"),
         ("linear", "linear.html"), ("quadratic", "quadratic.html"), ("frac_mul", "fraction_multiply.html"), ("frac_div", "fraction_divide.html"))]
     + [(t, t + ".html", "document.querySelectorAll('#sections .lvl')[1].click(); " + LVL % 2,
         "document.querySelectorAll('#sections .lvl')[2].click(); " + LVL % 1, "curSection + '/' + curLevel") for t in ("gcd", "lcm")]
-    + [("percent", "percent.html", "openProto('parts', 2)", "openProto(PERCENT_BANK.protos ? PERCENT_BANK.protos[5].id : 'parts', 3)", "S.task.pid + '/' + S.task.lvl"),
-       ("oge9", "oge9.html", "openModeById('linear'); setTimeout(() => document.querySelector('#levels .lvl[data-id=\"3\"]').click(), 200)",
-        "openModeById('quadratic'); setTimeout(() => document.querySelector('#levels .lvl[data-id=\"2\"]').click(), 200)",
-        "(tsGetState().curMode && (tsGetState().curMode.id || tsGetState().curMode)) + '/' + (document.querySelector('#levels .lvl.active') || { dataset: {} }).dataset.id")]
+    + [("percent", "percent.html", "openProto('parts', 2)", "openProto(PERCENT_BANK.protos ? PERCENT_BANK.protos[5].id : 'parts', 3)", "S.task.pid + '/' + S.task.lvl")]
 )
 
 

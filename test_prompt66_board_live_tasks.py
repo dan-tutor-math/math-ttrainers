@@ -339,23 +339,25 @@ def run():
         page.wait_for_timeout(200)
         check("6. квадратное: корни через «;» в любом порядке", (last_obj(page)["task"].get("st") or {}).get("res") == "ok")
 
-        # ОГЭ №9: движки уравнений закрыты в своих функциях — пример отдают
-        # через __boardLinP/__boardQuadP. Демоверсия: 3(x + 8) − 2(x − 8) = 8
+        # ОГЭ №9 (промпт №80 — прототипы, как №6): ответ — число из curTask.
+        # Демоверсия: 3(x + 8) − 2(x − 8) = 8
         page.evaluate("() => document.getElementById('bdTrainersPanel').classList.add('open')")
-        open_trainer(page, "oge9", "oge9.html", "document.querySelectorAll('.mode-card:not(.soon)')[0].click()")
+        open_trainer(page, "oge9", "oge9.html", "document.querySelector('.mode-card[data-id=\"demo2027\"]').click()")
         n_now = page.evaluate("() => getCurrentBoard().objects.length")
         add_to_board(page, n_now + 1)
         close_panel(page)
         o9 = last_obj(page)
-        check("6. ОГЭ №9, линейное уравнение демоверсии: ответ −32",
+        check("6. ОГЭ №9, уравнение демоверсии: ответ −32",
               bool(o9.get("task")) and float(o9["task"]["fields"][0]["value"]) == -32)
         page.evaluate("() => document.getElementById('bdTrainersPanel').classList.add('open')")
-        open_trainer(page, "oge9", "oge9.html", "document.querySelectorAll('.mode-card:not(.soon)')[2].click()")
+        open_trainer(page, "oge9", "oge9.html", "document.querySelector('.mode-card[data-id=\"p13\"]').click()")
+        want9 = page.evaluate(f"() => {FRAME}.contentWindow.eval('curTask.correctValue')")
         n_now = page.evaluate("() => getCurrentBoard().objects.length")
         add_to_board(page, n_now + 1)
         close_panel(page)
         o9q = last_obj(page)
-        check("6. ОГЭ №9, квадратное уравнение: корни записаны", bool(o9q.get("task")) and o9q["task"]["fields"][0]["type"] == "nums")
+        check("6. ОГЭ №9, квадратное уравнение: меньший корень — живое поле",
+              bool(o9q.get("task")) and o9q["task"]["fields"][0]["type"] == "num" and float(o9q["task"]["fields"][0]["value"]) == want9)
 
         # ОГЭ №24 (доказательство) — просто закреплённая картинка
         page.evaluate("() => document.getElementById('bdTrainersPanel').classList.add('open')")

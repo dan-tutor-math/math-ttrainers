@@ -421,21 +421,24 @@ def run():
         e3 = more(page, e2, "right")
         check("4. ЕГЭ база: дальше — по кругу за новым", e3["gen"]["pid"] == page.evaluate(f"() => {FRAME}.contentWindow.eval('pidAfter(' + JSON.stringify({json.dumps(e2['gen']['pid'])}) + ')')"))
 
-        # ОГЭ №9, движок линейных уравнений, уровень «3. Скобки» (id 2)
+        # ОГЭ №9 (промпт №80 — прототипы, как №6): «ещё такое же» — тот же прототип
         open_panel(page)
-        open_trainer(page, "oge9", "oge9.html",
-                     "openModeById('linear'); setTimeout(() => document.querySelector('#levels .lvl[data-id=\"2\"]').click(), 100);")
+        open_trainer(page, "oge9", "oge9.html", "document.querySelector('.mode-card[data-id=\"p5\"]').click();")
         page.wait_for_timeout(300)
         add_to_board(page)
         l1 = obj(page)
-        check("4. ОГЭ №9: запомнен движок и уровень", (l1.get("gen") or {}).get("kind") == "engine" and l1["gen"]["lvl"] == 2)
+        check("4. ОГЭ №9: запомнен прототип", (l1.get("gen") or {}).get("kind") == "state" and l1["gen"]["snap"]["curMode"] == "p5")
         page.evaluate("() => setTrainersPanel('collapsed')")
         page.wait_for_timeout(200)
         l2 = more(page, l1, "down")
-        lvl_in_frame = page.evaluate("""() => { const f = [...document.querySelectorAll('iframe.bd-gen-frame')].find(x => x.getAttribute('src').startsWith('oge9'));
-            const b = f.contentDocument.querySelector('#levels .lvl.active'); return b ? Number(b.dataset.id) : null; }""")
-        check("4. ОГЭ №9: новое уравнение того же уровня", l2["gen"]["lvl"] == 2 and lvl_in_frame == 2)
-        check("4. ОГЭ №9: у нового уравнения есть ответ «x =»", (l2.get("task") or {}).get("fields", [{}])[0].get("label") == "x =")
+        check("4. ОГЭ №9: новое уравнение того же прототипа с ответом",
+              l2["gen"]["snap"]["curMode"] == "p5" and (l2.get("task") or {}).get("kind") == "fields")
+        # задание, снятое с движка до промпта №80: «ещё такое же» — линейные вперемешку
+        page.evaluate(f"""() => {{ const o = getCurrentBoard().objects.find(x => x.id === {json.dumps(l2['id'])});
+            o.gen = {{ v: 1, tid: 'oge9', href: 'oge9.html', vw: o.gen.vw, kind: 'engine', mode: 'linear', lvl: 2 }}; }}""")
+        l3 = more(page, obj(page), "down")
+        check("4. ОГЭ №9: к старому заданию-движку — линейное уравнение из прототипов",
+              l3["gen"]["kind"] == "state" and l3["gen"]["snap"]["curMode"] == "randomLin" and (l3.get("task") or {}).get("kind") == "fields")
 
         # ОГЭ №8 — своя система карточек
         open_panel(page)

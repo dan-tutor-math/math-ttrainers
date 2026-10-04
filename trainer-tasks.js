@@ -47,8 +47,8 @@ const TT_UI_FONT = getComputedStyle(document.documentElement).getPropertyValue('
 // собрана по уже существующим кнопкам «В подборку» в каждом тренажёре (см.
 // Basket.extractFromSelectorsRich в их коде), без единого изменения в их
 // файлах. gateBtn — id кнопки, которая видна только когда соответствующий
-// вариант сейчас актуален (несколько типов заданий на одной странице — ОГЭ
-// №9 (мкв/линейные/квадратные), либо необязательная теория — №1–5); без
+// вариант сейчас актуален (необязательная теория — №1–5; до промпта №80 так
+// же различались три вида заданий ОГЭ №9); без
 // gateBtn запись берётся всегда. selAll вместо sel — узлов может быть
 // несколько сразу (доп. добавленные задания на ОГЭ №8), берём все на странице.
 const TRAINER_CAPTURE = {
@@ -56,7 +56,8 @@ const TRAINER_CAPTURE = {
   oge6:      [ { sel:'#questionPanel' } ],
   oge7:      [ { sel:'#questionPanel' } ],
   oge8:      [ { sel:'#questionPanel' }, { selAll:'.added-task-card .added-card-question' } ],
-  oge9:      [ { sel:'#questionPanel', gateBtn:'mcqBasketAddBtn' }, { sel:'#live', gateBtn:'linBasketAddBtn' }, { sel:'#eqLine', gateBtn:'quadBasketAddBtn' } ],
+  // Промпт №80: №9 — прототипы, как №6; движков уравнений на странице больше нет
+  oge9:      [ { sel:'#questionPanel' } ],
   oge10:     [ { sel:'#questionPanel' } ],
   oge11:     [ { sel:'#questionPanel' } ],
   // Промпт №54: у ОГЭ №12 и «Степеней» те же добавленные карточки, что у №8
@@ -559,13 +560,6 @@ function trainerTaskInfo(win, trainerId, el){
     if (el.id === 'theoryContent') return null;
     const st = typeof win.tsGetState === 'function' ? plainCopy(win.tsGetState()) : null;
     if (!st) return null;
-    if (trainerId === 'oge9'){
-      // движки линейных и квадратных уравнений в №9 закрыты в своих функциях,
-      // пример отдают через __boardLinP/__boardQuadP (oge9.html) — формы те же,
-      // что у linear.html и quadratic.html
-      if (el.id === 'live') return soloTaskInfo('linear', plainCopy(typeof win.__boardLinP === 'function' ? win.__boardLinP() : null));
-      if (el.id === 'eqLine') return soloTaskInfo('quadratic', plainCopy(typeof win.__boardQuadP === 'function' ? win.__boardQuadP() : null));
-    }
     if (st.solo) return soloTaskInfo(trainerId, st.P);
     if (cardIdx >= 0){
       const bt = (st.addedTasks || [])[cardIdx];
@@ -589,7 +583,8 @@ function trainerTaskInfo(win, trainerId, el){
              kind: 'state',  snap }     // ОГЭ, арифметика, НОД: снимок моста
                                         //   сессии (тип, уровень, раздел)
            | kind: 'ege',    n, pid     // ЕГЭ и ОГЭ ч. 2: следующий прототип
-           | kind: 'engine', mode, lvl  // движки уравнений ОГЭ №9
+           | kind: 'engine', mode, lvl  // движки уравнений ОГЭ №9 — только у
+                                        //   заданий, снятых до промпта №80
 
    По кнопке тренажёр открывается в НЕВИДИМОМ кадре (genFrameFor, адрес с
    ?bdgen=1 — session-share.js тогда не подключается к сессии), в него
@@ -633,13 +628,6 @@ function trainerGenInfo(win, tid, href, el){
       const pid = trainerEval(win, card ? 'S.cards[' + Number(card.dataset.idx) + '].pid' : 'S.pid');
       if (n == null || pid == null) return null;
       return Object.assign(base, { kind: 'ege', n: Number(n), pid: String(pid) });
-    }
-    if (tid === 'oge9' && (el.id === 'live' || el.id === 'eqLine')){
-      // пример движка живёт в замыкании, но уровень виден по кнопке уровней
-      const st = typeof win.tsGetState === 'function' ? win.tsGetState() : null;
-      const lvlBtn = el.ownerDocument.querySelector('#levels .lvl.active');
-      const mode = (st && st.curMode) || (el.id === 'live' ? 'linear' : 'quadratic');
-      return Object.assign(base, { kind: 'engine', mode, lvl: lvlBtn ? Number(lvlBtn.dataset.id) : null });
     }
     const api = win.__trainerState;
     // Промпт №14 «логарифмы и тригонометрия»: снимали карточку «+» — тренажёр отдаёт уровень и вид ЕЁ
@@ -706,13 +694,9 @@ async function genShowSameInFrame(win, g){
   if (g.kind === 'ege'){
     win.eval('openTask(' + JSON.stringify(g.n) + ', ' + JSON.stringify(g.pid) + '); if (typeof render === "function") render();');
   } else if (g.kind === 'engine'){
-    if (typeof win.openModeById !== 'function') throw new Error('нет openModeById');
-    win.openModeById(g.mode);
-    await genWait(150);
-    if (g.lvl != null){
-      const b = doc.querySelector('#levels .lvl[data-id="' + g.lvl + '"]');
-      if (b && !b.classList.contains('active')) b.click();
-    }
+    // задание движка до промпта №80: его вёрстку (#live, #eqLine) новый №9
+    // уже не построит — пусть доска оставит снимок как был
+    throw new Error('задание старого вида №9 не перестраивается');
   } else {
     const api = win.__trainerState;
     const snap = plainCopy(g.snap);
@@ -726,17 +710,14 @@ async function genNewTaskInFrame(win, g){
   if (g.kind === 'ege'){
     win.eval('openTask(' + JSON.stringify(g.n) + ', pidAfter(' + JSON.stringify(g.pid) + ')); if (typeof render === "function") render();');
   } else if (g.kind === 'engine'){
-    if (typeof win.openModeById !== 'function') throw new Error('нет openModeById');
-    win.openModeById(g.mode);
-    await genWait(150);
-    if (g.lvl != null){
-      const b = doc.querySelector('#levels .lvl[data-id="' + g.lvl + '"]');
-      if (b && !b.classList.contains('active')) b.click();
-      await genWait(80);
-    }
-    const rb = doc.getElementById('refreshBtn');
-    if (!rb) throw new Error('нет кнопки нового примера');
-    rb.click();
+    // Промпт №80: движков уравнений в №9 больше нет, а на досках остались
+    // задания, снятые с них. «Ещё такое же» к ним — задание №9 того же вида
+    // уравнения: «Случайно» среди линейных или квадратных прототипов
+    const api = win.__trainerState;
+    if (!api || !api.apply) throw new Error('нет __trainerState');
+    api.apply({ picker: false, curMode: g.mode === 'quadratic' ? 'randomQuad' : 'randomLin', curSubMode: 'exam' });
+    await genWait(120);
+    api.newTask();
   } else {
     const api = win.__trainerState;
     const snap = plainCopy(g.snap);

@@ -291,46 +291,28 @@ def test_oge10(browser):
     ctx.close()
 
 
-# ─── 3. №9: линейное уравнение из демоверсии по шагам ───
+# ─── 3. №9: уравнение из демоверсии — нулевой тип среди прототипов ───
+# Промпт №80: №9 переделан по прототипам, как №6. Раньше демоверсия была
+# уровнем движка линейных уравнений и решалась по шагам; теперь — тип №0 с
+# полем ответа, а по шагам уравнения решают linear.html и quadratic.html
 def test_oge9(browser):
     ctx, page, errors = new_page(browser, f"{BASE}/oge9.html")
-    first = page.eval_on_selector('#pickerArea .mode-card', 'e => [e.dataset.id, e.innerText]')
-    check("oge9: нулевой тип первым на экране выбора", first[0] == 'demo2027' and '№0.' in first[1], str(first))
-    open_type(page, 'demo2027', wait=800)
-    eq = page.inner_text('#live')
+    first = page.eval_on_selector('#modesGrid .mode-card:not(.random)', 'e => [e.dataset.id, e.innerText, e.className]')
+    check("oge9: нулевой тип первым на экране выбора, выделен",
+          first[0] == 'demo2027' and '№0.' in first[1] and 'demo' in first[2], str(first))
+    open_type(page, 'demo2027')
+    eq = page.inner_text('#questionPromptText .expr-display')
     check("oge9: уравнение 3(x + 8) − 2(x − 8) = 8", eq.strip() == '3(x + 8) − 2(x − 8) = 8', eq)
-    active = page.inner_text('.lvl.active')
-    check("oge9: открыт уровень «0. Демоверсия 2027»", active.strip().startswith('0. Демоверсия 2027'), active)
-    page.click('#goBtn')
-    page.wait_for_timeout(700)
-    prompts = []
-    for ans in ['3x', '24', '-2x', '16']:
-        prompts.append(page.inner_text('#prompt'))
-        page.fill('#brAns', ans)
-        page.click('#goBtn')
-        page.wait_for_timeout(1000)
-    check("oge9: фонтанчики — сначала первая скобка, потом вторая",
-          'в первой скобке' in prompts[0] and 'во второй скобке' in prompts[2] and '−2 · x' in prompts[2],
-          str([p[:40] for p in prompts]))
-    live = page.evaluate("[...document.querySelectorAll('#liveEq .term')].map(e => [e.dataset.side, e.textContent])")
-    check("oge9: после скобок слева 3x + 24 − 2x + 16, справа 8",
-          [t for s, t in live if s == 'L'] == ['3x', '+ 24', '− 2x', '+ 16'] and [t for s, t in live if s == 'R'] == ['8'], str(live))
-    for txt in ['+ 24', '+ 16']:
-        page.evaluate("""(t) => { const el = [...document.querySelectorAll('#liveEq .term')].find(e => e.dataset.side === 'L' && e.textContent === t); el.click(); }""", txt)
-        page.wait_for_timeout(900)
-    page.click('#goBtn')
-    page.wait_for_timeout(900)
-    page.fill('#inK', 'x')
-    page.fill('#inM', '-32')
-    page.click('#goBtn')
-    page.wait_for_timeout(700)
-    frozen = page.inner_text('#frozen')
-    check("oge9: решено, x = −32, деление на 1 пропущено",
-          'x=−32' in frozen.replace(' ', '').replace('\n', '') and 'обе части равны 8' in frozen and ':' not in frozen.split('Проверка')[0][-40:],
-          frozen[-120:])
-    check("oge9: звёзды за решение", page.inner_text('#stStars') == '★★★')
-    check("oge9: обычные уровни на месте, «Экзамен» демоверсию не берёт",
-          page.evaluate("[...document.querySelectorAll('.lvl')].map(b => b.textContent.trim().slice(0, 2)).join('|')").startswith('0.|1.|2.|3.|4.|5.'))
+    page.fill('#answerInput', '-32')
+    page.click('#checkAnswerBtn')
+    page.wait_for_timeout(500)
+    sol = page.inner_text('#explainBox')
+    check("oge9: ответ −32 засчитан, решение со скобками",
+          page.evaluate("taskAnswered && !hadWrongPick") and '3x + 24 − 2x + 16 = 8' in sol and 'x = −32' in sol, sol[-120:])
+    hits = page.evaluate("""() => { curMode = 'random'; let hits = 0;
+      for (let i = 0; i < 80; i++) { newTask(); if (curTask.correctValue === -32 && /x \+ 8/.test(curTask.prompt)) hits++; }
+      return hits; }""")
+    check("oge9: в «Случайно» демоверсии нет (80 заданий)", hits == 0, str(hits))
     check("oge9: без ошибок JS", not errors, str(errors[:1]))
     ctx.close()
 

@@ -228,12 +228,8 @@ def check_buttons(browser, failures, errors):
 # ────────────────────────── C ──────────────────────────
 def switch_type(page, url):
     """Сменить тип на странице ОГЭ на не первый (так, как это сделал бы учитель)."""
-    if url.startswith("oge9"):
-        page.click("#backBtn") if page.evaluate("() => document.getElementById('taskArea').style.display !== 'none'") \
-            else page.click("#linBackBtn")
-        page.wait_for_timeout(300)
-        page.click('#pickerArea .mode-card[data-id="rational"]')
-    elif url.startswith("oge19"):
+    # промпт №80: №9 — прототипы, как №6, своей ветки больше не нужно
+    if url.startswith("oge19"):
         page.click("#backBtn")
         page.wait_for_timeout(300)
         page.click('#pickerArea .mode-card[data-id="geom"]')

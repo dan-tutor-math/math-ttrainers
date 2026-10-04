@@ -215,8 +215,9 @@ def test_own_button(browser):
     cases = [
         ("Сложение", "add_col", "addition.html", None, "refreshBtn"),
         ("ОГЭ №6", "oge6", "oge6.html", "document.querySelectorAll('.mode-card:not(.soon):not(.demo)')[1].click()", "refreshBtn"),
-        ("ОГЭ №9, линейные", "oge9", "oge9.html", "openModeById('linear')", "refreshBtn"),
-        ("ОГЭ №9, дробно-рациональные", "oge9", "oge9.html", "openModeById('rational')", "mcqRefreshBtn"),
+        # промпт №80: №9 — прототипы, ⟳ одна (#refreshBtn), как в №6
+        ("ОГЭ №9, прототип", "oge9", "oge9.html", "document.querySelector('.mode-card[data-id=\"p12\"]').click()", "refreshBtn"),
+        ("ОГЭ №9, вперемешку", "oge9", "oge9.html", "document.querySelector('.mode-card[data-id=\"randomLin\"]').click()", "refreshBtn"),
         # промпт №14 «логарифмы и тригонометрия»: своя ⟳ — тот же уровень и вид / тип
         ("Логарифмы", "logarithms", "logarithms.html",
          "document.querySelector('.tile[data-pid=\"prod\"]').click(); document.querySelector('.tile[data-pid=\"quot\"]').click(); document.getElementById('pkStart').click(); setLevel(2)",

@@ -102,12 +102,10 @@ def main():
         # всё наружу обрывается: иначе каждая страница заводит сессию в
         # настоящей базе (раздел 8 HANDOFF), а клавиатуре сеть не нужна
         page.route("https://**/*", lambda route: route.abort())
+        # промпт №80: в ОГЭ №9 больше нет движков со своими клавиатурами
+        # (lin_, quad_) — одна клавиатура, как в №6
         for name in PAGES:
-            if name == "oge9":
-                errors += check(page, name, 375, 800, "lin_")
-                errors += check(page, name, 375, 800, "quad_")
-            else:
-                errors += check(page, name, 375, 800)
+            errors += check(page, name, 375, 800)
         for name in ["division", "oge1_5", "ege_prof"]:
             errors += check(page, name, 1280, 900)
         browser.close()

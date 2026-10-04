@@ -3,7 +3,7 @@
 
 Над панелью шагов — панель «Знаешь ответ — впиши сразу» с полем и
 «Проверить» (как в ОГЭ). Проверяем на каждом тренажёре (столбики, уравнения,
-дроби, НОД и оба движка уравнений в ОГЭ №9):
+дроби, НОД; до промпта №80 — и оба движка уравнений в ОГЭ №9):
   1. Панель стоит прямо над панелью шагов и видна сразу, до «Начать».
   2. Верный ответ с первой попытки — зелёным, «решено» +1, серия +1, ★★★,
      появляется «Следующий пример», поле больше не правится.
@@ -140,10 +140,8 @@ PAGES = {
     "fraction_multiply": ("fraction_multiply.html", "() => tsGetState().P", "() => newProblem()"),
     "fraction_divide": ("fraction_divide.html", "() => tsGetState().P", "() => newProblem()"),
     "gcd": ("gcd.html", "() => tsGetState().P", "() => newProblem()"),
-    # движки ОГЭ №9 закрыты в функциях: пример — через хуки промпта №66,
-    # новый пример — кнопкой ⟳
-    "lin": ("oge9.html", "() => window.__boardLinP()", "() => document.getElementById('refreshBtn').click()"),
-    "quad": ("oge9.html", "() => window.__boardQuadP()", "() => document.getElementById('refreshBtn').click()"),
+    # движки уравнений ОГЭ №9 («lin», «quad») убраны в промпте №80: №9 теперь
+    # по прототипам с одним полем ответа, «ответа сразу» там нет
 }
 
 
@@ -154,10 +152,6 @@ def open_page(ctx, name, errors):
     page.route("https://**/*", lambda r: r.abort())
     page.goto(f"{BASE}/{url}")
     page.wait_for_timeout(600)
-    if name == "lin":
-        page.evaluate("() => document.querySelectorAll('.mode-card:not(.soon)')[1].click()")
-    if name == "quad":
-        page.evaluate("() => document.querySelectorAll('.mode-card:not(.soon)')[2].click()")
     page.wait_for_selector(".qa-panel .qa-input", timeout=5000)
     return page
 
