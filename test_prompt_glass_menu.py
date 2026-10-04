@@ -219,9 +219,30 @@ def run():
         sz = page.evaluate("[document.querySelector('.boards-toggle').getBoundingClientRect().width, document.querySelector('.lg-side').getBoundingClientRect().width, document.querySelector('.lg-side .lg-glass').getBoundingClientRect().width]")
         check(sz[0] > 50 and sz[1] >= sz[0] + 6 and abs(sz[2] - sz[1]) < 1,
               f"капсула и её стекло растут вместе с кнопкой ({sz})")
-        page.mouse.move(640, 500); page.wait_for_timeout(200)
+        page.mouse.move(640, 500); page.wait_for_timeout(900)
         check(page.evaluate("document.querySelector('.boards-toggle').style.getPropertyValue('--lg-mag')") == "",
-              "курсор ушёл — кнопки вернулись к обычному размеру")
+              "курсор ушёл — кнопки плавно вернулись к обычному размеру")
+
+        # плавность: размер меняется каждый кадр небольшими шагами, без скачков
+        page.mouse.move(r[0], r[1])
+        samples = page.evaluate("""() => new Promise(res => { const out = []; const b = document.querySelector('.boards-toggle');
+            const t0 = performance.now();
+            (function f(){ out.push(parseFloat(b.style.getPropertyValue('--lg-mag')) || 1);
+              if (performance.now() - t0 < 450) requestAnimationFrame(f); else res(out); })(); })""")
+        steps = [b2 - a2 for a2, b2 in zip(samples, samples[1:])]
+        distinct = len(set(round(v, 3) for v in samples))
+        # шаг за кадр на экране 60 Гц — сотые доли; в безголовом браузере кадры
+        # реже, поэтому порог с запасом
+        check(distinct >= 8 and max(steps) < 0.16 and min(steps) > -0.005,
+              f"увеличение идёт по кадрам: {distinct} промежуточных значений, наибольший шаг {max(steps):.3f}")
+        # кнопка, мимо которой курсор просто едет, не дёргается: цель
+        # считается от покойных положений, а не от уже выросших соседей
+        page.mouse.move(r[0], r[1] + 3); page.wait_for_timeout(500)
+        a1 = page.evaluate("parseFloat(document.querySelector('.basket-toggle').style.getPropertyValue('--lg-mag'))")
+        page.mouse.move(r[0], r[1] + 4); page.wait_for_timeout(500)
+        a2 = page.evaluate("parseFloat(document.querySelector('.basket-toggle').style.getPropertyValue('--lg-mag'))")
+        check(abs(a2 - a1) < 0.02, f"сдвиг курсора на пиксель почти не меняет соседа ({a1} → {a2})")
+        page.mouse.move(640, 500); page.wait_for_timeout(900)
 
         # упругое нажатие — на «⋯»: ссылки капсулы увели бы со страницы
         r2 = page.evaluate("(()=>{const e=document.querySelector('#lgMenuToggle').getBoundingClientRect();return [e.left+e.width/2,e.top+e.height/2]})()")
@@ -232,6 +253,14 @@ def run():
         jelly = page.evaluate("document.querySelector('#lgMenuToggle').classList.contains('lg-jelly')")
         check(pressing and ripple and jelly, "нажатие: кнопка сжимается, вспыхивает свет и пружинит обратно")
         page.keyboard.press("Escape")
+
+        # меню: стекло растёт вслед за увеличенной кнопкой, кадр в кадр
+        page.click("#lgMenuToggle"); page.wait_for_timeout(800)
+        page.hover("#fxToggle"); page.wait_for_timeout(600)
+        mw = page.evaluate("[document.querySelector('#fxToggle').getBoundingClientRect().width, document.querySelector('.lg-menu-glass').getBoundingClientRect().width, document.querySelector('.lg-menu').offsetWidth]")
+        check(mw[0] > 48 and abs(mw[1] - mw[2]) < 1.5 and mw[1] >= mw[0] + 6,
+              f"стекло меню раздвигается вместе с увеличенной кнопкой ({mw})")
+        page.keyboard.press("Escape"); page.mouse.move(640, 500); page.wait_for_timeout(900)
 
         # рисование на холсте снимает преломление
         page.evaluate("""() => { const c=document.createElement('canvas'); c.id='tcv';

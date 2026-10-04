@@ -155,14 +155,21 @@ html[data-theme="dark"] .lg::before,html[data-theme="dark"] .lg-s::before{
    liquid-glass.js по расстоянию до курсора и кладёт в --lg-mag. Растёт
    настоящий размер кнопки, а не transform: так капсула раздвигается вместе
    с кнопками, как полка Dock, а не остаётся прежней под выросшим значком */
+/* CSS-переходов на размер здесь нет нарочно: размер ведёт пружина в
+   liquid-glass.js каждый кадр, а переход поверх неё перезапускался бы на
+   каждом кадре и давал рывки */
 [data-fx="full"] .lg-mag .lg-btn{
   width:calc(40px * var(--lg-mag,1));height:calc(40px * var(--lg-mag,1));
-  transition:width .2s cubic-bezier(.25,1.4,.5,1), height .2s cubic-bezier(.25,1.4,.5,1), background-color .15s;
+  transition:background-color .15s;
 }
 [data-fx="full"] .lg-mag .lg-btn > .mi{
   width:calc(20px * var(--lg-mag,1));height:calc(20px * var(--lg-mag,1));
-  transition:width .2s cubic-bezier(.25,1.4,.5,1), height .2s cubic-bezier(.25,1.4,.5,1);
 }
+/* пока кнопки растут, стекло меню идёт за ними кадр в кадр (его размер
+   меряет mathh-menu.js), без своего перехода — иначе оно отставало бы.
+   Пружина открытия (.lg-spring) важнее: на время открытия не трогаем */
+[data-fx="full"] .lg-menu.lg-magging:not(.lg-spring) .lg-menu-glass,
+[data-fx="full"] .lg-menu.lg-magging:not(.lg-spring) .lg-menu-shadow{transition:none}
 
 /* упругое нажатие: отдельное свойство scale, чтобы не спорить с увеличением */
 [data-fx="full"] .lg-pressing{scale:.86;transition:scale .12s ease}

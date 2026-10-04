@@ -293,21 +293,96 @@
       s.style.setProperty('--lg-mx', ((e.clientX - r.left) / r.width * 100).toFixed(1) + '%');
       s.style.setProperty('--lg-my', ((e.clientY - r.top) / r.height * 100).toFixed(1) + '%');
     }
-    // увеличение: ближняя кнопка растёт сильнее, соседние — меньше, волной
+    // увеличение: куда тянуться — решаем здесь, а сами кнопки плавно
+    // едут к цели в своём цикле кадров (magTick)
     var cont = t && t.closest('.lg-mag');
-    if (cont !== magCont) { resetMag(); magCont = cont; }
+    if (cont !== magCont) { releaseMag(magCont); magCont = cont; if (cont) restOf(cont); }
     if (cont && !(reduceMotion && reduceMotion.matches)) {
-      magButtons(cont).forEach(function (b) {
-        var br = b.getBoundingClientRect();
-        var d = Math.hypot(e.clientX - (br.left + br.width / 2), e.clientY - (br.top + br.height / 2));
-        var k = 1 + 0.34 * Math.exp(-(d * d) / (2 * 42 * 42));
-        b.style.setProperty('--lg-mag', k.toFixed(3));
+      var R = magRest.get(cont), cr = cont.getBoundingClientRect();
+      var p = R.row ? e.clientX - cr.left : e.clientY - cr.top;
+      R.list.forEach(function (it) {
+        var d = p - it.c;
+        setTarget(it.b, 1 + MAG * Math.exp(-(d * d) / (2 * SIGMA * SIGMA)));
       });
+      startMag(cont);
     }
   }
-  var magCont = null;
+
+  /* Увеличение как у Dock на Mac.
+     Раньше каждая кнопка получала новый размер на каждом движении мыши, а
+     CSS-переход перезапускался с нуля — отсюда рывки. Теперь у каждой кнопки
+     своя «пружина» (без перелёта, как в iOS): цель меняется сколько угодно
+     часто, а размер догоняет её плавно, кадр за кадром, с частотой экрана.
+     Расстояние до курсора меряем от ПОКОЙНОГО положения кнопки (как будто
+     ничего не увеличено) и только вдоль капсулы: иначе выросшая кнопка
+     сдвигает соседей, расстояния меняются, и всё начинает дрожать */
+  var MAG = 0.38, SIGMA = 46, K = 220, C = 2 * Math.sqrt(220);
+  var magCont = null, magState = new Map(), magRest = new WeakMap(), magRaf = 0, magLast = 0;
   function magButtons(c) { return c.querySelectorAll(':scope > a, :scope > button, .lg-item > .lg-btn, .lg-item > .ts-share-btn'); }
-  function resetMag() { if (magCont) magButtons(magCont).forEach(function (b) { b.style.removeProperty('--lg-mag'); }); }
+  // покойные центры кнопок вдоль капсулы: ширина и отступы кнопки в покое
+  // известны (40px), поэтому считаем по ним, а не по текущему, уже
+  // увеличенному размеру
+  function restOf(cont) {
+    var cs = getComputedStyle(cont);
+    var row = cs.flexDirection.indexOf('row') === 0;
+    var gap = parseFloat(row ? cs.columnGap : cs.rowGap) || 0;
+    var list = [], acc = null;
+    magButtons(cont).forEach(function (b) {
+      var st = magState.get(b), k = st ? st.x : 1;
+      var r = b.getBoundingClientRect(), cr = cont.getBoundingClientRect();
+      var size = row ? r.width : r.height, rest = size / k;
+      var start = row ? r.left - cr.left : r.top - cr.top;
+      // первая кнопка задаёт начало; дальше — покойный размер и тот же шаг
+      if (acc === null) acc = start;
+      list.push({ b: b, c: acc + rest / 2 });
+      acc += rest + gap;
+    });
+    magRest.set(cont, { row: row, list: list });
+  }
+  function setTarget(b, v) {
+    var st = magState.get(b);
+    if (!st) { st = { x: 1, v: 0, t: 1 }; magState.set(b, st); }
+    st.t = v;
+  }
+  function releaseMag(cont) {
+    if (!cont) return;
+    magButtons(cont).forEach(function (b) { setTarget(b, 1); });
+    startMag(cont);
+  }
+  function startMag(cont) {
+    var box = cont && cont.closest('.lg-menu, .lg-capsule');
+    if (box) box.classList.add('lg-magging');
+    if (!magRaf) { magLast = performance.now(); magRaf = requestAnimationFrame(magTick); }
+  }
+  function magTick(now) {
+    magRaf = 0;
+    // шаг по реальному времени кадра: на 60 и на 120 Гц скорость одна и та
+    // же, а редкие кадры слабого устройства считаем мелкими подшагами — так
+    // пружина не замедляется и не «взрывается» от большого шага
+    var dt = Math.min(0.1, Math.max(0.001, (now - magLast) / 1000));
+    magLast = now;
+    var n = Math.ceil(dt / 0.008), h = dt / n;
+    var busy = false;
+    magState.forEach(function (st, b) {
+      // критически затухающая пружина: быстро доходит до цели и не качается
+      for (var i = 0; i < n; i++) {
+        var a = -K * (st.x - st.t) - C * st.v;
+        st.v += a * h; st.x += st.v * h;
+      }
+      if (Math.abs(st.x - st.t) < 0.0015 && Math.abs(st.v) < 0.002) {
+        st.x = st.t; st.v = 0;
+        if (st.t === 1) { b.style.removeProperty('--lg-mag'); magState.delete(b); return; }
+      } else busy = true;
+      b.style.setProperty('--lg-mag', st.x.toFixed(4));
+    });
+    if (busy || magState.size && magCont) magRaf = requestAnimationFrame(magTick);
+    else document.querySelectorAll('.lg-magging').forEach(function (el) { el.classList.remove('lg-magging'); });
+  }
+  function resetMag() {
+    magState.forEach(function (st, b) { b.style.removeProperty('--lg-mag'); });
+    magState.clear();
+    document.querySelectorAll('.lg-magging').forEach(function (el) { el.classList.remove('lg-magging'); });
+  }
 
   var pressSel = ['.lg-btn', '.lg-press', '.lg-side > a', '.lg-side > button'];
   function onDown(e) {
@@ -357,7 +432,7 @@
     sync();
     document.addEventListener('pointermove', onMove, { passive: true });
     // курсор ушёл за окно — увеличенные кнопки возвращаем на место
-    root.addEventListener('mouseleave', function () { resetMag(); magCont = null; });
+    root.addEventListener('mouseleave', function () { releaseMag(magCont); magCont = null; });
     document.addEventListener('pointerdown', onDown, true);
     document.addEventListener('pointerup', onUp, true);
     document.addEventListener('pointercancel', onUp, true);
