@@ -2941,6 +2941,14 @@ window.__trainerState = { get: tsGetState, apply: tsApplyState,
   newTask: function(){ if (curMode) newTask(); } };
 if (window.TrainerSession) {
   window.TrainerSession.init({ trainer: 'oge7', getState: tsGetStateVersioned, applyState: tsApplyStateFromPeer });
+  /* Промпт №82: ход решения по шагам («Обучение») — общий. Раньше он был у
+     каждого свой (в снимке только задание и выбранный вариант), и ученик на
+     сцене не видел, как учитель проходит шаги. Шаги здесь — поля, «ОК» и
+     выбор дроби; session-share.js повторяет у собеседника нажатия внутри
+     этих областей (поля он повторяет сам, на любой странице). Подпись —
+     условие задания: на другом задании чужие нажатия не повторяются */
+  if (window.TrainerSession.mirrorActions) window.TrainerSession.mirrorActions(['#qaPanel', '#sheetArea'],
+    { sig: () => (curTask ? String(curTask.prompt) + '|' + String(curTask.answer) : '') });
 
   /* Как в ОГЭ №6: вызовов push() по коду нет, поэтому следим за состоянием
      таймером и рассылаем при изменении. Отличие одно: исходная подпись —

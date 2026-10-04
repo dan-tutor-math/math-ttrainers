@@ -431,7 +431,7 @@ def run_plain(browser):
     teacher.evaluate("() => window.openBoard('bA')")
     teacher.wait_for_function("() => window.getCurrentBoard() && window.getCurrentBoard().id === 'bA' && boardActive")
     plain = P.participant(ctx, "Q", 900, 640)
-    plain.add_init_script("try { localStorage.setItem('Q:tsStage:pref', 'off'); } catch (e) {}")
+    plain.add_init_script("try { localStorage.setItem('Q:tsStage:direct', '1'); } catch (e) {}")
     plain.goto(f"{BASE}/boards.html?s={code}")
     check("G: ученик в обычном режиме — без сцены", "stage.html" not in plain.url, plain.url)
     tids = teacher.evaluate(TEACHER_STATE)["ids"]

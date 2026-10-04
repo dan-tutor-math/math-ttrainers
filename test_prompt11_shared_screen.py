@@ -14,8 +14,8 @@
      ОГЭ (переход на соседнюю страницу) — ученик на сцене переходит следом,
      адрес сцены повторяет страницу группы.
   E. Перезагрузка сцены у ученика возвращает его туда же, размер приходит снова.
-  F. «Обычный режим»: страница без кадра, выбор помнится; кнопка в панели
-     возвращает на сцену.
+  F. «Обычного режима» нет (промпт №82): кнопки нет, прежний выбор не
+     действует, в панели ученика — «Выйти из сессии».
   G. Код, введённый в панели в обычном окне, тоже ведёт на сцену.
   H. Учитель на сцену не уходит; карточка «+1» (кадр) сценой себя не считает.
   I. Увеличение сцены: прокрутка появляется, «следить за учителем» подводит
@@ -70,7 +70,7 @@ def local_server():
 # Заглушка №54 держит «базу» в localStorage и «канал» в BroadcastChannel —
 # оба работают только между вкладками ОДНОГО контекста браузера. Но тогда у
 # учителя и ученика общий localStorage, а в нём лежат роль и код сессии
-# (trainerSession:*) и выбор режима сцены (tsStage:pref) — как будто они сидят в одном
+# (trainerSession:*) и переключатель сцены (tsStage:*) — как будто они сидят в одном
 # браузере. Поэтому ключи платформы у каждого участника получают свою
 # приставку: база и канал общие, а «браузеры» — разные, как в жизни
 PARTICIPANT_STORAGE = r"""
@@ -326,36 +326,23 @@ def part_a_to_e(browser):
     check("I: «100%» возвращает весь экран учителя",
           student.evaluate("() => getComputedStyle(document.getElementById('vp')).overflow") == "hidden")
 
-    # ── F. обычный режим ──
-    student.click("#exitBtn")
-    student.wait_for_url("**/oge15_18.html?*", timeout=8000)
-    t54.wait_code(student)
-    check("F: «Обычный режим» — страница без кадра", "stage.html" not in student.url and stage_frame(student) is None,
-          student.url)
-    check("F: ученик по-прежнему в сессии", student.evaluate("() => window.TrainerSession.getCode()") == code)
+    # ── F. «Обычного режима» больше нет (промпт №82) ──
+    # кнопки на сцене нет, а прежний выбор «off» не уводит со сцены
+    check("F: на сцене нет кнопки «Обычный режим»", student.locator("#exitBtn").count() == 0)
+    student.evaluate("() => localStorage.setItem('tsStage:pref', 'off')")
     student.reload()
-    t54.wait_code(student)
-    check("F: выбор обычного режима помнится после перезагрузки", "stage.html" not in student.url, student.url)
-    student.click(".ts-share-btn")
-    toggle = student.locator("#tsStageToggle")
-    check("F: в панели ученика есть кнопка «Смотреть экран учителя целиком»",
-          toggle.is_visible() and "экран учителя" in toggle.inner_text(), toggle.inner_text())
-    toggle.click()
-    try:
-        f = wait_stage(student)
-        ok = True
-    except Exception:
-        ok = False
-    check("F: кнопка в панели возвращает на сцену", ok, student.url)
-    if ok:
+    f = wait_stage(student)
+    check("F: прежний выбор «обычного режима» не действует — ученик на сцене", f is not None, student.url)
+    if f:
         f.click(".ts-share-btn")
-        tg = f.locator("#tsStageToggle")
-        check("F: на сцене в панели — «Обычный режим»", tg.is_visible() and "Обычный" in tg.inner_text(),
-              tg.inner_text())
+        f.wait_for_timeout(200)
+        check("F: в панели ученика на сцене нет «Обычного режима»", f.locator("#tsStageToggle").count() == 0)
+        lv = f.locator("#tsLeave")
+        check("F: в панели ученика — «Выйти из сессии»", lv.is_visible() and "Выйти" in lv.inner_text())
 
-    # учительская панель кнопки сцены не показывает
+    # учительская панель кнопки выхода не показывает
     teacher.click(".ts-share-btn")
-    check("H: у учителя переключателя сцены нет", not teacher.locator("#tsStageToggle").is_visible())
+    check("H: у учителя кнопки «Выйти из сессии» нет", not teacher.locator("#tsLeave").is_visible())
     ctx.close()
     return code
 

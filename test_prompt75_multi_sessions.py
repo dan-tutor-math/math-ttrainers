@@ -96,6 +96,10 @@ def goto(page, path):
 
 def open_panel(page):
     if not page.evaluate("() => document.querySelector('.ts-share-pop').classList.contains('open')"):
+        # на главной кнопка совместного доступа живёт в меню «⋯» (жидкое стекло)
+        if not page.locator(".ts-share-btn").first.is_visible() and page.locator("#lgMenuToggle").count():
+            page.click("#lgMenuToggle")
+            page.wait_for_timeout(250)
         page.click(".ts-share-btn")
     page.wait_for_timeout(450)   # опрос вкладок (250 мс) + отрисовка
 
@@ -118,7 +122,7 @@ def reg(page):
 def student(ctx, tag, url):
     p = ctx.new_page()
     p.add_init_script(PARTICIPANT_STORAGE % repr(tag + ":"))
-    p.add_init_script("try { localStorage.setItem('" + tag + ":tsStage:pref', 'off'); } catch (e) {}")
+    p.add_init_script("try { localStorage.setItem('" + tag + ":tsStage:direct', '1'); } catch (e) {}")
     p.goto(url)
     return p
 

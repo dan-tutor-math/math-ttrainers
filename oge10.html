@@ -2437,6 +2437,14 @@ window.__trainerState = { get: tsGetState, apply: tsApplyState,
   newTask: function(){ if (typeof newTask === 'function') newTask(); } };
 if (window.TrainerSession) {
   window.TrainerSession.init({ trainer: 'oge10', getState: tsGetStateVersioned, applyState: tsApplyStateFromPeer });
+  /* Промпт №82: «Решить по шагам», шаги (дробь, деление в столбик) и ответ
+     внизу — общие. В снимок они не входят: ход шагов живёт в виджетах.
+     session-share.js повторяет у собеседника нажатия внутри этих областей
+     (поля он повторяет сам, на любой странице). «Показать решение» сюда
+     же — открытое решение в снимке тоже не хранится. Подпись — условие и
+     ответ: на другом задании чужие нажатия не повторяются */
+  if (window.TrainerSession.mirrorActions) window.TrainerSession.mirrorActions(['#fracPanel', '#qaPanel', '#sheetArea', '#finalPanel', { sel: '#showSolutionBtn', perm: 'showSolution' }],
+    { sig: () => (curTask ? String(curTask.prompt) + '|' + String(curTask.answer) : '') });
   if (els.answerInput) window.TrainerSession.registerField('main', els.answerInput);
 
   /* В ОГЭ №8 каждое действие само вызывает TrainerSession.push() — там эти

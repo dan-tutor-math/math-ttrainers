@@ -85,7 +85,7 @@ def open_page(browser, width=1300, height=1000, fake=False, url="oge9.html", rea
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     if fake:
-        page.add_init_script("try { localStorage.setItem('tsStage:pref', 'off'); } catch (e) {}")
+        page.add_init_script("try { localStorage.setItem('tsStage:direct', '1'); } catch (e) {}")
         page.route("**/supabase-js.umd.js", lambda route: route.fulfill(
             status=200, content_type="application/javascript", body=FAKE_LIB))
         page.route("**/fonts.googleapis.com/**", lambda route: route.abort())
@@ -345,7 +345,7 @@ def test_link_session(browser):
 
     def mk(url):
         p = ctx.new_page()
-        p.add_init_script("try { localStorage.setItem('tsStage:pref', 'off'); } catch (e) {}")
+        p.add_init_script("try { localStorage.setItem('tsStage:direct', '1'); } catch (e) {}")
         p.route("**/supabase-js.umd.js", lambda route: route.fulfill(
             status=200, content_type="application/javascript", body=FAKE_LIB))
         p.route("**/fonts.googleapis.com/**", lambda route: route.abort())

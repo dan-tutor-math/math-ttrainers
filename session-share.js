@@ -91,6 +91,7 @@
       registerHistoryUI(){}, notifyHistoryChanged(){},
       isStageFrame(){ return false; }, stageFocus(){},
       hasViewers(){ return false; }, holdStageReady(){}, releaseStageReady(){}, socketBacklog(){ return 0; },
+      mirrorActions(){}, kickDevice(){}, leaveSession(){}, studentDevices(){ return []; },
       openNewSessionTab(){ return null; }, goToSession(){}, getSessionName(){ return ''; }, renameSession(){}, endSession: async () => false,
       isShared(){ return false; },
     };
@@ -504,6 +505,9 @@
     // поля — уже ПОСЛЕ структурного применения: если applyState пересоздал
     // карточки с полями ввода, они успели зарегистрироваться заново внутри
     // applyStateCb, и теперь можно проставить в них последние значения
+    if (state.__inputs && (!state.__g || !currentSig() || state.__g === currentSig())) {
+      Object.keys(state.__inputs).forEach(k => setMirroredInput(k, String(state.__inputs[k])));
+    }
     if (state.__fields) {
       Object.keys(state.__fields).forEach(id => {
         const entry = fields.get(id);
@@ -666,6 +670,13 @@
       .on('broadcast', { event: 'ev' }, ({ payload }) => {
         if (!payload || payload.uid === CLIENT_ID) return;
         if (payload.name === 'bye') { forgetPeer(payload.uid); return; }
+        // Промпт №82: проба «учитель здесь?» от браузера ученика, который
+        // решает, вести ли его на сцену (probeLeader). Это не участник —
+        // отвечаем, но в «учеников на связи» не считаем
+        if (payload.name === 'hb' && payload.data && payload.data.probe) {
+          if (isLeaderFlag) setTimeout(() => sendHeartbeat(false), 30);
+          return;
+        }
         touchPeer(payload.uid, payload.name === 'hb' ? payload.data : null);
         // новый участник спрашивает «кто здесь?» — отвечаем сразу, не через
         // 5 секунд: учителю, только что перешедшему на другую страницу, иначе
@@ -852,7 +863,11 @@
   // «пришлите, что у вас сейчас» (подключение/переподключение)
   function pushFull() {
     if (applyingRemote || !code || !channel) return;
-    queueSend({ type: 'broadcast', event: 'state', payload: { uid: CLIENT_ID, state: fullState() } });
+    const st = fullState();
+    // Промпт №82: и что набрано в полях — новый собеседник увидит их сразу
+    const inputs = inputsSnapshot();
+    if (inputs) { st.__inputs = inputs; st.__g = currentSig(); }
+    queueSend({ type: 'broadcast', event: 'state', payload: { uid: CLIENT_ID, state: st } });
   }
 
   // Промпт №21: тот, кто НЕ переходил по чужой ссылке/коду (т.е. сам открыл
@@ -1099,8 +1114,17 @@
     // идти другая. Общий — только для вкладки, у которой своей ещё нет
     const tabCode = ssGet(TAB_CODE_KEY);
     const fromTab = !!tabCode;
-    const stored = tabCode || readStoredCode();
+    let stored = tabCode || readStoredCode();
     const storedRole = fromTab ? (ssGet(TAB_ROLE_KEY) || 'leader') : readStoredRole();
+    // Промпт №82: браузер ученика помнит код прошлого занятия и при любом
+    // заходе на сайт уводил его на сцену — даже когда учитель давно закрыл
+    // вкладку (кнопку «Завершить» нажимают не всегда). Теперь сначала
+    // спрашиваем канал, на связи ли учитель. Нет — код забываем, и ученик
+    // остаётся на обычной странице; позвать его снова можно ссылкой
+    if (stored && storedRole === 'follower' && !(await followerSessionLive(stored))) {
+      forgetSessionCode(stored);
+      stored = null;
+    }
     if (stored && storedRole === 'follower' && canEnterStage()) {
       // Промпт №11 нового списка: тот же ученик открыл страницу платформы сам, без ссылки
       isLeaderFlag = false;
@@ -1136,6 +1160,44 @@
     isLeaderFlag = true;
     await activate(own, { createIfMissing: true });
     storeRole('leader');
+  }
+
+  // Промпт №82: занятие по сохранённому коду ещё идёт? Строка в базе не
+  // ответ: учитель мог просто закрыть вкладку, и строка висит как живая.
+  // Поэтому спрашиваем сам канал — учитель отвечает на пробу сразу
+  async function followerSessionLive(c) {
+    let row = null;
+    try { row = await fetchRow(c); } catch (e) { row = null; }
+    if (row && row.state && row.state.__ended) return false;
+    return probeLeader(c, 2500);
+  }
+  function probeLeader(c, ms) {
+    return new Promise((resolve) => {
+      let done = false, ch = null;
+      const probeId = generateCode(12);
+      const finish = (v) => {
+        if (done) return;
+        done = true;
+        try { if (ch) SB.removeChannel(ch); } catch (e) {}
+        resolve(v);
+      };
+      try {
+        ch = SB.channel('trainer_session:' + c)
+          .on('broadcast', { event: 'ev' }, ({ payload }) => {
+            if (payload && payload.name === 'hb' && payload.data && payload.data.leader) finish(true);
+          })
+          .on('broadcast', { event: 'state' }, ({ payload }) => {
+            // размер сцены в снимке кладёт только учитель
+            if (payload && payload.state && payload.state.__stage) finish(true);
+          })
+          .subscribe((status) => {
+            if (status !== 'SUBSCRIBED') return;
+            // probe — «я не участник»: учитель ответит, но в «на связи» не посчитает
+            try { ch.send({ type: 'broadcast', event: 'ev', payload: { uid: probeId, name: 'hb', data: { leader: false, stage: false, ask: 1, probe: 1 } } }); } catch (e) {}
+          });
+      } catch (e) { finish(false); return; }
+      setTimeout(() => finish(false), ms);
+    });
   }
 
   function registerField(fieldId, el) {
@@ -1245,7 +1307,10 @@
   }
   onEvent('session_end', (d) => { if (d && d.code) sessionEndedHere(d.code); });
 
+  // late: true — ссылка на уже завершённое занятие; 'kicked' — учитель
+  // отключил это устройство (промпт №82)
   function showEndedScreen(late) {
+    const kicked = late === 'kicked';
     if (IN_ANY_FRAME || document.getElementById('tsEnded')) return;
     const st = document.createElement('style');
     st.textContent = `
@@ -1269,8 +1334,8 @@
     el.id = 'tsEnded';
     el.innerHTML = `<div class="ts-ended-card" role="dialog" aria-live="polite">
       <div class="ts-ended-icon">👋</div>
-      <h2>${late ? 'Это занятие уже завершено' : 'Занятие завершено'}</h2>
-      <p>Спасибо за урок, до свидания!</p>
+      <h2>${kicked ? 'Учитель отключил это устройство' : late ? 'Это занятие уже завершено' : 'Занятие завершено'}</h2>
+      <p>${kicked ? 'Если это ошибка — попросите у учителя ссылку ещё раз.' : 'Спасибо за урок, до свидания!'}</p>
       <button class="ts-ended-home" id="tsEndedHome">На главную</button>
       <button class="ts-ended-stay" id="tsEndedStay">Остаться на этой странице</button>
     </div>`;
@@ -1383,15 +1448,19 @@
   let IN_ANY_FRAME = false;
   try { IN_ANY_FRAME = window.top !== window.self; } catch (e) { IN_ANY_FRAME = true; }
   const IN_STAGE = IN_ANY_FRAME && window.name === STAGE_FRAME_NAME;
-  // Ключ нарочно НЕ начинается с «trainerSession:»: readStoredCode() в браузере
-  // без общего кода берёт первый такой ключ за старый код сессии — и «off»
-  // стал бы кодом (поймано тестом №54).
-  // «off» — ученик сам выбрал обычный режим (своя вёрстка). Хранится у него
-  // в браузере: на телефоне в вертикальном положении экран учителя мелкий,
-  // и это решение ученика, а не повод дёргать учителя
-  const STAGE_PREF_KEY = 'tsStage:pref';
-  function stagePrefOn() { try { return localStorage.getItem(STAGE_PREF_KEY) !== 'off'; } catch (e) { return true; } }
-  function setStagePref(on) { try { localStorage.setItem(STAGE_PREF_KEY, on ? 'on' : 'off'); } catch (e) {} }
+  /* Промпт №82: «Обычный режим» (своя вёрстка у ученика) убран. Он работал
+     неверно: записи доски и всё, что привязано к месту на экране, у ученика
+     в своей вёрстке оказывалось не там, где у учителя. Ученик теперь всегда
+     смотрит экран учителя на сцене. Прежний выбор «off» (ключ tsStage:pref)
+     больше не читается — кто когда-то нажал кнопку, сам вернётся на сцену.
+     Страница без сцены у ученика осталась только для тестов и разбора
+     ошибок: tsStage:direct = 1, кнопки для этого нет.
+     Ключи нарочно НЕ «trainerSession:…»: readStoredCode() в браузере без
+     общего кода берёт первый такой ключ за старый код сессии (поймано
+     тестом №54) */
+  const STAGE_DIRECT_KEY = 'tsStage:direct';
+  function stagePrefOn() { try { return localStorage.getItem(STAGE_DIRECT_KEY) !== '1'; } catch (e) { return true; } }
+  try { localStorage.removeItem('tsStage:pref'); } catch (e) {}
   // карточки «+» и живые задания на доске — тоже кадры, но им сцена не нужна
   function canEnterStage() { return !IN_ANY_FRAME && stagePrefOn(); }
   // адрес этой страницы без кода: код сцена добавит сама
@@ -1537,12 +1606,26 @@
   const peers = new Map();           // uid -> { at, leader, stage }
   let lastPeerAt = 0, leaderSeenAt = 0;
   let silentStep = 0, silentAt = 0;  // 1 — переспросили, 2 — переподключились
+  /* Промпт №82: учитель видит устройства учеников («Устройство 1 ·
+     телефон») и может отключить любое — например, забытую вкладку, которая
+     висит «на связи» и сбивает счёт. Номер устройства держится, пока
+     открыта эта страница учителя. Отключённого не считаем, пока он сам не
+     зайдёт заново (его сигнал с просьбой ответить — признак нового входа):
+     иначе запоздавшие сигналы его уходящей страницы вернули бы его в список */
+  const deviceNo = new Map();        // uid -> номер устройства
+  let deviceSeq = 0;
+  const kickedUids = new Set();
   function touchPeer(uid, info) {
     if (!uid || uid === CLIENT_ID) return;
+    if (kickedUids.has(uid)) {
+      if (!(info && info.ask)) return;
+      kickedUids.delete(uid);
+    }
     const now = Date.now();
-    const p = peers.get(uid) || { at: 0, leader: false, stage: false };
+    const p = peers.get(uid) || { uid: uid, at: 0, leader: false, stage: false, dv: '' };
     p.at = now;
-    if (info) { p.leader = !!info.leader; p.stage = !!info.stage; }
+    if (info) { p.leader = !!info.leader; p.stage = !!info.stage; if (info.dv) p.dv = info.dv; }
+    if (!p.leader && !deviceNo.has(uid)) deviceNo.set(uid, ++deviceSeq);
     peers.set(uid, p);
     lastPeerAt = now;
     if (p.leader) leaderSeenAt = now;
@@ -1571,8 +1654,55 @@
     if (!code || !channel) return;
     if (!joinedAt) joinedAt = Date.now();
     const data = { leader: !!isLeaderFlag, stage: IN_STAGE };
+    if (!isLeaderFlag) data.dv = DEVICE_KIND;
     if (ask) data.ask = 1;
     broadcastEvent('hb', data);
+  }
+  // что за устройство у ученика — только для подписи в списке учителя
+  const DEVICE_KIND = (() => {
+    try {
+      const ua = navigator.userAgent || '';
+      if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1) || (/Android/.test(ua) && !/Mobile/.test(ua))) return 'планшет';
+      if (/Mobi|iPhone|Android/.test(ua)) return 'телефон';
+      return 'компьютер';
+    } catch (e) { return ''; }
+  })();
+  function studentDevices() {
+    return livePeers().filter(p => !p.leader)
+      .map(p => ({ uid: p.uid, no: deviceNo.get(p.uid) || 0, dv: p.dv || '' }))
+      .sort((a, b) => a.no - b.no);
+  }
+  function kickDevice(uid) {
+    if (!isLeaderFlag || !code || !uid) return;
+    broadcastEvent('kick', { uid: uid });
+    // второй раз — одно сообщение может потеряться
+    setTimeout(() => broadcastEvent('kick', { uid: uid }), 500);
+    kickedUids.add(uid);
+    forgetPeer(uid);
+    lastConnSig = '';
+    reportConn();
+  }
+  // ученик: учитель отключил это устройство
+  onEvent('kick', (d) => { if (d && d.uid === CLIENT_ID && !isLeaderFlag) leaveSession('kicked'); });
+
+  /* Промпт №82: ученик сам выходит из сессии («Выйти из сессии» в панели) —
+     или его отключил учитель. Код и роль стираются из браузера: следующий
+     заход на сайт — обычная страница, а не сцена этого занятия */
+  function leaveSession(kind) {
+    if (isLeaderFlag || !code) return;
+    const c = code, ch = channel;
+    try { if (ch) ch.send({ type: 'broadcast', event: 'ev', payload: { uid: CLIENT_ID, name: 'bye', data: {} } }); } catch (e) {}
+    forgetSessionCode(c);
+    if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null; }
+    clearTimeout(saveTimer);
+    channel = null;
+    code = null;
+    // канал снимаем чуть позже — чтобы прощание успело уйти
+    setTimeout(() => { try { if (ch) SB.removeChannel(ch); } catch (e) {} }, 300);
+    notifyUi();
+    if (IN_STAGE) { toStageHost({ type: kind === 'kicked' ? 'kicked' : 'left' }); return; }
+    if (kind === 'kicked') { showEndedScreen('kicked'); return; }
+    location.href = new URL('index.html', location.href).toString();
   }
   setInterval(() => {
     sendHeartbeat(false);
@@ -1593,11 +1723,19 @@
       reconnectNow();
     }
   }, HB_EVERY_MS);
-  // Кадр сцены не прощается: при смене страницы сцена держит старый кадр,
-  // пока новый не готов, а номер участника у них общий (он в sessionStorage
-  // вкладки) — прощание старого кадра «выписало» бы уже подключившийся новый
+  // Кадр сцены, который сцена заменила новым, не прощается: при смене
+  // страницы сцена держит старый кадр, пока новый не готов, а номер
+  // участника у них общий (он в sessionStorage вкладки) — прощание старого
+  // кадра «выписало» бы уже подключившийся новый. Перед заменой сцена
+  // говорит кадру «retire». Промпт №82: остальные кадры сцены прощаются —
+  // раньше закрытая вкладка ученика ещё 16 с числилась у учителя на связи
+  let stageRetired = false;
+  if (IN_STAGE) window.addEventListener('message', (e) => {
+    const d = e.data;
+    if (e.origin === location.origin && e.source === window.parent && d && d.source === 'ts-stage-host' && d.type === 'retire') stageRetired = true;
+  });
   window.addEventListener('pagehide', () => {
-    if (!IN_STAGE && code && channel) { try { channel.send({ type: 'broadcast', event: 'ev', payload: { uid: CLIENT_ID, name: 'bye', data: {} } }); } catch (e) {} }
+    if (code && channel && !(IN_STAGE && stageRetired)) { try { channel.send({ type: 'broadcast', event: 'ev', payload: { uid: CLIENT_ID, name: 'bye', data: {} } }); } catch (e) {} }
   });
   function onSocketHeartbeat(status) {
     if (!code) return;
@@ -1611,7 +1749,10 @@
   // событию, а по отсутствию событий
   let lastConnSig = '';
   function reportConn() {
-    const sig = connState + '|' + (teacherSilent() ? 'silent' : 'ok') + '|' + studentsOnline();
+    // номера устройств — в подпись: отключили одно, подключилось другое, а
+    // счёт тот же — список у учителя всё равно должен обновиться
+    const sig = connState + '|' + (teacherSilent() ? 'silent' : 'ok') + '|' + studentsOnline()
+      + '|' + (isLeaderFlag ? studentDevices().map(d => d.no).join(',') : '');
     if (sig === lastConnSig) return;
     lastConnSig = sig;
     notifyUi();
@@ -1771,6 +1912,173 @@
     }
     followerThemeTick();
   }, 300);
+
+  /* ═══ Промпт №82: всё, что набрано в полях, и ход решения по шагам ═══
+     Поля ответа синхронизировались только там, где тренажёр сам
+     регистрировал их (registerField) — примерно в половине тренажёров. В
+     остальных (ОГЭ №7, №10 и др.) ученик не видел, что набирает учитель, и
+     наоборот, а в полях шагов решения — нигде. Теперь любое текстовое поле
+     страницы повторяется у собеседника само: по пути в разметке от
+     ближайшего элемента с id (у собеседника та же страница и тот же экран).
+     Значение ставится вместе с событием input — от него у виджетов шагов
+     оживает кнопка «ОК» и переходит фокус, как при наборе руками.
+     Нажатия повторяются не все, а только в областях, которые страница сама
+     объявила (mirrorActions): шаги решения, «Решить по шагам», ответ
+     внизу. Всё остальное — новое задание, выбор ответа, «+» — уже идёт
+     общим снимком, и повтор нажатия сделал бы действие дважды. Enter в поле
+     такой области повторяется как Enter: многие поля отправляют ответ по
+     нему, минуя кнопку */
+  let mirrorReplay = false;            // сейчас повторяем пришедшее — назад не шлём
+  let mirrorRoots = [];                // [{ sel, perm }]
+  let mirrorSig = null;                // подпись задания: чужое задание — не повторяем
+  let suppressClickMirror = false;     // нажатие изнутри обработчика Enter — уже ушло как Enter
+  const MIRROR_SKIP_IDS = new Set(['cpR', 'cpG', 'cpB']);   // поля выбора цвета пера
+  const INPUT_TYPES = new Set(['', 'text', 'number', 'search', 'tel', 'url', 'email']);
+  function mirrorActions(list, opts) {
+    mirrorRoots = (list || []).map(x => typeof x === 'string' ? { sel: x } : x).filter(x => x && x.sel);
+    mirrorSig = opts && typeof opts.sig === 'function' ? opts.sig : null;
+  }
+  function currentSig() {
+    if (!mirrorSig) return '';
+    try { return String(mirrorSig() || ''); } catch (e) { return ''; }
+  }
+  function domPath(el) {
+    const parts = [];
+    let n = el;
+    while (n && n.nodeType === 1 && n !== document.body && n !== document.documentElement) {
+      if (n.id && document.getElementById(n.id) === n) { parts.unshift('#' + n.id); return parts.join('>'); }
+      const p = n.parentElement;
+      if (!p) break;
+      parts.unshift(String(Array.prototype.indexOf.call(p.children, n)));
+      n = p;
+    }
+    parts.unshift('B');
+    return parts.join('>');
+  }
+  function resolvePath(path) {
+    if (typeof path !== 'string' || !path) return null;
+    const parts = path.split('>');
+    const head = parts.shift();
+    let n = head === 'B' ? document.body : head.charAt(0) === '#' ? document.getElementById(head.slice(1)) : null;
+    for (const i of parts) { if (!n) return null; n = n.children[+i]; }
+    return n || null;
+  }
+  function isRegisteredField(el) {
+    for (const e of fields.values()) if (e.el === el) return true;
+    return false;
+  }
+  function mirrorableInput(el) {
+    if (!el || !el.tagName) return false;
+    if (el.tagName === 'INPUT') { if (!INPUT_TYPES.has(String(el.type || '').toLowerCase())) return false; }
+    else if (el.tagName !== 'TEXTAREA') return false;
+    if (MIRROR_SKIP_IDS.has(el.id)) return false;
+    if (el.closest && el.closest('.ts-share-pop, #tsEnded, [data-ts-nomirror]')) return false;
+    return !isRegisteredField(el);
+  }
+  function mirrorRootOf(el) {
+    if (!el || !el.closest) return null;
+    for (const r of mirrorRoots) { if (el.closest(r.sel)) return r; }
+    return null;
+  }
+  function canMirror() { return !!code && !!channel && !applyingRemote && !mirrorReplay && !mirrorApplying; }
+  function replay(fn) {
+    mirrorReplay = true; mirrorApplying = true;   // ограничения ученика на повтор не действуют
+    try { fn(); } catch (e) {} finally { mirrorReplay = false; mirrorApplying = false; }
+  }
+
+  document.addEventListener('input', (e) => {
+    const el = e.target;
+    if (!canMirror() || !mirrorableInput(el)) return;
+    el.__tsLocalAt = Date.now();
+    broadcastEvent('gin', { k: domPath(el), v: el.value, t: trainerSlug, g: currentSig() });
+  }, true);
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter' || !canMirror()) return;
+    const el = e.target;
+    if (!mirrorableInput(el) || !mirrorRootOf(el)) return;
+    broadcastEvent('gkey', { k: domPath(el), v: el.value, t: trainerSlug, g: currentSig() });
+    // обработчик страницы может сам нажать «ОК» — то нажатие у собеседника
+    // сделает его же Enter, второй раз слать не надо
+    suppressClickMirror = true;
+    setTimeout(() => { suppressClickMirror = false; }, 0);
+  }, true);
+  document.addEventListener('click', (e) => {
+    if (!mirrorRoots.length || suppressClickMirror || !canMirror()) return;
+    const r = mirrorRootOf(e.target);
+    if (!r) return;
+    // ученику нельзя то, что запретил учитель, — тогда и у учителя не повторяем
+    if (!isLeaderFlag && r.perm && studentRestricted(r.perm)) return;
+    const target = e.target.closest('button, a, label, [role="button"], input[type="button"], input[type="submit"], input[type="checkbox"], input[type="radio"]') || e.target;
+    broadcastEvent('gclick', { k: domPath(target), t: trainerSlug, g: currentSig() });
+  }, true);
+
+  // пришло раньше, чем у нас появилось само поле (шаг ещё рисуется) —
+  // подождём немного, но не дольше 3 с: позже это уже другое поле
+  const pendingInputs = new Map();     // путь -> { v, at }
+  function mirrorFits(d) {
+    if (!d || d.t !== trainerSlug) return false;
+    const mine = currentSig();
+    return !d.g || !mine || d.g === mine;
+  }
+  function setMirroredInput(k, v) {
+    const el = resolvePath(k);
+    if (!el || !mirrorableInput(el)) { pendingInputs.set(k, { v: v, at: Date.now() }); return; }
+    // сам сейчас печатает — не перебиваем, но и не теряем: поставим, когда
+    // пауза пройдёт (иначе последняя правка собеседника пропала бы навсегда)
+    if (Date.now() - (el.__tsLocalAt || 0) < LOCAL_EDIT_GRACE_MS) { pendingInputs.set(k, { v: v, at: Date.now() }); return; }
+    pendingInputs.delete(k);
+    if (el.value === v) return;
+    replay(() => {
+      el.value = v;
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+  setInterval(() => {
+    if (!pendingInputs.size) return;
+    const now = Date.now();
+    pendingInputs.forEach((p, k) => {
+      if (now - p.at > 3000) { pendingInputs.delete(k); return; }
+      if (resolvePath(k)) setMirroredInput(k, p.v);
+    });
+  }, 150);
+  onEvent('gin', (d) => { if (mirrorFits(d)) setMirroredInput(d.k, String(d.v == null ? '' : d.v)); });
+  onEvent('gkey', (d) => {
+    if (!mirrorFits(d)) return;
+    const el = resolvePath(d.k);
+    if (!el) return;
+    replay(() => {
+      if (typeof d.v === 'string' && el.value !== d.v) { el.value = d.v; el.dispatchEvent(new Event('input', { bubbles: true })); }
+      const ev = new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', bubbles: true, cancelable: true });
+      try { Object.defineProperty(ev, 'keyCode', { get: () => 13 }); Object.defineProperty(ev, 'which', { get: () => 13 }); } catch (e) {}
+      el.dispatchEvent(ev);
+    });
+  });
+  onEvent('gclick', (d) => {
+    if (!mirrorFits(d)) return;
+    const run = () => {
+      const el = resolvePath(d.k);
+      if (!el) return false;
+      replay(() => el.click());
+      return true;
+    };
+    // кнопка следующего шага может появиться чуть позже, чем пришло нажатие
+    if (!run()) setTimeout(run, 400);
+  });
+  // в полный снимок (подключился или переподключился собеседник) — что
+  // сейчас набрано в полях, иначе он увидел бы их пустыми до первой правки
+  function inputsSnapshot() {
+    const out = {};
+    let n = 0;
+    try {
+      document.querySelectorAll('input, textarea').forEach((el) => {
+        if (n >= 60 || !el.value || el.value.length > 300 || !mirrorableInput(el)) return;
+        if (el.offsetParent === null && getComputedStyle(el).position !== 'fixed') return;
+        out[domPath(el)] = el.value;
+        n++;
+      });
+    } catch (e) {}
+    return n ? out : null;
+  }
 
   /* ═══ Правка «оформление как у учителя» ═══
      Ученик в сессии менял себе светлую/тёмную тему кнопкой 🌙, у учителя
@@ -2293,6 +2601,32 @@
       uiEls.peersEl.textContent = txt;
       uiEls.peersEl.style.display = txt ? '' : 'none';
     }
+    // Промпт №82: устройства учеников и «Отключить» у каждого
+    if (uiEls.devList) {
+      const devs = isLeaderFlag && code && connState === CONN.ONLINE ? studentDevices() : [];
+      const box = uiEls.devList;
+      const sig = devs.map(d => d.uid + d.dv).join('|');
+      if (box.dataset.sig !== sig) {
+        box.dataset.sig = sig;
+        box.textContent = '';
+        devs.forEach((d) => {
+          const row = document.createElement('div');
+          row.className = 'ts-dev-row';
+          const label = document.createElement('span');
+          label.className = 'ts-dev-name';
+          label.textContent = 'Устройство ' + d.no + (d.dv ? ' · ' + d.dv : '');
+          const kick = document.createElement('button');
+          kick.type = 'button';
+          kick.className = 'ts-dev-kick';
+          kick.textContent = 'Отключить';
+          kick.title = 'Отключить это устройство от занятия. Вернуться можно по ссылке';
+          kick.addEventListener('click', (ev) => { ev.stopPropagation(); kickDevice(d.uid); });
+          row.appendChild(label); row.appendChild(kick);
+          box.appendChild(row);
+        });
+      }
+      box.style.display = devs.length ? '' : 'none';
+    }
     if (uiEls.btn) {
       const n = isLeaderFlag && code ? studentsOnline() : 0;
       uiEls.btn.classList.toggle('ts-has-peers', n > 0 && connState === CONN.ONLINE);
@@ -2330,11 +2664,9 @@
 
     uiEls.autosaveToggle.checked = getAutosaveHistory();
 
-    // Промпт №11 нового списка: переключатель сцены — только у ученика и только в окне
-    // платформы или в самой сцене (не в карточке «+» и не в задании на доске)
-    const stageSwitchable = !isLeaderFlag && !!code && (IN_STAGE || !IN_ANY_FRAME);
-    uiEls.stageToggle.style.display = stageSwitchable ? '' : 'none';
-    uiEls.stageToggle.textContent = IN_STAGE ? 'Обычный режим (своя вёрстка)' : 'Смотреть экран учителя целиком';
+    // Промпт №82: вместо прежнего «Обычного режима» у ученика — выход из
+    // сессии (только в окне платформы или на сцене, не в кадрах карточек)
+    uiEls.leaveBtn.style.display = !isLeaderFlag && !!code && (IN_STAGE || !IN_ANY_FRAME) ? '' : 'none';
 
     const count = historyUI && historyUI.getCount ? historyUI.getCount() : 0;
     uiEls.historyCountEl.textContent = count > 0 ? `История: ${count} ` + pluralSnapshots(count) : 'История: пока пусто';
@@ -2422,6 +2754,14 @@
       .ts-share-end{font-size:12.5px;font-weight:600;padding:8px 10px;border-radius:10px;cursor:pointer;
         background:none;border:1px solid var(--teacher,#d9534f);color:var(--teacher,#d9534f);}
       .ts-share-end:hover{background:rgba(217,83,79,.08);}
+      /* Промпт №82: устройства учеников в панели учителя */
+      .ts-dev-list{display:flex;flex-direction:column;gap:4px;margin-top:-4px;}
+      .ts-dev-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 6px;
+        border-radius:9px;background:var(--glass);border:1px solid var(--glass-border);}
+      .ts-dev-name{font-size:12px;color:var(--pencil);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+      .ts-dev-kick{font-size:11.5px;font-weight:600;padding:4px 8px;border-radius:8px;cursor:pointer;flex:0 0 auto;
+        background:none;border:1px solid var(--teacher,#d9534f);color:var(--teacher,#d9534f);}
+      .ts-dev-kick:hover{background:rgba(217,83,79,.08);}
       .ts-end-confirm{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;
         background:rgba(217,83,79,.07);border:1px solid rgba(217,83,79,.35);}
       .ts-share-row button.ts-end-yes{background:var(--teacher,#d9534f);flex:1;}
@@ -2472,6 +2812,7 @@
       <div class="ts-share-hint" id="tsRole" style="font-weight:600;"></div>
       <div class="ts-conn ts-conn-reconnecting" id="tsConn">На связи</div>
       <div class="ts-share-hint" id="tsPeers" style="margin-top:-4px"></div>
+      <div class="ts-dev-list" id="tsDevList" style="display:none"></div>
       <div class="ts-share-code" id="tsCode">—</div>
       <div class="ts-share-row">
         <input id="tsLink" type="text" readonly>
@@ -2493,7 +2834,7 @@
         <button id="tsJoin">Подключиться</button>
       </div>
       <div class="ts-share-msg" id="tsMsg"></div>
-      <button class="ts-share-reset" id="tsStageToggle" style="display:none"></button>
+      <button class="ts-share-end" id="tsLeave" style="display:none" title="Отключиться от занятия. Вернуться можно по ссылке учителя">Выйти из сессии</button>
       <div class="ts-share-sep" id="tsPermSep" style="display:none"></div>
       <div id="tsPermSection" style="display:none">
         <div class="ts-section-title">Права ученика</div>
@@ -2525,7 +2866,8 @@
       autosaveToggle: pop.querySelector('#tsAutosaveToggle'),
       historyCountEl: pop.querySelector('#tsHistoryCount'),
       historyDownloadBtn: pop.querySelector('#tsHistoryDownload'),
-      stageToggle: pop.querySelector('#tsStageToggle'),
+      leaveBtn: pop.querySelector('#tsLeave'),
+      devList: pop.querySelector('#tsDevList'),
       peersEl: pop.querySelector('#tsPeers'),
       endBtn: pop.querySelector('#tsEnd'),
       endConfirm: pop.querySelector('#tsEndConfirm'),
@@ -2597,12 +2939,10 @@
       try { await navigator.clipboard.writeText(uiEls.linkEl.value); uiEls.msgEl.textContent = 'Ссылка скопирована.'; uiEls.msgEl.classList.remove('err'); }
       catch (e) { uiEls.linkEl.select(); uiEls.msgEl.textContent = 'Скопируйте вручную (Ctrl+C).'; }
     });
-    // Промпт №11 нового списка: ученик сам переключается между экраном учителя (сцена) и
-    // своей обычной вёрсткой — например, на телефоне в вертикальном положении
-    uiEls.stageToggle.addEventListener('click', () => {
-      if (isLeaderFlag || !code) return;
-      if (IN_STAGE) { setStagePref(false); toStageHost({ type: 'exit' }); }
-      else { setStagePref(true); enterStage(code); }
+    // Промпт №82: ученик сам выходит из занятия
+    uiEls.leaveBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      leaveSession('left');
     });
     pop.querySelector('#tsReset').addEventListener('click', async () => {
       await resetSession();
@@ -2659,6 +2999,8 @@
     // сколько байт ещё не ушло в сеть из сокета этой страницы. board-stage.js
     // по нему держит темп, отдавая доску частями: см. там pumpBulk
     socketBacklog,
+    // Промпт №82: повтор нажатий в областях шагов, устройства, выход
+    mirrorActions, kickDevice, leaveSession, studentDevices,
     // Промпт №75: несколько сессий в одном браузере
     openNewSessionTab, goToSession,
     getSessionName: () => (amTabHolder() ? sessionLabel(regGet(code)) : ''),

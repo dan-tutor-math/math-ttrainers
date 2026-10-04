@@ -182,7 +182,7 @@ def run_main(browser):
     ok = wait_js(f, "() => { const p = window.__bdView && window.__bdView.progress(); return !!(p && p.count >= 2 && p.count < p.n - 1); }", 15000)
     check("2: доска едет частями (видно, сколько пришло)", ok, str(f.evaluate("() => window.__bdView.progress()")))
     late = participant(ctx, "Q", 900, 640)
-    late.add_init_script("try { localStorage.setItem('Q:tsStage:pref', 'off'); } catch (e) {}")
+    late.add_init_script("try { localStorage.setItem('Q:tsStage:direct', '1'); } catch (e) {}")
     late.goto(f"{BASE}/boards.html?s={code}")
 
     ok = wait_js(f, "w => { const B = window.getCurrentBoard(); return B && B.objects && (B.objects.length + ':' + B.objects[0].id + ':' + B.objects[B.objects.length - 1].id) === w; }", 40000, want)
@@ -329,7 +329,7 @@ def run_gz_fallback(browser):
     teacher.wait_for_function("() => window.getCurrentBoard() && window.getCurrentBoard().id === 'bBig' && boardActive")
     want = teacher.evaluate(BOARD_IDS)
     old = participant(ctx, "O", 900, 640, "try { delete window.DecompressionStream; window.DecompressionStream = undefined; } catch (e) {}")
-    old.add_init_script("try { localStorage.setItem('O:tsStage:pref', 'off'); } catch (e) {}")
+    old.add_init_script("try { localStorage.setItem('O:tsStage:direct', '1'); } catch (e) {}")
     old.goto(f"{BASE}/boards.html?s={code}")
     ok = wait_js(old, "w => { const B = window.getCurrentBoard(); return B && B.objects && (B.objects.length + ':' + B.objects[0].id + ':' + B.objects[B.objects.length - 1].id) === w; }", 30000, want)
     check("2: ученик, не умеющий распаковывать, получает доску несжатой", ok, old.evaluate(BOARD_IDS))

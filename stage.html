@@ -23,7 +23,8 @@
 
   Что делает эта страница — только рамка: размер и масштаб кадра, смена
   страниц без мигания (два кадра), курсор учителя, состояние связи, адрес
-  для перезагрузки, кнопки масштаба и «Обычный режим». Сессию, задания и
+  для перезагрузки, кнопки масштаба (прежний «Обычный режим» убран в
+  промпте №82). Сессию, задания и
   доску ведёт страница тренажёра внутри кадра, как у любого
   присоединившегося.
 
@@ -150,8 +151,9 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
   <button id="zoomLabel" title="Показать экран учителя целиком">100%</button>
   <button id="zoomIn" title="Увеличить" aria-label="Увеличить">+</button>
   <button id="panBtn" aria-pressed="false" title="Двигать увеличенный экран" aria-label="Двигать увеличенный экран">✋</button>
-  <span class="sep"></span>
-  <button id="exitBtn" title="Обычный режим: своя вёрстка под этот экран — задания те же, но расположены иначе, чем у учителя" aria-label="Обычный режим"><span class="full">Обычный режим</span><span class="short">⇱</span></button>
+  <!-- Промпт №82: «Обычный режим» убран — он работал неверно (записи доски
+       у ученика оказывались не на своих местах). Выйти из занятия — в панели
+       «Совместный доступ» -->
 </div>
 <div id="status">Подключаемся к экрану учителя…</div>
 <div id="conn" class="hidden" role="status" aria-live="polite"></div>
@@ -159,7 +161,7 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
   <div class="card">
     <div class="icon">👋</div>
     <h2 id="endedTitle">Занятие завершено</h2>
-    <p>Спасибо за урок, до свидания!</p>
+    <p id="endedText">Спасибо за урок, до свидания!</p>
     <button class="home" id="endedHome">На главную</button>
     <button class="stay" id="endedStay">Остаться на этой странице</button>
   </div>
@@ -182,7 +184,6 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
   const zoomInBtn = document.getElementById('zoomIn');
   const zoomOutBtn = document.getElementById('zoomOut');
   const panBtn = document.getElementById('panBtn');
-  const exitBtn = document.getElementById('exitBtn');
 
   function showStatus(html, keep){
     statusEl.innerHTML = html;
@@ -406,11 +407,6 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
   function frameHref(f){
     try { return (f || active).contentWindow.location.href; } catch (e) { return null; }
   }
-  function exitToNormal(){
-    try { localStorage.setItem('tsStage:pref', 'off'); } catch (e) {}
-    location.href = targetUrl(frameHref() || params.get('to')).toString();
-  }
-  exitBtn.onclick = exitToNormal;
 
   /* ── показать кадр ──
      Кадр проявляется, когда страница в нём сказала «готово» (догнала
@@ -429,8 +425,15 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
       pending = null;
       active.classList.remove('waiting');
       cur = null; placeCursor();
-      // старый кадр убираем, когда новый уже проявился
-      if (old) setTimeout(() => { try { old.remove(); } catch (_) {} }, 250);
+      // старый кадр убираем, когда новый уже проявился. Сначала говорим
+      // ему «ты заменён» — уходя, он не прощается с учителем (номер
+      // участника у кадров общий, прощание выписало бы и новый кадр).
+      // Кадр, который уходит не по замене (вкладку закрыли, ученик ушёл
+      // со сцены), прощается — и у учителя пропадает сразу (промпт №82)
+      if (old) {
+        try { old.contentWindow.postMessage({ source: 'ts-stage-host', type: 'retire' }, location.origin); } catch (_) {}
+        setTimeout(() => { try { old.remove(); } catch (_) {} }, 250);
+      }
     } else if (f === active) {
       f.classList.remove('waiting');
     }
@@ -476,10 +479,15 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
   /* ── занятие завершено ── */
   let ended = false;
   const endedEl = document.getElementById('ended');
+  // late: ссылка на уже завершённое; 'kicked' — учитель отключил это
+  // устройство (промпт №82)
   function showEnded(late){
     if (ended) return;
     ended = true;
-    if (late) document.getElementById('endedTitle').textContent = 'Это занятие уже завершено';
+    if (late === 'kicked') {
+      document.getElementById('endedTitle').textContent = 'Учитель отключил это устройство';
+      document.getElementById('endedText').textContent = 'Если это ошибка — попросите у учителя ссылку ещё раз.';
+    } else if (late) document.getElementById('endedTitle').textContent = 'Это занятие уже завершено';
     statusEl.classList.add('hidden');
     connEl.classList.add('hidden');
     cursorEl.classList.remove('on');
@@ -507,6 +515,10 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
     // надпись и «На главную». Код в его браузере кадр уже стёр, поэтому
     // главная откроется обычной страницей, а не сценой старого занятия
     if (d.type === 'ended') { showEnded(!f._doc || !f._doc.ready); return; }
+    if (d.type === 'kicked') { showEnded('kicked'); return; }
+    // Промпт №82: ученик сам вышел из занятия — код его браузер уже забыл,
+    // главная откроется обычной страницей
+    if (d.type === 'left') { location.href = new URL('index.html', location.href).toString(); return; }
     if (ended) return;
     if (d.type === 'size') {
       try { sessionStorage.setItem(SIZE_KEY, JSON.stringify({ w: d.w, h: d.h })); } catch (_) {}
@@ -557,8 +569,6 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
     } else if (d.type === 'conn') {
       lastConn = { state: d.state, teacher: d.teacher };
       setConn(d.state, d.teacher);
-    } else if (d.type === 'exit') {
-      exitToNormal();
     } else if (d.type === 'leave') {
       // сессии с этим кодом нет — страница без кода и без рамки
       const u = targetUrl(frameHref() || params.get('to'));

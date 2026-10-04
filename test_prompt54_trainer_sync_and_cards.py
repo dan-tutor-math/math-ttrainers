@@ -132,9 +132,10 @@ def new_page(context, errors, latency=0, select_delay=0):
     # Промпт №11 нового списка: ученик по ссылке ?s= теперь уходит на сцену
     # stage.html (тренажёр в кадре размером с окно учителя). Эти тесты
     # проверяют синхронизацию самих тренажёров, где ученик на странице
-    # напрямую, — это «Обычный режим», он у платформы остался. Сцену
+    # напрямую. С промпта №82 «Обычного режима» в интерфейсе нет — страницу
+    # без сцены включает только внутренний ключ tsStage:direct. Сцену
     # проверяет test_prompt11_shared_screen.py
-    page.add_init_script("try { localStorage.setItem('tsStage:pref', 'off'); } catch (e) {}")
+    page.add_init_script("try { localStorage.setItem('tsStage:direct', '1'); } catch (e) {}")
     page.route("**/supabase-js.umd.js", lambda route: route.fulfill(
         status=200, content_type="application/javascript", body=FAKE_LIB))
     # шрифты с Google в песочнице не грузятся — не ждём их

@@ -533,7 +533,7 @@ def test_session(browser):
 
     def mk(url):
         page = ctx.new_page()
-        page.add_init_script("try { localStorage.setItem('tsStage:pref', 'off'); } catch (e) {}")
+        page.add_init_script("try { localStorage.setItem('tsStage:direct', '1'); } catch (e) {}")
         page.route("**/supabase-js.umd.js", lambda route: route.fulfill(status=200, content_type="application/javascript", body=FAKE_LIB))
         page.route("**/fonts.googleapis.com/**", lambda route: route.abort())
         page.route("**/fonts.gstatic.com/**", lambda route: route.abort())

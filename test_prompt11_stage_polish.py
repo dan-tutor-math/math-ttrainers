@@ -300,7 +300,7 @@ def part_k_l_m(browser):
     # сам ученик на сцене ничего не открывал — ученик в обычном режиме
     # открывает своё сам (проверка: у обычного ученика колонка не открылась)
     plain = participant(ctx, "P", 1000, 700)
-    plain.add_init_script("try { localStorage.setItem('P:tsStage:pref', 'off'); } catch (e) {}")
+    plain.add_init_script("try { localStorage.setItem('P:tsStage:direct', '1'); } catch (e) {}")
     plain.goto(f"{BASE}/oge8.html?s={code}")
     t54.wait_code(plain)
     plain.wait_for_timeout(800)

@@ -524,7 +524,7 @@ def test_session(browser):
         page = ctx.new_page()
         # ученик по ?s= без этого уходит на сцену stage.html (промпт №11 нового
         # списка); здесь проверяется сам тренажёр — «Обычный режим»
-        page.add_init_script("try { localStorage.setItem('tsStage:pref', 'off'); } catch (e) {}")
+        page.add_init_script("try { localStorage.setItem('tsStage:direct', '1'); } catch (e) {}")
         page.route("**/supabase-js.umd.js", lambda route: route.fulfill(
             status=200, content_type="application/javascript", body=FAKE_LIB))
         page.route("**/fonts.googleapis.com/**", lambda route: route.abort())
