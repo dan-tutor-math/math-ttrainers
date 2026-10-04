@@ -1,0 +1,191 @@
+/* Жидкое стекло Mathh — общие стили кнопок, капсул и меню «⋯».
+ *
+ * Два режима, переключаются атрибутом data-fx на <html> (его ставит
+ * liquid-glass.js по сохранённому выбору устройства):
+ *   — обычный (по умолчанию, атрибута нет): то же размытое стекло, что уже
+ *     стоит в панелях тренажёров, и только короткие дешёвые переходы
+ *     (прозрачность и сдвиг). Видеокарту почти не нагружает;
+ *   — «максимум» (data-fx="full"): преломление фона под стеклом, увеличение
+ *     кнопок при наведении, упругое нажатие с вспышкой света, блик за
+ *     курсором, медленно плавающая подсветка фона, «вытекающее» меню.
+ * Цвета берутся из уже существующих переменных страниц (--glass-strong,
+ * --glass-border, --ink …), поэтому тёмная тема работает без отдельных правил.
+ */
+
+.mi{width:1em;height:1em;display:block;flex:none;fill:currentColor}
+
+/* ── стеклянная поверхность ─────────────────────────────────────────── */
+.lg{
+  position:relative;
+  background:var(--glass-strong);
+  -webkit-backdrop-filter:blur(20px) saturate(180%);
+  backdrop-filter:blur(20px) saturate(180%);
+  border:1px solid var(--glass-border);
+  box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);
+}
+/* блик сверху — у настоящего стекла светлее верхний край; рисуем его
+   отдельным слоем, чтобы не трогать фон элемента, который задаёт страница */
+.lg::before,.lg-s::before{
+  content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:linear-gradient(160deg,rgba(255,255,255,.45) 0%,rgba(255,255,255,0) 38%,rgba(255,255,255,0) 72%,rgba(255,255,255,.12) 100%);
+  mix-blend-mode:soft-light;
+}
+html[data-theme="dark"] .lg::before,html[data-theme="dark"] .lg-s::before{
+  background:linear-gradient(160deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,0) 40%,rgba(255,255,255,0) 75%,rgba(255,255,255,.06) 100%);
+}
+
+/* ── круглая кнопка и капсула ───────────────────────────────────────── */
+.lg-btn{
+  position:relative;width:40px;height:40px;border-radius:50%;padding:0;margin:0;
+  display:grid;place-items:center;flex:none;
+  font:inherit;font-size:19px;line-height:1;color:var(--ink);text-decoration:none;
+  background:transparent;border:0;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+  transition:background-color .15s, color .15s;
+}
+.lg-btn .mi{width:20px;height:20px;pointer-events:none}
+.lg-btn:hover{background:var(--hover-2,rgba(0,76,153,.10))}
+.lg-btn:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.lg-btn.is-on{background:var(--ink);color:#fff}
+
+/* капсула — несколько кнопок в одной стеклянной «пилюле», как панели iOS 26 */
+.lg-capsule{display:flex;flex-direction:column;align-items:center;gap:4px;padding:3px;border-radius:24px}
+.lg-capsule.is-row{flex-direction:row}
+
+/* Стекло капсулы — отдельный слой .lg-glass ПОД кнопками, а тень — на
+   самой капсуле. Так нужно для преломления: Chrome считает область
+   backdrop-filter вместе со всем, что вылезает за края элемента (своя
+   внешняя тень, увеличенные кнопки, вспышки), и тогда карта искажения
+   съезжает — по верхнему и левому краю стекла появляется белая полоса.
+   У слоя стекла снаружи ничего не торчит, поэтому карта ложится ровно */
+.lg-glass{position:absolute;inset:0;border-radius:inherit;z-index:0;pointer-events:none}
+.lg.lg-glass,.lg-menu-glass.lg{box-shadow:inset 0 1px 0 var(--glass-inset)}
+.lg-capsule > :not(.lg-glass){position:relative;z-index:1}
+
+/* боковая капсула главной: Подборка, Доски, Работы */
+.lg-side{position:fixed;top:16px;left:16px;z-index:200;box-shadow:var(--shadow)}
+
+/* ── меню «⋯» ───────────────────────────────────────────────────────── */
+.lg-menu{position:fixed;top:16px;right:16px;z-index:210;width:48px;
+  --lg-h:48px}
+/* само стекло меню — отдельный слой, у которого плавно меняется высота:
+   так капсула «вытекает» вниз, а кнопки внутри не перестраиваются */
+.lg-menu-glass,.lg-menu-shadow{position:absolute;top:0;right:0;width:48px;height:var(--lg-h);border-radius:24px;
+  transition:height .2s ease}
+.lg-menu-shadow{box-shadow:var(--shadow);pointer-events:none}
+.lg-menu-toggle{position:relative;margin:4px;z-index:1}
+.lg-menu-toggle .mi{transition:transform .25s ease}
+.lg-menu.is-open .lg-menu-toggle .mi{transform:rotate(90deg)}
+.lg-menu-items{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:0 4px 4px}
+.lg-item{position:relative;display:flex;align-items:center;justify-content:center}
+.lg-menu:not(.is-open) .lg-menu-items{visibility:hidden;pointer-events:none}
+.lg-menu:not(.is-open) .lg-item{opacity:0;transform:translateY(-8px)}
+.lg-item{transition:opacity .16s ease, transform .16s ease}
+
+/* подпись слева от кнопки — стеклянная плашка; видна, пока меню открыто,
+   потому что на телефоне нет наведения, а одна иконка «эффектов» неочевидна */
+.lg-label{position:absolute;right:calc(100% + 12px);top:50%;transform:translateY(-50%);
+  white-space:nowrap;font-family:var(--font-ui,inherit);font-size:13px;font-weight:600;color:var(--pencil,#1D1D1F);
+  padding:7px 12px;border-radius:999px;pointer-events:none;
+  transition:opacity .16s ease, transform .16s ease}
+.lg-menu:not(.is-open) .lg-label{opacity:0;transform:translate(8px,-50%)}
+.lg-menu.has-pop .lg-label{opacity:0}
+
+/* значок состояния на «⋯»: виден, когда меню закрыто, — чтобы не пропустить
+   обрыв связи совместного доступа, спрятанного внутрь меню */
+.lg-dot{position:absolute;top:3px;right:3px;width:10px;height:10px;border-radius:50%;display:none;
+  box-shadow:0 0 0 2px var(--glass-strong)}
+.lg-dot.is-warn{display:block;background:#e0a03a;animation:lgPulse 1.2s ease-in-out infinite}
+.lg-dot.is-bad{display:block;background:#d9534f}
+.lg-dot.is-ok{display:block;background:#2e9e5b}
+.lg-menu.is-open .lg-dot{display:none}
+@keyframes lgPulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* совместный доступ внутри меню: у session-share.js кнопка закреплена в углу
+   экрана — здесь она становится обычной круглой кнопкой списка */
+.lg-menu .ts-share-btn{position:relative;top:auto;right:auto;left:auto;width:40px;height:40px;border-radius:50%;
+  border:0;background:transparent;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;z-index:auto}
+.lg-menu .ts-share-btn.ts-offline,.lg-menu .ts-share-btn.ts-teacher-silent{border:0}
+
+/* ════════════════ режим «максимум» ════════════════ */
+
+/* меню вытекает с пружиной: высота с перелётом, кнопки падают по очереди */
+[data-fx="full"] .lg-menu-glass,[data-fx="full"] .lg-menu-shadow{transition:height .62s cubic-bezier(.34,1.56,.64,1)}
+[data-fx="full"] .lg-menu-toggle .mi{transition:transform .5s cubic-bezier(.34,1.56,.64,1)}
+[data-fx="full"] .lg-item{transition:opacity .3s ease, transform .55s cubic-bezier(.34,1.56,.64,1);transition-delay:calc(var(--i,0) * 45ms)}
+[data-fx="full"] .lg-menu:not(.is-open) .lg-item{transform:translateY(-18px) scale(.55);transition-delay:0s}
+[data-fx="full"] .lg-label{transition:opacity .3s ease, transform .5s cubic-bezier(.34,1.56,.64,1);transition-delay:calc(var(--i,0) * 45ms + 90ms)}
+[data-fx="full"] .lg-menu:not(.is-open) .lg-label{transform:translate(16px,-50%) scale(.9);transition-delay:0s}
+
+/* увеличение при наведении (как Dock на Mac): масштаб считает liquid-glass.js
+   по расстоянию до курсора и кладёт в --lg-mag */
+[data-fx="full"] .lg-side.lg-mag > :not(.lg-glass), [data-fx="full"] .lg-mag .lg-item > .lg-btn,
+[data-fx="full"] .lg-mag .lg-item > .ts-share-btn{
+  transform:scale(var(--lg-mag,1));transition:transform .18s cubic-bezier(.25,1.4,.5,1), background-color .15s;
+}
+[data-fx="full"] .lg-side.lg-mag > :not(.lg-glass){transform-origin:left center}
+[data-fx="full"] .lg-menu .lg-mag .lg-btn,[data-fx="full"] .lg-menu .lg-mag .ts-share-btn{transform-origin:right center}
+
+/* упругое нажатие: отдельное свойство scale, чтобы не спорить с увеличением */
+[data-fx="full"] .lg-pressing{scale:.86;transition:scale .12s ease}
+[data-fx="full"] .lg-jelly{animation:lgJelly .6s cubic-bezier(.3,1.6,.5,1)}
+@keyframes lgJelly{0%{scale:.86}35%{scale:1.12 .94}60%{scale:.97 1.04}100%{scale:1}}
+
+/* вспышка света из точки нажатия */
+.lg-ripple{position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+  background:radial-gradient(circle at var(--rx,50%) var(--ry,50%),rgba(255,255,255,.75) 0,rgba(255,255,255,0) 60%);
+  animation:lgRipple .65s ease-out forwards;mix-blend-mode:screen}
+@keyframes lgRipple{0%{opacity:.9;background-size:30% 30%;background-position:center}100%{opacity:0}}
+
+/* блик за курсором — поверх статичного блика, только в «максимуме» */
+[data-fx="full"] .lg::before,[data-fx="full"] .lg-s::before{
+  background:
+    radial-gradient(circle at var(--lg-mx,30%) var(--lg-my,-10%),rgba(255,255,255,.55) 0,rgba(255,255,255,0) 45%),
+    linear-gradient(160deg,rgba(255,255,255,.45) 0%,rgba(255,255,255,0) 38%,rgba(255,255,255,0) 72%,rgba(255,255,255,.14) 100%);
+}
+html[data-theme="dark"][data-fx="full"] .lg::before,html[data-theme="dark"][data-fx="full"] .lg-s::before{
+  background:
+    radial-gradient(circle at var(--lg-mx,30%) var(--lg-my,-10%),rgba(255,255,255,.22) 0,rgba(255,255,255,0) 45%),
+    linear-gradient(160deg,rgba(255,255,255,.16) 0%,rgba(255,255,255,0) 40%,rgba(255,255,255,0) 75%,rgba(255,255,255,.06) 100%);
+}
+
+/* преломление: фильтр с картой искажения строит liquid-glass.js под размер
+   каждого элемента. Только Chromium умеет SVG-фильтр в backdrop-filter —
+   класс lg-r-ready ставится лишь там; в Safari и Firefox остаётся размытие.
+   Размытие слабее, чем в обычном режиме: настоящее жидкое стекло прозрачное,
+   иначе искажение фона просто не видно */
+[data-fx="full"] .lg-r.lg-r-ready{
+  background-color:color-mix(in srgb,var(--glass-strong) 42%,transparent);
+  /* внешняя тень сбивает карту искажения (см. .lg-glass выше) — у
+     преломляющих панелей страницы остаётся только светлый ободок внутри */
+  box-shadow:inset 0 1px 0 var(--glass-inset), inset 0 0 0 1px var(--glass-border);
+  -webkit-backdrop-filter:blur(3px) saturate(185%);
+  backdrop-filter:var(--lg-refract) saturate(185%) brightness(1.03);
+}
+/* пока рисуют на холсте, преломление выключается: оно пересчитывается на
+   каждом кадре и может тормозить рисование на слабых устройствах */
+html.lg-paused .lg-r.lg-r-ready{backdrop-filter:blur(20px) saturate(180%)}
+
+/* медленно плавающая цветная подсветка фона: под стеклом появляется
+   движение, и стекло «оживает». Двигаются только transform — это дёшево */
+.lg-ambient{position:fixed;inset:-20vmax;z-index:-1;pointer-events:none;overflow:hidden}
+.lg-ambient i{position:absolute;width:60vmax;height:60vmax;border-radius:50%;opacity:.9;will-change:transform}
+.lg-ambient i:nth-child(1){left:0;top:0;background:radial-gradient(circle,var(--blob-1,rgba(120,150,255,.16)) 0,transparent 62%);animation:lgDrift1 38s ease-in-out infinite alternate}
+.lg-ambient i:nth-child(2){right:0;top:10vmax;background:radial-gradient(circle,var(--blob-2,rgba(190,150,230,.14)) 0,transparent 62%);animation:lgDrift2 46s ease-in-out infinite alternate}
+.lg-ambient i:nth-child(3){left:25vmax;bottom:0;background:radial-gradient(circle,var(--hl-10,rgba(0,76,153,.10)) 0,transparent 62%);animation:lgDrift3 52s ease-in-out infinite alternate}
+@keyframes lgDrift1{to{transform:translate(28vmax,18vmax) scale(1.15)}}
+@keyframes lgDrift2{to{transform:translate(-24vmax,22vmax) scale(.9)}}
+@keyframes lgDrift3{to{transform:translate(14vmax,-26vmax) scale(1.2)}}
+html:not([data-fx="full"]) .lg-ambient{display:none}
+
+/* «Уменьшить движение» в системе — уважаем даже в «максимуме»:
+   преломление остаётся (оно неподвижное), всё движущееся отключаем */
+@media (prefers-reduced-motion: reduce){
+  .lg-menu-glass,.lg-menu-shadow,.lg-item,.lg-label,.lg-menu-toggle .mi,.lg-btn{transition:none !important}
+  [data-fx="full"] .lg-side.lg-mag > :not(.lg-glass),[data-fx="full"] .lg-mag .lg-btn,[data-fx="full"] .lg-mag .ts-share-btn{transform:none !important}
+  .lg-jelly,.lg-ripple,.lg-ambient i,.lg-dot{animation:none !important}
+}
+
+@media print{
+  .lg-menu,.lg-side,.lg-ambient{display:none !important}
+}
