@@ -1797,6 +1797,20 @@ let curFill = false;
 let curSnap = true;
 let curArrowEnd = false;   // «Стрелка» — только для инструмента «Прямая»
 let curArrowBoth = false;  // «Двухсторонняя стрелка» — тоже только для «Прямой»
+/* Промпт №81: «Координатная прямая» — клеток в единичном отрезке и
+   нумерация делений. Запоминаются между заходами (как док и тема): на
+   уроке прямые чертят одной и той же разметкой, перенастраивать каждый раз
+   незачем */
+const AXIS_OPTS_KEY = 'boardsAxisOpts';
+const AXIS_MAX_CELLS = 10;
+let curAxisCells = 1, curAxisNums = true;
+try {
+  const v = JSON.parse(localStorage.getItem(AXIS_OPTS_KEY) || 'null');
+  if (v && typeof v === 'object'){
+    curAxisCells = Math.max(1, Math.min(AXIS_MAX_CELLS, Math.round(+v.cells) || 1));
+    curAxisNums = v.nums !== false;
+  }
+} catch (e) {}
 let curOpacity = false;    // «Полупрозрачность» — общий тумблер для любого инструмента рисования
 const SEMI_OPACITY = 0.45; // сама степень прозрачности при включённом тумблере
 let radiusSetting = null;   // «заданный радиус» циркуля; null = определять кликом
@@ -2529,6 +2543,7 @@ function renderObject(c, obj, camv, opts){
   } else if (obj.type === 'line'){
     strokePolyline(c, wp, false);
     if (obj.pivot) drawPivotMark(c, { x:(wp[0].x+wp[1].x)/2, y:(wp[0].y+wp[1].y)/2 }, obj.width, camv.zoom);
+    if (obj.axis) drawAxisDecor(c, wp[0], wp[1], obj.axis, camv.zoom);
     if (obj.arrowEnd || obj.arrowStart){
       c.save(); c.setLineDash([]);
       if (obj.arrowEnd) drawArrowHead(c, wp[0], wp[1], c.lineWidth);
@@ -2626,6 +2641,12 @@ function getHandles(obj){
     const a = obj.points[0], b = obj.points[1];
     return [{role:'pc',x:(a.x+b.x)/2,y:(a.y+b.y)/2},{role:'p0',x:a.x,y:a.y},{role:'p1',x:b.x,y:b.y}];
   }
+  // Промпт №81: у координатной прямой ещё ручка нуля. Последней — чтобы,
+  // когда ноль стоит на самом конце, конец всё равно можно было потянуть
+  if (obj.type === 'line' && obj.axis){
+    const z = axisZeroPoint(obj);
+    return [{role:'p0',x:obj.points[0].x,y:obj.points[0].y},{role:'p1',x:obj.points[1].x,y:obj.points[1].y},{role:'az',x:z.x,y:z.y}];
+  }
   if (obj.type === 'line') return [{role:'p0',x:obj.points[0].x,y:obj.points[0].y},{role:'p1',x:obj.points[1].x,y:obj.points[1].y}];
   if (obj.type === 'curve'){
     if (obj.ctrl) return [{role:'p0',x:obj.points[0].x,y:obj.points[0].y},{role:'p1',x:obj.points[1].x,y:obj.points[1].y},{role:'ctrl',x:obj.ctrl.x,y:obj.ctrl.y}];
@@ -2696,6 +2717,29 @@ function applyHandle(obj, role, pt){
     vx /= len; vy /= len;
     const end = { x: cx + vx*half, y: cy + vy*half }, opp = { x: cx - vx*half, y: cy - vy*half };
     obj.points = role === 'p0' ? [end, opp] : [opp, end];
+    return;
+  }
+  // Промпт №81: координатная прямая. Ноль едет только вдоль прямой. За
+  // концы — как у обычной прямой, но ноль держится за противоположный конец:
+  // тянешь начало — деления не «уплывают» под неподвижным концом
+  if (obj.type === 'line' && obj.axis && (role === 'az' || role === 'p0' || role === 'p1')){
+    const a = obj.points[0], b = obj.points[1];
+    const L = dist(a, b);
+    if (role === 'az'){
+      if (L < 1e-6) return;
+      const t = ((pt.x - a.x) * (b.x - a.x) + (pt.y - a.y) * (b.y - a.y)) / L;
+      obj.axis.z = Math.max(0, Math.min(L, t));
+      return;
+    }
+    const z = Math.max(0, Math.min(L, obj.axis.z || 0));
+    if (role === 'p0'){
+      obj.points[0] = pt;
+      const L2 = dist(obj.points[0], b);
+      obj.axis.z = Math.max(0, Math.min(L2, L2 - (L - z)));
+    } else {
+      obj.points[1] = pt;
+      obj.axis.z = Math.max(0, Math.min(dist(a, obj.points[1]), z));
+    }
     return;
   }
   // Промпт №69: ширина рамки текста. Правый край — просто ширина, левый —
@@ -2793,6 +2837,13 @@ function drawSelection(c, obj, camv){
   c.strokeStyle = '#fff'; c.lineWidth = 1.5;
   handles.forEach(h => {
     const s = worldToScreen(h);
+    if (h.role === 'az'){
+      // Промпт №81: ноль координатной прямой — полым кружком, чтобы не
+      // путать с концами: за него деления сдвигаются, а не прямая
+      c.save(); c.fillStyle = '#fff'; c.strokeStyle = themeVar('--ink'); c.lineWidth = 2;
+      c.beginPath(); c.arc(s.x, s.y, 5, 0, Math.PI*2); c.fill(); c.stroke(); c.restore();
+      return;
+    }
     c.beginPath(); c.arc(s.x, s.y, 5, 0, Math.PI*2); c.fill(); c.stroke();
   });
   c.restore();
@@ -2935,7 +2986,7 @@ const FIXED_COUNT = { line: 2, ellipse: 2, angle: 3 };
    правятся как раньше, по точке. «Прямая с закреплённым центром» — обычный
    'line' с флагом pivot: рисуется, выгружается, стирается и едет в общую
    доску как любая прямая, особые у неё только ручки (applyHandle) */
-const DRAG_SHAPE_TOOLS = { quad: 'rect', pivot: 'pivot' };
+const DRAG_SHAPE_TOOLS = { quad: 'rect', pivot: 'pivot', axis: 'axis' };
 function shapeFromDrag(sd, zoom){
   if (!sd) return null;
   const a = sd.a, b = sd.b || sd.a;
@@ -2955,7 +3006,86 @@ function shapeFromDrag(sd, zoom){
     obj.pivot = true;
     return obj;
   }
+  if (sd.type === 'axis'){
+    if (dist(a, b)*zoom < 4) return null;
+    const obj = newBase('line');
+    obj.points = [ {x:a.x,y:a.y}, {x:b.x,y:b.y} ];
+    // стрелка у координатной прямой всегда одна — на конце, куда тянули;
+    // флаг обычный, поэтому старый код (и ученик со старой страницей)
+    // нарисует хотя бы прямую со стрелкой
+    delete obj.arrowStart; obj.arrowEnd = true;
+    obj.axis = axisFromDrag(sd, dist(a, b));
+    return obj;
+  }
   return null;
+}
+/* Промпт №81: координатная прямая — обычный 'line' с полем axis:
+     cells — клеток в единичном отрезке (для панели и для правки);
+     step  — длина единичного отрезка в мировых единицах. Хранится готовой,
+             а не считается из B.cellSize при каждом кадре: точки прямой тоже
+             в мировых единицах, и смена размера клетки в настройках листа не
+             должна перекраивать уже начерченные деления;
+     nums  — подписывать ли деления;
+     z     — где ноль: расстояние от начала прямой (points[0]) вдоль неё.
+   Ноль по умолчанию — на делении ближе всего к середине: в школе на прямой
+   почти всегда есть и отрицательные, и положительные числа. Ноль можно
+   перетащить ручкой (applyHandle, роль 'az').
+   Параметры живут в самой протяжке (sd.cells/sd.nums), а не берутся из
+   общих переменных: board-stage.js шлёт ученику shapeDrag целиком, и его
+   предпросмотр рисуется той же разметкой, что у учителя. */
+function axisFromDrag(sd, len){
+  const cells = Math.max(1, Math.min(AXIS_MAX_CELLS, Math.round(sd.cells) || 1));
+  const step = cells * ((B && B.cellSize) || 24);
+  return { cells, step, nums: sd.nums !== false, z: Math.min(len, Math.round(len / 2 / step) * step) };
+}
+function axisZeroPoint(obj){
+  const a = obj.points[0], b = obj.points[1], L = dist(a, b) || 1;
+  const t = Math.max(0, Math.min(L, obj.axis.z || 0)) / L;
+  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+}
+// деления и подписи поверх уже нарисованной прямой (p0, p1 — экранные).
+// Вызывается из renderObject — поэтому то же самое попадает и в выгрузку
+// PNG/PDF, и в заметки справочной панели, и к ученику
+function drawAxisDecor(c, p0, p1, ax, zoom){
+  const L = dist(p0, p1);
+  const S = (ax.step || 24) * zoom;
+  if (L < 1 || S < 4) return;              // так мелко деления сливаются в полосу
+  const ux = (p1.x - p0.x) / L, uy = (p1.y - p0.y) / L;
+  // подписи — под горизонтальной прямой и левее вертикальной, куда бы её ни тянули
+  let nx = -uy, ny = ux;
+  if (ny < -1e-6 || (Math.abs(ny) <= 1e-6 && nx > 0)){ nx = -nx; ny = -ny; }
+  const cellW = (ax.step || 24) / (ax.cells || 1);
+  const half = Math.max(3, Math.min(7, cellW * 0.26)) * zoom;
+  const fs = Math.max(9, Math.min(16, cellW * 0.56)) * zoom;
+  const Z = Math.max(0, Math.min(L, (ax.z || 0) * zoom));
+  // под наконечником стрелки делений нет — иначе последнее налезает на неё
+  const headLen = Math.max(9, c.lineWidth * 3.2);
+  const tMax = L - headLen * 1.15;
+  const kMin = Math.ceil(-Z / S - 1e-6), kMax = Math.floor((tMax - Z) / S + 1e-6);
+  if (kMax - kMin > 600) return;            // защита от сотен тысяч делений при сбитых данных
+  c.save();
+  c.setLineDash([]);
+  c.beginPath();
+  for (let k = kMin; k <= kMax; k++){
+    const t = Z + k * S;
+    const x = p0.x + ux * t, y = p0.y + uy * t;
+    // ноль чуть длиннее остальных — от него отсчитывают
+    const hh = k === 0 ? half * 1.45 : half;
+    c.moveTo(x - nx * hh, y - ny * hh); c.lineTo(x + nx * hh, y + ny * hh);
+  }
+  c.stroke();
+  if (ax.nums){
+    c.font = (fs | 0) + 'px ' + UI_FONT_FAMILY;
+    c.textAlign = 'center'; c.textBaseline = 'middle';
+    const off = half * 1.45 + fs * 0.72;
+    for (let k = kMin; k <= kMax; k++){
+      const t = Z + k * S;
+      const x = p0.x + ux * t + nx * off, y = p0.y + uy * t + ny * off;
+      // настоящий минус, а не дефис: так пишут в тетради и в КИМ
+      c.fillText(k < 0 ? '\u2212' + (-k) : String(k), x, y);
+    }
+  }
+  c.restore();
 }
 function drawShapeDragPreview(c, sd, toScreen, zoom){
   if (!sd || !sd.b) return;
@@ -2971,6 +3101,13 @@ function drawShapeDragPreview(c, sd, toScreen, zoom){
     const p0 = toScreen({x:2*a.x-b.x, y:2*a.y-b.y}), p1 = toScreen(b), cc = toScreen(a);
     c.beginPath(); c.moveTo(p0.x, p0.y); c.lineTo(p1.x, p1.y); c.stroke();
     drawPivotMark(c, cc, curWidth, zoom);
+  } else if (sd.type === 'axis'){
+    const len = dist(a, b);
+    if (len * zoom < 1) return;
+    const p0 = toScreen(a), p1 = toScreen(b);
+    c.beginPath(); c.moveTo(p0.x, p0.y); c.lineTo(p1.x, p1.y); c.stroke();
+    c.save(); c.setLineDash([]); drawArrowHead(c, p0, p1, c.lineWidth); c.restore();
+    drawAxisDecor(c, p0, p1, axisFromDrag(sd, len), zoom);
   }
 }
 // отметка центра у прямой с закреплённым центром — заметная точка, в
@@ -3662,6 +3799,7 @@ canvas.addEventListener('pointerdown', (e) => {
   if (DRAG_SHAPE_TOOLS[tool]){
     const a = maybeSnap(pt);
     shapeDrag = { type: DRAG_SHAPE_TOOLS[tool], a, b: a };
+    if (tool === 'axis'){ shapeDrag.cells = curAxisCells; shapeDrag.nums = curAxisNums; }
     scheduleRedraw(); return;
   }
   if (tool === 'curve'){ curvePointClick(pt); scheduleRedraw(); return; }
@@ -3882,7 +4020,7 @@ function updateCursor(){
    ═══════════════════════════════════════════════════════════════════════ */
 const optbar = document.getElementById('bdOptbar');
 optbar.addEventListener('mousedown', (e) => { if (e.target.closest('button')) e.preventDefault(); });
-const TOOLS_WITH_OPTS = ['pen','line','pivot','curve','quad','poly','ellipse','circle','angle','text'];
+const TOOLS_WITH_OPTS = ['pen','line','axis','pivot','curve','quad','poly','ellipse','circle','angle','text'];
 document.querySelectorAll('.bd-tool[data-tool]').forEach(btn => {
   btn.addEventListener('click', () => {
     // если сейчас рисуется незавершённая кривая (или многоугольник) и
@@ -3928,6 +4066,10 @@ function applyOptbarForTool(){
   const arrowDisplay = (tool==='line') ? 'flex' : 'none';
   document.getElementById('toggleArrowEnd').style.display = arrowDisplay;
   document.getElementById('toggleArrowBoth').style.display = arrowDisplay;
+  const axisDisplay = (tool==='axis') ? 'flex' : 'none';
+  document.getElementById('bdAxisField').style.display = axisDisplay;
+  document.getElementById('toggleAxisNums').style.display = axisDisplay;
+  if (tool === 'axis') syncAxisOptsUI();
   const isTextTool = (tool === 'text');
   document.getElementById('bdFontSizeField').style.display = isTextTool ? 'flex' : 'none';
   document.querySelector('.bd-width').style.display = isTextTool ? 'none' : 'flex';
@@ -3949,6 +4091,8 @@ function openTextEditToolbar(){
   document.getElementById('bdRadiusField').style.display = 'none';
   document.getElementById('toggleArrowEnd').style.display = 'none';
   document.getElementById('toggleArrowBoth').style.display = 'none';
+  document.getElementById('bdAxisField').style.display = 'none';
+  document.getElementById('toggleAxisNums').style.display = 'none';
   document.getElementById('fontSizeVal').textContent = (textEditSession && textEditSession.fontSize) || curFontSize;
   layoutOptbar();
   layoutRefPanel();
@@ -6042,6 +6186,7 @@ refDrawCanvas.addEventListener('pointerdown', (e) => {
   if (DRAG_SHAPE_TOOLS[tool]){
     const a = maybeSnap(pt);
     rfShapeDrag = { type: DRAG_SHAPE_TOOLS[tool], a, b: a };
+    if (tool === 'axis'){ rfShapeDrag.cells = curAxisCells; rfShapeDrag.nums = curAxisNums; }
     rfScheduleRedraw(); return;
   }
   if (tool === 'curve'){ rfCurvePointClick(pt); rfScheduleRedraw(); return; }
@@ -6386,6 +6531,44 @@ document.getElementById('toggleSnap').classList.add('on');
 document.getElementById('toggleArrowEnd').addEventListener('click', (e) => { curArrowEnd=!curArrowEnd; e.currentTarget.classList.toggle('on',curArrowEnd); });
 document.getElementById('toggleArrowBoth').addEventListener('click', (e) => { curArrowBoth=!curArrowBoth; e.currentTarget.classList.toggle('on',curArrowBoth); });
 document.getElementById('toggleOpacity').addEventListener('click', (e) => { curOpacity=!curOpacity; e.currentTarget.classList.toggle('on',curOpacity); });
+/* Промпт №81: настройки координатной прямой. Меняют и следующую прямую, и
+   ту, что только что начертили (она ещё в «замке редактирования» — ручки
+   видны): обычно разметку подбирают, уже глядя на прямую на доске */
+function syncAxisOptsUI(){
+  document.getElementById('axisCellsVal').textContent = curAxisCells;
+  document.getElementById('toggleAxisNums').classList.toggle('on', curAxisNums);
+}
+function saveAxisOpts(){
+  try { localStorage.setItem(AXIS_OPTS_KEY, JSON.stringify({ cells: curAxisCells, nums: curAxisNums })); } catch (e) {}
+}
+function applyAxisOptsToLocked(){
+  const tryOne = (list, id, redraw) => {
+    if (!id || !list) return;
+    const obj = list.find(o => o.id === id);
+    if (!obj || obj.type !== 'line' || !obj.axis) return;
+    const cellW = obj.axis.step / (obj.axis.cells || 1);
+    if (obj.axis.cells === curAxisCells && obj.axis.nums === curAxisNums) return;
+    pushUndo();
+    // ноль остаётся на месте, меняется только шаг делений
+    obj.axis.cells = curAxisCells;
+    obj.axis.step = curAxisCells * cellW;
+    obj.axis.nums = curAxisNums;
+    saveDB(); redraw();
+  };
+  if (B){
+    tryOne(B.objects, editLockId, scheduleRedraw);
+    if (typeof rfObjects === 'function') tryOne(rfObjects(), rfEditLockId, rfScheduleRedraw);
+  }
+}
+function setAxisOpts(cells, nums){
+  curAxisCells = Math.max(1, Math.min(AXIS_MAX_CELLS, cells));
+  curAxisNums = !!nums;
+  syncAxisOptsUI(); saveAxisOpts(); applyAxisOptsToLocked();
+}
+document.getElementById('axisCellsMinus').addEventListener('click', () => setAxisOpts(curAxisCells - 1, curAxisNums));
+document.getElementById('axisCellsPlus').addEventListener('click', () => setAxisOpts(curAxisCells + 1, curAxisNums));
+document.getElementById('toggleAxisNums').addEventListener('click', () => setAxisOpts(curAxisCells, !curAxisNums));
+syncAxisOptsUI();
 document.getElementById('bdRadiusInput').addEventListener('input', (e) => {
   const v = parseFloat(e.target.value);
   radiusSetting = (v>0) ? v : null;
@@ -6784,6 +6967,11 @@ function setCropUI(){
   const img = document.querySelector('#imgModalPreview img');
   const reset = document.getElementById('imgCropReset');
   if (!box || !img) return;
+  // Промпт №81: подсказка меняется вместе с рамкой — одной длинной строкой
+  // она не помещалась в узкий предпросмотр
+  const hint = document.getElementById('imgCropHint');
+  if (hint) hint.textContent = cropRect ? 'Рамку можно двигать и тянуть за края и углы'
+                                        : 'Потяните рамку по картинке, чтобы обрезать';
   if (!cropRect){
     box.style.display = 'none';
     if (reset) reset.style.display = 'none';
@@ -6800,8 +6988,8 @@ function setCropUI(){
 }
 function previewHTML(src){
   return `<img src="${src}" alt="">
-    <div class="bd-crop-box" id="imgCropBox" style="display:none"></div>
-    <div class="bd-crop-hint">Потяните рамку по картинке, чтобы обрезать</div>`;
+    <div class="bd-crop-box" id="imgCropBox" style="display:none"><i class="nw"></i><i class="n"></i><i class="ne"></i><i class="e"></i><i class="se"></i><i class="s"></i><i class="sw"></i><i class="w"></i></div>
+    <div class="bd-crop-hint" id="imgCropHint">Потяните рамку по картинке, чтобы обрезать</div>`;
 }
 // вырезаем выбранный кусок в новую картинку
 function cropDataUrl(src, rect){
@@ -6854,6 +7042,21 @@ function rotateDataUrl(src, dir){
   });
 }
 
+/* Промпт №81: последнее состояние галочек окна вставки. Это настройка
+   человека, а не данные доски, поэтому localStorage, как тема и док: общая
+   для всех досок и не уезжает к ученику вместе с доской */
+const IMG_OPTS_KEY = 'boardsImgInsertOpts';
+function loadImgInsertOpts(){
+  try {
+    const v = JSON.parse(localStorage.getItem(IMG_OPTS_KEY) || 'null');
+    if (v && typeof v === 'object') return { lock: !!v.lock, snap: !!v.snap };
+  } catch (e) {}
+  return { lock: false, snap: false };
+}
+function saveImgInsertOpts(lock, snap){
+  try { localStorage.setItem(IMG_OPTS_KEY, JSON.stringify({ lock: !!lock, snap: !!snap })); } catch (e) {}
+}
+
 async function openImageModal(src, worldPt){
   const fit = await imageFitsStorage(src);
   if (!fit.ok) {
@@ -6870,10 +7073,15 @@ async function openImageModal(src, worldPt){
   cropRect = null;
   document.getElementById('imgModalPreview').innerHTML = previewHTML(src);
   setCropUI();
-  // по умолчанию не закрепляем: сразу после вставки картинку можно спокойно
-  // подвинуть и растянуть по размеру — закрепить можно потом, кнопкой на панели
-  document.getElementById('imgOptLock').checked = false;
-  document.getElementById('imgOptSnap').checked = false;
+  // Промпт №81: «Закрепить» и «Привязка к сетке» — как при прошлой вставке.
+  // Картинки на урок вставляют сериями (условия, чертежи), и галочку
+  // приходилось ставить заново на каждой. Самый первый раз — выключены:
+  // свежую картинку обычно сразу двигают и растягивают по месту.
+  // «Сохранить в библиотеку» не запоминаем нарочно: забытая галочка тихо
+  // копила бы каждую картинку в тяжёлой части доски (см. HANDOFF, раздел 6)
+  const imgOpts = loadImgInsertOpts();
+  document.getElementById('imgOptLock').checked = imgOpts.lock;
+  document.getElementById('imgOptSnap').checked = imgOpts.snap;
   document.getElementById('imgOptLib').checked = false;
   renderImageLibrary();
   document.getElementById('imgModalBackdrop').classList.add('open');
@@ -6902,39 +7110,95 @@ function renderImageLibrary(){
   });
 }
 
-/* тянем рамку по предпросмотру */
+/* тянем рамку по предпросмотру.
+   Промпт №81: готовую рамку можно править, как обрезку в редакторе фото:
+   зажал внутри — рамка едет целиком, за край или угол — тянется только
+   эта сторона, мимо рамки — рисуется новая. Раньше любое нажатие стирало
+   рамку и начинало заново, и чуть промахнувшись приходилось обводить
+   кусок картинки с нуля. Попадание считаем в пикселях экрана, а не в
+   долях: у вытянутой картинки доля по одной оси в разы «толще» другой */
+const CROP_MIN = 0.02;   // меньше этого — не обрезка, а случайный клик
+function cropHitZone(r, cx, cy, tol){
+  if (!cropRect) return null;
+  const x0 = r.left + cropRect.x * r.width, x1 = x0 + cropRect.w * r.width;
+  const y0 = r.top + cropRect.y * r.height, y1 = y0 + cropRect.h * r.height;
+  if (cx < x0 - tol || cx > x1 + tol || cy < y0 - tol || cy > y1 + tol) return null;
+  // у маленькой рамки края съели бы всю середину — оставляем внутри место,
+  // за которое её можно взять и подвинуть
+  const t = Math.min(tol, (x1 - x0) / 3, (y1 - y0) / 3);
+  let z = '';
+  if (Math.abs(cy - y0) <= t) z += 'n'; else if (Math.abs(cy - y1) <= t) z += 's';
+  if (Math.abs(cx - x0) <= t) z += 'w'; else if (Math.abs(cx - x1) <= t) z += 'e';
+  if (z) return z;
+  return (cx > x0 && cx < x1 && cy > y0 && cy < y1) ? 'move' : null;
+}
+const CROP_CURSORS = { move: 'move', n: 'ns-resize', s: 'ns-resize', e: 'ew-resize', w: 'ew-resize',
+  nw: 'nwse-resize', se: 'nwse-resize', ne: 'nesw-resize', sw: 'nesw-resize' };
 (function initCropDrag(){
   const host = document.getElementById('imgModalPreview');
   if (!host) return;
-  let start = null;
+  // drag: { mode: 'new'|'move'|зона края, start, orig }
+  let drag = null;
   const imgRect = () => { const im = host.querySelector('img'); return im ? im.getBoundingClientRect() : null; };
   const frac = (e, r) => ({
     x: clamp((e.clientX - r.left) / r.width, 0, 1),
     y: clamp((e.clientY - r.top) / r.height, 0, 1),
   });
+  // пальцем точно в тонкий край не попасть — зона шире, чем у мыши
+  const tolFor = (e) => (e.pointerType === 'touch' ? 16 : 9);
   host.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
     const r = imgRect(); if (!r) return;
     host.setPointerCapture(e.pointerId);
-    start = frac(e, r);
-    cropRect = null; setCropUI();
+    const zone = cropHitZone(r, e.clientX, e.clientY, tolFor(e));
+    const p = frac(e, r);
+    if (zone){
+      drag = { mode: zone, start: p, orig: Object.assign({}, cropRect) };
+    } else {
+      drag = { mode: 'new', start: p };
+      cropRect = null; setCropUI();
+    }
     e.preventDefault();
   });
   host.addEventListener('pointermove', (e) => {
-    if (!start) return;
     const r = imgRect(); if (!r) return;
+    if (!drag){
+      // без нажатия только подсказываем курсором, что под ним можно сделать
+      const zone = cropHitZone(r, e.clientX, e.clientY, tolFor(e));
+      host.style.cursor = zone ? CROP_CURSORS[zone] : '';
+      return;
+    }
     const p = frac(e, r);
-    cropRect = { x: Math.min(start.x, p.x), y: Math.min(start.y, p.y),
-                 w: Math.abs(p.x - start.x), h: Math.abs(p.y - start.y) };
+    if (drag.mode === 'new'){
+      cropRect = { x: Math.min(drag.start.x, p.x), y: Math.min(drag.start.y, p.y),
+                   w: Math.abs(p.x - drag.start.x), h: Math.abs(p.y - drag.start.y) };
+    } else if (drag.mode === 'move'){
+      // рамка упирается в край картинки, а не съёживается о него
+      const o = drag.orig;
+      cropRect = { x: clamp(o.x + p.x - drag.start.x, 0, 1 - o.w),
+                   y: clamp(o.y + p.y - drag.start.y, 0, 1 - o.h), w: o.w, h: o.h };
+    } else {
+      // тянем только названные стороны; противоположная стоит на месте и
+      // через неё рамка не «выворачивается» — упирается в минимум
+      const o = drag.orig, m = drag.mode;
+      let x0 = o.x, y0 = o.y, x1 = o.x + o.w, y1 = o.y + o.h;
+      if (m.indexOf('w') >= 0) x0 = Math.min(p.x, x1 - CROP_MIN);
+      if (m.indexOf('e') >= 0) x1 = Math.max(p.x, x0 + CROP_MIN);
+      if (m.indexOf('n') >= 0) y0 = Math.min(p.y, y1 - CROP_MIN);
+      if (m.indexOf('s') >= 0) y1 = Math.max(p.y, y0 + CROP_MIN);
+      cropRect = { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+    }
     setCropUI();
   });
   const end = () => {
-    start = null;
+    const wasNew = drag && drag.mode === 'new';
+    drag = null;
     // случайный клик без протяжки — это не обрезка, а промах
-    if (cropRect && (cropRect.w < 0.02 || cropRect.h < 0.02)){ cropRect = null; setCropUI(); }
+    if (wasNew && cropRect && (cropRect.w < CROP_MIN || cropRect.h < CROP_MIN)){ cropRect = null; setCropUI(); }
   };
   host.addEventListener('pointerup', end);
   host.addEventListener('pointercancel', end);
+  host.addEventListener('pointerleave', () => { if (!drag) host.style.cursor = ''; });
   window.addEventListener('resize', setCropUI);
   const reset = document.getElementById('imgCropReset');
   if (reset) reset.addEventListener('click', () => { cropRect = null; setCropUI(); });
@@ -6971,6 +7235,9 @@ document.getElementById('imgModalInsert').addEventListener('click', async () => 
     points: [pt], w, h, natW: pendingImage.natW, natH: pendingImage.natH,
     locked: document.getElementById('imgOptLock').checked,
   };
+  // запоминаем только при вставке: открыл окно, пощёлкал и закрыл — это
+  // не выбор, следующую картинку не трогаем
+  saveImgInsertOpts(obj.locked, document.getElementById('imgOptSnap').checked);
   pushUndo();
   B.objects.push(obj);
   if (document.getElementById('imgOptLib').checked){

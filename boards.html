@@ -480,6 +480,7 @@ html[data-theme="dark"] .bd-optbar{box-shadow:var(--shadow), inset 0 1px 0 rgba(
 .bd-radius-field input{width:calc(42px*var(--dock-scale,1));border:1px solid var(--glass-border);background:var(--glass);border-radius:8px;padding:calc(4px*var(--dock-scale,1)) calc(5px*var(--dock-scale,1));font-family:var(--font-mono);font-size:calc(12px*var(--dock-scale,1));text-align:center;color:var(--pencil);}
 .bd-optbar.side .bd-radius-field input{width:calc(34px*var(--dock-scale,1));padding:calc(3px*var(--dock-scale,1)) calc(4px*var(--dock-scale,1));}
 .bd-radius-field label{font-size:11px;color:var(--muted-2);}
+.bd-axis-field label{font-family:var(--font-ui);font-size:11px;color:var(--muted-2);}
 
 /* нативный color-input прячем визуально, но держим кликабельным */
 .bd-hidden-color{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;}
@@ -590,6 +591,14 @@ html[data-theme="dark"] .bd-optbar{box-shadow:var(--shadow), inset 0 1px 0 rgba(
 .bd-modal-preview{position:relative;cursor:crosshair;user-select:none;-webkit-user-select:none;}
 .bd-crop-box{position:absolute;border:1.5px solid var(--ink);background:rgba(10,60,160,.12);
   box-shadow:0 0 0 9999px rgba(0,0,0,.28);pointer-events:none;border-radius:2px;}
+/* Промпт №81: ручки рамки — только знак, что за края можно тянуть; сами
+   они нажатий не ловят (pointer-events у рамки выключены), попадание по
+   краю считает cropHitZone в пикселях вокруг всей стороны */
+.bd-crop-box i{position:absolute;width:9px;height:9px;margin:-5px 0 0 -5px;background:#fff;
+  border:1.5px solid var(--ink);border-radius:2px;box-sizing:border-box;}
+.bd-crop-box i.nw{left:0;top:0;} .bd-crop-box i.n{left:50%;top:0;} .bd-crop-box i.ne{left:100%;top:0;}
+.bd-crop-box i.e{left:100%;top:50%;} .bd-crop-box i.se{left:100%;top:100%;} .bd-crop-box i.s{left:50%;top:100%;}
+.bd-crop-box i.sw{left:0;top:100%;} .bd-crop-box i.w{left:0;top:50%;}
 .bd-crop-hint{position:absolute;left:10px;bottom:8px;font-family:var(--font-ui);font-size:11.5px;
   font-weight:600;color:var(--muted-3);background:var(--glass-strong);border-radius:999px;
   padding:4px 10px;pointer-events:none;}
@@ -945,6 +954,13 @@ function resolveBasketTexInHtml(html){
     <button class="bd-toggle" id="toggleArrowBoth" title="Двухсторонняя стрелка">
       <svg viewBox="0 0 24 24" fill="none"><line x1="6" y1="18" x2="18" y2="6" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"/><path d="M11 6h7v7" class="ac-line" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/><path d="M13 18H6v-7" class="ac-line" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
+    <!-- Промпт №81: только у «Координатной прямой» -->
+    <div class="bd-width bd-axis-field" id="bdAxisField" style="display:none" title="Клеток в единичном отрезке">
+      <label>ед.</label><button id="axisCellsMinus">−</button><span id="axisCellsVal">1</span><button id="axisCellsPlus">+</button>
+    </div>
+    <button class="bd-toggle" id="toggleAxisNums" style="display:none" title="Нумерация делений">
+      <svg viewBox="0 0 24 24" fill="none"><line x1="3" y1="8" x2="21" y2="8" stroke="currentColor" stroke-width="1.6"/><line x1="6" y1="5.5" x2="6" y2="10.5" stroke="currentColor" stroke-width="1.5"/><line x1="12" y1="5.5" x2="12" y2="10.5" stroke="currentColor" stroke-width="1.5"/><line x1="18" y1="5.5" x2="18" y2="10.5" stroke="currentColor" stroke-width="1.5"/><text x="6" y="20" font-size="7.5" font-family="var(--font-ui),sans-serif" text-anchor="middle" fill="currentColor" stroke="none">0</text><text x="12" y="20" font-size="7.5" font-family="var(--font-ui),sans-serif" text-anchor="middle" fill="currentColor" stroke="none">1</text><text x="18" y="20" font-size="7.5" font-family="var(--font-ui),sans-serif" text-anchor="middle" fill="currentColor" stroke="none">2</text></svg>
+    </button>
     <button class="bd-toggle" id="toggleOpacity" title="Полупрозрачность">
       <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8" fill="currentColor" fill-opacity="0.35" stroke="currentColor" stroke-width="1.6"/></svg>
     </button>
@@ -1011,6 +1027,12 @@ function resolveBasketTexInHtml(html){
     <div class="bd-dock-sep"></div>
     <button class="bd-tool" data-tool="line" title="Прямая (5)">
       <svg viewBox="0 0 24 24"><line x1="5" y1="19" x2="19" y2="5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle class="ac" cx="5" cy="19" r="1.6"/><circle class="ac" cx="19" cy="5" r="1.6"/></svg>
+    </button>
+    <!-- Промпт №81: координатная прямая — протяжкой, как прямая: сразу со
+         стрелкой и делениями; клеток в единичном отрезке и нумерация — в
+         доп. панели инструмента -->
+    <button class="bd-tool" data-tool="axis" title="Координатная прямая — зажмите и тяните; деления и нумерация — в панели над доком">
+      <svg viewBox="0 0 24 24" fill="none"><line x1="2.5" y1="13" x2="21" y2="13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M17.5 9.8L21 13l-3.5 3.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><line x1="6" y1="10.5" x2="6" y2="15.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><line x1="10" y1="10.5" x2="10" y2="15.5" class="ac-line" stroke-width="1.5" stroke-linecap="round"/><line x1="14" y1="10.5" x2="14" y2="15.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
     </button>
     <!-- Промпт №69: прямая с закреплённым центром — за центр переносится
          целиком, за конец поворачивается вокруг центра без смены длины -->
