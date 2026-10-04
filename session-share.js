@@ -92,6 +92,7 @@
       isStageFrame(){ return false; }, stageFocus(){},
       hasViewers(){ return false; }, holdStageReady(){}, releaseStageReady(){}, socketBacklog(){ return 0; },
       openNewSessionTab(){ return null; }, goToSession(){}, getSessionName(){ return ''; }, renameSession(){}, endSession: async () => false,
+      isShared(){ return false; },
     };
     return;
   }
@@ -2647,6 +2648,13 @@
     isStageFrame: () => IN_STAGE, stageFocus,
     // есть ли кому показывать (board-stage.js шлёт доску, только если есть)
     hasViewers: () => studentsOnline() > 0,
+    // Промпт №16: идёт ли занятие «в совместном доступе». Не только «ученик
+    // на связи прямо сейчас»: ученик, у которого на минуту пропал интернет,
+    // занятие не прерывает — поэтому смотрим и на отметку «были ученики» в
+    // строке этой сессии. Ученик (и кадр сцены) — всегда в совместном.
+    // По этому признаку конспект (lesson-notes.js) решает, чистить ли записи
+    // вокруг задания сам или оставить прежнюю механику урока
+    isShared: () => !isLeaderFlag || IN_STAGE || studentsOnline() > 0 || !!((regGet(code) || {}).students),
     holdStageReady, releaseStageReady,
     // сколько байт ещё не ушло в сеть из сокета этой страницы. board-stage.js
     // по нему держит темп, отдавая доску частями: см. там pumpBulk

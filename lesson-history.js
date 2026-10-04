@@ -132,7 +132,20 @@
   // вызывается со всех триггерных точек тренажёра; сам решает, включено ли
   // автосохранение, — вызывающему коду не нужно об этом думать
   function captureIfEnabled(scope, targetEl) {
-    if (!window.TrainerSession || !window.TrainerSession.getAutosaveHistory || !window.TrainerSession.getAutosaveHistory()) return Promise.resolve(null);
+    // Промпт №16: сначала — конспект сессии (lesson-notes.js). Он снимает
+    // задание и записи синхронно, до смены задания, и сам решает, нужна ли
+    // страница. Вне совместного доступа он же и убирает записи — тогда
+    // прежний снимок в памяти не нужен (его PDF живёт в панели совместного
+    // доступа), и второй html2canvas на каждое задание был бы зря. В
+    // совместном доступе всё прежнее остаётся как было: снимок сюда,
+    // очистку над заданием делает snapshotAndClear страницы после него
+    const TS = window.TrainerSession;
+    const shared = !!(TS && TS.isShared && TS.isShared());
+    if (window.LessonNotes && window.LessonNotes.active && window.LessonNotes.active()) {
+      try { window.LessonNotes.captureFromTrainer(scope, targetEl, { clear: !shared }); } catch (e) {}
+      if (!shared) return Promise.resolve(null);
+    }
+    if (!TS || !TS.getAutosaveHistory || !TS.getAutosaveHistory()) return Promise.resolve(null);
     return capture(scope, targetEl).catch(() => null);
   }
 

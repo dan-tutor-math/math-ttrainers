@@ -96,6 +96,13 @@
   let penWidth = 2;          // тонкая по умолчанию
   let penColor = '#000000';  // чёрный по умолчанию
   let eraserSize = 26;       // средний ластик по умолчанию
+  // Промпт №16 (конспект): у ластика два режима. 'area' — прежний, растровый:
+  // стирает только то, что под ластиком. 'stroke' — касание штриха удаляет
+  // его целиком: так быстрее убрать лишнюю запись, не выскребая её по
+  // кусочку. Выбор помним между страницами — человек ставит режим под свою
+  // привычку, а не под конкретное задание
+  let eraserMode = 'area';
+  try { if (localStorage.getItem('boardEraserMode') === 'stroke') eraserMode = 'stroke'; } catch (e) {}
   let dpr = Math.max(1, window.devicePixelRatio || 1);
 
   let strokes = [];          // завершённые штрихи: {tool,color,width,points:[{x,y}...]}
@@ -355,6 +362,57 @@
     TS.push();
   }
 
+  /* ═══ Промпт №16: ластик «по штрихам» ═══
+     Касание штриха удаляет его целиком. Ластик ведут быстро, и между двумя
+     событиями мыши он перескакивает на десятки пикселей — поэтому проверяем
+     не точку, а отрезок пути ластика от прошлой точки до текущей: иначе
+     тонкая линия, через которую «перепрыгнули», оставалась бы целой.
+     Штрихи растрового ластика (tool:'eraser') сами по себе не мишень: они
+     невидимы, и удалить их «касанием» значило бы внезапно вернуть стёртое. */
+  function segDist2(p, a, b){
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx * dx + dy * dy;
+    let t = len2 ? ((p.x - a.x) * dx + (p.y - a.y) * dy) / len2 : 0;
+    t = Math.max(0, Math.min(1, t));
+    const x = a.x + t * dx - p.x, y = a.y + t * dy - p.y;
+    return x * x + y * y;
+  }
+  function segsCross(a, b, c, d){
+    const o = (p, q, r) => (q.x - p.x) * (r.y - p.y) - (q.y - p.y) * (r.x - p.x);
+    const d1 = o(c, d, a), d2 = o(c, d, b), d3 = o(a, b, c), d4 = o(a, b, d);
+    return ((d1 > 0) !== (d2 > 0)) && ((d3 > 0) !== (d4 > 0)) && d1 !== 0 && d3 !== 0;
+  }
+  function segSegDist2(a, b, c, d){
+    if (segsCross(a, b, c, d)) return 0;
+    return Math.min(segDist2(a, c, d), segDist2(b, c, d), segDist2(c, a, b), segDist2(d, a, b));
+  }
+  function strokeHit(s, a, b, tol){
+    if (!s || s.tool === 'eraser' || !s.points || !s.points.length) return false;
+    const r = tol + (s.width || 2) / 2, r2 = r * r;
+    const pts = s.points;
+    if (pts.length === 1) return segDist2(pts[0], a, b) <= r2;
+    for (let i = 0; i < pts.length - 1; i++) {
+      if (segSegDist2(pts[i], pts[i + 1], a, b) <= r2) return true;
+    }
+    return false;
+  }
+  // a, b — две точки пути ластика в мировых координатах этой поверхности;
+  // undoPushed — объект жеста: стек отмены получает ОДНУ запись на весь жест
+  function wholeEraseAlong(surface, a, b, gesture){
+    const list = surface === 'bg' ? bgStrokes : strokes;
+    const scale = surface === 'bg' ? bgViewScale : viewScale;
+    const tol = (eraserSize / 2) / scale;
+    const hit = list.filter(s => strokeHit(s, a, b, tol));
+    if (!hit.length) return;
+    if (!gesture.undo) { pushUndo(surface); gesture.undo = true; }
+    rememberRemoved(hit);
+    const gone = new Set(hit);
+    if (surface === 'bg') { bgStrokes = bgStrokes.filter(s => !gone.has(s)); redrawBg(); }
+    else { strokes = strokes.filter(s => !gone.has(s)); redraw(); }
+    gesture.changed = true;
+  }
+  let wholeErase = null;   // { surface, last, undo, changed } — пока идёт жест ластика по штрихам
+
   // ── если перед началом рисования фокус оставался в текстовом поле (например,
   // пользователь только что напечатал ответ и, не кликнув мимо, сразу начал
   // писать на доске), это поле продолжает считаться "активным" — и следующее
@@ -486,6 +544,18 @@
     }
     if (e.pointerType === 'mouse' && e.button !== 0) return;
 
+    if (tool === 'eraser' && eraserMode === 'stroke') {
+      // ластик по штрихам: своего штриха не создаёт и собеседнику ничего не
+      // транслирует — удаление уходит обычным снимком (надгробия removedSids)
+      drawing = true;
+      try { canvas.setPointerCapture(e.pointerId); } catch(_){}
+      const p0 = screenToWorld(e.clientX, e.clientY);
+      wholeErase = { surface: 'sheet', last: p0, undo: false, changed: false };
+      wholeEraseAlong('sheet', p0, p0, wholeErase);
+      e.preventDefault();
+      return;
+    }
+
     drawing = true;
     try { canvas.setPointerCapture(e.pointerId); } catch(_){}
     pushUndo('sheet');
@@ -535,6 +605,13 @@
       e.preventDefault();
       return;
     }
+    if (drawing && wholeErase && wholeErase.surface === 'sheet') {
+      const p = screenToWorld(e.clientX, e.clientY);
+      wholeEraseAlong('sheet', wholeErase.last, p, wholeErase);
+      wholeErase.last = p;
+      e.preventDefault();
+      return;
+    }
     if (!drawing || !currentStroke) return;
     if (tool === 'line') {
       const p = screenToWorld(e.clientX, e.clientY);
@@ -566,6 +643,13 @@
     }
     if (!drawing) return;
     drawing = false;
+    if (wholeErase && wholeErase.surface === 'sheet') {
+      const changed = wholeErase.changed;
+      wholeErase = null;
+      try { canvas.releasePointerCapture(e.pointerId); } catch(_){}
+      if (changed) TS.push();
+      return;
+    }
     if (currentStroke) {
       // на случай, если pointerup пришёл без предшествующего pointermove
       // ровно в этой точке — досчитываем финальную позицию по самому событию
@@ -717,6 +801,16 @@
     }
     if (e.pointerType === 'mouse' && e.button !== 0) return;
 
+    if (tool === 'eraser' && eraserMode === 'stroke') {
+      bgDrawing = true;
+      try { canvasBg.setPointerCapture(e.pointerId); } catch(_){}
+      const p0 = bgScreenToWorld(e.clientX, e.clientY);
+      wholeErase = { surface: 'bg', last: p0, undo: false, changed: false };
+      wholeEraseAlong('bg', p0, p0, wholeErase);
+      e.preventDefault();
+      return;
+    }
+
     bgDrawing = true;
     try { canvasBg.setPointerCapture(e.pointerId); } catch(_){}
     pushUndo('bg');
@@ -740,6 +834,13 @@
       bgPanY = bgPanStartPanY - (e.clientY - bgPanStartClientY) / bgViewScale;
       redrawBg();
       if (window.__boardBroadcastView) window.__boardBroadcastView(); // Промпт №31
+      e.preventDefault();
+      return;
+    }
+    if (bgDrawing && wholeErase && wholeErase.surface === 'bg') {
+      const p = bgScreenToWorld(e.clientX, e.clientY);
+      wholeEraseAlong('bg', wholeErase.last, p, wholeErase);
+      wholeErase.last = p;
       e.preventDefault();
       return;
     }
@@ -770,6 +871,13 @@
     }
     if (!bgDrawing) return;
     bgDrawing = false;
+    if (wholeErase && wholeErase.surface === 'bg') {
+      const changed = wholeErase.changed;
+      wholeErase = null;
+      try { canvasBg.releasePointerCapture(e.pointerId); } catch(_){}
+      if (changed) TS.push();
+      return;
+    }
     if (bgCurrentStroke) {
       let finalPoint = null;
       if (typeof e.clientX === 'number') {
@@ -826,6 +934,62 @@
       updateCursor();
     };
   });
+
+  /* ── Промпт №16: переключатель режима ластика ──
+     Разметку панели не трогаем во всех 29 страницах — переключатель
+     достраивается здесь, в окошке размеров ластика (там его ищут
+     первым делом). Режим виден и без открытого окошка: значок в углу
+     главной кнопки ластика. */
+  (function mountEraserModes(){
+    if (!eraserMainBtn) return;
+    const group = eraserMainBtn.closest('.tool-group');
+    const flyout = group && group.querySelector('.size-flyout');
+    if (!flyout || flyout.querySelector('.be-modes')) return;
+    const st = document.createElement('style');
+    st.textContent =
+      '.be-modes{display:flex;gap:4px;align-items:center;}' +
+      '.be-mode{height:34px;padding:0 11px;border-radius:17px;border:1px solid var(--glass-border);background:var(--glass);' +
+      'color:var(--ink);font-size:12px;font-weight:600;line-height:1;font-family:inherit;cursor:pointer;white-space:nowrap;display:flex;align-items:center;gap:5px;}' +
+      '.be-mode:hover{border-color:var(--ink);}' +
+      '.be-mode.on{background:var(--ink);border-color:var(--ink);color:#fff;}' +
+      '.board-tool-btn.eraser{position:relative;}' +
+      '.be-badge{position:absolute;right:-4px;bottom:-4px;min-width:16px;height:16px;padding:0 3px;border-radius:8px;' +
+      'background:var(--ink);color:#fff;font:700 10px/16px system-ui,sans-serif;text-align:center;pointer-events:none;box-shadow:0 0 0 2px var(--glass-strong,#fff);}';
+    document.head.appendChild(st);
+    const box = document.createElement('div');
+    box.className = 'be-modes';
+    box.innerHTML =
+      '<button type="button" class="be-mode" data-eraser-mode="area" title="Ластик по области: стирает только то, что под ним">▦ Область</button>' +
+      '<button type="button" class="be-mode" data-eraser-mode="stroke" title="Ластик по штрихам: касание штриха удаляет его целиком">〰 Штрих</button>';
+    const sep = document.createElement('span');
+    sep.className = 'toolbar-sep';
+    flyout.insertBefore(sep, flyout.firstChild);
+    flyout.insertBefore(box, flyout.firstChild);
+    const badge = document.createElement('span');
+    badge.className = 'be-badge';
+    eraserMainBtn.appendChild(badge);
+    function paint(){
+      box.querySelectorAll('.be-mode').forEach(b => b.classList.toggle('on', b.dataset.eraserMode === eraserMode));
+      badge.textContent = eraserMode === 'stroke' ? '〰' : '▦';
+      eraserMainBtn.title = eraserMode === 'stroke' ? 'Ластик по штрихам' : 'Ластик по области';
+      eraserMainBtn.dataset.eraserMode = eraserMode;
+    }
+    box.addEventListener('click', (e) => {
+      const b = e.target.closest('.be-mode');
+      if (!b) return;
+      eraserMode = b.dataset.eraserMode === 'stroke' ? 'stroke' : 'area';
+      try { localStorage.setItem('boardEraserMode', eraserMode); } catch (err) {}
+      paint();
+      // выбор режима — это и выбор ластика: иначе человек переключил режим,
+      // а в руке у него по-прежнему ручка
+      if (tool !== 'eraser') eraserMainBtn.click();
+    });
+    paint();
+    window.__boardEraserMode = (m) => {
+      if (m === 'area' || m === 'stroke') { eraserMode = m; paint(); }
+      return eraserMode;
+    };
+  })();
 
   // ── всплывающие окошки с размерами (ручка/ластик): наведение показывает,
   // уход прячет — но с небольшой задержкой, чтобы курсор успевал доехать до
@@ -1195,6 +1359,77 @@
     if (Array.isArray(state.strokes)) { strokes = mergeStrokes(strokes, state.strokes); redraw(); }
     if (Array.isArray(state.bgStrokes)) { bgStrokes = mergeStrokes(bgStrokes, state.bgStrokes); redrawBg(); }
     if (state.__view && TS.studentRestricted && TS.studentRestricted('boardPan')) applyView(state.__view);
+  };
+
+  /* ═══ Промпт №16: штрихи для конспекта ═══
+     Конспект (lesson-notes.js) забирает записи вокруг задания перед его
+     сменой. Отдаём их в координатах ОКНА (как getBoundingClientRect), а не в
+     своих мировых: у листа и у фона миры разные (лист — пиксели листа с
+     панорамой, фон — документ с панорамой и масштабом), а конспекту нужна
+     одна система, общая со снимком задания. Толщина — тоже в пикселях окна.
+     opts.rect — забрать только штрихи, чей центр внутри прямоугольника
+     (расширенного на opts.inflate): карточка «+» на странице с несколькими
+     заданиями. Без rect — все штрихи обеих поверхностей.
+     opts.remove — убрать их с доски (с записью в стек отмены и рассылкой,
+     как у clearBoardInScreenRect). Порядок в ответе — порядок рисования:
+     сначала фон (он под листом), потом лист; ластик стирает только свою
+     поверхность, поэтому поверхность у каждого штриха указана. */
+  window.__boardTakeStrokes = function(opts){
+    opts = opts || {};
+    const rect = opts.rect || null, inflate = opts.inflate || 0;
+    // лист считаем от прямоугольника САМОГО листа задания, а не холста: в
+    // большинстве тренажёров у холста в CSS position:fixed при координатах
+    // документа (раздел 10 HANDOFF), и после прокрутки холст съезжает с
+    // задания на величину прокрутки. Мировые координаты листа — это пиксели
+    // листа, поэтому от листа и считаем: так записи ложатся на задание так,
+    // как их писали при непрокрученной странице
+    const target = resolveBoardTarget();
+    const cRect = (target || canvas).getBoundingClientRect();
+    const sheetVisible = canvas.style.display !== 'none' && cRect.width > 0;
+    const toView = {
+      sheet: (p) => ({ x: cRect.left + (p.x - panX) * viewScale, y: cRect.top + (p.y - panY) * viewScale }),
+      bg: (p) => ({ x: (p.x - bgPanX - window.scrollX) * bgViewScale, y: (p.y - bgPanY - window.scrollY) * bgViewScale }),
+    };
+    const scaleOf = { sheet: viewScale, bg: bgViewScale };
+    function pick(list, surface){
+      if (surface === 'sheet' && !sheetVisible) return [];
+      return list.filter(s => {
+        if (!s || !s.points || !s.points.length) return false;
+        if (!rect) return true;
+        let sx = 0, sy = 0;
+        for (const p of s.points) { sx += p.x; sy += p.y; }
+        const c = toView[surface]({ x: sx / s.points.length, y: sy / s.points.length });
+        return c.x >= rect.left - inflate && c.x <= rect.left + rect.width + inflate &&
+               c.y >= rect.top - inflate && c.y <= rect.top + rect.height + inflate;
+      });
+    }
+    const takeBg = pick(bgStrokes, 'bg'), takeSheet = pick(strokes, 'sheet');
+    const out = [];
+    [['bg', takeBg], ['sheet', takeSheet]].forEach(([surface, list]) => {
+      list.forEach(s => out.push({
+        surface, tool: s.tool, color: s.color || '#000000',
+        width: (s.width || 2) * scaleOf[surface],
+        points: s.points.map(toView[surface]),
+      }));
+    });
+    if (opts.remove && (takeBg.length || takeSheet.length)) {
+      if (takeSheet.length) {
+        pushUndo('sheet');
+        rememberRemoved(takeSheet);
+        const gone = new Set(takeSheet);
+        strokes = strokes.filter(s => !gone.has(s));
+        redraw();
+      }
+      if (takeBg.length) {
+        pushUndo('bg');
+        rememberRemoved(takeBg);
+        const gone = new Set(takeBg);
+        bgStrokes = bgStrokes.filter(s => !gone.has(s));
+        redrawBg();
+      }
+      TS.push();
+    }
+    return out;
   };
 
   // прокрутка страницы — часть вида: учитель прокручивает лист с заданиями,

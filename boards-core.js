@@ -7892,13 +7892,37 @@ window.boardsPersistQuiet = function(board){
 // подтверждения входа; если boards-cloud.js на странице нет вообще —
 // вызываем сразу же, как и раньше, чтобы обычная локальная работа никак
 // не зависела от облака.
+/* Промпт №16: «Сохранить как доску» в конспекте (notes.html) не пишет в
+   нашу базу сам — он оставляет готовую доску в ogeNotesDB (outbox) и
+   открывает boards.html#board=<id>. Забираем её здесь, обычным saveDB со
+   слиянием вкладок (idbSaveMerged), — так её не затрёт другая открытая
+   вкладка досок и не потеряется отметка «грязная» */
+async function importNotesOutbox(){
+  if (!window.NotesStore || !window.NotesStore.takeOutbox) return 0;
+  let items = [];
+  try { items = await window.NotesStore.takeOutbox(); } catch (e) { return 0; }
+  let n = 0;
+  items.forEach(it => {
+    const b = it && it.board;
+    if (!b || !b.id || !Array.isArray(b.objects) || DB.boards.some(x => x.id === b.id)) return;
+    b.folderId = null;
+    b.recentColors = PALETTE.map(p => p.tok);
+    b.colorUsage = {};
+    b.imageLib = [];
+    DB.boards.push(b);
+    touchBoard(b);
+    n++;
+  });
+  if (n) saveDB();
+  return n;
+}
 window.boardsAppBoot = function(){
   if (window.__boardsBooted) return;
   window.__boardsBooted = true;
   // сначала дочитываем доски из IndexedDB (и, если надо, переносим туда
   // старые), и только потом рисуем список — иначе на экране мелькнул бы
   // пустой список или устаревшее содержимое
-  idbLoadDB().then(() => {
+  idbLoadDB().then(() => importNotesOutbox()).then(() => {
     if (DB.sortMode && sortLabels[DB.sortMode]){
       sortMode = DB.sortMode;
       const lbl = document.getElementById('blSortLabel');
