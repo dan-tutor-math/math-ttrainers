@@ -35,7 +35,10 @@ logarithms.html и logarithms-bank.js.
   J. «В подборку» (индексы не склеиваются), главная (10 и 11 класс), доска:
      задание ложится живым (поле и выбор), −3/2 принимается, «ещё такое
      же» — та же тренировка и уровень;
-  K. телефон 375 и 320 px, планшет 768: без прокрутки вбок.
+  K. телефон 375 и 320 px, планшет 768: без прокрутки вбок;
+  L. формулы через KaTeX: в 2400 заданиях без ошибок KaTeX и без старой
+     разметки, корни — знаком KaTeX по размеру выражения, пропуск «?» в
+     формуле и число в нём после ответа, тёмная тема.
 
 Живой realtime из песочницы не проверить — совместный режим перепроверяется
 на сайте руками.
@@ -263,9 +266,10 @@ def test_tiles(browser):
       const area = rects.reduce((s, r) => s + r.width * r.height, 0);
       return { n: tiles.length, mix: !!document.querySelector('.tile.mix[data-pid="all"]'),
         cols: getComputedStyle(document.getElementById('tiles')).gridTemplateColumns.split(' ').length, width: box.width,
-        full: tiles.filter(t => !t.classList.contains('mix')).every(t => t.querySelector('.tile-title').textContent.trim() && t.querySelector('.tile-formula .lg, .tile-formula .pw') && t.querySelector('.demo .demo-line')),
-        fracs: ['quot', 'basepow', 'bothpow', 'change', 'swap'].every(id => document.querySelector('.tile[data-pid="' + id + '"] .tile-formula .frac')),
-        subs: document.querySelectorAll('.tile-formula sub').length,
+        // с перевода на KaTeX формула — .katex, индексы — .msupsub, дроби — .mfrac
+        full: tiles.filter(t => !t.classList.contains('mix')).every(t => t.querySelector('.tile-title').textContent.trim() && t.querySelector('.tile-formula .katex .msupsub') && t.querySelector('.demo .demo-line')),
+        fracs: ['quot', 'basepow', 'bothpow', 'change', 'swap'].every(id => document.querySelector('.tile[data-pid="' + id + '"] .tile-formula .katex .mfrac')),
+        subs: document.querySelectorAll('.tile-formula .katex .msupsub').length,
         // без дыр: сумма площадей плиток плюс промежутки ≈ площадь сетки
         fill: area / (box.width * box.height) };
     }""")
@@ -572,14 +576,15 @@ def test_platform(browser):
     page.click("#basketAddBtn")
     it = page.evaluate("() => Basket.all().slice(-1)[0]")
     check("J: «В подборку» — задание со свойством и уровнем", it and it["trainerId"] == "logarithms" and "Логарифм произведения · уровень А" == it["modeTitle"], str(it)[:200])
-    glued = re.search(r"log\d", it["text"])
-    subs = any(ch in it["text"] for ch in "₀₁₂₃₄₅₆₇₈₉")
-    check("J: в подборке индексы не склеиваются: log₂ в тексте, <sub> в разметке",
-          not glued and (subs and "<sub>" in it["html"] or "lg " in it["text"]), it["text"][:120])
+    # формулы KaTeX «Подборка» уносит исходником TeX (basket-tex) и рисует
+    # заново тем же KaTeX — индексы не склеиваются: \log_{2}
+    glued = re.search(r"(?<!\\)log\d", it["text"])
+    check("J: в подборке индексы не склеиваются: формула уходит исходником KaTeX",
+          not glued and "basket-tex" in it["html"] and ("\\log_{" in it["text"] or "\\lg" in it["text"]), it["text"][:120])
     page.evaluate("() => { Basket.clear(); startRun(['change'], 1); let i = 0; while (!S.task.choice && i++ < 80) newTask(); }")
     page.click("#basketAddBtn")
     it = page.evaluate("() => Basket.all().slice(-1)[0]")
-    check("J: у выбора формулы — варианты списком и дроби вертикальные", "basket-opt" in it["html"] and "basket-frac" in it["html"] and "<button" not in it["html"], it["html"][:200])
+    check("J: у выбора формулы — варианты списком, формулы (с дробями) — KaTeX", "basket-opt" in it["html"] and "basket-tex" in it["html"] and "frac{" in it["text"] and "<button" not in it["html"], it["html"][:200])
     page.evaluate("() => Basket.clear()")
     ctx.close()
 
@@ -656,6 +661,45 @@ def test_platform(browser):
     ctx.close()
 
 
+# ─── L. формулы через KaTeX (после промпта №79: «арифметические корни
+#        неправильно отображаются» — свой наборщик рисовал черту корня из CSS) ───
+def test_katex(browser):
+    ctx, page, errors = open_page(browser)
+    page.wait_for_function("() => document.documentElement.classList.contains('katex-fonts-ready')", timeout=5000)
+    r = page.evaluate("""() => { const out = { n: 0, err: [], old: 0, rootTasks: 0, rootOk: 0 };
+      const hasRoot = x => Array.isArray(x) && (x[0] === 'root' || x.some(hasRoot));
+      for (const p of LOG_BANK.props) for (let L = 1; L <= 4; L++) for (let i = 0; i < 60; i++) {
+        const t = LOG_BANK.generate([p.id], L); out.n++;
+        const all = t.text + t.steps.join('') + t.answer + (t.choice ? t.choice.opts.join('') : '') + (t.slotEq || '') + (t.filledHTML || '');
+        if (/katex-error/.test(all)) out.err.push(t.peek);
+        // старой разметки наборщика в задании больше нет
+        if (/class="(rt|rad|frac|pw|lg)"/.test(all)) out.old++;
+        if ((t.meta.chain || []).some(hasRoot)) { out.rootTasks++; if (/class="[^"]*\\bsqrt\\b/.test(all)) out.rootOk++; }
+      } return out; }""")
+    check(f"L: {r['n']} заданий — формулы рисует KaTeX без ошибок, старой разметки нет", not r["err"] and r["old"] == 0, str(r["err"][:2]) + f" old={r['old']}")
+    check(f"L: корни ({r['rootTasks']} заданий с корнем) — знаком корня KaTeX", r["rootTasks"] > 20 and r["rootOk"] == r["rootTasks"], str(r))
+    # корень на экране: черта над подкоренным выражением и знак — одна высота
+    # newTask, а не ⟳: ⟳ держит вид задания, а корни — только в одном виде
+    page.evaluate("() => { startRun(['bothpow'], 3); let i = 0; while (!/sqrt/.test(S.task.text) && i++ < 300) newTask(); }")
+    g = page.evaluate("""() => { const sq = document.querySelector('#logQuestion .log-expr .sqrt'); if (!sq) return null;
+        const svg = sq.querySelector('svg'), r = sq.getBoundingClientRect(), rs = svg && svg.getBoundingClientRect();
+        return { w: r.width, h: r.height, svg: !!svg, inside: rs && rs.left >= r.left - 1 && rs.right <= r.right + 1 }; }""")
+    check("L: корень в условии — знак и черта KaTeX (svg) по размеру выражения", g and g["svg"] and g["inside"] and g["w"] > 10, str(g))
+    # пропуск «?»: рамка в формуле, после ответа — верное число в той же рамке
+    page.evaluate("() => { startRun(['pow'], 2); drawTask(LOG_BANK.generate(S.props, 2, { type: 'simp' }), true); }")
+    before = page.evaluate("() => { const s = document.querySelector('#logQuestion .log-expr .katex .slot'); return s ? s.textContent.trim() : null; }")
+    page.evaluate(f"() => ({SOLVE_JS})(-1)")
+    after = page.evaluate("() => { const s = document.querySelector('#logQuestion .log-expr .katex .slot.filled'); return s ? s.textContent : null; }")
+    want = page.evaluate("() => S.task.fields[0].value")
+    check("L: пропуск «?» в формуле, после ответа — верное число в рамке", before == "?" and after and all(ch in after for ch in want.replace("-", "").replace("/", "")), f"{before} → {after} ({want})")
+    # тёмная тема — формулы цветом текста, не чёрным
+    page.evaluate("() => document.documentElement.setAttribute('data-theme', 'dark')")
+    col = page.evaluate("() => [getComputedStyle(document.querySelector('#logQuestion .log-expr .katex')).color, getComputedStyle(document.querySelector('#logQuestion .log-expr')).color]")
+    check("L: тёмная тема — формула цветом текста страницы", col[0] == col[1], str(col))
+    check("L: без ошибок JS", not errors, str(errors[:1]))
+    ctx.close()
+
+
 # ─── K. телефон и планшет ───
 def test_phone(browser):
     for w in (375, 320, 768):
@@ -683,7 +727,7 @@ def test_phone(browser):
 def run():
     with local_server(), sync_playwright() as p:
         browser = p.chromium.launch()
-        for t in (test_bank, test_tiles, test_select_and_modes, test_solve, test_parse, test_cards, test_session, test_platform, test_phone):
+        for t in (test_bank, test_tiles, test_select_and_modes, test_solve, test_parse, test_cards, test_session, test_platform, test_katex, test_phone):
             try:
                 t(browser)
             except Exception as e:  # noqa: BLE001

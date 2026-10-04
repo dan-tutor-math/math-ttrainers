@@ -306,6 +306,10 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .sys-brace{display:flex;align-items:center;font-family:Georgia,'Times New Roman',serif;font-size:2.3em;line-height:.5;color:var(--muted-5);font-weight:300;transform:scaleY(1.05);}
 .sys-lines{display:flex;flex-direction:column;justify-content:center;gap:6px;}
 .sys-line{font-family:var(--font-mono);font-size:19px;color:var(--muted-5);white-space:nowrap;}
+.sys-ask{margin-top:12px;}
+/* обыкновенная дробь в разборе — числитель над знаменателем, как в тетради */
+.vfrac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;font-size:.82em;line-height:1.15;margin:0 .12em;}
+.vfrac>.vnum{border-bottom:1px solid currentColor;padding:0 .2em;}
 
 /* ─── MCQ ─── */
 .mcq-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3);margin-bottom:10px;}
@@ -811,6 +815,245 @@ function gen_S2() {
   return gen_S2();
 }
 
+/* ═══════════════ СИСТЕМА НЕРАВЕНСТВ: ОТВЕТ — РИСУНОК НА ПРЯМОЙ ═══════════════
+   Тип 3 — прототип из открытого банка (решу ОГЭ): решить систему двух
+   линейных неравенств и выбрать рисунок, на котором изображено множество
+   решений. Того же вида задание в демоверсии 2027, но там оно одно; здесь —
+   генератор. Ответ бывает трёх форм, как в банке: отрезок между границами
+   (чаще всего), луч (оба неравенства «в одну сторону» — как в демоверсии)
+   и «система не имеет решений» (в банке это обычный неверный вариант,
+   поэтому верным он выпадает редко).
+   Рисунки — SVG в currentColor, как у нулевого типа: после ответа они
+   краснеют и зеленеют вместе с кнопкой, а задание целиком — данные (строки),
+   поэтому едет в снимок сессии, в «+», в подборку и на доску без функций. */
+
+// Граница промежутка. Дробь храним числителем и знаменателем, а не числом:
+// на рисунке и в разборе она пишется вертикально, как в КИМ (13 над 5), а
+// округлённое «−2,6» на рисунке было бы уже другим заданием
+function s3Int(n) { return { v: n, kind: 'int' }; }
+function s3Dec(x) { return { v: Math.round(x * 10) / 10, kind: 'dec' }; }
+function s3Frac(p, q) { return { v: p / q, kind: 'frac', p, q }; }
+function s3Gcd(a, b) { a = Math.abs(a); b = Math.abs(b); while (b) [a, b] = [b, a % b]; return a; }
+
+// случайная граница: в основном целая, иногда дробь со знаменателем 2, 4, 5
+// (тогда в разборе её можно честно сравнить десятичной записью) и изредка
+// десятичная, как −1,1 в демоверсии
+function s3RandBound(kind) {
+  if (kind === 'frac') {
+    for (;;) {
+      const q = pick([2, 4, 5]), p = ri(-40, 40);
+      if (p % q === 0 || s3Gcd(p, q) !== 1 || Math.abs(p / q) > 9) continue;
+      return s3Frac(p, q);
+    }
+  }
+  if (kind === 'dec') {
+    for (;;) {
+      const x = ri(-89, 89) / 10;
+      if (Number.isInteger(x)) continue;
+      return s3Dec(x);
+    }
+  }
+  return s3Int(ri(-9, 9));
+}
+function s3Txt(b) { return b.kind === 'frac' ? `${b.p < 0 ? '−' : ''}${Math.abs(b.p)}/${b.q}` : fmtNum(b.v); }
+function s3Html(b) {
+  if (b.kind !== 'frac') return fmtNum(b.v);
+  return `${b.p < 0 ? '−' : ''}<span class="vfrac"><span class="vnum">${Math.abs(b.p)}</span><span class="vden">${b.q}</span></span>`;
+}
+
+// Неравенство, которое после решения даёт «x rel b». Запись — как в банке:
+// «5x + 13 ≤ 0», «x + 5 ≥ 1», «7 − 3x ≤ 1», «−35 + 5x > 0», «4 − x > 0», «x > 3».
+// Возвращает и строку условия, и сами числа (a, k, op, c): по ним тест
+// независимо решает неравенство и сверяет рисунок
+function s3Ineq(b, rel) {
+  for (let t = 0; t < 500; t++) {
+    let a;
+    if (b.kind === 'frac') {
+      // коэффициент — кратное знаменателю, иначе граница не вышла бы этой дробью
+      a = b.q * ri(1, Math.floor(9 / b.q)) * (Math.random() < 0.65 ? 1 : -1);
+    } else if (b.kind === 'dec') {
+      a = Math.random() < 0.75 ? 1 : -1;
+    } else {
+      const r = Math.random();
+      a = r < 0.35 ? 1 : r < 0.5 ? -1 : ri(2, 9) * (Math.random() < 0.6 ? 1 : -1);
+    }
+    const K = Math.round(a * b.v * 10) / 10;   // a·x op K
+    const op = a < 0 ? flipOp(rel) : rel;
+    // «x > 3» без всего — только с коэффициентом 1 и целой/десятичной границей
+    if (a === 1 && Math.random() < 0.3) {
+      return { text: `x ${op} ${s3Html(b)}`, a, k: 0, op, c: b.v, bare: true };
+    }
+    const ax = Math.abs(a) === 1 ? 'x' : `${Math.abs(a)}x`;
+    // граница 0: без числа слева, «−3x < 0», — иначе выходило «14 − x > 14»
+    if (K === 0) {
+      if (a === 1) return { text: `x ${op} 0`, a, k: 0, op, c: 0, bare: true };
+      return { text: `${a < 0 ? '−' : ''}${ax} ${op} 0`, a, k: 0, op, c: 0, bare: false };
+    }
+    let k, c;
+    if (Math.random() < 0.35) { k = -K; c = 0; }                     // «5x + 13 ≤ 0»
+    else { k = ri(1, 20) * pick([1, -1]); c = Math.round((K + k) * 10) / 10; }
+    if (b.kind === 'dec' && Math.random() < 0.5) { k = -K; c = 0; }  // «x + 1,1 ≥ 0»
+    if (k === 0 || c === k || Math.abs(c) > 40 || Math.abs(k) > 40) continue;
+    // иногда число впереди: «7 − 3x ≤ 1», «−35 + 5x > 0» — так в банке тоже бывает,
+    // и именно здесь ученики теряют минус при коэффициенте
+    const constFirst = Math.random() < (a < 0 ? 0.75 : 0.3);
+    const text = constFirst
+      ? `${fmtNum(k)} ${a > 0 ? '+' : '−'} ${ax} ${op} ${fmtNum(c)}`
+      : `${a < 0 ? '−' : ''}${ax} ${k > 0 ? '+' : '−'} ${fmtNum(Math.abs(k))} ${op} ${fmtNum(c)}`;
+    return { text, a, k, op, c, bare: false };
+  }
+  return s3Ineq(b, rel);
+}
+
+// Разбор одного неравенства — по строкам: перенос числа, деление на
+// коэффициент; при отрицательном — напоминание, что знак меняется
+function s3Steps(q, b, rel) {
+  if (q.bare) return `${q.text} — уже решено.`;
+  const K = Math.round((q.c - q.k) * 10) / 10;
+  const ax = q.a === 1 ? 'x' : q.a === -1 ? '−x' : `${fmtNum(q.a)}x`;
+  // без числа слева («−3x < 0») переносить нечего — сразу делим
+  let s = q.k === 0 ? q.text : `${q.text} ⟺ ${ax} ${q.op} ${fmtNum(K)}`;
+  if (q.a === 1) return s + '.';
+  s += ` ⟺ x ${rel} ${s3Html(b)}`;
+  if (q.a < 0) s += q.a === -1 ? ' (умножаем на −1 — знак меняется)' : ` (делим на ${fmtNum(q.a)} — знак меняется)`;
+  return s + '.';
+}
+
+// Рисунок: прямая со стрелкой и «x», точки с подписями, штриховка над
+// прямой — как в КИМ. points: [{x, b, open}], shade: [[от, до]] в пикселях
+// (null — до края). Выколотую точку не заливаем цветом фона: фон кнопки
+// полупрозрачный, разный в светлой и тёмной теме и на доске, — вместо этого
+// сама прямая рвётся под кружком
+function s3Pic(points, shade) {
+  const Y = 18, R = 3.6;
+  let line = '', from = 4;
+  points.filter(p => p.open).map(p => p.x).sort((a, b) => a - b).forEach(x => {
+    line += `M${from} ${Y}H${x - R}`; from = x + R;
+  });
+  line += `M${from} ${Y}H238`;
+  const openAt = x => points.some(p => p.x === x && p.open);
+  let hatch = '';
+  shade.forEach(([a, b]) => {
+    // у выколотой точки штрихи начинаются дальше — не залезают в кружок
+    const start = a == null ? 8 : a + (openAt(a) ? R + 1 : 1);
+    const end = b == null ? 224 : b - (openAt(b) ? R + 1 : 5);
+    for (let x = start; x <= end; x += 6) hatch += `M${x.toFixed(1)} ${Y - 1}l5 -7`;
+  });
+  const dots = points.map(p => {
+    const dot = p.open
+      ? `<circle cx="${p.x}" cy="${Y}" r="${R}" fill="none" stroke="currentColor" stroke-width="1.3"/>`
+      : `<circle cx="${p.x}" cy="${Y}" r="${R}" fill="currentColor"/>`;
+    let lab;
+    if (p.b.kind === 'frac') {
+      // дробь вертикально: минус слева от черты, числитель над знаменателем
+      const n = String(Math.abs(p.b.p)), w = Math.max(n.length, String(p.b.q).length) * 7 + 4;
+      lab = (p.b.p < 0 ? `<text x="${p.x - w / 2 - 6}" y="${Y + 25}" text-anchor="middle" font-size="13" fill="currentColor">−</text>` : '') +
+        `<text x="${p.x}" y="${Y + 17}" text-anchor="middle" font-size="11.5" fill="currentColor">${n}</text>` +
+        `<line x1="${p.x - w / 2}" y1="${Y + 21}" x2="${p.x + w / 2}" y2="${Y + 21}" stroke="currentColor" stroke-width="1"/>` +
+        `<text x="${p.x}" y="${Y + 32}" text-anchor="middle" font-size="11.5" fill="currentColor">${p.b.q}</text>`;
+    } else {
+      lab = `<text x="${p.x}" y="${Y + 22}" text-anchor="middle" font-size="13" fill="currentColor">${fmtNum(p.b.v)}</text>`;
+    }
+    return dot + lab;
+  }).join('');
+  return `<svg viewBox="0 0 250 54" width="300" height="65" role="img" style="display:block;max-width:100%;height:auto">
+    <path d="${line}" stroke="currentColor" stroke-width="1.4" fill="none"/>
+    <path d="M246 ${Y}l-10 -4v8z" fill="currentColor"/>
+    <text x="236" y="${Y + 20}" text-anchor="middle" font-size="13" font-style="italic" fill="currentColor">x</text>
+    <path d="${hatch}" stroke="currentColor" stroke-width="1.1" fill="none"/>${dots}</svg>`;
+}
+
+// Варианты — описания, а не готовые картинки: по описанию тест проверяет,
+// что верный рисунок изображает именно множество решений, а неверные — нет.
+// lo, hi — точки слева и справа (их значения и выколотость)
+const S3_NONE = 'система не имеет решений';
+function s3Draw(d, lo, hi) {
+  const X1 = 80, X2 = 165, X0 = 120;
+  switch (d) {
+    case 'seg':     return s3Pic([{ x: X1, ...lo }, { x: X2, ...hi }], [[X1, X2]]);
+    // ловушка из банка: тот же отрезок, но подписи переставлены — ученик,
+    // который не сравнил −4 и −13/5, выбирает его
+    case 'segSwap': return s3Pic([{ x: X1, ...hi }, { x: X2, ...lo }], [[X1, X2]]);
+    case 'outer':   return s3Pic([{ x: X1, ...lo }, { x: X2, ...hi }], [[null, X1], [X2, null]]);
+    case 'rayRlo':  return s3Pic([{ x: X0, ...lo }], [[X0, null]]);
+    case 'rayRhi':  return s3Pic([{ x: X0, ...hi }], [[X0, null]]);
+    case 'rayLlo':  return s3Pic([{ x: X0, ...lo }], [[null, X0]]);
+    case 'rayLhi':  return s3Pic([{ x: X0, ...hi }], [[null, X0]]);
+    default:        return S3_NONE;
+  }
+}
+
+function gen_S3() {
+  for (let t = 0; t < 500; t++) {
+    // какая граница «неудобная»: дробь — четверть заданий, десятичная — изредка
+    const r = Math.random();
+    const oddKind = r < 0.25 ? 'frac' : r < 0.35 ? 'dec' : null;
+    const b1 = s3RandBound(oddKind || 'int'), b2 = s3RandBound('int');
+    if (b1.v === b2.v) continue;
+    const [L, H] = b1.v < b2.v ? [b1, b2] : [b2, b1];
+    if (H.v - L.v > 14) continue;
+    // форма ответа: отрезок — основной вид банка, луч — как в демоверсии,
+    // «нет решений» — редко (в банке это почти всегда неверный вариант)
+    const r2 = Math.random();
+    const shape = r2 < 0.65 ? 'seg' : r2 < 0.9 ? 'ray' : 'none';
+    // строгость обычно одна на всю систему (так в банке), иногда разная
+    let sL = Math.random() < 0.5, sH = sL;
+    if (Math.random() < 0.25) sH = !sL;
+    let relL, relH, correct, pool, must;
+    const ge = s => (s ? '>' : '≥'), le = s => (s ? '<' : '≤');
+    const rayRight = Math.random() < 0.5;
+    if (shape === 'seg') {
+      relL = ge(sL); relH = le(sH); correct = 'seg';
+      must = (L.v < 0 && H.v < 0) || L.kind !== 'int' || H.kind !== 'int' ? (Math.random() < 0.6 ? ['segSwap'] : []) : [];
+      pool = ['rayLhi', 'rayRlo', 'outer', 'none', 'rayLlo', 'rayRhi'];
+    } else if (shape === 'ray') {
+      // оба вправо — ответ луч от большей границы; главная ловушка — луч от меньшей
+      if (rayRight) { relL = ge(sL); relH = ge(sH); correct = 'rayRhi'; must = ['rayRlo']; pool = ['seg', 'outer', 'rayLhi', 'rayLlo', 'none']; }
+      else          { relL = le(sL); relH = le(sH); correct = 'rayLlo'; must = ['rayLhi']; pool = ['seg', 'outer', 'rayRlo', 'rayRhi', 'none']; }
+    } else {
+      relL = le(sL); relH = ge(sH); correct = 'none'; must = ['seg'];
+      pool = ['outer', 'rayRhi', 'rayLlo', 'rayRlo', 'rayLhi'];
+    }
+    const qL = s3Ineq(L, relL), qH = s3Ineq(H, relH);
+    const lo = { b: L, open: relL === '>' || relL === '<' };
+    const hi = { b: H, open: relH === '>' || relH === '<' };
+    const picks = [...must, ...shuffleArr(pool)].slice(0, 3);
+    const descs = shuffleArr([correct, ...picks]);
+    const options = descs.map(d => s3Draw(d, lo, hi));
+    const correctIndex = descs.indexOf(correct);
+    const firstL = Math.random() < 0.5;
+    const [q1, q2] = firstL ? [qL, qH] : [qH, qL];
+    const [st1, st2] = firstL ? [s3Steps(qL, L, relL), s3Steps(qH, H, relH)] : [s3Steps(qH, H, relH), s3Steps(qL, L, relL)];
+
+    // итог разбора: где лежат лучи, какая общая часть, какие точки закрашены
+    const cmp = (L.kind === 'frac' || H.kind === 'frac')
+      ? `<br>Сравним границы: ${[L, H].filter(b => b.kind === 'frac').map(b => `${s3Html(b)} = ${fmtNum(b.v)}`).join(', ')}, значит ${s3Html(L)} &lt; ${s3Html(H)}.`
+      : '';
+    const dotWord = p => `${s3Html(p.b)} — ${p.open ? 'выколотая (неравенство строгое, само число не подходит)' : 'закрашенная (неравенство нестрогое, само число подходит)'}`;
+    let fin;
+    if (shape === 'seg') {
+      fin = `Одно неравенство — луч вправо от ${s3Html(L)}, другое — луч влево от ${s3Html(H)}. Система требует, чтобы оба выполнялись сразу: общая часть лучей — промежуток между ${s3Html(L)} и ${s3Html(H)}. Точки: ${dotWord(lo)}; ${dotWord(hi)}.`;
+    } else if (shape === 'ray') {
+      const end = rayRight ? hi : lo;
+      fin = rayRight
+        ? `Оба луча идут вправо, общая часть — тот, что начинается правее: x ${relH} ${s3Html(H)}. Точка ${dotWord(end)}.`
+        : `Оба луча идут влево, общая часть — тот, что заканчивается левее: x ${relL} ${s3Html(L)}. Точка ${dotWord(end)}.`;
+    } else {
+      fin = `Один луч идёт влево от ${s3Html(L)}, другой — вправо от ${s3Html(H)}, а ${s3Html(L)} &lt; ${s3Html(H)}: общих точек у лучей нет, система не имеет решений.`;
+    }
+    return {
+      subtype: 'С3',
+      prompt: `Решите систему неравенств${fmtSystemHTML(q1.text + ',', q2.text + '.')}<div class="sys-ask">На каком рисунке изображено множество её решений?</div>`,
+      options, correctIndex,
+      explain: `Решим каждое неравенство:<br>${st1}<br>${st2}${cmp}<br>${fin}<br>Это ${correct === 'none' ? 'вариант' : 'рисунок'} ${correctIndex + 1}.`,
+      // числа задания для теста: он сам решает неравенства и сверяет рисунки
+      meta: { shape, descs, lines: [q1, q2].map(q => ({ a: q.a, k: q.k, op: q.op, c: q.c })),
+              lo: { v: L.v, label: s3Txt(L), open: lo.open }, hi: { v: H.v, label: s3Txt(H), open: hi.open } }
+    };
+  }
+  return gen_S3();
+}
+
 /* ═══════════════ КВАДРАТНЫЕ НЕРАВЕНСТВА ═══════════════ */
 function gen_K1() {
   const a = ri(3, 12);
@@ -956,6 +1199,8 @@ const GROUPS = [
   { title: 'Системы неравенств', modes: [
     { id: 'S1', title: 'Система неравенств тип 1', gen: gen_S1 },
     { id: 'S2', title: 'Система неравенств тип 2', gen: gen_S2 },
+    // тип 3 — ответ рисунком на координатной прямой, как в банке и демоверсии
+    { id: 'S3', title: 'Система неравенств тип 3', gen: gen_S3 },
   ]},
   { title: 'Квадратные неравенства', modes: [
     { id: 'K1', title: 'Квадратное неравенство тип 1', gen: gen_K1 },

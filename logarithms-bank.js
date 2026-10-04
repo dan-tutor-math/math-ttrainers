@@ -77,10 +77,10 @@
   const SLOT = ['slot'];
 
   /* ═══════════════ рисование формул ═══════════════
-     Свой маленький наборщик вместо KaTeX: формул немного, а KaTeX весит
-     сотни килобайт и «Подборка» разбирает его вёрстку только через
-     скрытую TeX-аннотацию. Здесь — обычные sub/sup и вертикальная дробь
-     .frac/.num/.den, которую понимают и «Подборка», и снимок на доску.
+     Сначала здесь был свой маленький наборщик (sub/sup, дробь .frac, корень
+     с чертой из CSS) — теперь он запасной (renderHTML), а рисует KaTeX
+     (ниже, «формулы через KaTeX»): у своего наборщика знак корня и черта
+     расходились. renderHTML остаётся на случай страницы без KaTeX.
      <wbr> после «+», «−», «·» и «=» — места, где длинная строка может
      перенестись на телефоне (логарифм, степень и дробь не рвутся). */
   const PREC = { '+': 1, '-': 1, '*': 2, 'neg': 2, 'log': 3, 'lg': 3, 'pow': 4 };
@@ -94,14 +94,15 @@
     return '<span class="mn">' + (n < 0 ? '−' : '') + s + '</span>';
   }
   const par = h => '<span class="mp">(</span>' + h + '<span class="mp">)</span>';
-  function wrapIf(t, cond){ const h = render(t); return cond ? par(h) : h; }
+  function wrapIf(t, cond){ const h = renderHTML(t); return cond ? par(h) : h; }
   // аргумент логарифма: скобки у суммы, произведения, отрицательного и
   // вложенного логарифма; у степени, дроби и корня — нет (log₂ 8⁵, log₃ 54/2)
   function argHTML(t){
     const needs = isNegative(t) || (Array.isArray(t) && ['+', '-', '*', 'log', 'lg'].indexOf(t[0]) >= 0);
-    return '<span class="la">' + (needs ? par(render(t)) : render(t)) + '</span>';
+    return '<span class="la">' + (needs ? par(renderHTML(t)) : renderHTML(t)) + '</span>';
   }
-  function render(t){
+  function renderHTML(t){
+    const render = renderHTML;
     if (typeof t === 'number') return numHTML(t);
     switch (t[0]){
       case 'v': return '<i class="mv">' + t[1] + '</i>';
@@ -136,6 +137,73 @@
       case '-': return render(t[1]) + '<span class="mo">−</span><wbr>' + wrapIf(t[2], prec(t[2]) <= 1 || isNegative(t[2]));
     }
     return '';
+  }
+
+  /* ═══════════════ формулы через KaTeX ═══════════════
+     Свой наборщик (renderHTML выше) рисовал корень чертой из CSS, и в
+     условиях вида log_√3 ∛9 или (∛4)⁶ знак корня и черта расходились —
+     арифметические корни выглядели неправильно. Теперь то же дерево
+     переводится в TeX и рисуется KaTeX — как в ЕГЭ и ОГЭ №8: корни,
+     дроби, индексы и степени ставит сам KaTeX. Дерево по-прежнему одно на
+     картинку и проверку (тест вычисляет его своим вычислителем).
+     KaTeX подключён прямо в logarithms.html; без него (страница без
+     библиотеки) — старый наборщик.
+     sc — внутри индекса или показателя: там дробь обычная \frac, снаружи
+     — \dfrac, во весь рост, как в тетради. */
+  const KATEX_OPTS = { throwOnError: false, output: 'htmlAndMathml', strict: 'ignore',
+    // \htmlClass — только для пропуска «?» (рамка и заполнение после ответа)
+    trust: ctx => ctx.command === '\\htmlClass' };
+  const numTeX = n => (n < 0 ? '-' : '') + String(Math.abs(n)).replace('.', '{,}');
+  function tex(t, sc, inFr){
+    if (typeof t === 'number') return numTeX(t);
+    const T = x => tex(x, sc, inFr), S = x => tex(x, true);
+    // \left( \right) — только вокруг дробей во весь рост: KaTeX не
+    // переносит строку внутри \left…\right, и длинное вычитаемое уровня Г
+    // «− (log₁₂ 18 + log₁₂ 2 + log₁₂ 4)» на телефоне выходило за экран;
+    // в обычных скобках строка рвётся по «+» и «−»
+    const P = h => h.indexOf('\\dfrac') >= 0 ? '\\left(' + h + '\\right)' : '(' + h + ')';
+    const W = (x, cond) => cond ? P(T(x)) : T(x);
+    switch (t[0]){
+      case 'v': return t[1];
+      case 'slot': return '\\htmlClass{slot}{\\text{?}}';
+      // верное число на месте пропуска после ответа
+      case 'mark': return '\\htmlClass{slot filled}{' + T(t[1]) + '}';
+      // дробь в дроби — обычная, не во весь рост: «3/4 : 1/2» иначе
+      // вырастало в четырёхэтажную башню
+      case '/': return (sc || inFr ? '\\frac' : '\\dfrac') + '{' + tex(t[1], sc, true) + '}{' + tex(t[2], sc, true) + '}';
+      case 'root': return '\\sqrt' + (t[1] === 2 ? '' : '[' + t[1] + ']') + '{' + T(t[2]) + '}';
+      case 'pow': {
+        const b = t[1];
+        const simple = (typeof b === 'number' && b >= 0) || (Array.isArray(b) && ['v', 'slot', 'mark'].indexOf(b[0]) >= 0);
+        return (simple ? T(b) : P(T(b))) + '^{' + S(t[2]) + '}';
+      }
+      // аргумент — в скобках у суммы, произведения, отрицательного и
+      // вложенного логарифма; у степени, дроби и корня — нет (как было)
+      case 'log': case 'lg': {
+        const arg = t[0] === 'log' ? t[2] : t[1];
+        const needs = isNegative(arg) || (Array.isArray(arg) && ['+', '-', '*', 'log', 'lg'].indexOf(arg[0]) >= 0);
+        return (t[0] === 'log' ? '\\log_{' + S(t[1]) + '}' : '\\lg') + (needs ? P(T(arg)) : '{' + T(arg) + '}');
+      }
+      case 'neg': return '-' + W(t[1], prec(t[1]) <= 2 && !(Array.isArray(t[1]) && t[1][0] === '*'));
+      case '*': return t.slice(1).map((x, i) => W(x, prec(x) < 2 || (i > 0 && isNegative(x)))).join(' \\cdot ');
+      case '+': return t.slice(1).map((x, i) => {
+        if (i === 0) return T(x);
+        if (typeof x === 'number' && x < 0) return ' - ' + numTeX(-x);
+        if (Array.isArray(x) && x[0] === 'neg') return ' - ' + W(x[1], prec(x[1]) <= 1 || isNegative(x[1]));
+        return ' + ' + T(x);
+      }).join('');
+      case '-': return T(t[1]) + ' - ' + W(t[2], prec(t[2]) <= 1 || isNegative(t[2]));
+    }
+    return '';
+  }
+  const hasKatex = () => !!(window.katex && window.katex.renderToString);
+  const katexOf = src => window.katex.renderToString(src, KATEX_OPTS);
+  // дерево → разметка; цепочка деревьев → одна формула «a = b = …»: KaTeX
+  // сам переносит длинную строку по «=», «+», «−», «·» верхнего уровня
+  function render(t){ return hasKatex() ? katexOf(tex(t)) : renderHTML(t); }
+  function renderEq(...trees){
+    if (!hasKatex()) return trees.map(renderHTML).join('<span class="mo eq">=</span><wbr>');
+    return katexOf(trees.map(x => x == null ? '' : tex(x)).join(' = '));
   }
 
   /* Строчная запись для истории решённого: log₂(4·8), 2^(log₂ 3). */
@@ -235,11 +303,15 @@
     } else if (spec.kind === 'slot'){
       const ansT = ratTree(spec.ans[0], spec.ans[1]);
       first = fillSlot(spec.lhs, ansT);
-      t.text = '<div class="log-ask">' + ASK.slot + '</div><div class="log-expr">' + render(spec.lhs) + '<span class="mo eq">=</span>' + render(spec.rhs) + '</div>' + (spec.vars ? VAR_NOTE : '');
+      // равенство с пропуском и оно же с вписанным числом (после ответа
+      // страница меняет одно на другое целиком — exprHTML / filledHTML)
+      t.exprHTML = renderEq(spec.lhs, spec.rhs);
+      t.filledHTML = renderEq(fillSlot(spec.lhs, ['mark', ansT]), fillSlot(spec.rhs, ['mark', ansT]));
+      t.text = '<div class="log-ask">' + ASK.slot + '</div><div class="log-expr">' + t.exprHTML + '</div>' + (spec.vars ? VAR_NOTE : '');
       const v = ratStr(spec.ans[0], spec.ans[1]);
       t.fields = [{ id: 'a', label: '<span class="slot">?</span> =', type: 'num', value: v }];
       t.answer = render(ansT);
-      t.slotEq = render(fillSlot(spec.lhs, ansT)) + '<span class="mo eq">=</span>' + render(fillSlot(spec.rhs, ansT));
+      t.slotEq = renderEq(fillSlot(spec.lhs, ansT), fillSlot(spec.rhs, ansT));
       t.meta = { lhs: spec.lhs, rhs: spec.rhs, ans: v, vars: spec.vars || null };
     } else {
       first = spec.first || spec.expr;
@@ -253,8 +325,7 @@
     // решение: первая строка «выражение = …», дальше «= …»
     const trees = [first].concat(spec.links.map(l => l[1]));
     t.steps = spec.links.map((l, i) =>
-      '<div class="step-line">' + stepTag(l[0]) + '<div class="step-math">' +
-        (i === 0 ? render(first) : '') + '<span class="mo eq">=</span><wbr>' + render(l[1]) + '</div></div>');
+      '<div class="step-line">' + stepTag(l[0]) + '<div class="step-math">' + renderEq(i === 0 ? first : null, l[1]) + '</div></div>');
     t.props = [...new Set(spec.links.map(l => l[0]).filter(p => propById(p)))];
     t.meta.chain = trees;
     t.peek = spec.kind === 'slot' ? plain(spec.lhs) + ' = ' + plain(spec.rhs) : plain(spec.expr);
@@ -893,14 +964,14 @@
         cur[i] = s[1];
         chain.push(Add(...cur.map(term)));
         t.steps.push('<div class="step-line">' + stepTag(s[0]) + '<div class="step-math">' +
-          (j === 0 ? '<span class="blk-no">' + (i + 1) + '</span>' + render(b.tree) : '') + '<span class="mo eq">=</span><wbr>' + render(s[1]) + '</div></div>');
+          (j === 0 ? '<span class="blk-no">' + (i + 1) + '</span>' : '') + renderEq(j === 0 ? b.tree : null, s[1]) + '</div></div>');
       });
     });
     // итог — значения кирпичей с теми же знаками: «2 − (−8) + 2»
     const sum = Add(...blocks.map((b, i) => term(ratTree(b.val[0], b.val[1]), i)));
     chain[chain.length - 1] = sum;
     chain.push(ratTree(ans[0], ans[1]));
-    t.steps.push('<div class="step-line">' + stepTag('arith') + '<div class="step-math">' + render(sum) + '<span class="mo eq">=</span><wbr>' + render(ratTree(ans[0], ans[1])) + '</div></div>');
+    t.steps.push('<div class="step-line">' + stepTag('arith') + '<div class="step-math">' + renderEq(sum, ratTree(ans[0], ans[1])) + '</div></div>');
     t.props = [...new Set([].concat(...blocks.map(b => b.steps.map(s => s[0]))).filter(p => propById(p)))];
     t.meta = { expr, ans: v, chain, blocks: blocks.map((b, i) => ({ sign: signs[i], chain: [b.tree].concat(b.steps.map(s => s[1])), val: ratStr(b.val[0], b.val[1]) })) };
     t.peek = plain(expr);
@@ -967,7 +1038,7 @@
 
   window.LOG_BANK = {
     props: PROPS, groups: GROUPS, propById, groupById,
-    generate, render, plain, ratTree, stepTag,
+    generate, render, renderEq, renderHTML, tex, plain, ratTree, stepTag,
     TYPES,
     LEVELS: ['А', 'Б', 'В', 'Г'],
     LEVEL_HINTS: ['прямое применение, простые числа', 'дроби, корни, отрицательные и «спрятанные» степени', 'свойство несколько раз и в обратную сторону',
