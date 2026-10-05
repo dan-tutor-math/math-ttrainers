@@ -291,6 +291,12 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .type-nav-btn:active{transform:scale(.9)}
 .submode-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
 .submode-tabs{display:flex;gap:8px;flex:1;}
+/* Промпт №18 нового списка: в строке режимов — галочка «Нулевые и
+   отрицательные степени». На узком экране (телефон, панель тренажёров на
+   доске) она уходит под вкладки, поэтому строка переносится и её предел
+   высоты для сворачивания подсказок — с запасом на две строки */
+.submode-row.has-hard{flex-wrap:wrap;row-gap:2px;max-height:120px;}
+.submode-row.has-hard .submode-tabs{flex:1 1 340px;}
 .add-task-btn-compact{width:40px;height:40px;flex:0 0 auto;border:none;border-radius:50%;background:var(--ink);color:#fff;font-size:20px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .15s;}
 .add-task-btn-compact:hover{transform:scale(1.06)}
 .add-task-btn-compact:active{transform:scale(.94)}
@@ -672,7 +678,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       </div>
     </div>
 
-    <div class="submode-row" id="submodeRow">
+    <div class="submode-row has-hard" id="submodeRow">
       <div class="submode-tabs">
         <button class="submode-tab" id="tabLearn">Обучение</button>
         <button class="submode-tab" id="tabPractice">Тренировка</button>
@@ -767,6 +773,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
 <script src="keypad.js"></script>
+<script src="no-repeat.js"></script>
+<script src="hard-toggle.js"></script>
 <script src="html2canvas.min.js"></script>
 <script src="jspdf.umd.min.js"></script>
 <script src="lesson-history.js"></script>
@@ -819,6 +827,17 @@ function tableHTML(headers, rows) {
 
 /* ═══════════════ 34 прототипа заданий на степени и корни (по материалам загруженного набора) ═══════════════ */
 
+/* ── Промпт №18 нового списка: натуральные степени по умолчанию ──
+   Раньше почти каждое второе задание «Степеней» (≈ 47 %) содержало нулевую
+   или отрицательную степень: показатели подбирались так, чтобы сошёлся
+   ответ, и один из них то и дело уходил в минус (в №4, №11, №13 — всегда).
+   Теперь у генераторов №1–13 параметр nat:
+     nat = true  — все показатели в условии и итоговый показатель натуральные;
+     nat = false — как было: нулевые и отрицательные допускаются.
+   Каждое задание отдаёт exps — показатели условия и итоговый (скрытые тоже:
+   8 = 2³ в №9 и №10). По ним powGen отбирает «трудное» задание (есть
+   показатель ≤ 0), и по ним же тест №18 проверяет, что без галочки
+   «Нулевые и отрицательные степени» таких заданий нет. */
 const BASE_POOL_ANY = [2,3,4,5,6,7,8,9,-2,-3,-4,-5,-6,-7,-8,-9];
 const BASE_POOL_NEG_OK = [
   {base:2, nets:[-1,-2]}, {base:-2, nets:[-1,-2]},
@@ -828,8 +847,10 @@ const BASE_POOL_NEG_OK = [
   {base:20, nets:[-1]}, {base:-20, nets:[-1]},
   {base:25, nets:[-1]}, {base:-25, nets:[-1]},
 ];
-function pickBaseAndNet(allowNeg, maxNet){
+function pickBaseAndNet(allowNeg, maxNet, nat){
   maxNet = maxNet===undefined ? 4 : maxNet;
+  // натуральный итог: без нуля (a⁰ = 1 — та же «нулевая степень»)
+  if (nat) return { base: pick(BASE_POOL_ANY), net: ri(1, maxNet) };
   if (allowNeg && Math.random() < 0.35) {
     const entry = pick(BASE_POOL_NEG_OK);
     return { base: entry.base, net: pick(entry.nets) };
@@ -841,92 +862,117 @@ function powVal(base, exp){
   return Math.round(v*100)/100;
 }
 function baseTex(v){ return v < 0 ? `(${v})` : String(v); }
+// слагаемое в строке «Показатель степени: 7+(−3)−5»: скобки только у
+// отрицательного — у натуральных они выглядели бы странно
+function sg(x){ return x < 0 ? `(${x})` : String(x); }
 // настоящая типографика формул — рендерим LaTeX через KaTeX (та же логика, что в Word/экзаменационных бланках):
 // корень тянется ровно по высоте содержимого, скобки сами подбирают размер, дробь — с чертой.
 function tex(src){
   try { return katex.renderToString(src, { throwOnError: false, output: 'htmlAndMathml' }); }
   catch(e){ return src; }
 }
+// aᵐ·(aⁿ)ᵖ с натуральными m, n, p: показатель итога — сумма, он не меньше
+// пяти. Чтобы ответ остался посильным устно, основание тогда ±2 или ±3
+// (не больше 2⁸ = 256 и 3⁶ = 729). Без галочки №4 и №13 иначе не собрать:
+// прежняя схема подгоняла m = итог − n·p, а это всегда минус. Сочетаний
+// так немного (18), и защита от повторов перебирает их по кругу
+const NAT_PPP = [
+  // [|основание|, n, p, m]
+  [2,2,2,1], [2,2,2,2], [2,2,2,3], [2,2,3,1], [2,2,3,2], [2,3,2,1], [2,3,2,2],
+  [3,2,2,1], [3,2,2,2],
+];
+function natProdPowPow(){
+  const [b, n, p, m] = pick(NAT_PPP);
+  const base = pick([b, -b]);
+  return { base, m, n, p, net: m + n*p };
+}
 
 /* ───────── степени ───────── */
 
-function gen_p1_pow_colon(){
-  const {base:a, net} = pickBaseAndNet(true);
-  const m = ri(4,20), p = ri(4,20);
-  const n = net - m + p;
+function gen_p1_pow_colon(nat){
+  const {base:a, net} = pickBaseAndNet(true, 4, nat);
+  let m, p, n;
+  do { m = ri(4,20); p = ri(4,20); n = net - m + p; } while (nat && n < 1);
   const correct = powVal(a, net);
   return {
     prompt: `Найдите значение выражения ${tex(`a^{${m}} \\cdot a^{${n}} : a^{${p}}`)} при a = ${a}.`,
     correctValue: correct,
-    explain: `Показатель степени: ${m}+(${n})−(${p}) = ${net}. Значение = ${tex(`a^{${net}} = (${a})^{${net}}`)} = ${fmtNum(correct)}.`
+    explain: `Показатель степени: ${m}+${sg(n)}−${sg(p)} = ${net}. Значение = ${tex(`a^{${net}} = (${a})^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, p, net],
   };
 }
 
-function gen_p2_pow_frac(){
-  const {base:a, net} = pickBaseAndNet(true);
-  const m = ri(4,20), p = ri(4,20);
-  const n = net - m + p;
+function gen_p2_pow_frac(nat){
+  const {base:a, net} = pickBaseAndNet(true, 4, nat);
+  let m, p, n;
+  do { m = ri(4,20); p = ri(4,20); n = net - m + p; } while (nat && n < 1);
   const correct = powVal(a, net);
   return {
     prompt: `Найдите значение выражения ${tex(`\\dfrac{a^{${m}} \\cdot a^{${n}}}{a^{${p}}}`)} при a = ${a}.`,
     correctValue: correct,
-    explain: `Показатель степени: ${m}+(${n})−(${p}) = ${net}. Значение = ${tex(`a^{${net}} = (${a})^{${net}}`)} = ${fmtNum(correct)}.`
+    explain: `Показатель степени: ${m}+${sg(n)}−${sg(p)} = ${net}. Значение = ${tex(`a^{${net}} = (${a})^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, p, net],
   };
 }
 
-function gen_p3_powpow_frac(){
-  const {base:a, net} = pickBaseAndNet(true);
-  const m = ri(2,6), n = ri(2,5);
-  const p = m*n - net;
+function gen_p3_powpow_frac(nat){
+  const {base:a, net} = pickBaseAndNet(true, 4, nat);
+  let m, n, p;
+  do { m = ri(2,6); n = ri(2,5); p = m*n - net; } while (nat && p < 1);
   const correct = powVal(a, net);
   return {
     prompt: `Найдите значение выражения ${tex(`\\dfrac{(a^{${m}})^{${n}}}{a^{${p}}}`)} при a = ${a}.`,
     correctValue: correct,
-    explain: `${tex(`(a^{${m}})^{${n}} = a^{${m*n}}`)}. Показатель степени: ${m*n}−(${p}) = ${net}. Значение = ${tex(`(${a})^{${net}}`)} = ${fmtNum(correct)}.`
+    explain: `${tex(`(a^{${m}})^{${n}} = a^{${m*n}}`)}. Показатель степени: ${m*n}−${sg(p)} = ${net}. Значение = ${tex(`(${a})^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, p, net],
   };
 }
 
-function gen_p4_prod_powpow(){
-  const {base:a, net} = pickBaseAndNet(true);
-  const n = ri(2,6), p = ri(2,5);
-  const m = net - n*p;
+function gen_p4_prod_powpow(nat){
+  let a, net, m, n, p;
+  if (nat) ({ base: a, m, n, p, net } = natProdPowPow());
+  else { ({base:a, net} = pickBaseAndNet(true)); n = ri(2,6); p = ri(2,5); m = net - n*p; }
   const correct = powVal(a, net);
   return {
-    prompt: `Найдите значение выражения ${tex(`a^{${m}} \\cdot (a^{${n}})^{${p}}`)} при a = ${a}.`,
+    // aᵐ при m = 1 пишем просто a — как в учебнике
+    prompt: `Найдите значение выражения ${tex(`${m === 1 ? 'a' : `a^{${m}}`} \\cdot (a^{${n}})^{${p}}`)} при a = ${a}.`,
     correctValue: correct,
-    explain: `${tex(`(a^{${n}})^{${p}} = a^{${n*p}}`)}. Показатель степени: (${m})+${n*p} = ${net}. Значение = ${tex(`(${a})^{${net}}`)} = ${fmtNum(correct)}.`
+    explain: `${tex(`(a^{${n}})^{${p}} = a^{${n*p}}`)}. Показатель степени: ${sg(m)}+${n*p} = ${net}. Значение = ${tex(`(${a})^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, p, net],
   };
 }
 
-function gen_p5_powpow_colon(){
-  const {base:a, net} = pickBaseAndNet(true);
-  const m = ri(2,6), n = ri(2,5);
-  const p = m*n - net;
+function gen_p5_powpow_colon(nat){
+  const {base:a, net} = pickBaseAndNet(true, 4, nat);
+  let m, n, p;
+  do { m = ri(2,6); n = ri(2,5); p = m*n - net; } while (nat && p < 1);
   const correct = powVal(a, net);
   return {
     prompt: `Найдите значение выражения ${tex(`(a^{${m}})^{${n}} : a^{${p}}`)} при a = ${a}.`,
     correctValue: correct,
-    explain: `${tex(`(a^{${m}})^{${n}} = a^{${m*n}}`)}. Показатель степени: ${m*n}−(${p}) = ${net}. Значение = ${tex(`(${a})^{${net}}`)} = ${fmtNum(correct)}.`
+    explain: `${tex(`(a^{${m}})^{${n}} = a^{${m*n}}`)}. Показатель степени: ${m*n}−${sg(p)} = ${net}. Значение = ${tex(`(${a})^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, p, net],
   };
 }
 
-function gen_p6_powpow_mul_frac(){
-  const {base:a, net} = pickBaseAndNet(true);
-  const m = ri(2,6), n = ri(2,5), p = ri(3,15);
-  const q = m*n + p - net;
+function gen_p6_powpow_mul_frac(nat){
+  const {base:a, net} = pickBaseAndNet(true, 4, nat);
+  let m, n, p, q;
+  do { m = ri(2,6); n = ri(2,5); p = ri(3,15); q = m*n + p - net; } while (nat && q < 1);
   const correct = powVal(a, net);
   return {
     prompt: `Найдите значение выражения ${tex(`\\dfrac{(a^{${m}})^{${n}} \\cdot a^{${p}}}{a^{${q}}}`)} при a = ${a}.`,
     correctValue: correct,
-    explain: `${tex(`(a^{${m}})^{${n}}\\cdot a^{${p}} = a^{${m*n+p}}`)}. Показатель степени: ${m*n+p}−(${q}) = ${net}. Значение = ${tex(`(${a})^{${net}}`)} = ${fmtNum(correct)}.`
+    explain: `${tex(`(a^{${m}})^{${n}}\\cdot a^{${p}} = a^{${m*n+p}}`)}. Показатель степени: ${m*n+p}−${sg(q)} = ${net}. Значение = ${tex(`(${a})^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, p, q, net],
   };
 }
 
-function gen_p7_twovar_cancel(){
+function gen_p7_twovar_cancel(nat){
   const a = pick([2,3,4,5,6,7]);
   const n = ri(2,4), p = ri(2,4);
   const q = n*p;
-  const netA = riLowZeroBias(4);
+  const netA = nat ? ri(1,4) : riLowZeroBias(4);
   const m = q + netA;
   const useIrrationalB = Math.random() < 0.4;
   const bRaw = useIrrationalB ? pick([2,3,5,6,7,10,11]) : ri(2,9);
@@ -935,63 +981,84 @@ function gen_p7_twovar_cancel(){
   return {
     prompt: `Найдите значение выражения ${tex(`\\dfrac{a^{${m}} \\cdot (b^{${n}})^{${p}}}{(a\\cdot b)^{${q}}}`)} при a = ${a} и b = ${bDisplay}.`,
     correctValue: correct,
-    explain: `${tex(`(b^{${n}})^{${p}} = b^{${q}}`)}, а ${tex(`(a\\cdot b)^{${q}} = a^{${q}}\\cdot b^{${q}}`)}. Степени b одинаковые в числителе и знаменателе — b сокращается полностью (при b≠0), независимо от его значения. Остаётся ${tex(`a^{${m}} : a^{${q}} = a^{${m-q}} = (${a})^{${netA}}`)} = ${fmtNum(correct)}.`
+    explain: `${tex(`(b^{${n}})^{${p}} = b^{${q}}`)}, а ${tex(`(a\\cdot b)^{${q}} = a^{${q}}\\cdot b^{${q}}`)}. Степени b одинаковые в числителе и знаменателе — b сокращается полностью (при b≠0), независимо от его значения. Остаётся ${tex(`a^{${m}} : a^{${q}} = a^{${m-q}} = (${a})^{${netA}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, p, q, netA],
   };
 }
 
-function gen_p8_numeric_samebase(){
-  const {base:c, net} = pickBaseAndNet(true);
-  const m = ri(4,20), p = ri(4,20);
-  const n = net - m + p;
+function gen_p8_numeric_samebase(nat){
+  const {base:c, net} = pickBaseAndNet(true, 4, nat);
+  let m, p, n;
+  do { m = ri(4,20); p = ri(4,20); n = net - m + p; } while (nat && n < 1);
   const correct = powVal(c, net);
   return {
     prompt: `Найдите значение выражения ${tex(`\\dfrac{${baseTex(c)}^{${m}} \\cdot ${baseTex(c)}^{${n}}}{${baseTex(c)}^{${p}}}`)}.`,
     correctValue: correct,
-    explain: `Показатель степени: ${m}+(${n})−(${p}) = ${net}. Значение = ${tex(`${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`
+    explain: `Показатель степени: ${m}+${sg(n)}−${sg(p)} = ${net}. Значение = ${tex(`${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, p, net],
   };
 }
 
-function gen_p9_hidden_denom(){
+function gen_p9_hidden_denom(nat){
   const c = pick([2,3,5]);
   const k = ri(2,4);
   const denomLiteral = Math.pow(c,k);
   const allowNeg = (c===2 || c===5);
   let net, M;
-  if (allowNeg && Math.random()<0.3) {
+  if (!nat && allowNeg && Math.random()<0.3) {
     net = pick([-1,-2]);
     M = k + net;
   } else {
-    net = riLowZeroBias(5);
+    net = nat ? ri(1,5) : riLowZeroBias(5);
     M = k + net;
   }
   const correct = powVal(c, net);
   return {
     prompt: `Найдите значение выражения ${tex(`\\dfrac{${c}^{${M}}}{${denomLiteral}}`)}.`,
     correctValue: correct,
-    explain: `${denomLiteral} = ${tex(`${c}^{${k}}`)}. ${tex(`\\dfrac{${c}^{${M}}}{${c}^{${k}}} = ${c}^{${net}}`)} = ${fmtNum(correct)}.`
+    explain: `${denomLiteral} = ${tex(`${c}^{${k}}`)}. ${tex(`\\dfrac{${c}^{${M}}}{${c}^{${k}}} = ${c}^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [M, k, net],
   };
 }
 
-function gen_p10_double_hidden(){
+function gen_p10_double_hidden(nat){
   const c = pick([2,3]);
-  let ea = ri(2,3), eb = ri(2,3);
-  let X = ri(2,4), Y = ri(2,4);
-  let net = ea*X - eb*Y;
-  if (net < 0 && (c===3 || net < -2)) {
-    [ea, eb] = [eb, ea];
-    [X, Y] = [Y, X];
+  let ea, eb, X, Y, net;
+  do {
+    ea = ri(2,3); eb = ri(2,3);
+    X = ri(2,4); Y = ri(2,4);
     net = ea*X - eb*Y;
-  }
+    if (net < 0 && (c===3 || net < -2)) {
+      [ea, eb] = [eb, ea];
+      [X, Y] = [Y, X];
+      net = ea*X - eb*Y;
+    }
+  } while (nat && net < 1);
   const litA = Math.pow(c, ea), litB = Math.pow(c, eb);
   const correct = powVal(c, net);
   return {
     prompt: `Найдите значение выражения ${tex(`\\dfrac{${litA}^{${X}}}{${litB}^{${Y}}}`)}.`,
     correctValue: correct,
-    explain: `${litA} = ${tex(`${c}^{${ea}}`)}, ${litB} = ${tex(`${c}^{${eb}}`)}. Выражение = ${tex(`\\dfrac{${c}^{${ea*X}}}{${c}^{${eb*Y}}} = ${c}^{${net}}`)} = ${fmtNum(correct)}.`
+    explain: `${litA} = ${tex(`${c}^{${ea}}`)}, ${litB} = ${tex(`${c}^{${eb}}`)}. Выражение = ${tex(`\\dfrac{${c}^{${ea*X}}}{${c}^{${eb*Y}}} = ${c}^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [X, Y, ea, eb, net],
   };
 }
 
-function gen_p11_recip_product(){
+function gen_p11_recip_product(nat){
+  if (nat) {
+    // произведение двух дробей 1/cᵐ · 1/cⁿ с натуральными m и n — это всегда
+    // c в минус (m + n)-й степени. Без галочки дробь в произведении одна:
+    // 1/cᵐ · cⁿ = cⁿ⁻ᵐ, n > m — та же «обратная степень», но итог натуральный
+    const {base:c, net} = pickBaseAndNet(false, 4, true);
+    const m = ri(5,20), n = m + net;
+    const correct = powVal(c, net);
+    return {
+      prompt: `Найдите значение выражения ${tex(`\\dfrac{1}{${baseTex(c)}^{${m}}} \\cdot ${baseTex(c)}^{${n}}`)}.`,
+      correctValue: correct,
+      explain: `${tex(`\\dfrac{1}{${baseTex(c)}^{${m}}} \\cdot ${baseTex(c)}^{${n}} = \\dfrac{${baseTex(c)}^{${n}}}{${baseTex(c)}^{${m}}} = ${baseTex(c)}^{${n}-${m}} = ${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`,
+      exps: [m, n, net],
+    };
+  }
   const {base:c, net} = pickBaseAndNet(true);
   const m = pick([1,-1])*ri(5,20);
   const n = -net - m;
@@ -999,31 +1066,34 @@ function gen_p11_recip_product(){
   return {
     prompt: `Найдите значение выражения ${tex(`\\left(\\dfrac{1}{${baseTex(c)}^{${m}}}\\right) \\cdot \\left(\\dfrac{1}{${baseTex(c)}^{${n}}}\\right)`)}.`,
     correctValue: correct,
-    explain: `${tex(`\\dfrac{1}{${baseTex(c)}^{${m}}} = ${baseTex(c)}^{${-m}}`)}, ${tex(`\\dfrac{1}{${baseTex(c)}^{${n}}} = ${baseTex(c)}^{${-n}}`)}. Произведение = ${tex(`${baseTex(c)}^{${-m-n}} = ${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`
+    explain: `${tex(`\\dfrac{1}{${baseTex(c)}^{${m}}} = ${baseTex(c)}^{${-m}}`)}, ${tex(`\\dfrac{1}{${baseTex(c)}^{${n}}} = ${baseTex(c)}^{${-n}}`)}. Произведение = ${tex(`${baseTex(c)}^{${-m-n}} = ${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, -m, -n, net],
   };
 }
 
-function gen_p12_numeric_powpow_frac(){
-  const {base:c, net} = pickBaseAndNet(true);
-  const m = ri(2,10), n = pick([-4,-3,-2,2,3,4]);
-  const p = m*n - net;
+function gen_p12_numeric_powpow_frac(nat){
+  const {base:c, net} = pickBaseAndNet(true, 4, nat);
+  let m, n, p;
+  do { m = ri(2,10); n = nat ? pick([2,3,4]) : pick([-4,-3,-2,2,3,4]); p = m*n - net; } while (nat && p < 1);
   const correct = powVal(c, net);
   return {
     prompt: `Найдите значение выражения ${tex(`\\dfrac{(${baseTex(c)}^{${m}})^{${n}}}{${baseTex(c)}^{${p}}}`)}.`,
     correctValue: correct,
-    explain: `${tex(`(${baseTex(c)}^{${m}})^{${n}} = ${baseTex(c)}^{${m*n}}`)}. Показатель степени: ${m*n}−(${p}) = ${net}. Значение = ${tex(`${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`
+    explain: `${tex(`(${baseTex(c)}^{${m}})^{${n}} = ${baseTex(c)}^{${m*n}}`)}. Показатель степени: ${m*n}−${sg(p)} = ${net}. Значение = ${tex(`${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, p, m*n, net],
   };
 }
 
-function gen_p13_numeric_prod_powpow(){
-  const {base:c, net} = pickBaseAndNet(true);
-  const n = ri(2,5), p = ri(2,4);
-  const m = net - n*p;
+function gen_p13_numeric_prod_powpow(nat){
+  let c, net, m, n, p;
+  if (nat) ({ base: c, m, n, p, net } = natProdPowPow());
+  else { ({base:c, net} = pickBaseAndNet(true)); n = ri(2,5); p = ri(2,4); m = net - n*p; }
   const correct = powVal(c, net);
   return {
-    prompt: `Найдите значение выражения ${tex(`${baseTex(c)}^{${m}} \\cdot (${baseTex(c)}^{${n}})^{${p}}`)}.`,
+    prompt: `Найдите значение выражения ${tex(`${m === 1 ? baseTex(c) : `${baseTex(c)}^{${m}}`} \\cdot (${baseTex(c)}^{${n}})^{${p}}`)}.`,
     correctValue: correct,
-    explain: `${tex(`(${baseTex(c)}^{${n}})^{${p}} = ${baseTex(c)}^{${n*p}}`)}. Показатель степени: (${m})+${n*p} = ${net}. Значение = ${tex(`${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`
+    explain: `${tex(`(${baseTex(c)}^{${n}})^{${p}} = ${baseTex(c)}^{${n*p}}`)}. Показатель степени: ${sg(m)}+${n*p} = ${net}. Значение = ${tex(`${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, p, net],
   };
 }
 
@@ -1035,7 +1105,8 @@ function gen_p14_prod_pow_cancel_c(){
   return {
     prompt: `Найдите значение выражения ${tex(`\\dfrac{(${c}\\cdot ${d})^{${n}}}{${c}^{${n}}\\cdot ${d}^{${k}}}`)}.`,
     correctValue: correct,
-    explain: `${tex(`(${c}\\cdot ${d})^{${n}} = ${c}^{${n}}\\cdot ${d}^{${n}}`)}. Выражение = ${tex(`\\dfrac{${c}^{${n}}\\cdot ${d}^{${n}}}{${c}^{${n}}\\cdot ${d}^{${k}}} = ${d}^{${n-k}}`)} = ${correct}.`
+    explain: `${tex(`(${c}\\cdot ${d})^{${n}} = ${c}^{${n}}\\cdot ${d}^{${n}}`)}. Выражение = ${tex(`\\dfrac{${c}^{${n}}\\cdot ${d}^{${n}}}{${c}^{${n}}\\cdot ${d}^{${k}}} = ${d}^{${n-k}}`)} = ${correct}.`,
+    exps: [n, k, n-k],
   };
 }
 
@@ -1047,7 +1118,8 @@ function gen_p15_prod_pow_cancel_denom(){
   return {
     prompt: `Найдите значение выражения ${tex(`\\dfrac{${c}^{${k}} \\cdot ${d}^{${n}}}{(${c}\\cdot ${d})^{${k}}}`)}.`,
     correctValue: correct,
-    explain: `${tex(`(${c}\\cdot ${d})^{${k}} = ${c}^{${k}}\\cdot ${d}^{${k}}`)}. Выражение = ${tex(`\\dfrac{${c}^{${k}}\\cdot ${d}^{${n}}}{${c}^{${k}}\\cdot ${d}^{${k}}} = ${d}^{${n-k}}`)} = ${correct}.`
+    explain: `${tex(`(${c}\\cdot ${d})^{${k}} = ${c}^{${k}}\\cdot ${d}^{${k}}`)}. Выражение = ${tex(`\\dfrac{${c}^{${k}}\\cdot ${d}^{${n}}}{${c}^{${k}}\\cdot ${d}^{${k}}} = ${d}^{${n-k}}`)} = ${correct}.`,
+    exps: [k, n, n-k],
   };
 }
 
@@ -1059,7 +1131,8 @@ function gen_p16_composite_both_remain(){
   return {
     prompt: `Найдите значение выражения ${tex(`\\dfrac{(${c}\\cdot ${d})^{${n}}}{${c}^{${mExp}}\\cdot ${d}^{${kExp}}}`)}.`,
     correctValue: correct,
-    explain: `${tex(`(${c}\\cdot ${d})^{${n}} = ${c}^{${n}}\\cdot ${d}^{${n}}`)}. Выражение = ${tex(`\\dfrac{${c}^{${n}}\\cdot ${d}^{${n}}}{${c}^{${mExp}}\\cdot ${d}^{${kExp}}} = ${c}^{${n-mExp}}\\cdot ${d}^{${n-kExp}}`)} = ${correct}.`
+    explain: `${tex(`(${c}\\cdot ${d})^{${n}} = ${c}^{${n}}\\cdot ${d}^{${n}}`)}. Выражение = ${tex(`\\dfrac{${c}^{${n}}\\cdot ${d}^{${n}}}{${c}^{${mExp}}\\cdot ${d}^{${kExp}}} = ${c}^{${n-mExp}}\\cdot ${d}^{${n-kExp}}`)} = ${correct}.`,
+    exps: [n, mExp, kExp, n-mExp, n-kExp],
   };
 }
 
@@ -1337,22 +1410,22 @@ function gen_p34_sqrt_coeff_cancel(){
 
 const GROUPS = [
   { title: 'Степени', modes: [
-    { id: 'p1', title: '№1. aᵐ · aⁿ : aᵖ', gen: gen_p1_pow_colon },
-    { id: 'p2', title: '№2. (aᵐ · aⁿ) / aᵖ', gen: gen_p2_pow_frac },
-    { id: 'p3', title: '№3. (aᵐ)ⁿ / aᵖ', gen: gen_p3_powpow_frac },
-    { id: 'p4', title: '№4. aᵐ · (aⁿ)ᵖ', gen: gen_p4_prod_powpow },
-    { id: 'p5', title: '№5. (aᵐ)ⁿ : aᵖ', gen: gen_p5_powpow_colon },
-    { id: 'p6', title: '№6. (aᵐ)ⁿ · aᵖ / aq', gen: gen_p6_powpow_mul_frac },
-    { id: 'p7', title: '№7. Сокращение переменной b', gen: gen_p7_twovar_cancel },
-    { id: 'p8', title: '№8. Числовое cᵐ · cⁿ / cᵖ', gen: gen_p8_numeric_samebase },
-    { id: 'p9', title: '№9. Скрытая степень в знаменателе', gen: gen_p9_hidden_denom },
-    { id: 'p10', title: '№10. Два скрытых основания', gen: gen_p10_double_hidden },
-    { id: 'p11', title: '№11. Произведение обратных степеней', gen: gen_p11_recip_product },
-    { id: 'p12', title: '№12. Числовое (cᵐ)ⁿ / cᵖ', gen: gen_p12_numeric_powpow_frac },
-    { id: 'p13', title: '№13. Числовое cᵐ · (cⁿ)ᵖ', gen: gen_p13_numeric_prod_powpow },
-    { id: 'p14', title: '№14. (c·d)ⁿ / (cⁿ·dᵏ)', gen: gen_p14_prod_pow_cancel_c },
-    { id: 'p15', title: '№15. cᵏ·dⁿ / (c·d)ᵏ', gen: gen_p15_prod_pow_cancel_denom },
-    { id: 'p16', title: '№16. (c·d)ⁿ / (cᵐ·dᵏ)', gen: gen_p16_composite_both_remain },
+    { id: 'p1', title: '№1. aᵐ · aⁿ : aᵖ', gen: powGen(gen_p1_pow_colon, true), hard: true },
+    { id: 'p2', title: '№2. (aᵐ · aⁿ) / aᵖ', gen: powGen(gen_p2_pow_frac, true), hard: true },
+    { id: 'p3', title: '№3. (aᵐ)ⁿ / aᵖ', gen: powGen(gen_p3_powpow_frac, true), hard: true },
+    { id: 'p4', title: '№4. aᵐ · (aⁿ)ᵖ', gen: powGen(gen_p4_prod_powpow, true), hard: true },
+    { id: 'p5', title: '№5. (aᵐ)ⁿ : aᵖ', gen: powGen(gen_p5_powpow_colon, true), hard: true },
+    { id: 'p6', title: '№6. (aᵐ)ⁿ · aᵖ / aq', gen: powGen(gen_p6_powpow_mul_frac, true), hard: true },
+    { id: 'p7', title: '№7. Сокращение переменной b', gen: powGen(gen_p7_twovar_cancel, true), hard: true },
+    { id: 'p8', title: '№8. Числовое cᵐ · cⁿ / cᵖ', gen: powGen(gen_p8_numeric_samebase, true), hard: true },
+    { id: 'p9', title: '№9. Скрытая степень в знаменателе', gen: powGen(gen_p9_hidden_denom, true), hard: true },
+    { id: 'p10', title: '№10. Два скрытых основания', gen: powGen(gen_p10_double_hidden, true), hard: true },
+    { id: 'p11', title: '№11. Произведение обратных степеней', gen: powGen(gen_p11_recip_product, true), hard: true },
+    { id: 'p12', title: '№12. Числовое (cᵐ)ⁿ / cᵖ', gen: powGen(gen_p12_numeric_powpow_frac, true), hard: true },
+    { id: 'p13', title: '№13. Числовое cᵐ · (cⁿ)ᵖ', gen: powGen(gen_p13_numeric_prod_powpow, true), hard: true },
+    { id: 'p14', title: '№14. (c·d)ⁿ / (cⁿ·dᵏ)', gen: powGen(gen_p14_prod_pow_cancel_c, false), hard: false },
+    { id: 'p15', title: '№15. cᵏ·dⁿ / (c·d)ᵏ', gen: powGen(gen_p15_prod_pow_cancel_denom, false), hard: false },
+    { id: 'p16', title: '№16. (c·d)ⁿ / (cᵐ·dᵏ)', gen: powGen(gen_p16_composite_both_remain, false), hard: false },
   ]},
   { title: 'Корни', modes: [
     { id: 'p17', title: '№17. (k√n)² / m', gen: gen_p17_ksqrt_sq_over_m },
@@ -1376,6 +1449,61 @@ const GROUPS = [
   ]},
 ];
 const ALL_MODES = GROUPS.flatMap(g => g.modes);
+
+/* ═══ Промпт №18 нового списка: галочка «Нулевые и отрицательные степени» ═══
+   Без галочки (по умолчанию) все задания — на натуральных степенях. С
+   галочкой задание типов №1–13 получается «трудным» (есть нулевая или
+   отрицательная степень в условии или в итоге) с вероятностью HARD_SHARE,
+   у №14–16 таких вариантов нет вообще. Раньше трудными выходили ≈ 47 %
+   заданий «Степеней» — почти каждое второе, и это было слишком часто.
+   Даниил просил снизить на 15–20 %: 0,37 у №1–13 — это ≈ 30 % по всем
+   шестнадцати типам, на 17 пунктов меньше. */
+const HARD_SHARE = 0.37;
+function hasNonNat(t){ return !!(t && t.exps && t.exps.some(e => e <= 0)); }
+// генератор типа: gen(hard). Трудное — тот же прежний генератор (nat=false),
+// из которого берётся вариант, где показатель ≤ 0 действительно есть
+function powGen(f, canHard){
+  return function(hard){
+    if (!hard || !canHard) return f(true);
+    let t = null;
+    for (let i = 0; i < 40; i++){ t = f(false); if (hasNonNat(t)) return t; }
+    return t;
+  };
+}
+let hardCtl = { get: () => false, set(){}, setDisabled(){} };   // настоящая — ниже, после разметки
+function wantHard(m){ return !!(m && m.hard && hardCtl.get() && Math.random() < HARD_SHARE); }
+
+/* ═══ Промпт №18: без повторов (no-repeat.js) ═══
+   «Похожее» в №8 — та же запись, где меняется только подставляемое
+   значение (a = 2 → a = 3), а в числовых степенях — основание при тех же
+   показателях (2⁵·2³ : 2⁴ и 3⁵·3³ : 3⁴): для ученика это одно и то же
+   задание. Сравниваем запись формулы из KaTeX (она лежит в условии как
+   annotation), в числовых степенях — с числами вне показателей,
+   заменёнными на #. У корней без подстановки «похожих» не ищем: там
+   показатель всегда 2, и все задания типа были бы «похожими». */
+function texOfPrompt(html){
+  const m = /<annotation encoding="application\/x-tex">([\s\S]*?)<\/annotation>/.exec(html || '');
+  return m ? m[1] : '';
+}
+function nrKeys(t){
+  if (!t) return {};
+  const expr = texOfPrompt(t.prompt);
+  let shape = null;
+  if (/\sпри\s/.test(t.prompt || '')) shape = expr;
+  else if (expr && !/\\sqrt/.test(expr)) {
+    const ex = [];
+    shape = expr.replace(/\^\{(-?\d+)\}/g, (_, e) => { ex.push(e); return '^{E}'; }).replace(/\d+/g, '#') + '|' + ex.join(',');
+  }
+  return { exact: t.prompt, shape, answer: t.correctValue };
+}
+// одно решение «трудное или обычное» на задание: повтор перебирается внутри
+// того же решения, иначе отбраковка повторов сдвигала бы долю трудных.
+// avoid — что сейчас на экране: заменяемое задание и соседние карточки
+function genUnique(m){
+  const hard = wantHard(m);
+  const avoid = [curTask].concat(addedTasks.map(bt => bt && bt.task));
+  return NoRepeat.pick('powers:' + curMode, () => m.gen(hard), { keys: nrKeys, avoid });
+}
 
 /* ═══════════════ управление ═══════════════ */
 let totalSolved = 0, streak = 0, totalErrors = 0;
@@ -1427,7 +1555,8 @@ const els = {
    поэтому переход между типами не теряет ни текущий пример, ни счётчик медалей —
    и всё это переживает перезагрузку страницы. */
 const PROGRESS_NS = 'ogeProg:powers:';
-const TASK_RENDER_VERSION = 2; // меняли способ отрисовки формул (переход на KaTeX) — версия 2
+const TASK_RENDER_VERSION = 3; // 2 — переход на KaTeX; 3 — промпт №18 нового списка: сохранённое раньше задание могло быть
+                               // с отрицательной степенью, а без галочки их теперь нет — пусть придумается заново
 // память в оперативной памяти страницы — работает ВСЕГДА, независимо от того,
 // насколько надёжно localStorage ведёт себя в конкретном браузере (бывает
 // нестабильно, например, при открытии файла напрямую с диска, в приватном
@@ -1654,6 +1783,7 @@ function openTask() {
   els.prevTypeBtn.style.display = showTypeNav ? 'inline-flex' : 'none';
   els.nextTypeBtn.style.display = showTypeNav ? 'inline-flex' : 'none';
   curProg = (curMode !== 'random') ? loadProgOrFresh(curMode) : freshProg();
+  syncHardToggle();
   renderMedalBadges();
   renderExampleHistory();
   regenerateAddedTasksForNewType();
@@ -1672,6 +1802,7 @@ function navigateType(delta){
   const newIdx = (idx + delta + ALL_MODES.length) % ALL_MODES.length;
   curMode = ALL_MODES[newIdx].id;
   els.taskTitle.textContent = ALL_MODES[newIdx].title;
+  syncHardToggle();
   curProg = loadProgOrFresh(curMode);
   renderMedalBadges();
   renderExampleHistory();
@@ -1749,7 +1880,7 @@ function newTask(opts) {
   // страницы), чтобы не задваивать снимок/очистку одного и того же задания
   if (!opts.skipSnapshot) snapshotAndClear('single', document.getElementById('card1Wrapper'));
   const m = curMode === 'random' ? pick(ALL_MODES) : ALL_MODES.find(x => x.id === curMode);
-  curTask = m.gen();
+  curTask = genUnique(m);
   taskAnswered = false;
   hadWrongPick = false;
 
@@ -1936,7 +2067,7 @@ let addRailOpen = false; // Промпт №32: развёрнута ли бок
 
 function genAddedTask(){
   const m = curMode === 'random' ? pick(ALL_MODES) : ALL_MODES.find(x => x.id === curMode);
-  return { task: m.gen(), answered: false, hadWrongPick: false, solutionRevealed: false };
+  return { task: genUnique(m), answered: false, hadWrongPick: false, solutionRevealed: false };
 }
 // «В подборку» работает на трёх уровнях: личная кнопка у КАЖДОЙ карточки (включая первую) —
 // добавляет только её; общая 📥 в шапке и иконка 📥 в панели добавления — обе разом добавляют
@@ -2347,6 +2478,33 @@ setupFloatingKeypad();
 
 renderPicker();
 
+/* Промпт №18 нового списка: галочка «Нулевые и отрицательные степени» —
+   общий компонент hard-toggle.js. Нажатие — как ⟳ всей страницы: вся
+   партия заданий сразу перегенерируется с новым выбором, иначе после
+   щелчка ничего бы не менялось до следующего примера. У ученика в
+   сессии нажатие закрыто, как и ⟳ (guardStudentAction('refreshAll')) */
+hardCtl = HardToggle.mount({
+  host: document.getElementById('submodeRow'),
+  key: 'powers',
+  label: 'Нулевые и отрицательные степени',
+  title: 'Добавить задания с нулевыми и отрицательными степенями',
+  wrap: fn => guardStudentAction('refreshAll', fn),
+  onChange(){
+    const m = ALL_MODES.find(x => x.id === curMode);
+    const matters = curMode === 'random' || (m && m.hard);
+    if (matters && els.taskArea.style.display !== 'none' && (curSubMode === 'exam' || curSubMode === 'practice')) nextBatchAll();
+    else if (window.TrainerSession) window.TrainerSession.push();
+  },
+});
+// у корней и у №14–16 нулевых и отрицательных степеней не бывает —
+// галочка там видна (выбор помнится), но неактивна
+function syncHardToggle(){
+  const m = ALL_MODES.find(x => x.id === curMode);
+  const live = curMode === 'random' || !!(m && m.hard);
+  hardCtl.setDisabled(!live, m && m.demo ? 'Задание из демоверсии всегда одно и то же'
+    : 'В этом типе нулевых и отрицательных степеней не бывает — галочка действует на типы №1–13');
+}
+
 /* ═══ Промпт №19: совместный доступ — синхронизация состояния тренажёра ═══
    Синхронизируем «что мы вместе сейчас решаем»: экран выбора типа/сам тип,
    вкладку режима, текущее основное задание и его статус, весь список
@@ -2368,6 +2526,10 @@ function tsGetState(){
     // Промпт №25: статистика (решено/серия/ошибки) — учитель должен видеть
     // актуальные показатели ученика в реальном времени, а не только у себя
     totalSolved, streak, totalErrors,
+    // Промпт №18 нового списка: галочка «Нулевые и отрицательные степени» —
+    // ученик видит выбор учителя, и доска, придумывая «ещё такое же» в
+    // невидимом кадре, берёт задание с той же галочкой
+    hardNums: hardCtl.get(),
   };
   // доска (инструмент рисования поверх тренажёра) — своё, отдельно управляемое
   // подмодулем поле; подмешиваем его снимок сюда же, чтобы штрихи попадали в
@@ -2381,6 +2543,12 @@ function tsApplyState(state){
   // применяем штрихи доски ДО развилки по picker/задаче — доска видна и
   // доступна независимо от того, какой сейчас экран у тренажёра
   if (window.__boardApplyState) window.__boardApplyState(state);
+  // до openTask/newTask ниже: задание, которое придумает этот вызов
+  // (доска в невидимом кадре зовёт newTask сразу после), — уже с
+  // галочкой из снимка. Снимок без поля — от вкладки до промпта №18,
+  // тогда галочка выключена, как и было. Не в localStorage: это чужой
+  // выбор, свой на этом устройстве он не меняет
+  hardCtl.set(!!state.hardNums, { persist: false });
   // Промпт №25: статистика — тоже независимо от picker/задачи, и всегда,
   // когда пришедший снимок её содержит (не только когда числа отличаются:
   // достаточно дёшево, а лишних перерисовок DOM тут не будет — textContent

@@ -515,6 +515,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
   <div id="boardSpace" aria-hidden="true"></div></div>
 
 <script src="basket-core.js"></script>
+<script src="no-repeat.js"></script>
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
@@ -777,7 +778,11 @@ function renderPrompt(){
 function newTask() {
   // «+» в карточке, пока главная страница на экране выбора, — берём обычный тип
   if (els.taskArea.style.display === 'none') enterMode(curMode);
-  curTask = modeById(curMode).gen();
+  // Промпт №18 нового списка: без повторов — тот же генератор, но задание,
+  // совпавшее с недавним (целиком или ответом подряд), перегенерируется
+  // (no-repeat.js); avoid — заменяемое задание на экране
+  const m = modeById(curMode);
+  curTask = NoRepeat.pick('oge19:' + curMode, () => m.gen(), { avoid: [curTask] });
   taskAnswered = false;
   checked = false;
   hadWrongPick = false;

@@ -1536,11 +1536,20 @@
   // сессии (набранное в прошлом задании не должно перетечь в новое) и
   // сравнивается «то же задание или уже другое» при чужом снимке
   function makeKey(){ return Date.now().toString(36) + '-' + (++seq).toString(36) + '-' + Math.random().toString(36).slice(2, 7); }
-  function generate(pid, lvl){
+  function generateRaw(pid, lvl){
     const pr = PROTOS.find(p => p.id === pid) || PROTOS[0];
     const L = Math.max(1, Math.min(3, lvl | 0 || 1));
     const t = pr.gen.call(pr, L);
     return Object.assign({ pid: pr.id, lvl: L, key: makeKey() }, t);
+  }
+  /* Промпт №18 нового списка: без повторов (no-repeat.js). Своя защита
+     банка (то же условие два раза подряд) — только от соседнего задания, а
+     «+5» или несколько «⟳» подряд всё равно повторяли задания и ответы.
+     Ключи — условие и ответ: у задания есть случайный key, целиком объект
+     каждый раз «новый». Без модуля (тест грузит банк отдельно) — как раньше */
+  function generate(pid, lvl){
+    if (!window.NoRepeat) return generateRaw(pid, lvl);
+    return window.NoRepeat.pick('percent:' + pid + ':' + (lvl | 0 || 1), () => generateRaw(pid, lvl));
   }
 
   window.PERCENT_BANK = {

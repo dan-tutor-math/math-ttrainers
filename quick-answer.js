@@ -175,7 +175,21 @@
   }
   const settled = S => !!(S && S.quick && (S.quick.res === 'ok' || S.quick.res === 'fail'));
 
+  // Промпт №18 нового списка: ответ примера нужен ещё и защите от повторов
+  // (no-repeat.js — «не два одинаковых ответа подряд»). Как считать ответ,
+  // знает только страница — она отдаёт это сюда в fields; берём оттуда же,
+  // а не пишем второй раз в каждом тренажёре
+  let answerFields = null;
+  function answerOf(P){
+    if (!answerFields || !P) return null;
+    try {
+      const f = answerFields(P);
+      return f && f.length ? f.map(x => x.value).join(';') : null;
+    } catch (e) { return null; }
+  }
+
   function mount(opts){
+    answerFields = opts.fields;
     if (!document.getElementById('qaStyle')) {
       const st = document.createElement('style');
       st.id = 'qaStyle'; st.textContent = CSS;
@@ -308,5 +322,5 @@
     return ctl;
   }
 
-  window.QuickAnswer = { mount, settled, checkField, parseFrac, evalExpr, prettyValue };
+  window.QuickAnswer = { mount, settled, checkField, parseFrac, evalExpr, prettyValue, answerOf };
 })();

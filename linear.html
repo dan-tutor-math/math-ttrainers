@@ -755,6 +755,7 @@ html[data-focus="on"] .hint{
 </div>
 
 <script src="basket-core.js"></script>
+<script src="no-repeat.js"></script>
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
@@ -887,9 +888,17 @@ function sideText(terms){
 /* ───────── состояние ───────── */
 let P=null, S=null;
 
+/* Промпт №18 нового списка: без повторов (no-repeat.js). Пример целиком
+   и его ответ — тот же, что у «ответа сразу» (QuickAnswer.answerOf): два
+   одинаковых ответа подряд тоже не выпадают */
+function nrKeysP(p){
+  // у слагаемых сквозной id (по нему их переносят через «=») — к самому
+  // уравнению он не относится
+  return { exact: NoRepeat.stable(p, ['id', 'moved']), answer: window.QuickAnswer && QuickAnswer.answerOf ? QuickAnswer.answerOf(p) : null };
+}
 function newProblem(){
   clearFountain();
-  P = gen(curLevel);
+  P = NoRepeat.pick('linear:' + curLevel, () => gen(curLevel), { keys: nrKeysP, avoid: [P] });
   taskCounter++;
   S = {
     phase: 'preview',

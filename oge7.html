@@ -818,6 +818,7 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
 </div>
 
 <script src="basket-core.js"></script>
+<script src="no-repeat.js"></script>
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
@@ -2325,7 +2326,10 @@ function renderCurrentTask(){
 
 function newTask(){
   const m = curMode==='random' ? pick(MODES.filter(x=>!x.demo)) : MODES.find(x=>x.id===curMode);
-  curTask = m.gen();
+  // Промпт №18 нового списка: без повторов — тот же генератор, но задание,
+  // совпавшее с недавним (целиком или ответом подряд), перегенерируется
+  // (no-repeat.js); avoid — заменяемое задание на экране
+  curTask = NoRepeat.pick('oge7:' + curMode, () => m.gen(), { avoid: [curTask] });
   stepIdx = 0;
   optionsLocked = false;
   hadWrongPick = false;

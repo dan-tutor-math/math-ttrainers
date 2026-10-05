@@ -770,6 +770,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 </div>
 
 <script src="basket-core.js"></script>
+<script src="no-repeat.js"></script>
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
@@ -1386,7 +1387,10 @@ function newTask(opts) {
   // страницы), чтобы не задваивать снимок/очистку одного и того же задания
   if (!opts.skipSnapshot) snapshotAndClear('single', document.getElementById('card1Wrapper'));
   const m = curMode === 'random' ? pick(RANDOM_MODES) : ALL_MODES.find(x => x.id === curMode);
-  curTask = m.gen();
+  // Промпт №18 нового списка: без повторов — тот же генератор, но задание,
+  // совпавшее с недавним (целиком или ответом подряд), перегенерируется
+  // (no-repeat.js); avoid — что сейчас на экране
+  curTask = NoRepeat.pick('oge12:' + curMode, () => m.gen(), { avoid: [curTask].concat(addedTasks.map(bt => bt && bt.task)) });
   taskAnswered = false;
   hadWrongPick = false;
 
@@ -1573,7 +1577,8 @@ let addRailOpen = false; // Промпт №32: развёрнута ли бок
 
 function genAddedTask(){
   const m = curMode === 'random' ? pick(RANDOM_MODES) : ALL_MODES.find(x => x.id === curMode);
-  return { task: m.gen(), answered: false, hadWrongPick: false, solutionRevealed: false };
+  const task = NoRepeat.pick('oge12:' + curMode, () => m.gen(), { avoid: [curTask].concat(addedTasks.map(bt => bt && bt.task)) });
+  return { task, answered: false, hadWrongPick: false, solutionRevealed: false };
 }
 // «В подборку» работает на трёх уровнях: личная кнопка у КАЖДОЙ карточки (включая первую) —
 // добавляет только её; общая 📥 в шапке и иконка 📥 в панели добавления — обе разом добавляют

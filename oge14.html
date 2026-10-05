@@ -596,6 +596,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 </div>
 
 <script src="basket-core.js"></script>
+<script src="no-repeat.js"></script>
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
@@ -1201,7 +1202,10 @@ function renderCurrentTask() {
 
 function newTask() {
   const m = curMode === 'random' ? pick(RANDOM_MODES) : ALL_MODES.find(x => x.id === curMode);
-  curTask = m.gen();
+  // Промпт №18 нового списка: без повторов — тот же генератор, но задание,
+  // совпавшее с недавним (целиком или ответом подряд), перегенерируется
+  // (no-repeat.js); avoid — заменяемое задание на экране
+  curTask = NoRepeat.pick('oge14:' + curMode, () => m.gen(), { avoid: [curTask] });
   taskAnswered = false;
   hadWrongPick = false;
 

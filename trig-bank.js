@@ -1057,7 +1057,7 @@
   // серия числами (для теста и доски): база, шаг, вид; a — в радианах
   function serData(s){ return { c: qv(s.c) * Math.PI, a: aNum(s.a), p: qv(s.p) * Math.PI, sg: s.sg, text: seriesPlain(s) }; }
 
-  function generate(pids, lvlUnused, prefer){
+  function generateRaw(pids, lvlUnused, prefer){
     const list = (Array.isArray(pids) ? pids : [pids]).filter(p => GEN[p]);
     if (!list.length) list.push(TILES[0].id);
     let pid = prefer && list.indexOf(prefer) >= 0 ? prefer : pick(list);
@@ -1069,6 +1069,22 @@
       if (t.text !== lastText[pid]) break;
     }
     lastText[pid] = t.text;
+    return t;
+  }
+  /* Промпт №18 нового списка: без повторов (no-repeat.js). Своя защита
+     банка (то же условие два раза подряд) — только от соседнего задания, а
+     «+5» или несколько «⟳» подряд всё равно повторяли задания и ответы.
+     Ключи — условие и ответ: у задания есть случайный key, целиком объект
+     каждый раз «новый». Без модуля (тест грузит банк отдельно) — как раньше */
+  function generate(pids, lvlUnused, prefer){
+    if (!window.NoRepeat) return generateRaw(pids, lvlUnused, prefer);
+    const scope = 'trig:' + [].concat(pids).join(',') + ':' + (prefer || '');
+    // «подряд не тот же тип» считается от ПРИНЯТОГО задания, а не от
+    // отбракованной пробы — lastPid возвращаем перед каждой пробой
+    const keepPid = lastPid;
+    const t = window.NoRepeat.pick(scope, () => { lastPid = keepPid; return generateRaw(pids, lvlUnused, prefer); });
+    // принято могло быть и не последнее опробованное
+    if (t && t.pid) lastPid = t.pid;
     return t;
   }
 

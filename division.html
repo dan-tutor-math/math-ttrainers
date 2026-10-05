@@ -659,6 +659,7 @@ html[data-focus="on"] .hint{
 <div id="boardSpace" aria-hidden="true"></div></div>
 
 <script src="basket-core.js"></script>
+<script src="no-repeat.js"></script>
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
@@ -748,8 +749,14 @@ function genProblem(level){
 let P=null, S=null;
 let pendingBringDownAnim = null;  // мета для анимации «сноса» цифры вниз
 
+/* Промпт №18 нового списка: без повторов (no-repeat.js). Пример целиком
+   и его ответ — тот же, что у «ответа сразу» (QuickAnswer.answerOf): два
+   одинаковых ответа подряд тоже не выпадают */
+function nrKeysP(p){
+  return { exact: NoRepeat.stable(p), answer: window.QuickAnswer && QuickAnswer.answerOf ? QuickAnswer.answerOf(p) : null };
+}
 function newProblem(){
-  P = genProblem(curLevel);
+  P = NoRepeat.pick('division:' + curLevel, () => genProblem(curLevel), { keys: nrKeysP, avoid: [P] });
   taskCounter++;
   S = {
     phase:'group',

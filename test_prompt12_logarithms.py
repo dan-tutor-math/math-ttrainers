@@ -431,7 +431,10 @@ def test_solve(browser):
     page.evaluate(f"({SOLVE_JS})(-1)")
     after = page.evaluate("() => ({ txt: document.querySelector('#logQuestion .log-expr .slot').textContent, filled: document.querySelector('#logQuestion .log-expr .slot').classList.contains('filled'), want: S.task.fields[0].value })")
     check("F: пропуск «?» после ответа заполнен верным числом", before == "?" and after["filled"] and after["txt"].replace("−", "-") == after["want"].replace("/", ""), str(after))
-    page.evaluate("() => { startRun(['pow'], 1); let i = 0; while (!S.task.choice && i++ < 80) newTask(); }")
+    # выбор формулы у «Логарифма степени» на уровне А — одно-единственное
+    # задание; после промпта №18 нового списка (no-repeat.js) уже показанное
+    # не вернётся, пока не перебраны остальные, — поэтому историю сбрасываем
+    page.evaluate("() => { NoRepeat.reset(); startRun(['pow'], 1); let i = 0; while (!S.task.choice && i++ < 80) newTask(); }")
     page.evaluate(f"({WRONG_JS})(-1)")
     page.evaluate(f"({WRONG_JS})(-1)")
     c = page.evaluate("() => ({ a: S.answered, bad: document.querySelectorAll('#logQuestion .mcq-btn.bad').length, fixed: document.querySelectorAll('#logQuestion .mcq-btn.fixed').length })")
@@ -581,7 +584,7 @@ def test_platform(browser):
     glued = re.search(r"(?<!\\)log\d", it["text"])
     check("J: в подборке индексы не склеиваются: формула уходит исходником KaTeX",
           not glued and "basket-tex" in it["html"] and ("\\log_{" in it["text"] or "\\lg" in it["text"]), it["text"][:120])
-    page.evaluate("() => { Basket.clear(); startRun(['change'], 1); let i = 0; while (!S.task.choice && i++ < 80) newTask(); }")
+    page.evaluate("() => { Basket.clear(); NoRepeat.reset(); startRun(['change'], 1); let i = 0; while (!S.task.choice && i++ < 80) newTask(); }")  # сброс истории — см. выбор формулы выше
     page.click("#basketAddBtn")
     it = page.evaluate("() => Basket.all().slice(-1)[0]")
     check("J: у выбора формулы — варианты списком, формулы (с дробями) — KaTeX", "basket-opt" in it["html"] and "basket-tex" in it["html"] and "frac{" in it["text"] and "<button" not in it["html"], it["html"][:200])
@@ -643,7 +646,7 @@ def test_platform(browser):
     st = page.evaluate(f"() => getCurrentBoard().objects.find(x => x.id === {json.dumps(o['id'])}).task.st")
     check("J: на доске ответ «" + want.replace("-", "−") + "» принят", bool(st) and st.get("res") == "ok", str(st))
     page.evaluate("() => document.getElementById('bdTrainersPanel').classList.add('open')")
-    o3 = add("startRun(['quot', 'swap'], 1); (function(){ let i = 0; while (!S.task.choice && i++ < 200) newTask(); })()")
+    o3 = add("NoRepeat.reset(); startRun(['quot', 'swap'], 1); (function(){ let i = 0; while (!S.task.choice && i++ < 200) newTask(); })()")  # сброс истории — см. выбор формулы выше
     check("J: выбор формулы лёг с живыми вариантами", o3.get("task") and o3["task"]["kind"] == "choice" and o3["task"]["n"] == 4 and len(o3["task"]["hot"]["opts"]) == 4, str(o3.get("task"))[:200])
     check("J: у задания запомнено, как сделать ещё такое же", o3.get("gen") and o3["gen"]["kind"] == "state" and o3["gen"]["snap"].get("props") == ["quot", "swap"], str(o3.get("gen"))[:200])
     page.evaluate("() => { document.getElementById('bdTrainersPanel').classList.remove('open'); boardsRedraw(); }")

@@ -849,6 +849,7 @@ html[data-focus="on"] .lvl-desc{max-height:0;opacity:0;margin:0;pointer-events:n
 </div>
 
 <script src="basket-core.js"></script>
+<script src="no-repeat.js"></script>
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
@@ -1015,8 +1016,14 @@ function initState(P){
 
 let P=null, S=null;
 
+/* Промпт №18 нового списка: без повторов (no-repeat.js). Пример целиком
+   и его ответ — тот же, что у «ответа сразу» (QuickAnswer.answerOf): два
+   одинаковых ответа подряд тоже не выпадают */
+function nrKeysP(p){
+  return { exact: NoRepeat.stable(p), answer: window.QuickAnswer && QuickAnswer.answerOf ? QuickAnswer.answerOf(p) : null };
+}
 function newProblem(){
-  P = makeProblem(curSection, curLevel);
+  P = NoRepeat.pick('gcd:' + curSection + ':' + curLevel, () => makeProblem(curSection, curLevel), { keys: nrKeysP, avoid: [P] });
   S = initState(P);
   taskCounter++;
   document.getElementById('taskNum').textContent = 'пример №'+taskCounter;

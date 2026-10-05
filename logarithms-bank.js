@@ -991,7 +991,7 @@
   let lastPid = null;
   const lastText = {};
   const LEVEL_MAX = 4;
-  function generate(props, lvl, opt){
+  function generateRaw(props, lvl, opt){
     const list = (Array.isArray(props) ? props : [props]).filter(p => GEN[p]);
     if (!list.length) list.push(PROPS[0].id);
     lvl = Math.max(1, Math.min(LEVEL_MAX, lvl || 1));
@@ -1033,7 +1033,29 @@
     }
     // такого вида нет ни у одного свойства тренировки на этом уровне —
     // задание того же уровня любого вида
-    return generate(list, lvl, { prefer: pid });
+    return generateRaw(list, lvl, { prefer: pid });
+  }
+  /* Промпт №18 нового списка: без повторов (no-repeat.js). Своя защита
+     банка (то же условие два раза подряд) — только от соседнего задания, а
+     «+5» или несколько «⟳» подряд всё равно повторяли задания и ответы.
+     Ключи — условие и ответ: у задания есть случайный key, целиком объект
+     каждый раз «новый». Без модуля (тест грузит банк отдельно) — как раньше */
+  function generate(props, lvl, opt){
+    if (!window.NoRepeat) return generateRaw(props, lvl, opt);
+    const o = typeof opt === 'string' ? { prefer: opt } : (opt || {});
+    const scope = 'logarithms:' + [].concat(props).join(',') + ':' + (lvl || 1) + ':' + (o.type || '') + ':' + (o.prefer || '');
+    // «подряд не то же свойство» считается от ПРИНЯТОГО задания, а не от
+    // отбракованной пробы — lastPid возвращаем перед каждой пробой
+    const keepPid = lastPid;
+    // вид задания (⟳, «ещё такое же») важнее повторов: если у вида мало
+    // вариантов и все уже были, повтор лучше задания другого вида. Без
+    // этого перебор натыкался на запасной путь банка («такого вида нет —
+    // любой») и брал оттуда «свежее» задание другого вида
+    const t = window.NoRepeat.pick(scope, () => { lastPid = keepPid; return generateRaw(props, lvl, opt); },
+      { ok: o.type ? (x => x.type === o.type) : null });
+    // принято могло быть и не последнее опробованное
+    if (t && t.pid) lastPid = t.pid;
+    return t;
   }
 
   window.LOG_BANK = {
