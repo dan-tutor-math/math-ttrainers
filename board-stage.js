@@ -135,6 +135,13 @@
     try { role = sessionStorage.getItem('tsTab:role') || localStorage.getItem('trainerSession:global:role'); } catch (e) {}
     if (role === 'follower') return;
     TS.init({ trainer: 'boards', getState: () => ({}), applyState: () => {} });
+    // Кнопка «Совместный доступ» — та же, что на тренажёрах. Раньше её здесь
+    // не было: урок часто идёт только на досках, и за кодом для ученика
+    // приходилось уходить на главную. Ученику (просмотр, VIEWER) кнопка не
+    // нужна — у него свой интерфейс сцены. Класс на <html> — чтобы
+    // boards.html отодвинул от неё свои кнопки в правом верхнем углу
+    TS.mountShareButton();
+    document.documentElement.classList.add('ts-share-on');
 
     // «К тренажёрам» — через сессию, чтобы ученики вернулись следом
     const toIndex = document.getElementById('blToIndex');

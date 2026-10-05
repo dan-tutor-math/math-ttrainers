@@ -4261,7 +4261,9 @@ let dockDrag = null;
    разошлась бы с этим кодом */
 function dockObstacles(){
   const els = [document.getElementById('bdName')?.closest('.bd-topbar'), railEl,
-    document.getElementById('bdRefToggle'), document.getElementById('themeToggle')];
+    document.getElementById('bdRefToggle'), document.getElementById('themeToggle'),
+    // кнопка «Совместный доступ» (у учителя) — рядом с кнопкой темы
+    document.querySelector('.ts-share-btn')];
   return els.filter(Boolean).map(el => el.getBoundingClientRect()).filter(r => r.width > 0 && r.height > 0);
 }
 function dockOffsetRange(){

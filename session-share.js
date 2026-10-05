@@ -1381,6 +1381,10 @@
     const u = new URL(location.href);
     u.search = '';
     u.searchParams.set('s', code);
+    // На досках в адресе висит #board=<номер> открытой доски учителя. Ученику
+    // он ни к чему (доска приходит каналом, а не по номеру), а ссылка с ним
+    // выдаёт номер личной доски и выглядит так, будто открывает конкретную
+    if (trainerSlug === 'boards') u.hash = '';
     return u.toString();
   }
 
@@ -2808,7 +2812,9 @@
         <div class="ts-share-hint" id="tsSessMsg" style="display:none;margin-top:6px"></div>
       </div>
       <div class="ts-share-sep" id="tsSessSep" style="display:none"></div>
-      <div class="ts-share-hint">Поделитесь кодом или ссылкой — тот, кто откроет её, увидит те же задания и ввод, что и вы, в реальном времени.</div>
+      <div class="ts-share-hint">${trainerSlug === 'boards'
+        ? 'Поделитесь кодом или ссылкой — ученик увидит доску, которую вы откроете, и всё, что вы на ней пишете, в реальном времени. Перейдёте к тренажёрам — ученик перейдёт следом.'
+        : 'Поделитесь кодом или ссылкой — тот, кто откроет её, увидит те же задания и ввод, что и вы, в реальном времени.'}</div>
       <div class="ts-share-hint" id="tsRole" style="font-weight:600;"></div>
       <div class="ts-conn ts-conn-reconnecting" id="tsConn">На связи</div>
       <div class="ts-share-hint" id="tsPeers" style="margin-top:-4px"></div>

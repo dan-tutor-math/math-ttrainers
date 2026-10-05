@@ -580,8 +580,13 @@
   const shareBtn = document.createElement('button');
   shareBtn.className = 'bd-gear';
   shareBtn.id = 'bdShareBtn';
-  shareBtn.title = 'Совместная работа';
-  shareBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none"><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.6"/><circle cx="17" cy="6" r="2.4" stroke="currentColor" stroke-width="1.6"/><circle cx="17" cy="18" r="2.4" stroke="currentColor" stroke-width="1.6"/><path d="M10.6 9.4L15 6.9M10.6 12.6L15 17.1M3 19c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+  shareBtn.title = 'Общая доска по email — совместная работа через аккаунты';
+  // Значок — облако с человеком, а не «люди со связями»: тот же значок
+  // «люди со связями» у кнопки «Совместный доступ» (код и ссылка для
+  // ученика, session-share.js), и с промпта о сессии на досках обе кнопки
+  // стоят на одном экране. Одинаковые значки путали: эта — про облачную
+  // доску и вход по email, та — про показ ученику без входа
+  shareBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none"><path d="M6.5 19.5h11a4.5 4.5 0 0 0 .7-8.95A6.5 6.5 0 0 0 5.6 9.6 5 5 0 0 0 6.5 19.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="11.6" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M8.6 19.4c.3-2.1 1.7-3.4 3.4-3.4s3.1 1.3 3.4 3.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
   if (gearBtn && gearBtn.parentElement) gearBtn.parentElement.insertBefore(shareBtn, gearBtn.nextSibling);
 
   const sharePop = document.createElement('div');
