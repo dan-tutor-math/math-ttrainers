@@ -503,12 +503,17 @@ function mergeDbs(stored, mine){
     const sb = storedById.get(mb.id);
     if (!sb) { out.push(mb); return; }
     const lastOpened = Math.max(sb.lastOpenedAt || 0, mb.lastOpenedAt || 0);
+    const myView = mb.view;
     if (storedWins(sb, mb)) {
-      const myView = mb.view;
       Object.assign(mb, sb);
-      if (myView) mb.view = myView;        // куда прокручено — дело этой вкладки
       if (B && B.id === mb.id) activeChanged = true;
     }
+    // «Вставка и вид доски»: вид — какой запомнили последним, в этой вкладке или в
+    // соседней. Раньше всегда оставался свой, и вкладка со старым видом
+    // затирала свежий (камеру открытой доски это не двигает: вид читается
+    // только при открытии)
+    const view = newerView(myView, sb.view);
+    if (view) mb.view = view;
     mb.lastOpenedAt = lastOpened;
     out.push(mb);
   });
@@ -1718,11 +1723,92 @@ function totalH(){ return sheetHpx() * SHEET_ROWS; }
    из-за неё не должны появляться расхождения при переносе досок между
    компьютерами и скакать сортировка «по дате работы». */
 let viewSaveTimer = null;
-function rememberView(){
-  if (!B || !boardActive || !cssW || !cssH) return;
-  B.view = { x: cam.x, y: cam.y, zoom: cam.zoom };
+/* ═══ «Вставка и вид доски»: доска всё равно иногда открывалась не там ═══
+   Причин было три, все чинятся здесь:
+   1) Вид жил только в индексе досок, а при слиянии вкладок (mergeDbs) каждая
+      вкладка считала главным СВОЙ вид. Вкладка с досками, открытая ещё
+      утром, держала в памяти утренний вид и при первом же своём сохранении
+      или при открытии доски возвращала его. Теперь у вида есть время (at), и
+      при слиянии побеждает свежий, чей бы он ни был (newerView).
+   2) Закрытие вкладки крестиком: запись в IndexedDB асинхронная, и при
+      закрытии браузер её может не дождаться. Поэтому вид дублируется в
+      localStorage — он пишется синхронно и доживает до следующего захода
+      (VIEW_LS_KEY). При открытии берётся свежий из двух.
+   3) Камера двигалась не только колесом и перетаскиванием: подъезд к новому
+      заданию, жесты, клавиши, «показать всё» — и эти сдвиги не запоминались.
+      Теперь отрисовка сама замечает, что камера сдвинулась (rememberViewIfMoved).
+   Вдобавок запоминаем не левый верхний угол, а точку доски в середине окна
+   (cx, cy): окно в другой раз может быть другого размера, и с углом середина
+   уезжала. Середина считается по окну, а не по холсту: панель тренажёров
+   сдвигает холст, но то, что на экране, остаётся на месте (applyBoardInset),
+   и середина окна от неё не зависит. x и y оставлены для старых копий. */
+const VIEW_LS_KEY = 'boardsViews';
+const VIEW_LS_MAX = 300;          // досок много не бывает, но список не должен расти вечно
+let viewReady = false;            // вид открытой доски уже восстановлен — до этого не пишем
+let lastViewCam = null;           // камера, которую запомнили последней
+function viewOf(){
+  const z = cam.zoom;
+  return {
+    x: cam.x, y: cam.y, zoom: z,
+    cx: cam.x + (window.innerWidth / 2 - boardInset) / z,
+    cy: cam.y + cssH / 2 / z,
+    at: Date.now(),
+  };
+}
+function viewIsSane(v){
+  if (!v || ![v.x, v.y, v.zoom].every(n => typeof n === 'number' && isFinite(n))) return false;
+  if (v.zoom < ZOOM_MIN || v.zoom > ZOOM_MAX) return false;
+  if (v.cx !== undefined && !(typeof v.cx === 'number' && isFinite(v.cx) && typeof v.cy === 'number' && isFinite(v.cy))) return false;
+  return true;
+}
+// из двух видов — тот, что запомнен позже; вид без времени (до правки «вставка и вид доски»)
+// уступает любому со временем
+function newerView(a, b){
+  if (!viewIsSane(b)) return a;
+  if (!viewIsSane(a)) return b;
+  return (b.at || 0) > (a.at || 0) ? b : a;
+}
+function readLocalViews(){
+  try {
+    const m = JSON.parse(localStorage.getItem(VIEW_LS_KEY) || 'null');
+    return (m && typeof m === 'object') ? m : {};
+  } catch (e) { return {}; }
+}
+function writeLocalView(id, v){
+  try {
+    const m = readLocalViews();
+    m[id] = { x: v.x, y: v.y, zoom: v.zoom, cx: v.cx, cy: v.cy, at: v.at };
+    const ids = Object.keys(m);
+    if (ids.length > VIEW_LS_MAX){
+      ids.sort((a, b) => (m[a].at || 0) - (m[b].at || 0))
+         .slice(0, ids.length - VIEW_LS_MAX).forEach(k => { delete m[k]; });
+    }
+    localStorage.setItem(VIEW_LS_KEY, JSON.stringify(m));
+  } catch (e) {}
+}
+// now = true — при уходе с доски и закрытии вкладки: localStorage пишем
+// сразу, без паузы, второго шанса не будет
+function rememberView(now){
+  if (!B || !boardActive || !viewReady || !cssW || !cssH) return;
+  B.view = viewOf();
+  lastViewCam = { x: cam.x, y: cam.y, zoom: cam.zoom };
+  const board = B, v = B.view;
   clearTimeout(viewSaveTimer);
-  viewSaveTimer = setTimeout(() => { idbSaveDB().catch(() => {}); }, 700);
+  if (now === true){ viewSaveTimer = null; writeLocalView(board.id, v); return; }
+  // localStorage — с той же паузой, что и диск: при прокрутке тачпадом
+  // rememberView зовут на каждое событие, а переписывать список видов
+  // сотни раз в секунду незачем. На закрытие есть now = true
+  viewSaveTimer = setTimeout(() => {
+    viewSaveTimer = null;
+    writeLocalView(board.id, v);
+    idbSaveDB().catch(() => {});
+  }, 700);
+}
+function rememberViewIfMoved(){
+  if (!viewReady || !boardActive) return;
+  const c = lastViewCam;
+  if (c && c.x === cam.x && c.y === cam.y && c.zoom === cam.zoom) return;
+  rememberView();
 }
 /* ═══ Промпт №41: три уровня доступа к общей доске ═══
    «Полный доступ» — можно всё, как у владельца.
@@ -1980,6 +2066,7 @@ function openBoard(id){
   ensureBoardLoaded(b).then(() => openBoardReady(b, id), alertBoardReadFailed);
 }
 function openBoardReady(b, id){
+  viewReady = false;   // «Вставка и вид доски»: пока вид не восстановлен, камера чужая
   b.lastOpenedAt = nowTs();
   B = b;
   B.objects = B.objects || [];
@@ -2059,11 +2146,17 @@ function openBoardReady(b, id){
     // Промпт №39: если доска уже открывалась — возвращаемся ровно туда, где
     // работали в прошлый раз; проверяем числа на вменяемость, чтобы испорченная
     // запись не выкинула доску в пустоту (тогда просто открываем как раньше)
-    const v = B.view;
-    const sane = v && [v.x, v.y, v.zoom].every(n => typeof n === 'number' && isFinite(n))
-                 && v.zoom >= ZOOM_MIN && v.zoom <= ZOOM_MAX;
-    if (sane) {
-      cam.zoom = v.zoom; cam.x = v.x; cam.y = v.y;
+    // «Вставка и вид доски»: свежий из двух — индекса и localStorage (туда вид пишется
+    // и при закрытии вкладки крестиком, см. rememberView)
+    const v = newerView(B.view, readLocalViews()[B.id]);
+    if (v) {
+      cam.zoom = v.zoom;
+      if (v.cx !== undefined){
+        // точка, бывшая в середине окна, снова в середине окна
+        cam.x = v.cx - (window.innerWidth / 2 - boardInset) / v.zoom;
+        cam.y = v.cy - cssH / 2 / v.zoom;
+      } else { cam.x = v.x; cam.y = v.y; }
+      B.view = v;
     } else {
       cam.zoom = 1;
       // центрируем ровно на середину ОДНОГО конкретного центрального листа, а не
@@ -2078,6 +2171,11 @@ function openBoardReady(b, id){
       cam.y = sheetCenterY - cssH/2/cam.zoom;
     }
     clampCam();
+    // с этого момента камера — вид этой доски; до восстановления в ней была
+    // камера прошлой доски, и запомнить её сюда значило бы открыть доску
+    // потом на чужом месте
+    lastViewCam = { x: cam.x, y: cam.y, zoom: cam.zoom };
+    viewReady = true;
     updateZoomLabel();
     updateSettingsUI();
     renderSwatches();
@@ -2089,9 +2187,10 @@ function openBoardReady(b, id){
 }
 
 function backToList(){
-  rememberView();
+  rememberView(true);
   clearTimeout(viewSaveTimer); viewSaveTimer = null;
   boardActive = false;
+  viewReady = false;
   screenBoard.style.display = 'none';
   screenList.style.display = 'flex';
   location.hash = '';
@@ -2191,6 +2290,7 @@ function scheduleRedraw(){
     redrawScheduled = false;
     if (!boardActive) return;
     render(ctx, cssW, cssH, cam, true);
+    rememberViewIfMoved();   // «Вставка и вид доски»: любой сдвиг камеры, чем бы он ни был
     syncTextEditorToCam();
     syncTaskOverlays();   // Промпт №66
   });
@@ -3685,6 +3785,23 @@ canvas.addEventListener('pointerdown', (e) => {
   }
 
   if (tool === 'hand'){
+    // «Вставка и вид доски»: вставили сразу несколько объектов (с картинкой — значит,
+    // включилась «рука») — тащим их вместе, как «Выделение», а не по одному:
+    // иначе вставка разъезжалась бы по частям
+    if (multiSelectIds.length){
+      const hitGroup = multiSelectIds.some(id => {
+        const o = B.objects.find(x => x.id === id);
+        return o && hitTestObject(o, pt, 8/cam.zoom);
+      });
+      if (hitGroup){
+        pushUndo();
+        dragMode='multimove'; dragGroupIds = multiSelectIds.slice(); dragStart = pt;
+        dragOrigMap = {};
+        dragGroupIds.forEach(id => { const o=B.objects.find(x=>x.id===id); if (o) dragOrigMap[id]=clonePts(o); });
+        return;
+      }
+      multiSelectIds = [];   // мимо группы — группу отпускаем, клик как обычно
+    }
     // закреплённые изображения — единственное исключение из новой модели:
     // пока не «взведены» двойным кликом, одиночный клик их не двигает
     if (armedHandId){
@@ -4748,7 +4865,8 @@ function applyBoardInset(){
   if (B && boardActive){
     // то, что было на экране, остаётся на месте: холст съехал вправо на d,
     // камера — на столько же. Иначе при каждом открытии панели доска
-    // прыгала бы вбок. Вид при этом не запоминаем — это не прокрутка
+    // прыгала бы вбок. Запомненный вид (точка в середине окна, «вставка и вид доски»)
+    // от этого не меняется — это не прокрутка
     cam.x += d / cam.zoom;
     resizeCanvas();
     updateContextMenu();
@@ -7420,8 +7538,7 @@ document.getElementById('imgModalInsert').addEventListener('click', async () => 
      подгоняют по месту — поэтому включаем «руку» и «взводим» именно эту
      картинку: первый же клик по ней её потащит. Чтобы начать писать
      поверх, достаточно нажать ручку, как обычно. */
-  const handBtn = document.querySelector('.bd-tool[data-tool="hand"]');
-  if (handBtn) handBtn.click();
+  switchToHandTool();
   selectedId = obj.id; multiSelectIds = [];
   armedHandId = obj.id;
   enterEditLock(obj, 'image');
@@ -7984,6 +8101,14 @@ function pasteAnchorWorld(clientPt){
   const v = visibleBoardRect();
   return { x: v.x + v.w/2, y: v.y + v.h/2 };
 }
+/* «Вставка и вид доски»: «рука» после вставки картинки — нажатием её кнопки, а не
+   присваиванием tool: обработчик кнопки заодно закрывает недорисованное,
+   редактор текста, панель настроек и меняет курсор. Нажатие снимает
+   выделение, поэтому выделять вставленное — уже после этого вызова */
+function switchToHandTool(){
+  const handBtn = document.querySelector('.bd-tool[data-tool="hand"]');
+  if (handBtn) handBtn.click();
+}
 function pasteClipboard(clientPt){
   if (!mayDraw()) return;                             // Промпт №41
   if (!clipboardObjs || !clipboardObjs.length || !B) return;
@@ -8018,8 +8143,17 @@ function pasteClipboard(clientPt){
     B.objects.push(obj);
     newIds.push(obj.id);
   });
+  // «Вставка и вид доски»: среди вставленного есть картинка — включаем «руку», как
+  // после окна вставки (промпт №44). Картинку с другой доски почти всегда
+  // сразу двигают по месту, а прежний инструмент (ручка, прямая…) первым же
+  // касанием начинал рисовать поверх неё
+  const hasImage = clipboardObjs.some(o => o.type === 'image');
+  if (hasImage) switchToHandTool();
   if (newIds.length === 1){ selectedId = newIds[0]; multiSelectIds = []; }
   else { selectedId = null; multiSelectIds = newIds; }
+  // закреплённую картинку (задание с тренажёра) «взводим», как свежевставленную:
+  // иначе «рука» потащила бы её только после двойного клика
+  if (hasImage && newIds.length === 1) armedHandId = newIds[0];
   saveDB(); scheduleRedraw(); updateContextMenu();
 }
 document.getElementById('bdCtxZoomIn').addEventListener('click', () => setZoom(cam.zoom*1.25, cam.x+cssW/2/cam.zoom, cam.y+cssH/2/cam.zoom, cssW/2, cssH/2));
@@ -8136,5 +8270,9 @@ if (!window.__hasCloudGate) window.boardsAppBoot();
 // сохранение «на всякий случай» при уходе со страницы и при сворачивании
 // вкладки — теперь тоже в IndexedDB (обычное сохранение и так идёт на каждое
 // изменение, это лишь подстраховка)
-window.addEventListener('beforeunload', () => { if (B) { rememberView(); idbSaveDB(); } });
-document.addEventListener('visibilitychange', () => { if (document.hidden && B) { rememberView(); idbSaveDB(); } });
+// «Вставка и вид доски»: rememberView(true) — вид сразу в localStorage, синхронно: запись
+// в IndexedDB при закрытии вкладки браузер дождаться не обязан. pagehide —
+// для Safari и закрытия на телефоне, где beforeunload приходит не всегда
+window.addEventListener('beforeunload', () => { if (B) { rememberView(true); idbSaveDB(); } });
+window.addEventListener('pagehide', () => { if (B) rememberView(true); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && B) { rememberView(true); idbSaveDB(); } });
