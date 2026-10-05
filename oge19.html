@@ -301,6 +301,12 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .home-btn{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
 .home-btn:hover{border-color:var(--ink)}
 .home-btn:active{transform:scale(.92)}
+/* «Тренировка»: кнопка разбора — как в ОГЭ №7 */
+.sol-btn-row{display:flex;margin:-4px 0 14px;}
+.soft-btn{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--ink);background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:11px;padding:9px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:transform .12s, border-color .12s;}
+.soft-btn:hover{border-color:var(--ink)}
+.soft-btn:active{transform:scale(.96)}
+.explain .answer-line{margin-top:10px;}
 </style>
 </head>
 <body>
@@ -463,6 +469,12 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       <button class="change-answer-btn" id="changeAnswerBtn" style="display:none">✎ Изменить ответ</button>
     </div>
 
+    <!-- «Тренировка»: разбор по кнопке. Снаружи #questionPanel нарочно — он
+         целиком уходит «В подборку» и снимается на доску, кнопке там не место -->
+    <div class="sol-btn-row" id="solBtnRow" style="display:none">
+      <button class="soft-btn" id="showSolutionBtn">Показать решение и ответ</button>
+    </div>
+
     <div class="panel" id="mainPanel" style="display:none">
       <div class="explain" id="explainBox" style="display:none"></div>
       <button class="next-btn" id="nextBtn" style="display:none">Следующий пример →</button>
@@ -619,24 +631,97 @@ const els = {
 
 const COMING_SOON_TEXT = {
   learn: '🚧 Режим «Обучение» ещё в разработке. Здесь появится подробное объяснение решения — со всеми подсказками, шаг за шагом.',
-  practice: '🚧 Режим «Тренировка» ещё в разработке. Здесь будут задания с частью подсказок — уже поменьше, чем в «Обучении».',
 };
 
 let curSubMode = 'exam';
+/* «Тренировка» на этом этапе — тот же «Экзамен» плюс кнопка «Показать
+   решение и ответ»: то же задание, та же проверка, тот же счёт. Поэтому
+   переход между этими двумя вкладками не меняет пример и не стирает
+   набранный ответ, а режим переживает смену типа — как в ОГЭ №7 и ЕГЭ.
+   «Обучение» пока заглушка. */
+let solShown = false;      // «Тренировка»: разбор раскрыт кнопкой
+// карточка «+» — это та же страница в кадре (trainer-multi.js, ?card=1);
+// своих вкладок у неё нет, поэтому режим всегда тот же, что у основной страницы
+const IS_CARD = new URLSearchParams(location.search).get('card') === '1';
+function parentSubMode(){
+  try { return window.parent !== window ? window.parent.document.documentElement.getAttribute('data-submode') : null; }
+  catch (e) { return null; }
+}
+if (IS_CARD && parentSubMode() === 'practice') curSubMode = 'practice';
+els.solBtnRow = document.getElementById('solBtnRow');
+els.showSolutionBtn = document.getElementById('showSolutionBtn');
+function syncTabs(){
+  els.tabLearn.classList.toggle('active', curSubMode === 'learn');
+  els.tabPractice.classList.toggle('active', curSubMode === 'practice');
+  els.tabExam.classList.toggle('active', curSubMode === 'exam');
+  // по этому атрибуту карточки «+» узнают режим основной страницы
+  document.documentElement.setAttribute('data-submode', curSubMode);
+}
+// разбор с ответом: верные номера — первой строкой, это и есть ответ
+function solutionHTML(){
+  const correctSet = correctIndexSet();
+  const nums = [...correctSet].map(i => i + 1).sort((a, b) => a - b).join(', ');
+  const details = curTask.statements.map((s, i) => `${i + 1}) ${s.isTrue ? '<b>верно.</b>' : 'неверно.'} ${s.explain}`).join('<br>');
+  return `<b>${correctSet.size === 1 ? 'Верное утверждение' : 'Верные утверждения'}: ${nums}.</b><br><br>${details}`;
+}
+// «Тренировка»: кнопка и сам разбор по ней. После ответа кнопки нет — разбор
+// тогда показывает finishTask, одинаково во всех режимах
+function syncSolutionUI(){
+  const canShow = curSubMode === 'practice' && !!curTask && !taskAnswered
+    && els.questionPanel.style.display !== 'none';
+  els.solBtnRow.style.display = canShow ? 'flex' : 'none';
+  els.showSolutionBtn.textContent = solShown ? 'Скрыть решение и ответ' : 'Показать решение и ответ';
+  if (taskAnswered) return;
+  if (canShow && solShown) {
+    const wasHidden = els.mainPanel.style.display === 'none';
+    els.explainBox.innerHTML = solutionHTML();
+    els.explainBox.style.display = 'block';
+    els.nextBtn.style.display = 'none';
+    els.mainPanel.style.display = 'block';
+    if (wasHidden) {
+      els.mainPanel.classList.remove('reveal');
+      void els.mainPanel.offsetWidth;
+      els.mainPanel.classList.add('reveal');
+    }
+  } else {
+    els.mainPanel.style.display = 'none';
+    els.explainBox.style.display = 'none';
+  }
+}
+els.showSolutionBtn.onclick = ((window.TrainerSession && window.TrainerSession.guardStudentAction)
+  ? window.TrainerSession.guardStudentAction('showSolution', toggleSolution) : toggleSolution);
+function toggleSolution(){
+  if (taskAnswered || curSubMode !== 'practice') return;
+  solShown = !solShown;
+  syncSolutionUI();
+}
+syncTabs();
+if (IS_CARD) {
+  // «Обучение» у карточки не повторяем: там заглушка, а пример в карточке нужен
+  setInterval(() => {
+    const m = parentSubMode();
+    if ((m === 'practice' || m === 'exam') && m !== curSubMode) switchSubMode(m);
+  }, 400);
+}
 
-function switchSubMode(mode) {
+function switchSubMode(mode, isEntering) {
+  const wasTaskMode = curSubMode !== 'learn';
   curSubMode = mode;
-  els.tabLearn.classList.toggle('active', mode === 'learn');
-  els.tabPractice.classList.toggle('active', mode === 'practice');
-  els.tabExam.classList.toggle('active', mode === 'exam');
+  if (mode !== 'practice') solShown = false;
+  syncTabs();
 
-  if (mode === 'exam') {
+  if (mode === 'exam' || mode === 'practice') {
     els.comingSoonPanel.style.display = 'none';
     els.refreshBtn.style.display = 'inline-flex';
-    newTask();
+    // между «Тренировкой» и «Экзаменом» задание общее — появляется или
+    // пропадает только кнопка разбора; новое задание — при входе в тип и
+    // при выходе из «Обучения»
+    if (!isEntering && wasTaskMode && curTask && els.questionPanel.style.display !== 'none') syncSolutionUI();
+    else newTask();
   } else {
     els.questionPanel.style.display = 'none';
     els.mainPanel.style.display = 'none';
+    els.solBtnRow.style.display = 'none';
     els.refreshBtn.style.display = 'none';
     els.comingSoonPanel.textContent = COMING_SOON_TEXT[mode];
     els.comingSoonPanel.style.display = 'block';
@@ -645,7 +730,7 @@ function switchSubMode(mode) {
 els.tabLearn.onclick = () => switchSubMode('learn');
 els.tabPractice.onclick = () => switchSubMode('practice');
 els.tabExam.onclick = () => switchSubMode('exam');
-els.refreshBtn.onclick = () => { if (curSubMode === 'exam') newTask(); };
+els.refreshBtn.onclick = () => { if (curSubMode !== 'learn') newTask(); };
 
 els.basketAddBtn = document.getElementById('basketAddBtn');
 els.basketAddBtn.onclick = () => {
@@ -680,7 +765,8 @@ function enterMode(id){
 }
 function openMode(id){
   enterMode(id);
-  switchSubMode('exam');
+  // «Тренировка» переживает смену типа; из заглушки «Обучения» — в «Экзамен»
+  switchSubMode(curSubMode === 'practice' ? 'practice' : 'exam', true);
 }
 els.backBtn.onclick = showPicker;
 
@@ -712,6 +798,9 @@ function newTask() {
   els.mainPanel.style.display = 'none';
   els.explainBox.style.display = 'none';
   els.nextBtn.style.display = 'none';
+  // новое задание — разбор «Тренировки» закрыт
+  solShown = false;
+  syncSolutionUI();
 }
 
 function attachStmtHandlers() {
@@ -789,12 +878,10 @@ els.changeAnswerBtn.onclick = () => {
 };
 
 function finishTask() {
+  els.solBtnRow.style.display = 'none';
   els.mainPanel.style.display = 'block';
   els.explainBox.style.display = 'block';
-  const correctSet = correctIndexSet();
-  const nums = [...correctSet].map(i => i + 1).sort((a, b) => a - b).join(', ');
-  const details = curTask.statements.map((s, i) => `${i + 1}) ${s.isTrue ? '<b>верно.</b>' : 'неверно.'} ${s.explain}`).join('<br>');
-  els.explainBox.innerHTML = `<b>${correctSet.size === 1 ? 'Верное утверждение' : 'Верные утверждения'}: ${nums}.</b><br><br>${details}`;
+  els.explainBox.innerHTML = solutionHTML();
   els.nextBtn.style.display = 'block';
   els.mainPanel.classList.remove('reveal');
   void els.mainPanel.offsetWidth;
@@ -823,6 +910,8 @@ function tsGetState(){
     // открыта ли кнопка «изменить ответ» — после первой неверной проверки
     // неверно отмеченные подсвечены, пока её не нажмут
     wrongShown: els.changeAnswerBtn.style.display === 'block',
+    // раскрытый в «Тренировке» разбор — общий, как в ОГЭ №7
+    solShown: !!solShown,
   };
   if (window.__boardGetState) Object.assign(base, window.__boardGetState());
   if (window.__cardsGetState) Object.assign(base, window.__cardsGetState());
@@ -859,7 +948,10 @@ function tsRenderStatements(taskChanged, wrongShown){
     els.changeAnswerBtn.style.display = 'none';
     // разбор показываем один раз — при переходе в «решено», а не на каждый
     // входящий снимок: иначе анимация переигрывалась бы на каждый штрих
-    if (els.mainPanel.style.display === 'none') finishTask();
+    // смотрим на «Следующий пример», а не на саму панель: в «Тренировке» она
+    // уже может быть открыта кнопкой «Показать решение», а разбор после
+    // ответа — другой
+    if (els.nextBtn.style.display === 'none') finishTask();
     return;
   }
   els.checkBtn.style.display = 'block';
@@ -882,21 +974,22 @@ function tsApplyState(state){
   if (state.picker) { if (els.pickerArea.style.display === 'none') showPicker(); return; }
   if (els.pickerArea.style.display !== 'none' || curMode !== (state.curMode || 'geom')) enterMode(state.curMode || 'geom');
 
-  if (state.curSubMode !== curSubMode) {
-    // «Обучение» и «Тренировка» здесь пока заглушки — переключаем экран без
-    // генерации: в «Экзамене» задание всё равно сразу придёт ниже
-    if (state.curSubMode === 'exam') {
-      curSubMode = 'exam';
-      els.tabLearn.classList.remove('active');
-      els.tabPractice.classList.remove('active');
-      els.tabExam.classList.add('active');
+  // в карточке «+» режим берётся с основной страницы (IS_CARD), а не из снимка
+  if (!IS_CARD && state.curSubMode !== curSubMode) {
+    // «Обучение» здесь пока заглушка. В «Тренировку» и «Экзамен» переключаем
+    // экран без генерации: задание всё равно сразу придёт ниже
+    if (state.curSubMode === 'learn') {
+      switchSubMode('learn');
+    } else {
+      curSubMode = state.curSubMode;
+      if (curSubMode !== 'practice') solShown = false;
+      syncTabs();
       els.comingSoonPanel.style.display = 'none';
       els.refreshBtn.style.display = 'inline-flex';
-    } else {
-      switchSubMode(state.curSubMode);
+      syncSolutionUI();
     }
   }
-  if (state.curSubMode !== 'exam' || !state.curTask) return;
+  if (curSubMode === 'learn' || !state.curTask) return;
 
   const picked = Array.isArray(state.picked) ? state.picked : [];
   const taskChanged = !curTask || JSON.stringify(curTask) !== JSON.stringify(state.curTask);
@@ -907,19 +1000,22 @@ function tsApplyState(state){
     && (els.changeAnswerBtn.style.display === 'block') === !!state.wrongShown
     && els.questionPanel.style.display !== 'none'
     && els.taskArea.style.display !== 'none';
-  if (same) return;
-
-  curTask = state.curTask;
-  taskAnswered = !!state.taskAnswered;
-  hadWrongPick = !!state.hadWrongPick;
-  checked = taskAnswered || hadWrongPick;
-  pickedSet = new Set(picked);
-  tsRenderStatements(taskChanged, !!state.wrongShown);
+  if (!same) {
+    curTask = state.curTask;
+    taskAnswered = !!state.taskAnswered;
+    hadWrongPick = !!state.hadWrongPick;
+    checked = taskAnswered || hadWrongPick;
+    pickedSet = new Set(picked);
+    tsRenderStatements(taskChanged, !!state.wrongShown);
+  }
+  // tsRenderStatements закрывает разбор — открываем его по снимку уже после
+  const wantSol = curSubMode === 'practice' && !!state.solShown;
+  if (!same || wantSol !== solShown) { solShown = wantSol; syncSolutionUI(); }
 }
 
 // Промпт №54: пришедшее от собеседника назад не рассылаем — иначе через
 // 300 мс эхо откатывало бы его следующее действие (подробно — в ОГЭ №6)
-function tsWatchSig(s){ return JSON.stringify([s.picker, s.curMode, s.curSubMode, s.curTask, s.picked, s.taskAnswered, s.hadWrongPick, s.wrongShown]); }
+function tsWatchSig(s){ return JSON.stringify([s.picker, s.curMode, s.curSubMode, s.curTask, s.picked, s.taskAnswered, s.hadWrongPick, s.wrongShown, s.solShown]); }
 let tsPeerSig = null;
 /* Версия задания в общем снимке. Снимок уходит не только при правке задания,
    но и с каждым штрихом доски — и несёт то задание, которое было у
@@ -952,7 +1048,7 @@ function tsApplyStateFromPeer(state){
   try { tsPeerSig = tsWatchSig(tsGetState()); } catch (e) {}
 }
 window.__trainerState = { get: tsGetState, apply: tsApplyState,
-  newTask: function(){ if (curSubMode === 'exam') newTask(); } };
+  newTask: function(){ if (curSubMode !== 'learn') newTask(); } };
 if (window.TrainerSession) {
   window.TrainerSession.init({ trainer: 'oge19', getState: tsGetStateVersioned, applyState: tsApplyStateFromPeer });
 
