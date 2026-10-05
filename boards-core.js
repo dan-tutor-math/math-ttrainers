@@ -4261,9 +4261,11 @@ let dockDrag = null;
    разошлась бы с этим кодом */
 function dockObstacles(){
   const els = [document.getElementById('bdName')?.closest('.bd-topbar'), railEl,
-    document.getElementById('bdRefToggle'), document.getElementById('themeToggle'),
-    // кнопка «Совместный доступ» (у учителя) — рядом с кнопкой темы
-    document.querySelector('.ts-share-btn')];
+    document.getElementById('bdRefToggle'),
+    // кнопка «⋯» меню (boards.html). Саму кнопку темы — только если меню
+    // нет: в меню она спрятана в закрытом списке, но место под него в
+    // разметке занимает, и док справа упирался бы в невидимые кнопки
+    document.getElementById('lgMenuToggle') || document.getElementById('themeToggle')];
   return els.filter(Boolean).map(el => el.getBoundingClientRect()).filter(r => r.width > 0 && r.height > 0);
 }
 function dockOffsetRange(){

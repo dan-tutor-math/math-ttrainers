@@ -118,7 +118,13 @@ html[data-theme="dark"] .lg::before,html[data-theme="dark"] .lg-s::before{
   .lg-menu.is-open .lg-label{opacity:0;transform:translate(8px,-50%)}
   .lg-menu.is-open .lg-item:hover .lg-label,
   .lg-menu.is-open .lg-item:focus-within .lg-label{opacity:1;transform:translate(0,-50%);transition-delay:0s}
-  .lg-menu.has-pop .lg-item .lg-label{opacity:0}
+  /* панель совместного доступа открыта — подписи прячем и под курсором:
+     курсор стоит на кнопке, по которой только что нажали, и её подпись
+     ложилась поверх панели (правило с :hover выше сильнее простого
+     .has-pop, поэтому повторяем его с :hover) */
+  .lg-menu.has-pop .lg-item .lg-label,
+  .lg-menu.is-open.has-pop .lg-item:hover .lg-label,
+  .lg-menu.is-open.has-pop .lg-item:focus-within .lg-label{opacity:0}
 }
 
 /* значок состояния на «⋯»: виден, когда меню закрыто, — чтобы не пропустить
