@@ -5044,6 +5044,25 @@ function newStackSpot(w, h, g){
   return findFreeSpotInView(w, h);
 }
 
+// снимок задания; sol — разбор «Тренировки» (trainerSolutionHTML): тогда
+// разбор снимается отдельной картинкой, а на карточке внизу — ряд с кнопкой.
+// Разбор не снялся — задание всё равно ложится, просто без кнопки
+async function captureTaskWithSolution(el, info, cw, sol){
+  const opts = { width: cw };
+  if (!sol) return captureTrainerNode(el, info, opts);
+  const shot = await captureTrainerNode(el, info, Object.assign({}, opts, { solRow: true }));
+  try {
+    // разбор — шириной во всю карточку задания: под ней он и раскрывается
+    const solImg = await captureSolutionImage(el, sol, shot.css.w);
+    if (shot.solHot) shot.sol = { v: 1, src: solImg.src, css: solImg.css, card: solImg.card, hot: shot.solHot, open: false };
+    return shot;
+  } catch (e) {
+    console.warn('[доска] не удалось снять разбор задания', e);
+    // ряд с кнопкой без разбора был бы мёртвым — снимаем задание без него
+    return captureTrainerNode(el, info, opts);
+  }
+}
+
 // вставка одной готовой картинки задания на доску — тот же формат объекта,
 // что и у обычной вставленной картинки (см. imgModalInsert выше).
 // beside — исходное задание для «ещё такое же» и сторона (src, dir); без
@@ -5086,6 +5105,7 @@ async function insertTaskImage(dataUrl, task, gen, beside, shot, cw){
   if (gen) obj.gen = gen;   // Промпт №68: из чего делать «ещё такое же»
   if (card && card.r > 0) obj.card = card;   // Промпт №70: скругление карточки (renderImageObject)
   if (css) obj.css = Object.assign({}, css, cw ? { cw } : {});
+  if (shot && shot.sol) obj.sol = shot.sol;   // «Тренировка»: разбор по кнопке (trainer-tasks.js)
   if (stack) obj.stack = stack;
   obj.gap = gap;
   obj.addedAt = Date.now();
@@ -5100,7 +5120,12 @@ trainersAddBtn.addEventListener('click', async () => {
   let doc;
   try { doc = trainersIframe.contentDocument; } catch(e){ doc = null; }
   if (!doc){ showTrainersToast('Не удалось получить доступ к тренажёру'); return; }
-  const nodes = collectTrainerCaptureNodes(doc, trainersOpenId);
+  // теорию к заданию (ОГЭ №1–5) кладёт своя кнопка «Добавить теорию на
+  // доску» рядом с «Показать теорию» (addTheoryToBoard) — сюда она больше не
+  // едет довеском к каждому заданию
+  const all = collectTrainerCaptureNodes(doc, trainersOpenId);
+  all.forEach(n => { if (n.el.id === 'theoryContent' && n.restore) n.restore(); });
+  const nodes = all.filter(n => n.el.id !== 'theoryContent');
   if (!nodes.length){ showTrainersToast('Не нашли текущее задание — попробуйте сгенерировать заново'); return; }
   trainersAddBtn.disabled = true;
   // пока снимаем, пример в кадре менять нельзя — снялось бы полузаменённое
@@ -5114,7 +5139,7 @@ trainersAddBtn.addEventListener('click', async () => {
         const info = trainerTaskInfo(win, trainersOpenId, el);
         const gen = trainerGenInfo(win, trainersOpenId, trainersOpenHref, el);
         const cw = widthForNewTask(gen);
-        const shot = await captureTrainerNode(el, info, { width: cw });
+        const shot = await captureTaskWithSolution(el, info, cw, trainerSolutionHTML(win, trainersOpenId, el));
         await insertTaskImage(shot.dataUrl, (info && shot.hot) ? Object.assign({ v: 1 }, info, { hot: shot.hot }) : null, gen, null, shot, cw);
         added++;
         scheduleRedraw();   // каждое задание — на глазах, не дожидаясь остальных из пакета
@@ -5172,6 +5197,56 @@ trainersIframe.addEventListener('load', () => {
   st.textContent = '.keypad-float,.keypad-toggle{margin-bottom:58px !important;}';
   doc.head.appendChild(st);
 });
+
+/* ── ОГЭ №1–5: «Добавить теорию на доску» ──
+   У наборов №1–5 («Шина», тарифы…) под заданием кнопка «Показать теорию»:
+   без неё задачу не решить. Раньше теория уезжала на доску довеском к
+   КАЖДОМУ заданию — пять заданий набора давали пять одинаковых листов
+   теории. Теперь у неё своя кнопка, рядом с «Показать теорию», и задание
+   кладётся без неё. Кнопку кладёт в кадр сама доска (как стиль выше): на
+   странице тренажёра она не нужна, а файл тренажёра не трогаем. Появляется
+   и прячется вместе с блоком теории — его тренажёр показывает только у
+   заданий, где теория есть. */
+trainersIframe.addEventListener('load', () => {
+  let doc = null;
+  try { doc = trainersIframe.contentDocument; } catch (e) {}
+  const toggle = doc && doc.getElementById('theoryToggleBtn');
+  if (!toggle || doc.getElementById('bdTheoryAddBtn')) return;
+  const b = doc.createElement('button');
+  b.type = 'button'; b.id = 'bdTheoryAddBtn';
+  b.className = toggle.className;
+  b.textContent = '📥 Добавить теорию на доску';
+  b.addEventListener('click', () => addTheoryToBoard(b));
+  toggle.insertAdjacentElement('afterend', b);
+});
+let theoryAdding = false;
+async function addTheoryToBoard(btn){
+  if (theoryAdding || !B) return;
+  let doc = null;
+  try { doc = trainersIframe.contentDocument; } catch (e) {}
+  const el = doc && doc.getElementById('theoryContent');
+  if (!el || !el.textContent.trim()){ showTrainersToast('У этого задания нет теории'); return; }
+  theoryAdding = true;
+  btn.disabled = true; trainersAddBtn.disabled = true;
+  // свёрнутую теорию на время снимка раскрываем: html2canvas нужна настоящая
+  // вёрстка (так же делал collectTrainerCaptureNodes с unhide)
+  const prev = el.style.display;
+  if (getComputedStyle(el).display === 'none') el.style.display = 'block';
+  try {
+    const shot = await captureTrainerNode(el, null, {});
+    await insertTaskImage(shot.dataUrl, null, null, null, shot, null);
+    saveDB(); scheduleRedraw();
+    showTrainersToast('Теория добавлена на доску');
+  } catch (err) {
+    console.error('[trainers panel] theory capture failed', err);
+    showTrainersToast('Не получилось добавить теорию');
+  } finally {
+    el.style.display = prev;
+    btn.disabled = false; trainersAddBtn.disabled = false;
+    theoryAdding = false;
+  }
+}
+
 trainersRefreshBtn.addEventListener('click', () => {
   let res = 'notask';
   try { res = refreshTrainerInPanel(); } catch (err) { console.error('[trainers panel] refresh failed', err); }
@@ -5209,7 +5284,10 @@ function makeSimilarTask(srcId, dir){
       // Промпт №13 «раскладка заданий»: ширина и масштаб — исходного задания, а не
       // последнего добавленного на доску (insertTaskImage, beside)
       const cw = widthLike(src, gen);
-      const shot = await captureTrainerNode(el, info, { width: cw });
+      // у исходного был разбор — будет и у нового (режим в невидимом кадре
+      // может быть любым, поэтому force)
+      const sol = src.sol ? trainerSolutionHTML(win, g.tid, el, true) : null;
+      const shot = await captureTaskWithSolution(el, info, cw, sol);
       // пока снимали, могли уйти с доски или удалить исходное задание
       const srcNow = taskObjById(srcId);
       if (B !== boardAtStart || !srcNow) throw new Error('доска сменилась');
@@ -5261,7 +5339,8 @@ function reflowTaskWidth(id, worldW, side){
     const { el, restore } = main[0];
     try {
       const t = obj.task ? plainCopy(obj.task) : null;
-      const shot = await captureTrainerNode(el, t, { html: g.html, width: cw });
+      // ряд с кнопкой разбора — заново, под новую ширину; сам разбор прежний
+      const shot = await captureTrainerNode(el, t, { html: g.html, width: cw, solRow: !!obj.sol });
       const o = taskObjById(id);
       if (!o || B !== boardAtStart) throw new Error('доска сменилась');
       // живые поля обязаны найтись и на перестроенном — иначе лучше оставить как было
@@ -5283,6 +5362,7 @@ function reflowTaskWidth(id, worldW, side){
       if (shot.card && shot.card.r > 0) o.card = shot.card;
       o.css = Object.assign({}, shot.css, { cw });
       if (o.task) o.task.hot = shot.hot;
+      if (o.sol && shot.solHot) o.sol.hot = shot.solHot;
       touchTaskImage(o);
       saveDB(); scheduleRedraw(); updateContextMenu();
       return o;
@@ -5369,9 +5449,19 @@ function taskLayer(){
     .bd-task-dirs button.def{box-shadow:inset 0 0 0 2px var(--ink);}
     .bd-task-dirs .bd-task-dirs-mid{grid-area:2/2;display:flex;align-items:center;justify-content:center;
       font-size:9.5px;line-height:1.1;text-align:center;color:var(--muted-2);}
+    .bd-task-solbtn{position:absolute;box-sizing:border-box;pointer-events:auto;margin:0;padding:0 .6em;border:none;
+      background:transparent;color:transparent;font-weight:600;font-family:var(--font-ui);cursor:pointer;
+      white-space:nowrap;overflow:hidden;}
+    .bd-task-solbtn:hover{background:rgba(46,125,224,.08);}
+    .bd-task-solbtn.on{background:rgba(46,125,224,.16);color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink);}
+    .bd-task-sol{position:absolute;left:0;display:none;pointer-events:auto;border-radius:12px;
+      box-shadow:0 6px 24px rgba(0,0,0,.22);}
+    .bd-task-sol.open{display:block;}
+    .bd-task-sol img{display:block;width:100%;height:auto;border-radius:inherit;user-select:none;-webkit-user-drag:none;}
     [data-access="view"] .bd-task-more,[data-access="view"] .bd-task-dirs{display:none!important;}
     [data-access="view"] .bd-task-in,[data-access="view"] .bd-task-btn,
-    [data-access="view"] .bd-task-opt,[data-access="view"] .bd-task-reset{pointer-events:none;}
+    [data-access="view"] .bd-task-opt,[data-access="view"] .bd-task-reset,
+    [data-access="view"] .bd-task-solbtn{pointer-events:none;}
   `;
   document.head.appendChild(st);
   taskLayerEl = document.createElement('div');
@@ -5403,6 +5493,7 @@ function buildTaskOverlay(obj){
   const rec = { root, inputs: [], opts: [], check: null, msg: null, sig: null };
   const id = obj.id;
   if (obj.gen) buildMoreButton(rec, id);
+  if (obj.sol) buildSolutionToggle(rec, obj);
   // клик по живому элементу не должен начинать жест доски под ним
   root.addEventListener('pointerdown', (e) => e.stopPropagation());
   if (!obj.task || !obj.task.hot){
@@ -5468,6 +5559,65 @@ function buildTaskOverlay(obj){
   rec.msg = msg;
   taskLayer().appendChild(root);
   return rec;
+}
+
+/* ── «Тренировка»: «Показать решение и ответ» у задания ──
+   Кнопка лежит на ряду, дорисованном внизу карточки (bakeSolutionRow), разбор
+   — картинка obj.sol.src — раскрывается под карточкой. Раскрыт ли он — поле
+   obj.sol.open, обычная правка доски, как итог проверки (commitTaskState):
+   учитель открыл разбор — ученик в общей доске видит его тоже, так же
+   общий и раскрытый разбор в самом тренажёре. Разбор — слой поверх холста,
+   а не часть картинки: иначе следующее задание стопки, нарисованное позже,
+   закрыло бы его собой. */
+function buildSolutionToggle(rec, obj){
+  const id = obj.id;
+  const btn = document.createElement('button');
+  btn.type = 'button'; btn.className = 'bd-task-solbtn';
+  btn.textContent = 'Показать решение и ответ';
+  taskPlace(btn, obj.sol.hot);
+  btn.addEventListener('click', () => taskToggleSolution(id));
+  const panel = document.createElement('div');
+  panel.className = 'bd-task-sol';
+  const img = document.createElement('img');
+  img.alt = 'Решение и ответ';
+  img.draggable = false;
+  img.src = obj.sol.src;
+  panel.appendChild(img);
+  rec.root.appendChild(btn);
+  rec.root.appendChild(panel);
+  rec.solBtn = btn; rec.solPanel = panel; rec.solOpen = null;
+}
+function syncSolutionToggle(rec, o, sw, sh){
+  if (!rec.solBtn) return;
+  const open = !!o.sol.open;
+  if (rec.solOpen !== open){
+    rec.solOpen = open;
+    rec.solBtn.textContent = open ? 'Скрыть решение и ответ' : 'Показать решение и ответ';
+    rec.solBtn.classList.toggle('on', open);
+    rec.solPanel.classList.toggle('open', open);
+    // раскрыт — на кнопке «Скрыть…»: фон карточки поверх нарисованного
+    // «Показать…», иначе надписи легли бы одна на другую
+    rec.solBtn.style.background = open ? ((o.css && o.css.bg) || '#fff') : '';
+  }
+  // шрифт кнопки — как нарисованный под ней (15 CSS-пикселей тренажёра на
+  // ряд в 40), разбор — в масштабе самого задания
+  rec.solBtn.style.fontSize = Math.max(5, o.sol.hot.h * sh * 0.375) + 'px';
+  rec.solBtn.style.borderRadius = (o.sol.hot.h * sh * 0.3) + 'px';
+  if (open){
+    const k = (o.css && o.css.w) ? sw / o.css.w : 1;
+    const pw = o.sol.css.w * k;
+    rec.solPanel.style.width = pw + 'px';
+    rec.solPanel.style.borderRadius = ((o.sol.card && o.sol.card.r ? o.sol.card.r : 0.02) * pw) + 'px';
+    rec.solPanel.style.top = (sh + Math.max(4, 10 * k)) + 'px';
+  }
+}
+function taskToggleSolution(id){
+  const obj = taskObjById(id);
+  if (!obj || !obj.sol || !taskMayAnswer()) return;
+  pushUndo();
+  obj.sol.open = !obj.sol.open;
+  saveDB();
+  scheduleRedraw();
 }
 
 /* ── Промпт №68: кнопка «ещё такое же» и выбор, куда поставить ──
@@ -5703,14 +5853,15 @@ function syncTaskOverlays(){
       // живые поля — у заданий с ответом; кнопка «ещё такое же» (промпт №68)
       // — у любого задания с тренажёра, даже если ответ доске не известен
       const live = !!(o.task && o.task.hot);
-      if (!live && !o.gen) continue;
+      const hasSol = !!(o.sol && o.sol.hot);
+      if (!live && !o.gen && !hasSol) continue;
       const x = o.points[0].x, y = o.points[0].y;
       if (x + o.w < vx0 || x > vx1 || y + o.h < vy0 || y > vy1) continue;
       seen.add(o.id);
       let rec = taskEls.get(o.id);
       // форма живого слоя: у задания могли смениться места полей (новая
       // ширина, её отмена, правка собеседника) — тогда слой собираем заново
-      const shape = (live ? 'L' + JSON.stringify(o.task.hot) : '') + (o.gen ? 'G' : '');
+      const shape = (live ? 'L' + JSON.stringify(o.task.hot) : '') + (o.gen ? 'G' : '') + (hasSol ? 'S' + JSON.stringify(o.sol.hot) + o.sol.src.length : '');
       if (rec && rec.shape !== shape){ rec.root.remove(); taskEls.delete(o.id); rec = null; }
       if (!rec){ rec = buildTaskOverlay(o); rec.shape = shape; taskEls.set(o.id, rec); }
       const sig = live ? JSON.stringify(o.task.st || null) : '';
@@ -5723,13 +5874,16 @@ function syncTaskOverlays(){
       const p0 = worldToScreen(o.points[0]);
       const sw = o.w * cam.zoom, sh = o.h * cam.zoom;
       const root = rec.root;
-      // задания внахлёст: живые элементы верхнего (позже добавленного) — сверху
-      root.style.zIndex = String(oi + 1);
+      // задания внахлёст: живые элементы верхнего (позже добавленного) — сверху;
+      // раскрытый разбор лежит под карточкой поверх соседних заданий стопки —
+      // он выше всех
+      root.style.zIndex = String((hasSol && o.sol.open ? B.objects.length : 0) + oi + 1);
       root.style.left = p0.x + 'px'; root.style.top = p0.y + 'px';
       // пока тянут ширину, поля старого снимка не на своих местах — прячем
       root.style.visibility = taskWidthPreview.has(o.id) ? 'hidden' : '';
       root.style.width = sw + 'px'; root.style.height = sh + 'px';
       if (o.gen) root.classList.toggle('more-in', taskMoreBlocked(o));
+      if (hasSol) syncSolutionToggle(rec, o, sw, sh);
       // шрифт и скругления — в масштабе картинки: сколько экранных пикселей
       // приходится на один CSS-пиксель тренажёра
       if (!live) continue;

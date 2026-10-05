@@ -343,6 +343,7 @@ async function captureTrainerNode(el, task, opts){
         c.style.setProperty('max-height', 'none', 'important');
       }
       cleanCloneForCard(c, card);
+      hideDeadSolutionButtons(c);
       if (task) hot = prepareTaskClone(c, task);
     },
   };
@@ -372,6 +373,27 @@ async function captureTrainerNode(el, task, opts){
     const b = bakeTaskRows(canvas, task, hot, card.color, scale);
     if (b) { canvas = b.canvas; hot = b.hot; cw = hot.w; ch = hot.h; baked = true; }
   }
+  // «Тренировка»: ряд с кнопкой «Показать решение и ответ» — в самом низу
+  // карточки, поверх него доска кладёт живую кнопку (solHot — доли карточки)
+  let solHot = null;
+  if (opts.solRow) {
+    // узел сам карточка (ОГЭ №8: #questionPanel) — у него свои внутренние
+    // отступы, ряд встаёт по левому краю содержимого, а снизу — тот же отступ
+    let inset = null;
+    if (card.own) {
+      const ecs = getComputedStyle(el);
+      inset = { l: parseFloat(ecs.paddingLeft) || 0, b: parseFloat(ecs.paddingBottom) || 0 };
+    }
+    const s = bakeSolutionRow(canvas, cw, ch, card.color, scale, inset);
+    if (task && hot) {
+      const ky = ch / s.h;
+      const fix = r => r && ({ x: r.x, y: r.y * ky, w: r.w, h: r.h * ky });
+      hot.fields = hot.fields.map(fix); hot.opts = hot.opts.map(fix); hot.check = fix(hot.check);
+      hot.h = s.h;
+    }
+    canvas = s.canvas; ch = s.h;
+    solHot = { x: s.btn.x / cw, y: s.btn.y / ch, w: s.btn.w / cw, h: s.btn.h / ch };
+  }
   const wrapped = wrapIntoCard(canvas, card, scale, cw, ch);
   canvas = wrapped.canvas;
   if (task && hot && card.pad) {
@@ -380,6 +402,10 @@ async function captureTrainerNode(el, task, opts){
     const fix = r => r && ({ x: (r.x * cw + p) / W, y: (r.y * ch + p) / H, w: r.w * cw / W, h: r.h * ch / H });
     hot.fields = hot.fields.map(fix); hot.opts = hot.opts.map(fix); hot.check = fix(hot.check);
     hot.w = W; hot.h = H;
+  }
+  if (solHot && card.pad) {
+    const p = card.pad, W = wrapped.W, H = wrapped.H;
+    solHot = { x: (solHot.x * cw + p) / W, y: (solHot.y * ch + p) / H, w: solHot.w * cw / W, h: solHot.h * ch / H };
   }
   if (task && hot && !baked && hot.fields.length && hot.style) {
     // фон поля в тренажёре полупрозрачный (стекло поверх панели) — живое
@@ -400,7 +426,167 @@ async function captureTrainerNode(el, task, opts){
     // размер карточки в CSS-пикселях тренажёра, поле вокруг содержимого и
     // цвет карточки — для изменения размера на доске (промпт №70)
     css: { w: wrapped.W, h: wrapped.H, pad: card.pad, bg: card.color },
+    solHot,
   };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   «ПОКАЗАТЬ РЕШЕНИЕ И ОТВЕТ» У ЗАДАНИЙ «ТРЕНИРОВКИ» НА ДОСКЕ.
+   В «Тренировке» тренажёр рисует под заданием кнопку «Показать решение и
+   ответ», и она попадала на снимок — на доске это была просто картинка
+   кнопки. Теперь при добавлении задания разбор снимается отдельной
+   картинкой (obj.sol), а на карточке внизу — ряд с кнопкой, поверх которого
+   доска кладёт живую кнопку: по ней разбор раскрывается под заданием.
+
+   Разбор берётся из того же тренажёра и тем же кодом, что рисует его там:
+   у ЕГЭ, ОГЭ ч. 2, «Процентов», логарифмов и тригонометрии — их функцией
+   solutionHTML (через eval окна кадра, как ответ в egeTaskInfo), у ОГЭ —
+   из curTask.explain, как это делает revealSolution каждого тренажёра.
+   Нажимать кнопку в самом тренажёре нельзя: в совместной сессии раскрытый
+   разбор общий, и ученик на миг увидел бы ответ. Поэтому разметка разбора
+   собирается в невидимом узле за краем страницы кадра, снимается и
+   убирается — состояние тренажёра не меняется вовсе.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+// кнопки разбора на снимке не нужны: живую кнопку доска ставит в свой ряд,
+// а нарисованная тренажёрная нажималась бы впустую. Ряд кнопок карточки (⟳,
+// «В подборку», разбор) на доске тоже мёртвый — прячем, если в нём нет поля
+// ответа или «Проверить»
+function hideDeadSolutionButtons(c){
+  c.querySelectorAll('#showSolutionBtn, .added-solution-btn, #solBtnRow').forEach(e => { e.style.setProperty('display', 'none', 'important'); });
+  c.querySelectorAll('.card-btn-row').forEach(row => {
+    if (!row.querySelector('input, .check-btn, .mcq-btn')) row.style.setProperty('display', 'none', 'important');
+  });
+}
+
+// разбор текущего задания → { cls, html } или null (не «Тренировка», нет
+// разбора, теория). force — не смотреть на режим: «ещё такое же» к заданию,
+// у которого разбор уже есть, делается в невидимом кадре, а режим там свой
+function trainerSolutionHTML(win, trainerId, el, force){
+  if (!win || !el || !trainerId || el.id === 'theoryContent') return null;
+  try {
+    const card = el.closest ? el.closest('.added-task-card[data-idx]') : null;
+    const cardIdx = card ? Number(card.dataset.idx) : -1;
+    if (isEgeLikeTrainer(trainerId) || typeof win.__boardTaskInfo === 'function') {
+      if (!force && trainerEval(win, 'S.mode') !== 'practice') return null;
+      if (typeof win.solutionHTML !== 'function') return null;
+      const t = isEgeLikeTrainer(trainerId)
+        ? trainerEval(win, cardIdx >= 0 ? 'protoById(S.n, S.cards[' + cardIdx + '].pid)' : 'protoById(S.n, S.pid)')
+        : trainerEval(win, cardIdx >= 0 ? '(S.cards[' + cardIdx + '] || {}).task' : 'S.task');
+      if (!t) return null;
+      const html = win.solutionHTML(t);
+      return html ? { cls: '', html } : null;
+    }
+    const st = typeof win.tsGetState === 'function' ? win.tsGetState() : null;
+    if (!st || (!force && st.curSubMode !== 'practice')) return null;
+    const t = cardIdx >= 0 ? ((st.addedTasks || [])[cardIdx] || {}).task : st.curTask;
+    if (!t) return null;
+    // ОГЭ №6, №7, №9, №11, №13–19: у тренажёра своя solutionHTML() без
+    // аргументов — разбор основного задания ровно как по его кнопке (с
+    // ответом «как в бланке», если в explain ответа нет; у №19 explain у
+    // каждого утверждения свой, а не у задания)
+    if (cardIdx < 0 && typeof win.solutionHTML === 'function' && win.solutionHTML.length === 0) {
+      const own = win.solutionHTML();
+      if (own) return { cls: 'explain', html: own };
+    }
+    if (!t.explain) return null;
+    // остальные (№8, №12, «Степени», №10, №1–5, карточки «+») показывают
+    // в разборе explain; у вариантов дописываем номер верного, как №7
+    let html = '<b>Решение:</b> ' + t.explain;
+    if (!/Ответ/.test(t.explain) && Array.isArray(t.options) && typeof t.correctIndex === 'number' && t.options[t.correctIndex] != null)
+      html += '<div class="answer-line" style="margin-top:10px"><b>Ответ:</b> ' + (t.correctIndex + 1) + ') ' + t.options[t.correctIndex] + '</div>';
+    return { cls: 'explain', html };
+  } catch (e) {
+    console.warn('[доска] не удалось прочитать разбор задания', e);
+    return null;
+  }
+}
+
+// снять разбор картинкой-карточкой той же ширины, что задание (el — узел
+// задания в кадре: его документ, стили, тема)
+async function captureSolutionImage(el, sol, width){
+  const doc = el.ownerDocument;
+  const w = Math.round(width || el.getBoundingClientRect().width || 600);
+  const host = doc.createElement('div');
+  host.setAttribute('aria-hidden', 'true');
+  // за левым краем страницы: на экране его не видно, а вёрстка настоящая —
+  // html2canvas нужна именно она (display:none дал бы пустой снимок)
+  host.style.cssText = 'position:absolute;left:-30000px;top:0;width:' + w + 'px;pointer-events:none;';
+  const panel = doc.createElement('div');
+  panel.className = 'panel';
+  panel.style.cssText = 'display:block;margin:0;width:' + w + 'px;box-sizing:border-box;';
+  const inner = doc.createElement('div');
+  if (sol.cls) inner.className = sol.cls;
+  // у .explain в тренажёрах бывает верхняя черта-отбивка от задания — в
+  // отдельной карточке разбора она лишняя
+  inner.style.cssText = 'display:block;margin-top:0;padding-top:0;border-top:0;';
+  inner.innerHTML = sol.html;
+  panel.appendChild(inner);
+  host.appendChild(panel);
+  doc.body.appendChild(host);
+  try {
+    flattenModernColors(panel);
+    const shot = await captureTrainerNode(panel, null, {});
+    return { src: shot.dataUrl, css: { w: shot.css.w, h: shot.css.h }, card: shot.card };
+  } finally {
+    host.remove();
+  }
+}
+
+// html2canvas не понимает цвета вида color(srgb …) — так браузер отдаёт
+// вычисленный color-mix() (метки свойств в шагах логарифмов и тригонометрии)
+// — и падает на всём снимке. Узел разбора временный, поэтому такие цвета
+// прямо в нём заменяем на rgba того же пикселя
+const MODERN_COLOR_PROPS = ['color', 'background-color', 'border-top-color', 'border-right-color', 'border-bottom-color', 'border-left-color'];
+let colorProbe = null;
+function cssColorToRgba(css){
+  if (!colorProbe){ colorProbe = document.createElement('canvas'); colorProbe.width = colorProbe.height = 1; }
+  const c = colorProbe.getContext('2d', { willReadFrequently: true });
+  c.clearRect(0, 0, 1, 1);
+  c.fillStyle = '#000'; c.fillStyle = css;
+  c.fillRect(0, 0, 1, 1);
+  const d = c.getImageData(0, 0, 1, 1).data;
+  return 'rgba(' + d[0] + ',' + d[1] + ',' + d[2] + ',' + (d[3] / 255).toFixed(3) + ')';
+}
+function flattenModernColors(root){
+  const win = root.ownerDocument.defaultView;
+  [root, ...root.querySelectorAll('*')].forEach(e => {
+    const cs = win.getComputedStyle(e);
+    MODERN_COLOR_PROPS.forEach(p => {
+      const v = cs.getPropertyValue(p);
+      if (v && /^(color|oklch|oklab|lab|lch)\(/.test(v)) e.style.setProperty(p, cssColorToRgba(v), 'important');
+    });
+  });
+}
+
+// ряд «Показать решение и ответ» под снимком (CSS-пиксели тренажёра)
+const SOL_BTN_TEXT = 'Показать решение и ответ';
+// inset — внутренние отступы узла-карточки: ряд по левому краю содержимого,
+// под ним — тот же нижний отступ, что был у карточки
+function bakeSolutionRow(canvas, W, H, bgColor, scale, inset){
+  const dark = isDarkColor(bgColor);
+  const ROW = 40, GAP = 12, FONT = 15;
+  const L = inset ? Math.min(inset.l, W / 3) : 0, B = inset ? Math.min(inset.b, 40) : 0;
+  const PAD = B || 4;
+  const top = H - B;     // где кончается содержимое
+  const meas = document.createElement('canvas').getContext('2d');
+  meas.font = '600 ' + FONT + 'px ' + TT_UI_FONT;
+  const bw = Math.min(W - L * 2, Math.ceil(meas.measureText(SOL_BTN_TEXT).width) + 36);
+  const totalH = top + GAP + ROW + PAD;
+  const out = document.createElement('canvas');
+  out.width = canvas.width; out.height = Math.round(totalH * scale);
+  const c = out.getContext('2d');
+  // ниже снимка холст прозрачный — wrapIntoCard зальёт его цветом карточки
+  c.drawImage(canvas, 0, 0);
+  c.scale(scale, scale);
+  const x = L, y = top + GAP;
+  c.beginPath(); ttRoundRectPath(c, x, y, bw, ROW, 12);
+  c.fillStyle = dark ? 'rgba(138,180,248,.16)' : 'rgba(46,125,224,.10)'; c.fill();
+  c.fillStyle = dark ? '#8AB4F8' : '#1F5FB8';
+  c.font = '600 ' + FONT + 'px ' + TT_UI_FONT;
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillText(SOL_BTN_TEXT, x + bw / 2, y + ROW / 2, bw - 12);
+  return { canvas: out, h: totalH, btn: { x, y, w: bw, h: ROW } };
 }
 
 // собрать список узлов текущего задания по TRAINER_CAPTURE — см. комментарий
