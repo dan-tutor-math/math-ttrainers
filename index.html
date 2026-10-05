@@ -202,7 +202,7 @@ footer{text-align:center;font-family:var(--font-ui);font-weight:500;color:var(--
 /* панель совместного доступа открывается слева от капсулы меню, а не под
    ней: капсула со списком кнопок занимает правый край сверху вниз.
    body — чтобы перебить стиль, который session-share.js вставляет позже */
-body .ts-share-pop{top:16px;right:76px;max-height:calc(100vh - 32px);}
+body .ts-share-pop{top:16px;right:calc(16px + var(--lg-menu-w, 48px) + 12px);max-height:calc(100vh - 32px);}
 
 /* ───────── подборка ───────── */
 .basket-toolbar{margin-bottom:14px;}

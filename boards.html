@@ -13,6 +13,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<!-- жидкое стекло (общее с главной): режим «обычный»/«максимум» выбирается
+     в меню «⋯» на главной и хранится на устройстве — здесь он тот же -->
+<link rel="stylesheet" href="liquid-glass.css">
+<script src="liquid-glass.js"></script>
 <style>
 .katex{visibility:hidden}
 html.katex-fonts-ready .katex{visibility:visible}
@@ -202,6 +206,25 @@ html[data-theme="dark"] .bd-rail{box-shadow:var(--shadow),inset 0 1px 0 rgba(255
      скролл самих инструментов вынесен во внутренний .bd-dock-tools */
 }
 html[data-theme="dark"] .bd-dock{box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.10), inset 0 0 0 .5px rgba(255,255,255,.07);}
+/* «Максимум» (liquid-glass.css/js): у дока прозрачное преломляющее стекло —
+   отдельным слоем .lg-glass под инструментами. На самом доке стекла нет:
+   у него торчат за край ручки перемещения и размера и тень, а всё, что
+   вылезает за край, сбивает карту преломления (HANDOFF, раздел 8) */
+.bd-dock > .lg-glass{display:none}
+[data-fx="full"] .bd-dock > .lg-glass{display:block}
+[data-fx="full"] .bd-dock{background:transparent;-webkit-backdrop-filter:none;backdrop-filter:none;border-color:transparent;box-shadow:var(--shadow)}
+.bd-dock-tools{position:relative;z-index:1}
+.bd-dock-tools > .bd-tool{position:relative;z-index:1}
+/* инструменты растут под курсором, как Dock на Mac: коэффициент ведёт
+   пружина в liquid-glass.js (--lg-mag), переходов на размер нет нарочно */
+[data-fx="full"] .bd-dock-tools.lg-mag > .bd-tool{
+  width:calc(34px*var(--dock-scale,1)*var(--lg-mag,1));height:calc(34px*var(--dock-scale,1)*var(--lg-mag,1));}
+[data-fx="full"] .bd-dock-tools.lg-mag > .bd-tool svg{
+  width:calc(18px*var(--dock-scale,1)*var(--lg-mag,1));height:calc(18px*var(--dock-scale,1)*var(--lg-mag,1));}
+/* выбранный инструмент подсвечивает «капля» (.lg-pill), которая перетекает
+   к новому инструменту при переключении — свой фон у кнопки тогда не нужен */
+[data-fx="full"] .bd-dock-tools.lg-has-pill > .bd-tool.active{background:transparent;}
+[data-fx="full"] .bd-dock-tools > .bd-tool{transition:transform .12s,background .12s,color .25s;}
 .bd-dock-tools{display:flex; align-items:center; gap:4px;}
 /* Промпт №9: ручки перемещения с ОБОИХ концов дока (слева и справа, у
    бокового — сверху и снизу), поэтому поле под ручку с обеих сторон, а
@@ -1027,7 +1050,8 @@ function resolveBasketTexInHtml(html){
     </div>
   </div>
 
-  <div class="bd-dock pos-bottom" id="bdDock">
+  <div class="bd-dock pos-bottom lg-box" id="bdDock">
+    <span class="lg-glass lg lg-r" aria-hidden="true"></span>
     <div class="bd-dock-grip" id="bdDockGrip" title="Перетащите — переместить панель (вниз/влево/вправо)"><span></span><span></span><span></span></div>
     <div class="bd-dock-grip end" id="bdDockGripEnd" title="Перетащите — переместить панель (вниз/влево/вправо)"><span></span><span></span><span></span></div>
     <div class="bd-dock-resize" id="bdDockResize" title="Поперёк панели — изменить размер, вдоль — переместить"></div>
@@ -1361,6 +1385,30 @@ window.__boardViewer = /[?&]s=[^&#]/.test(location.search);</script>
 <!-- Промпт №17: готовые фигуры — плоские (поля fig у poly/circle), меню и
      панель; тела и 3D-конструктор догружаются из него же по требованию -->
 <script src="board-figures.js"></script>
+<script>(function(){
+  // Жидкое стекло на доске (режим «максимум»; в обычном всё как было):
+  // увеличение инструментов под курсором, капля выбранного инструмента,
+  // упругое нажатие и названия инструментов при наведении
+  if (!window.MathhGlass) return;
+  var dock = document.getElementById('bdDock'), tools = document.getElementById('bdDockTools');
+  tools.classList.add('lg-mag');
+  MathhGlass.liquidSelect(tools, '.bd-tool[data-tool]', 'active');
+  MathhGlass.pressable('.bd-tool');
+  // подсказка — с той стороны, где свободно: над нижним доком, у бокового —
+  // в сторону доски
+  MathhGlass.floatTips('.bd-dock-tools > .bd-tool', function () {
+    return dock.classList.contains('pos-left') ? 'right' : dock.classList.contains('pos-right') ? 'left' : 'top';
+  }, { fullOnly: true });
+  // док растёт под курсором — панель настроек инструмента (цвет, толщина)
+  // отодвигается вместе с ним, а не оказывается под выросшими кнопками
+  if (window.ResizeObserver && typeof layoutOptbar === 'function') {
+    var raf = 0;
+    new ResizeObserver(function () {
+      if (raf) return;
+      raf = requestAnimationFrame(function () { raf = 0; layoutOptbar(); });
+    }).observe(dock);
+  }
+})();</script>
 <!-- вход и общая доска с учеником — необязательный слой поверх обычного
      локального приложения; если supabase-config.js не заполнен, ниже
      покажется понятная подсказка вместо тихой поломки. Библиотека

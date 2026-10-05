@@ -227,14 +227,15 @@ def run():
         page.mouse.move(r[0], r[1])
         samples = page.evaluate("""() => new Promise(res => { const out = []; const b = document.querySelector('.boards-toggle');
             const t0 = performance.now();
-            (function f(){ out.push(parseFloat(b.style.getPropertyValue('--lg-mag')) || 1);
+            (function f(t){ out.push([performance.now(), parseFloat(b.style.getPropertyValue('--lg-mag')) || 1]);
               if (performance.now() - t0 < 450) requestAnimationFrame(f); else res(out); })(); })""")
-        steps = [b2 - a2 for a2, b2 in zip(samples, samples[1:])]
-        distinct = len(set(round(v, 3) for v in samples))
-        # шаг за кадр на экране 60 Гц — сотые доли; в безголовом браузере кадры
-        # реже, поэтому порог с запасом
-        check(distinct >= 8 and max(steps) < 0.16 and min(steps) > -0.005,
-              f"увеличение идёт по кадрам: {distinct} промежуточных значений, наибольший шаг {max(steps):.3f}")
+        vals = [v for _, v in samples]
+        # скорость в долях за миллисекунду: не зависит от частоты кадров
+        # (в безголовом браузере кадры реже, чем на экране)
+        rates = [(b2[1] - a2[1]) / max(1, b2[0] - a2[0]) for a2, b2 in zip(samples, samples[1:])]
+        distinct = len(set(round(v, 3) for v in vals))
+        check(distinct >= 8 and max(rates) < 0.004 and min(rates) > -0.0002,
+              f"увеличение идёт по кадрам: {distinct} промежуточных значений, наибольшая скорость {max(rates)*1000:.2f} в секунду")
         # кнопка, мимо которой курсор просто едет, не дёргается: цель
         # считается от покойных положений, а не от уже выросших соседей
         page.mouse.move(r[0], r[1] + 3); page.wait_for_timeout(500)
@@ -261,6 +262,32 @@ def run():
         check(mw[0] > 48 and abs(mw[1] - mw[2]) < 1.5 and mw[1] >= mw[0] + 6,
               f"стекло меню раздвигается вместе с увеличенной кнопкой ({mw})")
         page.keyboard.press("Escape"); page.mouse.move(640, 500); page.wait_for_timeout(900)
+
+        # совместный доступ: панель вытекает из кнопки («джинн») и держит
+        # одинаковый зазор до капсулы, как бы ни выросли кнопки
+        page.click("#lgMenuToggle"); page.wait_for_timeout(800)
+        page.click(".lg-menu .ts-share-btn")
+        page.wait_for_timeout(120)
+        mid = page.evaluate("(()=>{const p=document.querySelector('.ts-share-pop'); return [p.style.clipPath.slice(0,8), p.style.transform]})()")
+        check(mid[0] == "polygon(" and "scaleX" in mid[1], f"панель открывается «джинном»: воронка и сжатие к кнопке ({mid[1]})")
+        page.wait_for_timeout(700)
+        end = page.evaluate("(()=>{const p=document.querySelector('.ts-share-pop'); return [p.style.clipPath, p.style.transform, getComputedStyle(p).display]})()")
+        check(end == ["", "", "flex"], f"после анимации панель обычная, без обрезки ({end})")
+        gaps = []
+        for target in ["#fxToggle", ".lg-menu .ts-share-btn", "h1"]:
+            page.hover(target); page.wait_for_timeout(120)
+            for _ in range(4):
+                gaps.append(page.evaluate("(()=>{const p=document.querySelector('.ts-share-pop').getBoundingClientRect(), g=document.querySelector('.lg-menu-glass').getBoundingClientRect(); return g.left-p.right})()"))
+                page.wait_for_timeout(70)
+        check(max(gaps) - min(gaps) < 1.5 and abs(gaps[0] - 12) < 1.5,
+              f"зазор между панелью и капсулой один и тот же во время увеличения ({min(gaps):.1f}…{max(gaps):.1f}px)")
+        page.click("#lgMenuToggle"); page.wait_for_timeout(100)
+        closing = page.evaluate("(()=>{const p=document.querySelector('.ts-share-pop'); return [p.classList.contains('open'), p.classList.contains('lg-genie-out'), getComputedStyle(p).display]})()")
+        check(closing == [False, True, "flex"], f"при закрытии панель втягивается в кнопку, а не пропадает сразу ({closing})")
+        page.wait_for_timeout(700)
+        gone = page.evaluate("(()=>{const p=document.querySelector('.ts-share-pop'); return [p.classList.contains('lg-genie-out'), getComputedStyle(p).display]})()")
+        check(gone == [False, "none"], f"после втягивания панель скрыта ({gone})")
+        page.mouse.move(640, 500); page.wait_for_timeout(900)
 
         # рисование на холсте снимает преломление
         page.evaluate("""() => { const c=document.createElement('canvas'); c.id='tcv';

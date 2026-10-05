@@ -27,7 +27,10 @@
  *      MathhGlass.autoRefract(селектор) — то же для панелей, которые страница
  *      создаёт и пересоздаёт сама; MathhGlass.pressable(селектор) — добавить
  *      кнопкам страницы упругое нажатие; MathhGlass.tips(селектор, 'left'|'right') —
- *      название кнопки стеклянной плашкой при наведении.
+ *      название кнопки стеклянной плашкой при наведении; MathhGlass.floatTips —
+ *      то же для кнопок в прокручиваемых панелях; MathhGlass.liquidSelect —
+ *      выделение выбранной кнопки, перетекающее каплей; MathhGlass.genie(окно,
+ *      кнопка, открытие?) — окно вытекает из кнопки и втягивается обратно.
  */
 (function () {
   'use strict';
@@ -264,6 +267,197 @@
     if (document.body) run(); else document.addEventListener('DOMContentLoaded', run);
   }
 
+  /* ── «жидкое» выделение: капля, перетекающая к выбранной кнопке ──────── */
+  // В «максимуме» подсветка выбранного инструмента — отдельная капля под
+  // кнопками. При смене инструмента она не перескакивает, а перетекает к
+  // новому: едет на пружине и вытягивается по ходу движения, как капля
+  // жидкости. Кнопки сами по-прежнему получают свой класс выбора — капля
+  // только следит за ним, поэтому код страницы менять не нужно
+  var pills = [], pillRaf = 0, pillLast = 0;
+  var PK = 260, PC = 2 * Math.sqrt(260) * 0.82;   // чуть недодемпфирована — лёгкий «плюх» в конце
+  function liquidSelect(cont, itemSel, activeClass) {
+    if (!cont || cont._lgPill) return;
+    activeClass = activeClass || 'active';
+    var pill = document.createElement('span');
+    pill.className = 'lg-pill'; pill.setAttribute('aria-hidden', 'true');
+    cont.insertBefore(pill, cont.firstChild);
+    cont.classList.add('lg-has-pill');
+    var P = { cont: cont, pill: pill, sel: itemSel, cls: activeClass, x: 0, y: 0, w: 0, h: 0, vx: 0, vy: 0, vw: 0, vh: 0, placed: false, on: false };
+    cont._lgPill = P;
+    pills.push(P);
+    new MutationObserver(kickPills).observe(cont, { attributes: true, attributeFilter: ['class'], subtree: true, childList: true });
+    // панель могла быть скрыта, когда её размечали (доска ещё не открыта) —
+    // капля встанет на место, как только у панели появится размер
+    if (window.ResizeObserver) new ResizeObserver(kickPills).observe(cont);
+    window.addEventListener('resize', kickPills);
+    kickPills();
+  }
+  function pillTarget(P) {
+    var el = P.cont.querySelector(P.sel + '.' + P.cls);
+    if (!el || !el.offsetParent) return null;
+    // offsetLeft/Top — от самого контейнера и не зависят от его прокрутки:
+    // капля лежит внутри него и прокручивается вместе с кнопками
+    return { x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight,
+      r: getComputedStyle(el).borderTopLeftRadius };
+  }
+  function kickPills() {
+    if (!pills.length) return;
+    if (!pillRaf) { pillLast = performance.now(); pillRaf = requestAnimationFrame(pillTick); }
+  }
+  function pillTick(now) {
+    pillRaf = 0;
+    var dt = Math.min(0.1, Math.max(0.001, (now - pillLast) / 1000)); pillLast = now;
+    var n = Math.ceil(dt / 0.008), h = dt / n, busy = false;
+    var still = cur !== 'full' || (reduceMotion && reduceMotion.matches);
+    pills.forEach(function (P) {
+      var T = pillTarget(P);
+      P.pill.style.opacity = T ? '1' : '0';
+      if (!T) { P.placed = false; return; }
+      P.pill.style.borderRadius = T.r;
+      if (!P.placed || still) {
+        // первый показ и обычный режим — без анимации, сразу на месте
+        P.x = T.x; P.y = T.y; P.w = T.w; P.h = T.h; P.vx = P.vy = P.vw = P.vh = 0; P.placed = true;
+      } else {
+        for (var i = 0; i < n; i++) {
+          P.vx += (-PK * (P.x - T.x) - PC * P.vx) * h; P.x += P.vx * h;
+          P.vy += (-PK * (P.y - T.y) - PC * P.vy) * h; P.y += P.vy * h;
+          P.vw += (-PK * (P.w - T.w) - PC * P.vw) * h; P.w += P.vw * h;
+          P.vh += (-PK * (P.h - T.h) - PC * P.vh) * h; P.h += P.vh * h;
+        }
+        if (Math.abs(P.x - T.x) + Math.abs(P.y - T.y) + Math.abs(P.w - T.w) + Math.abs(P.h - T.h) > 0.3 ||
+            Math.abs(P.vx) + Math.abs(P.vy) + Math.abs(P.vw) + Math.abs(P.vh) > 2) busy = true;
+        else { P.x = T.x; P.y = T.y; P.w = T.w; P.h = T.h; P.vx = P.vy = P.vw = P.vh = 0; }
+      }
+      // вытягивание по ходу движения: чем быстрее капля едет, тем она длиннее
+      // вдоль пути и тоньше поперёк — и в покое снова круглая
+      var sx = 1 + Math.min(Math.abs(P.vx) / 2600, 0.35) - Math.min(Math.abs(P.vy) / 5200, 0.15);
+      var sy = 1 + Math.min(Math.abs(P.vy) / 2600, 0.35) - Math.min(Math.abs(P.vx) / 5200, 0.15);
+      P.pill.style.width = P.w.toFixed(2) + 'px';
+      P.pill.style.height = P.h.toFixed(2) + 'px';
+      P.pill.style.transform = 'translate(' + P.x.toFixed(2) + 'px,' + P.y.toFixed(2) + 'px) scale(' + sx.toFixed(3) + ',' + sy.toFixed(3) + ')';
+    });
+    // пока кнопки увеличиваются под курсором, капля следует за размером своей
+    if (busy || magState.size) pillRaf = requestAnimationFrame(pillTick);
+  }
+
+  /* ── «джинн»: окно вытекает из кнопки, как свёрнутое окно из Dock на Mac ── */
+  // Окно на время анимации сжато вдоль оси к кнопке (scale) и обрезано
+  // воронкой (clip-path): у кнопки — узкое горлышко высотой с кнопку, дальше
+  // плавно расширяется до полного окна. К концу воронка распрямляется.
+  // Кнопку перечитываем каждый кадр — она может расти под курсором.
+  // opening = true — из кнопки в окно, false — обратно в кнопку.
+  function genie(el, anchor, opening, done) {
+    if (el._genieRaf) { cancelAnimationFrame(el._genieRaf); el._genieRaf = 0; }
+    var finish = function () {
+      el._genieRaf = 0;
+      el.style.clipPath = ''; el.style.transform = ''; el.style.transformOrigin = ''; el.style.opacity = '';
+      if (done) done();
+    };
+    if (cur !== 'full' || (reduceMotion && reduceMotion.matches) || !anchor) { finish(); return; }
+    var DUR = opening ? 560 : 420, t0 = performance.now(), N = 26;
+    var ease = function (x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; };
+    var sm = function (a, b, x) { x = Math.min(1, Math.max(0, (x - a) / (b - a))); return x * x * (3 - 2 * x); };
+    // сбрасываем свои стили, чтобы мерить окно в его настоящем положении
+    el.style.transform = ''; el.style.clipPath = '';
+    var step = function (now) {
+      var k = Math.min(1, (now - t0) / DUR);
+      var e = ease(opening ? k : 1 - k);           // 0 — всё в кнопке, 1 — окно открыто
+      var r = el.getBoundingClientRect(), a = anchor.getBoundingClientRect();
+      var W = el.offsetWidth, H = el.offsetHeight;
+      // координаты кнопки в системе окна (без учёта нашего же transform)
+      var sx = r.width / W || 1, sy = r.height / H || 1;
+      var ox = r.left - (el._gx || 0) * (1 - sx), oy = r.top - (el._gy || 0) * (1 - sy);
+      var ax = a.left + a.width / 2 - ox, ay = a.top + a.height / 2 - oy;
+      var horiz = ax > W || ax < 0;                // кнопка сбоку от окна — тянемся вдоль x
+      var L = horiz ? W : H, C = horiz ? H : W;     // длина вдоль оси и поперёк
+      var ac = horiz ? ay : ax, half = (horiz ? a.height : a.width) / 2;
+      var atEnd = horiz ? ax > W : ay > H;          // кнопка у дальнего конца оси
+      var pinch = Math.pow(1 - e, 0.85);
+      var pts = [], i, u, w, lo, hi, pos;
+      for (i = 0; i <= N; i++) {
+        u = i / N;                                   // 0 — дальний от кнопки край, 1 — у кнопки
+        w = pinch * sm(0.05, 1, u);
+        lo = (ac - half) * w; pos = (atEnd ? u : 1 - u) * L;
+        pts.push(horiz ? [pos, lo] : [lo, pos]);
+      }
+      for (i = N; i >= 0; i--) {
+        u = i / N; w = pinch * sm(0.05, 1, u);
+        hi = C + (ac + half - C) * w; pos = (atEnd ? u : 1 - u) * L;
+        pts.push(horiz ? [pos, hi] : [hi, pos]);
+      }
+      el.style.clipPath = 'polygon(' + pts.map(function (p) { return p[0].toFixed(1) + 'px ' + p[1].toFixed(1) + 'px'; }).join(',') + ')';
+      var gx = horiz ? (atEnd ? W : 0) : ax, gy = horiz ? ay : (atEnd ? H : 0);
+      el._gx = gx; el._gy = gy;
+      el.style.transformOrigin = gx + 'px ' + gy + 'px';
+      var sc = 0.04 + 0.96 * e;
+      el.style.transform = horiz ? 'scaleX(' + sc.toFixed(4) + ')' : 'scaleY(' + sc.toFixed(4) + ')';
+      el.style.opacity = Math.min(1, e * 5).toFixed(3);
+      if (k < 1) el._genieRaf = requestAnimationFrame(step); else finish();
+    };
+    el._genieRaf = requestAnimationFrame(step);
+  }
+
+  /* ── подсказки над кнопками в прокручиваемых панелях ───────────────────── */
+  // Подсказку внутри кнопки (tips) обрезала бы прокрутка панели — док доски
+  // прокручивается на узком экране. Поэтому здесь одна общая плашка на
+  // странице, прикреплённая к экрану, и её ставим к кнопке под курсором.
+  // side(кнопка) говорит, с какой стороны показывать: 'top' | 'left' | 'right'
+  var ftip = null, ftipFor = null, ftipStripped = [];
+  // opts.fullOnly — только в «максимуме»; в обычном режиме у кнопок остаётся
+  // их системная подсказка title, как было
+  function floatTips(sel, side, opts) {
+    opts = opts || {};
+    var run = function () {
+      if (!ftip) {
+        ftip = document.createElement('div');
+        ftip.className = 'lg-ftip lg'; ftip.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(ftip);
+      }
+      var show = function (b) {
+        if (opts.fullOnly && cur !== 'full') return;
+        var text = b.getAttribute('data-tip') || b.getAttribute('data-title') || b.title || b.getAttribute('aria-label') || '';
+        // в title инструментов часто пояснение после тире — в подсказку идёт
+        // только название, полный текст остаётся у кнопки в data-title
+        text = text.split(' — ')[0];
+        if (b.title) { b.setAttribute('data-title', b.title); b.removeAttribute('title'); ftipStripped.push(b); }
+        if (!text) return;
+        ftipFor = b;
+        ftip.textContent = text;
+        var sd = (typeof side === 'function' ? side(b) : side) || 'top';
+        ftip.setAttribute('data-side', sd);
+        placeTip();
+        ftip.classList.add('is-on');
+      };
+      document.addEventListener('pointerover', function (e) {
+        if (e.pointerType === 'touch') return;
+        var b = e.target.closest && e.target.closest(sel);
+        if (b && b !== ftipFor) show(b);
+        else if (!b && ftipFor) { ftipFor = null; ftip.classList.remove('is-on'); }
+      });
+      document.addEventListener('focusin', function (e) { var b = e.target.closest && e.target.closest(sel); if (b && b.matches(':focus-visible')) show(b); });
+      document.addEventListener('focusout', function () { ftipFor = null; ftip.classList.remove('is-on'); });
+      document.addEventListener('pointerdown', function () { ftipFor = null; ftip.classList.remove('is-on'); }, true);
+      // вернулись в обычный режим — возвращаем кнопкам их title
+      if (opts.fullOnly) listeners.push(function (m) {
+        if (m === 'full') return;
+        ftipFor = null; ftip.classList.remove('is-on');
+        ftipStripped.forEach(function (b) { if (!b.title && b.getAttribute('data-title')) b.title = b.getAttribute('data-title'); });
+        ftipStripped = [];
+      });
+    };
+    if (document.body) run(); else document.addEventListener('DOMContentLoaded', run);
+  }
+  // кнопка под курсором может расти (увеличение) — подсказка едет за ней
+  function placeTip() {
+    if (!ftip || !ftipFor) return;
+    var r = ftipFor.getBoundingClientRect(), sd = ftip.getAttribute('data-side');
+    var x, y;
+    if (sd === 'left') { x = r.left - 12; y = r.top + r.height / 2; }
+    else if (sd === 'right') { x = r.right + 12; y = r.top + r.height / 2; }
+    else { x = r.left + r.width / 2; y = r.top - 10; }
+    ftip.style.left = x + 'px'; ftip.style.top = y + 'px';
+  }
+
   /* ── плавающая подсветка ───────────────────────────────────────────── */
   function ensureAmbient() {
     if (document.querySelector('.lg-ambient')) return;
@@ -287,7 +481,7 @@
     var s = t && t.closest('.lg, .lg-s');
     // у капсул стекло — отдельный слой под кнопками, курсор над кнопкой
     // в него не попадает: ищем слой стекла своей капсулы
-    if (!s && t) { var cap = t.closest('.lg-capsule, .lg-menu'); if (cap) s = cap.querySelector('.lg-glass, .lg-menu-glass'); }
+    if (!s && t) { var cap = t.closest('.lg-capsule, .lg-menu, .lg-box'); if (cap) s = cap.querySelector('.lg-glass, .lg-menu-glass'); }
     if (s) {
       var r = s.getBoundingClientRect();
       s.style.setProperty('--lg-mx', ((e.clientX - r.left) / r.width * 100).toFixed(1) + '%');
@@ -298,8 +492,8 @@
     var cont = t && t.closest('.lg-mag');
     if (cont !== magCont) { releaseMag(magCont); magCont = cont; if (cont) restOf(cont); }
     if (cont && !(reduceMotion && reduceMotion.matches)) {
-      var R = magRest.get(cont), cr = cont.getBoundingClientRect();
-      var p = R.row ? e.clientX - cr.left : e.clientY - cr.top;
+      var R = magRest.get(cont);
+      var p = R.row ? e.clientX : e.clientY;
       R.list.forEach(function (it) {
         var d = p - it.c;
         setTarget(it.b, 1 + MAG * Math.exp(-(d * d) / (2 * SIGMA * SIGMA)));
@@ -318,24 +512,28 @@
      сдвигает соседей, расстояния меняются, и всё начинает дрожать */
   var MAG = 0.38, SIGMA = 46, K = 220, C = 2 * Math.sqrt(220);
   var magCont = null, magState = new Map(), magRest = new WeakMap(), magRaf = 0, magLast = 0;
-  function magButtons(c) { return c.querySelectorAll(':scope > a, :scope > button, .lg-item > .lg-btn, .lg-item > .ts-share-btn'); }
-  // покойные центры кнопок вдоль капсулы: ширина и отступы кнопки в покое
-  // известны (40px), поэтому считаем по ним, а не по текущему, уже
-  // увеличенному размеру
+  function magButtons(c) { return c.querySelectorAll(':scope > a, :scope > button, .lg-item > .lg-btn, .lg-item > .ts-share-btn, .lg-mag-item'); }
+  // Покойные центры кнопок вдоль капсулы, в координатах экрана. Снимаем их,
+  // когда ничего не увеличено, и держим, пока кнопки не вернутся в покой:
+  // капсула, стоящая по центру (док доски), при росте раздвигается в обе
+  // стороны, и центры «от края капсулы» поехали бы вслед за курсором
   function restOf(cont) {
     var cs = getComputedStyle(cont);
     var row = cs.flexDirection.indexOf('row') === 0;
-    var gap = parseFloat(row ? cs.columnGap : cs.rowGap) || 0;
-    var list = [], acc = null;
-    magButtons(cont).forEach(function (b) {
+    var btns = Array.prototype.slice.call(magButtons(cont));
+    var moving = btns.some(function (b) { return magState.has(b); });
+    var old = magRest.get(cont);
+    if (moving && old && old.list.length === btns.length) return;
+    // запасной путь, если кнопки ещё не в покое: вычитаем, насколько
+    // выросли предыдущие кнопки (разделители между ними не растут)
+    var grown = 0, list = [];
+    btns.forEach(function (b) {
       var st = magState.get(b), k = st ? st.x : 1;
-      var r = b.getBoundingClientRect(), cr = cont.getBoundingClientRect();
+      var r = b.getBoundingClientRect();
       var size = row ? r.width : r.height, rest = size / k;
-      var start = row ? r.left - cr.left : r.top - cr.top;
-      // первая кнопка задаёт начало; дальше — покойный размер и тот же шаг
-      if (acc === null) acc = start;
-      list.push({ b: b, c: acc + rest / 2 });
-      acc += rest + gap;
+      var start = (row ? r.left : r.top) - grown;
+      list.push({ b: b, c: start + rest / 2 });
+      grown += size - rest;
     });
     magRest.set(cont, { row: row, list: list });
   }
@@ -375,6 +573,8 @@
       } else busy = true;
       b.style.setProperty('--lg-mag', st.x.toFixed(4));
     });
+    if (pills.length) kickPills();
+    placeTip();
     if (busy || magState.size && magCont) magRaf = requestAnimationFrame(magTick);
     else document.querySelectorAll('.lg-magging').forEach(function (el) { el.classList.remove('lg-magging'); });
   }
@@ -425,6 +625,7 @@
     if (cur === 'full') ensureAmbient();
     if (cur !== 'full') { resetMag(); magCont = null; }
     refreshRefraction();
+    kickPills();
   }
 
   function init() {
@@ -448,6 +649,9 @@
     refract: refract,
     autoRefract: autoRefract,
     tips: tips,
+    floatTips: floatTips,
+    liquidSelect: liquidSelect,
+    genie: genie,
     // ещё кнопки страницы, которые должны пружинить при нажатии в «максимуме»
     pressable: function (sel) { pressSel.push(sel); },
     canRefract: canRefract

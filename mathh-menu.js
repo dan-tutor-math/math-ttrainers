@@ -50,6 +50,9 @@
       var w = open ? wrap.offsetWidth : toggle.offsetWidth + 8;
       wrap.style.setProperty('--lg-h', h + 'px');
       wrap.style.setProperty('--lg-w', w + 'px');
+      // панель совместного доступа стоит слева от капсулы и держит до неё
+      // один и тот же зазор, даже пока капсула растёт за увеличенной кнопкой
+      document.documentElement.style.setProperty('--lg-menu-w', w + 'px');
     }
     var springT = 0;
     function setOpen(open) {
@@ -148,6 +151,25 @@
         };
         new MutationObserver(mirror).observe(b, { attributes: true, attributeFilter: ['class'] });
         if (pop) new MutationObserver(mirror).observe(pop, { attributes: true, attributeFilter: ['class'] });
+        // в «максимуме» панель вытекает из своей кнопки и втягивается в неё,
+        // как свёрнутое окно в Dock на Mac. session-share.js прячет панель
+        // мгновенно (снимает .open) — на время втягивания держим её видимой
+        // своим классом .lg-genie-out
+        if (pop && window.MathhGlass && window.MathhGlass.genie) {
+          var wasOpen = pop.classList.contains('open');
+          new MutationObserver(function () {
+            var isOpen = pop.classList.contains('open');
+            if (isOpen === wasOpen) return;
+            wasOpen = isOpen;
+            if (isOpen) {
+              pop.classList.remove('lg-genie-out');
+              window.MathhGlass.genie(pop, b, true);
+            } else if (window.MathhGlass.mode() === 'full') {
+              pop.classList.add('lg-genie-out');
+              window.MathhGlass.genie(pop, b, false, function () { if (!pop.classList.contains('open')) pop.classList.remove('lg-genie-out'); });
+            }
+          }).observe(pop, { attributes: true, attributeFilter: ['class'] });
+        }
         mirror();
         if (o.onAdopt) o.onAdopt(api);
         return true;

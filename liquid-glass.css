@@ -131,11 +131,35 @@ html[data-theme="dark"] .lg::before,html[data-theme="dark"] .lg-s::before{
 .lg-menu.is-open .lg-dot{display:none}
 @keyframes lgPulse{0%,100%{opacity:1}50%{opacity:.35}}
 
+/* панель совместного доступа во время «втягивания» в кнопку (genie) —
+   session-share.js уже снял .open, но анимация ещё идёт */
+.ts-share-pop.lg-genie-out{display:flex !important;pointer-events:none}
+
 /* совместный доступ внутри меню: у session-share.js кнопка закреплена в углу
    экрана — здесь она становится обычной круглой кнопкой списка */
 .lg-menu .ts-share-btn{position:relative;top:auto;right:auto;left:auto;width:40px;height:40px;border-radius:50%;
   border:0;background:transparent;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;z-index:auto}
 .lg-menu .ts-share-btn.ts-offline,.lg-menu .ts-share-btn.ts-teacher-silent{border:0}
+
+/* капля выбранной кнопки (MathhGlass.liquidSelect) — видна только в
+   «максимуме»; в обычном режиме кнопка подсвечивается своим фоном, как раньше */
+.lg-pill{position:absolute;left:0;top:0;z-index:0;pointer-events:none;display:none;
+  background:var(--ink);transform-origin:center;will-change:transform,width,height;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35), inset 0 -1px 2px rgba(0,0,0,.15), 0 4px 14px rgba(0,40,100,.28)}
+[data-fx="full"] .lg-pill{display:block}
+
+/* общая подсказка для кнопок прокручиваемых панелей (MathhGlass.floatTips) */
+.lg-ftip{position:fixed;z-index:1000;left:0;top:0;pointer-events:none;opacity:0;
+  white-space:nowrap;font-family:var(--font-ui,inherit);font-size:13px;font-weight:600;line-height:1.2;color:var(--pencil,#1D1D1F);
+  padding:7px 12px;border-radius:999px;transition:opacity .14s ease}
+.lg-ftip[data-side="top"]{transform:translate(-50%,-100%) translateY(4px)}
+.lg-ftip[data-side="left"]{transform:translate(-100%,-50%) translateX(4px)}
+.lg-ftip[data-side="right"]{transform:translate(0,-50%) translateX(-4px)}
+.lg-ftip.is-on{opacity:1}
+.lg-ftip.is-on[data-side="top"]{transform:translate(-50%,-100%)}
+.lg-ftip.is-on[data-side="left"]{transform:translate(-100%,-50%)}
+.lg-ftip.is-on[data-side="right"]{transform:translate(0,-50%)}
+[data-fx="full"] .lg-ftip{transition:opacity .2s ease, transform .4s cubic-bezier(.34,1.56,.64,1)}
 
 /* ════════════════ режим «максимум» ════════════════ */
 
@@ -229,7 +253,7 @@ html:not([data-fx="full"]) .lg-ambient{display:none}
 /* «Уменьшить движение» в системе — уважаем даже в «максимуме»:
    преломление остаётся (оно неподвижное), всё движущееся отключаем */
 @media (prefers-reduced-motion: reduce){
-  .lg-menu-glass,.lg-menu-shadow,.lg-item,.lg-label,.lg-tip,.lg-menu-toggle .mi,.lg-btn,.lg-btn > .mi{transition:none !important}
+  .lg-menu-glass,.lg-menu-shadow,.lg-item,.lg-label,.lg-tip,.lg-ftip,.lg-menu-toggle .mi,.lg-btn,.lg-btn > .mi{transition:none !important}
   .lg-jelly,.lg-ripple,.lg-ambient i,.lg-dot{animation:none !important}
 }
 
