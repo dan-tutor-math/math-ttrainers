@@ -222,6 +222,45 @@ html[data-theme="dark"] .bl-card-menu:hover{background:rgba(255,255,255,.18);}
 .bd-rail-btn svg{width:16px;height:16px;}
 .bd-rail-sep{height:1px;background:var(--glass-border);margin:2px 4px;}
 html[data-theme="dark"] .bd-rail{box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.08);}
+/* Промпт №20: точный масштаб. Проценты — по-прежнему кнопка (один щелчок —
+   100 %), а двойное нажатие подменяет её полем того же размера: так рейл не
+   прыгает по ширине, и поле стоит ровно там, куда только что нажали.
+   touch-action:manipulation — иначе на iPhone второе касание двойного
+   нажатия увеличивает всю страницу, а не открывает панель */
+#railZoomLabel,.bd-zoom-input{touch-action:manipulation;}
+.bd-zoom-input{width:34px;height:34px;flex:none;box-sizing:border-box;padding:0;margin:0;border:1.5px solid var(--ink);border-radius:11px;background:#fff;color:#1D1D1F;font-family:var(--font-ui);font-weight:700;font-size:12px;text-align:center;outline:none;-webkit-appearance:none;appearance:none;}
+/* у .bd-rail-btn свой display:flex — он перебивал атрибут hidden, и кнопка
+   с процентами оставалась видна рядом с полем */
+#railZoomLabel[hidden],.bd-zoom-input[hidden]{display:none;}
+/* панель — сосед рейла, а не его потомок: у рейла backdrop-filter, и
+   position:fixed внутри него отсчитывался бы от рейла, а не от окна.
+   Белая, как лист доски, а бегунок синий — цвет --ink, тот же, что у
+   «Назад к доскам» и выбранного на доске */
+.bd-zoom-pop{position:fixed;z-index:330;display:none;flex-direction:column;align-items:center;gap:8px;background:#fff;border:1px solid var(--glass-border);border-radius:14px;box-shadow:var(--shadow);padding:10px 8px;}
+.bd-zoom-pop.open{display:flex;}
+/* в тёмной теме белая плашка слепила бы на тёмной доске — там стекло
+   темы, а полоса бегунка остаётся светлой */
+html[data-theme="dark"] .bd-zoom-pop{background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);}
+.bd-zoom-pop-end{font-family:var(--font-mono);font-size:11px;color:var(--muted-2);flex:none;min-width:34px;text-align:center;}
+/* Бегунок свой, а не <input type=range>: вертикальный range в Safari до
+   17.4 не поворачивается вовсе, а синий бегунок на белой полосе одинаково
+   во всех браузерах получается только своим. Положение — доля --f от 0
+   (низ, 10 %) до 1 (верх, 400 %); --pad — радиус бегунка: центр бегунка
+   ходит от --pad до высоты минус --pad, чтобы бегунок не вылезал за полосу */
+.bd-zoom-track{--f:0;--f1:0;--pad:9px;position:relative;width:30px;height:min(200px,calc(100vh - 150px));flex:none;cursor:pointer;touch-action:none;outline:none;border-radius:10px;}
+.bd-zoom-track:focus-visible{box-shadow:0 0 0 2px var(--ink);}
+.bd-zoom-rail{position:absolute;left:50%;top:calc(var(--pad) - 3px);bottom:calc(var(--pad) - 3px);width:6px;margin-left:-3px;border-radius:3px;background:#fff;box-shadow:inset 0 0 0 1px rgba(0,76,153,.28);overflow:hidden;}
+.bd-zoom-fill{position:absolute;left:0;right:0;bottom:0;height:calc(3px + var(--f) * (100% - 6px));background:var(--ink);border-radius:3px;}
+/* засечка 100 %: шкала логарифмическая, середина у неё не на 100 % —
+   без засечки «натуральный размер» на глаз не найти */
+.bd-zoom-tick{position:absolute;left:4px;right:4px;height:2px;margin-bottom:-1px;bottom:calc(var(--pad) + var(--f1) * (100% - 2 * var(--pad)));border-radius:1px;background:var(--ink);opacity:.35;pointer-events:none;}
+.bd-zoom-thumb{position:absolute;left:50%;width:calc(2 * var(--pad));height:calc(2 * var(--pad));margin-left:calc(-1 * var(--pad));margin-bottom:calc(-1 * var(--pad));bottom:calc(var(--pad) + var(--f) * (100% - 2 * var(--pad)));border-radius:50%;background:var(--ink);border:2px solid #fff;box-sizing:border-box;box-shadow:0 1px 4px rgba(0,0,0,.28);pointer-events:none;}
+.bd-zoom-track.dragging .bd-zoom-thumb{transform:scale(1.12);}
+/* на пальце бегунок и полоса крупнее: 26 px — подушечка пальца */
+@media (pointer:coarse){
+  .bd-zoom-track{--pad:13px;width:44px;height:min(220px,calc(100vh - 160px));}
+  .bd-zoom-pop{padding:10px 6px;}
+}
 
 /* ── плавающий тулбар с инструментами — по умолчанию снизу, но можно
    перетащить целиком к левому или правому краю экрана (см. #bdDockGrip),
@@ -1035,7 +1074,8 @@ function resolveBasketTexInHtml(html){
     </button>
     <div class="bd-rail-sep"></div>
     <button class="bd-rail-btn" id="railZoomIn">+</button>
-    <button class="bd-rail-btn" id="railZoomLabel">100%</button>
+    <button class="bd-rail-btn" id="railZoomLabel" title="Щелчок — 100 %, двойное нажатие — точный масштаб">100%</button>
+    <input class="bd-zoom-input" id="railZoomInput" type="text" inputmode="decimal" enterkeyhint="done" autocomplete="off" autocorrect="off" spellcheck="false" maxlength="6" aria-label="Масштаб доски в процентах" hidden>
     <button class="bd-rail-btn" id="railZoomOut">−</button>
     <div class="bd-rail-sep"></div>
     <button class="bd-rail-btn" id="railPdf" title="Сохранить в PDF">
@@ -1051,6 +1091,15 @@ function resolveBasketTexInHtml(html){
     <button class="bd-rail-btn" id="railFullscreen" title="Во весь экран">
       <svg viewBox="0 0 24 24" fill="none"><path d="M3 9V5a2 2 0 0 1 2-2h4M15 3h4a2 2 0 0 1 2 2v4M21 15v4a2 2 0 0 1-2 2h-4M9 21H5a2 2 0 0 1-2-2v-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle class="ac" cx="12" cy="12" r="1.3"/></svg>
     </button>
+  </div>
+  <div class="bd-zoom-pop" id="bdZoomPop" role="dialog" aria-label="Масштаб доски">
+    <span class="bd-zoom-pop-end" id="bdZoomPopMax">400%</span>
+    <div class="bd-zoom-track" id="bdZoomSlider" role="slider" tabindex="0" aria-orientation="vertical" aria-label="Масштаб доски">
+      <div class="bd-zoom-rail"><div class="bd-zoom-fill"></div></div>
+      <i class="bd-zoom-tick" id="bdZoomTick"></i>
+      <div class="bd-zoom-thumb" id="bdZoomThumb"></div>
+    </div>
+    <span class="bd-zoom-pop-end" id="bdZoomPopMin">10%</span>
   </div>
 
   <div class="bd-optbar" id="bdOptbar">

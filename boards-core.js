@@ -2187,6 +2187,7 @@ function openBoardReady(b, id){
 }
 
 function backToList(){
+  closeZoomPop(false);   // Промпт №20: панель масштаба не переживает выход из доски
   rememberView(true);
   clearTimeout(viewSaveTimer); viewSaveTimer = null;
   boardActive = false;
@@ -2271,7 +2272,12 @@ function setZoom(z, wx, wy, sx, sy){
   scheduleRedraw();
   rememberView();
 }
-function updateZoomLabel(){ document.getElementById('railZoomLabel').textContent = Math.round(cam.zoom * 100) + '%'; }
+function updateZoomLabel(){
+  document.getElementById('railZoomLabel').textContent = Math.round(cam.zoom * 100) + '%';
+  // Промпт №20: проценты в поле и бегунок тянутся за любым изменением
+  // масштаба — кнопками, колёсиком, щипком, восстановлением вида
+  if (typeof syncZoomPop === 'function') syncZoomPop();
+}
 
 function maybeSnap(p){
   if (!curSnap || !B) return p;
@@ -6942,7 +6948,209 @@ document.getElementById('railZoomIn').addEventListener('mousedown', (e) => e.pre
 document.getElementById('railZoomOut').addEventListener('mousedown', (e) => e.preventDefault());
 document.getElementById('railZoomIn').addEventListener('click', () => setZoom(cam.zoom*1.25, cam.x+cssW/2/cam.zoom, cam.y+cssH/2/cam.zoom, cssW/2, cssH/2));
 document.getElementById('railZoomOut').addEventListener('click', () => setZoom(cam.zoom/1.25, cam.x+cssW/2/cam.zoom, cam.y+cssH/2/cam.zoom, cssW/2, cssH/2));
-document.getElementById('railZoomLabel').addEventListener('click', () => setZoom(1, cam.x+cssW/2/cam.zoom, cam.y+cssH/2/cam.zoom, cssW/2, cssH/2));
+
+/* ═══ Промпт №20: точный масштаб — поле с процентами и бегунок ═══
+   Шаг кнопок «+/−» в 25 % бывает слишком крупным: нужное «чуть ближе» лежит
+   между двумя нажатиями. Двойное нажатие на проценты открывает рядом панель
+   с бегунком, а сами проценты становятся полем — можно ввести число и Enter.
+   Масштабируем всегда вокруг середины видимой части доски, как кнопки «+/−»:
+   точка, на которую смотрели, остаётся на месте. */
+const zoomLabelEl = document.getElementById('railZoomLabel');
+const zoomInputEl = document.getElementById('railZoomInput');
+const zoomPopEl = document.getElementById('bdZoomPop');
+const zoomSliderEl = document.getElementById('bdZoomSlider');
+// Бегунок вертикальный: внизу 10 %, вверху 400 %. Шкала логарифмическая:
+// на ровной шкале 100 % оказались бы у самого низа, а всё «мельче обычного» —
+// на паре миллиметров. По логарифму каждый миллиметр бегунка — одно и то же
+// «во сколько раз», как у щипка двумя пальцами, движение ощущается ровным.
+// Положение — доля f от 0 до 1; CSS рисует по ней бегунок, заливку и засечку
+const ZOOM_LN_MIN = Math.log(ZOOM_MIN), ZOOM_LN_MAX = Math.log(ZOOM_MAX);
+const zoomToFrac = (z) => clamp((Math.log(z) - ZOOM_LN_MIN) / (ZOOM_LN_MAX - ZOOM_LN_MIN), 0, 1);
+const fracToZoom = (f) => Math.exp(ZOOM_LN_MIN + clamp(f, 0, 1) * (ZOOM_LN_MAX - ZOOM_LN_MIN));
+// Окно двойного нажатия. Своё, а не событие dblclick: на iPhone dblclick на
+// кнопке не приходит вовсе, а щелчок и двойное нажатие надо различать сами —
+// одиночный щелчок сбрасывает масштаб на 100 %, и сработай он сразу, первое
+// нажатие двойного уже дёрнуло бы доску
+const ZOOM_DBL_MS = 350;
+let zoomPopOpen = false;
+let zoomInputDirty = false;   // человек набирает число — не перебивать его
+let zoomLastTap = 0, zoomResetTimer = null;
+
+zoomSliderEl.style.setProperty('--f1', zoomToFrac(1).toFixed(4));
+zoomSliderEl.setAttribute('aria-valuemin', String(Math.round(ZOOM_MIN * 100)));
+zoomSliderEl.setAttribute('aria-valuemax', String(Math.round(ZOOM_MAX * 100)));
+document.getElementById('bdZoomPopMin').textContent = Math.round(ZOOM_MIN * 100) + '%';
+document.getElementById('bdZoomPopMax').textContent = Math.round(ZOOM_MAX * 100) + '%';
+
+function zoomAroundCenter(z){
+  setZoom(z, cam.x + cssW/2/cam.zoom, cam.y + cssH/2/cam.zoom, cssW/2, cssH/2);
+}
+function syncZoomPop(){
+  if (!zoomPopOpen) return;
+  if (!zoomInputDirty) zoomInputEl.value = Math.round(cam.zoom * 100) + '%';
+  zoomSliderEl.style.setProperty('--f', zoomToFrac(cam.zoom).toFixed(4));
+  zoomSliderEl.setAttribute('aria-valuenow', String(Math.round(cam.zoom * 100)));
+  zoomSliderEl.setAttribute('aria-valuetext', Math.round(cam.zoom * 100) + ' %');
+}
+// Панель — у процентов: рейл слева — справа от него, серединой на уровне
+// поля, но не выше нижнего края верхней панели доски; рейл в верхней
+// панели — под полем. И всегда целиком в окне
+function layoutZoomPop(){
+  if (!zoomPopOpen) return;
+  const anchor = zoomInputEl.hidden ? zoomLabelEl : zoomInputEl;
+  const a = anchor.getBoundingClientRect(), rr = railEl.getBoundingClientRect();
+  const pw = zoomPopEl.offsetWidth, ph = zoomPopEl.offsetHeight;
+  const W = window.innerWidth, H = window.innerHeight, G = 8;
+  let x, y;
+  if (railEl.classList.contains('pos-top')){ x = a.left + a.width/2 - pw/2; y = rr.bottom + G; }
+  else {
+    x = rr.right + G; y = a.top + a.height/2 - ph/2;
+    const tb = document.querySelector('.bd-topbar');
+    const top = tb ? tb.getBoundingClientRect().bottom + G : G;
+    if (y < top) y = top;
+  }
+  zoomPopEl.style.left = Math.round(clamp(x, G, Math.max(G, W - pw - G))) + 'px';
+  zoomPopEl.style.top = Math.round(clamp(y, G, Math.max(G, H - ph - G))) + 'px';
+}
+function openZoomPop(){
+  if (zoomPopOpen) return;
+  zoomPopOpen = true;
+  zoomInputDirty = false;
+  zoomLabelEl.hidden = true;
+  zoomInputEl.hidden = false;
+  zoomPopEl.classList.add('open');
+  syncZoomPop();
+  layoutZoomPop();
+  // с мышью курсор сразу в поле — можно печатать, не целясь в крошечное поле.
+  // На телефоне и планшете — нет: вылезшая клавиатура закрыла бы полэкрана, а
+  // пришли, скорее всего, за бегунком. Поле всё равно редактируемое — тапни
+  if (!matchMedia('(pointer: coarse)').matches){ zoomInputEl.focus(); zoomInputEl.select(); }
+}
+// apply — забрать набранное: щелчок мимо и «Готово» на клавиатуре телефона
+// (там на цифровой клавиатуре нет Enter) считаются согласием; Escape — отказ
+function closeZoomPop(apply){
+  if (!zoomPopOpen) return;
+  if (apply && zoomInputDirty) applyZoomInput();
+  zoomPopOpen = false;
+  zoomInputDirty = false;
+  zoomPopEl.classList.remove('open');
+  // фокус не должен остаться на спрятанном поле: иначе цифры с клавиатуры
+  // уходили бы в него, а не переключали инструменты доски
+  zoomInputEl.blur(); zoomSliderEl.blur();
+  zoomInputEl.hidden = true;
+  zoomLabelEl.hidden = false;
+  updateZoomLabel();
+}
+// «150», «150%», «150 %», «87,5» — всё понимаем; за пределами 10–400 %
+// берём ближайшую границу (её и подставит setZoom через clamp)
+function applyZoomInput(){
+  const raw = String(zoomInputEl.value).replace(/[%\s]/g, '').replace(',', '.');
+  const pct = parseFloat(raw);
+  zoomInputDirty = false;
+  if (isFinite(pct) && pct > 0) zoomAroundCenter(pct / 100);
+  // и при неверном вводе, и при верном — показать то, что реально стоит
+  syncZoomPop();
+}
+function onZoomTap(){
+  const now = performance.now();
+  if (now - zoomLastTap < ZOOM_DBL_MS){
+    zoomLastTap = 0;
+    clearTimeout(zoomResetTimer); zoomResetTimer = null;
+    if (zoomPopOpen) closeZoomPop(true); else openZoomPop();
+    return;
+  }
+  zoomLastTap = now;
+  // одиночный щелчок по закрытым процентам — прежний сброс на 100 %, но
+  // только когда стало ясно, что второго нажатия не будет
+  if (!zoomPopOpen){
+    clearTimeout(zoomResetTimer);
+    zoomResetTimer = setTimeout(() => { zoomResetTimer = null; zoomAroundCenter(1); }, ZOOM_DBL_MS);
+  }
+}
+zoomLabelEl.addEventListener('click', onZoomTap);
+zoomInputEl.addEventListener('click', onZoomTap);
+zoomInputEl.addEventListener('input', () => { zoomInputDirty = true; });
+zoomInputEl.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter'){ e.preventDefault(); applyZoomInput(); zoomInputEl.select(); }
+  else if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); closeZoomPop(false); }
+});
+// телефон: «Готово» над клавиатурой снимает фокус — набранное применяем
+zoomInputEl.addEventListener('blur', () => { if (zoomPopOpen && zoomInputDirty) applyZoomInput(); });
+// Бегунок пальцем или мышью: нажал — бегунок прыгает в точку нажатия, дальше
+// тянется за указателем. setPointerCapture — чтобы тянуть можно было и
+// выйдя пальцем за узкую полосу, как у обычного ползунка
+function zoomSliderTo(f){
+  let z = fracToZoom(f);
+  // лёгкий «магнит» у 100 %: попасть пальцем ровно в натуральный размер
+  // иначе почти невозможно, а нужен он чаще любого другого
+  if (Math.abs(z - 1) < 0.03) z = 1;
+  // ввод в поле, начатый и не применённый, бегунком отменяется: двигаю
+  // бегунок — проценты в поле показывают бегунок, а не недонабранное
+  zoomInputDirty = false;
+  zoomAroundCenter(z);
+}
+function zoomSliderFracAt(clientY){
+  const r = zoomSliderEl.getBoundingClientRect();
+  const pad = parseFloat(getComputedStyle(zoomSliderEl).getPropertyValue('--pad')) || 9;
+  return (r.bottom - pad - clientY) / Math.max(1, r.height - 2 * pad);
+}
+let zoomSliderPointer = null;
+zoomSliderEl.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 && e.pointerType === 'mouse') return;
+  e.preventDefault();
+  zoomSliderPointer = e.pointerId;
+  try { zoomSliderEl.setPointerCapture(e.pointerId); } catch (_) {}
+  zoomSliderEl.classList.add('dragging');
+  // фокус — полосе, а не полю: стрелки с клавиатуры после щелчка двигают бегунок.
+  // На касание фокус не ставим, чтобы не закрывать клавиатуру телефона, если она открыта
+  if (e.pointerType === 'mouse') zoomSliderEl.focus({ preventScroll: true });
+  zoomSliderTo(zoomSliderFracAt(e.clientY));
+});
+zoomSliderEl.addEventListener('pointermove', (e) => {
+  if (e.pointerId !== zoomSliderPointer) return;
+  zoomSliderTo(zoomSliderFracAt(e.clientY));
+});
+function zoomSliderRelease(e){
+  if (e.pointerId !== zoomSliderPointer) return;
+  zoomSliderPointer = null;
+  zoomSliderEl.classList.remove('dragging');
+}
+zoomSliderEl.addEventListener('pointerup', zoomSliderRelease);
+zoomSliderEl.addEventListener('pointercancel', zoomSliderRelease);
+// стрелками — мелкими шагами (сотая шкалы ≈ 4 %), Page Up/Down — крупными,
+// Home/End — к краям. Без магнита: стрелкой шагают точно, а не «примерно»
+zoomSliderEl.addEventListener('keydown', (e) => {
+  const steps = { ArrowUp: 0.01, ArrowRight: 0.01, ArrowDown: -0.01, ArrowLeft: -0.01, PageUp: 0.1, PageDown: -0.1 };
+  let f = null;
+  if (e.key in steps) f = zoomToFrac(cam.zoom) + steps[e.key];
+  else if (e.key === 'Home') f = 0;
+  else if (e.key === 'End') f = 1;
+  if (f === null) return;
+  e.preventDefault();
+  e.stopPropagation();
+  zoomInputDirty = false;
+  zoomAroundCenter(fracToZoom(f));
+});
+// Escape, когда фокус уже не в поле (подвигали бегунок, щёлкнули по доске
+// колёсиком) — тоже закрывает; в фазе захвата, чтобы общий обработчик доски
+// не снял заодно выделение
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape' || !zoomPopOpen) return;
+  e.stopPropagation();
+  closeZoomPop(false);
+}, true);
+// щелчок мимо закрывает. «+/−» и сами проценты — не «мимо»: ими удобно
+// докрутить масштаб при открытой панели, и бегунок пойдёт следом
+document.addEventListener('pointerdown', (e) => {
+  if (!zoomPopOpen) return;
+  const t = e.target;
+  if (zoomPopEl.contains(t) || t === zoomInputEl || t === zoomLabelEl) return;
+  // набранное, но не применённое число «+/−» отменяют: после нажатия поле
+  // должно показывать масштаб, который стал, а не недонабранное
+  if (t.closest && t.closest('#railZoomIn, #railZoomOut')){ zoomInputDirty = false; return; }
+  closeZoomPop(true);
+}, true);
+window.addEventListener('resize', layoutZoomPop);
 /* Выгрузка открытой доски в файл — прямо отсюда, не выходя из доски.
    Раньше это жило только в меню «⋯» у доски в списке: чтобы спасти работу,
    надо было сначала выйти из доски — а именно в момент сбоя сохранения
