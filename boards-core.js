@@ -719,7 +719,9 @@ function pingOtherTabs(){
   lastPingSent = now;
   try { localStorage.setItem(DB_PING, String(now)); } catch (e) {}
 }
-function refreshFromStore(){
+// visibleToo — на вкладку вернулись: тогда и камера переезжает на более
+// свежий вид из соседней вкладки, даже если эта видима (см. adoptFresherView)
+function refreshFromStore(visibleToo){
   return idbGet('db').then(stored => {
     if (!stored || !Array.isArray(stored.boards)) return;
     const lost = activeLostTo(stored);
@@ -727,6 +729,8 @@ function refreshFromStore(){
     const merged = mergeDbs(stored, mineIndex);
     merged.deleted = pruneDeleted(merged.deleted);
     applyMergedIndex(merged);
+    // «Вид и вкладки»: слияние могло принести вид этой доски свежее того, что на экране
+    adoptFresherView(!!visibleToo);
     return refreshActivePayloadIfLost(lost).then(() => { if (!boardActive) renderList(); });
   }).catch(() => {});
 }
@@ -739,9 +743,11 @@ window.addEventListener('storage', (e) => { if (e.key === DB_PING) refreshFromSt
    перечитать хранилище: так доска свежая уже в момент, когда на неё
    посмотрели, а не через несколько секунд. */
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') refreshFromStore();
+  // «Вид и вкладки»: localStorage читается сразу — камера на свежем месте уже в
+  // первом кадре, не дожидаясь чтения IndexedDB
+  if (document.visibilityState === 'visible'){ adoptFresherView(true); refreshFromStore(true); }
 });
-window.addEventListener('focus', () => { refreshFromStore(); });
+window.addEventListener('focus', () => { adoptFresherView(true); refreshFromStore(true); });
 /* Отметка времени правки. Раньше updatedAt записывалось один раз при
    создании доски и дальше не менялось никогда — то есть узнать, какая из
    двух версий доски свежее, было в принципе невозможно. Сохранение идёт
@@ -1786,30 +1792,92 @@ function writeLocalView(id, v){
     localStorage.setItem(VIEW_LS_KEY, JSON.stringify(m));
   } catch (e) {}
 }
+/* ═══ «Вид и вкладки»: доска всё равно открывалась не там, если вкладок несколько ═══
+   Вкладка, где доска открыта давно (на уроке их бывает несколько), держит в
+   памяти свою камеру — где в ней работали в последний раз. Раньше при
+   сворачивании, переключении на другую вкладку и закрытии она записывала эту
+   камеру видом доски с ТЕКУЩИМ временем, без проверки, двигали ли её вообще.
+   И старое место становилось «самым свежим» — перебивало то, где на самом
+   деле закончили в другой вкладке. Поэтому:
+   - вид пишется, только если камера в этой вкладке правда сдвинулась с
+     прошлого запоминания (или такая запись ещё ждёт паузы — тогда её
+     дописываем сразу). Время у вида — время движения, а не сворачивания;
+   - старая вкладка сама переезжает на более свежий вид из соседней
+     (adoptFresherView): когда на неё возвращаются, а пока она в фоне — сразу.
+     Видимая вкладка рядом (два окна бок о бок) от чужой прокрутки не прыгает:
+     там человек может смотреть в другое место той же доски. */
+let shownViewAt = 0;              // время вида, который сейчас на экране этой вкладки
+let pendingView = null;           // { id, v } — запомнено, но ещё ждёт паузы перед записью
+function camMovedSinceRemembered(){
+  const c = lastViewCam;
+  return !(c && c.x === cam.x && c.y === cam.y && c.zoom === cam.zoom);
+}
+function flushPendingView(){
+  clearTimeout(viewSaveTimer); viewSaveTimer = null;
+  if (!pendingView) return;
+  writeLocalView(pendingView.id, pendingView.v);
+  pendingView = null;
+}
 // now = true — при уходе с доски и закрытии вкладки: localStorage пишем
 // сразу, без паузы, второго шанса не будет
 function rememberView(now){
   if (!B || !boardActive || !viewReady || !cssW || !cssH) return;
-  B.view = viewOf();
-  lastViewCam = { x: cam.x, y: cam.y, zoom: cam.zoom };
-  const board = B, v = B.view;
-  clearTimeout(viewSaveTimer);
-  if (now === true){ viewSaveTimer = null; writeLocalView(board.id, v); return; }
+  if (camMovedSinceRemembered()){
+    B.view = viewOf();
+    lastViewCam = { x: cam.x, y: cam.y, zoom: cam.zoom };
+    shownViewAt = B.view.at;
+    pendingView = { id: B.id, v: B.view };
+  }
+  // камера стоит там же, где её запомнили, и записывать нечего — молчим:
+  // иначе давно открытая вкладка проштамповала бы свой старый вид как свежий
+  if (!pendingView) return;
+  if (now === true){ flushPendingView(); return; }
   // localStorage — с той же паузой, что и диск: при прокрутке тачпадом
   // rememberView зовут на каждое событие, а переписывать список видов
   // сотни раз в секунду незачем. На закрытие есть now = true
+  clearTimeout(viewSaveTimer);
   viewSaveTimer = setTimeout(() => {
-    viewSaveTimer = null;
-    writeLocalView(board.id, v);
+    flushPendingView();
     idbSaveDB().catch(() => {});
   }, 700);
 }
 function rememberViewIfMoved(){
   if (!viewReady || !boardActive) return;
-  const c = lastViewCam;
-  if (c && c.x === cam.x && c.y === cam.y && c.zoom === cam.zoom) return;
+  if (!camMovedSinceRemembered()) return;
   rememberView();
 }
+// камеру — так, чтобы точка доски из вида оказалась посередине окна
+function placeCamAtView(v){
+  cam.zoom = v.zoom;
+  if (v.cx !== undefined){
+    cam.x = v.cx - (window.innerWidth / 2 - boardInset) / v.zoom;
+    cam.y = v.cy - cssH / 2 / v.zoom;
+  } else { cam.x = v.x; cam.y = v.y; }
+}
+// «Вид и вкладки»: соседняя вкладка запомнила вид этой доски позже, чем
+// показан здесь, — переезжаем туда. visibleToo — вкладку открыли/вернулись
+// на неё; без него (сообщение от соседней вкладки) — только пока она в фоне
+function adoptFresherView(visibleToo){
+  // ученик на чужой доске: камера — учителя, своих видов у него нет
+  if (window.__boardViewer) return;
+  if (!B || !boardActive || !viewReady || !cssW || !cssH) return;
+  if (!visibleToo && !document.hidden) return;
+  // здесь камеру двигали после запоминания — своё движение свежее любого
+  // чужого, его запишет rememberView
+  if (pendingView || camMovedSinceRemembered()) return;
+  const v = newerView(B.view, readLocalViews()[B.id]);
+  if (!v || !((v.at || 0) > shownViewAt)) return;
+  placeCamAtView(v);
+  clampCam();
+  // переезд — не движение человека: запоминаем камеру как уже записанную,
+  // чтобы отрисовка не выдала его за новое и не проштамповала свежим временем
+  lastViewCam = { x: cam.x, y: cam.y, zoom: cam.zoom };
+  shownViewAt = v.at || 0;
+  B.view = v;
+  updateZoomLabel();
+  scheduleRedraw();
+}
+window.addEventListener('storage', (e) => { if (e.key === VIEW_LS_KEY) adoptFresherView(false); });
 /* ═══ Промпт №41: три уровня доступа к общей доске ═══
    «Полный доступ» — можно всё, как у владельца.
    «Только свои записи» — можно писать и править/стирать только то, что
@@ -2074,6 +2142,9 @@ function openBoard(id){
   ensureBoardLoaded(b).then(() => openBoardReady(b, id), alertBoardReadFailed);
 }
 function openBoardReady(b, id){
+  // «Вид и вкладки»: недописанный вид прошлой доски — дописать сейчас, пока
+  // B не стала другой доской
+  flushPendingView();
   viewReady = false;   // «Вставка и вид доски»: пока вид не восстановлен, камера чужая
   b.lastOpenedAt = nowTs();
   B = b;
@@ -2157,13 +2228,12 @@ function openBoardReady(b, id){
     // «Вставка и вид доски»: свежий из двух — индекса и localStorage (туда вид пишется
     // и при закрытии вкладки крестиком, см. rememberView)
     const v = newerView(B.view, readLocalViews()[B.id]);
+    // «Вид и вкладки»: время вида на экране — по нему вкладка потом решает,
+    // свежее ли вид, запомненный в соседней (adoptFresherView)
+    shownViewAt = v ? (v.at || 0) : 0;
     if (v) {
-      cam.zoom = v.zoom;
-      if (v.cx !== undefined){
-        // точка, бывшая в середине окна, снова в середине окна
-        cam.x = v.cx - (window.innerWidth / 2 - boardInset) / v.zoom;
-        cam.y = v.cy - cssH / 2 / v.zoom;
-      } else { cam.x = v.x; cam.y = v.y; }
+      // точка, бывшая в середине окна, снова в середине окна
+      placeCamAtView(v);
       B.view = v;
     } else {
       cam.zoom = 1;
