@@ -49,6 +49,11 @@ BASE = f"http://127.0.0.1:{PORT}"
 
 FAKE_LIB = r"""
 (function(){
+  // Промпт №21 нового списка: ссылка ?s= сначала спрашивает «Подключиться к
+  // сессии?». Тесты на этой заглушке проверяют то, что после согласия, —
+  // соглашаемся заранее внутренним ключом. Само окно проверяет
+  // test_prompt21_invite_link.py (он этот ключ из заглушки вырезает)
+  try { localStorage.setItem('tsInvite:auto', '1'); } catch (e) {}
   const LS = 'fakeTrainerSessions';
   const readT = () => { try { return JSON.parse(localStorage.getItem(LS) || '{}'); } catch (e) { return {}; } };
   const writeT = (t) => localStorage.setItem(LS, JSON.stringify(t));

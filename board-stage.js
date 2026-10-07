@@ -134,7 +134,20 @@
     let role = null;
     try { role = sessionStorage.getItem('tsTab:role') || localStorage.getItem('trainerSession:global:role'); } catch (e) {}
     if (role === 'follower') return;
+    // Промпт №21 нового списка: окно «Подключиться к сессии?» у ученика
+    // называет то, что открыто у учителя, — здесь это открытая доска
+    window.__tsInviteTitle = () => (boardActive && B && B.name ? 'Доска «' + B.name + '»' : 'Доски');
     TS.init({ trainer: 'boards', getState: () => ({}), applyState: () => {} });
+    // название попадает в строку сессии с очередным снимком, а на досках
+    // снимок сам почти не пишется (состояния у страницы нет, всё идёт
+    // событиями) — поэтому досылаем, когда сменилась открытая доска. Снимок
+    // здесь пустой ({}), перезаписать им в строке нечего
+    let invTitle = null;
+    setInterval(() => {
+      if (!TS.getCode || !TS.getCode() || !TS.isLeader()) return;
+      const t = window.__tsInviteTitle();
+      if (t !== invTitle) { invTitle = t; TS.push(); }
+    }, 1000);
     // Кнопка «Совместный доступ» — та же, что на тренажёрах. Раньше её здесь
     // не было: урок часто идёт только на досках, и за кодом для ученика
     // приходилось уходить на главную. Ученику (просмотр, VIEWER) кнопка не

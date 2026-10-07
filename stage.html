@@ -487,6 +487,13 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
     if (late === 'kicked') {
       document.getElementById('endedTitle').textContent = 'Учитель отключил это устройство';
       document.getElementById('endedText').textContent = 'Если это ошибка — попросите у учителя ссылку ещё раз.';
+    } else if (late === 'missing') {
+      // промпт №21 нового списка: по коду в адресе никого нет
+      endedMissing = true;
+      document.querySelector('#ended .icon').textContent = '🔍';
+      document.getElementById('endedTitle').textContent = 'Сессия не найдена';
+      document.getElementById('endedText').textContent = 'Код неверный или занятие уже закончилось. Попросите у учителя новую ссылку.';
+      document.getElementById('endedStay').textContent = 'Открыть страницу без сессии';
     } else if (late) document.getElementById('endedTitle').textContent = 'Это занятие уже завершено';
     statusEl.classList.add('hidden');
     connEl.classList.add('hidden');
@@ -496,7 +503,18 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
     endedEl.classList.add('on');
   }
   document.getElementById('endedHome').addEventListener('click', () => { location.href = new URL('index.html', location.href).toString(); });
-  document.getElementById('endedStay').addEventListener('click', () => endedEl.classList.remove('on'));
+  // «остаться» при ненайденной сессии — смотреть в рамке нечего: та же
+  // страница, но обычная, без кода
+  let endedMissing = false;
+  function leaveToPlain(){
+    const u = targetUrl(frameHref() || params.get('to'));
+    u.searchParams.delete('s');
+    location.href = u.toString();
+  }
+  document.getElementById('endedStay').addEventListener('click', () => {
+    if (endedMissing) { leaveToPlain(); return; }
+    endedEl.classList.remove('on');
+  });
 
   /* ── сообщения из кадров ── */
   function whichFrame(src){
@@ -570,10 +588,11 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
       lastConn = { state: d.state, teacher: d.teacher };
       setConn(d.state, d.teacher);
     } else if (d.type === 'leave') {
-      // сессии с этим кодом нет — страница без кода и без рамки
-      const u = targetUrl(frameHref() || params.get('to'));
-      u.searchParams.delete('s');
-      location.href = u.toString();
+      // Промпт №21 нового списка: сессии с этим кодом нет. Раньше сцена
+      // молча уходила на обычную страницу — со стороны это выглядело как
+      // «ссылка ничего не сделала». Теперь — надпись и выбор
+      if (d.reason === 'not_found') { showEnded('missing'); return; }
+      leaveToPlain();
     }
   });
 

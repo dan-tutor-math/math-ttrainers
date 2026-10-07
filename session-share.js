@@ -406,8 +406,302 @@
   function urlJoinCode() {
     try {
       const p = new URLSearchParams(location.search);
-      return p.get('s') || null;
+      return cleanJoinCode(p.get('s')) || null;
     } catch (e) { return null; }
+  }
+  // Промпт №21 нового списка: код из ссылки и из поля «Подключиться» — одной
+  // меркой. Код диктуют голосом и пересылают в мессенджерах: туда попадают
+  // пробелы, дефисы, точка в конце предложения, а иногда в поле кода
+  // вставляют всю ссылку целиком. В самом коде только буквы и цифры
+  function cleanJoinCode(raw) {
+    let s = String(raw || '').trim();
+    const m = s.match(/[?&]s=([^&#\s]+)/i);
+    if (m) { try { s = decodeURIComponent(m[1]); } catch (e) { s = m[1]; } }
+    return s.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16);
+  }
+
+  /* ═══ Промпт №21 нового списка: ссылка-приглашение ═══
+     Раньше переход по ссылке сразу уводил на сцену, а если код не подходил
+     (опечатка, учитель сменил код, урок закончился) — молча возвращал на
+     обычную страницу со СВОЕЙ новой сессией. Снаружи это выглядело как
+     «ссылка ничего не делает»: ни подключения, ни объяснения.
+     Теперь ссылка сначала проверяет код и спрашивает: «Подключиться к
+     сессии?» с названием того, что открыто у учителя. Завершённое занятие и
+     неверный код — понятной надписью, с полем, куда можно ввести код
+     вручную. Вход в аккаунт для этого не нужен ни на тренажёрах, ни на
+     досках: сессия анонимная (см. createClient выше), а доски по ссылке
+     открываются просмотром без экрана входа (window.__boardViewer). */
+  // Не спрашивать вовсе — внутренний ключ для тестов, как tsStage:direct;
+  // кнопки нет. Имя нарочно не «trainerSession:…» (см. readStoredCode)
+  const INVITE_AUTO_KEY = 'tsInvite:auto';
+  // sessionStorage: к какому коду в этой вкладке уже согласились подключиться.
+  // Нужен страницам, на которые подключение уводит само (группа на другом
+  // тренажёре, переход учителя у ученика без сцены): у них в адресе тот же
+  // ?s=, и второй раз спрашивать незачем
+  const INVITE_OK_KEY = 'tsInvite:ok';
+  function inviteAutoOn() { try { return localStorage.getItem(INVITE_AUTO_KEY) === '1'; } catch (e) { return false; } }
+  // ask — показать окно; join — подключать, как раньше; own — это сессия
+  // самого учителя в этой же вкладке
+  function inviteDecision(c) {
+    if (IN_ANY_FRAME || inviteAutoOn()) return 'join';
+    const tabCode = ssGet(TAB_CODE_KEY), tabRole = ssGet(TAB_ROLE_KEY);
+    if (tabCode === c && tabRole === 'follower') return 'join';
+    if (ssGet(INVITE_OK_KEY) === c) return 'join';
+    if (tabCode === c && (tabRole || 'leader') === 'leader') return 'own';
+    return 'ask';
+  }
+  function urlWithoutJoin() {
+    const u = new URL(location.href);
+    u.searchParams.delete('s');
+    return u.toString();
+  }
+  function dropJoinParam() {
+    try { history.replaceState(history.state, '', urlWithoutJoin()); } catch (e) {}
+  }
+  // что открыто у учителя — для окна у пришедшего по ссылке. Доски
+  // подставляют название открытой доски сами (board-stage.js)
+  function inviteTitleHere() {
+    try {
+      if (typeof window.__tsInviteTitle === 'function') {
+        const t = window.__tsInviteTitle();
+        if (t) return String(t).slice(0, 140);
+      }
+    } catch (e) {}
+    try { return baseTitle(); } catch (e) { return document.title || ''; }
+  }
+  // строка сессии — с признаком «не дочитали» (сеть), а не только null:
+  // окну надо отличать «такого кода нет» от «не смогли спросить»
+  async function fetchRowChecked(c) {
+    try {
+      const { data, error } = await SB.from('trainer_sessions').select('code, state, trainer').eq('code', c).maybeSingle();
+      if (error) return { row: null, failed: true };
+      return { row: data || null, failed: false };
+    } catch (e) { return { row: null, failed: true }; }
+  }
+  // название страницы по её слагу. В строке сессии его пишет учитель
+  // (__title), но строка бывает старой — от версии без этого поля; тогда
+  // берём заголовок самой страницы: он и так есть у каждой, отдельная
+  // таблица названий разошлась бы с ними при первой же правке
+  async function pageTitleOf(slug) {
+    if (!slug || !/^[a-z0-9_]+$/i.test(slug)) return '';
+    if (slug === trainerSlug) return document.title || '';
+    try {
+      const r = await fetch(new URL(slug + '.html', location.href).toString(), { credentials: 'same-origin' });
+      if (!r.ok) return '';
+      const m = (await r.text()).match(/<title>([^<]*)<\/title>/i);
+      if (!m) return '';
+      return (new DOMParser().parseFromString(m[1], 'text/html').documentElement.textContent || '').trim();
+    } catch (e) { return ''; }
+  }
+  async function titleForRow(row) {
+    const slug = row.trainer || '', st = row.state || {};
+    // заголовок главной — название сайта, ученику он ничего не скажет
+    if (slug === 'index') return 'Главная страница тренажёров';
+    // снимок с другой страницы (учитель уже ушёл, строка ещё не догнала) —
+    // его название было бы чужим
+    if (st.__title && (!st.__trainer || st.__trainer === slug)) return String(st.__title).slice(0, 140);
+    if (slug === 'boards') return 'Доски';
+    return pageTitleOf(slug);
+  }
+  async function inspectInvite(c) {
+    // «учитель на связи?» — параллельно с базой: для живой сессии без
+    // строки (см. probeLiveSession) это единственный ответ, а для обычной —
+    // подсказка в окне, что экран появится, когда учитель вернётся
+    // 6 с, а не 2,5, как у probeLeader в init(): здесь сокет холодный —
+    // страница только открылась, и подключение к серверу плюс вход в канал
+    // на живом сайте сами съедают пару секунд (проверено: с 2,5 с окно у
+    // ученика писало «учитель не на связи» при учителе на месте)
+    const live = probeLeader(c, 6000);
+    let res = await fetchRowChecked(c);
+    if (!res.failed && !res.row) {
+      for (const delay of JOIN_RETRY_DELAYS_MS) {
+        await new Promise(r => setTimeout(r, delay));
+        res = await fetchRowChecked(c);
+        if (res.failed || res.row) break;
+      }
+    }
+    if (res.row && res.row.state && res.row.state.__ended) return { kind: 'ended', live };
+    if (res.row) return { kind: 'ok', title: await titleForRow(res.row), live };
+    // строки нет — ответ даёт только канал. Ждём его не все 6 с: код с
+    // опечаткой не должен держать «Проверяем ссылку…» так долго
+    const quick = await Promise.race([live, new Promise(r => setTimeout(() => r(false), 4000))]);
+    if (quick) return { kind: 'ok', title: '', live: Promise.resolve(true) };
+    return { kind: (res.failed || navigator.onLine === false) ? 'error' : 'not_found', live };
+  }
+
+  // Окно приглашения. Обещание выполняется кодом, к которому согласились
+  // подключиться; «Отмена» перезагружает страницу без ?s=, и обещание так и
+  // не выполняется — дальше страница грузится заново обычной. Именно
+  // перезагрузка, а не «продолжить тут»: доски по ссылке открыты просмотром
+  // без движка (window.__boardViewer), продолжить их обычными нельзя
+  function inviteFlow(c) {
+    return new Promise((resolve) => {
+      const ui = inviteUi();
+      let token = 0, current = c, probing = Promise.resolve();
+      const finish = async (k) => {
+        ssSet(INVITE_OK_KEY, k);
+        storeLastJoinCode(k);
+        ui.busy();
+        // проба «учитель на связи?» держит свой канал с тем же именем, а
+        // supabase-js на повторный channel() с тем же именем отдаёт уже
+        // открытый. Подключись мы прямо сейчас на этой же странице — проба,
+        // закрываясь, сняла бы и наш канал. На сцену уходим другой
+        // страницей, там ждать нечего
+        if (!canEnterStage()) await probing;
+        ui.close();
+        resolve({ code: k });
+      };
+      async function check(k, typed) {
+        const my = ++token;
+        current = k;
+        ui.render('checking', { code: k });
+        const info = await inspectInvite(k);
+        probing = info.live || Promise.resolve();
+        if (my !== token) return;
+        // код набрали руками и нажали «Подключиться» — второй раз не спрашиваем
+        if (info.kind === 'ok' && typed) { finish(k); return; }
+        ui.render(info.kind, { code: k, title: info.title });
+        if (info.kind === 'ok') info.live.then((on) => { if (my === token && !on) ui.teacherAway(); });
+      }
+      ui.bind({
+        join: () => finish(current),
+        cancel: () => { ui.busy(); location.replace(urlWithoutJoin()); },
+        home: () => { ui.busy(); location.href = new URL('index.html', location.href).toString(); },
+        retry: () => check(current, false),
+        typed: (raw) => { const k = cleanJoinCode(raw); if (!k) return false; check(k, true); return true; },
+      });
+      check(c, false);
+    });
+  }
+
+  function inviteUi() {
+    const st = document.createElement('style');
+    st.textContent = `
+      #tsInvite{position:fixed;inset:0;z-index:100002;display:flex;align-items:center;justify-content:center;
+        padding:16px;box-sizing:border-box;background:rgba(20,22,26,.46);
+        backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);font-family:var(--font-ui,system-ui,-apple-system,sans-serif);}
+      #tsInvite .ts-inv-card{max-width:400px;width:100%;box-sizing:border-box;text-align:center;padding:26px 22px 18px;
+        border-radius:20px;background:var(--glass-strong,#fff);border:1px solid var(--glass-border,rgba(0,0,0,.1));
+        box-shadow:var(--shadow,0 12px 40px rgba(0,0,0,.25));color:var(--pencil,#1f2126);
+        backdrop-filter:blur(24px) saturate(170%);-webkit-backdrop-filter:blur(24px) saturate(170%);
+        max-height:calc(100vh - 32px);overflow-y:auto;}
+      #tsInvite .ts-inv-icon{font-size:34px;line-height:1;margin-bottom:10px;}
+      #tsInvite .ts-inv-spin{width:30px;height:30px;margin:2px auto 12px;border-radius:50%;
+        border:3px solid var(--glass-border,rgba(0,0,0,.12));border-top-color:var(--ink,#2f6fed);animation:tsInvSpin .8s linear infinite;}
+      @keyframes tsInvSpin{to{transform:rotate(360deg)}}
+      #tsInvite h2{margin:0 0 8px;font-size:21px;font-weight:700;line-height:1.25;}
+      #tsInvite .ts-inv-name{margin:0 0 10px;padding:10px 12px;border-radius:12px;font-size:16px;font-weight:600;line-height:1.35;
+        background:var(--glass,rgba(0,0,0,.04));border:1px solid var(--glass-border,rgba(0,0,0,.08));overflow-wrap:anywhere;}
+      #tsInvite p{margin:0 0 16px;font-size:14.5px;color:var(--muted-2,#6b7280);line-height:1.45;}
+      #tsInvite .ts-inv-code-val{font-weight:700;letter-spacing:.05em;color:var(--pencil,#1f2126);white-space:nowrap;}
+      #tsInvite .ts-inv-away{margin:-6px 0 14px;font-size:13px;color:#b7791f;}
+      #tsInvite .ts-inv-main{display:block;width:100%;min-height:46px;padding:11px 14px;border-radius:12px;border:none;cursor:pointer;
+        background:var(--ink,#2f6fed);color:#fff;font:inherit;font-size:16px;font-weight:600;}
+      #tsInvite .ts-inv-main:hover{background:var(--ink-active,var(--ink,#2f6fed));}
+      #tsInvite .ts-inv-second{display:block;width:100%;margin-top:6px;min-height:40px;background:none;border:none;
+        color:var(--muted-2,#6b7280);font:inherit;font-size:14px;cursor:pointer;padding:8px;}
+      #tsInvite .ts-inv-second:hover{color:var(--pencil,#1f2126);}
+      #tsInvite [hidden]{display:none !important;}
+      #tsInvite button:focus{outline:none;}
+      #tsInvite button:focus-visible{outline:2px solid var(--ink,#2f6fed);outline-offset:2px;}
+      #tsInvite .ts-inv-form{margin:4px 0 16px;padding-top:14px;border-top:1px solid var(--glass-border,rgba(0,0,0,.1));text-align:left;}
+      #tsInvite .ts-inv-form label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--pencil,#1f2126);}
+      #tsInvite .ts-inv-form .row{display:flex;gap:6px;}
+      #tsInvite .ts-inv-form input{flex:1;min-width:0;font:inherit;font-size:16px;letter-spacing:.05em;text-transform:uppercase;
+        padding:9px 11px;border-radius:10px;border:1px solid var(--glass-border,rgba(0,0,0,.15));
+        background:var(--glass,#fff);color:var(--pencil,#1f2126);outline:none;}
+      #tsInvite .ts-inv-form input:focus{border-color:var(--ink,#2f6fed);}
+      #tsInvite .ts-inv-form input.bad{border-color:var(--teacher,#d9534f);}
+      #tsInvite .ts-inv-form button{font:inherit;font-size:14px;font-weight:600;padding:9px 12px;border-radius:10px;border:none;
+        cursor:pointer;background:var(--ink,#2f6fed);color:#fff;white-space:nowrap;}
+    `;
+    document.head.appendChild(st);
+    const el = document.createElement('div');
+    el.id = 'tsInvite';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.setAttribute('aria-labelledby', 'tsInvH');
+    el.innerHTML = `<div class="ts-inv-card">
+      <div class="ts-inv-spin" id="tsInvSpin"></div>
+      <div class="ts-inv-icon" id="tsInvIcon" hidden></div>
+      <h2 id="tsInvH"></h2>
+      <div class="ts-inv-name" id="tsInvName" hidden></div>
+      <p id="tsInvText"></p>
+      <p class="ts-inv-away" id="tsInvAway" hidden>Учитель сейчас не на связи — его экран появится, как только он вернётся.</p>
+      <form class="ts-inv-form" id="tsInvForm" hidden>
+        <label for="tsInvInput">Есть другой код?</label>
+        <div class="row">
+          <input id="tsInvInput" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="код сессии">
+          <button type="submit" id="tsInvInputBtn">Подключиться</button>
+        </div>
+      </form>
+      <button type="button" class="ts-inv-main" id="tsInvMain" hidden></button>
+      <button type="button" class="ts-inv-second" id="tsInvSecond"></button>
+    </div>`;
+    const mount = () => document.body.appendChild(el);
+    if (document.body) mount(); else document.addEventListener('DOMContentLoaded', mount);
+    const $ = (id) => el.querySelector('#' + id);
+    let acts = {}, mainAct = null, secondAct = null;
+    const codeHtml = (k) => `<span class="ts-inv-code-val">${String(k).replace(/[^A-Z0-9]/g, '')}</span>`;
+    const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    const TEXTS = {
+      checking: { h: 'Проверяем ссылку…', t: (k) => 'Код сессии ' + codeHtml(k), second: ['Отмена', 'cancel'] },
+      ok: { icon: '🔗', h: 'Подключиться к сессии?',
+        t: (k) => 'Вы увидите экран учителя — задания, ответы и записи — в реальном времени. Код сессии ' + codeHtml(k) + '.',
+        main: ['Подключиться', 'join'], second: ['Отмена', 'cancel'] },
+      ended: { icon: '👋', h: 'Это занятие уже завершено',
+        t: (k) => 'Учитель завершил сессию ' + codeHtml(k) + '. Если урок продолжается — попросите у него новую ссылку.',
+        form: true, main: ['На главную', 'home'], second: ['Остаться на этой странице', 'cancel'] },
+      not_found: { icon: '🔍', h: 'Сессия не найдена',
+        t: (k) => 'По коду ' + codeHtml(k) + ' сейчас нет занятия: в ссылке опечатка или урок уже закончился. Проверьте код или попросите у учителя новую ссылку.',
+        form: true, main: ['На главную', 'home'], second: ['Остаться на этой странице', 'cancel'] },
+      error: { icon: '📡', h: 'Не удалось проверить ссылку',
+        t: () => 'Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.',
+        main: ['Повторить', 'retry'], second: ['Отмена', 'cancel'] },
+    };
+    function render(kind, info) {
+      const T = TEXTS[kind] || TEXTS.not_found;
+      el.dataset.state = kind;
+      $('tsInvSpin').hidden = kind !== 'checking';
+      $('tsInvIcon').hidden = !T.icon;
+      $('tsInvIcon').textContent = T.icon || '';
+      $('tsInvH').textContent = T.h;
+      const name = kind === 'ok' ? (info.title || 'Занятие учителя') : '';
+      $('tsInvName').hidden = !name;
+      $('tsInvName').innerHTML = name ? esc(name) : '';
+      $('tsInvText').innerHTML = T.t(info.code || '');
+      $('tsInvAway').hidden = true;
+      $('tsInvForm').hidden = !T.form;
+      $('tsInvInput').classList.remove('bad');
+      mainAct = T.main ? T.main[1] : null;
+      secondAct = T.second ? T.second[1] : null;
+      $('tsInvMain').hidden = !T.main;
+      $('tsInvMain').textContent = T.main ? T.main[0] : '';
+      $('tsInvSecond').hidden = !T.second;
+      $('tsInvSecond').textContent = T.second ? T.second[0] : '';
+      // кнопку «Подключиться» — под палец и под Enter сразу
+      if (kind === 'ok') setTimeout(() => { try { $('tsInvMain').focus({ preventScroll: true }); } catch (e) {} }, 30);
+    }
+    $('tsInvMain').addEventListener('click', () => { if (mainAct && acts[mainAct]) acts[mainAct](); });
+    $('tsInvSecond').addEventListener('click', () => { if (secondAct && acts[secondAct]) acts[secondAct](); });
+    $('tsInvForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const inp = $('tsInvInput');
+      if (!acts.typed || !acts.typed(inp.value)) { inp.classList.add('bad'); inp.focus(); }
+    });
+    // клавиши — окну, а не странице под ним (у досок и тренажёров свои
+    // горячие клавиши). Esc — как «Отмена», пока она есть
+    el.addEventListener('keydown', (e) => {
+      e.stopPropagation();
+      if (e.key === 'Escape' && secondAct === 'cancel') { e.preventDefault(); acts.cancel(); }
+    });
+    return {
+      render,
+      bind(a) { acts = a; },
+      teacherAway() { if (el.dataset.state === 'ok') $('tsInvAway').hidden = false; },
+      busy() { $('tsInvMain').disabled = true; $('tsInvSecond').disabled = true; },
+      close() { el.remove(); st.remove(); },
+    };
   }
 
   async function fetchRow(c) {
@@ -444,6 +738,9 @@
     }, isLeaderFlag ? {
       __stage: stageSize(), __ui: uiSnapshot(),
       __scroll: { x: Math.round(window.scrollX), y: Math.round(window.scrollY) },
+      // Промпт №21 нового списка: название того, что открыто у учителя, —
+      // его показывает окно «Подключиться к сессии?» у пришедшего по ссылке
+      __title: inviteTitleHere(),
     } : {});
   }
 
@@ -736,6 +1033,8 @@
       });
   }
 
+  // код, который сейчас завершают (endSession): в его строку больше не пишем
+  let endingCode = null;
   function scheduleSave() {
     clearTimeout(saveTimer);
     // Промпт №11 нового списка: сохранение пишет в строку ТОГО кода, для
@@ -745,7 +1044,7 @@
     // моей странице» — и ученика не уводило к учителю
     const forCode = code;
     saveTimer = setTimeout(() => {
-      if (!code || code !== forCode) return;
+      if (!code || code !== forCode || code === endingCode) return;
       upsertState(code, trainerSlug, fullState());
     }, 400);
   }
@@ -1061,7 +1360,30 @@
     applyStateCb = opts.applyState || (() => {});
     bindConnectionWatchers(); // Промпт №31 — следим за сетью/возвратом вкладки
 
-    const joinCode = urlJoinCode();
+    let joinCode = urlJoinCode();
+    // Промпт №21 нового списка: ссылка-приглашение сначала спрашивает
+    // «Подключиться к сессии?» и проверяет код — раньше по неверной или
+    // старой ссылке человек молча оказывался на обычной странице со своей
+    // сессией и не понимал, подключился он или нет. Кадр сцены не спрашивает
+    // (согласие уже дали в окне), повторный заход этой же вкладки — тоже
+    if (joinCode && !IN_ANY_FRAME) {
+      const d = inviteDecision(joinCode);
+      if (d === 'own') {
+        // учитель открыл СВОЮ ссылку в своей же вкладке (вставил в адресную
+        // строку, чтобы проверить). Раньше он становился учеником
+        // собственного занятия, и вести урок стало некому. Это его сессия —
+        // просто убираем код из адреса и продолжаем учителем
+        // Доски с ?s= уже открылись просмотром (window.__boardViewer ставится
+        // до движка) — их только перезагрузить обычными
+        if (window.__boardViewer) { location.replace(urlWithoutJoin()); return; }
+        dropJoinParam();
+        joinCode = null;
+      } else if (d === 'ask') {
+        isLeaderFlag = false;
+        const r = await inviteFlow(joinCode);
+        joinCode = r.code;
+      }
+    }
     // Промпт №11 нового списка: пришёл по ссылке учителя в обычном окне — открываем эту
     // же страницу на сцене (stage.html), а сами к каналу не подключаемся:
     // подключится кадр сцены, второй участник от того же ученика не нужен
@@ -1079,13 +1401,16 @@
         if (IN_STAGE) { toStageHost({ type: 'ended' }); return; }
         showEndedScreen(true);
       }
-      // ссылка устарела/битая — просто продолжаем со своей обычной сессией,
-      // без всплывающих ошибок при обычном заходе на страницу
+      // ссылка устарела/битая — продолжаем со своей обычной сессией
       isLeaderFlag = true;
-      // Промпт №11 нового списка: на сцене смотреть некого (урок кончился,
-      // код старый) — выходим из рамки на обычную страницу, выбор ученика
-      // «сцена/обычный режим» при этом не трогаем
-      if (IN_STAGE) toStageHost({ type: 'leave' });
+      // Промпт №21 нового списка: но уже не молча. Окно ссылки код проверило,
+      // так что сюда попадают редкие случаи: учитель сменил код, пока ученик
+      // думал, или открыли адрес сцены со старым кодом. Сцена рисует «Сессия
+      // не найдена» сама — поверх, с выбором «на главную / остаться»; без
+      // сцены — то же окно, что у завершённого занятия
+      if (IN_STAGE) { toStageHost({ type: 'leave', reason: res.reason || 'not_found' }); return; }
+      if (res.reason !== 'ended') showEndedScreen('missing');
+      dropJoinParam();
     }
     // Промпт №75: вкладку открыла кнопка «Новая сессия» или строка списка
     // («открыть закрытую сессию») — код уже лежит во вкладке (takeTabParams)
@@ -1266,11 +1591,20 @@
     if (!isLeaderFlag || !code) return false;
     const old = code;
     clearTimeout(saveTimer);
+    // Промпт №21 нового списка: пока идут паузы ниже, code ещё старый, и
+    // любое отложенное сохранение — своё (тренажёр сам отмечает изменения
+    // таймером) или ученика, который как раз что-то вводил, — записывало в
+    // строку полный снимок поверх __ended. Ссылка завершённого занятия после
+    // этого выглядела живой. Свои сохранения для этого кода глушим, а метку
+    // ставим ещё раз в конце, когда ученики уже получили session_end
+    endingCode = old;
+    const endedMark = { __ended: Date.now(), __trainer: trainerSlug };
     broadcastEvent('session_end', { code: old });
-    try { await upsertState(old, trainerSlug, { __ended: Date.now(), __trainer: trainerSlug }); } catch (e) {}
+    try { await upsertState(old, trainerSlug, endedMark); } catch (e) {}
     await new Promise(r => setTimeout(r, 450));
     broadcastEvent('session_end', { code: old });
     await new Promise(r => setTimeout(r, 250));
+    try { await upsertState(old, trainerSlug, endedMark); } catch (e) {}
     tabsPost({ t: 'bye' });
     forgetSessionCode(old);
     const fresh = generateCode();
@@ -1287,6 +1621,9 @@
   // введённый — чтобы следующая страница не подключилась к нему снова
   function forgetSessionCode(c) {
     if (ssGet(TAB_CODE_KEY) === c) { ssDel(TAB_CODE_KEY); ssDel(TAB_ROLE_KEY); }
+    // согласие «подключиться» по этой ссылке — тоже: ушёл с занятия или его
+    // завершили, и та же ссылка снова спросит, а не подключит молча
+    if (ssGet(INVITE_OK_KEY) === c) ssDel(INVITE_OK_KEY);
     try {
       if (localStorage.getItem(GLOBAL_CODE_KEY) === c) { localStorage.removeItem(GLOBAL_CODE_KEY); localStorage.removeItem(ROLE_KEY); }
       if (localStorage.getItem(LAST_JOIN_KEY) === c) localStorage.removeItem(LAST_JOIN_KEY);
@@ -1311,6 +1648,8 @@
   // отключил это устройство (промпт №82)
   function showEndedScreen(late) {
     const kicked = late === 'kicked';
+    // промпт №21 нового списка: по ссылке никого нет (код неверный)
+    const missing = late === 'missing';
     if (IN_ANY_FRAME || document.getElementById('tsEnded')) return;
     const st = document.createElement('style');
     st.textContent = `
@@ -1333,9 +1672,9 @@
     const el = document.createElement('div');
     el.id = 'tsEnded';
     el.innerHTML = `<div class="ts-ended-card" role="dialog" aria-live="polite">
-      <div class="ts-ended-icon">👋</div>
-      <h2>${kicked ? 'Учитель отключил это устройство' : late ? 'Это занятие уже завершено' : 'Занятие завершено'}</h2>
-      <p>${kicked ? 'Если это ошибка — попросите у учителя ссылку ещё раз.' : 'Спасибо за урок, до свидания!'}</p>
+      <div class="ts-ended-icon">${missing ? '🔍' : '👋'}</div>
+      <h2>${missing ? 'Сессия не найдена' : kicked ? 'Учитель отключил это устройство' : late ? 'Это занятие уже завершено' : 'Занятие завершено'}</h2>
+      <p>${missing ? 'Код неверный или занятие уже закончилось. Попросите у учителя новую ссылку.' : kicked ? 'Если это ошибка — попросите у учителя ссылку ещё раз.' : 'Спасибо за урок, до свидания!'}</p>
       <button class="ts-ended-home" id="tsEndedHome">На главную</button>
       <button class="ts-ended-stay" id="tsEndedStay">Остаться на этой странице</button>
     </div>`;
@@ -1345,9 +1684,12 @@
   }
 
   async function joinByCode(rawCode) {
-    const c = (rawCode || '').trim().toUpperCase().replace(/\s+/g, '');
+    const c = cleanJoinCode(rawCode);
     if (!c) return { ok: false, reason: 'empty' };
     storeLastJoinCode(c);
+    // код набрали сами — это и есть согласие: страница, на которую уведёт
+    // подключение (у неё в адресе ?s=), второй раз не спросит
+    ssSet(INVITE_OK_KEY, c);
     isLeaderFlag = false; // подключаемся к чужому коду — дальше синхронизируемся к нему
     const res = await activate(c, { createIfMissing: false, requestSyncFromLeader: true });
     if (res.ok) {
@@ -1357,7 +1699,7 @@
       tabsPost({ t: 'bye' });
       applyTitle();
     }
-    else isLeaderFlag = true; // код не найден — остаёмся при своей сессии
+    else { isLeaderFlag = true; ssDel(INVITE_OK_KEY); } // код не найден — остаёмся при своей сессии
     // Промпт №11 нового списка: код ввели в обычном окне — дальше смотрим экран учителя
     // на сцене. Если activate() уже уводит на страницу группы, сцену
     // откроет та страница: у неё в адресе будет ?s=
@@ -2569,6 +2911,28 @@
     input.addEventListener('click', (ev) => ev.stopPropagation());
   }
 
+  // Копирование в буфер. navigator.clipboard есть не везде: старый Safari,
+  // страница в кадре без разрешения clipboard-write, открытая не по https.
+  // Тогда — прежним способом, через выделенное скрытое поле: он работает,
+  // пока мы внутри нажатия на кнопку
+  async function copyText(text) {
+    try {
+      if (navigator.clipboard && window.isSecureContext !== false) { await navigator.clipboard.writeText(text); return true; }
+    } catch (e) {}
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.setAttribute('readonly', '');
+      ta.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none;';
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, text.length);
+      const ok = document.execCommand('copy');
+      ta.remove();
+      return !!ok;
+    } catch (e) { return false; }
+  }
+
   // ── стандартная плавающая кнопка + панель (одинаковая на всех тренажёрах) ──
   let uiEls = null;
   function notifyUi() { if (uiEls) renderPanel(); }
@@ -2751,6 +3115,22 @@
       .ts-share-row button{font-size:12px;font-weight:600;padding:8px 10px;border-radius:9px;border:none;
         background:var(--ink);color:#fff;cursor:pointer;white-space:nowrap;}
       .ts-share-row button:hover{background:var(--ink-active);}
+      /* Промпт №21 нового списка: «Скопировать код» рядом со «Скопировать
+         ссылку». Ссылка — во всю ширину над кнопками: двум кнопкам рядом с
+         полем в панели шириной 290 px места не хватило бы */
+      .ts-copy-wrap{position:relative;display:flex;flex-direction:column;gap:6px;}
+      .ts-share-link{width:100%;box-sizing:border-box;font-size:12px;padding:7px 9px;border-radius:9px;
+        border:1px solid var(--glass-border);background:var(--glass);color:var(--muted-2);outline:none;}
+      /* ширина по надписи, а не поровну: «Скопировать ссылку» длиннее, и при
+         равных половинах она обрезалась. Не влезло (крупный системный
+         шрифт) — надпись переносится, а не режется */
+      .ts-copy-row button{flex:1 1 auto;min-width:0;padding:8px 5px;white-space:normal;line-height:1.2;}
+      .ts-share-code{cursor:copy;}
+      .ts-copy-toast{position:absolute;left:50%;top:3px;transform:translate(-50%,4px);pointer-events:none;
+        padding:5px 12px;border-radius:999px;background:#2e9e5b;color:#fff;font-size:12px;font-weight:700;
+        box-shadow:0 4px 14px rgba(0,0,0,.18);opacity:0;transition:opacity .15s,transform .15s;white-space:nowrap;}
+      .ts-copy-toast.on{opacity:1;transform:translate(-50%,0);}
+      .ts-copy-toast.err{background:var(--teacher,#d9534f);}
       .ts-share-sep{border-top:1px solid var(--glass-border);margin:2px 0;}
       .ts-share-reset{font-size:12px;background:none;border:none;color:var(--teacher);cursor:pointer;
         text-decoration:underline;padding:0;align-self:flex-start;}
@@ -2819,10 +3199,14 @@
       <div class="ts-conn ts-conn-reconnecting" id="tsConn">На связи</div>
       <div class="ts-share-hint" id="tsPeers" style="margin-top:-4px"></div>
       <div class="ts-dev-list" id="tsDevList" style="display:none"></div>
-      <div class="ts-share-code" id="tsCode">—</div>
-      <div class="ts-share-row">
-        <input id="tsLink" type="text" readonly>
-        <button id="tsCopy">Копировать</button>
+      <div class="ts-share-code" id="tsCode" title="Нажмите, чтобы скопировать код">—</div>
+      <div class="ts-copy-wrap">
+        <input id="tsLink" class="ts-share-link" type="text" readonly aria-label="Ссылка на сессию">
+        <div class="ts-share-row ts-copy-row">
+          <button id="tsCopyCode" title="Только код — чтобы продиктовать или вписать в поле «Подключиться»">Скопировать код</button>
+          <button id="tsCopy" title="Ссылка, по которой ученик подключится сразу">Скопировать ссылку</button>
+        </div>
+        <div class="ts-copy-toast" id="tsCopyToast" role="status" aria-live="polite">Скопировано</div>
       </div>
       <button class="ts-share-reset" id="tsReset" title="Ученики по старой ссылке отключатся; имя сессии и подборка останутся">Сменить код этой сессии</button>
       <button class="ts-share-end" id="tsEnd" style="display:none">Завершить сессию</button>
@@ -2836,7 +3220,7 @@
       <div class="ts-share-sep"></div>
       <div class="ts-share-hint">Есть код от другого человека?</div>
       <div class="ts-share-row">
-        <input id="tsJoinInput" type="text" placeholder="код сессии">
+        <input id="tsJoinInput" type="text" placeholder="код или ссылка" autocomplete="off" autocapitalize="characters" spellcheck="false">
         <button id="tsJoin">Подключиться</button>
       </div>
       <div class="ts-share-msg" id="tsMsg"></div>
@@ -2941,10 +3325,28 @@
       const path = e.composedPath ? e.composedPath() : [];
       if (!path.includes(pop) && e.target !== btn && !btn.contains(e.target)) pop.classList.remove('open');
     });
-    pop.querySelector('#tsCopy').addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(uiEls.linkEl.value); uiEls.msgEl.textContent = 'Ссылка скопирована.'; uiEls.msgEl.classList.remove('err'); }
-      catch (e) { uiEls.linkEl.select(); uiEls.msgEl.textContent = 'Скопируйте вручную (Ctrl+C).'; }
-    });
+    // Промпт №21 нового списка: две кнопки — код отдельно и ссылка, обе с
+    // коротким «Скопировано». Код нужен, когда его диктуют или ученик уже на
+    // сайте и вводит его в «Подключиться»
+    const toast = pop.querySelector('#tsCopyToast');
+    let toastT = null;
+    function showCopied(ok) {
+      toast.textContent = ok ? 'Скопировано' : 'Не получилось — скопируйте вручную';
+      toast.classList.toggle('err', !ok);
+      toast.classList.add('on');
+      clearTimeout(toastT);
+      toastT = setTimeout(() => toast.classList.remove('on'), ok ? 1400 : 2600);
+    }
+    async function copyAndTell(text, selectEl) {
+      if (!text) return;
+      const ok = await copyText(text);
+      showCopied(ok);
+      if (!ok && selectEl) { try { selectEl.focus(); selectEl.select(); } catch (e) {} }
+      if (uiEls.msgEl.classList.contains('err')) { uiEls.msgEl.textContent = ''; uiEls.msgEl.classList.remove('err'); }
+    }
+    pop.querySelector('#tsCopy').addEventListener('click', () => copyAndTell(uiEls.linkEl.value, uiEls.linkEl));
+    pop.querySelector('#tsCopyCode').addEventListener('click', () => copyAndTell(code || '', null));
+    uiEls.codeEl.addEventListener('click', () => copyAndTell(code || '', null));
     // Промпт №82: ученик сам выходит из занятия
     uiEls.leaveBtn.addEventListener('click', (e) => {
       e.stopPropagation();

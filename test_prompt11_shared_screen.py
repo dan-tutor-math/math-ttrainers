@@ -385,10 +385,20 @@ def part_g_h(browser):
     check("H: учитель сам на сцену не ушёл", "stage.html" not in teacher.url, teacher.url)
 
     # ── код устарел (урок кончился) — со сцены на обычную страницу ──
-    # (новый ученик: у этого браузера ещё нет роли и кода живой сессии)
+    # (новый ученик: у этого браузера ещё нет роли и кода живой сессии).
+    # Промпт №21 нового списка: не молча — сцена сначала говорит «Сессия не
+    # найдена», а «Открыть страницу без сессии» ведёт на обычную страницу
     late = participant(ctx, "S3", 800, 600)
     late.goto(f"{BASE}/oge6.html?s=ZZZZ2222")
     try:
+        late.wait_for_function("() => document.getElementById('ended') && document.getElementById('ended').classList.contains('on')"
+                               " && document.getElementById('endedTitle').textContent === 'Сессия не найдена'", timeout=15000)
+        said = True
+    except Exception:
+        said = False
+    check("H: несуществующий код — сцена говорит «Сессия не найдена»", said, late.url)
+    try:
+        late.click("#endedStay")
         late.wait_for_url(lambda u: "stage.html" not in u and "oge6.html" in u and "s=" not in u, timeout=15000)
         t54.wait_code(late)
         ok = late.evaluate("() => window.TrainerSession.isLeader()")
