@@ -829,6 +829,23 @@
     if (a !== b) return a > b;
     return String(inc.rvBy || '') >= String(local.rvBy || '');
   }
+  // одинаково ли содержимое двух копий объекта. Ключи сортируются: из базы
+  // объект приходит с другим их порядком (jsonb), и простое сравнение JSON
+  // считало бы разными одинаковые. src — сотни КБ, его не сериализуем
+  function sameObjectContent(a, b) {
+    if (!a || !b) return a === b;
+    if (a.src !== b.src) return false;
+    const sig = (v, top) => {
+      if (Array.isArray(v)) return '[' + v.map(x => sig(x, false)).join(',') + ']';
+      if (v && typeof v === 'object') {
+        // undefined в базу не доезжает (JSON его выбрасывает) — не различие
+        return '{' + Object.keys(v).filter(k => v[k] !== undefined && !(top && k === 'src')).sort()
+          .map(k => JSON.stringify(k) + ':' + sig(v[k], false)).join(',') + '}';
+      }
+      return JSON.stringify(v === undefined ? null : v);
+    };
+    return sig(a, true) === sig(b, true);
+  }
   function tombBlocks(id, rv) {
     return cloudTombs.has(id) && (rv || 0) <= cloudTombs.get(id);
   }
@@ -1251,6 +1268,7 @@
   // наружу отдаём только для проверок — сама логика никуда больше не ходит
   window.__cloudDiffTest = {
     lightenDiff, BROADCAST_LIMIT, HEAVY_OBJ_BYTES,
+    sameContent: sameObjectContent,
     tombs: () => cloudTombs,
     writesIdle: () => cloudWriteChain,
     // Промпт №10
@@ -1388,6 +1406,13 @@
       cloudFlushTimer = setTimeout(cloudFinalizeGesture, 250);
     }
   };
+  // Правка общей доски уходит собеседнику, только если перед ней был
+  // pushUndo — он снимает «как было» для сравнения. Жест, который сам решает,
+  // звать ли pushUndo (колесо над картинкой: один шаг отмены на серию
+  // прокруток), спрашивает здесь, не закрылся ли его снимок: сохранение
+  // закрывает его через 250 мс, и остаток серии иначе оставался только на
+  // этом экране (раздел 8 HANDOFF, «картинка у учителя и ученика разная»)
+  window.boardsCloudGestureIdle = function () { return !!cloudBoardId && cloudGestureBefore === null; };
   window.doUndo = function () { if (cloudBoardId) cloudUndo(); else _origDoUndo(); };
   window.doRedo = function () { if (cloudBoardId) cloudRedo(); else _origDoRedo(); };
   // важно: НЕ на фазе перехвата (capture) — жест ещё не записан в объекты
@@ -1848,7 +1873,15 @@
         // одна и та же версия одного автора — одно и то же содержимое (любая
         // правка поднимает номер); не сериализуем зря картинки по сотне КБ
         const sameVer = revOf(inc) > 0 && revOf(inc) === revOf(local) && (inc.rvBy || '') === (local.rvBy || '');
-        if (!sameVer && JSON.stringify(local) !== JSON.stringify(inc)) { next[i] = cloneObj(inc); touched.push(inc.id); }
+        // «Та же версия — то же содержимое» верно, только если каждая правка
+        // доходила до базы. Правка без pushUndo (колесо над картинкой) номер
+        // не поднимала и в базу не уходила — у одного участника картинка
+        // оставалась своего размера навсегда, и записи собеседника ложились у
+        // него мимо рисунка. Поэтому при той же версии всё равно сверяем
+        // содержимое, но без тяжёлого src (его — простым сравнением строк) и
+        // без учёта порядка ключей: jsonb в базе их переставляет
+        const differs = sameVer ? !sameObjectContent(local, inc) : JSON.stringify(local) !== JSON.stringify(inc);
+        if (differs) { next[i] = cloneObj(inc); touched.push(inc.id); }
       } else if (canWrite && !cloudMine.has(inc.id)) {
         // у нас версия новее, а в базе её нет — запись когда-то не дошла
         upUpdated.push({ id: inc.id, before: inc, after: local });

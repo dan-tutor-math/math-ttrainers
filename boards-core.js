@@ -4080,7 +4080,13 @@ canvas.addEventListener('wheel', (e) => {
   if (!multiSelectIds.length && selectedId){
     const obj = B.objects.find(o=>o.id===selectedId);
     if (obj && obj.type === 'image'){
-      if (!wheelResizeUndoDone){ pushUndo(); wheelResizeUndoDone = true; }
+      // На общей доске снимок «как было» закрывается через 250 мс после
+      // сохранения, а серия прокруток держит флаг полсекунды. Прокрутка с
+      // паузой между ними (тачпад с инерцией) шла мимо собеседника: у
+      // учителя картинка менялась, у ученика — нет, и его записи у учителя
+      // съезжали с рисунка. Снимок закрылся — открываем новый
+      const cloudIdle = typeof window.boardsCloudGestureIdle === 'function' && window.boardsCloudGestureIdle();
+      if (!wheelResizeUndoDone || cloudIdle){ pushUndo(); wheelResizeUndoDone = true; }
       clearTimeout(wheelResizeTimer);
       wheelResizeTimer = setTimeout(() => { wheelResizeUndoDone = false; }, 500);
       const factor = Math.exp(-e.deltaY*0.0016);
