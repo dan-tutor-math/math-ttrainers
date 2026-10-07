@@ -1972,7 +1972,7 @@ function enterEditLock(obj, viaTool){
   selectedId = obj.id; multiSelectIds = [];
 }
 function clearEditLock(){ editLockId = null; editLockTool = null; }
-let dragMode = null;        // null | 'move' | 'handle' | 'pan' | 'multimove' | 'marquee'
+let dragMode = null;        // null | 'move' | 'handle' | 'pan' | 'multimove' | 'marquee' | 'lasso' | 'erase'
 let dragHandleRole = null;
 let dragObjId = null;
 let dragStart = null;
@@ -1981,6 +1981,14 @@ let dragGroupIds = null;    // групповое перетаскивание (
 let dragOrigMap = null;
 let panStart = null, camStart = null;
 let marqueeStart = null, marqueeCur = null; // рамка выделения инструмента «выделение»
+// Промпт №22: у «Выделения» два режима — 'rect' (рамка, как было) и 'lasso'
+// (обвести от руки). Выбор — предпочтение интерфейса, а не данные доски:
+// хранится в localStorage, как положение дока
+let selectMode = 'rect';
+try { if (localStorage.getItem('boardsSelectMode') === 'lasso') selectMode = 'lasso'; } catch (e) {}
+let lassoPts = null;        // путь лассо в мировых координатах, пока его ведут
+let lassoBase = null;       // что было выделено до обводки с ⌘/Ctrl — к нему и добавляем
+let marqueeBase = null;     // то же для рамки
 
 let draft = null;           // {type, pts:[...]} — для line/ellipse/quad/angle
 let curvePts = null;        // {pts:[...], preview} — «кривая»: произвольное число точек
@@ -3067,6 +3075,7 @@ function render(c, w, h, camv, isScreen, renderDpr){
     });
   }
   if (isScreen && dragMode === 'marquee' && marqueeStart && marqueeCur) drawMarquee(c, camv);
+  if (isScreen && dragMode === 'lasso' && lassoPts) drawLasso(c);
   c.restore();
   if (isScreen){ updateUnlockBtn(); updateContextMenu(); }
 }
@@ -3089,6 +3098,19 @@ function drawMarquee(c, camv){
   c.lineWidth = 1.4; c.setLineDash([5,4]);
   c.fillRect(p0.x, p0.y, p1.x-p0.x, p1.y-p0.y);
   c.strokeRect(p0.x, p0.y, p1.x-p0.x, p1.y-p0.y);
+  c.restore();
+}
+
+function drawLasso(c){
+  const sp = lassoPts.map(worldToScreen);
+  c.save();
+  c.fillStyle = 'rgba(0,120,255,.08)';
+  c.strokeStyle = 'rgba(0,120,255,.9)';
+  c.lineWidth = 1.4; c.setLineDash([5,4]); c.lineJoin = 'round';
+  c.beginPath();
+  sp.forEach((p,i) => i ? c.lineTo(p.x,p.y) : c.moveTo(p.x,p.y));
+  c.closePath();   // заливка — сразу по замкнутому контуру: видно, что попадёт внутрь
+  c.fill(); c.stroke();
   c.restore();
 }
 
@@ -3592,7 +3614,8 @@ canvas.addEventListener('dblclick', (e) => {
 
 function cancelDrafts(){
   draft=null; curvePts=null; circleState=null; polyState=null; penStroke=null; shapeDrag=null; armedHandId=null;
-  marqueeStart=null; marqueeCur=null; pendingMoveArmed=false; clearEditLock();
+  marqueeStart=null; marqueeCur=null; marqueeBase=null; lassoPts=null; lassoBase=null; pendingMoveArmed=false; clearEditLock();
+  if (dragMode === 'marquee' || dragMode === 'lasso') dragMode = null;
   // расширенное меню выделения обновляем СРАЗУ (не дожидаясь следующего кадра
   // rAF) — иначе при быстрой смене инструмента меню на миг остаётся открытым
   // на старом месте и перехватывает клик, предназначенный холсту под ним
@@ -3680,8 +3703,171 @@ function hitTestObject(obj, pt, tol){
   }
   return false;
 }
+/* ── Промпт №22: ластик — размер и два режима ──
+   Размер — диаметр в ЭКРАННЫХ пикселях, как в тренажёрах: на любом масштабе
+   ластик под рукой одной и той же величины, а кольцо-курсор показывает
+   ровно ту область, которую он берёт. 28 — прежний ластик (радиус 14).
+   Режимы: «Объект» — прежний, касание удаляет объект целиком; «Область» —
+   как растровый ластик тренажёров: стирает только то, что под ним. Доска
+   хранит не пиксели, а объекты (и в облаке — построчно), поэтому «Область»
+   переводится в геометрию тем же NotesStore.eraseAlong, что и в конспекте:
+   у штриха ручки и прямой выбрасываются точки под путём ластика, а остаток
+   распадается на новые штрихи. Фигуры, текст и картинки «Область» не режет. */
+const ERASER_SIZES = [6, 10, 14, 20, 28, 36, 48, 64, 80, 100, 120];
+let eraserMode = 'object';
+let eraserSize = 28;
+try {
+  if (localStorage.getItem('boardsEraserMode') === 'area') eraserMode = 'area';
+  const s = parseInt(localStorage.getItem('boardsEraserSize'), 10);
+  if (ERASER_SIZES.includes(s)) eraserSize = s;
+} catch (e) {}
+let areaErase = null;     // { last, undoDone } — пока идёт жест «Области» на доске
+let rfAreaErase = null;   // то же для заметок справочной панели
+
+// «Область» на одном списке объектов. Возвращает новый массив (или null,
+// если ничего не задето) и id объектов, которые пришлось заменить кусками.
+// Через NotesStore.eraseAlong прогоняем объекты ПО ОДНОМУ: так чужие и
+// закреплённые остаются на своих местах в порядке слоёв, а куски встают
+// ровно на место разрезанного штриха
+function eraseAreaIn(objs, path, radius, beforeChange){
+  const NS = window.NotesStore;
+  if (!NS || !NS.eraseAlong) return null;
+  let changed = false;
+  const out = [], gone = [];
+  for (const o of objs){
+    if (o.locked || !mayTouch(o) || (o.type !== 'pen' && o.type !== 'line') || o.axis){ out.push(o); continue; }
+    const res = NS.eraseAlong([o], path, radius);
+    if (!res.changed){ out.push(o); continue; }
+    if (!changed){ beforeChange(); changed = true; }
+    gone.push(o.id);
+    res.objs.forEach(p => {
+      // кусок — новый объект: номер версии облака у него свой, с нуля
+      delete p.rv; delete p.rvBy;
+      // кусок прямой — тоже прямая: хватит двух концов, а не сотни
+      // промежуточных точек, которые eraseAlong насыпал для точности. И тип
+      // оставляем «прямая»: иначе следующий шаг того же жеста резал бы кусок
+      // уже как штрих ручки и снова насыпал точки (стрелки и центр
+      // eraseAlong снял — у обрезка их быть не должно)
+      if (o.type === 'line'){ p.type = 'line'; p.points = [p.points[0], p.points[p.points.length - 1]]; }
+      out.push(p);
+    });
+  }
+  return changed ? { objs: out, gone } : null;
+}
+function eraseAreaAlong(a, b){
+  if (!areaErase) return;
+  const path = (a.x === b.x && a.y === b.y) ? [a] : [a, b];
+  const res = eraseAreaIn(B.objects, path, (eraserSize / 2) / cam.zoom, () => {
+    // одна запись в отмену на весь жест. Но в общей доске снимок «как было»
+    // закрывается сохранением через 250 мс тишины (boards-cloud.js) — после
+    // паузы открываем новый, иначе стёртое дальше осталось бы только у меня
+    // (тот же приём, что у колеса над картинкой, раздел 8 HANDOFF)
+    const cloudIdle = typeof window.boardsCloudGestureIdle === 'function' && window.boardsCloudGestureIdle();
+    if (!areaErase.undoDone || cloudIdle){ pushUndo(); areaErase.undoDone = true; }
+  });
+  if (!res) return;
+  B.objects = res.objs;
+  res.gone.forEach(goneId => {
+    if (selectedId===goneId) selectedId=null;
+    if (armedHandId===goneId) armedHandId=null;
+    if (editLockId===goneId) clearEditLock();
+  });
+  multiSelectIds = multiSelectIds.filter(id => !res.gone.includes(id));
+  updateContextMenu();
+  saveDB(); scheduleRedraw();
+}
+function rfEraseAreaAlong(a, b){
+  if (!rfAreaErase) return;
+  const path = (a.x === b.x && a.y === b.y) ? [a] : [a, b];
+  const objs = rfObjects();
+  const res = eraseAreaIn(objs, path, (eraserSize / 2) / rfCam.zoom, () => {
+    if (!rfAreaErase.undoDone){ rfPushUndo(); rfAreaErase.undoDone = true; }
+  });
+  if (!res) return;
+  // rfObjects() — массив внутри B.refPanel: меняем его содержимое на месте,
+  // а не подменяем ссылку, иначе отрисовка и сохранение держали бы старый
+  objs.splice(0, objs.length, ...res.objs);
+  if (res.gone.includes(rfSelectedId)) rfSelectedId = null;
+  if (res.gone.includes(rfArmedHandId)) rfArmedHandId = null;
+  if (res.gone.includes(rfEditLockId)) rfClearEditLock();
+  rfMultiSelectIds = rfMultiSelectIds.filter(id => !res.gone.includes(id));
+  saveDB(); rfScheduleRedraw();
+}
+
+// кольцо-курсор ластика — отдельный элемент поверх холста, а не рисунок на
+// нём: на каждое движение мыши перерисовывать всю доску (с картинками) ради
+// одного кружка дорого, а элемент просто едет за указателем
+const eraserRing = document.getElementById('bdEraserRing');
+let eraserRingFlashTimer = null;
+function placeEraserRing(x, y){
+  if (!eraserRing) return;
+  eraserRing.style.width = eraserRing.style.height = eraserSize + 'px';
+  eraserRing.style.left = x + 'px'; eraserRing.style.top = y + 'px';
+  eraserRing.classList.add('show');
+}
+function hideEraserRing(){ if (eraserRing && !eraserRingFlashTimer) eraserRing.classList.remove('show'); }
+// размер меняют кнопками на панели — курсор в этот момент над панелью, и
+// кольца на доске не видно. Поэтому показываем его на миг: там, где мышь
+// была на доске в последний раз, а если её там не было — посреди доски
+function flashEraserRing(){
+  if (!eraserRing || !canvas) return;
+  let x, y;
+  if (lastBoardPointer){ x = lastBoardPointer.x; y = lastBoardPointer.y; }
+  else { const r = canvas.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top + r.height / 2; }
+  clearTimeout(eraserRingFlashTimer); eraserRingFlashTimer = null;
+  placeEraserRing(x, y);
+  eraserRing.classList.add('flash');
+  eraserRingFlashTimer = setTimeout(() => {
+    eraserRingFlashTimer = null;
+    eraserRing.classList.remove('flash');
+    if (!eraserRing.dataset.hover) eraserRing.classList.remove('show');
+  }, 900);
+}
+function trackEraserRing(el){
+  el.addEventListener('pointermove', (e) => {
+    if (tool !== 'eraser'){ eraserRing.classList.remove('show'); return; }
+    eraserRing.dataset.hover = '1';
+    placeEraserRing(e.clientX, e.clientY);
+  });
+  el.addEventListener('pointerdown', (e) => { if (tool === 'eraser'){ eraserRing.dataset.hover = '1'; placeEraserRing(e.clientX, e.clientY); } });
+  el.addEventListener('pointerleave', () => { delete eraserRing.dataset.hover; hideEraserRing(); });
+}
+function setEraserSize(s){
+  eraserSize = s;
+  try { localStorage.setItem('boardsEraserSize', String(s)); } catch (e) {}
+  syncEraserOptsUI();
+  flashEraserRing();
+}
+function stepEraserSize(dir){
+  let i = ERASER_SIZES.indexOf(eraserSize);
+  if (i < 0) i = ERASER_SIZES.indexOf(28);
+  const j = clamp(i + dir, 0, ERASER_SIZES.length - 1);
+  if (j !== i) setEraserSize(ERASER_SIZES[j]); else flashEraserRing();
+}
+function setEraserMode(m){
+  eraserMode = (m === 'area') ? 'area' : 'object';
+  try { localStorage.setItem('boardsEraserMode', eraserMode); } catch (e) {}
+  syncEraserOptsUI();
+}
+function syncEraserOptsUI(){
+  document.querySelectorAll('#bdEraserOpts [data-eraser-mode]').forEach(b => b.classList.toggle('on', b.dataset.eraserMode === eraserMode));
+  const v = document.getElementById('eraserSizeVal'); if (v) v.textContent = eraserSize;
+  // кружок на панели — в натуральную величину, пока помещается в строку;
+  // крупнее — упирается в потолок, а настоящий размер видно кольцом на доске
+  const dot = document.getElementById('eraserDot');
+  if (dot){ const d = Math.min(eraserSize, 26); dot.style.width = dot.style.height = d + 'px'; }
+  const m = document.getElementById('eraserMinus'), p = document.getElementById('eraserPlus');
+  if (m) m.disabled = eraserSize <= ERASER_SIZES[0];
+  if (p) p.disabled = eraserSize >= ERASER_SIZES[ERASER_SIZES.length - 1];
+  const btn = document.querySelector('.bd-tool[data-tool="eraser"]');
+  if (btn){
+    btn.dataset.eraserMode = eraserMode;
+    btn.title = (eraserMode === 'area' ? 'Ластик: область' : 'Ластик: объект целиком') + ' (4); размер — [ и ]';
+  }
+}
+
 function eraseAt(pt){
-  const tol = 14/cam.zoom;
+  const tol = (eraserSize / 2) / cam.zoom;
   for (let i=B.objects.length-1;i>=0;i--){
     if (B.objects[i].locked) continue; // закреплённое изображение ластик не трогает
     if (hitTestObject(B.objects[i], pt, tol)){
@@ -3706,6 +3892,98 @@ function hitTestHandles(obj, pt){
   for (const h of handles) if (dist(pt,h)<=tol) return h.role;
   return null;
 }
+/* ── Промпт №22: выделение набором ── */
+function currentSelectionIds(){
+  if (multiSelectIds.length) return multiSelectIds.slice();
+  return selectedId ? [selectedId] : [];
+}
+// один объект — обычное выделение (с ручками и своим меню), несколько —
+// групповое; так ведёт себя и рамка, поэтому любой способ выделить
+// приходит к одному и тому же виду
+function setSelectionIds(ids){
+  const seen = new Set();
+  const list = ids.filter(id => !seen.has(id) && seen.add(id) && B.objects.some(o => o.id === id));
+  if (list.length === 1){ selectedId = list[0]; multiSelectIds = []; }
+  else { selectedId = null; multiSelectIds = list; }
+}
+// ⌘/Ctrl+щелчок. Объект из сохранённой группы («Объединить в группу»)
+// добавляется и убирается всей группой — обычный щелчок тоже берёт её целиком
+function toggleInSelection(obj){
+  const ids = obj.groupId ? B.objects.filter(o => o.groupId === obj.groupId).map(o => o.id) : [obj.id];
+  const cur = currentSelectionIds();
+  const all = ids.every(id => cur.includes(id));
+  setSelectionIds(all ? cur.filter(id => !ids.includes(id)) : cur.concat(ids));
+  updateContextMenu();
+  scheduleRedraw();
+}
+function startSelectGesture(pt, base){
+  if (selectMode === 'lasso'){ dragMode = 'lasso'; lassoPts = [pt]; lassoBase = base; }
+  else { dragMode = 'marquee'; marqueeStart = pt; marqueeCur = pt; marqueeBase = base; }
+  updateContextMenu();
+  scheduleRedraw();
+}
+// Точки контура объекта — по ним лассо решает, обведён ли он. Берём именно
+// контур, а не рамку-bbox: у косой прямой или круга углы рамки висят в
+// пустоте, и аккуратно обведённая фигура иначе считалась бы не обведённой
+function lassoOutline(o){
+  const P = o.points || [];
+  if (o.type === 'pen' || o.type === 'line') return { pts: P, closed: false };
+  if (o.type === 'curve'){
+    if (!o.ctrl) return { pts: P, closed: false };
+    const out = [];
+    for (let t=0;t<=16;t++){
+      const s=t/16;
+      out.push({ x:(1-s)*(1-s)*P[0].x + 2*(1-s)*s*o.ctrl.x + s*s*P[1].x,
+                 y:(1-s)*(1-s)*P[0].y + 2*(1-s)*s*o.ctrl.y + s*s*P[1].y });
+    }
+    return { pts: out, closed: false };
+  }
+  if (o.type === 'quad' || o.type === 'poly') return { pts: P, closed: true };
+  if (o.type === 'angle') return { pts: [P[0], P[1], P[2]], closed: false };
+  if ((o.type === 'ellipse' || o.type === 'circle') && P[0]){
+    const rx = o.type === 'circle' ? o.r : o.rx, ry = o.type === 'circle' ? o.r : o.ry;
+    const out = [];
+    for (let k=0;k<32;k++){ const a = k/32*Math.PI*2; out.push({ x:P[0].x + rx*Math.cos(a), y:P[0].y + ry*Math.sin(a) }); }
+    return { pts: out, closed: true };
+  }
+  // текст, картинка и всё прочее — по прямоугольнику объекта
+  const b = objectBBox(o);
+  return { pts: [{x:b.minX,y:b.minY},{x:b.maxX,y:b.minY},{x:b.maxX,y:b.maxY},{x:b.minX,y:b.maxY}], closed: true };
+}
+// 48 точек, равномерно по длине контура, — чтобы «бо́льшая часть» значила
+// большую часть длины, а не число точек (у штриха ручки они лежат то гуще,
+// то реже)
+function lassoSamples(o){
+  const { pts, closed } = lassoOutline(o);
+  const good = pts.filter(p => p && isFinite(p.x) && isFinite(p.y));
+  if (good.length <= 1) return good;
+  const segs = [];
+  for (let i=0;i<good.length-1;i++) segs.push([good[i], good[i+1]]);
+  if (closed) segs.push([good[good.length-1], good[0]]);
+  const total = segs.reduce((s, sg) => s + dist(sg[0], sg[1]), 0);
+  if (!(total > 0)) return [good[0]];
+  const N = 48, out = [];
+  let si = 0, acc = 0;
+  for (let k=0;k<N;k++){
+    const want = closed ? (k/N)*total : (k/(N-1))*total;
+    while (si < segs.length-1 && acc + dist(segs[si][0], segs[si][1]) < want){ acc += dist(segs[si][0], segs[si][1]); si++; }
+    const [a, b] = segs[si];
+    const L = dist(a, b), t = L ? Math.min(1, Math.max(0, (want - acc)/L)) : 0;
+    out.push({ x: a.x + (b.x-a.x)*t, y: a.y + (b.y-a.y)*t });
+  }
+  return out;
+}
+// обведён — если внутри лассо оказалась бо́льшая часть контура: так из
+// плотно исписанного места можно забрать одну запись, не прихватив
+// соседей, которых лассо лишь задело краем
+function lassoCaptures(o, path){
+  const smp = lassoSamples(o);
+  if (!smp.length) return false;
+  let inside = 0;
+  smp.forEach(p => { if (pointInPolygon(p, path)) inside++; });
+  return inside * 2 > smp.length;
+}
+
 function getSelectedObjects(){
   if (multiSelectIds.length) return B.objects.filter(o => multiSelectIds.includes(o.id));
   if (selectedId){ const o = B.objects.find(x=>x.id===selectedId); return o ? [o] : []; }
@@ -3860,6 +4138,19 @@ canvas.addEventListener('pointerdown', (e) => {
   }
 
   if (tool === 'select'){
+    // Промпт №22: ⌘ на Mac, Ctrl на Windows (и Shift — по привычке из других
+    // редакторов, в том числе нашего конспекта) — выделение «как в Finder»:
+    // щелчок добавляет объект к выделенному или убирает его, соседей не
+    // трогая; обводка мимо объектов ДОБАВЛЯЕТ попавшее к уже выделенному.
+    // Проверяется раньше всего остального: иначе щелчок по участнику группы
+    // начал бы её перетаскивать, а щелчок мимо — сбросил бы выделение
+    if (e.metaKey || e.ctrlKey || e.shiftKey){
+      for (let i=B.objects.length-1;i>=0;i--){
+        if (hitTestObject(B.objects[i], pt, 8/cam.zoom)){ toggleInSelection(B.objects[i]); return; }
+      }
+      startSelectGesture(pt, currentSelectionIds());
+      return;
+    }
     // групповое выделение (рамкой или через «Объединить в группу») — клик по
     // любому из его участников двигает всю группу разом
     if (multiSelectIds.length){
@@ -3907,10 +4198,9 @@ canvas.addEventListener('pointerdown', (e) => {
     }
     // ничего не задели — начинаем рамку выделения (marquee): все объекты,
     // хоть частично попавшие в неё, будут выделены при отпускании ЛКМ
+    // (или лассо — в его режиме)
     selectedId = null; multiSelectIds = [];
-    updateContextMenu();
-    dragMode = 'marquee'; marqueeStart = pt; marqueeCur = pt;
-    scheduleRedraw();
+    startSelectGesture(pt, []);
     return;
   }
 
@@ -3931,7 +4221,12 @@ canvas.addEventListener('pointerdown', (e) => {
     if (curOpacity) penStroke.opacity = SEMI_OPACITY;
     return;
   }
-  if (tool === 'eraser'){ dragMode='erase'; eraseAt(pt); return; }
+  if (tool === 'eraser'){
+    dragMode='erase';
+    if (eraserMode === 'area'){ areaErase = { last: pt, undoDone: false }; eraseAreaAlong(pt, pt); }
+    else eraseAt(pt);
+    return;
+  }
 
   if (DRAG_SHAPE_TOOLS[tool]){
     const a = maybeSnap(pt);
@@ -3955,8 +4250,21 @@ canvas.addEventListener('pointermove', (e) => {
     clampCam();
     scheduleRedraw(); rememberView(); return;
   }
-  if (dragMode === 'erase'){ eraseAt(pt); return; }
+  if (dragMode === 'erase'){
+    // «Область» стирает весь отрезок пути от прошлого события до этого:
+    // ластик ведут быстро, и точками между событиями штрих перескакивался бы
+    if (areaErase){ eraseAreaAlong(areaErase.last, pt); areaErase.last = pt; }
+    else eraseAt(pt);
+    return;
+  }
   if (dragMode === 'marquee'){ marqueeCur = pt; scheduleRedraw(); return; }
+  if (dragMode === 'lasso'){
+    // точку пути берём не на каждое событие, а через 3 экранных пикселя:
+    // путь выходит ровный и лёгкий для проверки попадания
+    const last = lassoPts[lassoPts.length - 1];
+    if (dist(last, pt) * cam.zoom >= 3){ lassoPts.push(pt); scheduleRedraw(); }
+    return;
+  }
   if (dragMode === 'multimove'){
     const dx = pt.x-dragStart.x, dy = pt.y-dragStart.y;
     dragGroupIds.forEach(id => {
@@ -4039,14 +4347,22 @@ canvas.addEventListener('pointerup', (e) => {
       const b = objectBBox(o);
       return b.maxX >= x0 && b.minX <= x1 && b.maxY >= y0 && b.minY <= y1;
     });
-    if (hits.length === 1){ selectedId = hits[0].id; multiSelectIds = []; }
-    else if (hits.length > 1){ selectedId = null; multiSelectIds = hits.map(o=>o.id); }
-    else { selectedId = null; multiSelectIds = []; }
-    marqueeStart = null; marqueeCur = null;
+    setSelectionIds((marqueeBase || []).concat(hits.map(o=>o.id)));
+    marqueeStart = null; marqueeCur = null; marqueeBase = null;
     updateContextMenu(); // сразу, не дожидаясь кадра — см. комментарий в cancelDrafts()
     scheduleRedraw();
   }
+  if (dragMode === 'lasso'){
+    // короткий росчерк (по сути щелчок мимо) ничего не обводит — как щелчок
+    // мимо в режиме рамки: обычный снимает выделение, с ⌘ оставляет прежнее
+    const hits = (lassoPts && lassoPts.length >= 3) ? B.objects.filter(o => mayTouch(o) && lassoCaptures(o, lassoPts)) : [];
+    setSelectionIds((lassoBase || []).concat(hits.map(o=>o.id)));
+    lassoPts = null; lassoBase = null;
+    updateContextMenu();
+    scheduleRedraw();
+  }
   dragMode = null; dragHandleRole=null; dragObjId=null; dragGroupIds=null; dragOrigMap=null;
+  areaErase = null;
   if (penStroke){
     if (penStroke.points.length >= 2) B.objects.push(penStroke);
     if (penStroke.points.length >= 1) bumpColorUsage(penStroke.color);
@@ -4057,7 +4373,8 @@ canvas.addEventListener('pointercancel', () => {
   if (shapeDrag){ shapeDrag = null; scheduleRedraw(); }
   if (dragMode==='pan') updateCursor();
   if (dragMode==='marquee'){ marqueeStart=null; marqueeCur=null; }
-  dragMode=null;
+  if (dragMode==='lasso'){ lassoPts=null; lassoBase=null; scheduleRedraw(); }
+  dragMode=null; areaErase=null;
   if (penStroke){ penStroke=null; scheduleRedraw(); }
 });
 
@@ -4134,24 +4451,10 @@ function penCursorCSS(){
   </svg>`;
   return svgCursorUrl(svg, 9, 28, 'crosshair');
 }
-function eraserCursorCSS(){
-  // тот же изящный язык, что и у ручки-«паркер»: аккуратный скруглённый
-  // ластик тёмного лакового тона с золотым ободком-полоской, без пёстрых
-  // розовых плашек. Белый ореол держит форму читаемой на любом фоне листа.
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30">
-    <g transform="rotate(-25 15 15)">
-      <rect x="6" y="9.5" width="18" height="12" rx="3.2" fill="white" stroke="white" stroke-width="4"/>
-      <rect x="6" y="9.5" width="18" height="12" rx="3.2" fill="#2c2c34" stroke="#0c0c10" stroke-width="1"/>
-      <rect x="6" y="9.5" width="18" height="3.6" rx="1.8" fill="#dcb24a" stroke="#a9821f" stroke-width=".3"/>
-      <rect x="7" y="14.4" width="16" height="0.9" rx=".45" fill="#ffffff" opacity=".16"/>
-    </g>
-  </svg>`;
-  return svgCursorUrl(svg, 10, 23, 'crosshair');
-}
 function updateCursor(){
   if (!canvas) return;
   if (tool === 'pen') canvas.style.cursor = penCursorCSS();
-  else if (tool === 'eraser') canvas.style.cursor = eraserCursorCSS();
+  else if (tool === 'eraser') canvas.style.cursor = 'none';   // Промпт №22: вместо значка — кольцо размера ластика (#bdEraserRing)
   else if (tool === 'hand') canvas.style.cursor = 'grab';
   else if (tool === 'select') canvas.style.cursor = 'default';
   else if (tool === 'text') canvas.style.cursor = 'text';
@@ -4166,6 +4469,12 @@ optbar.addEventListener('mousedown', (e) => { if (e.target.closest('button')) e.
 const TOOLS_WITH_OPTS = ['pen','line','axis','pivot','curve','quad','poly','ellipse','circle','angle','text'];
 document.querySelectorAll('.bd-tool[data-tool]').forEach(btn => {
   btn.addEventListener('click', () => {
+    // Промпт №22: повторное нажатие на уже включённое «Выделение» (или
+    // клавиша 2) переключает рамку и лассо — не надо тянуться к панели
+    if (tool === 'select' && btn.dataset.tool === 'select'){
+      setSelectMode(selectMode === 'lasso' ? 'rect' : 'lasso');
+      return;
+    }
     // если сейчас рисуется незавершённая кривая (или многоугольник) и
     // снова жмут на ту же кнопку инструмента — это способ ЗАКОНЧИТЬ её
     // на последней точке (как двойной клик или Enter), а не бросить черновик
@@ -4199,7 +4508,14 @@ document.querySelectorAll('.bd-tool[data-tool]').forEach(btn => {
 // показывается не по инструменту, а по факту открытой сессии редактирования
 // — см. openTextEditToolbar/closeTextEditToolbar ниже)
 function applyOptbarForTool(){
-  optbar.classList.toggle('open', TOOLS_WITH_OPTS.includes(tool));
+  // Промпт №22: у «Выделения» и «Ластика» своя короткая панель — только их
+  // режимы (и размер ластика); цвет, толщина и прочее им ни к чему
+  const modeOnly = (tool === 'select' || tool === 'eraser');
+  optbar.classList.toggle('open', TOOLS_WITH_OPTS.includes(tool) || modeOnly);
+  optbar.classList.toggle('mode-only', modeOnly);
+  document.getElementById('bdSelectModes').classList.toggle('show', tool === 'select');
+  document.getElementById('bdEraserOpts').classList.toggle('show', tool === 'eraser');
+  if (tool !== 'eraser' && eraserRing) eraserRing.classList.remove('show');
   optbar.classList.remove('text-editing');
   // Промпт №69: паттерны — только у «Ручки»
   document.getElementById('bdPatterns').classList.toggle('open', tool === 'pen');
@@ -4225,6 +4541,7 @@ function applyOptbarForTool(){
 // («рука» через двойной клик или «текст») редактирование было открыто
 function openTextEditToolbar(){
   optbar.classList.add('open');
+  optbar.classList.remove('mode-only');   // правка текста, открытая «Выделением», — полная панель форматирования
   optbar.classList.add('text-editing');
   document.getElementById('bdPatterns').classList.remove('open');
   document.getElementById('bdFontSizeField').style.display = 'flex';
@@ -4245,6 +4562,39 @@ function openTextEditToolbar(){
 function closeTextEditToolbar(){
   applyOptbarForTool();
 }
+
+/* ── Промпт №22: режимы «Выделения» на панели ── */
+const SELECT_ICON_RECT = (document.querySelector('.bd-tool[data-tool="select"] svg') || {}).outerHTML || '';
+const SELECT_ICON_LASSO = '<svg viewBox="0 0 24 24" fill="none"><path d="M12.6 3.6c4.7 0 8.2 2.3 8.2 5.3s-3.5 5.3-8.2 5.3c-1.5 0-2.9-.2-4.1-.7-2.4-.9-4.1-2.6-4.1-4.6 0-3 3.5-5.3 8.2-5.3Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 13.5c-1.9 1.3-2 3.3-.5 4.3 1.2.8 1.4 2 .7 3.1" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle class="ac" cx="8.5" cy="13.5" r="1.6"/></svg>';
+function setSelectMode(m){
+  selectMode = (m === 'lasso') ? 'lasso' : 'rect';
+  try { localStorage.setItem('boardsSelectMode', selectMode); } catch (e) {}
+  // обводку, которую ведут прямо сейчас, не переделываем на ходу
+  syncSelectModesUI();
+}
+function syncSelectModesUI(){
+  document.querySelectorAll('#bdSelectModes [data-sel-mode]').forEach(b => b.classList.toggle('on', b.dataset.selMode === selectMode));
+  const btn = document.querySelector('.bd-tool[data-tool="select"]');
+  if (!btn) return;
+  // значок кнопки в доке показывает режим — видно, не открывая панель
+  const svg = btn.querySelector('svg');
+  const want = selectMode === 'lasso' ? SELECT_ICON_LASSO : SELECT_ICON_RECT;
+  if (svg && btn.dataset.selMode !== selectMode){ svg.outerHTML = want; btn.dataset.selMode = selectMode; }
+  btn.title = selectMode === 'lasso'
+    ? 'Выделение: лассо (2) — обведите нужное; ⌘/Ctrl+щелчок — добавить или убрать объект'
+    : 'Выделение: рамка (2) — зажмите и тяните; ⌘/Ctrl+щелчок — добавить или убрать объект';
+}
+document.querySelectorAll('#bdSelectModes [data-sel-mode]').forEach(b => {
+  b.addEventListener('click', () => setSelectMode(b.dataset.selMode));
+});
+document.querySelectorAll('#bdEraserOpts [data-eraser-mode]').forEach(b => {
+  b.addEventListener('click', () => setEraserMode(b.dataset.eraserMode));
+});
+document.getElementById('eraserMinus').addEventListener('click', () => stepEraserSize(-1));
+document.getElementById('eraserPlus').addEventListener('click', () => stepEraserSize(+1));
+syncSelectModesUI();
+syncEraserOptsUI();
+trackEraserRing(canvas);
 
 /* ═══════════════════════════════════════════════════════════════════════
    ПОЛОЖЕНИЕ И РАЗМЕР ПАНЕЛИ ИНСТРУМЕНТОВ — можно перетащить целиком к
@@ -6374,7 +6724,7 @@ function rfHitTestHandles(obj, pt){
   return null;
 }
 function rfEraseAt(pt){
-  const tol = 14/rfCam.zoom;
+  const tol = (eraserSize / 2) / rfCam.zoom;   // Промпт №22: размер ластика общий на оба холста
   const objs = rfObjects();
   for (let i=objs.length-1;i>=0;i--){
     if (objs[i].locked) continue;
@@ -6409,13 +6759,14 @@ function rfDeleteSelected(){
 function rfUpdateCursor(){
   if (!refDrawCanvas) return;
   if (tool === 'pen') refDrawCanvas.style.cursor = penCursorCSS();
-  else if (tool === 'eraser') refDrawCanvas.style.cursor = eraserCursorCSS();
+  else if (tool === 'eraser') refDrawCanvas.style.cursor = 'none';
   else if (tool === 'hand') refDrawCanvas.style.cursor = 'grab';
   else if (tool === 'select') refDrawCanvas.style.cursor = 'default';
   else refDrawCanvas.style.cursor = 'crosshair';
 }
 
 refDrawCanvas.addEventListener('contextmenu', e => e.preventDefault());
+trackEraserRing(refDrawCanvas);   // Промпт №22: кольцо размера ластика и над заметками
 refDrawCanvas.addEventListener('pointerdown', (e) => {
   if (!B) return;
   lastActiveSurface = 'notes';
@@ -6483,7 +6834,12 @@ refDrawCanvas.addEventListener('pointerdown', (e) => {
     if (curOpacity) rfPenStroke.opacity = SEMI_OPACITY;
     return;
   }
-  if (tool === 'eraser'){ rfDragMode='erase'; rfEraseAt(pt); return; }
+  if (tool === 'eraser'){
+    rfDragMode='erase';
+    if (eraserMode === 'area'){ rfAreaErase = { last: pt, undoDone: false }; rfEraseAreaAlong(pt, pt); }
+    else rfEraseAt(pt);
+    return;
+  }
 
   if (DRAG_SHAPE_TOOLS[tool]){
     const a = maybeSnap(pt);
@@ -6506,7 +6862,11 @@ refDrawCanvas.addEventListener('pointermove', (e) => {
     rfCam.x = rfCamStart.x - dx; rfCam.y = rfCamStart.y - dy;
     rfScheduleRedraw(); return;
   }
-  if (rfDragMode === 'erase'){ rfEraseAt(pt); return; }
+  if (rfDragMode === 'erase'){
+    if (rfAreaErase){ rfEraseAreaAlong(rfAreaErase.last, pt); rfAreaErase.last = pt; }
+    else rfEraseAt(pt);
+    return;
+  }
   if (rfDragMode === 'move'){
     const dx = pt.x-rfDragStart.x, dy = pt.y-rfDragStart.y;
     const obj = rfObjects().find(o=>o.id===rfDragObjId);
@@ -6548,7 +6908,7 @@ refDrawCanvas.addEventListener('pointerup', (e) => {
   }
   if (rfDragMode === 'move' || rfDragMode === 'handle'){ saveDB(); }
   if (rfDragMode === 'pan') rfUpdateCursor();
-  rfDragMode = null; rfDragHandleRole=null; rfDragObjId=null;
+  rfDragMode = null; rfDragHandleRole=null; rfDragObjId=null; rfAreaErase = null;
   if (rfPenStroke){
     if (rfPenStroke.points.length >= 2) rfObjects().push(rfPenStroke);
     if (rfPenStroke.points.length >= 1) bumpColorUsage(rfPenStroke.color);
@@ -6558,7 +6918,7 @@ refDrawCanvas.addEventListener('pointerup', (e) => {
 refDrawCanvas.addEventListener('pointercancel', () => {
   if (rfShapeDrag){ rfShapeDrag = null; rfScheduleRedraw(); }
   if (rfDragMode==='pan') rfUpdateCursor();
-  rfDragMode=null;
+  rfDragMode=null; rfAreaErase=null;
   if (rfPenStroke){ rfPenStroke=null; rfScheduleRedraw(); }
 });
 refDrawCanvas.addEventListener('dblclick', (e) => {
@@ -8212,7 +8572,14 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Enter' && tool==='curve'){ if (curvePts) finishCurve(); if (rfCurvePts) rfFinishCurve(); return; }
   if ((e.key==='Backspace' || e.key==='Delete')){
     if (lastActiveSurface === 'notes' && rfSelectedId){ rfDeleteSelected(); return; }
-    if (selectedId){ deleteSelected(); return; }
+    // Промпт №22: и групповое выделение (рамкой, лассо, ⌘+щелчками) — раньше
+    // Delete срабатывал только на одиночный объект
+    if (selectedId || multiSelectIds.length){ deleteSelected(); return; }
+  }
+  // Промпт №22: размер ластика — [ и ], как кисть в Фотошопе. По e.code —
+  // физической клавише: на русской раскладке там «х» и «ъ»
+  if (tool === 'eraser' && !e.ctrlKey && !e.metaKey && !e.altKey && (e.code === 'BracketLeft' || e.code === 'BracketRight')){
+    e.preventDefault(); stepEraserSize(e.code === 'BracketRight' ? 1 : -1); return;
   }
   const t = KEY_TOOL[e.key.toLowerCase()];
   if (t){ const btn = document.querySelector(`.bd-tool[data-tool="${t}"]`); if (btn) btn.click(); }
@@ -8226,7 +8593,7 @@ document.addEventListener('keydown', (e) => {
 function updateContextMenu(){
   const menu = document.getElementById('bdCtxMenu');
   if (!menu || !B) return;
-  if (dragMode === 'marquee' || dragMode === 'pan'){ menu.classList.remove('open'); return; }
+  if (dragMode === 'marquee' || dragMode === 'lasso' || dragMode === 'pan'){ menu.classList.remove('open'); return; }
   const sel = getSelectedObjects();
   if (!sel.length){ menu.classList.remove('open'); if (typeof figOnSelection === 'function') figOnSelection(sel); return; }
 
