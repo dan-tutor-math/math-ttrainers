@@ -3128,13 +3128,21 @@ function render(c, w, h, camv, isScreen, renderDpr){
   const cullPad = 80 / camv.zoom;
   const visMinX = camv.x - cullPad, visMinY = camv.y - cullPad;
   const visMaxX = camv.x + w / camv.zoom + cullPad, visMaxY = camv.y + h / camv.zoom + cullPad;
+  // правят уже готовый текст — сам объект на экране не рисуем: до «Подтвердить»
+  // он живёт в поле ввода поверх доски, а старая версия под полем давала
+  // наложение двух текстов (у ученика так же прячет board-stage.js). Только на
+  // экране — в экспорт/миниатюры текст попадает как есть
+  const editingId = (isScreen && textEditSession && textEditSession.objId) || null;
   B.objects.forEach(o => {
+    if (editingId && o.id === editingId) return;
     const b = objectBBox(o);
     if (b.maxX < visMinX || b.minX > visMaxX || b.maxY < visMinY || b.minY > visMaxY) return;
     renderObject(c, o, camv);
   });
   if (isScreen) drawDraftPreview(c, camv);
-  if (isScreen && selectedId){
+  // рамку выделения редактируемого текста тоже прячем: она старого размера
+  // и с ручками, а у поля ввода свои рамка и ручки ширины
+  if (isScreen && selectedId && selectedId !== editingId){
     const obj = B.objects.find(o=>o.id===selectedId);
     if (obj) drawSelection(c, obj, camv);
   }
@@ -3471,6 +3479,8 @@ function openTextEditor(existingObj, worldPt){
   // двигается камера, так что расхождений между «во время» и «после» нет
   syncTextEditorToCam();
   openTextEditToolbar();
+  // перерисовать сразу: правим готовый текст — render() спрячет его старую версию
+  if (existingObj) scheduleRedraw();
 
   // клик по самим кнопкам не должен раньше времени увести фокус с textarea
   // (иначе сработал бы blur ниже и вызвал confirm ещё до клика по кнопке)
@@ -3554,7 +3564,9 @@ function confirmTextEditor(){
   closeTextEditToolbar();
   const value = s.textarea.value;
   s.wrap.remove();
-  if (!value || !value.trim()) return; // пустой текст — ничего не создаём и не сохраняем
+  // пустой текст — ничего не создаём и не сохраняем; перерисовка всё равно
+  // нужна: пока поле было открыто, старый текст был спрятан (см. render)
+  if (!value || !value.trim()){ scheduleRedraw(); return; }
   const fields = { color: s.color, fontSize: s.fontSize, bold: s.bold, italic: s.italic, underline: s.underline, strike: s.strike, bg: s.bg, locked: s.locked };
   if (s.isNew){
     const obj = Object.assign({ id: uid(), type:'text', points:[{ x: s.worldPt.x, y: s.worldPt.y }], content: value }, fields);
