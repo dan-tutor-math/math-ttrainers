@@ -63,6 +63,8 @@ def test_schema():
     pg = W.PG()
     try:
         pg.ok(W.SUPABASE_STUB)
+        pg.ok("create role service_role nologin bypassrls;"
+              " create table public.profiles (id uuid primary key, email text);")
         # в заглушке auth.users только id — добавляем то, что читает перенос
         pg.ok("""alter table auth.users add column email text, add column raw_app_meta_data jsonb,
                  add column created_at timestamptz default now();""")
@@ -84,6 +86,10 @@ def test_schema():
             check(err is not None and 'permission denied' in err, f'{role}: чтение запрещено')
             err = pg.fails("insert into public.access_emails (email) values ('x@y.ru');", role=role, uid=OLD)
             check(err is not None and 'permission denied' in err, f'{role}: запись запрещена')
+        err = pg.fails("insert into public.access_emails (email) values ('srv@mail.ru'); select count(*) from public.access_emails;"
+                       " update public.access_emails set label = 'x' where email = 'srv@mail.ru';"
+                       " delete from public.access_emails where email = 'srv@mail.ru';", role='service_role')
+        check(err is None, f'service_role (функция): права на таблицу выданы явно ({err})')
         check(pg.fails("insert into public.access_emails (email) values ('Big@Mail.ru');") is not None,
               'почта не строчными — отказ')
         check(pg.fails("insert into public.access_emails (email, role) values ('a@b.ru', 'admin');") is not None,

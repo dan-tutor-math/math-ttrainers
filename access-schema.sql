@@ -42,6 +42,14 @@ alter table public.access_emails enable row level security;
 -- читать никто, кроме функции (у неё ключ сервера, RLS её не держит)
 revoke all on table public.access_emails from anon;
 revoke all on table public.access_emails from authenticated;
+-- А функции — явно всё. Ключ сервера обходит RLS, но не права на таблицу:
+-- в этом проекте новые таблицы не получают права service_role сами
+-- (живой случай №83 — функция падала «permission denied for table
+-- access_emails», хотя ключ правильный)
+grant select, insert, update, delete on table public.access_emails to service_role;
+-- profiles функция тоже читает (найти аккаунт по почте) и дописывает (чтобы
+-- «Совместная работа» нашла почту) — по той же причине права явно
+grant select, insert, update on table public.profiles to service_role;
 
 -- Перенос: все, кто уже входил на платформу до нового входа, попадают в
 -- список учениками — иначе они просто перестали бы входить (письма для
