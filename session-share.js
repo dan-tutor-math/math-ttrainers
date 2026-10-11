@@ -3059,6 +3059,8 @@
   function renderPanel() {
     if (!uiEls) return;
     uiEls.codeEl.textContent = code || '—';
+    // у ученика это код занятия, к которому он подключён, — не «его» код
+    if (uiEls.codeTitleEl) uiEls.codeTitleEl.textContent = isLeaderFlag ? 'Ваш код — отправьте его ученику' : 'Код этого занятия';
     uiEls.linkEl.value = code ? getShareUrl() : '';
     uiEls.roleEl.textContent = isLeaderFlag
       ? 'Вы — главный (Учитель): к вашему заданию подключаются присоединившиеся.'
@@ -3146,7 +3148,15 @@
     // только что открыли, или подключение отвалилось после перезагрузки) —
     // подставляем туда последний использованный код, чтобы «подключиться
     // заново» было одним кликом, а не набором кода по памяти
-    try { if (!uiEls.joinInput.value) uiEls.joinInput.value = readLastJoinCode(); } catch (e) {}
+    // Но не код той сессии, в которой мы и так сейчас: поле подключения
+    // теперь первое в панели, и учитель видел бы в нём собственный код (его
+    // браузер помнит, как сам когда-то подключался учеником), а ученик —
+    // код занятия, где он уже сидит
+    try {
+      const last = readLastJoinCode();
+      if (!uiEls.joinInput.value && last && last !== code) uiEls.joinInput.value = last;
+      else if (code && cleanJoinCode(uiEls.joinInput.value) === code && document.activeElement !== uiEls.joinInput) uiEls.joinInput.value = '';
+    } catch (e) {}
 
     // права ученика редактирует только «главный» — присоединившийся видит
     // только сам факт (через применённые ограничения в интерфейсе тренажёра),
@@ -3244,6 +3254,23 @@
       .ts-sess-del:hover{color:var(--teacher);}
       .ts-share-pop.open{display:flex;}
       .ts-share-title{font-size:13px;font-weight:700;color:var(--pencil);}
+      /* главный блок панели — подключиться по коду: крупно, с подложкой цвета
+         кнопок, чтобы глаз падал сюда первым */
+      .ts-join-box{display:flex;flex-direction:column;gap:8px;margin:0;padding:12px;border-radius:14px;
+        background:rgba(47,111,237,.08);border:1.5px solid rgba(47,111,237,.4);
+        background:color-mix(in srgb, var(--ink,#2f6fed) 9%, transparent);
+        border:1.5px solid color-mix(in srgb, var(--ink,#2f6fed) 45%, transparent);}
+      .ts-join-title{font-size:16px;font-weight:700;color:var(--pencil);}
+      .ts-join-sub{font-size:12.5px;line-height:1.35;color:var(--muted-2);margin-top:-4px;}
+      .ts-join-box input{font:inherit;font-size:20px;font-weight:700;letter-spacing:.08em;text-align:center;
+        text-transform:uppercase;padding:10px;border-radius:11px;border:1.5px solid var(--glass-border);
+        background:var(--glass-strong,#fff);color:var(--pencil);outline:none;min-width:0;width:100%;box-sizing:border-box;}
+      .ts-join-box input::placeholder{text-transform:none;letter-spacing:.02em;font-weight:600;color:var(--muted-2);opacity:.7;}
+      .ts-join-box input:focus{border-color:var(--ink,#2f6fed);box-shadow:0 0 0 3px color-mix(in srgb, var(--ink,#2f6fed) 22%, transparent);}
+      .ts-join-box button{font:inherit;font-size:15px;font-weight:700;padding:11px;border-radius:11px;border:none;
+        background:var(--ink,#2f6fed);color:#fff;cursor:pointer;}
+      .ts-join-box button:hover{background:var(--ink-active,#2559c9);}
+      .ts-join-box .ts-share-msg:empty{display:none;}
       .ts-share-hint{font-size:12px;line-height:1.45;color:var(--muted-2);}
       .ts-share-code{font-size:20px;font-weight:700;letter-spacing:.06em;color:var(--pencil);text-align:center;
         padding:8px;border-radius:10px;background:var(--glass);border:1px solid var(--glass-border);}
@@ -3326,6 +3353,22 @@
     pop.className = 'ts-share-pop';
     pop.innerHTML = `
       <div class="ts-share-title">Совместный доступ</div>
+      <!-- Главное в панели — подключиться по коду: её открывает и ученик, и
+           раньше первым он видел крупный СВОЙ код и думал, что этот код надо
+           куда-то вписать. Теперь сверху поле для кода от учителя, а свой
+           код и подсказки — ниже, под правами ученика -->
+      <form class="ts-join-box" id="tsJoinForm" autocomplete="off">
+        <div class="ts-join-title">Подключиться к занятию</div>
+        <div class="ts-join-sub">Введите код, который прислал учитель</div>
+        <input id="tsJoinInput" type="text" placeholder="Код" aria-label="Код сессии" autocomplete="off" autocapitalize="characters" spellcheck="false" enterkeyhint="go">
+        <button type="submit" id="tsJoin">Подключиться</button>
+        <div class="ts-share-msg" id="tsMsg"></div>
+      </form>
+      <button class="ts-share-end" id="tsLeave" style="display:none" title="Отключиться от занятия. Вернуться можно по ссылке учителя">Выйти из сессии</button>
+      <div class="ts-conn ts-conn-reconnecting" id="tsConn">На связи</div>
+      <div class="ts-share-hint" id="tsPeers" style="margin-top:-4px"></div>
+      <div class="ts-dev-list" id="tsDevList" style="display:none"></div>
+      <div class="ts-share-sep" id="tsSessSep" style="display:none"></div>
       <div id="tsSessSection" style="display:none">
         <div class="ts-sess-head">
           <span class="ts-section-title">Сессии</span>
@@ -3334,14 +3377,13 @@
         <div class="ts-sess-list" id="tsSessList"></div>
         <div class="ts-share-hint" id="tsSessMsg" style="display:none;margin-top:6px"></div>
       </div>
-      <div class="ts-share-sep" id="tsSessSep" style="display:none"></div>
-      <div class="ts-share-hint">${trainerSlug === 'boards'
-        ? 'Поделитесь кодом или ссылкой — ученик увидит доску, которую вы откроете, и всё, что вы на ней пишете, в реальном времени. Перейдёте к тренажёрам — ученик перейдёт следом.'
-        : 'Поделитесь кодом или ссылкой — тот, кто откроет её, увидит те же задания и ввод, что и вы, в реальном времени.'}</div>
-      <div class="ts-share-hint" id="tsRole" style="font-weight:600;"></div>
-      <div class="ts-conn ts-conn-reconnecting" id="tsConn">На связи</div>
-      <div class="ts-share-hint" id="tsPeers" style="margin-top:-4px"></div>
-      <div class="ts-dev-list" id="tsDevList" style="display:none"></div>
+      <div class="ts-share-sep" id="tsPermSep" style="display:none"></div>
+      <div id="tsPermSection" style="display:none">
+        <div class="ts-section-title">Права ученика</div>
+        <div class="ts-perm-list" id="tsPermList"></div>
+      </div>
+      <div class="ts-share-sep"></div>
+      <div class="ts-section-title" id="tsCodeTitle">Ваш код — отправьте его ученику</div>
       <div class="ts-share-code" id="tsCode" title="Нажмите, чтобы скопировать код">—</div>
       <div class="ts-copy-wrap">
         <input id="tsLink" class="ts-share-link" type="text" readonly aria-label="Ссылка на сессию">
@@ -3351,6 +3393,7 @@
         </div>
         <div class="ts-copy-toast" id="tsCopyToast" role="status" aria-live="polite">Скопировано</div>
       </div>
+      <div class="ts-share-msg" id="tsCodeMsg"></div>
       <button class="ts-share-reset" id="tsReset" title="Ученики по старой ссылке отключатся; имя сессии и подборка останутся">Сменить код этой сессии</button>
       <button class="ts-share-end" id="tsEnd" style="display:none">Завершить сессию</button>
       <div class="ts-end-confirm" id="tsEndConfirm" style="display:none">
@@ -3361,19 +3404,6 @@
         </div>
       </div>
       <div class="ts-share-sep"></div>
-      <div class="ts-share-hint">Есть код от другого человека?</div>
-      <div class="ts-share-row">
-        <input id="tsJoinInput" type="text" placeholder="код или ссылка" autocomplete="off" autocapitalize="characters" spellcheck="false">
-        <button id="tsJoin">Подключиться</button>
-      </div>
-      <div class="ts-share-msg" id="tsMsg"></div>
-      <button class="ts-share-end" id="tsLeave" style="display:none" title="Отключиться от занятия. Вернуться можно по ссылке учителя">Выйти из сессии</button>
-      <div class="ts-share-sep" id="tsPermSep" style="display:none"></div>
-      <div id="tsPermSection" style="display:none">
-        <div class="ts-section-title">Права ученика</div>
-        <div class="ts-perm-list" id="tsPermList"></div>
-      </div>
-      <div class="ts-share-sep"></div>
       <div class="ts-perm-row">
         <span>Сохранять обновлённые задания в историю</span>
         <label class="ts-switch"><input type="checkbox" id="tsAutosaveToggle"><span class="slider"></span></label>
@@ -3382,6 +3412,11 @@
         <span id="tsHistoryCount">История: 0 снимков</span>
         <button id="tsHistoryDownload" disabled>Скачать PDF</button>
       </div>
+      <div class="ts-share-sep"></div>
+      <div class="ts-share-hint" id="tsRole" style="font-weight:600;"></div>
+      <div class="ts-share-hint">${trainerSlug === 'boards'
+        ? 'Поделитесь кодом или ссылкой — ученик увидит доску, которую вы откроете, и всё, что вы на ней пишете, в реальном времени. Перейдёте к тренажёрам — ученик перейдёт следом.'
+        : 'Поделитесь кодом или ссылкой — тот, кто откроет её, увидит те же задания и ввод, что и вы, в реальном времени.'}</div>
     `;
     document.body.appendChild(pop);
 
@@ -3390,6 +3425,8 @@
       codeEl: pop.querySelector('#tsCode'),
       linkEl: pop.querySelector('#tsLink'),
       msgEl: pop.querySelector('#tsMsg'),
+      codeMsgEl: pop.querySelector('#tsCodeMsg'),
+      codeTitleEl: pop.querySelector('#tsCodeTitle'),
       joinInput: pop.querySelector('#tsJoinInput'),
       roleEl: pop.querySelector('#tsRole'),
       connEl: pop.querySelector('#tsConn'),
@@ -3497,10 +3534,18 @@
     });
     pop.querySelector('#tsReset').addEventListener('click', async () => {
       await resetSession();
-      uiEls.msgEl.textContent = 'Код сменился — отправьте ученику новую ссылку.'; uiEls.msgEl.classList.remove('err');
+      uiEls.codeMsgEl.textContent = 'Код сменился — отправьте ученику новую ссылку.'; uiEls.codeMsgEl.classList.remove('err');
     });
-    pop.querySelector('#tsJoin').addEventListener('click', async () => {
+    // форма, а не просто кнопка: Enter в поле (и «Перейти» на клавиатуре
+    // телефона) подключает так же, как нажатие
+    pop.querySelector('#tsJoinForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
       const val = uiEls.joinInput.value;
+      if (!String(val || '').trim()) {
+        uiEls.msgEl.textContent = 'Впишите код от учителя.'; uiEls.msgEl.classList.add('err');
+        uiEls.joinInput.focus();
+        return;
+      }
       uiEls.msgEl.textContent = 'Подключаемся…'; uiEls.msgEl.classList.remove('err');
       const res = await joinByCode(val);
       if (res.ok) { uiEls.joinInput.value = ''; uiEls.msgEl.textContent = 'Подключено.'; uiEls.msgEl.classList.remove('err'); }
@@ -3517,10 +3562,10 @@
     pop.querySelector('#tsEndNo').addEventListener('click', () => { endConfirm.style.display = 'none'; renderPanel(); });
     pop.querySelector('#tsEndYes').addEventListener('click', async () => {
       endConfirm.style.display = 'none';
-      uiEls.msgEl.textContent = 'Завершаем занятие…'; uiEls.msgEl.classList.remove('err');
+      uiEls.codeMsgEl.textContent = 'Завершаем занятие…'; uiEls.codeMsgEl.classList.remove('err');
       const ok = await endSession();
-      uiEls.msgEl.textContent = ok ? 'Сессия завершена. Для следующего занятия — новый код выше.' : 'Не удалось завершить — попробуйте ещё раз.';
-      uiEls.msgEl.classList.toggle('err', !ok);
+      uiEls.codeMsgEl.textContent = ok ? 'Сессия завершена. Для следующего занятия — новый код выше.' : 'Не удалось завершить — попробуйте ещё раз.';
+      uiEls.codeMsgEl.classList.toggle('err', !ok);
       renderPanel();
     });
     renderPanel();

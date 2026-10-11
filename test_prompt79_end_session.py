@@ -112,7 +112,7 @@ def run_main(browser):
           not plain.evaluate("() => !!document.getElementById('tsEnded')") and plain.url.split("?")[0].endswith("/oge11.html"))
     check("C: ученик больше не в сессии", plain.evaluate("() => TrainerSession.getCode()") is None)
 
-    teacher.wait_for_function("() => document.getElementById('tsMsg').textContent.indexOf('завершена') >= 0", timeout=8000)
+    teacher.wait_for_function("() => document.getElementById('tsCodeMsg').textContent.indexOf('завершена') >= 0", timeout=8000)
     new = teacher.evaluate("() => TrainerSession.getCode()")
     check("D: у учителя новый код", new and new != old, f"{old} → {new}")
     check("D: учитель по-прежнему ведущий", teacher.evaluate("() => TrainerSession.isLeader()"))
@@ -120,7 +120,7 @@ def run_main(browser):
         "c => JSON.parse(localStorage.getItem('tsSessions:v1') || '[]').some(e => e.code === c)", old))
     row = teacher.evaluate(ROW, old)
     check("D: строка старой сессии в базе помечена завершённой", bool(row and row.get("state", {}).get("__ended")), str(row)[:120])
-    check("D: в панели — «Сессия завершена»", "завершена" in teacher.inner_text("#tsMsg"), teacher.inner_text("#tsMsg"))
+    check("D: в панели — «Сессия завершена»", "завершена" in teacher.inner_text("#tsCodeMsg"), teacher.inner_text("#tsCodeMsg"))
     check("D: страница учителя та же, задание на месте", teacher.url.split("?")[0].endswith("/oge11.html")
           and teacher.evaluate("() => { const s = tsGetState(); return !!(s && s.picker !== undefined); }"))
 
