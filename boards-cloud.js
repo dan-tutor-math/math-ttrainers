@@ -2,10 +2,12 @@
    boards-cloud.js — вход по email и (в перспективе) общая доска с учеником.
 
    Это отдельный, необязательный слой поверх обычного локального
-   приложения (boards-core.js). Пока в нём только: (1) экран входа,
-   который перекрывает всё приложение, пока пользователь не подтвердит
-   email; (2) после входа — вызывает window.boardsAppBoot(), который
-   раньше вызывался сам по себе при загрузке страницы.
+   приложения (boards-core.js): (1) экран входа, который перекрывает всё
+   приложение, пока человек не войдёт — по почте из списка доступа или
+   паролем (промпт №83, функция supabase/functions/email-login); окна
+   «Доступ» (список почт) и «Пароль», красная плашка «Добавьте пароль» у
+   преподавателя; (2) после входа — вызывает window.boardsAppBoot(),
+   который раньше вызывался сам по себе при загрузке страницы.
 
    Если supabase-config.js не заполнен настоящими значениями — показываем
    понятную подсказку вместо тихой поломки, и приложение НЕ запускается
@@ -53,6 +55,9 @@
       padding:7px 12px;border-radius:12px;background:var(--glass-strong);border:1px solid var(--glass-border);
       backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
       box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);font-size:12.5px;color:var(--muted-2);}
+    /* на телефоне ссылки плашки (имя, пароль, доступ, выйти) в одну строку
+       не влезают — переносятся, а не уезжают за край экрана */
+    .ag-user-pill{max-width:calc(100vw - 32px);box-sizing:border-box;flex-wrap:wrap;row-gap:3px;}
     .ag-user-pill b{color:var(--pencil);font-weight:600;}
     .ag-user-pill a{color:var(--ink);cursor:pointer;text-decoration:underline;margin-left:2px;}
     .ag-user-pill .ag-edit-name{opacity:.7;font-size:11.5px;}
@@ -82,6 +87,66 @@
       padding:5px 12px;cursor:pointer;background:#fff;color:#c0392b;}
     #bdCloudLoad .bd-cl-retry:disabled{opacity:.7;cursor:default;}
     #bdCloudLoad .bd-cl-retry[hidden]{display:none;}
+
+    /* ── Промпт №83: вход по списку почт ── */
+    .ag-pw-hint{font-size:12.5px;color:var(--muted-2);margin:-4px 0 10px;line-height:1.4;}
+    /* Красная плашка «Добавьте пароль» у преподавателя без пароля — слева
+       сверху, В ВЕРХНЕЙ СТРОКЕ, сразу правее «Назад к доскам» на доске и
+       правее заголовка в списке (место считает placePwBanner). Просто
+       поставить её в угол нельзя: там «К тренажёрам», поиск, рейл доски, и
+       плашка их перекрывала (та же ошибка была у «Вы вошли как», см.
+       .ag-user-pill). Закрыть нельзя: пока пароля нет, войти в аккаунт
+       может любой, кто знает почту */
+    #agPwBanner{position:fixed;top:14px;left:16px;z-index:450;display:none;align-items:center;gap:7px;
+      height:34px;box-sizing:border-box;padding:0 12px 0 8px;border-radius:10px;white-space:nowrap;
+      border:2px solid #FF3B30;background:var(--glass-strong);color:#FF3B30;font-weight:700;font-size:13.5px;
+      backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
+      box-shadow:0 0 0 3px rgba(255,59,48,.16), var(--shadow);cursor:pointer;font-family:inherit;}
+    #agPwBanner.open{display:inline-flex;}
+    #agPwBanner .ag-pwb-dot{width:18px;height:18px;border-radius:50%;background:#FF3B30;color:#fff;
+      display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:none;}
+    #agPwBanner:hover{background:#FF3B30;color:#fff;}
+    /* места на полную плашку нет — только кружок «!», текст в подсказке */
+    #agPwBanner.mini{width:34px;padding:0;justify-content:center;font-size:0;gap:0;border-radius:50%;}
+    #agPwBanner.mini .ag-pwb-dot{font-size:12px;}
+    #agPwBanner:hover .ag-pwb-dot{background:#fff;color:#FF3B30;}
+    /* окна «Пароль» и «Доступ» — та же стеклянная карточка, что вход */
+    .ag-modal{position:fixed;inset:0;z-index:5100;display:none;align-items:center;justify-content:center;
+      background:rgba(0,0,0,.28);padding:16px;}
+    .ag-modal.open{display:flex;}
+    .ag-modal .ag-card{position:relative;max-height:calc(100vh - 32px);overflow:auto;}
+    .ag-modal input,.ag-modal textarea,.ag-modal select{width:100%;font:inherit;font-size:14px;padding:9px 11px;
+      border-radius:11px;border:1px solid var(--glass-border);background:var(--glass);color:var(--pencil);
+      outline:none;margin-bottom:9px;box-sizing:border-box;}
+    .ag-modal textarea{min-height:76px;resize:vertical;}
+    .ag-modal input:focus,.ag-modal textarea:focus{border-color:var(--ink);}
+    .ag-modal .ag-primary{width:100%;font-size:14px;font-weight:600;padding:10px 12px;border-radius:11px;
+      border:none;background:var(--ink);color:#fff;cursor:pointer;}
+    .ag-modal .ag-primary:disabled{opacity:.6;cursor:default;}
+    .ag-modal .ag-close{position:absolute;top:12px;right:14px;border:0;background:none;font-size:20px;line-height:1;
+      color:var(--muted-2);cursor:pointer;padding:4px;}
+    .ag-modal .ag-msg{font-size:13px;line-height:1.4;margin-top:9px;color:var(--muted-2);white-space:pre-line;}
+    .ag-modal .ag-msg.err{color:var(--teacher);}
+    #agAccess .ag-card{width:520px;}
+    .ag-acc-add{display:flex;flex-direction:column;}
+    .ag-acc-row2{display:flex;gap:8px;}
+    .ag-acc-row2 > *{flex:1;min-width:0;}
+    .ag-acc-sec{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-2);
+      margin:16px 0 6px;}
+    .ag-acc-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--glass-border);}
+    .ag-acc-who{flex:1;min-width:0;}
+    .ag-acc-email{font-size:13.5px;color:var(--pencil);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .ag-acc-meta{font-size:12px;color:var(--muted-2);margin-top:2px;}
+    .ag-acc-meta .pw{color:var(--ok, #3E8E5B);}
+    .ag-acc-item select{width:auto;margin:0;padding:5px 6px;font-size:12.5px;border-radius:8px;}
+    .ag-acc-item button{flex:none;font:inherit;font-size:12.5px;border:1px solid var(--glass-border);border-radius:8px;
+      padding:5px 9px;background:var(--glass);color:var(--pencil);cursor:pointer;white-space:nowrap;}
+    .ag-acc-item button.danger{color:var(--teacher);}
+    .ag-acc-item button.confirm{background:var(--teacher);color:#fff;border-color:var(--teacher);}
+    @media (max-width:520px){
+      .ag-acc-item{flex-wrap:wrap;}
+      .ag-acc-who{flex-basis:100%;}
+    }
   `;
   document.head.appendChild(style);
 
@@ -90,37 +155,21 @@
       <div class="ag-card">
         <div class="ag-logo">Тренажёры</div>
         <div id="agStep1">
-          <p class="ag-hint">Войдите по email. Если уже задавали пароль — введите его, вход будет сразу, без письма. Если ещё нет — оставьте поле пароля пустым.</p>
+          <p class="ag-hint">Введите почту, которую вы дали преподавателю, и нажмите «Войти». Если вы задавали пароль — введите и его.</p>
           <input id="agEmail" type="email" placeholder="you@example.com" autocomplete="email">
-          <input id="agPassword" type="password" placeholder="Пароль (если уже задан)" autocomplete="current-password">
+          <input id="agPassword" type="password" placeholder="Пароль (если задавали)" autocomplete="current-password">
           <button id="agSend">Войти</button>
-          <button id="agSendLink" class="ag-link">Прислать ссылку на почту вместо пароля</button>
-        </div>
-        <div id="agStep2" hidden>
-          <p class="ag-hint">Письмо отправлено на <b id="agSentEmail"></b>. Откройте его на этом же устройстве и перейдите по ссылке — страница обновится сама.</p>
-          <button id="agResend" class="ag-link">Ввести другой email</button>
         </div>
         <div id="agLoading" hidden><p class="ag-hint">Входим…</p></div>
-        <!-- Показывается вместо пустой формы «введите email», когда на ЭТОМ
-             устройстве уже есть сохранённый вход (человек когда-то прошёл по
-             ссылке из письма), но прямо сейчас не получилось связаться с
-             сервером (сеть моргнула, сервер на секунду недоступен и т.п.).
-             Без этого экрана человек в такой ситуации видел просто пустую
-             форму входа — и заново отправлял себе письмо, хотя оно совершенно
-             не нужно: сам вход на устройстве никуда не делся, достаточно
-             просто повторить попытку, когда соединение восстановится */ -->
+        <!-- Показывается вместо пустой формы входа, когда на ЭТОМ устройстве
+             уже есть сохранённый вход, но прямо сейчас не получилось связаться
+             с сервером (сеть моргнула, сервер на секунду недоступен). Без
+             этого экрана человек видел пустую форму и входил заново, хотя
+             вход на устройстве никуда не делся — достаточно повторить -->
         <div id="agReconnect" hidden>
-          <p class="ag-hint">Не получилось подключиться к серверу — но вы уже входили на этом устройстве. Проверьте интернет-соединение и повторите попытку; письмо для этого не нужно.</p>
+          <p class="ag-hint">Не получилось подключиться к серверу — но вы уже входили на этом устройстве. Проверьте интернет-соединение и повторите попытку.</p>
           <button id="agRetryConnect">Повторить попытку</button>
           <button id="agUseOtherEmail" class="ag-link">Войти под другой почтой</button>
-        </div>
-        <!-- Ссылка-приглашение из URL (?invite=...) устарела, уже использована
-             кем-то другим, или её отозвали — регистрация по ней закрыта
-             специально (см. sendMagicLink/shouldCreateUser ниже), чтобы
-             посторонний человек не мог сам себе завести вход на сайт -->
-        <div id="agInviteInvalid" hidden>
-          <p class="ag-hint">Эта ссылка-приглашение уже использована или недействительна. Попросите новую у того, кто её прислал.</p>
-          <button id="agInviteGoNormal" class="ag-link">У меня уже есть аккаунт — войти обычно</button>
         </div>
         <div id="agError" class="ag-error" hidden></div>
       </div>
@@ -128,24 +177,61 @@
     <div id="authUserPill" class="ag-user-pill" style="display:none">
       <span>Вы вошли как <b id="agCurrentEmail"></b></span>
       <a id="agEditName" class="ag-edit-name" title="Задать имя, которое увидит собеседник рядом со своим курсором">изменить имя</a>
-      <a id="agSetPassword" class="ag-edit-name" title="Задать или сменить пароль для входа без письма">задать пароль</a>
-      <a id="agCreateInvite" class="ag-edit-name" style="display:none" title="Создать одноразовую ссылку-приглашение для нового человека">пригласить</a>
+      <a id="agSetPassword" class="ag-edit-name" title="Задать или сменить пароль">задать пароль</a>
+      <a id="agOpenAccess" class="ag-edit-name" style="display:none" title="Кому открыт вход на платформу">доступ</a>
       <a id="agSignOut">Выйти</a>
       <a id="agPillCollapse" class="ag-pill-collapse" title="Свернуть эту панель">✕</a>
     </div>
     <div id="agPillHandle" class="ag-pill-handle" style="display:none" title="Показать данные входа">⋯</div>
+    <button id="agPwBanner" type="button" title="Пока пароля нет, войти в ваш аккаунт может любой, кто знает вашу почту">
+      <span class="ag-pwb-dot">!</span>Добавьте пароль
+    </button>
+    <div id="agPwModal" class="ag-modal">
+      <div class="ag-card">
+        <button class="ag-close" type="button" title="Закрыть">×</button>
+        <div class="ag-logo" id="agPwTitle">Пароль</div>
+        <p class="ag-hint" id="agPwText"></p>
+        <input id="agPw1" type="password" placeholder="Новый пароль" autocomplete="new-password">
+        <input id="agPw2" type="password" placeholder="Повторите пароль" autocomplete="new-password">
+        <div class="ag-pw-hint">Не короче 6 символов.</div>
+        <button class="ag-primary" id="agPwSave" type="button">Сохранить</button>
+        <div class="ag-msg" id="agPwMsg" hidden></div>
+      </div>
+    </div>
+    <div id="agAccess" class="ag-modal">
+      <div class="ag-card">
+        <button class="ag-close" type="button" title="Закрыть">×</button>
+        <div class="ag-logo">Доступ</div>
+        <p class="ag-hint" id="agAccHint"></p>
+        <div class="ag-acc-add">
+          <textarea id="agAccEmails" placeholder="Почты — через запятую или каждая с новой строки"></textarea>
+          <div class="ag-acc-row2">
+            <input id="agAccLabel" type="text" maxlength="120" placeholder="Подпись (необязательно): Маша, 9 класс">
+            <select id="agAccRole">
+              <option value="student">Ученик</option>
+              <option value="teacher">Преподаватель</option>
+            </select>
+          </div>
+          <button class="ag-primary" id="agAccAdd" type="button">Добавить</button>
+          <div class="ag-msg" id="agAccMsg" hidden></div>
+        </div>
+        <input id="agAccFilter" type="search" placeholder="Найти по почте или подписи" style="margin-top:14px">
+        <div id="agAccList"></div>
+      </div>
+    </div>
   `);
 
   const gate = document.getElementById('authGate');
   const step1 = document.getElementById('agStep1');
-  const step2 = document.getElementById('agStep2');
   const loading = document.getElementById('agLoading');
   const reconnectBox = document.getElementById('agReconnect');
   const errBox = document.getElementById('agError');
   const pill = document.getElementById('authUserPill');
   const pillHandle = document.getElementById('agPillHandle');
   const pillCollapseBtn = document.getElementById('agPillCollapse');
-  const inviteInvalidBox = document.getElementById('agInviteInvalid');
+  const pwBanner = document.getElementById('agPwBanner');
+  const pwModal = document.getElementById('agPwModal');
+  const accModal = document.getElementById('agAccess');
   let pillCollapsed = false;
   try { pillCollapsed = localStorage.getItem('ag-pill-collapsed') === '1'; } catch (e) {}
   // что из плашки/кружка видно, зависит от двух вещей: вошёл ли человек
@@ -170,21 +256,17 @@
 
   function setStage(stage, msg) {
     step1.hidden = stage !== 'form';
-    step2.hidden = stage !== 'sent';
     loading.hidden = stage !== 'loading';
     reconnectBox.hidden = stage !== 'reconnect';
-    inviteInvalidBox.hidden = stage !== 'invite-invalid';
     if (msg) { errBox.hidden = false; errBox.textContent = msg; } else { errBox.hidden = true; }
   }
 
-  // ── Закрытая регистрация по ссылке-приглашению (?invite=<id>): без
-  //    валидного приглашения новый аккаунт создать нельзя (см. sendMagicLink
-  //    -> shouldCreateUser ниже) — так посторонний человек с адресом сайта
-  //    не сможет сам себе завести вход, а сможет только тот, кому дали
-  //    одноразовую ссылку. У кого уже ЕСТЬ аккаунт — вход как обычно,
-  //    приглашение вообще не требуется. ──
-  let inviteId = new URLSearchParams(location.search).get('invite');
-  let inviteInfo = { valid: !inviteId, label: '' };
+  // Ссылки-приглашения (?invite=…) остались в старых сообщениях. Вход
+  // теперь по списку почт, сама ссылка ничего не значит — просто убираем
+  // её из адреса, чтобы не путала, и показываем обычную форму
+  if (new URLSearchParams(location.search).has('invite')) {
+    try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
+  }
   // есть ли на этом устройстве сохранённый с прошлого раза вход — используем
   // только для того, чтобы решить, ЧТО показать при сбое связи (см. выше);
   // сам ключ (sb-<project-ref>-auth-token) — деталь реализации supabase-js,
@@ -206,6 +288,7 @@
     gate.style.display = 'flex';
     pill.style.display = 'none';
     pillHandle.style.display = 'none';
+    pwBanner.classList.remove('open');
     const sl = document.getElementById('screenList'), sb2 = document.getElementById('screenBoard');
     if (sl) sl.style.display = 'none';
     if (sb2) sb2.style.display = 'none';
@@ -226,56 +309,40 @@
     document.getElementById('agSend').disabled = true;
     document.getElementById('agEmail').disabled = true;
     document.getElementById('agPassword').disabled = true;
-    document.getElementById('agSendLink').disabled = true;
     return;
   }
 
   const sb = window.supabase.createClient(cfg.url, cfg.anonKey);
   window.SB = sb; // остальным модулям (совместное редактирование, шаринг) — тот же клиент
 
-  // Проверяем ссылку СРАЗУ (пока идёт остальная загрузка), но ничего не
-  // помечаем использованной здесь — только смотрим, действительна ли она.
-  // Погашение (redeem_invite) происходит позже, только в момент реальной
-  // отправки письма (sendMagicLink) — чтобы просто открыть ссылку и уйти
-  // не сжигало её впустую.
-  const inviteCheckPromise = inviteId
-    ? sb.rpc('check_invite', { p_id: inviteId }).then(({ data, error }) => {
-        const row = Array.isArray(data) ? data[0] : data;
-        inviteInfo = (!error && row && row.valid) ? { valid: true, label: row.label || '' } : { valid: false };
-      }).catch(() => { inviteInfo = { valid: false }; })
-    : Promise.resolve();
-
-  // Момент «показать форму входа с нуля» — либо обычная форма (email/
-  // пароль), либо та же форма с другой подсказкой (пришли по действующему
-  // приглашению), либо экран «ссылка недействительна»
-  async function presentForm() {
-    await inviteCheckPromise;
-    if (inviteId && !inviteInfo.valid) { setStage('invite-invalid'); return; }
-    document.querySelector('#agStep1 .ag-hint').textContent = (inviteId && inviteInfo.valid)
-      ? 'Вас пригласили' + (inviteInfo.label ? ` (${inviteInfo.label})` : '') + '. Введите свою почту — придёт письмо со ссылкой для входа.'
-      : 'Войдите по email. Если уже задавали пароль — введите его, вход будет сразу, без письма. Если ещё нет — оставьте поле пароля пустым.';
-    setStage('form');
+  // Все обращения к серверной функции входа и списка почт
+  // (supabase/functions/email-login). Функция всегда отвечает 200 с
+  // { ok, error } — сетевой сбой и «функции нет» (не развёрнута, 404)
+  // сводим к одному { ok:false, error:'network' }
+  async function callAccess(body) {
+    try {
+      const { data, error } = await sb.functions.invoke('email-login', { body });
+      if (error || !data) {
+        console.error('[вход] функция email-login:', error && error.message);
+        return { ok: false, error: 'network' };
+      }
+      return data;
+    } catch (e) {
+      console.error('[вход] функция email-login:', e);
+      return { ok: false, error: 'network' };
+    }
   }
-  document.getElementById('agInviteGoNormal').addEventListener('click', () => {
-    // ссылка оказалась чужой/старой, но у человека уже есть свой аккаунт —
-    // даём войти обычным способом, просто убираем ?invite= из адресной строки
-    history.replaceState(null, '', location.pathname);
-    inviteId = null;
-    inviteInfo = { valid: true, label: '' };
-    presentForm();
-  });
+
+  function presentForm() { setStage('form'); }
 
   showGate();
   setStage('loading');
   let authSettled = false;
   // подстраховка: если по какой-то причине onAuthStateChange не сработает
   // быстро (например, сеть подвисла на первом запросе к Supabase), не
-  // оставляем пользователя навсегда смотреть на «Входим…». Раньше в этом
-  // случае всегда показывали пустую форму «введите email» — из-за чего
-  // человек, уже когда-то входивший на этом устройстве, при обычном сетевом
-  // сбое сам себе заново отправлял письмо, хотя сессия никуда не делась и
-  // достаточно было просто повторить попытку (см. hasCachedSessionOnThisDevice
-  // и agReconnect выше) — здесь просто РАЗДЕЛЯЕМ эти два случая
+  // оставляем пользователя навсегда смотреть на «Входим…». Человеку, уже
+  // входившему на этом устройстве, показываем «Повторить», а не пустую
+  // форму — вход на устройстве при сетевом сбое никуда не девается
   const loadingFallback = setTimeout(() => {
     if (authSettled) return;
     if (hasCachedSessionOnThisDevice()) { setStage('reconnect'); startAutoReconnect(); }
@@ -304,62 +371,44 @@
     setStage('form');
   });
 
-  async function sendMagicLink(email) {
+  // Вход по одной почте: функция проверяет список и выдаёт одноразовый код
+  // (то же, что ссылка из письма, только без письма), сайт меняет его на
+  // обычную сессию. Дальше всё как при любом входе — onAuthStateChange
+  async function emailLogin(email) {
     setStage('loading');
-    try {
-      // Разрешаем создать НОВЫЙ аккаунт только если пришли по ещё не
-      // погашенной ссылке-приглашению — redeem_invite атомарно помечает её
-      // использованной и возвращает true только ПЕРВОМУ, кто успел. Без
-      // приглашения (или если оно уже использовано кем-то другим) —
-      // shouldCreateUser:false: у СУЩЕСТВУЮЩИХ пользователей вход при этом
-      // работает как обычно, это ограничивает только СОЗДАНИЕ новых аккаунтов.
-      let allowCreate = false;
-      if (inviteId && inviteInfo.valid) {
-        const { data: redeemed, error: redeemErr } = await sb.rpc('redeem_invite', { p_id: inviteId, p_email: email });
-        if (redeemErr) { setStage('form', 'Не получилось проверить приглашение: ' + redeemErr.message); return; }
-        if (!redeemed) { setStage('invite-invalid'); return; }
-        allowCreate = true;
+    const res = await callAccess({ action: 'login', email });
+    if (!res.ok) {
+      if (res.error === 'password_required') {
+        setStage('form', 'Для этой почты задан пароль — введите его и нажмите «Войти».');
+        document.getElementById('agPassword').focus();
+      } else if (res.error === 'not_allowed') {
+        setStage('form', 'Эта почта не добавлена на платформу. Напишите преподавателю — он добавит её, и вход заработает сразу.');
+      } else if (res.error === 'bad_email') {
+        setStage('form', 'Похоже, в почте опечатка — проверьте её.');
+      } else {
+        setStage('form', 'Не получилось связаться с сервером входа. Проверьте интернет и попробуйте ещё раз.');
       }
-      const { error } = await sb.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: location.origin + location.pathname, shouldCreateUser: allowCreate }
-      });
-      if (error) {
-        const notAllowed = /signup|not allowed/i.test(error.message || '');
-        setStage('form', notAllowed
-          ? 'Эта почта ещё не зарегистрирована, а свободная регистрация закрыта — нужна ссылка-приглашение от владельца платформы.'
-          : 'Не получилось отправить письмо: ' + error.message);
-        return;
-      }
-      document.getElementById('agSentEmail').textContent = email;
-      setStage('sent');
-    } catch (e) {
-      setStage('form', 'Не получилось отправить письмо: ' + (e && e.message ? e.message : e));
+      return;
     }
+    // type 'email' — нынешнее имя этого кода в supabase-js; 'magiclink' —
+    // старое, на случай если сервер Supabase окажется старше библиотеки
+    let { error } = await sb.auth.verifyOtp({ token_hash: res.token_hash, type: 'email' });
+    if (error) ({ error } = await sb.auth.verifyOtp({ token_hash: res.token_hash, type: 'magiclink' }));
+    if (error) setStage('form', 'Не получилось войти: ' + error.message);
   }
   document.getElementById('agSend').addEventListener('click', async () => {
     const email = document.getElementById('agEmail').value.trim();
     const password = document.getElementById('agPassword').value;
-    if (!email) { setStage('form', 'Введите email.'); return; }
-    if (password) {
-      setStage('loading');
-      try {
-        const { error } = await sb.auth.signInWithPassword({ email, password });
-        if (!error) return; // дальше всё делает onAuthStateChange — письмо не отправлялось
-        // намеренно НЕ отправляем письмо сами в этой ветке — только предлагаем
-        // явную кнопку ниже, чтобы не слать письма молча на опечатку в пароле
-        setStage('form', 'Не подошёл пароль (или он ещё не задан для этой почты). Проверьте пароль или нажмите «Прислать ссылку на почту».');
-      } catch (e) {
-        setStage('form', 'Не получилось войти: ' + (e && e.message ? e.message : e));
-      }
-      return;
+    if (!email) { setStage('form', 'Введите почту.'); return; }
+    if (!password) { await emailLogin(email); return; }
+    setStage('loading');
+    try {
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (!error) return; // дальше всё делает onAuthStateChange
+      setStage('form', 'Не подошёл пароль. Проверьте его. Если не помните — напишите владельцу платформы, он сбросит пароль, и можно будет войти по одной почте.');
+    } catch (e) {
+      setStage('form', 'Не получилось войти: ' + (e && e.message ? e.message : e));
     }
-    await sendMagicLink(email);
-  });
-  document.getElementById('agSendLink').addEventListener('click', () => {
-    const email = document.getElementById('agEmail').value.trim();
-    if (!email) { setStage('form', 'Введите email.'); return; }
-    sendMagicLink(email);
   });
   // Enter в любом из полей формы входа — как нажатие «Войти»
   ['agEmail', 'agPassword'].forEach(id => {
@@ -367,7 +416,6 @@
       if (e.key === 'Enter') document.getElementById('agSend').click();
     });
   });
-  document.getElementById('agResend').addEventListener('click', () => setStage('form'));
   document.getElementById('agSignOut').addEventListener('click', () => { sb.auth.signOut(); });
   // «изменить имя» — доступно в любой момент, не только при регистрации:
   // это имя (не email) увидит собеседник на общей доске рядом со своим
@@ -389,64 +437,291 @@
     }
   });
 
+  // ── Роли и пароль ──
+  // is_owner лежит в app_metadata (ставится руками в дашборде Supabase),
+  // mathh_role — тоже в app_metadata, его пишет функция email-login по
+  // списку почт. user_metadata человек может менять сам себе через
+  // updateUser(), app_metadata — нет; поэтому роль не подделать с сайта.
+  // На сайте роль решает только, что ПОКАЗАТЬ; права проверяет функция
   function hasPassword(user) {
     return !!(user && user.user_metadata && user.user_metadata.has_password);
   }
-  function updateSetPasswordLabel(user) {
-    const el = document.getElementById('agSetPassword');
-    if (el) el.textContent = hasPassword(user) ? 'сменить пароль' : 'задать пароль';
+  function roleOf(user) {
+    const am = (user && user.app_metadata) || {};
+    if (am.is_owner) return 'owner';
+    return am.mathh_role === 'teacher' ? 'teacher' : (am.mathh_role === 'student' ? 'student' : null);
   }
-  // is_owner специально хранится в app_metadata (а не в user_metadata, как
-  // has_password/display_name) — user_metadata человек может менять сам
-  // себе через updateUser(), а app_metadata правится только вручную в
-  // дашборде Supabase самим владельцем проекта. Так рядовой аккаунт не
-  // сможет сам себе выдать право создавать приглашения.
-  function isOwner(user) {
-    return !!(user && user.app_metadata && user.app_metadata.is_owner);
+  window.mathhRole = () => roleOf(window.CURRENT_USER);
+  function updateAccountUI(user) {
+    const role = roleOf(user);
+    document.getElementById('agSetPassword').textContent = hasPassword(user) ? 'сменить пароль' : 'задать пароль';
+    document.getElementById('agOpenAccess').style.display = (role === 'owner' || role === 'teacher') ? '' : 'none';
+    // плашка — только у преподавателя: ученики входят по почте, и это
+    // нормально; у владельца пароль есть всегда (по почте он не входит)
+    pwBanner.classList.toggle('open', !!user && role === 'teacher' && !hasPassword(user));
+    placePwBanner();
   }
-  function updateOwnerUI(user) {
-    const el = document.getElementById('agCreateInvite');
-    if (el) el.style.display = isOwner(user) ? '' : 'none';
+  // Место плашки — слева сверху, но на свободном месте: сначала в верхней
+  // строке правее «Назад к доскам» (на доске) или заголовка (в списке), по
+  // их высоте; не влезло — первое свободное место сверху вниз, слева
+  // направо в верхних 200 px; нет и такого — плашка сжимается до красного
+  // кружка «!» и ищет место снова. «Свободное» — не накрывает ни одной
+  // кнопки, ссылки, поля и рейла: на телефоне верхняя строка забита, и
+  // плашка в фиксированном углу закрывала «Создать доску» и название доски.
+  // Экраны переключает boards-core.js без событий для нас, поэтому пока
+  // плашка видна — сверяемся раз в полсекунды; пересчёт сетки — только
+  // если сменился экран/размер окна или место перестало быть свободным
+  const PW_BLOCKERS = '#screenList button, #screenList a, #screenList input, #screenList .bl-title, '
+    + '#screenBoard button, #screenBoard a, #screenBoard input, .bd-rail, #bdShareBtn, #lgMenuToggle, '
+    + '.ag-user-pill, .ag-pill-handle';
+  let pwPlaceKey = '';
+  function pwBlockers() {
+    const out = [];
+    document.querySelectorAll(PW_BLOCKERS).forEach(el => {
+      if (el === pwBanner || pwBanner.contains(el)) return;
+      const r = el.getBoundingClientRect();
+      if (r.width && r.height && r.top < 260 && getComputedStyle(el).visibility !== 'hidden') out.push(r);
+    });
+    return out;
   }
-  async function offerSetPassword() {
+  function pwFree(left, top, w, h, rects) {
+    if (left < 6 || top < 6 || left + w > window.innerWidth - 6) return false;
+    return !rects.some(r => left < r.right + 4 && r.left - 4 < left + w && top < r.bottom + 4 && r.top - 4 < top + h);
+  }
+  function pwFindSpot(rects) {
+    const w = pwBanner.offsetWidth, h = pwBanner.offsetHeight;
+    const vis = el => { if (!el) return null; const r = el.getBoundingClientRect(); return r.width ? r : null; };
+    const anchor = vis(document.getElementById('bdBack')) || vis(document.getElementById('blTitle'))
+      || vis(document.getElementById('blToIndex'));
+    if (anchor) {
+      const l = Math.round(anchor.right + 10), t = Math.round(anchor.top + (anchor.height - h) / 2);
+      if (pwFree(l, t, w, h, rects)) return [l, t];
+    }
+    for (let t = 8; t <= 200; t += 6)
+      for (let l = 8; l + w <= window.innerWidth - 6; l += 6)
+        if (pwFree(l, t, w, h, rects)) return [l, t];
+    return null;
+  }
+  function placePwBanner() {
+    if (!pwBanner.classList.contains('open')) return;
+    const board = document.getElementById('screenBoard');
+    const key = [window.innerWidth, window.innerHeight, board && getComputedStyle(board).display,
+      pwBanner.classList.contains('mini')].join('|');
+    const rects = pwBlockers();
+    const cur = pwBanner.getBoundingClientRect();
+    if (key === pwPlaceKey && pwFree(cur.left, cur.top, cur.width, cur.height, rects)) return;
+    pwBanner.classList.remove('mini');
+    let spot = pwFindSpot(rects);
+    if (!spot) { pwBanner.classList.add('mini'); spot = pwFindSpot(rects) || [16, 64]; }
+    pwBanner.style.left = spot[0] + 'px';
+    pwBanner.style.top = spot[1] + 'px';
+    pwPlaceKey = [window.innerWidth, window.innerHeight, board && getComputedStyle(board).display,
+      pwBanner.classList.contains('mini')].join('|');
+  }
+  setInterval(placePwBanner, 500);
+  window.addEventListener('resize', placePwBanner);
+
+  function openPwModal() {
     const already = hasPassword(window.CURRENT_USER);
-    const msg = already
-      ? 'Новый пароль для входа без письма (не короче 6 символов). Оставьте пустым, чтобы отменить.'
-      : 'Задать пароль, чтобы в следующий раз входить сразу, без письма? Не короче 6 символов. Оставьте пустым, если не хотите — предложим позже, кнопкой «задать пароль» рядом с вашим email.';
-    const pw = prompt(msg);
-    if (pw === null) return; // отменили
-    const trimmed = pw.trim();
-    if (!trimmed) return; // оставили пустым — не настаиваем
-    if (trimmed.length < 6) { alert('Пароль должен быть не короче 6 символов. Можно задать его позже.'); return; }
+    document.getElementById('agPwTitle').textContent = already ? 'Сменить пароль' : 'Добавить пароль';
+    document.getElementById('agPwText').textContent = already
+      ? 'Новый пароль заменит старый на всех устройствах.'
+      : 'После этого войти в ваш аккаунт можно будет только с паролем — по одной почте уже нельзя.';
+    document.getElementById('agPw1').value = '';
+    document.getElementById('agPw2').value = '';
+    document.getElementById('agPwMsg').hidden = true;
+    document.getElementById('agPwSave').disabled = false;
+    pwModal.classList.add('open');
+    setTimeout(() => document.getElementById('agPw1').focus(), 30);
+  }
+  function pwMessage(text, isErr) {
+    const m = document.getElementById('agPwMsg');
+    m.hidden = !text; m.textContent = text || ''; m.classList.toggle('err', !!isErr);
+  }
+  async function savePassword() {
+    const p1 = document.getElementById('agPw1').value;
+    const p2 = document.getElementById('agPw2').value;
+    if (p1.trim().length < 6) { pwMessage('Пароль должен быть не короче 6 символов.', true); return; }
+    if (p1 !== p2) { pwMessage('Пароли не совпадают.', true); return; }
+    const btn = document.getElementById('agPwSave');
+    btn.disabled = true;
+    pwMessage('Сохраняем…');
     try {
-      const { data, error } = await sb.auth.updateUser({ password: trimmed, data: { has_password: true } });
-      if (error) { alert('Не получилось сохранить пароль: ' + error.message); return; }
-      if (data && data.user) { window.CURRENT_USER = data.user; updateSetPasswordLabel(data.user); }
+      const { data, error } = await sb.auth.updateUser({ password: p1, data: { has_password: true } });
+      if (error) {
+        const same = /different from the old|same_password/i.test(error.message || '');
+        pwMessage(same ? 'Это ваш нынешний пароль — придумайте другой.' : 'Не получилось сохранить пароль: ' + error.message, true);
+        btn.disabled = false;
+        return;
+      }
+      if (data && data.user) window.CURRENT_USER = data.user;
+      updateAccountUI(window.CURRENT_USER);
+      pwMessage('Пароль сохранён. В следующий раз входите с почтой и паролем.');
+      setTimeout(() => pwModal.classList.remove('open'), 1200);
     } catch (e) {
-      alert('Не получилось сохранить пароль: ' + (e && e.message ? e.message : e));
+      pwMessage('Не получилось сохранить пароль: ' + (e && e.message ? e.message : e), true);
+      btn.disabled = false;
     }
   }
-  document.getElementById('agSetPassword').addEventListener('click', () => offerSetPassword());
-  document.getElementById('agCreateInvite').addEventListener('click', async () => {
-    const label = (prompt('Для кого эта ссылка? (необязательно, просто чтобы не забыть, кому давали)') || '').trim();
-    try {
-      const { data, error } = await sb.from('invites')
-        .insert({ created_by: window.CURRENT_USER.id, label: label || null })
-        .select('id').single();
-      if (error || !data) { alert('Не получилось создать приглашение: ' + (error ? error.message : 'нет ответа')); return; }
-      const link = location.origin + location.pathname + '?invite=' + data.id;
-      const note = '\n\nОна одноразовая: сработает только у первого, кто по ней зарегистрируется.';
-      try {
-        await navigator.clipboard.writeText(link);
-        alert('Ссылка-приглашение скопирована в буфер обмена:\n\n' + link + note);
-      } catch (e) {
-        alert('Ссылка-приглашение (скопируйте вручную):\n\n' + link + note);
-      }
-    } catch (e) {
-      alert('Не получилось создать приглашение: ' + (e && e.message ? e.message : e));
-    }
+  document.getElementById('agSetPassword').addEventListener('click', openPwModal);
+  pwBanner.addEventListener('click', openPwModal);
+  document.getElementById('agPwSave').addEventListener('click', savePassword);
+  ['agPw1', 'agPw2'].forEach(id => document.getElementById(id).addEventListener('keydown', e => {
+    if (e.key === 'Enter') savePassword();
+  }));
+  [pwModal, accModal].forEach(m => {
+    m.querySelector('.ag-close').addEventListener('click', () => m.classList.remove('open'));
+    // клик мимо карточки закрывает; mousedown — чтобы выделение текста в
+    // поле, отпущенное за краем карточки, окно не закрывало
+    m.addEventListener('mousedown', e => { if (e.target === m) m.classList.remove('open'); });
   });
-  let passwordPromptShown = false;
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') [pwModal, accModal].forEach(m => m.classList.remove('open'));
+  });
+
+  // ── Окно «Доступ»: список почт ──
+  // Владелец видит всех и задаёт роль; преподаватель — только своих
+  // учеников. Список и все изменения идут через функцию: у браузера прав на
+  // таблицу access_emails нет вовсе (access-schema.sql)
+  let accRows = [];
+  let accConfirm = null; // почта, у которой «Убрать» ждёт второго нажатия
+  function accMessage(text, isErr) {
+    const m = document.getElementById('agAccMsg');
+    m.hidden = !text; m.textContent = text || ''; m.classList.toggle('err', !!isErr);
+  }
+  const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  function fmtDate(iso) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+  }
+  function renderAccList() {
+    const owner = roleOf(window.CURRENT_USER) === 'owner';
+    const q = document.getElementById('agAccFilter').value.trim().toLowerCase();
+    const rows = accRows.filter(r => !q || r.email.includes(q) || (r.label || '').toLowerCase().includes(q));
+    const item = r => {
+      const meta = [];
+      if (r.label) meta.push(esc(r.label));
+      meta.push(r.last_login_at ? 'входил(а) ' + fmtDate(r.last_login_at) : 'ещё не входил(а)');
+      if (r.has_password) meta.push('<span class="pw">пароль задан</span>');
+      if (owner && !r.added_by_me && r.added_by_email) meta.push('добавил(а) ' + esc(r.added_by_email));
+      const roleCtl = owner
+        ? `<select data-act="role" data-email="${esc(r.email)}">
+             <option value="teacher"${r.role === 'teacher' ? ' selected' : ''}>Преподаватель</option>
+             <option value="student"${r.role === 'student' ? ' selected' : ''}>Ученик</option>
+           </select>`
+        : '';
+      const reset = r.can_manage && r.has_password
+        ? `<button data-act="reset" data-email="${esc(r.email)}" title="Пароль сотрётся, человек снова войдёт по почте и задаст новый">Сбросить пароль</button>` : '';
+      const del = r.can_manage
+        ? (accConfirm === r.email
+            ? `<button class="confirm" data-act="remove" data-email="${esc(r.email)}">Точно убрать?</button>`
+            : `<button class="danger" data-act="remove-ask" data-email="${esc(r.email)}" title="Вход закроется на всех устройствах. Доски и работы человека останутся">Убрать</button>`)
+        : '';
+      return `<div class="ag-acc-item" data-email="${esc(r.email)}">
+        <div class="ag-acc-who"><div class="ag-acc-email" title="${esc(r.email)}">${esc(r.email)}</div>
+          <div class="ag-acc-meta">${meta.join(' · ')}</div></div>
+        ${roleCtl}${reset}${del}</div>`;
+    };
+    let html = '';
+    if (!accRows.length) html = '<p class="ag-hint" style="margin-top:12px">Пока никого.</p>';
+    else if (!rows.length) html = '<p class="ag-hint" style="margin-top:12px">Ничего не нашлось.</p>';
+    else if (owner) {
+      const t = rows.filter(r => r.role === 'teacher'), s = rows.filter(r => r.role !== 'teacher');
+      if (t.length) html += `<div class="ag-acc-sec">Преподаватели · ${t.length}</div>` + t.map(item).join('');
+      if (s.length) html += `<div class="ag-acc-sec">Ученики · ${s.length}</div>` + s.map(item).join('');
+    } else {
+      html = `<div class="ag-acc-sec">Мои ученики · ${rows.length}</div>` + rows.map(item).join('');
+    }
+    document.getElementById('agAccList').innerHTML = html;
+  }
+  async function loadAccList() {
+    document.getElementById('agAccList').innerHTML = '<p class="ag-hint" style="margin-top:12px">Загрузка…</p>';
+    const res = await callAccess({ action: 'list' });
+    if (!res.ok) {
+      document.getElementById('agAccList').innerHTML = `<p class="ag-msg err">${res.error === 'forbidden'
+        ? 'Список доступен только владельцу платформы и преподавателям.'
+        : 'Не получилось загрузить список. Проверьте интернет и откройте окно ещё раз.'}</p>`;
+      return;
+    }
+    accRows = res.rows || [];
+    renderAccList();
+  }
+  function openAccess() {
+    const owner = roleOf(window.CURRENT_USER) === 'owner';
+    document.getElementById('agAccHint').textContent = owner
+      ? 'Добавленные почты входят на платформу без пароля и писем: открыть сайт, ввести почту, «Войти». Преподавателям после первого входа предложим задать пароль.'
+      : 'Добавьте почты своих учеников — они войдут на платформу без пароля и писем: открыть сайт, ввести почту, «Войти». И их сразу можно звать к доске.';
+    document.getElementById('agAccRole').style.display = owner ? '' : 'none';
+    document.getElementById('agAccRole').value = 'student';
+    accConfirm = null;
+    accMessage('');
+    accModal.classList.add('open');
+    loadAccList();
+  }
+  document.getElementById('agOpenAccess').addEventListener('click', openAccess);
+  document.getElementById('agAccFilter').addEventListener('input', renderAccList);
+
+  const ADD_REASON = { bad_email: 'не похоже на почту', self: 'это ваша почта', error: 'ошибка сервера' };
+  // Добавить почты в список. Отдельной функцией — её же зовёт «Совместная
+  // работа», когда к доске зовут почту, которой на платформе ещё нет
+  async function addAccessEmails(emails, role, label) {
+    return callAccess({ action: 'add', emails, role, label });
+  }
+  window.mathhAddAccess = addAccessEmails;
+  document.getElementById('agAccAdd').addEventListener('click', async () => {
+    const emails = document.getElementById('agAccEmails').value;
+    if (!emails.trim()) { accMessage('Впишите хотя бы одну почту.', true); return; }
+    const btn = document.getElementById('agAccAdd');
+    btn.disabled = true;
+    accMessage('Добавляем…');
+    const res = await addAccessEmails(emails, document.getElementById('agAccRole').value,
+      document.getElementById('agAccLabel').value);
+    btn.disabled = false;
+    if (!res.ok) {
+      accMessage(res.error === 'forbidden' ? 'Добавлять почты могут только владелец платформы и преподаватели.'
+        : res.error === 'no_emails' ? 'Не нашлось ни одной почты.'
+        : 'Не получилось связаться с сервером. Попробуйте ещё раз.', true);
+      return;
+    }
+    const by = s => res.results.filter(r => r.status === s);
+    const lines = [];
+    const added = by('added'), upd = by('updated'), exists = by('exists');
+    if (added.length) lines.push('Добавлено: ' + added.length);
+    if (upd.length) lines.push('Обновлено: ' + upd.length);
+    if (exists.length) lines.push('Уже были: ' + exists.map(r => r.email).join(', '));
+    const bad = res.results.filter(r => ADD_REASON[r.status]);
+    bad.forEach(r => lines.push(r.email + ' — ' + ADD_REASON[r.status]));
+    accMessage(lines.join('\n'), !!bad.length);
+    if (!bad.length) {
+      document.getElementById('agAccEmails').value = '';
+      document.getElementById('agAccLabel').value = '';
+    } else {
+      // в поле оставляем только то, что не прошло, — поправить и отправить снова
+      document.getElementById('agAccEmails').value = bad.filter(r => r.status !== 'self').map(r => r.email).join('\n');
+    }
+    loadAccList();
+  });
+  document.getElementById('agAccList').addEventListener('click', async e => {
+    const btn = e.target.closest('button[data-act]');
+    if (!btn) return;
+    const email = btn.dataset.email, act = btn.dataset.act;
+    if (act === 'remove-ask') { accConfirm = email; renderAccList(); return; }
+    btn.disabled = true;
+    const res = await callAccess(act === 'remove' ? { action: 'remove', email } : { action: 'reset_password', email });
+    accConfirm = null;
+    if (!res.ok) accMessage('Не получилось: ' + (res.error === 'forbidden' ? 'нет прав на эту почту' : 'нет связи с сервером'), true);
+    else accMessage(act === 'remove' ? email + ' — вход закрыт' : email + ' — пароль сброшен, вход снова по почте');
+    loadAccList();
+  });
+  document.getElementById('agAccList').addEventListener('change', async e => {
+    const sel = e.target.closest('select[data-act="role"]');
+    if (!sel) return;
+    sel.disabled = true;
+    const res = await callAccess({ action: 'set_role', email: sel.dataset.email, role: sel.value });
+    if (!res.ok) accMessage('Не получилось сменить роль — нет связи с сервером.', true);
+    loadAccList();
+  });
 
   sb.auth.onAuthStateChange((event, session) => {
     if (session && session.user) {
@@ -455,30 +730,34 @@
       if (autoReconnectTimer) { clearInterval(autoReconnectTimer); autoReconnectTimer = null; }
       window.CURRENT_USER = session.user;
       document.getElementById('agCurrentEmail').textContent = displayNameOf(session.user);
-      updateSetPasswordLabel(session.user);
-      updateOwnerUI(session.user);
+      updateAccountUI(session.user);
       syncPillVisibility();
       hideGate();
       if (window.boardsAppBoot) window.boardsAppBoot();
       // подтягиваем в локальный список доски, которыми с этим пользователем
       // поделились (см. второй блок ниже — cloudImportSharedBoards)
       if (window.cloudImportSharedBoards) window.cloudImportSharedBoards();
-      // event==='SIGNED_IN' — именно свежий вход в этой вкладке (по ссылке из
-      // письма или по паролю), а не тихое восстановление уже существующей
-      // сессии при обычной перезагрузке страницы (иначе предложение задать
-      // пароль всплывало бы при каждом открытии приложения)
-      if (event === 'SIGNED_IN' && !passwordPromptShown && !hasPassword(session.user)) {
-        passwordPromptShown = true;
-        offerSetPassword();
+      // Роль в сохранённом входе может быть старой: владелец сменил её или
+      // сбросил пароль, а токен обновляется раз в час. getUser берёт
+      // аккаунт с сервера — плашка и «доступ» сразу как есть сейчас.
+      // Один раз на вход/открытие, не на каждое обновление токена
+      if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
+        sb.auth.getUser().then(({ data }) => {
+          if (data && data.user && window.CURRENT_USER && data.user.id === window.CURRENT_USER.id) {
+            window.CURRENT_USER = data.user;
+            updateAccountUI(data.user);
+          }
+        }).catch(() => { /* нет связи — остаётся то, что в сохранённом входе */ });
       }
     } else {
       window.CURRENT_USER = null;
+      updateAccountUI(null);
       // сессии сейчас нет — но если на устройстве всё ещё лежит сохранённый
       // токен, это почти наверняка просто сбой сети при попытке его обновить,
       // а не настоящий выход: когда сервер ДЕЙСТВИТЕЛЬНО признаёт вход
       // недействительным (или человек сам нажал «Выйти»), supabase-js сам
       // стирает токен из хранилища — вот тогда и покажем обычную форму входа.
-      // Пока токен на месте — не дёргаем человека письмом, а даём кнопке
+      // Пока токен на месте — не дёргаем человека, а даём кнопке
       // «Повторить»/тихому авто-повтору ещё шанс
       if (hasCachedSessionOnThisDevice()) {
         clearTimeout(loadingFallback);
@@ -2096,12 +2375,30 @@
 
   async function inviteToBoard(email, role) {
     if (!cloudBoardId) return;
+    email = email.trim().toLowerCase();
     const { data: profile, error: pErr } = await window.SB.from('profiles').select('id').eq('email', email).maybeSingle();
-    if (pErr || !profile) {
-      renderSharePanel('Этот email ещё не входил в приложение хотя бы раз — попроси сначала войти по ссылке входа, потом пригласи снова.', true);
-      return;
+    let userId = !pErr && profile ? profile.id : null;
+    if (!userId) {
+      // Промпт №83: почты на платформе ещё нет. Владелец и преподаватель
+      // добавляют её в список тут же, учеником, — функция сразу создаёт
+      // аккаунт, и к доске можно звать, не дожидаясь первого входа (раньше
+      // приходилось просить человека сначала войти по письму)
+      const myRole = window.mathhRole ? window.mathhRole() : null;
+      if ((myRole !== 'owner' && myRole !== 'teacher') || !window.mathhAddAccess) {
+        renderSharePanel('Этой почты нет на платформе. Попросите преподавателя добавить её, потом позовите снова.', true);
+        return;
+      }
+      renderSharePanel('Добавляю почту на платформу…');
+      const res = await window.mathhAddAccess(email, 'student');
+      const r = res && res.ok && res.results && res.results[0];
+      if (!r || !r.user_id) {
+        renderSharePanel(r && r.status === 'bad_email' ? 'Похоже, в почте опечатка — проверьте её.'
+          : 'Не получилось добавить почту на платформу. Проверьте интернет и попробуйте ещё раз.', true);
+        return;
+      }
+      userId = r.user_id;
     }
-    const { error } = await window.SB.from('board_access').upsert({ board_id: cloudBoardId, user_id: profile.id, role }, { onConflict: 'board_id,user_id' });
+    const { error } = await window.SB.from('board_access').upsert({ board_id: cloudBoardId, user_id: userId, role }, { onConflict: 'board_id,user_id' });
     if (error) { renderSharePanel(roleError(error) || ('Не получилось добавить: ' + error.message), true); return; }
     renderSharePanel();
   }
