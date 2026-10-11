@@ -312,6 +312,10 @@ def run_main(browser):
     check("L: подтвердил — у ученика текст стал объектом, живого больше нет", ok)
     # правка существующего текста: у ученика старый прячется, виден набираемый
     teacher.evaluate("() => openTextEditor(getCurrentBoard().objects.find(o => o.id === 't1'))")
+    # редактор ставит фокус и выделяет весь старый текст через setTimeout(0):
+    # End до этого момента выделение не снимет, и «!!» заменило бы весь текст
+    # (так тест через раз падал, когда страница учителя занята чуть больше)
+    teacher.wait_for_function("() => { const a = document.activeElement; return a && a.tagName === 'TEXTAREA' && a.selectionEnd > a.selectionStart; }")
     teacher.keyboard.press("End")
     teacher.keyboard.type("!!", delay=30)
     ok = wait_js(f, "() => { const t = window.__bdView.liveText(); return !!(t && t.objId === 't1' && t.content === 'Задача 1!!'); }", 3000)

@@ -3876,6 +3876,15 @@ function placeEraserRing(x, y){
   eraserRing.classList.add('show');
 }
 function hideEraserRing(){ if (eraserRing && !eraserRingFlashTimer) eraserRing.classList.remove('show'); }
+// «Курсор-инструмент»: у ластика курсор «none», а видно кольцо — отдельный
+// элемент, CSS-курсором его не передать. Совместная сессия спрашивает здесь,
+// что дорисовать у ученика поверх курсора учителя: размер кольца в пикселях
+// окна (сцена сама переводит в свой масштаб). Только пока указатель над
+// доской — вспышка кольца при смене размера идёт не под курсором
+window.__tsCursorExtra = function(){
+  if (tool !== 'eraser' || !eraserRing || !eraserRing.dataset.hover || !eraserRing.classList.contains('show')) return null;
+  return { r: eraserSize };
+};
 // размер меняют кнопками на панели — курсор в этот момент над панелью, и
 // кольца на доске не видно. Поэтому показываем его на миг: там, где мышь
 // была на доске в последний раз, а если её там не было — посреди доски

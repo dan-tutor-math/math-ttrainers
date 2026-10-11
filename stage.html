@@ -67,14 +67,29 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
 #vp.panning #pan{display:block;}
 
 /* Курсор учителя. Размер не масштабируется вместе со сценой: на телефоне
-   сцена уменьшена в три-четыре раза, и уменьшенная стрелка потерялась бы */
-#cursor{position:absolute;left:0;top:0;z-index:3;pointer-events:none;width:22px;height:22px;
-  margin:-2px 0 0 -2px;opacity:0;transition:opacity .2s;will-change:transform;}
+   сцена уменьшена в три-четыре раза, и уменьшенная стрелка потерялась бы.
+   Сам #cursor — точка, куда указывает учитель (горячая точка курсора), всё
+   остальное разложено вокруг неё */
+#cursor{position:absolute;left:0;top:0;z-index:3;pointer-events:none;width:0;height:0;
+  opacity:0;transition:opacity .2s;will-change:transform;}
 #cursor.on{opacity:1;}
-#cursor svg{display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));}
-#cursor .ring{position:absolute;left:-9px;top:-9px;width:22px;height:22px;border-radius:50%;
-  border:2px solid var(--cursor);opacity:0;transform:scale(.4);transition:opacity .12s, transform .12s;}
-#cursor.down .ring{opacity:.9;transform:scale(1);}
+#cursor svg, #cursor img{display:block;filter:drop-shadow(0 1px 2px rgba(0,0,0,.35));}
+#cursor .arrow{position:absolute;left:-3px;top:-2px;}
+/* «Курсор-инструмент»: вместо стрелки — тот курсор, что у учителя (ручка,
+   «рука», крестик…), и кольцо ластика в масштабе сцены.
+   Красного кружка «нажал» вокруг курсора больше нет ни у какого вида (просьба
+   Даниила): при письме он мигал у ученика на каждом штрихе и мешал смотреть.
+   Нажатие и так видно по тому, что появляется на доске. Класс .down остаётся —
+   по нему проверяют тесты */
+#cursor .look{position:absolute;display:none;}
+#cursor.look-on .look{display:block;}
+#cursor.look-on .arrow, #cursor.look-none .arrow{display:none;}
+#cursor .erase{position:absolute;left:0;top:0;display:none;border-radius:50%;transform:translate(-50%,-50%);box-sizing:border-box;
+  border:1.5px solid rgba(18,18,26,.85);box-shadow:0 0 0 1px rgba(255,255,255,.9), inset 0 0 0 1px rgba(255,255,255,.9);}
+#cursor .erase::after{content:"";position:absolute;left:50%;top:50%;width:3px;height:3px;margin:-1.5px 0 0 -1.5px;
+  border-radius:50%;background:rgba(18,18,26,.85);}
+#cursor.erase-on .erase{display:block;}
+#cursor.erase-on.down .erase{background:rgba(0,120,255,.10);}   /* ластик стирает — подкрашено, как у учителя при смене размера */
 
 #bar{position:fixed;z-index:10;display:flex;align-items:center;gap:2px;padding:4px;
   border-radius:14px;background:var(--bar-bg);border:1px solid var(--bar-border);
@@ -139,8 +154,9 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
   <div id="box">
     <div id="pan"></div>
     <div id="cursor" aria-hidden="true">
-      <span class="ring"></span>
-      <svg width="22" height="22" viewBox="0 0 22 22"><path d="M3 2 L3 17 L7.2 13.2 L10 19.5 L12.8 18.3 L10.1 12.2 L15.8 12 Z" fill="#e5484d" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      <span class="erase"></span>
+      <span class="look"></span>
+      <svg class="arrow" width="22" height="22" viewBox="0 0 22 22"><path d="M3 2 L3 17 L7.2 13.2 L10 19.5 L12.8 18.3 L10.1 12.2 L15.8 12 Z" fill="#e5484d" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
     </div>
   </div>
 </div>
@@ -362,10 +378,113 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
     cursorEl.style.transform = 'translate(' + (cur.x * scale) + 'px,' + (cur.y * scale) + 'px)';
     cursorEl.classList.add('on');
     cursorEl.classList.toggle('down', !!cur.d);
+    sizeErase();
   }
+
+  /* ── вид курсора учителя («курсор-инструмент») ──
+     Учитель присылает свой CSS-курсор (l.c) — так, как его отдаёт браузер:
+     картинка с горячей точкой («url("data:…") 9 28, crosshair») или слово
+     (crosshair, grab, text…). Картинку показываем как есть (ручка — с цветом
+     чернил), слова — своими значками в духе системных: настоящий системный
+     курсор поверх кадра не нарисовать. Неизвестное слово и «auto» — прежняя
+     красная стрелка. l.r — кольцо ластика, диаметр в пикселях окна учителя */
+  const lookEl = cursorEl.querySelector('.look');
+  const eraseEl = cursorEl.querySelector('.erase');
+  let look = null, lookKey = '';
+  // обводка белым под чёрным — читается и на белом листе, и на тёмной теме
+  function outlined(d, w){
+    return '<path d="' + d + '" fill="none" stroke="#fff" stroke-width="' + (w + 2.4) + '" stroke-linecap="round" stroke-linejoin="round"/>'
+      + '<path d="' + d + '" fill="none" stroke="#111" stroke-width="' + w + '" stroke-linecap="round" stroke-linejoin="round"/>';
+  }
+  function svg24(body){ return '<svg width="24" height="24" viewBox="0 0 24 24">' + body + '</svg>'; }
+  // рука: пальцы — толстые скруглённые линии (чёрный контур, белая заливка),
+  // ладонь — скруглённый прямоугольник. tops — где кончается каждый из
+  // четырёх пальцев: у открытой ладони высоко, у сжатой — низко
+  function hand(tops){
+    const xs = [8.6, 11.4, 14.2, 17];
+    const fingers = (w, col) => xs.map((x, i) => '<path d="M' + x + ' 14V' + tops[i] + '" stroke="' + col + '" stroke-width="' + w + '" stroke-linecap="round"/>').join('');
+    const thumb = (w, col) => '<path d="M7.2 16.5L4.6 13.4" stroke="' + col + '" stroke-width="' + w + '" stroke-linecap="round"/>';
+    const palm = (inset, col) => '<rect x="' + (6.6 + inset) + '" y="' + (11.4 + inset) + '" width="' + (12.2 - 2 * inset) + '" height="' + (9.6 - 2 * inset) + '" rx="' + (3.6 - inset) + '" fill="' + col + '"/>';
+    return svg24(fingers(4.4, '#111') + thumb(4.4, '#111') + palm(0, '#111')
+      + fingers(2.4, '#fff') + thumb(2.4, '#fff') + palm(1, '#fff'));
+  }
+  function arrowPair(rot){
+    const d = 'M4 12H20M7.5 8.5L4 12L7.5 15.5M16.5 8.5L20 12L16.5 15.5';
+    return svg24('<g transform="rotate(' + rot + ' 12 12)">' + outlined(d, 1.6) + '</g>');
+  }
+  const KW = {
+    crosshair: { svg: svg24(outlined('M12 3.5V9.5M12 14.5V20.5M3.5 12H9.5M14.5 12H20.5', 1.5)), hx: 12, hy: 12 },
+    text: { svg: svg24(outlined('M9 4.5C10.8 4.5 12 5.2 12 6.5V17.5C12 18.8 10.8 19.5 9 19.5M15 4.5C13.2 4.5 12 5.2 12 6.5V17.5C12 18.8 13.2 19.5 15 19.5M10.3 12H13.7', 1.4)), hx: 12, hy: 12 },
+    grab: { svg: hand([6, 4.6, 5, 6.8]), hx: 12, hy: 12 },
+    grabbing: { svg: hand([11, 10.4, 10.6, 11.4]), hx: 12, hy: 13 },
+    pointer: { svg: hand([3.4, 10.6, 10.8, 11.6]), hx: 8.6, hy: 3 },
+    move: { svg: svg24(outlined('M12 3.5V20.5M3.5 12H20.5M9.5 6L12 3.5L14.5 6M9.5 18L12 20.5L14.5 18M6 9.5L3.5 12L6 14.5M18 9.5L20.5 12L18 14.5', 1.6)), hx: 12, hy: 12 },
+    ew: { svg: arrowPair(0), hx: 12, hy: 12 },
+    ns: { svg: arrowPair(90), hx: 12, hy: 12 },
+    nwse: { svg: arrowPair(45), hx: 12, hy: 12 },
+    nesw: { svg: arrowPair(-45), hx: 12, hy: 12 },
+  };
+  const KW_ALIAS = {
+    '-webkit-grab': 'grab', '-webkit-grabbing': 'grabbing', 'all-scroll': 'move', cell: 'crosshair', 'vertical-text': 'text',
+    'ew-resize': 'ew', 'e-resize': 'ew', 'w-resize': 'ew', 'col-resize': 'ew',
+    'ns-resize': 'ns', 'n-resize': 'ns', 's-resize': 'ns', 'row-resize': 'ns',
+    'nwse-resize': 'nwse', 'nw-resize': 'nwse', 'se-resize': 'nwse',
+    'nesw-resize': 'nesw', 'ne-resize': 'nesw', 'sw-resize': 'nesw',
+  };
+  function kwOf(s){
+    const k = String(s || '').split(',').pop().trim().toLowerCase();
+    return KW_ALIAS[k] || k;
+  }
+  // «url("…") 9 28, crosshair» → адрес, горячая точка и запасное слово;
+  // кавычки внутри адреса браузер экранирует обратной косой чертой
+  const URL_RE = /^url\(\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^)\s]*))\s*\)\s*(?:(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?))?\s*(?:,\s*([\s\S]*))?$/;
+  function parseCursorCss(css){
+    const s = String(css || '').trim();
+    const m = URL_RE.exec(s);
+    if (!m) return { kw: kwOf(s) };
+    const raw = m[1] !== undefined ? m[1] : (m[2] !== undefined ? m[2] : m[3]);
+    return { url: raw.replace(/\\(.)/g, '$1'), hx: +m[4] || 0, hy: +m[5] || 0, kw: kwOf(m[6]) };
+  }
+  function sizeErase(){
+    if (!look || !(look.r > 0)) return;
+    const d = Math.max(6, look.r * scale);
+    eraseEl.style.width = eraseEl.style.height = d + 'px';
+  }
+  function applyLook(l){
+    const key = l ? JSON.stringify(l) : '';
+    if (key === lookKey) return;
+    lookKey = key; look = l || null;
+    let mode = 'arrow';
+    lookEl.textContent = '';
+    if (look && typeof look.c === 'string'){
+      const p = parseCursorCss(look.c);
+      // картинка — только своя, data:image: адрес приходит по сети, и чужой
+      // ссылкой ученика никуда не отправим
+      if (p.url && /^data:image\//i.test(p.url) && p.url.length < 200000){
+        const img = new Image();
+        img.alt = ''; img.draggable = false; img.src = p.url;
+        lookEl.appendChild(img);
+        lookEl.style.left = (-p.hx) + 'px'; lookEl.style.top = (-p.hy) + 'px';
+        mode = 'look';
+      } else if (p.kw === 'none'){
+        mode = 'none';
+      } else if (KW[p.kw]){
+        lookEl.innerHTML = KW[p.kw].svg;   // наши же строки, не присланные
+        lookEl.style.left = (-KW[p.kw].hx) + 'px'; lookEl.style.top = (-KW[p.kw].hy) + 'px';
+        mode = 'look';
+      }
+    }
+    cursorEl.classList.toggle('look-on', mode === 'look');
+    cursorEl.classList.toggle('look-none', mode === 'none');
+    cursorEl.classList.toggle('erase-on', !!(look && look.r > 0));
+    sizeErase();
+  }
+  window.__stageCursor = { look: () => ({ key: lookKey, mode: cursorEl.classList.contains('look-on') ? 'look' : (cursorEl.classList.contains('look-none') ? 'none' : 'arrow') }) };
+
   let followCursorAt = 0;
   function onCursor(d){
     if (d.h) { cur = null; placeCursor(); return; }
+    if (d.l) applyLook(d.l);
     cur = { x: d.x, y: d.y, d: d.d };
     placeCursor();
     // за курсором увеличенная сцена едет реже, чем за пером, — иначе при

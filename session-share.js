@@ -2194,14 +2194,53 @@
      режиме (своя вёрстка) чужие координаты бессмысленны */
   const CURSOR_MS = 50;
   let curLast = 0, curTimer = null, curPending = null, curShown = false;
+  /* «Курсор-инструмент»: ученик видел у учителя всегда одну красную стрелку,
+     а учитель у себя — ручку, «руку», крестик, кольцо ластика. По стрелке
+     ученику не понять, пишет учитель сейчас или двигает доску. Поэтому вместе
+     с координатами уходит и вид курсора (l): CSS-курсор элемента под
+     указателем — ровно то, что рисует браузер у учителя, без знания, какой
+     инструмент на какой странице, — плюс то, что страница рисует сама поверх
+     курсора (кольцо ластика на доске, __tsCursorExtra).
+     Вид у ручки — картинка с цветом чернил, килобайта два: в каждое
+     сообщение раз в 50 мс его не кладём, только когда поменялся и раз в
+     LOOK_RESEND_MS — для ученика, подключившегося посреди урока */
+  const LOOK_RESEND_MS = 2000;
+  let curTarget = null, curLastMsg = null, lookKey = '', lookSentAt = 0;
+  function cursorLook() {
+    let c = 'auto';
+    const t = curTarget;
+    try {
+      // элемент мог быть в кадре своей страницы (карточки «+») — стиль
+      // спрашиваем у его окна
+      if (t && t.nodeType === 1 && t.isConnected) c = t.ownerDocument.defaultView.getComputedStyle(t).cursor || 'auto';
+    } catch (e) {}
+    const look = { c: c };
+    if (typeof window.__tsCursorExtra === 'function') {
+      try { const ex = window.__tsCursorExtra(t); if (ex) Object.assign(look, ex); } catch (e) {}
+    }
+    return look;
+  }
   function flushCursor() {
     curTimer = null;
     if (!curPending) return;
     curLast = Date.now();
+    if (!curPending.h) {
+      const look = cursorLook(), key = JSON.stringify(look);
+      if (key !== lookKey || curLast - lookSentAt > LOOK_RESEND_MS) {
+        curPending.l = look; lookKey = key; lookSentAt = curLast;
+      }
+      curLastMsg = { x: curPending.x, y: curPending.y, d: curPending.d };
+    }
     broadcastEvent('cursor', curPending);
     curShown = !curPending.h;
     curPending = null;
   }
+  // Инструмент сменили клавишей или поменяли цвет ручки, а мышь стоит —
+  // движений нет, и ученик так и видел бы прежний вид. Сверяем сами
+  setInterval(() => {
+    if (!curShown || !curLastMsg || curPending || !isLeaderFlag || !code || !channel || !stageViewers()) return;
+    if (JSON.stringify(cursorLook()) !== lookKey) queueCursor(Object.assign({}, curLastMsg), true);
+  }, 250);
   function queueCursor(c, now) {
     if (!isLeaderFlag || !code || !channel || !stageViewers()) return;
     curPending = c;
@@ -2218,6 +2257,7 @@
       try { masked = !!window.__tsCursorMask(x, y); } catch (err) {}
       if (masked) { hideCursor(); return; }
     }
+    curTarget = e.target;
     queueCursor({ x: Math.round(x), y: Math.round(y), d: e.buttons ? 1 : 0 }, now);
   }
   function hideCursor() { if (curShown) queueCursor({ h: 1 }, true); }
