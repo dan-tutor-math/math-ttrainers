@@ -92,6 +92,7 @@
       isStageFrame(){ return false; }, stageFocus(){},
       hasViewers(){ return false; }, holdStageReady(){}, releaseStageReady(){}, socketBacklog(){ return 0; },
       mirrorActions(){}, kickDevice(){}, leaveSession(){}, studentDevices(){ return []; },
+      reloadStudent(){}, reloadOwnPage(){ try { location.reload(); } catch (e) {} },
       openNewSessionTab(){ return null; }, goToSession(){}, getSessionName(){ return ''; }, renameSession(){}, endSession: async () => false,
       isShared(){ return false; },
     };
@@ -874,7 +875,13 @@
       const rt = SB.realtime;
       const sock = (rt && rt.socketAdapter && rt.socketAdapter.socket) || rt;
       const conn = sock && sock.conn;
-      const n = conn && conn.bufferedAmount;
+      // Правка «доска застряла у учителя»: закрытый сокет так и держит в
+      // bufferedAmount то, что не успело уйти, — навсегда. Пока библиотека не
+      // завела новый (или отправляет через REST), такой «буфер» держал очередь
+      // частей доски вечно, и ученик видел загрузку без конца. Считаем только
+      // у открытого сокета
+      if (!conn || (typeof conn.readyState === 'number' && conn.readyState !== 1)) return 0;
+      const n = conn.bufferedAmount;
       return typeof n === 'number' ? n : 0;
     } catch (e) { return 0; }
   }
@@ -975,6 +982,20 @@
           return;
         }
         touchPeer(payload.uid, payload.name === 'hb' ? payload.data : null);
+        /* Ученик не там, где учитель (после живого урока: учитель на доске, а
+           подключившийся ученик остался на главной и видел её, пока учитель не
+           ушёл с доски и не вернулся). Ученика переводит событие 'navigate' или
+           живой снимок учителя с другой страницы (followLeaderPage). Но на
+           досках учитель снимков почти не шлёт (состояния у страницы нет, всё
+           идёт событиями доски), строка в базе может помнить прежнюю страницу,
+           а 'navigate' ученик мог пропустить или вовсе подключиться позже.
+           Поэтому учитель в каждом сигнале «на связи» (раз в 5 с и сразу в
+           ответ новому участнику) называет свою страницу, и ученик на чужой
+           странице идёт за ним тем же путём, что и за снимком */
+        if (payload.name === 'hb' && payload.data && payload.data.leader && payload.data.pg && !isLeaderFlag) {
+          lastLeaderTrainer = payload.data.pg;
+          if (payload.data.pg !== trainerSlug) followLeaderPage({ __stage: 1, __trainer: payload.data.pg });
+        }
         // новый участник спрашивает «кто здесь?» — отвечаем сразу, не через
         // 5 секунд: учителю, только что перешедшему на другую страницу, иначе
         // до следующего сигнала казалось бы, что на сцене никого нет
@@ -1308,7 +1329,18 @@
       // равно относится к другому тренажёру и там будет применена заново
       // после перехода.
       const treatAsFollower = !opts.createIfMissing || opts.followerFallback;
-      if (treatAsFollower && row.trainer && row.trainer !== trainerSlug) {
+      /* Сюда ученика только что привёл сам учитель — его живой сигнал или
+         снимок с этой страницы (followLeaderPage). Строка в базе бывает
+         старой: на досках учитель её почти не переписывает. Поверь мы ей —
+         ученик уходил бы обратно, сигнал учителя вёл бы сюда снова, и так
+         по кругу. Живой учитель важнее строки */
+      let ledHere = false;
+      try {
+        const f = String(ssGet(FOLLOW_KEY) || '').split('|');
+        ledHere = f[0] === trainerSlug && Date.now() - (+f[1] || 0) < 20000;
+      } catch (e) {}
+      if (ledHere) ssSet(FOLLOW_KEY, '');
+      if (treatAsFollower && !ledHere && row.trainer && row.trainer !== trainerSlug) {
         // прежде чем окончательно решить "группа сейчас не здесь" — даём
         // БД короткое окно догнать реальность (см. комментарий у
         // MISMATCH_RECHECK_DELAYS_MS выше)
@@ -1890,6 +1922,8 @@
   // оттуда: сам учитель на новой странице отвечает на запрос синхронизации
   // быстрее, чем истекает пауза
   let followTimer = null, followTarget = '', lastLeaderTrainer = '';
+  // sessionStorage: «сюда меня только что привёл живой учитель» — страница|время
+  const FOLLOW_KEY = 'tsFollow:page';
   function followLeaderPage(state) {
     if (isLeaderFlag || !code || !state || !state.__stage || !state.__trainer) return;
     if (followTarget === state.__trainer) return;
@@ -1898,6 +1932,9 @@
     followTimer = setTimeout(() => {
       if (isLeaderFlag || !code || followTarget === target || lastLeaderTrainer !== target) return;
       followTarget = target;
+      // новая страница не должна верить строке в базе больше, чем живому
+      // учителю (см. FOLLOW_KEY у activate)
+      ssSet(FOLLOW_KEY, target + '|' + Date.now());
       const url = urlForTrainer(target, code);
       if (IN_STAGE) toStageHost({ type: 'nav', url: url });
       else { try { location.href = url; } catch (e) {} }
@@ -2001,6 +2038,10 @@
     if (!joinedAt) joinedAt = Date.now();
     const data = { leader: !!isLeaderFlag, stage: IN_STAGE };
     if (!isLeaderFlag) data.dv = DEVICE_KIND;
+    // учитель говорит, на какой он странице, — см. «ученик не там, где учитель»
+    // у обработчика сигналов: на досках снимков почти нет, и сигнал — единственное,
+    // что регулярно приносит ученику страницу учителя
+    else data.pg = trainerSlug;
     if (ask) data.ask = 1;
     broadcastEvent('hb', data);
   }
@@ -2030,6 +2071,45 @@
   }
   // ученик: учитель отключил это устройство
   onEvent('kick', (d) => { if (d && d.uid === CLIENT_ID && !isLeaderFlag) leaveSession('kicked'); });
+
+  /* «Обновить» у устройства ученика в панели учителя. Зачем: у ученика бывает,
+     что страница «застряла» — доска учителя не догрузилась, кадр сцены
+     остался на старом экране, — а сам ученик (часто ребёнок) не знает, что
+     нажать, или сидит с планшета, где перезагрузка неочевидна. Учитель
+     перезагружает ему страницу сам, не прерывая занятия: код и роль живут во
+     вкладке ученика, поэтому после перезагрузки он сразу снова в той же
+     сессии и на той же странице, что учитель.
+     Сообщение уходит дважды (одно может потеряться), а перезагрузиться нужно
+     один раз — поэтому у просьбы свой номер, и выполненный номер помнится
+     во вкладке: повтор, пришедший уже на свежую страницу, её не перезагрузит */
+  const RELOAD_DONE_KEY = 'tsReload:done';
+  function reloadStudent(uid) {
+    if (!isLeaderFlag || !code) return;
+    const rid = generateCode(8);
+    const data = { uid: uid || '*', rid: rid };
+    broadcastEvent('reload_page', data);
+    setTimeout(() => broadcastEvent('reload_page', data), 500);
+  }
+  // перезагрузить страницу ученика целиком. На сцене — саму сцену, а не только
+  // кадр: «застрять» может и сцена (ждёт кадр, который так и не сказал
+  // «готово»), а сцена при загрузке заново заводит кадр с той страницей, где
+  // сейчас учитель
+  function reloadOwnPage(rid) {
+    // на сцене номер просьбы проверяет сама сцена: просьба доходит и до
+    // кадра, который сцена уже убирает (старая страница после перехода), —
+    // запомни номер он, кадр на экране счёл бы просьбу выполненной
+    if (IN_STAGE) { toStageHost({ type: 'reload', rid: rid || '' }); return; }
+    if (rid) {
+      if (ssGet(RELOAD_DONE_KEY) === rid) return;
+      ssSet(RELOAD_DONE_KEY, rid);
+    }
+    try { location.reload(); } catch (e) {}
+  }
+  onEvent('reload_page', (d) => {
+    if (!d || isLeaderFlag || !d.rid) return;
+    if (d.uid !== '*' && d.uid !== CLIENT_ID) return;
+    reloadOwnPage(d.rid);
+  });
 
   /* Промпт №82: ученик сам выходит из сессии («Выйти из сессии» в панели) —
      или его отключил учитель. Код и роль стираются из браузера: следующий
@@ -2989,7 +3069,25 @@
           kick.textContent = 'Отключить';
           kick.title = 'Отключить это устройство от занятия. Вернуться можно по ссылке';
           kick.addEventListener('click', (ev) => { ev.stopPropagation(); kickDevice(d.uid); });
-          row.appendChild(label); row.appendChild(kick);
+          // «Обновить» — перезагрузить страницу у этого ученика (см. reloadStudent)
+          const rel = document.createElement('button');
+          rel.type = 'button';
+          rel.className = 'ts-dev-reload';
+          rel.textContent = 'Обновить';
+          rel.title = 'Перезагрузить страницу у этого ученика — если у него что-то не загрузилось. Из занятия он не выйдет';
+          rel.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            reloadStudent(d.uid);
+            // подтверждение прямо на кнопке: ученик мог и не исчезнуть из списка,
+            // и без отклика непонятно, ушла ли команда
+            rel.textContent = 'Обновляем…';
+            rel.disabled = true;
+            setTimeout(() => { rel.textContent = 'Обновить'; rel.disabled = false; }, 3000);
+          });
+          const btns = document.createElement('span');
+          btns.className = 'ts-dev-btns';
+          btns.appendChild(rel); btns.appendChild(kick);
+          row.appendChild(label); row.appendChild(btns);
           box.appendChild(row);
         });
       }
@@ -3146,6 +3244,11 @@
       .ts-dev-kick{font-size:11.5px;font-weight:600;padding:4px 8px;border-radius:8px;cursor:pointer;flex:0 0 auto;
         background:none;border:1px solid var(--teacher,#d9534f);color:var(--teacher,#d9534f);}
       .ts-dev-kick:hover{background:rgba(217,83,79,.08);}
+      .ts-dev-btns{display:flex;gap:6px;flex:0 0 auto;}
+      .ts-dev-reload{font-size:11.5px;font-weight:600;padding:4px 8px;border-radius:8px;cursor:pointer;flex:0 0 auto;
+        background:none;border:1px solid var(--ink,#2f6fed);color:var(--ink,#2f6fed);}
+      .ts-dev-reload:hover{background:rgba(47,111,237,.08);}
+      .ts-dev-reload:disabled{opacity:.6;cursor:default;}
       .ts-end-confirm{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:12px;
         background:rgba(217,83,79,.07);border:1px solid rgba(217,83,79,.35);}
       .ts-share-row button.ts-end-yes{background:var(--teacher,#d9534f);flex:1;}
@@ -3409,6 +3512,8 @@
     socketBacklog,
     // Промпт №82: повтор нажатий в областях шагов, устройства, выход
     mirrorActions, kickDevice, leaveSession, studentDevices,
+    // «Обновить» ученика: учитель перезагружает страницу ученика; ученик — свою (доска не догрузилась)
+    reloadStudent, reloadOwnPage,
     // Промпт №75: несколько сессий в одном браузере
     openNewSessionTab, goToSession,
     getSessionName: () => (amTabHolder() ? sessionLabel(regGet(code)) : ''),

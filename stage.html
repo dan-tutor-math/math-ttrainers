@@ -537,6 +537,20 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
     // Промпт №82: ученик сам вышел из занятия — код его браузер уже забыл,
     // главная откроется обычной страницей
     if (d.type === 'left') { location.href = new URL('index.html', location.href).toString(); return; }
+    // «Обновить» учителя (или кнопка ученика на заставке доски): перезагружаем
+    // сцену целиком, а не один кадр — заново заводится и кадр, и размер, и
+    // ожидание «готово». Код в адресе сцены, роль — во вкладке, поэтому
+    // ученик возвращается в то же занятие сам
+    // Просьба учителя уходит дважды — номер выполненной помним во вкладке,
+    // чтобы повтор не перезагрузил уже свежую сцену (сообщения от старого,
+    // уходящего кадра сюда не доходят — whichFrame выше)
+    if (d.type === 'reload') {
+      if (d.rid) {
+        try { if (sessionStorage.getItem('tsReload:done') === d.rid) return; sessionStorage.setItem('tsReload:done', d.rid); } catch (_) {}
+      }
+      try { location.reload(); } catch (_) {}
+      return;
+    }
     if (ended) return;
     if (d.type === 'size') {
       try { sessionStorage.setItem(SIZE_KEY, JSON.stringify({ w: d.w, h: d.h })); } catch (_) {}

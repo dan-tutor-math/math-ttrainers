@@ -79,6 +79,8 @@
   const BACKLOG_MAX = 64 * 1024; // в буфере сокета больше этого — следующую часть придержим
   const LIVE_MS = 30;           // живое (штрих, фигура, текст, перетаскивание, камера) — как штрихи на тренажёрах
   const PROTO = 2;              // версия способа передачи (см. bd_hello)
+  const BACKLOG_STALL_MS = 4000; // буфер сокета не пустеет дольше — не верим ему (см. pumpBulk)
+  const PACK_STALL_MS = 8000;   // доска сжимается дольше — начинаем рассылку заново (см. sendFull)
 
   /* ── сжатие ──
      CompressionStream есть во всех нынешних браузерах (Safari — с 16.4).
@@ -168,9 +170,13 @@
     // key — чтобы одна и та же часть, запрошенная дважды, не встала в
     // очередь второй раз
     const bulk = [];
-    let bulkTimer = null, lastBulkAt = 0;
+    let bulkTimer = null, lastBulkAt = 0, heldSince = 0;
+    // когда очередь в последний раз сдвинулась (ушла часть или очередь только
+    // что начала наполняться) — по нему видно, что рассылка застряла
+    let bulkMovedAt = 0;
     function sendBulk(name, data, key) {
       if (key && bulk.some(m => m[2] === key)) return;
+      if (!bulk.length) bulkMovedAt = Date.now();
       bulk.push([name, data, key]);
       if (!bulkTimer) bulkTimer = setTimeout(pumpBulk, 0);
     }
@@ -179,9 +185,16 @@
       if (!bulk.length) return;
       const wait = lastBulkAt + BULK_GAP_MS - Date.now();
       const backlog = TS.socketBacklog ? TS.socketBacklog() : 0;
-      if (wait > 0 || backlog > BACKLOG_MAX) { bulkTimer = setTimeout(pumpBulk, Math.max(wait, 50)); return; }
+      // буфер не пустеет слишком долго — значит, он не настоящий (сокет
+      // подвис, библиотека шлёт мимо него): держать очередь дальше — это
+      // ученик с вечной загрузкой. Отпускаем по одной части в BACKLOG_STALL_MS
+      const now = Date.now();
+      if (backlog > BACKLOG_MAX) { if (!heldSince) heldSince = now; } else heldSince = 0;
+      const stalled = heldSince && now - heldSince > BACKLOG_STALL_MS;
+      if (wait > 0 || (backlog > BACKLOG_MAX && !stalled)) { bulkTimer = setTimeout(pumpBulk, Math.max(wait, 50)); return; }
+      if (stalled) heldSince = now;
       const m = bulk.shift();
-      lastBulkAt = Date.now();
+      lastBulkAt = bulkMovedAt = Date.now();
       TS.broadcastEvent(m[0], m[1]);
       if (bulk.length) bulkTimer = setTimeout(pumpBulk, BULK_GAP_MS);
     }
@@ -191,6 +204,7 @@
     let ver = 0;               // номер правки внутри неё
     let pack = null;           // упакованная доска текущей рассылки: { sync, bid, z, chunks, settings, size }
     let packing = 0;           // номер рассылки, которая сейчас сжимается
+    let packingAt = 0;         // когда начали сжимать
     let noGz = !CAN_GZIP;      // кто-то из учеников не умеет распаковывать
     let lastFullAt = 0;
     let shownId = undefined;   // какая доска сейчас «в эфире» (null — список)
@@ -298,6 +312,7 @@
       imgs.clear();
       pack = null;
       packing = my;
+      packingAt = Date.now();
       lastFullAt = Date.now();
       sent = new Map();
       const objs = B.objects.map((o) => { sent.set(o.id, sig(o)); return slim(o); });
@@ -495,7 +510,21 @@
       const v = viewers();
       const nowId = boardOpen() ? B.id : null;
       if (!v) { hadViewers = false; return; }
+      /* Сжатие доски не закончилось за PACK_STALL_MS. Пока packing стоит,
+         учитель молчит: правки копятся, просьбы ученика «пришли доску»
+         ждут «шапку», которая уйдёт «сама», — а если сжатие так и не
+         вернулось (вкладку учителя браузер заморозил посреди него, сбой
+         потока), то не уйдёт никогда, и ученик видит загрузку без конца.
+         Лечилось только уходом учителя с доски и возвратом. Теперь —
+         начинаем рассылку заново; ответ зависшего сжатия, если всё же
+         придёт, отбросится по номеру рассылки */
+      if (packing && Date.now() - packingAt > PACK_STALL_MS) { packing = 0; sendFull(); return; }
       if (!hadViewers || nowId !== shownId) {
+        // пришёл ученик — заодно переписываем строку сессии: «группа на
+        // досках». Сами доски снимков почти не шлют, и строка могла помнить
+        // прежнюю страницу — тогда каждый новый или перезагрузившийся ученик
+        // сначала попадал туда и только потом, по сигналу учителя, сюда
+        if (!hadViewers) TS.push();
         hadViewers = true;
         if (nowId) sendFull(); else sendClosed();
         return;
@@ -522,7 +551,10 @@
         // доска ещё едет — новому ученику хватит «шапки»: части, что уже
         // ушли до него, он дозапросит по номерам. Начинать всё заново —
         // это и был бесконечный круг (см. вверху файла)
-        if (!repack && pack && pack.bid === B.id && chunksQueued(pack.sync)) { sendMeta(); return; }
+        // Но только если очередь движется: стоит дольше BACKLOG_STALL_MS —
+        // рассылка застряла, и «шапка» без частей ученику ничего не даст
+        const moving = Date.now() - bulkMovedAt < BACKLOG_STALL_MS + BULK_GAP_MS;
+        if (!repack && pack && pack.bid === B.id && chunksQueued(pack.sync) && moving) { sendMeta(); return; }
         sendFull();
       }, 120);
     });
@@ -584,23 +616,40 @@
         text-align:center;padding:24px;box-sizing:border-box;}
       #bdViewerWait.hidden{display:none;}
       #bdViewerWait b{display:block;color:var(--pencil,#222);font-size:20px;margin-bottom:6px;}
+      #bdViewerWaitNote{display:block;margin-top:10px;font-size:14px;max-width:360px;margin-left:auto;margin-right:auto;}
+      #bdViewerWaitNote:empty{display:none;}
+      #bdViewerReload{margin-top:14px;font:inherit;font-size:15px;font-weight:600;padding:10px 18px;border-radius:12px;
+        border:none;cursor:pointer;background:var(--ink,#2f6fed);color:#fff;pointer-events:auto;}
+      #bdViewerReload[hidden]{display:none;}
     `;
     document.head.appendChild(st);
     document.documentElement.classList.add('bd-viewer');
     const wait = document.createElement('div');
     wait.id = 'bdViewerWait';
-    wait.innerHTML = '<div><b>Доска учителя</b><span id="bdViewerWaitText">Подключаемся…</span></div>';
+    wait.innerHTML = '<div><b>Доска учителя</b><span id="bdViewerWaitText">Подключаемся…</span>'
+      + '<span id="bdViewerWaitNote"></span><button type="button" id="bdViewerReload" hidden>Обновить страницу</button></div>';
     document.body.appendChild(wait);
     const waitText = wait.querySelector('#bdViewerWaitText');
-    function showWait(text) { waitText.textContent = text; wait.classList.remove('hidden'); }
-    function hideWait() { wait.classList.add('hidden'); }
+    const waitNote = wait.querySelector('#bdViewerWaitNote');
+    const reloadBtn = wait.querySelector('#bdViewerReload');
+    // с какого момента ученик смотрит на заставку: застряла дольше
+    // STUCK_MS — предлагаем обновить страницу (см. проверку ниже)
+    let waitSince = Date.now();
+    function showWait(text) {
+      if (wait.classList.contains('hidden')) waitSince = Date.now();
+      waitText.textContent = text; wait.classList.remove('hidden');
+    }
+    function hideWait() { wait.classList.add('hidden'); reloadBtn.hidden = true; waitNote.textContent = ''; }
+    // перезагрузка — через сессию: на сцене перезагружается сама сцена, а не
+    // только этот кадр (см. reloadOwnPage в session-share.js)
+    reloadBtn.addEventListener('click', (e) => { e.preventDefault(); TS.reloadOwnPage ? TS.reloadOwnPage() : location.reload(); });
     screenList.style.display = 'none';
 
     // ученик смотрит, а не управляет: колесо, клавиши, жесты — мимо движка.
     // Кроме кнопки справочных материалов и её «свернуть» (на планшете
     // preventDefault у касания отменил бы и само нажатие) и текста в
     // справочной панели — его можно листать
-    const REF_FREE = '#bdRefToggle, #bdRefClose, #bdRefTextarea';
+    const REF_FREE = '#bdRefToggle, #bdRefClose, #bdRefTextarea, #bdViewerReload';
     const block = (e) => {
       const t = e.target;
       if (e.type !== 'keydown' && t && t.closest && t.closest(REF_FREE)) return;
@@ -1014,6 +1063,33 @@
         else hello();
       }
       wasOnline = on;
+    }, 1000);
+
+    /* Заставка висит, а доски всё нет. Раньше ученик (часто ребёнок) видел
+       бесконечное «Подключаемся…» и не понимал, ждать или что-то делать, а
+       учитель не видел, что у ученика не так. Теперь:
+       - нет связи с сервером — так и пишем: дело в интернете, а не в
+         учителе (и учителю ученик может это сказать словами);
+       - через STUCK_MS без доски — кнопка «Обновить страницу». Код и роль
+         живут во вкладке, после перезагрузки ученик снова в том же занятии.
+       «Учитель выбирает доску…» — не застревание: учитель на списке досок,
+       ждать там можно сколько угодно */
+    const STUCK_MS = 15000;
+    setInterval(() => {
+      if (wait.classList.contains('hidden')) return;
+      const picking = !complete && !assembling && !unpacking && waitText.textContent.indexOf('выбирает') >= 0;
+      if (picking) { waitSince = Date.now(); reloadBtn.hidden = true; waitNote.textContent = ''; return; }
+      const conn = TS.getConnState ? TS.getConnState() : 'online';
+      let note = '';
+      // первые секунды сокет ещё только подключается — это не повод писать
+      // ученику про связь
+      const long = Date.now() - waitSince > 4000;
+      if (long && conn === 'offline') note = 'Нет связи с сервером. Проверьте интернет — доска появится, когда связь вернётся.';
+      else if (long && conn !== 'online') note = 'Связь с сервером восстанавливается…';
+      const stuck = Date.now() - waitSince > STUCK_MS;
+      if (!note && stuck) note = 'Доска загружается дольше обычного. Можно обновить страницу — вы останетесь на занятии.';
+      if (waitNote.textContent !== note) waitNote.textContent = note;
+      reloadBtn.hidden = !stuck;
     }, 1000);
 
     // для тестов и отладки: сколько точек живого штриха учителя сейчас на экране
