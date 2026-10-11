@@ -320,7 +320,8 @@ def test_oge9(browser):
 def test_oge19(browser):
     ctx, page, errors = new_page(browser, f"{BASE}/oge19.html")
     cards = page.eval_on_selector_all('#modesGrid .mode-card', 'es => es.map(e => [e.dataset.id, e.innerText])')
-    check("oge19: экран выбора — нулевой тип и прежний", [c[0] for c in cards] == ['demo2027', 'geom'], str(cards))
+    # третьим с правки «банк ФИПИ №19» идёт тип 'fipi' — его проверяет test_prompt_fipi19.py
+    check("oge19: экран выбора — нулевой тип и прежний", [c[0] for c in cards][:2] == ['demo2027', 'geom'], str(cards))
     check("oge19: задания до выбора типа не видно", page.eval_on_selector('#taskArea', 'e => e.style.display') == 'none')
     st = page.evaluate("window.__trainerState.get()")
     check("oge19: экран выбора в общем снимке", st.get("picker") is True and st.get("curMode") is None, str(st)[:80])
