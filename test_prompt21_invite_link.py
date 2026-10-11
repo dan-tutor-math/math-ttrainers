@@ -21,8 +21,8 @@
   D. Платформа уже открыта в соседней вкладке: окно, подключение во второй
      вкладке, первая осталась со своей сессией.
   E. «Отмена» — обычная страница без кода, своя сессия, без сцены.
-  F. Завершённое занятие — «Это занятие уже завершено», «Остаться» —
-     обычная страница.
+  F. Завершённое занятие — «Это занятие уже завершено», только «На
+     главную» (и поле для другого кода), «Остаться» нет.
   G. Неверный код — «Сессия не найдена», поле для кода; код, набранный
      вручную (строчными, с пробелами), подключает сразу.
   H. Учитель ушёл, строка осталась — окно подключения с пометкой «Учитель
@@ -253,17 +253,17 @@ def part_b_to_k(browser):
     late.goto(link2)
     info = wait_invite(late, "ended")
     check("F: «Это занятие уже завершено»", bool(info) and info["h"] == "Это занятие уже завершено", info)
-    check("F: с кнопками «На главную» и «Остаться на этой странице»",
-          bool(info) and info["main"] == "На главную" and info["second"] == "Остаться на этой странице", info)
+    check("F: только «На главную», «Остаться на этой странице» нет",
+          bool(info) and info["main"] == "На главную" and info["second"] is None, info)
     check("F: и полем для другого кода", bool(info) and info["form"], info)
-    late.click("#tsInvSecond")
+    late.click("#tsInvMain")
     try:
-        late.wait_for_url(lambda u: "oge9.html" in u and "s=" not in u, timeout=10000)
+        late.wait_for_url(lambda u: "index.html" in u and "s=" not in u, timeout=10000)
         own = t54.wait_code(late)
         ok = own != code2 and late.evaluate("() => TrainerSession.isLeader()")
     except Exception:
         ok = False
-    check("F: «Остаться» — обычная страница, к завершённому не подключается", ok, late.url)
+    check("F: «На главную» — обычная главная, к завершённому не подключается", ok, late.url)
 
     print("G. Неверный код")
     wrong = participant(ctx, "S5", 1100, 750)
@@ -273,6 +273,7 @@ def part_b_to_k(browser):
     check("G: «Сессия не найдена» с кодом из ссылки",
           bool(info) and info["h"] == "Сессия не найдена" and "ZZZZ2222" in (info["text"] or ""), info)
     check("G: поле для кода есть", bool(info) and info["form"], info)
+    check("G: и только «На главную», без «Остаться»", bool(info) and info["main"] == "На главную" and info["second"] is None, info)
     wrong.fill("#tsInvInput", "  " + code[:4].lower() + " " + code[4:].lower() + " ")
     wrong.click("#tsInvInputBtn")
     try:
@@ -338,14 +339,15 @@ def part_b_to_k(browser):
     except Exception:
         ok = False
     check("K: на сцене — «Сессия не найдена», а не пустой экран", ok)
-    st_page.click("#endedStay")
+    check("K: «Открыть страницу без сессии» нет", st_page.evaluate("() => !document.getElementById('endedStay')"))
+    st_page.click("#endedHome")
     try:
-        st_page.wait_for_url(lambda u: "oge8.html" in u and "s=" not in u and "stage.html" not in u, timeout=10000)
+        st_page.wait_for_url(lambda u: "index.html" in u and "s=" not in u and "stage.html" not in u, timeout=10000)
         t54.wait_code(st_page)
         ok = st_page.evaluate("() => TrainerSession.isLeader()")
     except Exception:
         ok = False
-    check("K: «Открыть страницу без сессии» — обычная страница", ok, st_page.url)
+    check("K: «На главную» — обычная главная", ok, st_page.url)
     ctx.close()
 
 

@@ -116,6 +116,20 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;touch-
 #bar .sep{width:1px;height:20px;background:var(--bar-border);margin:0 3px;}
 #bar.vertical .sep{width:20px;height:1px;margin:3px 0;}
 #zoomLabel{min-width:52px;font-variant-numeric:tabular-nums;}
+/* дверь — квадрат под значок, как «+» и «−» */
+#leaveBtn{width:34px;min-width:34px;padding:0;}
+#leaveBtn[aria-expanded="true"]{background:var(--bar-active);}
+/* подтверждение выхода — пузырь в стиле капсулы над (или слева от) дверью */
+#leaveAsk{position:fixed;z-index:12;padding:12px;border-radius:14px;background:var(--bar-bg);border:1px solid var(--bar-border);
+  backdrop-filter:blur(14px) saturate(150%);-webkit-backdrop-filter:blur(14px) saturate(150%);
+  box-shadow:0 6px 24px rgba(0,0,0,.35);color:var(--bar-ink);width:max-content;max-width:calc(100vw - 24px);box-sizing:border-box;}
+#leaveAsk[hidden]{display:none;}
+#leaveAsk .q{font-size:14px;font-weight:600;margin:0 2px 10px;text-align:center;}
+#leaveAsk .row{display:flex;gap:6px;}
+#leaveAsk button{appearance:none;flex:1;min-width:84px;height:34px;padding:0 12px;border-radius:10px;border:1px solid var(--bar-border);
+  background:none;color:inherit;font:inherit;font-size:13px;font-weight:600;cursor:pointer;}
+#leaveAsk button:hover{background:var(--bar-hover);}
+#leaveAsk #leaveYes{background:var(--bar-active);}
 /* сбоку поле узкое (телефон лёжа) — подпись «Обычный режим» не влезла бы и
    легла на задание, там вместо неё значок; полное название — в подсказке */
 #bar .short{display:none;font-size:16px;}
@@ -152,7 +166,6 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;touch-
 #ended p{margin:0 0 18px;font-size:15px;color:var(--bar-muted);line-height:1.45;}
 #ended .home{display:block;width:100%;padding:11px 14px;border-radius:12px;border:none;cursor:pointer;
   background:#f1f2f4;color:#1f2126;font:inherit;font-size:15px;font-weight:600;}
-#ended .stay{margin-top:8px;background:none;border:none;color:var(--bar-muted);font:inherit;font-size:13px;cursor:pointer;padding:6px;}
 </style>
 </head>
 <body>
@@ -173,9 +186,22 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;touch-
   <button id="zoomLabel" title="Показать экран учителя целиком">100%</button>
   <button id="zoomIn" title="Увеличить" aria-label="Увеличить">+</button>
   <button id="panBtn" aria-pressed="false" title="Двигать увеличенный экран" aria-label="Двигать увеличенный экран">✋</button>
+  <span class="sep"></span>
+  <!-- выйти из занятия сразу на главную. Только значок, квадратная, как
+       «+» и «−»; не красная — в цвет капсулы: это не «опасная» кнопка, а
+       дверь. Случайное касание на телефоне выкинуло бы с урока, поэтому
+       выход — только после подтверждения в пузыре над панелью (#leaveAsk) -->
+  <button id="leaveBtn" title="Выйти из занятия на главную" aria-label="Выйти из занятия на главную" aria-haspopup="dialog" aria-expanded="false"><svg class="door" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 4H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6"/><path d="M16 8l4 4-4 4"/><path d="M20 12H10"/></svg></button>
   <!-- Промпт №82: «Обычный режим» убран — он работал неверно (записи доски
        у ученика оказывались не на своих местах). Выйти из занятия — в панели
        «Совместный доступ» -->
+</div>
+<div id="leaveAsk" role="dialog" aria-label="Выйти из занятия?" hidden>
+  <div class="q">Выйти из занятия?</div>
+  <div class="row">
+    <button id="leaveNo" type="button">Отмена</button>
+    <button id="leaveYes" type="button">Выйти</button>
+  </div>
 </div>
 <div id="status">Подключаемся к экрану учителя…</div>
 <div id="conn" class="hidden" role="status" aria-live="polite"></div>
@@ -185,7 +211,6 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;touch-
     <h2 id="endedTitle">Занятие завершено</h2>
     <p id="endedText">Спасибо за урок, до свидания!</p>
     <button class="home" id="endedHome">На главную</button>
-    <button class="stay" id="endedStay">Остаться на этой странице</button>
   </div>
 </div>
 
@@ -344,6 +369,62 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;touch-
     panBtn.setAttribute('aria-pressed', panning ? 'true' : 'false');
   }
   panBtn.onclick = () => setPanning(!panning);
+
+  /* ── выйти из занятия ──
+     Кадр выходит сам (leaveSession в session-share.js): прощается с
+     учителем, забывает код и роль и говорит сцене «left» — та уводит на
+     главную. Кадр не ответил (ещё грузится, связь оборвалась) — через
+     1,5 с забываем код сами (те же ключи, что стирает кадр) и уходим:
+     иначе главная по сохранённой роли снова открыла бы сцену */
+  const leaveBtn = document.getElementById('leaveBtn');
+  const leaveAsk = document.getElementById('leaveAsk');
+  let exiting = false, leaveAskT = null;
+  function goHomeForgetting(){
+    try {
+      if (sessionStorage.getItem('tsTab:code') === code) { sessionStorage.removeItem('tsTab:code'); sessionStorage.removeItem('tsTab:role'); }
+      if (sessionStorage.getItem('tsInvite:ok') === code) sessionStorage.removeItem('tsInvite:ok');
+      if (localStorage.getItem('trainerSession:global') === code) { localStorage.removeItem('trainerSession:global'); localStorage.removeItem('trainerSession:global:role'); }
+      if (localStorage.getItem('trainerSession:lastJoinCode') === code) localStorage.removeItem('trainerSession:lastJoinCode');
+    } catch (_) {}
+    location.href = new URL('index.html', location.href).toString();
+  }
+  // пузырь — у двери: над горизонтальной панелью, слева от вертикальной
+  function placeLeaveAsk(){
+    const b = leaveBtn.getBoundingClientRect(), a = leaveAsk.getBoundingClientRect();
+    const vw = window.innerWidth, vh = window.innerHeight;
+    let x, y;
+    if (bar.classList.contains('vertical')) { x = b.left - a.width - 10; y = b.top + b.height / 2 - a.height / 2; }
+    else { x = b.left + b.width / 2 - a.width / 2; y = bar.getBoundingClientRect().top - a.height - 8; }
+    leaveAsk.style.left = Math.max(12, Math.min(vw - a.width - 12, x)) + 'px';
+    leaveAsk.style.top = Math.max(12, Math.min(vh - a.height - 12, y)) + 'px';
+  }
+  function showLeaveAsk(on){
+    leaveAsk.hidden = !on;
+    leaveBtn.setAttribute('aria-expanded', on ? 'true' : 'false');
+    bar.classList.toggle('show', on);
+    clearTimeout(leaveAskT);
+    if (!on) return;
+    placeLeaveAsk();
+    // не ответил — вопрос уходит сам: ученик мог задеть дверь случайно
+    leaveAskT = setTimeout(() => showLeaveAsk(false), 6000);
+  }
+  leaveBtn.onclick = () => { if (!exiting) showLeaveAsk(leaveAsk.hidden); };
+  document.getElementById('leaveNo').onclick = () => showLeaveAsk(false);
+  document.getElementById('leaveYes').onclick = () => {
+    if (exiting) return;
+    exiting = true;
+    showLeaveAsk(false);
+    try { active && active.contentWindow.postMessage({ source: 'ts-stage-host', type: 'leave' }, location.origin); } catch (_) {}
+    setTimeout(goHomeForgetting, 1500);
+  };
+  // нажатие мимо пузыря (в том числе по экрану учителя в кадре — оно сюда
+  // не доходит, поэтому и таймер выше) закрывает вопрос
+  document.addEventListener('pointerdown', (e) => {
+    if (leaveAsk.hidden) return;
+    if (e.target.closest && e.target.closest('#leaveAsk, #leaveBtn')) return;
+    showLeaveAsk(false);
+  }, true);
+  window.addEventListener('resize', () => { if (!leaveAsk.hidden) placeLeaveAsk(); });
   let drag = null;
   pan.addEventListener('pointerdown', (e) => {
     // пальцы двигают сцену через «щипок и перетаскивание» ниже — здесь
@@ -475,7 +556,7 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;touch-
   // касания над самой сценой (поля, «рука», панель масштаба)
   ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach((t) => {
     document.addEventListener(t, (e) => {
-      if (e.target && e.target.closest && e.target.closest('#bar, #ended, #status a')) return;   // кнопки — как обычно
+      if (e.target && e.target.closest && e.target.closest('#bar, #leaveAsk, #ended, #status a')) return;   // кнопки — как обычно
       const kind = t === 'touchstart' ? 'start' : t === 'touchmove' ? 'move' : 'end';
       const took = onTouches(kind, listOf(e.touches, (p) => ({ x: p.clientX, y: p.clientY })), true);
       if ((took || e.touches.length > 1) && e.cancelable) e.preventDefault();
@@ -487,7 +568,7 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;touch-
   let lastTapAt = 0;
   document.addEventListener('touchend', (e) => {
     const now = Date.now();
-    if (now - lastTapAt < 320 && e.cancelable && !(e.target && e.target.closest && e.target.closest('#bar, #ended'))) e.preventDefault();
+    if (now - lastTapAt < 320 && e.cancelable && !(e.target && e.target.closest && e.target.closest('#bar, #leaveAsk, #ended'))) e.preventDefault();
     lastTapAt = now;
   }, { passive: false });
 
@@ -823,11 +904,9 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;touch-
       document.getElementById('endedText').textContent = 'Если это ошибка — попросите у учителя ссылку ещё раз.';
     } else if (late === 'missing') {
       // промпт №21 нового списка: по коду в адресе никого нет
-      endedMissing = true;
       document.querySelector('#ended .icon').textContent = '🔍';
       document.getElementById('endedTitle').textContent = 'Сессия не найдена';
       document.getElementById('endedText').textContent = 'Код неверный или занятие уже закончилось. Попросите у учителя новую ссылку.';
-      document.getElementById('endedStay').textContent = 'Открыть страницу без сессии';
     } else if (late) document.getElementById('endedTitle').textContent = 'Это занятие уже завершено';
     statusEl.classList.add('hidden');
     connEl.classList.add('hidden');
@@ -837,18 +916,14 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;touch-
     endedEl.classList.add('on');
   }
   document.getElementById('endedHome').addEventListener('click', () => { location.href = new URL('index.html', location.href).toString(); });
-  // «остаться» при ненайденной сессии — смотреть в рамке нечего: та же
-  // страница, но обычная, без кода
-  let endedMissing = false;
+  // «Остаться на этой странице» (и «Открыть страницу без сессии» у
+  // ненайденной) убрано по просьбе Даниила: занятие кончилось или
+  // устройство отключили — ученику только «На главную»
   function leaveToPlain(){
     const u = targetUrl(frameHref() || params.get('to'));
     u.searchParams.delete('s');
     location.href = u.toString();
   }
-  document.getElementById('endedStay').addEventListener('click', () => {
-    if (endedMissing) { leaveToPlain(); return; }
-    endedEl.classList.remove('on');
-  });
 
   /* ── сообщения из кадров ── */
   function whichFrame(src){

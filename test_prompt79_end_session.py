@@ -10,7 +10,7 @@
 Проверяем:
   A. Подтверждение: «Завершить сессию» → «Отмена» ничего не завершает.
   B. Ученик на сцене: надпись поверх последнего экрана, кадр на той же
-     странице, код стёрт; «Остаться» прячет надпись; «На главную» — обычная
+     странице, код стёрт; «Остаться» нет (убрано); «На главную» — обычная
      главная, без сцены и без старого кода.
   C. Ученик в обычном режиме (на доске учителя): та же надпись на странице.
   D. Учитель: новый код, старой сессии нет в списке, строка в базе
@@ -107,9 +107,8 @@ def run_main(browser):
     check("C: ученик в обычном режиме — надпись поверх страницы", ok)
     check("C: та же надпись и «На главную»", plain.is_visible("#tsEndedHome") and "Занятие завершено" in plain.inner_text("#tsEnded"))
     check("C: страница та же", plain.url.split("?")[0].endswith("/oge11.html"), plain.url)
-    plain.click("#tsEndedStay")
-    check("C: «Остаться» — надпись убрана, страница на месте",
-          not plain.evaluate("() => !!document.getElementById('tsEnded')") and plain.url.split("?")[0].endswith("/oge11.html"))
+    check("C: «Остаться на этой странице» нет — только «На главную»",
+          plain.evaluate("() => !document.getElementById('tsEndedStay') && document.querySelectorAll('#tsEnded button').length === 1"))
     check("C: ученик больше не в сессии", plain.evaluate("() => TrainerSession.getCode()") is None)
 
     teacher.wait_for_function("() => document.getElementById('tsCodeMsg').textContent.indexOf('завершена') >= 0", timeout=8000)
@@ -132,9 +131,8 @@ def run_main(browser):
     check("F: и код забыт", off.evaluate("() => TrainerSession.getCode()") is None)
 
     print("B. «На главную»")
-    student.click("#endedStay")
-    check("B: «Остаться» прячет надпись на сцене", not student.evaluate(ENDED_ON))
-    student.evaluate("() => document.getElementById('ended').classList.add('on')")
+    check("B: на сцене «Остаться на этой странице» нет — только «На главную»",
+          student.evaluate("() => !document.getElementById('endedStay') && document.querySelectorAll('#ended button').length === 1"))
     student.click("#endedHome")
     student.wait_for_url("**/index.html", timeout=8000)
     student.wait_for_function("() => window.TrainerSession && window.TrainerSession.getCode()", timeout=10000)
@@ -158,7 +156,9 @@ def run_main(browser):
     check("E: в обычном режиме — тоже", ok and "уже завершено" in late2.inner_text("#tsEnded"))
     late2.wait_for_function("() => window.TrainerSession && window.TrainerSession.getCode()", timeout=10000)
     check("E: и в старую сессию не подключился", late2.evaluate("() => TrainerSession.getCode()") != old)
-    late2.click("#tsEndedStay")
+    # кнопки «Остаться» больше нет — надпись убираем вручную, чтобы проверить
+    # поле «Подключиться» на этой же странице
+    late2.evaluate("() => document.getElementById('tsEnded').remove()")
     open_panel(late2)
     late2.fill("#tsJoinInput", old)
     late2.click("#tsJoin")

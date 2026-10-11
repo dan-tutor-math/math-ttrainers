@@ -387,7 +387,7 @@ def part_g_h(browser):
     # ── код устарел (урок кончился) — со сцены на обычную страницу ──
     # (новый ученик: у этого браузера ещё нет роли и кода живой сессии).
     # Промпт №21 нового списка: не молча — сцена сначала говорит «Сессия не
-    # найдена», а «Открыть страницу без сессии» ведёт на обычную страницу
+    # найдена» и только «На главную» («Открыть страницу без сессии» убрано)
     late = participant(ctx, "S3", 800, 600)
     late.goto(f"{BASE}/oge6.html?s=ZZZZ2222")
     try:
@@ -397,14 +397,15 @@ def part_g_h(browser):
     except Exception:
         said = False
     check("H: несуществующий код — сцена говорит «Сессия не найдена»", said, late.url)
+    check("H: кнопки «Остаться»/«Открыть без сессии» нет", late.evaluate("() => !document.getElementById('endedStay')"))
     try:
-        late.click("#endedStay")
-        late.wait_for_url(lambda u: "stage.html" not in u and "oge6.html" in u and "s=" not in u, timeout=15000)
+        late.click("#endedHome")
+        late.wait_for_url(lambda u: "stage.html" not in u and "index.html" in u and "s=" not in u, timeout=15000)
         t54.wait_code(late)
         ok = late.evaluate("() => window.TrainerSession.isLeader()")
     except Exception:
         ok = False
-    check("H: несуществующий код — ученик на обычной странице, без сцены", ok, late.url)
+    check("H: несуществующий код — «На главную», обычная главная без сцены", ok, late.url)
 
     # ── сцена без кода — понятное сообщение, а не пустой экран ──
     student.goto(f"{BASE}/stage.html")

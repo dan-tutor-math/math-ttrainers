@@ -645,6 +645,9 @@
     let acts = {}, mainAct = null, secondAct = null;
     const codeHtml = (k) => `<span class="ts-inv-code-val">${String(k).replace(/[^A-Z0-9]/g, '')}</span>`;
     const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+    // У завершённого занятия и неверного кода — только «На главную» (и поле
+    // для другого кода): «Остаться на этой странице» оставляло ученика на
+    // странице, которая уже ничего не показывает, и он не понимал, что дальше
     const TEXTS = {
       checking: { h: 'Проверяем ссылку…', t: (k) => 'Код сессии ' + codeHtml(k), second: ['Отмена', 'cancel'] },
       ok: { icon: '🔗', h: 'Подключиться к сессии?',
@@ -652,10 +655,10 @@
         main: ['Подключиться', 'join'], second: ['Отмена', 'cancel'] },
       ended: { icon: '👋', h: 'Это занятие уже завершено',
         t: (k) => 'Учитель завершил сессию ' + codeHtml(k) + '. Если урок продолжается — попросите у него новую ссылку.',
-        form: true, main: ['На главную', 'home'], second: ['Остаться на этой странице', 'cancel'] },
+        form: true, main: ['На главную', 'home'] },
       not_found: { icon: '🔍', h: 'Сессия не найдена',
         t: (k) => 'По коду ' + codeHtml(k) + ' сейчас нет занятия: в ссылке опечатка или урок уже закончился. Проверьте код или попросите у учителя новую ссылку.',
-        form: true, main: ['На главную', 'home'], second: ['Остаться на этой странице', 'cancel'] },
+        form: true, main: ['На главную', 'home'] },
       error: { icon: '📡', h: 'Не удалось проверить ссылку',
         t: () => 'Нет связи с сервером. Проверьте интернет и попробуйте ещё раз.',
         main: ['Повторить', 'retry'], second: ['Отмена', 'cancel'] },
@@ -1697,8 +1700,6 @@
       #tsEnded p{margin:0 0 18px;font-size:15px;color:var(--muted-2,#6b7280);line-height:1.45;}
       #tsEnded .ts-ended-home{display:block;width:100%;padding:11px 14px;border-radius:12px;border:none;cursor:pointer;
         background:var(--ink,#2f6fed);color:#fff;font:inherit;font-size:15px;font-weight:600;}
-      #tsEnded .ts-ended-stay{margin-top:8px;background:none;border:none;color:var(--muted-2,#6b7280);font:inherit;
-        font-size:13px;cursor:pointer;padding:6px;}
     `;
     document.head.appendChild(st);
     const el = document.createElement('div');
@@ -1708,11 +1709,11 @@
       <h2>${missing ? 'Сессия не найдена' : kicked ? 'Учитель отключил это устройство' : late ? 'Это занятие уже завершено' : 'Занятие завершено'}</h2>
       <p>${missing ? 'Код неверный или занятие уже закончилось. Попросите у учителя новую ссылку.' : kicked ? 'Если это ошибка — попросите у учителя ссылку ещё раз.' : 'Спасибо за урок, до свидания!'}</p>
       <button class="ts-ended-home" id="tsEndedHome">На главную</button>
-      <button class="ts-ended-stay" id="tsEndedStay">Остаться на этой странице</button>
     </div>`;
+    // «Остаться на этой странице» убрано (просьба Даниила): занятие
+    // закончилось или устройство отключили — ученику дальше только на главную
     document.body.appendChild(el);
     el.querySelector('#tsEndedHome').addEventListener('click', () => { location.href = new URL('index.html', location.href).toString(); });
-    el.querySelector('#tsEndedStay').addEventListener('click', () => el.remove());
   }
 
   async function joinByCode(rawCode) {
@@ -2179,7 +2180,12 @@
   let stageRetired = false;
   if (IN_STAGE) window.addEventListener('message', (e) => {
     const d = e.data;
-    if (e.origin === location.origin && e.source === window.parent && d && d.source === 'ts-stage-host' && d.type === 'retire') stageRetired = true;
+    if (!(e.origin === location.origin && e.source === window.parent && d && d.source === 'ts-stage-host')) return;
+    if (d.type === 'retire') stageRetired = true;
+    // кнопка-дверь на панели сцены: ученик выходит из занятия сам — тем же
+    // путём, что «Выйти из сессии» в панели (прощание, код и роль забыты,
+    // сцена уходит на главную)
+    if (d.type === 'leave') leaveSession('left');
   });
   window.addEventListener('pagehide', () => {
     if (code && channel && !(IN_STAGE && stageRetired)) { try { channel.send({ type: 'broadcast', event: 'ev', payload: { uid: CLIENT_ID, name: 'bye', data: {} } }); } catch (e) {} }
