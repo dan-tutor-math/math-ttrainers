@@ -2130,8 +2130,29 @@
     if (kind === 'kicked') { showEndedScreen('kicked'); return; }
     location.href = new URL('index.html', location.href).toString();
   }
+  /* Экран не гаснет, пока идёт занятие (wake-lock.js). На сцене ученика
+     этим занимается сама сцена (stage.html), здесь — окно верхнего уровня:
+     учитель, у которого на связи ученики (ведёт урок с планшета или
+     ноутбука и подолгу только говорит), и ученик без сцены. Модуль
+     подгружается, только когда понадобился */
+  let wakeWanted = false;
+  function syncWakeLock() {
+    if (IN_ANY_FRAME) return;
+    const want = !!code && (isLeaderFlag ? studentsOnline() > 0 : true);
+    if (want === wakeWanted) return;
+    wakeWanted = want;
+    const go = () => { try { if (window.MathhWakeLock) window.MathhWakeLock[wakeWanted ? 'hold' : 'release'](); } catch (e) {} };
+    if (window.MathhWakeLock || !want) { go(); return; }
+    if (document.querySelector('script[data-wake-lock]')) return;
+    const sc = document.createElement('script');
+    sc.src = new URL('wake-lock.js', location.href).toString();
+    sc.dataset.wakeLock = '1';
+    sc.onload = go;
+    (document.head || document.documentElement).appendChild(sc);
+  }
   setInterval(() => {
     sendHeartbeat(false);
+    syncWakeLock();
     // молчаливая смерть связи (см. выше)
     if (!code || connState !== CONN.ONLINE || !lastPeerAt) return;
     const now = Date.now();

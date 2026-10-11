@@ -2,7 +2,10 @@
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- масштаб страницы браузером запрещён: щипок обрабатывает сама сцена
+     (см. «щипок» в скрипте). Родное увеличение браузера на iPhone роняло
+     страницу — «На странице повторно возникла проблема» -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#1f2126">
 <title>Экран учителя · Тренажёры</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
@@ -45,14 +48,17 @@
   --good:#2e9e5b;
   --cursor:#e5484d;
 }
-html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
+html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;touch-action:none;
   font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%;}
 /* окно просмотра: пока сцена целиком помещается, прокрутки нет; увеличили —
    появляется своя прокрутка сцены (кадр внутри её прокрутить нельзя: у
    ученика прокрутку ведёт учитель) */
-#vp{position:fixed;inset:0;overflow:hidden;}
+#vp{position:fixed;inset:0;overflow:hidden;touch-action:none;}
 #vp.zoomed{overflow:auto;}
-#box{position:relative;background:#fff;}
+#box{position:relative;background:#fff;transform-origin:0 0;}
+/* пока пальцы сводят/разводят — сцена масштабируется картинкой (без
+   перевёрстки и перерисовки кадра), настоящий масштаб — когда отпустили */
+#box.pinching{will-change:transform;}
 /* Кадров два, когда учитель меняет страницу: старый остаётся на экране, а
    новый грузится под ним невидимым и проявляется, только когда уже показывает
    то же, что у учителя. Прячем прозрачностью, а не visibility/display:
@@ -183,9 +189,12 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
   </div>
 </div>
 
+<script src="wake-lock.js"></script>
 <script>
 (function(){
   'use strict';
+  // экран у ученика не гаснет, пока открыта сцена (см. wake-lock.js)
+  try { window.MathhWakeLock && window.MathhWakeLock.hold(); } catch (_) {}
   const params = new URLSearchParams(location.search);
   const code = (params.get('s') || '').trim().toUpperCase();
   const vp = document.getElementById('vp');
@@ -239,6 +248,7 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
   } catch (e) {}
   let zoom = 1;
   const ZOOM_STEPS = [1, 1.25, 1.5, 2, 2.5, 3, 4];
+  const ZOOM_MAX = ZOOM_STEPS[ZOOM_STEPS.length - 1];
   let scale = 1;
 
   /* ── кадры ──
@@ -296,8 +306,8 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
     placeBar(vw, vh, bw, bh);
     placeCursor();
     zoomLabel.textContent = Math.round(zoom * 100) + '%';
-    zoomOutBtn.disabled = zoom <= ZOOM_STEPS[0];
-    zoomInBtn.disabled = zoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1];
+    zoomOutBtn.disabled = zoom <= ZOOM_STEPS[0] + 1e-6;
+    zoomInBtn.disabled = zoom >= ZOOM_MAX - 1e-6;
     panBtn.disabled = zoom <= 1;
     if (zoom <= 1 && panning) setPanning(false);
     window.__stageScale = scale;   // для теста и отладки
@@ -315,14 +325,15 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
   }
 
   function setZoom(z){
-    zoom = Math.min(ZOOM_STEPS[ZOOM_STEPS.length - 1], Math.max(ZOOM_STEPS[0], z));
+    zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_STEPS[0], z));
     layout(true);
+    scheduleFrameDpr();
   }
   zoomInBtn.onclick = () => setZoom(ZOOM_STEPS.find(z => z > zoom + 1e-6) || zoom);
   zoomOutBtn.onclick = () => setZoom([...ZOOM_STEPS].reverse().find(z => z < zoom - 1e-6) || ZOOM_STEPS[0]);
   zoomLabel.onclick = () => setZoom(1);
 
-  window.addEventListener('resize', () => layout(true));
+  window.addEventListener('resize', () => { layout(true); scheduleFrameDpr(); });
   window.addEventListener('orientationchange', () => setTimeout(() => layout(true), 250));
 
   /* ── двигать увеличенную сцену ── */
@@ -335,6 +346,9 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
   panBtn.onclick = () => setPanning(!panning);
   let drag = null;
   pan.addEventListener('pointerdown', (e) => {
+    // пальцы двигают сцену через «щипок и перетаскивание» ниже — здесь
+    // только мышь и перо, иначе одно касание двигало бы сцену дважды
+    if (e.pointerType === 'touch') return;
     drag = { x: e.clientX, y: e.clientY, sl: vp.scrollLeft, st: vp.scrollTop };
     pan.classList.add('drag');
     try { pan.setPointerCapture(e.pointerId); } catch (_) {}
@@ -351,6 +365,207 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;
   pan.addEventListener('pointercancel', endDrag);
   // колесо и полосы прокрутки самой сцены — тоже ручное перемещение
   vp.addEventListener('wheel', () => { lastManualAt = Date.now(); }, { passive: true });
+
+  /* ── щипок и перетаскивание пальцами ──
+     Раньше щипок на телефоне увеличивал всю страницу средствами браузера.
+     На iPhone это роняло страницу («повторно возникла проблема»): браузер
+     перерисовывал увеличенный кадр с холстами доски в полном разрешении
+     экрана, и памяти не хватало. На Android щипок над кадром не работал
+     вовсе — кадр забирал касания себе. Теперь масштаб браузера запрещён
+     (viewport, gesture*, touch-action), а щипок и перетаскивание делает
+     сама сцена, одинаково на iPhone и Android:
+     - двумя пальцами — увеличить/уменьшить (от 100 % до ZOOM_MAX) и сразу
+       двигать: точка между пальцами остаётся под пальцами;
+     - одним пальцем — двигать увеличенную сцену: всегда на полях сцены и
+       на доске учителя (там ученик ничего не нажимает), а в тренажёре —
+       только с «рукой» ✋: одним пальцем ученик там вводит ответы;
+     - по ходу жеста сцена масштабируется картинкой (transform на #box) —
+       плавно и без перерисовки кадра; настоящий масштаб ставится, когда
+       пальцы отпустили.
+     Касания над кадром приходят в документ кадра, а не сцены, — сцена
+     подписывается на них сама (hookFrame). На досках кадр гасит touchstart
+     (board-stage.js), поэтому жест начинается с первого touchmove */
+  const PAN_SLOP = 6;   // столько пикселей палец может сдвинуться, пока это ещё нажатие
+  let gest = null;      // { mode: 'pinch' | 'pan' | 'wait', … }
+  function rel(){ return box.getBoundingClientRect(); }
+  function pinchStart(a, b){
+    const r = rel();
+    gest = {
+      mode: 'pinch',
+      d0: Math.max(10, Math.hypot(a.x - b.x, a.y - b.y)),
+      m0: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 },
+      r0: { x: r.left, y: r.top },
+      zoom0: zoom, scale0: scale, v: 1, m: null,
+    };
+    box.classList.add('pinching');
+  }
+  function pinchMove(a, b){
+    const g = gest;
+    const d = Math.max(10, Math.hypot(a.x - b.x, a.y - b.y));
+    const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    const z = Math.min(ZOOM_MAX, Math.max(ZOOM_STEPS[0], g.zoom0 * d / g.d0));
+    g.v = z / g.zoom0;
+    g.m = m;
+    // точка сцены, что была между пальцами, — снова между пальцами
+    const qx = g.m0.x - g.r0.x, qy = g.m0.y - g.r0.y;
+    const tx = m.x - g.v * qx - g.r0.x, ty = m.y - g.v * qy - g.r0.y;
+    box.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + g.v + ')';
+    lastManualAt = Date.now();
+  }
+  function pinchEnd(){
+    const g = gest;
+    gest = null;
+    box.classList.remove('pinching');
+    box.style.transform = '';
+    if (!g.m) return;   // пальцы поставили и убрали, не двигая
+    let z = g.zoom0 * g.v;
+    if (z < 1.04) z = 1;   // почти «целиком» — ровно целиком
+    // точка кадра под пальцами в начале жеста
+    const cx = (g.m0.x - g.r0.x) / g.scale0, cy = (g.m0.y - g.r0.y) / g.scale0;
+    zoom = Math.min(ZOOM_MAX, Math.max(ZOOM_STEPS[0], z));
+    layout(false);
+    if (zoom > 1) {
+      vp.scrollLeft = box.offsetLeft + cx * scale - g.m.x;
+      vp.scrollTop = box.offsetTop + cy * scale - g.m.y;
+    }
+    lastManualAt = Date.now();
+    scheduleFrameDpr();
+  }
+  function panStart(p){
+    gest = { mode: 'wait', x: p.x, y: p.y, sl: vp.scrollLeft, st: vp.scrollTop };
+  }
+  function panMove(p){
+    const g = gest;
+    if (g.mode === 'wait') {
+      if (Math.hypot(p.x - g.x, p.y - g.y) < PAN_SLOP) return false;
+      g.mode = 'pan';
+    }
+    vp.scrollLeft = g.sl - (p.x - g.x);
+    vp.scrollTop = g.st - (p.y - g.y);
+    lastManualAt = Date.now();
+    return true;
+  }
+  /* pts — касания в координатах окна сцены; canPan — можно ли двигать
+     одним пальцем там, где оно началось. Возвращает true, если касание
+     забрала сцена (тогда preventDefault — браузер его не обрабатывает) */
+  function onTouches(type, pts, canPan){
+    if (type === 'end') {
+      if (gest && gest.mode === 'pinch') {
+        if (pts.length < 2) pinchEnd();
+        // остался один палец — дальше он двигает сцену с этого места
+        if (pts.length === 1 && zoom > 1 && canPan) panStart(pts[0]);
+        return true;
+      }
+      if (gest && !pts.length) { const was = gest.mode; gest = null; return was === 'pan'; }
+      return false;
+    }
+    if (pts.length >= 2) {
+      if (!gest || gest.mode !== 'pinch') pinchStart(pts[0], pts[1]);
+      else pinchMove(pts[0], pts[1]);
+      return true;
+    }
+    if (pts.length === 1 && zoom > 1 && canPan) {
+      if (!gest) { panStart(pts[0]); return false; }
+      if (gest.mode === 'pinch') return true;
+      return panMove(pts[0]);
+    }
+    return false;
+  }
+  const listOf = (tl, map) => { const out = []; for (let i = 0; i < tl.length; i++) out.push(map(tl[i])); return out; };
+  // касания над самой сценой (поля, «рука», панель масштаба)
+  ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach((t) => {
+    document.addEventListener(t, (e) => {
+      if (e.target && e.target.closest && e.target.closest('#bar, #ended, #status a')) return;   // кнопки — как обычно
+      const kind = t === 'touchstart' ? 'start' : t === 'touchmove' ? 'move' : 'end';
+      const took = onTouches(kind, listOf(e.touches, (p) => ({ x: p.clientX, y: p.clientY })), true);
+      if ((took || e.touches.length > 1) && e.cancelable) e.preventDefault();
+    }, { passive: false, capture: true });
+  });
+  // Safari: свой жест масштаба страницы — гасим везде
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach((t) => document.addEventListener(t, (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false }));
+  // двойное нажатие на iPhone тоже увеличивает страницу — не здесь
+  let lastTapAt = 0;
+  document.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTapAt < 320 && e.cancelable && !(e.target && e.target.closest && e.target.closest('#bar, #ended'))) e.preventDefault();
+    lastTapAt = now;
+  }, { passive: false });
+
+  /* Касания над кадром: подписываемся на документ кадра (свой сайт, доступ
+     есть). Подписываемся заново после каждой загрузки страницы в кадре —
+     проверка раз в 300 мс, потому что событие load у тяжёлой страницы
+     приходит поздно, а щипок может начаться раньше */
+  function hookFrame(f){
+    let w, d;
+    try { w = f.contentWindow; d = w && w.document; } catch (_) { return; }
+    if (!w || !d || w.__stageTouchHooked || d.readyState === 'loading') return;
+    w.__stageTouchHooked = true;
+    const toStage = (p) => {
+      const r = f.getBoundingClientRect();
+      const k = f.offsetWidth ? r.width / f.offsetWidth : scale;
+      return { x: r.left + p.clientX * k, y: r.top + p.clientY * k };
+    };
+    // одним пальцем двигаем сцену, где ученик ничего не нажимает сам: доска
+    // учителя (просмотр) — или когда включена «рука» (тогда сверху накладка
+    // #pan, и касания вообще приходят в сцену)
+    const canPan = () => { try { return !!w.__boardViewer; } catch (_) { return false; } };
+    ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach((t) => {
+      w.addEventListener(t, (e) => {
+        if (f !== active) return;
+        const kind = t === 'touchstart' ? 'start' : t === 'touchmove' ? 'move' : 'end';
+        const took = onTouches(kind, listOf(e.touches, toStage), canPan());
+        if ((took || e.touches.length > 1) && e.cancelable) e.preventDefault();
+        if (kind === 'end') { try { window.MathhWakeLock && window.MathhWakeLock.poke(); } catch (_) {} }
+      }, { passive: false, capture: true });
+    });
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach((t) => w.addEventListener(t, (e) => { if (e.cancelable) e.preventDefault(); }, { passive: false, capture: true }));
+    // и родной щипок/двойное нажатие внутри кадра браузеру не отдаём; свои
+    // правила touch-action у холстов (none) этим не отменяются
+    try {
+      const st = d.createElement('style');
+      st.textContent = 'html{touch-action:pan-x pan-y;}';
+      (d.head || d.documentElement).appendChild(st);
+    } catch (_) {}
+    applyFrameDpr(f, true);
+  }
+  setInterval(() => { [active, pending].forEach((f) => { if (f) hookFrame(f); }); }, 300);
+
+  /* ── разрешение холстов в кадре ──
+     Кадр — окно учителя (например 1440×900), уменьшенное под телефон в
+     три-четыре раза. А холсты доски внутри кадра рисуются в разрешении
+     экрана телефона (devicePixelRatio = 3): каждый — десятки мегабайт, у
+     доски на тренажёре — во всю длину страницы. Ученику столько точек не
+     видно: на экране холст всё равно уменьшен в scale раз. Поэтому кадру
+     сообщаем «плотность» по тому, что реально видно: экран × масштаб сцены
+     (с запасом), не меньше 1 и не больше настоящей. Память холстов на
+     телефоне падает в разы — это и была главная причина падений на iPhone.
+     Увеличили сцену — плотность растёт, и картинка снова чёткая. Движки
+     досок перечитывают devicePixelRatio при resize — его кадру и шлём */
+  const DEV_DPR = Math.max(1, window.devicePixelRatio || 1);
+  function wantDpr(){
+    return Math.round(Math.min(DEV_DPR, Math.max(1, DEV_DPR * scale * 1.15)) * 100) / 100;
+  }
+  function applyFrameDpr(f, fresh){
+    let w;
+    try { w = f && f.contentWindow; } catch (_) { return; }
+    if (!w) return;
+    const v = wantDpr();
+    let cur = 0;
+    try { cur = w.__stageDpr || 0; } catch (_) { return; }
+    // без заметной разницы не пересоздаём холсты зря
+    if (!fresh && cur && Math.abs(cur - v) / cur < 0.15) return;
+    try {
+      w.__stageDpr = v;
+      Object.defineProperty(w, 'devicePixelRatio', { configurable: true, get: () => w.__stageDpr });
+      if (v !== DEV_DPR || cur) w.dispatchEvent(new w.Event('resize'));
+    } catch (_) {}
+  }
+  let dprTimer = null;
+  function scheduleFrameDpr(){
+    clearTimeout(dprTimer);
+    dprTimer = setTimeout(() => { [active, pending].forEach((f) => { if (f) applyFrameDpr(f, false); }); }, 300);
+  }
+  window.__stageDpr = () => wantDpr();   // для теста и отладки
 
   /* ── следить за учителем ──
      Ученик увеличил сцену, а учитель пишет или показывает курсором за краем
