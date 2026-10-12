@@ -850,6 +850,39 @@
       border:1px solid var(--glass-border);color:var(--pencil);
       backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);
       box-shadow:var(--shadow);}
+
+    /* «Кто на доске»: участники общей доски, которые сейчас на ней, — справа
+       от кнопки «Совместная работа». Каждое имя — кнопка «найти»: камера
+       едет к курсору человека (или, если мышь у него не над доской, к
+       середине его экрана). Высота как у соседних кнопок панели (32 px) */
+    .bd-peers{display:flex;align-items:center;gap:6px;flex:0 1 auto;min-width:0;}
+    .bd-peers:empty{display:none;}
+    .bd-peer{display:inline-flex;align-items:center;gap:6px;height:32px;max-width:170px;flex:0 1 auto;min-width:0;
+      padding:0 10px 0 4px;border-radius:10px;border:1px solid var(--glass-border);background:var(--glass);
+      color:var(--pencil);font:600 12.5px var(--font-ui);cursor:pointer;transition:border-color .12s,transform .12s;}
+    .bd-peer:hover{border-color:var(--ink);}
+    .bd-peer:active{transform:scale(.96);}
+    .bd-peer-dot{flex:none;width:24px;height:24px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+      color:#fff;font-size:12px;font-weight:700;position:relative;}
+    .bd-peer-dot svg{position:absolute;right:-4px;bottom:-4px;width:13px;height:13px;border-radius:50%;
+      background:var(--glass-strong);color:var(--pencil);padding:1px;box-sizing:border-box;}
+    .bd-peer-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    /* на узком экране в панели тесно — остаётся только квадратик с буквой,
+       полное имя в подсказке (title) */
+    @media (max-width:760px){
+      .bd-peers{flex:none;gap:4px;}
+      .bd-peer{padding:0 3px;flex:none;}
+      .bd-peer-name{display:none;}
+    }
+    /* «вот он» — расходящееся кольцо там, куда привела кнопка, и подпись
+       курсора на миг подсвечивается. Без него после полёта не сразу
+       понятно, где именно человек на экране */
+    .bd-peer-ping{position:absolute;left:0;top:0;width:0;height:0;pointer-events:none;}
+    .bd-peer-ping::before,.bd-peer-ping::after{content:'';position:absolute;left:-28px;top:-28px;width:56px;height:56px;
+      border-radius:50%;border:3px solid var(--ping-c,#3b82f6);opacity:0;animation:bdPeerPing 1.4s ease-out 2;}
+    .bd-peer-ping::after{animation-delay:.35s;}
+    @keyframes bdPeerPing{0%{transform:scale(.3);opacity:.9;}100%{transform:scale(1.6);opacity:0;}}
+    .bd-remote-cursor.is-found .bd-remote-cursor-label{outline:2px solid var(--ping-c,#3b82f6);outline-offset:1px;}
   `;
   document.head.appendChild(style);
 
@@ -867,6 +900,12 @@
   // доску и вход по email, та — про показ ученику без входа
   shareBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none"><path d="M6.5 19.5h11a4.5 4.5 0 0 0 .7-8.95A6.5 6.5 0 0 0 5.6 9.6 5 5 0 0 0 6.5 19.5z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="12" cy="11.6" r="2" stroke="currentColor" stroke-width="1.5"/><path d="M8.6 19.4c.3-2.1 1.7-3.4 3.4-3.4s3.1 1.3 3.4 3.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>`;
   if (gearBtn && gearBtn.parentElement) gearBtn.parentElement.insertBefore(shareBtn, gearBtn.nextSibling);
+
+  // участники общей доски — сразу справа от кнопки «Совместная работа»
+  const peersBar = document.createElement('div');
+  peersBar.className = 'bd-peers';
+  peersBar.id = 'bdPeers';
+  if (shareBtn.parentElement) shareBtn.parentElement.insertBefore(peersBar, shareBtn.nextSibling);
 
   const sharePop = document.createElement('div');
   sharePop.className = 'bd-share-pop';
@@ -978,6 +1017,7 @@
     // в первом блоке файла); email — старое поле, оставлено на всякий
     // случай (если по какой-то причине имя не задано и не пришло)
     entry.name = payload.name || payload.email || '';
+    if (touchPeer(payload.uid, entry.name)) renderPeers();
     entry.x = payload.x; entry.y = payload.y;
     entry.drawing = !!payload.drawing;
     entry.lastSeen = Date.now();
@@ -1003,6 +1043,18 @@
         entry.el.style.transform = `translate(${Math.round(rect.left + s.x - CURSOR_TIP_X)}px, ${Math.round(rect.top + s.y - CURSOR_TIP_Y)}px)`;
       });
     }
+    if (peerPings.length && window.worldToScreen) {
+      const canvasEl = document.getElementById('boardCv');
+      const rect = canvasEl ? canvasEl.getBoundingClientRect() : { left: 0, top: 0 };
+      const now = Date.now();
+      peerPings = peerPings.filter(pg => {
+        if (now > pg.until) { pg.el.remove(); return false; }
+        const s = window.worldToScreen({ x: pg.x, y: pg.y });
+        pg.el.style.transform = `translate(${Math.round(rect.left + s.x)}px, ${Math.round(rect.top + s.y)}px)`;
+        return true;
+      });
+    }
+    maybeSendHereOnMove();
     cursorAnimHandle = requestAnimationFrame(cursorAnimTick);
   }
   function startCursorAnim() { if (!cursorAnimHandle) cursorAnimHandle = requestAnimationFrame(cursorAnimTick); }
@@ -1040,6 +1092,141 @@
     const wait = Math.max(0, 65 - (Date.now() - cursorLastSentAt));
     cursorSendTimer = setTimeout(flushCursorSend, wait);
   }
+
+  // ------------------------------------------------------------------
+  // «Кто на доске» и кнопка «найти». Курсора одного мало: он есть, только
+  // пока мышь человека над холстом, и пропадает через 6 с тишины — а
+  // ученик может смотреть на свой кусок доски, не двигая мышью, или сидеть
+  // с планшета. Поэтому каждый участник раз в 5 с (и сразу, как сдвинул
+  // камеру) рассылает тем же каналом `here`: кто он и какая точка доски у
+  // него посередине экрана. Новенький шлёт `ask` — остальные отвечают
+  // сразу, не дожидаясь своих 5 с. Уходя — `bye`. В базу ничего не пишется.
+  // Кнопка ведёт к курсору, если он сейчас виден, иначе — к середине
+  // экрана человека: курсор точнее (туда человек показывает)
+  // ------------------------------------------------------------------
+  const HERE_EVERY = 5000;
+  const PEER_TTL = 16000;          // три пропущенных `here` подряд — ушёл
+  const PEER_COLORS = ['#3b82f6', '#e8590c', '#2f9e44', '#9c36b5', '#c2255c', '#0c8599', '#f08c00', '#5f3dc4'];
+  let peers = new Map();           // uid -> { name, cx, cy, zoom, lastSeen }
+  let hereLastSentAt = 0;
+  let hereLastView = null;
+  let peerPings = [];              // { el, x, y, until }
+
+  // цвет закреплён за человеком, пока он на доске: пришёл третий — у первых
+  // двух цвета не меняются. Начальный — по номеру (FNV-1a), занятый уже
+  // кем-то из присутствующих — следующий свободный, чтобы двое не были
+  // одного цвета
+  function peerColor(uid) {
+    const p = peers.get(uid);
+    if (p && p.color) return p.color;
+    let h = 2166136261;
+    for (let i = 0; i < uid.length; i++) { h ^= uid.charCodeAt(i); h = Math.imul(h, 16777619) >>> 0; }
+    const used = new Set(Array.from(peers.values()).map(q => q.color).filter(Boolean));
+    let c = PEER_COLORS[h % PEER_COLORS.length];
+    for (let k = 0; k < PEER_COLORS.length && used.has(c); k++) c = PEER_COLORS[(h + k + 1) % PEER_COLORS.length];
+    if (p) p.color = c;
+    return c;
+  }
+  function escHtml(t) {
+    return String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function sendHere(extra) {
+    if (!cloudChannel || !cloudBoardId || !window.CURRENT_USER) return;
+    const v = window.boardsViewCenter ? window.boardsViewCenter() : null;
+    hereLastSentAt = Date.now();
+    hereLastView = v;
+    const payload = Object.assign({ uid: window.CURRENT_USER.id, name: window.displayNameOf(window.CURRENT_USER) },
+      v ? { cx: v.x, cy: v.y, z: v.zoom } : {}, extra || {});
+    try { cloudChannel.send({ type: 'broadcast', event: 'here', payload }); } catch (e) {}
+  }
+  // своя камера сдвинулась заметно (на четверть экрана или масштабом) —
+  // говорим об этом не позже чем через полсекунды, а не ждём 5 с: иначе
+  // «найти» приводило бы туда, где человек был, а не где он сейчас
+  function maybeSendHereOnMove() {
+    if (!cloudChannel || !window.boardsViewCenter) return;
+    if (Date.now() - hereLastSentAt < 500) return;
+    const v = window.boardsViewCenter();
+    if (!v) return;
+    const p = hereLastView;
+    const far = !p || Math.abs(v.zoom - p.zoom) > 0.01
+      || Math.hypot(v.x - p.x, v.y - p.y) * v.zoom > Math.min(window.innerWidth, window.innerHeight) / 4;
+    if (far) sendHere();
+  }
+  function touchPeer(uid, name) {
+    let p = peers.get(uid);
+    const isNew = !p;
+    if (!p) { p = {}; peers.set(uid, p); }
+    if (name) p.name = name;
+    p.lastSeen = Date.now();
+    return isNew;
+  }
+  function cloudHandleHere(payload) {
+    if (!payload || !cloudBoardId || !payload.uid) return;
+    if (window.CURRENT_USER && payload.uid === window.CURRENT_USER.id) return;
+    if (payload.bye) { if (peers.delete(payload.uid)) renderPeers(); return; }
+    const isNew = touchPeer(payload.uid, payload.name || '');
+    const p = peers.get(payload.uid);
+    if (typeof payload.cx === 'number' && typeof payload.cy === 'number') { p.cx = payload.cx; p.cy = payload.cy; p.zoom = payload.z; }
+    // ответ новенькому — с небольшим разбросом, чтобы при пяти участниках
+    // ответы не летели в канал одной пачкой
+    if (payload.ask) setTimeout(() => sendHere(), 50 + Math.random() * 250);
+    if (isNew || p.shownName !== p.name) renderPeers();
+  }
+  function renderPeers() {
+    const list = Array.from(peers.entries())
+      .map(([uid, p]) => ({ uid, name: p.name || 'Участник' }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
+    peers.forEach(p => { p.shownName = p.name; });
+    const locate = '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="5.5" stroke="currentColor" stroke-width="2.2"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
+    peersBar.innerHTML = list.map(({ uid, name }) => {
+      const letter = escHtml((name.trim()[0] || '?').toUpperCase());
+      return `<button type="button" class="bd-peer" data-uid="${escHtml(uid)}" title="Найти на доске: ${escHtml(name)}">`
+        + `<span class="bd-peer-dot" style="background:${peerColor(uid)}">${letter}${locate}</span>`
+        + `<span class="bd-peer-name">${escHtml(name)}</span></button>`;
+    }).join('');
+  }
+  function findPeer(uid) {
+    const p = peers.get(uid);
+    if (!p || !window.boardsFlyTo) return false;
+    const cur = remoteCursors.get(uid);
+    let x, y;
+    if (cur && typeof cur.x === 'number') { x = cur.x; y = cur.y; }
+    else if (typeof p.cx === 'number') { x = p.cx; y = p.cy; }
+    else return false;
+    window.boardsFlyTo(x, y);
+    const color = peerColor(uid);
+    const el = document.createElement('div');
+    el.className = 'bd-peer-ping';
+    el.style.setProperty('--ping-c', color);
+    cursorLayer.appendChild(el);
+    peerPings.push({ el, x, y, until: Date.now() + 3200 });
+    if (cur && cur.el) {
+      cur.el.style.setProperty('--ping-c', color);
+      cur.el.classList.add('is-found');
+      setTimeout(() => cur.el && cur.el.classList.remove('is-found'), 2400);
+    }
+    startCursorAnim();
+    return true;
+  }
+  function clearPeers() {
+    peers.clear();
+    peerPings.forEach(pg => pg.el.remove());
+    peerPings = [];
+    hereLastView = null;
+    renderPeers();
+  }
+  peersBar.addEventListener('click', (e) => {
+    const b = e.target.closest('.bd-peer');
+    if (b) findPeer(b.dataset.uid);
+  });
+  setInterval(() => {
+    if (!cloudBoardId) return;
+    if (cloudChannel && Date.now() - hereLastSentAt >= HERE_EVERY - 100) sendHere();
+    const now = Date.now();
+    let gone = false;
+    peers.forEach((p, uid) => { if (now - p.lastSeen > PEER_TTL) { peers.delete(uid); gone = true; } });
+    if (gone) renderPeers();
+  }, 1000);
 
   function computeDiff(beforeArr, afterArr) {
     const beforeMap = new Map(beforeArr.map(o => [o.id, o]));
@@ -1555,6 +1742,9 @@
     retryLoad: () => retryLoadNow(),   // Промпт №76
     seen: () => Array.from(cloudSeen),
     reconcileNow: () => reconcileOnce(cloudBoardId),
+    // «Найти участника»
+    peers: () => Array.from(peers.keys()),
+    hereState: () => ({ at: hereLastSentAt, now: Date.now(), channel: !!cloudChannel, board: cloudBoardId }),
   };
 
   function pushDiffToSupabase(boardId, liveDiff) {
@@ -1805,6 +1995,70 @@
     // его «снимок до», чтобы чужое изменение не попало в diff как моё
     syncGestureBefore(board, touched);
     if (touched.length) window.boardsRedraw();
+  }
+
+  /* ═══ Задание на доске у обоих сразу ═══
+     Поля ответа, варианты, «Проверить» и «Показать решение и ответ» лежат
+     поверх картинки задания. Их состояние едет лёгким сообщением task_live
+     (ядро, boardsApplyTaskLive / taskLiveOut): по символу при наборе и сразу
+     по нажатию. Картинку целиком собеседник по-прежнему получает обычной
+     правкой через базу — она нужна для перезагрузки, но живой показ от неё
+     больше не зависит.
+     Страховка записи: ученик с уровнем «Только свои записи» правит объект,
+     который положил учитель, и правила базы могут такую запись не пустить —
+     тогда после перезагрузки ответ ученика пропал бы. Поэтому тот, у кого
+     полный доступ, получив новый итог или разбор от собеседника, ждёт его
+     «записано» (board_ready). Не дождался — сверяет с базой и, если там
+     другое, записывает сам, своей правкой без шага отмены */
+  const TASK_SAVE_WAIT_MS = 4000;
+  const taskSaveWait = new Map();   // id задания → таймер
+  window.boardsTaskLiveSend = function (p) {
+    if (!cloudBoardId || !cloudChannel || !p) return;
+    try {
+      cloudChannel.send({ type: 'broadcast', event: 'task_live',
+        payload: Object.assign({}, p, { uid: myUid() || null, b: cloudBoardId }) });
+    } catch (e) {}
+  };
+  function taskSaved(ids) {
+    (ids || []).forEach(id => {
+      if (!taskSaveWait.has(id)) return;
+      clearTimeout(taskSaveWait.get(id));
+      taskSaveWait.delete(id);
+    });
+  }
+  function cloudHandleTaskLive(payload) {
+    if (!payload || !payload.id || !cloudBoardId) return;
+    if (payload.uid && payload.uid === myUid()) return;
+    if (payload.b && payload.b !== cloudBoardId) return;
+    const board = window.getCurrentBoard();
+    if (!board || board.cloudBoardId !== cloudBoardId || !window.boardsApplyTaskLive) return;
+    const res = window.boardsApplyTaskLive(payload);
+    if (res !== 'state') return;
+    // итог поменял объект доски: мой незавершённый жест не должен счесть это
+    // своей правкой, а на диске пусть лежит то же, что на экране
+    syncGestureBefore(board, [payload.id]);
+    persistBoardQuiet(board);
+    if (window.getBoardAccess && window.getBoardAccess() === 'full') {
+      clearTimeout(taskSaveWait.get(payload.id));
+      const boardId = cloudBoardId;
+      taskSaveWait.set(payload.id, setTimeout(() => ensureTaskSaved(boardId, payload.id), TASK_SAVE_WAIT_MS));
+    }
+  }
+  async function ensureTaskSaved(boardId, id) {
+    taskSaveWait.delete(id);
+    if (boardId !== cloudBoardId) return;
+    const res = await window.SB.from('board_objects').select('obj_id, data').eq('board_id', boardId).in('obj_id', [id]);
+    if (res.error || !res.data || boardId !== cloudBoardId) return;
+    const board = window.getCurrentBoard();
+    const obj = board && board.objects.find(o => o.id === id);
+    if (!obj) return;
+    const row = res.data[0] && res.data[0].data;
+    const pick = (o) => JSON.stringify([o && o.task ? (o.task.st || null) : null, o && o.sol ? !!o.sol.open : null]);
+    if (row && pick(row) === pick(obj)) return;    // собеседник записал сам
+    if (row && revOf(row) > revOf(obj)) return;     // в базе новее — придёт своим путём
+    const diff = { added: [], updated: [{ id, before: cloneObj(obj), after: obj }], removed: [] };
+    stampLocalDiff(diff);
+    pushDiffToSupabase(boardId, diff);
   }
 
   // что из объявленного (номер и версия) нам стоит забрать из базы
@@ -2087,21 +2341,29 @@
       // ничего не пишет в базу (в отличие от postgres_changes выше), это
       // ровно то, что нужно для эфемерного "где сейчас мышь"
       .on('broadcast', { event: 'cursor' }, ({ payload }) => cloudHandleRemoteCursor(payload))
+      .on('broadcast', { event: 'here' }, ({ payload }) => cloudHandleHere(payload))
       // быстрый путь для самих объектов доски — см. pushDiffToSupabase выше;
       // postgres_changes (обработчик над этим) остаётся как подстраховка
       .on('broadcast', { event: 'board_diff' }, ({ payload }) => cloudHandleRemoteDiff(payload))
       // Промпт №42: «объекты записаны, заберите их сами» — страховка на случай,
       // если основная рассылка не долетела
+      // задание на доске: набор, проверка, разбор — см. cloudHandleTaskLive
+      .on('broadcast', { event: 'task_live' }, ({ payload }) => cloudHandleTaskLive(payload))
       .on('broadcast', { event: 'board_ready' }, ({ payload }) => {
         if (!payload || !payload.ids) return;
         if (payload.uid && window.CURRENT_USER && payload.uid === window.CURRENT_USER.id) return;
+        taskSaved(payload.ids);
         const b = window.getCurrentBoard();
         if (!b) return;
         const revs = payload.revs || {};
         const { ids, expect } = wantedFromAnnounce(b, payload.ids.map(id => ({ id, rv: revs[id] })));
         if (ids.length) fetchHeavyObjects(cloudBoardId, ids, 0, expect);
       })
-      .subscribe();
+      .subscribe((status) => {
+        // «я пришёл, кто здесь?» — только когда канал действительно
+        // подключён: отправленное раньше сервер молча выбросит
+        if (status === 'SUBSCRIBED') sendHere({ ask: true });
+      });
     startReconcile(boardId);
     cloudInitialLoad(boardId, board, cloudLoadGen, 0);
   }
@@ -2280,11 +2542,13 @@
       // по-хорошему сообщаем остальным, что нас больше нет — на случай
       // сбоя всё равно есть подстраховка по таймауту (setInterval выше)
       try { cloudChannel.send({ type: 'broadcast', event: 'cursor', payload: { uid: window.CURRENT_USER ? window.CURRENT_USER.id : null, leave: true } }); } catch (e) {}
+      try { cloudChannel.send({ type: 'broadcast', event: 'here', payload: { uid: window.CURRENT_USER ? window.CURRENT_USER.id : null, bye: true } }); } catch (e) {}
       window.SB.removeChannel(cloudChannel);
       cloudChannel = null;
     }
     stopCursorAnim();
     clearAllCursors();
+    clearPeers();
     stopReconcile();
     clearTimeout(goneCheckTimer); goneCheckTimer = null; goneCheckIds = new Set();
   }

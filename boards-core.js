@@ -6162,6 +6162,7 @@ function buildTaskOverlay(obj){
       inp.addEventListener('input', () => {
         taskDraft(id).vals[f.id] = inp.value;
         inp.classList.remove('bad');   // исправляет — красное снимаем, пока не проверит
+        taskLiveOut(id, false);
       });
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); taskCheck(id); } });
       root.appendChild(inp);
@@ -6259,6 +6260,7 @@ function taskToggleSolution(id){
   obj.sol.open = !obj.sol.open;
   saveDB();
   scheduleRedraw();
+  taskLiveOut(id, true);
 }
 
 /* ── Промпт №68: кнопка «ещё такое же» и выбор, куда поставить ──
@@ -6327,15 +6329,29 @@ function runMoreTask(rec, id, dir){
 
 // привести живые элементы к состоянию объекта (после проверки, отмены,
 // правки от собеседника)
-function applyTaskState(rec, obj){
+// remote — пришло от собеседника: поле с фокусом тоже переписываем (поле
+// общее, последний набор побеждает), иначе у того, кто только что нажал
+// «Проверить» и остался в поле, не стёрлось бы ↺ и не дошёл бы набор
+// собеседника. Своё обновление поле в фокусе не трогает — там человек печатает
+function applyTaskState(rec, obj, remote){
   if (!obj.task) return;
   const t = obj.task, st = t.st || null, d = taskDrafts.get(obj.id);
   rec.root.classList.toggle('answered', !!st);
   if (t.kind === 'fields'){
     rec.inputs.forEach(inp => {
       const fid = inp.dataset.fid;
-      const val = st && st.vals && st.vals[fid] != null ? st.vals[fid] : (d && d.vals[fid] != null ? d.vals[fid] : '');
+      // набранное после неверной проверки (своё или собеседника) важнее
+      // записи той проверки: иначе у собеседника, у которого поле не в
+      // фокусе, исправление не показывалось бы вовсе — стояла бы старая
+      // неверная запись. После верного ответа поле закрыто, черновика нет
+      const val = (d && d.vals[fid] != null && !(st && st.res === 'ok')) ? d.vals[fid]
+        : (st && st.vals && st.vals[fid] != null ? st.vals[fid] : '');
       if (document.activeElement !== inp) inp.value = val;
+      else if (remote && inp.value !== val){
+        const pos = Math.min(inp.selectionStart == null ? val.length : inp.selectionStart, val.length);
+        inp.value = val;
+        try { inp.setSelectionRange(pos, pos); } catch (e) {}
+      }
       const mark = st && st.marks ? st.marks[fid] : null;
       inp.classList.toggle('good', mark === true);
       inp.classList.toggle('bad', mark === false && inp.value === (st.vals || {})[fid]);
@@ -6416,6 +6432,7 @@ function taskCheck(id){
     const ok = t.fields.every(f => marks[f.id] === true);
     commitTaskState(obj, { res: ok ? 'ok' : 'bad', vals, marks, tries: ((prev && prev.tries) || 0) + 1 });
     const d = taskDrafts.get(id); if (d) d.vals = {};
+    taskLiveOut(id, true);
     return;
   }
   if (t.kind === 'multi'){
@@ -6425,6 +6442,7 @@ function taskCheck(id){
     const ok = picks.length === t.correct.length && picks.every(i => t.correct.indexOf(i) >= 0);
     commitTaskState(obj, { res: ok ? 'ok' : 'bad', picks, tries: ((prev && prev.tries) || 0) + 1 });
     d.picks = picks.slice();
+    taskLiveOut(id, true);
   }
 }
 
@@ -6438,6 +6456,7 @@ function taskPick(id, i){
     // сменить на другой
     if (prev && prev.pick === i) return;
     commitTaskState(obj, { res: i === t.correct ? 'ok' : 'bad', pick: i, tries: ((prev && prev.tries) || 0) + 1 });
+    taskLiveOut(id, true);
     return;
   }
   if (t.kind === 'multi'){
@@ -6448,6 +6467,7 @@ function taskPick(id, i){
     if (k >= 0) d.picks.splice(k, 1); else d.picks.push(i);
     const rec = taskEls.get(id);
     if (rec) applyTaskState(rec, obj);
+    taskLiveOut(id, true);
   }
 }
 
@@ -6461,7 +6481,71 @@ function taskReset(id){
   delete obj.task.st;
   saveDB();
   scheduleRedraw();
+  taskLiveOut(id, true);
 }
+
+/* ── Задание на общей доске: всё видно у обоих сразу ──
+   Итог проверки и раскрытый разбор и раньше были обычной правкой доски, но
+   доезжали до собеседника вместе со ВСЕЙ картинкой задания: она тяжелее
+   предела сообщения, поэтому летит заглушкой, и собеседник забирает объект
+   из базы — после записи, с повторами, а если запись ученика в чужой
+   (учительский) объект база не пустила — не забирает никогда. Набранное до
+   «Проверить» и отметки утверждений не уходили вовсе: они живут в черновике
+   taskDrafts. Поэтому состояние задания — черновик, итог, разбор — едет
+   отдельным лёгким сообщением (несколько сотен байт) сразу по каждому
+   символу и нажатию. Отправляет облачный модуль (boardsTaskLiveSend), здесь —
+   только что отправить и как принять. Обычная правка доски с картинкой
+   по-прежнему уходит в базу: она нужна, чтобы ответ пережил перезагрузку */
+const TASK_LIVE_MS = 90;          // набор: не чаще сообщения в 90 мс на задание
+const taskLiveTimers = new Map();
+function taskLivePayload(id){
+  const obj = taskObjById(id);
+  if (!obj) return null;
+  const d = taskDrafts.get(id);
+  const p = { id, vals: d ? Object.assign({}, d.vals) : {}, picks: d && d.picks ? d.picks.slice() : null };
+  if (obj.task) p.st = obj.task.st ? JSON.parse(JSON.stringify(obj.task.st)) : null;
+  if (obj.sol) p.sol = !!obj.sol.open;
+  return p;
+}
+function taskLiveOut(id, now){
+  if (typeof window.boardsTaskLiveSend !== 'function') return;
+  const send = () => {
+    taskLiveTimers.delete(id);
+    const p = taskLivePayload(id);
+    if (p) window.boardsTaskLiveSend(p);
+  };
+  if (now){ clearTimeout(taskLiveTimers.get(id)); send(); return; }
+  // по символу, но пачкой за 90 мс: быстрый набор не забивает канал, а
+  // последнее состояние уходит всегда (таймер не сбрасывается новым символом)
+  if (!taskLiveTimers.has(id)) taskLiveTimers.set(id, setTimeout(send, TASK_LIVE_MS));
+}
+// пришло от собеседника. Возвращает 'state' — поменялся итог или разбор (это
+// правка объекта доски), 'draft' — только черновик, '' — задания нет
+window.boardsApplyTaskLive = function(p){
+  const obj = p && p.id ? taskObjById(p.id) : null;
+  if (!obj || (!obj.task && !obj.sol)) return '';
+  let changed = false;
+  if (obj.task && 'st' in p){
+    const was = JSON.stringify(obj.task.st || null), now = JSON.stringify(p.st || null);
+    if (was !== now){
+      if (p.st) obj.task.st = p.st; else delete obj.task.st;
+      changed = true;
+    }
+  }
+  if (obj.sol && 'sol' in p && !!obj.sol.open !== !!p.sol){ obj.sol.open = !!p.sol; changed = true; }
+  const d = taskDraft(p.id);
+  d.vals = p.vals && typeof p.vals === 'object' ? Object.assign({}, p.vals) : {};
+  d.picks = Array.isArray(p.picks) ? p.picks.slice() : null;
+  const rec = taskEls.get(p.id);
+  if (rec && obj.task && obj.task.hot){
+    // подпись итога ставим сами: иначе перерисовка решила бы, что итог
+    // сменился, и выбросила бы только что пришедшие отметки утверждений
+    rec.sig = JSON.stringify(obj.task.st || null);
+    applyTaskState(rec, obj, true);
+  }
+  scheduleRedraw();
+  return changed ? 'state' : 'draft';
+};
 
 // Промпт №13 «раскладка заданий»: кнопка «ещё такое же» стоит справа от
 // задания, за его краем. В стопке столбики идут через небольшой отступ, и
@@ -8906,6 +8990,46 @@ document.getElementById('bdCtxZoomOut').addEventListener('click', () => setZoom(
    ═══════════════════════════════════════════════════════════════════════ */
 window.getDB = function(){ return DB; };
 window.__w2s = function(p){ return worldToScreen(p); };   // для проверок
+// «Найти участника» (boards-cloud.js, кнопки с именами в верхней панели).
+// Середина вида считается по ВИДИМОЙ части холста — под верхней панелью
+// (53 px) он тоже лежит, и точка ровно посередине окна казалась бы сдвинутой
+// вверх, под панель
+const BOARD_TOPBAR_H = 53;
+function visibleCenterPx(){ return { x: cssW / 2, y: (BOARD_TOPBAR_H + cssH) / 2 }; }
+window.boardsViewCenter = function(){
+  if (!B || !cssW || !cssH) return null;
+  const c = visibleCenterPx();
+  return { x: cam.x + c.x / cam.zoom, y: cam.y + c.y / cam.zoom, zoom: cam.zoom };
+};
+// Камера плавно (а не скачком) едет к точке: скачок на другой конец доски
+// теряет ориентацию — непонятно, в какую сторону тебя унесло. Масштаб свой
+// не меняем: человек выбрал его под свой экран. Если посреди полёта камеру
+// сдвинул сам человек (тянет доску, колесо, щипок) — полёт молча
+// прекращается, а не дерётся с его жестом: так проще, чем ловить все
+// способы двигать камеру
+let camFlyRaf = null;
+window.boardsFlyTo = function(wx, wy){
+  if (!B || !cssW || !cssH || !isFinite(wx) || !isFinite(wy)) return false;
+  if (camFlyRaf) cancelAnimationFrame(camFlyRaf);
+  const c = visibleCenterPx();
+  const from = { x: cam.x, y: cam.y };
+  const to = { x: wx - c.x / cam.zoom, y: wy - c.y / cam.zoom };
+  const t0 = performance.now(), DUR = 420;
+  let last = { x: cam.x, y: cam.y };
+  const step = (now) => {
+    if (Math.abs(cam.x - last.x) > 0.01 || Math.abs(cam.y - last.y) > 0.01 || !boardActive) { camFlyRaf = null; return; }
+    const k = Math.min(1, (now - t0) / DUR), e = 1 - Math.pow(1 - k, 3);
+    cam.x = from.x + (to.x - from.x) * e;
+    cam.y = from.y + (to.y - from.y) * e;
+    clampCam();
+    last = { x: cam.x, y: cam.y };
+    scheduleRedraw();
+    if (k < 1) camFlyRaf = requestAnimationFrame(step);
+    else { camFlyRaf = null; rememberView(); }
+  };
+  camFlyRaf = requestAnimationFrame(step);
+  return true;
+};
 // Промпт №48: для проверки, что unloadBoard() реально чистит decoded-картинки,
 // а не только obj/imageLib — сам imgCache наружу не отдаём (незачем), только
 // булев ответ по конкретному src
