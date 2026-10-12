@@ -5260,6 +5260,70 @@ function closeTrainerFrame(){
 }
 trainersBackBtn.addEventListener('click', closeTrainerFrame);
 
+/* ── Что открыто в кадре на самом деле ──
+   В кадре живёт полноценная страница тренажёра со своей стрелкой «Ко всем
+   тренажёрам» — она вела в обычную главную (index.html) прямо внутри кадра.
+   Оттуда открывали другой тренажёр, а доска всё ещё считала открытым
+   первый: искала на странице деления узел задания ОГЭ, «Добавить на доску»
+   отвечала «Не нашли текущее задание», «Обновить пример» — «Сначала
+   откройте задание» (а через раз, когда узлы случайно совпадали,
+   срабатывало). Теперь:
+   — выход из тренажёра в кадре (стрелка, главная по любой ссылке) ведёт в
+     список тренажёров самой панели, а не в обычную главную;
+   — какой тренажёр открыт, доска берёт из адреса кадра при каждой его
+     загрузке и перед каждым нажатием «Добавить» / «Обновить»: стрелки между
+     номерами ЕГЭ меняют ?n= без перезагрузки (так же сделано в works.html). */
+function trainersFrameLocation(){
+  try { return trainersIframe.contentWindow.location; } catch (e) { return null; }
+}
+function trainersFrameIsHome(loc){
+  if (!loc || !loc.href || loc.href === 'about:blank') return false;
+  const file = (loc.pathname || '').split('/').pop();
+  return file === '' || file === 'index.html';
+}
+// → true, если в кадре тренажёр из каталога (и id/адрес/заголовок теперь его)
+function syncTrainersFrame(){
+  if (!trainersOpenId) return false;
+  const loc = trainersFrameLocation();
+  if (!loc || loc.href === 'about:blank') return false;
+  const it = ttPanelItemForLocation(loc);
+  if (!it) return false;
+  if (it.id !== trainersOpenId){
+    trainersOpenId = it.id;
+    trainersOpenHref = it.href;
+    trainersTitleEl.textContent = it.name;
+    trainersStripText.textContent = it.name;
+  }
+  return true;
+}
+trainersIframe.addEventListener('load', () => {
+  if (!trainersOpenId) return;
+  const loc = trainersFrameLocation();
+  if (!loc || loc.href === 'about:blank') return;
+  // в кадре всё же открылась главная (или чужая страница — доски, работы,
+  // сцена): панель возвращается к своему списку тренажёров
+  if (trainersFrameIsHome(loc) || !syncTrainersFrame()){ closeTrainerFrame(); return; }
+  let doc = null;
+  try { doc = trainersIframe.contentDocument; } catch (e) {}
+  if (!doc || doc.__bdHomeHook) return;
+  doc.__bdHomeHook = true;
+  // стрелку «Ко всем тренажёрам» и любые ссылки на главную перехватываем
+  // ещё до обработчика страницы (фаза перехвата на документе): иначе в
+  // кадре на мгновение мелькнула бы обычная главная
+  doc.addEventListener('click', (e) => {
+    const a = e.target && e.target.closest && e.target.closest('a[href], #homeBtn');
+    if (!a) return;
+    let home = a.id === 'homeBtn';
+    if (!home && a.href){
+      try { home = trainersFrameIsHome(new URL(a.href, doc.baseURI)); } catch (err) {}
+    }
+    if (!home) return;
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    closeTrainerFrame();
+  }, true);
+});
+
 /* ── Промпт №68: открыть / свернуть / закрыть ──
    Три состояния панели: открыта; свёрнута в узкую полосу у левого края
    (тренажёр в кадре живёт дальше — выбранный тип, уровень, набранное
@@ -5691,6 +5755,7 @@ async function insertTaskImage(dataUrl, task, gen, beside, shot, cw){
 }
 
 trainersAddBtn.addEventListener('click', async () => {
+  syncTrainersFrame();
   if (!trainersOpenId || !B) return;
   let doc;
   try { doc = trainersIframe.contentDocument; } catch(e){ doc = null; }
@@ -5752,6 +5817,7 @@ trainersAddBtn.addEventListener('click', async () => {
 // сама логика — в trainer-tasks.js (refreshTrainerIn): та же кнопка есть и в
 // конструкторе работ (works.html)
 function refreshTrainerInPanel(){
+  syncTrainersFrame();
   if (!trainersOpenId) return 'notask';
   let win = null;
   try { win = trainersIframe.contentWindow; } catch (e) {}

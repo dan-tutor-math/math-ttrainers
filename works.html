@@ -808,7 +808,10 @@ async function shootBlock(win, tid, href, el, info){
   if (gen) delete gen.html;
   const exact = exactSnap(win, el);
   const w0 = el.getBoundingClientRect().width;
-  const shots = await shootThemes(win, el, info, w0 > CAP_W ? { width: CAP_W } : {});
+  // строку ответа у столбиков доска ставит справа от записи (снизу учитель
+  // решает ручкой); в работе её смотрят с телефона, и карточка стала бы шире
+  // CAP_W — здесь ответ остаётся под записью
+  const shots = await shootThemes(win, el, info, Object.assign({ answer: 'below' }, w0 > CAP_W ? { width: CAP_W } : {}));
   const L = shots.light;
   return {
     tid, href, gen, exact,

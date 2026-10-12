@@ -67,10 +67,15 @@ const TRAINER_CAPTURE = {
   oge14:     [ { sel:'#questionPanel' } ],
   oge15_18:  [ { sel:'#questionPanel' } ],
   oge19:     [ { sel:'#questionPanel' } ],
-  add_col:   [ { sel:'#board' } ],
-  sub_col:   [ { sel:'#board' } ],
-  mul_col:   [ { sel:'#board' } ],
-  div_col:   [ { sel:'#prompt' } ],
+  // Столбики снимаются не с живого #board, а с чистой записи, которую
+  // собирает columnCaptureNode: на странице до «Начать» пример стоит в
+  // строку («87 + 6 = ?»), во время решения на листе подсветка и уже
+  // вписанные цифры, а у деления раньше снимался вопрос шага («Сколько
+  // первых цифр…»), а не сам уголок
+  add_col:   [ { column:'add' } ],
+  sub_col:   [ { column:'sub' } ],
+  mul_col:   [ { column:'mul' } ],
+  div_col:   [ { column:'div' } ],
   linear:    [ { sel:'#live' } ],
   quadratic: [ { sel:'#eqLine' } ],
   frac_mul:  [ { sel:'#board' } ],
@@ -299,6 +304,9 @@ function wrapIntoCard(content, card, scale, cssW, cssH){
   return { canvas: out, W, H, R: R / scale };
 }
 
+// opts.answer — где строка ответа, если её дорисовывать: 'below' (под
+// снимком) или 'right'; без него — как просит узел (data-bd-answer у
+// столбиков), иначе под снимком.
 // opts.html — содержимое узла, которое подставить в клон вместо того, что
 // сейчас на странице (перестройка задания под новую ширину, промпт №70);
 // opts.width — ширина узла в CSS-пикселях: текст и формулы переносятся по ней
@@ -306,6 +314,7 @@ async function captureTrainerNode(el, task, opts){
   if (typeof html2canvas !== 'function') throw new Error('html2canvas not loaded');
   opts = opts || {};
   const doc = el.ownerDocument;
+  const answerSide = opts.answer || el.getAttribute('data-bd-answer');
   const pageBg = trainerPageBg(doc);
   const card = trainerCardStyle(el, pageBg);
   // не меньше двух пикселей на CSS-пиксель: задание на доске часто смотрят
@@ -344,6 +353,8 @@ async function captureTrainerNode(el, task, opts){
       }
       cleanCloneForCard(c, card);
       hideDeadSolutionButtons(c);
+      // столбик с ответом под записью — место для решения не нужно
+      if (answerSide !== 'right') c.querySelectorAll('.bd-col-blank').forEach(e => e.remove());
       if (task) hot = prepareTaskClone(c, task);
     },
   };
@@ -370,7 +381,7 @@ async function captureTrainerNode(el, task, opts){
   if (task && hot) {
     // чего на снимке не нашлось (у ЕГЭ снимается одно условие, у столбиков —
     // сам пример), то дорисовываем строкой ниже: подпись, поле, кнопка
-    const b = bakeTaskRows(canvas, task, hot, card.color, scale);
+    const b = bakeTaskRows(canvas, task, hot, card.color, scale, answerSide);
     if (b) { canvas = b.canvas; hot = b.hot; cw = hot.w; ch = hot.h; baked = true; }
   }
   // «Тренировка»: ряд с кнопкой «Показать решение и ответ» — в самом низу
@@ -600,6 +611,11 @@ function collectTrainerCaptureNodes(doc, trainerId){
       const btn = doc.getElementById(entry.gateBtn);
       if (!btn || btn.offsetParent === null) return; // этот вариант сейчас не активен на странице
     }
+    if (entry.column){
+      const node = columnCaptureNode(doc, entry.column);
+      if (node) out.push(node);
+      return;
+    }
     if (entry.selAll){
       doc.querySelectorAll(entry.selAll).forEach(el => { if (el.offsetParent !== null) out.push({ el, restore:null }); });
       return;
@@ -617,6 +633,133 @@ function collectTrainerCaptureNodes(doc, trainerId){
   return out;
 }
 
+/* ── Столбики на доске: чистая запись примера и место под решение ──
+   Учитель решает столбик на доске сам, ручкой, поэтому на карточке нужен
+   пример в том виде, как его пишут в тетради, и пустые клетки под ним.
+   Живой #board тренажёра для этого не годится: до «Начать» там пример в
+   строку, во время решения — подсветка, перенос и уже вписанные цифры.
+   Поэтому запись собирается заново из P тренажёра его же классами
+   (.mrow/.mc/.mline у сложения, вычитания, умножения, .row/.c у деления) —
+   цифры, шрифт и линии те же, что на странице, — во временном узле за
+   левым краем страницы кадра (как разбор в captureSolutionImage), внутри
+   такого же тетрадного листа .sheet: по нему снимок берёт цвет карточки.
+   restore убирает узел. Строка ответа у такого узла встаёт справа от
+   записи (data-bd-answer="right", bakeTaskRows): снизу — место для решения.
+   Сам тренажёр и его состояние не трогаются вовсе — в совместной сессии
+   ученик ничего не увидит. */
+const COL_EXTRA_ROWS = { add: 2, sub: 2 };
+function columnCaptureNode(doc, kind){
+  const win = doc.defaultView;
+  const P = trainerEval(win, 'P');
+  if (!P || typeof P !== 'object') return null;
+  let html = null;
+  try { html = kind === 'div' ? divColumnHTML(P) : arithColumnHTML(P, kind); } catch (e) { html = null; }
+  if (!html) return null;
+  const host = doc.createElement('div');
+  host.setAttribute('aria-hidden', 'true');
+  host.style.cssText = 'position:absolute;left:-30000px;top:0;pointer-events:none;';
+  const sheet = doc.createElement('div');
+  sheet.className = 'sheet';
+  // лист нужен только ради цвета карточки и переменных темы: поля, высота
+  // и прокрутка тренажёрного листа во временном узле ни к чему
+  sheet.style.cssText = 'display:inline-block;min-height:0;overflow:visible;padding:0;';
+  const el = doc.createElement('div');
+  el.id = 'bdColumn';
+  el.setAttribute('data-bd-answer', 'right');
+  // у деления #board растянут на всю ширину листа (min-width:100%) — здесь
+  // ширина по самой записи
+  el.style.cssText = 'display:inline-block;position:relative;min-width:0;';
+  el.innerHTML = html;
+  sheet.appendChild(el);
+  host.appendChild(sheet);
+  doc.body.appendChild(host);
+  return { el, restore: () => host.remove() };
+}
+// сложение, вычитание, умножение: числа по правому краю, знак слева от
+// нижнего, черта, пустые строки под ответ (у умножения на многозначное —
+// под каждое неполное произведение, вторая черта и строка суммы)
+function arithColumnHTML(P, kind){
+  let top, bot, resLen;
+  if (kind === 'mul'){
+    top = (P.top || String(P.topVal).split('')).map(String);
+    bot = (P.bottom || String(P.bottomVal).split('')).map(String);
+    resLen = String(P.topVal * P.bottomVal).length;
+  } else {
+    top = (P.topDigits || String(P.topVal).split('')).map(String);
+    bot = (P.bottomDigits || String(P.bottomVal).split('')).map(String);
+    // у тренажёра нижнее число дополнено нулями слева до длины верхнего —
+    // в тетради их не пишут
+    while (bot.length > 1 && bot[0] === '0') bot.shift();
+    while (top.length > 1 && top[0] === '0') top.shift();
+    resLen = String(kind === 'add' ? P.topVal + P.bottomVal : P.topVal - P.bottomVal).length;
+  }
+  if (!top.length || !bot.length) return null;
+  const W = Math.max(top.length, bot.length + 1, resLen) + 1;
+  const sign = kind === 'add' ? '+' : kind === 'sub' ? '−' : '×';
+  const cell = ch => '<div class="mc">' + (ch == null ? '' : ch) + '</div>';
+  const row = (digits, signAt) => {
+    const cells = [];
+    for (let i = 0; i < W; i++) cells.push(null);
+    digits.forEach((d, i) => { cells[W - digits.length + i] = d; });
+    return '<div class="mrow">' + cells.map((c, i) => i === signAt ? '<div class="mc sign">' + sign + '</div>' : cell(c)).join('') + '</div>';
+  };
+  // пустые строки под решение помечены: если ответ встаёт под запись (работы
+  // для телефона), captureTrainerNode их убирает
+  const blank = () => row([]).replace('class="mrow"', 'class="mrow bd-col-blank"');
+  // знак — как в самих тренажёрах: у умножения прямо перед множителем, у
+  // сложения и вычитания — перед началом длинного числа
+  const signAt = W - (kind === 'mul' ? bot.length : Math.max(bot.length, top.length)) - 1;
+  const rows = [row(top), row(bot, signAt), '<div class="mline"></div>'];
+  if (kind === 'mul' && bot.length > 1){
+    for (let i = 0; i < bot.length; i++) rows.push(blank());
+    rows.push('<div class="mline bd-col-blank"></div>');
+    rows.push(blank());
+  } else {
+    const extra = COL_EXTRA_ROWS[kind] || 1;
+    for (let i = 0; i < extra; i++) rows.push(blank());
+  }
+  return rows.join('');
+}
+// деление — уголок, как в тренажёре (render в division.html): делимое,
+// черта, делитель с полкой под частное; ниже — по две строки на каждую
+// цифру частного (вычитаемое и остаток) и запас
+function divColumnHTML(P){
+  const dividend = String(P.dividend || '');
+  const divisor = String(P.divisor || '');
+  if (!dividend || !divisor) return null;
+  const n = dividend.length;
+  const D = n + 1 + (P.decimal ? (P.maxDecimalDigits || 2) + 1 : 0);
+  const qLen = String(P.q != null ? P.q : '').replace('.', ',').length || 1;
+  const shelf = Math.max(divisor.length, qLen + 1);
+  const cols = D + 1 + shelf + 1;
+  const blankRow = () => Array.from({ length: cols }, () => ({ ch: '', cls: '' }));
+  const r0 = blankRow();
+  for (let i = 0; i < n; i++) r0[i + 1].ch = dividend[i];
+  r0[D].cls = 'vline';
+  for (let i = 0; i < shelf; i++){ r0[D + 1 + i].cls = 'uline'; if (i < divisor.length) r0[D + 1 + i].ch = divisor[i]; }
+  const r1 = blankRow();
+  r1[D].cls = 'vline';
+  const rows = [r0, r1];
+  const steps = Math.min(12, 2 * qLen + 1);
+  for (let i = 1; i < steps; i++) rows.push(blankRow());
+  return rows.map((rr, i) => '<div class="row' + (i > 1 ? ' bd-col-blank' : '') + '">' + rr.map(c => '<div class="c ' + c.cls + '">' + c.ch + '</div>').join('') + '</div>').join('');
+}
+
+// какой тренажёр из каталога открыт по адресу loc (location кадра): файл
+// и ?n= для страниц, где один файл на много номеров (ЕГЭ, ОГЭ ч. 2). null —
+// это не тренажёр каталога (главная, доски, работы…)
+function ttPanelItemForLocation(loc){
+  if (!loc || !loc.href || loc.href === 'about:blank') return null;
+  const file = (loc.pathname || '').split('/').pop();
+  const n = new URLSearchParams(loc.search || '').get('n');
+  for (const g of TRAINERS_PANEL_GROUPS) for (const it of g.items){
+    const [f, q] = it.href.split('?');
+    if (f !== file) continue;
+    if (!q) return it;
+    if (n && q === 'n=' + n) return it;
+  }
+  return null;
+}
 
 /* ═══════════════════════════════════════════════════════════════════════
    Промпт №66: ЗАДАНИЯ С ТРЕНАЖЁРОВ НА ДОСКЕ — ЖИВЫЕ.
@@ -998,7 +1141,9 @@ function isDarkColor(css){
 // номеров вариантов), если на самом снимке таких мест нет. Пишем прямо в
 // картинку, чтобы задание оставалось одним объектом: его рамка, закрепление,
 // перенос и копирование не знают ни о каких «приставках» снизу
-function bakeTaskRows(canvas, task, hot, bgColor, scale){
+// side === 'right' — строки встают справа от снимка, сверху (столбики:
+// под записью учитель решает сам, место там должно оставаться пустым)
+function bakeTaskRows(canvas, task, hot, bgColor, scale, side){
   const need = task.kind === 'fields' ? !hot.fields.length : !hot.opts.length;
   if (!need) return null;
   const dark = isDarkColor(bgColor);
@@ -1015,8 +1160,14 @@ function bakeTaskRows(canvas, task, hot, bgColor, scale){
   else rows.push({ label: task.kind === 'multi' ? 'Верные:' : 'Ответ:' });
   const labelW = Math.max(...rows.map(r => meas.measureText(r.label).width)) + 12;
   const extraH = PAD + rows.length * ROW + (rows.length - 1) * GAP + PAD;
-  const totalW = Math.max(W, PAD + labelW + 200 + GAP + BTN_W + PAD);
-  const totalH = H + extraH;
+  const right = side === 'right';
+  // справа: блок строк шириной под подпись, поле и кнопку; отступ от записи
+  // — как поле карточки, чтобы поле ответа не липло к цифрам
+  const SIDE_GAP = 28;
+  const blockW = PAD + labelW + 180 + GAP + BTN_W + PAD;
+  const x0Block = right ? W + SIDE_GAP - PAD : 0;
+  const totalW = right ? x0Block + blockW : Math.max(W, PAD + labelW + 200 + GAP + BTN_W + PAD);
+  const totalH = right ? Math.max(H, extraH - PAD) : H + extraH;
   const out = document.createElement('canvas');
   out.width = Math.round(totalW * scale); out.height = Math.round(totalH * scale);
   const c = out.getContext('2d');
@@ -1033,11 +1184,13 @@ function bakeTaskRows(canvas, task, hot, bgColor, scale){
     if (fill){ c.fillStyle = fill; c.fill(); }
     if (stroke){ c.strokeStyle = stroke; c.lineWidth = 2; c.stroke(); }
   };
-  let y = H + PAD;
+  // справа — от верхнего края записи (первая строка поля — вровень с
+  // первым числом), снизу — с отступом под снимком
+  let y = right ? 0 : H + PAD;
   rows.forEach((r, i) => {
     c.fillStyle = ink; c.textAlign = 'left';
-    c.fillText(r.label, PAD, y + ROW / 2);
-    const x0 = PAD + labelW;
+    c.fillText(r.label, x0Block + PAD, y + ROW / 2);
+    const x0 = x0Block + PAD + labelW;
     const isLast = i === rows.length - 1;
     const room = totalW - x0 - PAD - (isLast ? BTN_W + GAP : 0);
     if (task.kind === 'fields'){
