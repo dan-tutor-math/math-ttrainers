@@ -1862,6 +1862,19 @@ els.addToBasketAllBtn.onclick = () => {
    Колонки с заданиями тянутся за любой край и расширяются симметрично —
    нужно прежде всего при трёх колонках, но доступно всегда. */
 const WORK_W_KEY = EXAM.slug + ':workZoneW';
+/* ширина рабочей зоны «по умолчанию» — вся ширина её родителя (--work-w не
+   задана, 100%). Нужна clampWorkW: клавиатура ограничивает растягивание,
+   только когда стоит СБОКУ от зоны такой ширины. В узком окне (тренажёр в
+   панели на доске, пол-экрана) клавиатура висит поверх зоны уже по
+   умолчанию — там её предел только сжимал зону при первом же касании
+   края до узкой полосы и не давал растянуть обратно под окно */
+function workZoneBaseW(){
+  try {
+    const p = els.workZone.parentElement;
+    const cs = getComputedStyle(p);
+    return p.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0);
+  } catch (e) { return 0; }
+}
 function clampWorkW(w){
   const min = 380;
   let max = window.innerWidth - 24;
@@ -1869,7 +1882,7 @@ function clampWorkW(w){
     if (els.keypadFloat && getComputedStyle(els.keypadFloat).display !== 'none') {
       // край рабочей зоны не должен заезжать под плавающую клавиатуру
       const byKeypad = 2 * (els.keypadFloat.getBoundingClientRect().left - 16 - window.innerWidth / 2);
-      if (byKeypad > 0) max = Math.min(max, byKeypad);
+      if (byKeypad > 0 && byKeypad >= workZoneBaseW()) max = Math.min(max, byKeypad);
     }
   } catch (e) {}
   max = Math.max(min, max);

@@ -2323,6 +2323,19 @@ els.addToBasketAllBtn.onclick = () => {
    доступна всегда, независимо от того, сколько заданий сейчас на доске
    (пригодится в первую очередь при 7+ заданиях в три колонки, но не только) ── */
 const WORK_W_KEY = 'powers:workZoneW';
+/* ширина рабочей зоны «по умолчанию» — вся ширина её родителя (--work-w не
+   задана, 100%). Нужна clampWorkW: клавиатура ограничивает растягивание,
+   только когда стоит СБОКУ от зоны такой ширины. В узком окне (тренажёр в
+   панели на доске, пол-экрана) клавиатура висит поверх зоны уже по
+   умолчанию — там её предел только сжимал зону при первом же касании
+   края до узкой полосы и не давал растянуть обратно под окно */
+function workZoneBaseW(){
+  try {
+    const p = els.workZone.parentElement;
+    const cs = getComputedStyle(p);
+    return p.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0);
+  } catch (e) { return 0; }
+}
 function clampWorkW(w){
   const min = 380;
   let max = window.innerWidth - 24;
@@ -2332,7 +2345,7 @@ function clampWorkW(w){
       const kpLeft = kp.getBoundingClientRect().left;
       const gap = 16; // запас, чтобы край рабочей зоны не касался клавиатуры
       const maxByKeypad = 2 * (kpLeft - gap - window.innerWidth / 2);
-      if (maxByKeypad > 0) max = Math.min(max, maxByKeypad);
+      if (maxByKeypad > 0 && maxByKeypad >= workZoneBaseW()) max = Math.min(max, maxByKeypad);
     }
   } catch(e){}
   max = Math.max(min, max);
