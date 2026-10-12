@@ -294,6 +294,12 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .type-nav-btn:active{transform:scale(.9)}
 .submode-row{display:flex;align-items:center;gap:10px;margin-bottom:14px;}
 .submode-tabs{display:flex;gap:8px;flex:1;}
+/* галочка «Дробные числа и большие ответы» в строке режимов — как в №8: на
+   узком экране (телефон, панель тренажёров на доске) она уходит под
+   вкладки, поэтому строка переносится и её предел высоты для сворачивания
+   подсказок — с запасом на две строки */
+.submode-row.has-hard{flex-wrap:wrap;row-gap:2px;max-height:120px;}
+.submode-row.has-hard .submode-tabs{flex:1 1 340px;}
 .add-task-btn-compact{width:40px;height:40px;flex:0 0 auto;border:none;border-radius:50%;background:var(--ink);color:#fff;font-size:20px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .15s;}
 .add-task-btn-compact:hover{transform:scale(1.06)}
 .add-task-btn-compact:active{transform:scale(.94)}
@@ -679,7 +685,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       </div>
     </div>
 
-    <div class="submode-row" id="submodeRow">
+    <div class="submode-row has-hard" id="submodeRow">
       <div class="submode-tabs">
         <button class="submode-tab" id="tabLearn">Обучение</button>
         <button class="submode-tab" id="tabPractice">Тренировка</button>
@@ -771,6 +777,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
 <script src="basket-core.js"></script>
 <script src="no-repeat.js"></script>
+<script src="hard-toggle.js"></script>
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
@@ -842,58 +849,140 @@ function tex(src){
    отрицательных/абсурдных величин там, где это противоречило бы смыслу
    (скорость, ускорение, число колец, стоимость — всегда неотрицательны) ───────── */
 
-/* ── тип 1: перевод °F → °C ── */
-function gen_f1_ftoc(){
-  const tC = ri(-14, 20) * 5; // −70…100 °C, шаг 5 — гарантирует целый °F
-  const tF = 9 * (tC / 5) + 32;
-  const correct = Math.round(tC * 100) / 100;
-  return {
-    prompt: `Температуру ${tex('t_F')} по шкале Фаренгейта можно перевести в температуру ${tex('t_C')} по шкале Цельсия по формуле ${tex('t_C = \\dfrac{5}{9}\\left(t_F - 32\\right)')}. Пользуясь этой формулой, найдите ${tex('t_C')}, если ${tex(`t_F = ${baseTex(tF)}`)}. Ответ дайте в градусах Цельсия.`,
-    correctValue: correct,
-    explain: `${tex(`t_C = \\dfrac{5}{9}\\left(${baseTex(tF)} - 32\\right) = \\dfrac{5}{9}\\cdot ${baseTex(tF - 32)} = ${fmtNum(correct)}`)} °C.`
+/* ═══ Галочка «Дробные числа и большие ответы» (как «Нулевые и отрицательные
+   степени» в №8, общий компонент hard-toggle.js) ═══
+   Без галочки (по умолчанию) — все данные и ответ ЦЕЛЫЕ, ответ не больше
+   трёхзначного, и сами данные тоже не больше 999: Даниил просил, чтобы без
+   галочки решение было рациональным, без деления 361,25 на 72,25. Исключения —
+   там, где формула сама не даёт маленьких чисел: в №8 F = 9800·V (при целом
+   V меньше 9800 не бывает), в №9–10 C = 6500 + 4000n — там предел 99 999.
+   sin α в №5 остаётся обыкновенной дробью: синус — это дробь по природе,
+   «целыми» Даниил просил сделать сами величины (S, d₁, d₂).
+   С галочкой задание «трудное» с вероятностью HARD_SHARE: в данных или в
+   ответе есть десятичная дробь, или числа больше 999 — но не больше
+   шестизначных (999 999).
+
+   Каждый тип — пара генераторов easy() / hard(). Оба отдают nums — все
+   числа условия и ответ: по ним numGen проверяет, что задание то, за что
+   себя выдаёт, и перегенерирует, если нет (так проще, чем доказывать для
+   каждой формулы, что подбор никогда не промахнётся). Ещё nums страхуют от
+   старой ошибки: fmtNum округляет до сотых, и при S = 9,375 на экране было
+   9,38 — ответ по показанным числам выходил не тот. Теперь у любого числа
+   не больше двух знаков после запятой. */
+const HARD_SHARE = 0.5;
+const EASY_MAX = 999, HARD_MAX = 999999;
+const r2 = x => Math.round(x * 100) / 100;
+const isInt = x => Math.abs(x - Math.round(x)) < 1e-9;
+const twoDec = x => Number.isFinite(x) && Math.abs(x * 100 - Math.round(x * 100)) < 1e-6;
+// число для KaTeX: десятичная запятая в фигурных скобках, иначе KaTeX ставит
+// после неё пробел, как после знака препинания («361, 25»)
+function texNum(x, paren){
+  const s = String(r2(x)).replace('.', '{,}');
+  return (paren && x < 0) ? `(${s})` : s;
+}
+function isEasyTask(t, spec){
+  const max = (spec && spec.easyMax) || EASY_MAX;
+  return !!(t && t.nums && t.nums.every(x => isInt(x) && Math.abs(x) <= max));
+}
+function isHardTask(t, spec){
+  if (!t || !t.nums || !t.nums.every(x => twoDec(x) && Math.abs(x) <= HARD_MAX)) return false;
+  if (spec && spec.hardTest) return spec.hardTest(t);
+  return t.nums.some(x => !isInt(x) || Math.abs(x) > EASY_MAX);
+}
+// генератор типа: gen(hard). Подбор случайный, поэтому проверяем и при
+// промахе берём заново; 200 проб хватает с огромным запасом (промахов
+// у самых тесных типов — около половины)
+function numGen(spec){
+  return function(hard){
+    let t = null;
+    for (let i = 0; i < 200; i++){
+      t = hard ? spec.hard() : spec.easy();
+      if (hard ? isHardTask(t, spec) : isEasyTask(t, spec)) return t;
+    }
+    return t;
   };
 }
+
+/* ── тип 1: перевод °F → °C ── */
+function task_f1(tC){
+  const tF = r2(9 * tC / 5 + 32);
+  return {
+    prompt: `Температуру ${tex('t_F')} по шкале Фаренгейта можно перевести в температуру ${tex('t_C')} по шкале Цельсия по формуле ${tex('t_C = \\dfrac{5}{9}\\left(t_F - 32\\right)')}. Пользуясь этой формулой, найдите ${tex('t_C')}, если ${tex(`t_F = ${texNum(tF, true)}`)}. Ответ дайте в градусах Цельсия.`,
+    correctValue: tC,
+    nums: [tF, tC],
+    explain: `${tex(`t_C = \\dfrac{5}{9}\\left(${texNum(tF, true)} - 32\\right) = \\dfrac{5}{9}\\cdot ${texNum(r2(tF - 32), true)} = ${texNum(tC)}`)} °C.`
+  };
+}
+// трудное: °C не кратна 5 — тогда °F с одним знаком после запятой, или
+// половинка градуса — тогда дробные обе
+function hardCelsius(lo, hi){
+  if (Math.random() < 0.5){
+    let c; do { c = ri(lo, hi); } while (c % 5 === 0);
+    return c;
+  }
+  let j; do { j = ri(lo * 2, hi * 2); } while (j % 2 === 0);
+  return j / 2;
+}
+const SPEC_F1 = {
+  easy: () => task_f1(ri(-14, 20) * 5), // −70…100 °C, шаг 5 — °F целая
+  hard: () => task_f1(hardCelsius(-70, 100)),
+};
 
 /* ── тип 2: перевод °C → °F ── */
-function gen_f2_ctof(){
-  const tC = ri(-24, 8) * 5; // −120…40 °C, шаг 5 — гарантирует целый °F
-  const tF = 9 * (tC / 5) + 32;
-  const correct = Math.round(tF * 100) / 100;
+function task_f2(tC){
+  const tF = r2(9 * tC / 5 + 32);
   return {
-    prompt: `Температуру ${tex('t_C')} по шкале Цельсия можно перевести в температуру ${tex('t_F')} по шкале Фаренгейта по формуле ${tex('t_F = \\dfrac{9}{5}t_C + 32')}. Пользуясь этой формулой, найдите ${tex('t_F')}, если ${tex(`t_C = ${baseTex(tC)}`)}. Ответ дайте в градусах Фаренгейта.`,
-    correctValue: correct,
-    explain: `${tex(`t_F = \\dfrac{9}{5}\\cdot ${baseTex(tC)} + 32 = ${baseTex(9 * (tC / 5))} + 32 = ${fmtNum(correct)}`)} °F.`
+    prompt: `Температуру ${tex('t_C')} по шкале Цельсия можно перевести в температуру ${tex('t_F')} по шкале Фаренгейта по формуле ${tex('t_F = \\dfrac{9}{5}t_C + 32')}. Пользуясь этой формулой, найдите ${tex('t_F')}, если ${tex(`t_C = ${texNum(tC, true)}`)}. Ответ дайте в градусах Фаренгейта.`,
+    correctValue: tF,
+    nums: [tC, tF],
+    explain: `${tex(`t_F = \\dfrac{9}{5}\\cdot ${texNum(tC, true)} + 32 = ${texNum(r2(9 * tC / 5), true)} + 32 = ${texNum(tF)}`)} °F.`
   };
 }
+const SPEC_F2 = {
+  easy: () => task_f2(ri(-24, 8) * 5), // −120…40 °C, шаг 5 — °F целая
+  hard: () => task_f2(hardCelsius(-120, 40)),
+};
 
 /* ── тип 3: мощность постоянного тока P = I²R, найти R ── */
-const I_POOL_T3 = [2,3,4,4.5,5,5.5,6,6.5,7,7.5,8,8.5,9,9.5,10];
-function gen_f3_power(){
-  const I = pick(I_POOL_T3);
-  const R = ri(2, 20);
-  const P = Math.round(I * I * R * 100) / 100;
-  const correct = R;
+function task_f3(I, R){
+  const P = r2(I * I * R);
   return {
-    prompt: `Мощность ${tex('P')} (в ваттах), развиваемая постоянным электрическим током, вычисляется по формуле ${tex('P = I^{2}R')}, где ${tex('I')} — сила тока (в амперах), ${tex('R')} — сопротивление участка цепи (в омах). Пользуясь этой формулой, найдите ${tex('R')}, если ${tex(`P = ${fmtNum(P)}`)}, ${tex(`I = ${fmtNum(I)}`)}. Ответ дайте в омах.`,
-    correctValue: correct,
-    explain: `${tex(`R = \\dfrac{P}{I^{2}} = \\dfrac{${fmtNum(P)}}{${fmtNum(I)}^{2}} = ${fmtNum(correct)}`)} Ом.`
+    prompt: `Мощность ${tex('P')} (в ваттах), развиваемая постоянным электрическим током, вычисляется по формуле ${tex('P = I^{2}R')}, где ${tex('I')} — сила тока (в амперах), ${tex('R')} — сопротивление участка цепи (в омах). Пользуясь этой формулой, найдите ${tex('R')}, если ${tex(`P = ${texNum(P)}`)}, ${tex(`I = ${texNum(I)}`)}. Ответ дайте в омах.`,
+    correctValue: R,
+    nums: [P, I, R],
+    explain: `${tex(`R = \\dfrac{P}{I^{2}} = \\dfrac{${texNum(P)}}{${texNum(I)}^{2}} = \\dfrac{${texNum(P)}}{${texNum(r2(I * I))}} = ${texNum(R)}`)} Ом.`
   };
 }
+const SPEC_F3 = {
+  easy: () => task_f3(ri(2, 10), ri(2, 40)),
+  // ток «с половинкой» (I² — с двумя знаками) или большие ток и сопротивление
+  hard: () => Math.random() < 0.65
+    ? task_f3(ri(0, 11) + 0.5, ri(2, 40))
+    : task_f3(ri(11, 40), ri(10, 500)),
+};
 
 /* ── тип 4: центростремительное ускорение a = ω²R, найти R ── */
 const OMEGA_POOL_T4 = [2,2.5,3,3.5,4,4.5,5,6,6.5,7,7.5,8,9,10,12];
 const R_POOL_T4 = [0.5,1,1.2,1.4,1.5,1.6,1.8,2,2.5,3,3.5,4,4.5,5,6,7,8,9,10];
-function gen_f4_centripetal(){
-  const w = pick(OMEGA_POOL_T4);
-  const R = pick(R_POOL_T4);
-  const a = Math.round(w * w * R * 100) / 100;
-  const correct = R;
+function task_f4(w, R){
+  const a = r2(w * w * R);
+  // при трёх знаках (6,25·1,5 = 9,375) a округлилась бы, и R по показанным числам не вышло бы
+  const exact = Math.abs(a - w * w * R) < 1e-9;
   return {
-    prompt: `Центростремительное ускорение ${tex('a')} (в м/с²) тела, движущегося по окружности радиуса ${tex('R')} (в метрах) с угловой скоростью ${tex('\\omega')} (в рад/с), вычисляется по формуле ${tex('a = \\omega^{2}R')}. Пользуясь этой формулой, найдите ${tex('R')}, если ${tex(`a = ${fmtNum(a)}`)}, ${tex(`\\omega = ${fmtNum(w)}`)}. Ответ дайте в метрах.`,
-    correctValue: correct,
-    explain: `${tex(`R = \\dfrac{a}{\\omega^{2}} = \\dfrac{${fmtNum(a)}}{${fmtNum(w)}^{2}} = ${fmtNum(correct)}`)} м.`
+    prompt: `Центростремительное ускорение ${tex('a')} (в м/с²) тела, движущегося по окружности радиуса ${tex('R')} (в метрах) с угловой скоростью ${tex('\\omega')} (в рад/с), вычисляется по формуле ${tex('a = \\omega^{2}R')}. Пользуясь этой формулой, найдите ${tex('R')}, если ${tex(`a = ${texNum(a)}`)}, ${tex(`\\omega = ${texNum(w)}`)}. Ответ дайте в метрах.`,
+    correctValue: R,
+    nums: exact ? [a, w, R] : [NaN],
+    explain: `${tex(`R = \\dfrac{a}{\\omega^{2}} = \\dfrac{${texNum(a)}}{${texNum(w)}^{2}} = \\dfrac{${texNum(a)}}{${texNum(r2(w * w))}} = ${texNum(R)}`)} м.`
   };
 }
+const SPEC_F4 = {
+  easy: () => task_f4(ri(2, 12), ri(1, 30)),
+  // прежние наборы (дробные ω и R) — но a = 6,25·1,5 = 9,375 с тремя
+  // знаками отбракует numGen: показали бы 9,38, и ответ не сошёлся бы
+  hard: () => Math.random() < 0.65
+    ? task_f4(pick(OMEGA_POOL_T4), pick(R_POOL_T4))
+    : task_f4(ri(10, 30), ri(10, 300)),
+};
 
 /* ── тип 5: площадь четырёхугольника через диагонали и угол, найти d1 ── */
 const SIN_FRAC_POOL_T5 = [
@@ -902,81 +991,106 @@ const SIN_FRAC_POOL_T5 = [
   {p:1,q:8},{p:3,q:8},{p:5,q:8},{p:7,q:8},
   {p:1,q:10},{p:3,q:10},{p:7,q:10},{p:9,q:10}
 ];
-function gen_f5_quad_area(){
-  const d1 = ri(3, 20);
-  const d2 = ri(4, 24);
-  const {p, q} = pick(SIN_FRAC_POOL_T5);
-  const S = Math.round((d1 * d2 * p / (2 * q)) * 1000) / 1000;
-  const correct = d1;
+function task_f5(d1, d2, sn){
+  const {p, q} = sn;
+  const S = r2(d1 * d2 * p / (2 * q));
+  // сверка: при трёх знаках S округлилась бы, и d₁ по показанным числам не вышло бы
+  const exact = Math.abs(S * 2 * q - d1 * d2 * p) < 1e-6;
   return {
-    prompt: `Площадь ${tex('S')} четырёхугольника, диагонали которого равны ${tex('d_1')} и ${tex('d_2')}, а угол между ними равен ${tex('\\alpha')}, вычисляется по формуле ${tex('S = \\dfrac{d_1 d_2 \\sin\\alpha}{2}')}. Пользуясь этой формулой, найдите ${tex('d_1')}, если ${tex(`S = ${fmtNum(S)}`)}, ${tex(`d_2 = ${d2}`)}, ${tex(`\\sin\\alpha = \\dfrac{${p}}{${q}}`)}.`,
-    correctValue: correct,
-    explain: `${tex(`d_1 = \\dfrac{2S}{d_2\\sin\\alpha} = \\dfrac{2\\cdot ${fmtNum(S)}}{${d2}\\cdot \\frac{${p}}{${q}}} = ${fmtNum(correct)}`)}.`
+    prompt: `Площадь ${tex('S')} четырёхугольника, диагонали которого равны ${tex('d_1')} и ${tex('d_2')}, а угол между ними равен ${tex('\\alpha')}, вычисляется по формуле ${tex('S = \\dfrac{d_1 d_2 \\sin\\alpha}{2}')}. Пользуясь этой формулой, найдите ${tex('d_1')}, если ${tex(`S = ${texNum(S)}`)}, ${tex(`d_2 = ${texNum(d2)}`)}, ${tex(`\\sin\\alpha = \\dfrac{${p}}{${q}}`)}.`,
+    correctValue: d1,
+    nums: exact ? [S, d2, d1] : [NaN],
+    explain: `${tex(`d_1 = \\dfrac{2S}{d_2\\sin\\alpha} = \\dfrac{2\\cdot ${texNum(S)}}{${texNum(d2)}\\cdot \\frac{${p}}{${q}}} = ${texNum(d1)}`)}.`
   };
 }
+const SPEC_F5 = {
+  easy: () => task_f5(ri(2, 40), ri(2, 40), pick(SIN_FRAC_POOL_T5)),
+  hard: () => Math.random() < 0.65
+    ? task_f5(ri(2, 40), ri(2, 40), pick(SIN_FRAC_POOL_T5))
+    : task_f5(ri(20, 200), ri(20, 200), pick(SIN_FRAC_POOL_T5)),
+};
 
 /* ── тип 6: потенциальная энергия P = mgh, найти m ── */
-function gen_f6_potential_energy(){
-  const m = ri(1, 20) * 5; // 5…100 кг, кратно 5 — гарантирует целую P
-  const h = ri(1, 50);
-  const P = m * 9.8 * h;
-  const correct = m;
+function task_f6(m, h){
+  const P = r2(9.8 * m * h);
   return {
-    prompt: `Потенциальная энергия ${tex('P')} (в джоулях) тела массой ${tex('m')} (в кг), поднятого на высоту ${tex('h')} (в метрах), вычисляется по формуле ${tex('P = mgh')}, где ${tex('g = 9.8')} м/с² — ускорение свободного падения. Пользуясь этой формулой, найдите массу тела ${tex('m')}, если ${tex(`P = ${fmtNum(P)}`)}, ${tex(`h = ${h}`)}. Ответ дайте в килограммах.`,
-    correctValue: correct,
-    explain: `${tex(`m = \\dfrac{P}{gh} = \\dfrac{${fmtNum(P)}}{9.8\\cdot ${h}} = ${fmtNum(correct)}`)} кг.`
+    prompt: `Потенциальная энергия ${tex('P')} (в джоулях) тела массой ${tex('m')} (в кг), поднятого на высоту ${tex('h')} (в метрах), вычисляется по формуле ${tex('P = mgh')}, где ${tex('g = 9{,}8')} м/с² — ускорение свободного падения. Пользуясь этой формулой, найдите массу тела ${tex('m')}, если ${tex(`P = ${texNum(P)}`)}, ${tex(`h = ${texNum(h)}`)}. Ответ дайте в килограммах.`,
+    correctValue: m,
+    nums: [P, h, m],
+    explain: `${tex(`m = \\dfrac{P}{gh} = \\dfrac{${texNum(P)}}{9{,}8\\cdot ${texNum(h)}} = \\dfrac{${texNum(P)}}{${texNum(r2(9.8 * h))}} = ${texNum(m)}`)} кг.`
   };
 }
+const SPEC_F6 = {
+  // P = 9,8·m·h целая, только если m·h кратно 5; без галочки P ≤ 999 — значит m·h ≤ 101
+  easy: () => task_f6(ri(1, 20), ri(1, 50)),
+  hard: () => Math.random() < 0.5
+    ? task_f6(ri(1, 20) * 5, ri(1, 50))
+    : task_f6(ri(1, 20) * 5, ri(0, 49) + 0.5),
+};
 
 /* ── тип 7: кинетическая энергия E = mv²/2, найти v ── */
-function gen_f7_kinetic_energy(){
-  const v = ri(2, 40);
-  const m = ri(2, 50) * 100; // 200…5000 кг, всегда чётное — гарантирует целую E
-  const E = m * v * v / 2;
-  const correct = v;
+const M_DEC_POOL_T7 = [0.2, 0.4, 0.5, 0.6, 0.8, 1.2, 1.5, 2.5, 3.5, 4.5];
+function task_f7(m, v){
+  const E = r2(m * v * v / 2);
   return {
-    prompt: `Кинетическая энергия ${tex('E')} (в джоулях) тела массой ${tex('m')} (в кг), движущегося со скоростью ${tex('v')} (в м/с), вычисляется по формуле ${tex('E = \\dfrac{mv^{2}}{2}')}. Пользуясь этой формулой, найдите скорость ${tex('v')}, если ${tex(`E = ${fmtNum(E)}`)}, ${tex(`m = ${m}`)}. Ответ дайте в м/с.`,
-    correctValue: correct,
-    explain: `${tex(`v = \\sqrt{\\dfrac{2E}{m}} = \\sqrt{\\dfrac{2\\cdot ${fmtNum(E)}}{${m}}} = \\sqrt{${fmtNum(v*v)}} = ${fmtNum(correct)}`)} м/с.`
+    prompt: `Кинетическая энергия ${tex('E')} (в джоулях) тела массой ${tex('m')} (в кг), движущегося со скоростью ${tex('v')} (в м/с), вычисляется по формуле ${tex('E = \\dfrac{mv^{2}}{2}')}. Пользуясь этой формулой, найдите скорость ${tex('v')}, если ${tex(`E = ${texNum(E)}`)}, ${tex(`m = ${texNum(m)}`)}. Ответ дайте в м/с.`,
+    correctValue: v,
+    nums: [E, m, v],
+    explain: `${tex(`v = \\sqrt{\\dfrac{2E}{m}} = \\sqrt{\\dfrac{2\\cdot ${texNum(E)}}{${texNum(m)}}} = \\sqrt{${v * v}} = ${texNum(v)}`)} м/с.`
   };
 }
+const SPEC_F7 = {
+  easy: () => task_f7(ri(1, 40), ri(2, 30)),
+  // прежний вариант (m = 200…5000 кг) давал E до 4 000 000 — семь знаков,
+  // теперь такие отбраковываются по пределу 999 999
+  hard: () => Math.random() < 0.5
+    ? task_f7(ri(2, 50) * 100, ri(2, 40))
+    : task_f7(pick(M_DEC_POOL_T7), ri(2, 40)),
+};
 
 /* ── тип 8: архимедова сила F = ρgV, найти F (прямой расчёт) ── */
-function gen_f8_archimedes(){
-  const k = ri(1, 40);
-  const V = Math.round((k / 20) * 100) / 100; // 0,05…2,00 м³, шаг 0,05
-  const F = 490 * k; // = 1000 · 9.8 · V, целое при любом k
-  const correct = F;
+function task_f8(V){
+  const F = r2(9800 * V);
   return {
-    prompt: `Выталкивающая (архимедова) сила ${tex('F')} (в ньютонах), действующая на тело, погружённое в воду, вычисляется по формуле ${tex('F = \\rho g V')}, где ${tex('\\rho = 1000')} кг/м³ — плотность воды, ${tex('g = 9.8')} м/с², ${tex('V')} — объём погружённой части тела (в м³). Пользуясь этой формулой, найдите ${tex('F')}, если ${tex(`V = ${fmtNum(V)}`)}. Ответ дайте в ньютонах.`,
-    correctValue: correct,
-    explain: `${tex(`F = 1000\\cdot 9.8\\cdot ${fmtNum(V)} = ${fmtNum(correct)}`)} Н.`
+    prompt: `Выталкивающая (архимедова) сила ${tex('F')} (в ньютонах), действующая на тело, погружённое в воду, вычисляется по формуле ${tex('F = \\rho g V')}, где ${tex('\\rho = 1000')} кг/м³ — плотность воды, ${tex('g = 9{,}8')} м/с², ${tex('V')} — объём погружённой части тела (в м³). Пользуясь этой формулой, найдите ${tex('F')}, если ${tex(`V = ${texNum(V)}`)}. Ответ дайте в ньютонах.`,
+    correctValue: F,
+    nums: [V, F],
+    explain: `${tex(`F = 1000\\cdot 9{,}8\\cdot ${texNum(V)} = 9800\\cdot ${texNum(V)} = ${texNum(F)}`)} Н.`
   };
 }
+const SPEC_F8 = {
+  // при целом V сила не меньше 9800 — трёхзначного ответа тут не бывает
+  easyMax: 99999,
+  easy: () => task_f8(ri(1, 10)),
+  // V с шагом 0,05 до 20 м³: F = 490·k, не больше 196 000
+  hard: () => task_f8(ri(1, 400) / 20),
+  hardTest: t => !isInt(t.nums[0]),
+};
 
-/* ── тип 9: стоимость колодца, фирма «Чистая вода», C = 6500 + 4000n ── */
-function gen_f9_well_chistaya(){
-  const n = ri(1, 30);
-  const C = 6500 + 4000 * n;
-  const correct = C;
+/* ── типы 9–10: стоимость колодца C = a + b·n ── */
+function task_well(firm, a, b, n){
+  const C = a + b * n;
   return {
-    prompt: `Для рытья колодцев фирма «Чистая вода» берёт ${tex('C')} рублей, где ${tex('C = 6500 + 4000n')}, а ${tex('n')} — число колец. Пользуясь этой формулой, найдите стоимость работ, если число колец ${tex(`n = ${n}`)}. Ответ дайте в рублях.`,
-    correctValue: correct,
-    explain: `${tex(`C = 6500 + 4000\\cdot ${n} = 6500 + ${4000 * n} = ${fmtNum(correct)}`)} руб.`
+    prompt: `Для рытья колодцев фирма «${firm}» берёт ${tex('C')} рублей, где ${tex(`C = ${a} + ${b}n`)}, а ${tex('n')} — число колец. Пользуясь этой формулой, найдите стоимость работ, если число колец ${tex(`n = ${n}`)}. Ответ дайте в рублях.`,
+    correctValue: C,
+    nums: [n, C],
+    explain: `${tex(`C = ${a} + ${b}\\cdot ${n} = ${a} + ${b * n} = ${C}`)} руб.`
   };
 }
-
-/* ── тип 10: стоимость колодца, фирма «Родник», C = 6000 + 4100n ── */
-function gen_f10_well_rodnik(){
-  const n = ri(1, 30);
-  const C = 6000 + 4100 * n;
-  const correct = C;
-  return {
-    prompt: `Для рытья колодцев фирма «Родник» берёт ${tex('C')} рублей, где ${tex('C = 6000 + 4100n')}, а ${tex('n')} — число колец. Пользуясь этой формулой, найдите стоимость работ, если число колец ${tex(`n = ${n}`)}. Ответ дайте в рублях.`,
-    correctValue: correct,
-    explain: `${tex(`C = 6000 + 4100\\cdot ${n} = 6000 + ${4100 * n} = ${fmtNum(correct)}`)} руб.`
-  };
-}
+// число колец дробным не бывает, «трудное» здесь — шестизначная стоимость;
+// без галочки колец до 20 — стоимость пятизначная (меньше не даёт сама формула)
+const SPEC_F9 = {
+  easyMax: 99999,
+  easy: () => task_well('Чистая вода', 6500, 4000, ri(1, 20)),
+  hard: () => task_well('Чистая вода', 6500, 4000, ri(24, 60)),
+  hardTest: t => t.correctValue > 99999,
+};
+const SPEC_F10 = {
+  easyMax: 99999,
+  easy: () => task_well('Родник', 6000, 4100, ri(1, 20)),
+  hard: () => task_well('Родник', 6000, 4100, ri(23, 60)),
+  hardTest: t => t.correctValue > 99999,
+};
 
 /* ═══════════════ демоверсия ОГЭ-2027 ═══════════════
    Нулевой тип — задание №12 из демоверсии ФИПИ слово в слово. Генератор
@@ -998,22 +1112,31 @@ const GROUPS = [
     { id: 'demo2027', title: '№0. Задание из демоверсии ОГЭ 2027', demo: true, gen: gen_demo2027 },
   ]},
   { title: 'Практические задачи по формулам', modes: [
-    { id: 'f1', title: '№1. Температура: °F → °C', gen: gen_f1_ftoc },
-    { id: 'f2', title: '№2. Температура: °C → °F', gen: gen_f2_ctof },
-    { id: 'f3', title: '№3. Мощность тока P = I²R', gen: gen_f3_power },
-    { id: 'f4', title: '№4. Центростремительное ускорение a = ω²R', gen: gen_f4_centripetal },
-    { id: 'f5', title: '№5. Площадь четырёхугольника S = d₁d₂sinα/2', gen: gen_f5_quad_area },
-    { id: 'f6', title: '№6. Потенциальная энергия P = mgh', gen: gen_f6_potential_energy },
-    { id: 'f7', title: '№7. Кинетическая энергия E = mv²/2', gen: gen_f7_kinetic_energy },
-    { id: 'f8', title: '№8. Архимедова сила F = ρgV', gen: gen_f8_archimedes },
-    { id: 'f9', title: '№9. Стоимость колодца — «Чистая вода»', gen: gen_f9_well_chistaya },
-    { id: 'f10', title: '№10. Стоимость колодца — «Родник»', gen: gen_f10_well_rodnik },
+    { id: 'f1', title: '№1. Температура: °F → °C', gen: numGen(SPEC_F1), spec: SPEC_F1, hard: true },
+    { id: 'f2', title: '№2. Температура: °C → °F', gen: numGen(SPEC_F2), spec: SPEC_F2, hard: true },
+    { id: 'f3', title: '№3. Мощность тока P = I²R', gen: numGen(SPEC_F3), spec: SPEC_F3, hard: true },
+    { id: 'f4', title: '№4. Центростремительное ускорение a = ω²R', gen: numGen(SPEC_F4), spec: SPEC_F4, hard: true },
+    { id: 'f5', title: '№5. Площадь четырёхугольника S = d₁d₂sinα/2', gen: numGen(SPEC_F5), spec: SPEC_F5, hard: true },
+    { id: 'f6', title: '№6. Потенциальная энергия P = mgh', gen: numGen(SPEC_F6), spec: SPEC_F6, hard: true },
+    { id: 'f7', title: '№7. Кинетическая энергия E = mv²/2', gen: numGen(SPEC_F7), spec: SPEC_F7, hard: true },
+    { id: 'f8', title: '№8. Архимедова сила F = ρgV', gen: numGen(SPEC_F8), spec: SPEC_F8, hard: true },
+    { id: 'f9', title: '№9. Стоимость колодца — «Чистая вода»', gen: numGen(SPEC_F9), spec: SPEC_F9, hard: true },
+    { id: 'f10', title: '№10. Стоимость колодца — «Родник»', gen: numGen(SPEC_F10), spec: SPEC_F10, hard: true },
   ]},
 ];
 const ALL_MODES = GROUPS.flatMap(g => g.modes);
 // «Случайно» берёт только генераторы: нулевой тип из демоверсии — всегда одно
 // и то же задание, в случайной подборке оно выпадало бы снова и снова
 const RANDOM_MODES = ALL_MODES.filter(m => !m.demo);
+let hardCtl = { get: () => false, set(){}, setDisabled(){} };   // настоящая — ниже, после разметки
+function wantHard(m){ return !!(m && m.hard && hardCtl.get() && Math.random() < HARD_SHARE); }
+// одно решение «трудное или обычное» на задание: повтор перебирается внутри
+// того же решения, иначе отбраковка повторов сдвигала бы долю трудных.
+// avoid — что сейчас на экране: заменяемое задание и соседние карточки
+function genUnique(m){
+  const hard = wantHard(m);
+  return NoRepeat.pick('oge12:' + curMode, () => m.gen(hard), { avoid: [curTask].concat(addedTasks.map(bt => bt && bt.task)) });
+}
 
 /* ═══════════════ управление ═══════════════ */
 let totalSolved = 0, streak = 0, totalErrors = 0;
@@ -1065,7 +1188,8 @@ const els = {
    поэтому переход между типами не теряет ни текущий пример, ни счётчик медалей —
    и всё это переживает перезагрузку страницы. */
 const PROGRESS_NS = 'ogeProg:oge12:';
-const TASK_RENDER_VERSION = 2; // меняли способ отрисовки формул (переход на KaTeX) — версия 2
+const TASK_RENDER_VERSION = 3; // 2 — переход на KaTeX; 3 — галочка «Дробные числа и большие ответы»: сохранённое
+                               // раньше задание могло быть с дробями, а без галочки их теперь нет — пусть придумается заново
 // память в оперативной памяти страницы — работает ВСЕГДА, независимо от того,
 // насколько надёжно localStorage ведёт себя в конкретном браузере (бывает
 // нестабильно, например, при открытии файла напрямую с диска, в приватном
@@ -1292,6 +1416,7 @@ function openTask() {
   els.prevTypeBtn.style.display = showTypeNav ? 'inline-flex' : 'none';
   els.nextTypeBtn.style.display = showTypeNav ? 'inline-flex' : 'none';
   curProg = (curMode !== 'random') ? loadProgOrFresh(curMode) : freshProg();
+  syncHardToggle();
   renderMedalBadges();
   renderExampleHistory();
   regenerateAddedTasksForNewType();
@@ -1310,6 +1435,7 @@ function navigateType(delta){
   const newIdx = (idx + delta + ALL_MODES.length) % ALL_MODES.length;
   curMode = ALL_MODES[newIdx].id;
   els.taskTitle.textContent = ALL_MODES[newIdx].title;
+  syncHardToggle();
   curProg = loadProgOrFresh(curMode);
   renderMedalBadges();
   renderExampleHistory();
@@ -1390,7 +1516,7 @@ function newTask(opts) {
   // Промпт №18 нового списка: без повторов — тот же генератор, но задание,
   // совпавшее с недавним (целиком или ответом подряд), перегенерируется
   // (no-repeat.js); avoid — что сейчас на экране
-  curTask = NoRepeat.pick('oge12:' + curMode, () => m.gen(), { avoid: [curTask].concat(addedTasks.map(bt => bt && bt.task)) });
+  curTask = genUnique(m);
   taskAnswered = false;
   hadWrongPick = false;
 
@@ -1577,7 +1703,7 @@ let addRailOpen = false; // Промпт №32: развёрнута ли бок
 
 function genAddedTask(){
   const m = curMode === 'random' ? pick(RANDOM_MODES) : ALL_MODES.find(x => x.id === curMode);
-  const task = NoRepeat.pick('oge12:' + curMode, () => m.gen(), { avoid: [curTask].concat(addedTasks.map(bt => bt && bt.task)) });
+  const task = genUnique(m);
   return { task, answered: false, hadWrongPick: false, solutionRevealed: false };
 }
 // «В подборку» работает на трёх уровнях: личная кнопка у КАЖДОЙ карточки (включая первую) —
@@ -1834,6 +1960,19 @@ els.addToBasketAllBtn.onclick = () => {
    доступна всегда, независимо от того, сколько заданий сейчас на доске
    (пригодится в первую очередь при 7+ заданиях в три колонки, но не только) ── */
 const WORK_W_KEY = 'oge12:workZoneW';
+/* ширина рабочей зоны «по умолчанию» — вся ширина её родителя (--work-w не
+   задана, 100%). Нужна clampWorkW: клавиатура ограничивает растягивание,
+   только когда стоит СБОКУ от зоны такой ширины. В узком окне (тренажёр в
+   панели на доске, пол-экрана) клавиатура висит поверх зоны уже по
+   умолчанию — там её предел только сжимал зону при первом же касании
+   края до узкой полосы и не давал растянуть обратно под окно */
+function workZoneBaseW(){
+  try {
+    const p = els.workZone.parentElement;
+    const cs = getComputedStyle(p);
+    return p.clientWidth - parseFloat(cs.paddingLeft || 0) - parseFloat(cs.paddingRight || 0);
+  } catch (e) { return 0; }
+}
 function clampWorkW(w){
   const min = 380;
   let max = window.innerWidth - 24;
@@ -1843,7 +1982,7 @@ function clampWorkW(w){
       const kpLeft = kp.getBoundingClientRect().left;
       const gap = 16; // запас, чтобы край рабочей зоны не касался клавиатуры
       const maxByKeypad = 2 * (kpLeft - gap - window.innerWidth / 2);
-      if (maxByKeypad > 0) max = Math.min(max, maxByKeypad);
+      if (maxByKeypad > 0 && maxByKeypad >= workZoneBaseW()) max = Math.min(max, maxByKeypad);
     }
   } catch(e){}
   max = Math.max(min, max);
@@ -1989,6 +2128,32 @@ setupFloatingKeypad();
 
 renderPicker();
 
+/* Галочка «Дробные числа и большие ответы» — общий компонент hard-toggle.js,
+   как «Нулевые и отрицательные степени» в №8. Нажатие — как ⟳ всей
+   страницы: вся партия заданий сразу перегенерируется с новым выбором,
+   иначе после щелчка ничего бы не менялось до следующего примера. У ученика
+   в сессии нажатие закрыто, как и ⟳ (guardStudentAction('refreshAll')) */
+hardCtl = HardToggle.mount({
+  host: document.getElementById('submodeRow'),
+  key: 'oge12',
+  label: 'Дробные числа и большие ответы',
+  title: 'Добавить задания с десятичными дробями в данных и ответах до шести знаков. Без галочки — только целые числа, ответ не больше трёхзначного',
+  wrap: fn => guardStudentAction('refreshAll', fn),
+  onChange(){
+    const m = ALL_MODES.find(x => x.id === curMode);
+    const matters = curMode === 'random' || (m && m.hard);
+    if (matters && els.taskArea.style.display !== 'none' && (curSubMode === 'exam' || curSubMode === 'practice')) nextBatchAll();
+    else if (window.TrainerSession) window.TrainerSession.push();
+  },
+});
+// задание из демоверсии всегда одно и то же — там галочка видна (выбор
+// помнится), но неактивна
+function syncHardToggle(){
+  const m = ALL_MODES.find(x => x.id === curMode);
+  const live = curMode === 'random' || !!(m && m.hard);
+  hardCtl.setDisabled(!live, 'Задание из демоверсии всегда одно и то же');
+}
+
 /* ═══ Промпт №19: совместный доступ — синхронизация состояния тренажёра ═══
    Синхронизируем «что мы вместе сейчас решаем»: экран выбора типа/сам тип,
    вкладку режима, текущее основное задание и его статус, весь список
@@ -2010,6 +2175,10 @@ function tsGetState(){
     // Промпт №25: статистика (решено/серия/ошибки) — учитель должен видеть
     // актуальные показатели ученика в реальном времени, а не только у себя
     totalSolved, streak, totalErrors,
+    // галочка «Дробные числа и большие ответы» — ученик видит выбор учителя,
+    // и доска, придумывая «ещё такое же» в невидимом кадре, берёт задание
+    // с той же галочкой
+    hardNums: hardCtl.get(),
   };
   // доска (инструмент рисования поверх тренажёра) — своё, отдельно управляемое
   // подмодулем поле; подмешиваем его снимок сюда же, чтобы штрихи попадали в
@@ -2023,6 +2192,11 @@ function tsApplyState(state){
   // применяем штрихи доски ДО развилки по picker/задаче — доска видна и
   // доступна независимо от того, какой сейчас экран у тренажёра
   if (window.__boardApplyState) window.__boardApplyState(state);
+  // до openTask/newTask ниже: задание, которое придумает этот вызов (доска
+  // в невидимом кадре зовёт newTask сразу после), — уже с галочкой из
+  // снимка. Снимок без поля — от вкладки до галочки, тогда она выключена.
+  // Не в localStorage: это чужой выбор, свой на этом устройстве он не меняет
+  hardCtl.set(!!state.hardNums, { persist: false });
   // Промпт №25: статистика — тоже независимо от picker/задачи, и всегда,
   // когда пришедший снимок её содержит (не только когда числа отличаются:
   // достаточно дёшево, а лишних перерисовок DOM тут не будет — textContent
