@@ -523,6 +523,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="fipi-split.js"></script>
 <script src="exam-nav.js"></script>
 <script src="trainer-multi.js"></script>
 <script src="oge19-fipi-bank.js"></script>
@@ -628,7 +629,8 @@ const MODES = [
 ];
 // если файл банка не загрузился, типа просто нет — остальное работает как раньше
 if (FIPI_BANK && FIPI_BANK.tasks && FIPI_BANK.tasks.length) {
-  MODES.push({ id: 'fipi', title: 'Задания из открытого банка ФИПИ',
+  // fipi: true — карточка встаёт в колонку «ФИПИ» экрана выбора (fipi-split.js)
+  MODES.push({ id: 'fipi', fipi: true, title: 'Задания из открытого банка ФИПИ',
     sub: FIPI_BANK.tasks.length + ' заданий · источник: открытый банк заданий ФИПИ', gen: genFipiTask });
 }
 // пока тип не выбран (экран выбора или кадр карточки до снимка) — обычный тип
@@ -780,10 +782,13 @@ els.basketAddBtn.onclick = () => {
 /* ── экран выбора типа ── */
 function renderPicker(){
   els.modesGrid.innerHTML = MODES.map(m =>
-    `<div class="mode-card${m.demo ? ' demo' : ''}" data-id="${m.id}"><div class="mtitle">${m.title}</div>${m.sub ? `<div class="msub">${m.sub}</div>` : ''}</div>`).join('');
+    `<div class="mode-card${m.demo ? ' demo' : ''}" data-id="${m.id}"${m.fipi ? ' data-fipi="1"' : ''}><div class="mtitle">${m.title}</div>${m.sub ? `<div class="msub">${m.sub}</div>` : ''}</div>`).join('');
   els.modesGrid.querySelectorAll('.mode-card').forEach(card => {
     card.onclick = () => openMode(card.dataset.id);
   });
+  // промпт №22: колонки «ФИПИ» и «Наши» — карточки переносятся вместе с
+  // обработчиками, поэтому раскладываем уже после того, как их привязали
+  if (window.FipiSplit) FipiSplit.apply(els.modesGrid);
 }
 function showPicker(){
   els.taskArea.style.display = 'none';

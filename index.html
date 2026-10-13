@@ -210,10 +210,6 @@ html[data-theme="dark"] .subj-btn.active{background:rgba(255,255,255,.14);color:
 .item-num{font-family:var(--font-mono);font-size:13px;color:var(--muted-1);min-width:22px;}
 .item-name{font-size:17px}
 .topic-item.soon{opacity:.5;cursor:default;pointer-events:none;}
-/* «банк ФИПИ» — задания открытого банка дословно, а не наши аналоги:
-   метка нужна, чтобы этому разделу доверяли так же, как сайту ФИПИ */
-.item-chip{margin-left:auto;flex:0 0 auto;font-family:var(--font-ui);font-size:11px;font-weight:600;letter-spacing:.02em;padding:4px 9px;border-radius:999px;color:var(--ink);background:var(--hl-10);white-space:nowrap;}
-html[data-theme="dark"] .item-chip{color:#fff;}
 .item-soon{margin-left:auto;font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-1);white-space:nowrap;}
 .group{margin:2px 4px 6px;border-radius:14px;background:var(--hover-1);overflow:hidden;}
 .group-header{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:none;border:none;cursor:pointer;text-align:left;font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--pencil);}
@@ -574,9 +570,9 @@ Object.keys(OGE_PART2_TITLES).forEach(n => {
   TRAINERS['oge' + n] = { name: '№' + n + '. ' + OGE_PART2_TITLES[n], href: 'oge_part2.html?n=' + n };
 });
 
-// №19–21 собраны из открытого банка ФИПИ дословно (oge19-fipi-bank.js,
-// oge-part2-fipi*.js) — у них метка «банк ФИПИ»
-['oge19', 'oge20', 'oge21'].forEach(id => { TRAINERS[id].fipi = true; });
+// Промпт №22: метки «банк ФИПИ» в каталоге больше нет — что из ФИПИ, а что
+// наше, видно внутри тренажёра ОГЭ: колонки «ФИПИ» и «Наши» на экране выбора
+// типа (fipi-split.js)
 
 /* Русский язык, ОГЭ (2026/2027 — 13 заданий): №2–12 — одна страница
    rus_oge.html на все номера (?n=5), задания и ключи — rus-oge-fipi.js, только
@@ -595,7 +591,7 @@ const RUS_OGE_PAGES = { 13: 'rus_oge13.html' };
 Object.keys(RUS_OGE_TITLES).forEach(k => {
   const n = +k, ready = n >= 2 && n <= 12;
   const href = RUS_OGE_PAGES[n] || (ready ? 'rus_oge.html?n=' + n : null);
-  TRAINERS['rus' + n] = { name: '№' + n + '. ' + RUS_OGE_TITLES[n], href, fipi: !!href };
+  TRAINERS['rus' + n] = { name: '№' + n + '. ' + RUS_OGE_TITLES[n], href };
 });
 const rusIds = (from, to) => { const a = []; for (let n = from; n <= to; n++) a.push('rus' + n); return a; };
 
@@ -791,7 +787,6 @@ function itemHTML(it, ii, base){
     <a class="topic-item" href="${it.href}">
       <span class="item-num">${num}</span>
       <span class="item-name">${it.name}</span>
-      ${it.fipi ? '<span class="item-chip">банк ФИПИ</span>' : ''}
     </a>
   `;
 }

@@ -782,6 +782,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
 <script src="keypad.js"></script>
+<script src="fipi-split.js"></script>
 <script src="exam-nav.js"></script>
 <script src="html2canvas.min.js"></script>
 <script src="jspdf.umd.min.js"></script>
@@ -1398,6 +1399,9 @@ function renderPicker() {
   // привязывать отдельно (раньше эта кнопка была нерабочей)
   const randomCard = document.querySelector('.mode-card.random[data-id]');
   if (randomCard) randomCard.onclick = guardStudentAction('switchTask', () => { curMode = randomCard.dataset.id; openTask(); });
+  // промпт №22: колонки «ФИПИ» и «Наши» — карточки переносятся вместе с
+  // обработчиками, поэтому раскладываем уже после того, как их привязали
+  if (window.FipiSplit) FipiSplit.apply(els.modesGrid);
 }
 
 const COMING_SOON_TEXT = {

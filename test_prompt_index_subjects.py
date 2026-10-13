@@ -127,9 +127,9 @@ def main():
         check([i["href"] for i in part2] == [f"oge_part2.html?n={n}" for n in range(20, 26)], "№20–25 ведут в oge_part2.html")
         check(part2[0]["num"] == "13" and part2[-1]["num"] == "18", "нумерация второй части продолжается (13–18)")
 
-        print("2. метка «банк ФИПИ»")
+        print("2. метки «банк ФИПИ» больше нет (промпт №22)")
         chips = [i["href"] for i in items if i["chip"]]
-        check(chips == ["oge19.html", "oge_part2.html?n=20", "oge_part2.html?n=21"], f"у математики — №19–21: {chips}")
+        check(chips == [], f"у математики меток нет: {chips}")
         pg.click('.nav-tab[data-id="grades"]')
         pg.click('.nav-subtab[data-id="g6"]')
         pg.wait_for_timeout(150)
@@ -152,7 +152,7 @@ def main():
         check([i["num"] for i in items] == [f"{n:02d}" for n in range(1, 14)], "сквозная нумерация 01–13")
         check([i["href"] for i in items if i["href"]] == [f"rus_oge.html?n={n}" for n in range(2, 13)] + ["rus_oge13.html"], "№2–12 ведут в rus_oge.html?n=…, №13 — в rus_oge13.html")
         check([i["name"] for i in items if i["soon"]] == ["№1. Сжатое изложение"], "«скоро» — только №1")
-        check(sum(i["chip"] for i in items) == 12 and all(i["chip"] for i in items if i["href"]), "у №2–13 метка «банк ФИПИ»")
+        check(not any(i["chip"] for i in items), "у русского меток «банк ФИПИ» тоже нет (промпт №22)")
         check(items[4]["name"] == "№5. Расстановка запятых", f"названия как в rus_oge.html: {items[4]['name']}")
         cnt = pg.inner_text(".nav-tab.active")
         check("12" in cnt, f"счётчик вкладки — 12 готовых ({cnt.strip()})")

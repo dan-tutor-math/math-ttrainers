@@ -758,6 +758,7 @@ html[data-medals="on"] .board-view-toolbar{bottom:64px;}
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
 <script src="keypad.js"></script>
+<script src="fipi-split.js"></script>
 <script src="exam-nav.js"></script>
 <script src="html2canvas.min.js"></script>
 <script src="jspdf.umd.min.js"></script>
@@ -1344,7 +1345,7 @@ function renderPicker(){
   /* отметку «решено» держим слева, рядом с номером: правый край карточки на
      обычном экране уходит под кнопки темы и подсказок в углу страницы */
   els.protoList.innerHTML = list.map((p, i) => `
-    <div class="mode-card" data-pid="${p.id}">
+    <div class="mode-card" data-pid="${p.id}"${fipiAttr([p])}>
       <div class="mtitle">${p.title ? p.title : 'Прототип ' + (i + 1)}</div>
       ${isSolved(p.id) ? '<div class="mdone">✓ решено</div>' : ''}
       <div class="mpeek">${protoPeek(p)}</div>
@@ -1352,6 +1353,7 @@ function renderPicker(){
   els.protoList.querySelectorAll('.mode-card').forEach(card => {
     card.onclick = guard('switchTask', () => openTask(S.n, card.dataset.pid));
   });
+  splitPicker();
   els.pageTitle.textContent = EXAM.title + ' · №' + S.n;
   els.pageSub.textContent = subtitleOf(t);
 }
@@ -1359,11 +1361,25 @@ function renderPicker(){
    разделы («Уравнения», «Системы уравнений»…) и в них карточки групп —
    название, сколько заданий (или сколько решено) и условие первого как
    пример. Нажатие открывает первое нерешённое задание группы */
+/* Промпт №22: в ОГЭ (EXAM.fipiSplit) список номера делится на колонки
+   «ФИПИ» и «Наши» (fipi-split.js). Задание ФИПИ — из открытого банка
+   (поле fipi) или из демоверсии (src «Демоверсия …»: её составил ФИПИ,
+   формулировка и решение слово в слово). Группа — ФИПИ, если все её
+   задания из банка. В ЕГЭ флага нет, и список остаётся одним, как был */
+function fipiAttr(items){
+  if (!EXAM.fipiSplit) return '';
+  return items.length && items.every(p => p.fipi || /^демоверсия/i.test(p.src || '')) ? ' data-fipi="1"' : '';
+}
+function splitPicker(){
+  if (EXAM.fipiSplit && window.FipiSplit) FipiSplit.apply(els.protoList, {
+    emptyOurs: 'Своих прототипов к этому номеру пока нет — только задания ФИПИ.',
+  });
+}
 function renderGroupedPicker(list){
   const t = task(S.n);
   const loose = list.filter(p => !p.group);
   let html = loose.map((p, i) => `
-    <div class="mode-card" data-pid="${p.id}">
+    <div class="mode-card" data-pid="${p.id}"${fipiAttr([p])}>
       <div class="mtitle">${p.title ? p.title : 'Прототип ' + (i + 1)}</div>
       ${isSolved(p.id) ? '<div class="mdone">✓ решено</div>' : ''}
       <div class="mpeek">${protoPeek(p)}</div>
@@ -1379,7 +1395,7 @@ function renderGroupedPicker(list){
     }
     const done = items.filter(p => isSolved(p.id)).length;
     html += `
-    <div class="mode-card" data-gid="${g.id}">
+    <div class="mode-card" data-gid="${g.id}"${fipiAttr(items)}>
       <div class="mtitle">${rich(g.title)}</div>
       ${done ? '<div class="mdone">✓ ' + done + ' из ' + items.length + '</div>'
              : '<div class="mcount">' + items.length + ' ' + plural(items.length, 'задание', 'задания', 'заданий') + '</div>'}
@@ -1394,6 +1410,7 @@ function renderGroupedPicker(list){
       openTask(S.n, (items.find(p => !isSolved(p.id)) || items[0]).id);
     });
   });
+  splitPicker();
   els.pageTitle.textContent = EXAM.title + ' · №' + S.n;
   els.pageSub.textContent = subtitleOf(t);
 }
