@@ -836,7 +836,7 @@ function egeTaskInfo(win, cardIdx){
     value: f.value == null ? '' : String(f.value),
     alts: (f.alts || []).map(String), seq: !!f.seq, anyOrder: !!f.anyOrder, unit: f.unit || '',
   }));
-  if (fields.some(f => ['plain', 'num', 'nums', 'set', 'yesno'].indexOf(f.type) < 0)) return null;
+  if (fields.some(f => ['plain', 'num', 'nums', 'set', 'yesno', 'pairs'].indexOf(f.type) < 0)) return null;
   return { kind: 'fields', fields };
 }
 
@@ -1443,7 +1443,30 @@ function taCheckField(f, value){
     const v = taParseSet(raw);
     return v === null ? null : taSameSets(v, taParseSet(f.value));
   }
+  if (f.type === 'pairs'){
+    const v = taParsePairs(raw);
+    return v === null ? null : taSamePairs(v, taParsePairs(f.value));
+  }
   return null;
+}
+// пары — ответ системы (ОГЭ №20): «(−1; 4); (1; 4)», порядок пар не важен,
+// порядок чисел в паре важен; копия parsePairs/samePairs из ege_prof.html
+function taParsePairs(src){
+  const out = [];
+  for (const item of taSplit(src)){
+    const it = taStrip(item);
+    if (!/^\(.*\)$/.test(it)) return null;
+    const xy = taSplit(it.slice(1, -1)).map(taEval);
+    if (xy.length !== 2 || xy.some(isNaN)) return null;
+    out.push(xy);
+  }
+  return out.length ? out : null;
+}
+function taSamePairs(a, b){
+  if (!a || !b || a.length !== b.length) return false;
+  const ord = arr => arr.slice().sort((p, q) => p[0] - q[0] || p[1] - q[1]);
+  const x = ord(a), y = ord(b);
+  return x.every((p, k) => taSameNum(p[0], y[k][0]) && taSameNum(p[1], y[k][1]));
 }
 
 

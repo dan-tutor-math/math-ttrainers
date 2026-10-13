@@ -459,7 +459,10 @@ def test_catalog(browser):
     check("каталог: названия номеров совпадают с банком", names == bank, str(list(zip(names, bank))[:2]))
     check("банк: номера 20–25, вторая часть по 2 балла",
           page.evaluate("NUMS.join() === '20,21,22,23,24,25' && NUMS.every(n => BANK[n].part === 2 && BANK[n].points === 2)"))
-    ok = page.evaluate("""() => NUMS.every(n => BANK[n].protos.length === 1 && BANK[n].protos[0].src === 'Демоверсия ОГЭ 2027'
+    # с «банком ФИПИ №20» в номере есть и задания из банка ФИПИ (oge-part2-fipi.js):
+    # задание демоверсии в каждом номере ровно одно и стоит первым
+    ok = page.evaluate("""() => NUMS.every(n => BANK[n].protos.filter(p => p.src === 'Демоверсия ОГЭ 2027').length === 1
+      && BANK[n].protos[0].src === 'Демоверсия ОГЭ 2027'
       && BANK[n].protos[0].title === '№0. Задание из демоверсии ОГЭ 2027' && BANK[n].protos[0].criteria.length === 3)""")
     check("банк: в каждом номере одно задание из демоверсии, критерии ФИПИ", ok)
     ref = page.evaluate("""() => { const bad = [];
