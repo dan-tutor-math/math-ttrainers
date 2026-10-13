@@ -104,6 +104,7 @@ h1{font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,5vw,34px);text-ali
 }
 .mode-card:hover:not(:disabled){border-color:var(--ink);transform:translateX(3px)}
 .mode-card:disabled{cursor:default;opacity:.62}
+a.mode-card{text-decoration:none;box-sizing:border-box}
 .mode-card .mtitle{font-weight:600;font-size:15px;line-height:1.3;flex:1 1 260px;}
 .mode-card .msub{font-size:13px;font-weight:500;color:var(--muted-3);flex:1 1 100%;}
 .mode-card .mprog{font-size:13px;font-weight:600;color:var(--ok);}
@@ -272,7 +273,7 @@ h1{font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,5vw,34px);text-ali
 const EXAM_ATTEMPTS = 3;
 
 // Названия номеров — по демоверсии ФИПИ (структура ОГЭ-2026/2027: 13 заданий;
-// №1 изложение и №13 сочинение проверяет преподаватель — их здесь пока нет).
+// №13 сочинение — на отдельной странице rus_oge13.html, №1 изложение пока нет).
 const NUMS = [
   {n:2,  title:'Грамматическая основа', part:2},
   {n:3,  title:'Характеристики предложений', part:2},
@@ -375,9 +376,13 @@ function renderPicker(){
       ${solved ? `<span class="mprog">✓ ${solved} из ${list.length}</span>` : ''}
       <span class="msub">${sub}</span></button>`;
   });
+  // №13 живёт на своей странице (там темы, черновик и образцы), отсюда — ссылка;
+  // №1 без аудиозаписи изложения не сделать, поэтому пока выключен
   html += '<div class="section-title">Изложение и сочинение</div>' +
-    '<button class="mode-card" disabled><span class="mtitle">№1. Сжатое изложение · №13. Сочинение-рассуждение</span>' +
-    '<span class="msub">проверяет преподаватель — появятся отдельно</span></button>';
+    '<a class="mode-card" id="essayLink" href="rus_oge13.html"><span class="mtitle">№13. Сочинение-рассуждение</span>' +
+    '<span class="msub">99 текстов ФИПИ · темы 13.1–13.3, самопроверка и образцы</span></a>' +
+    '<button class="mode-card" disabled><span class="mtitle">№1. Сжатое изложение</span>' +
+    '<span class="msub">скоро</span></button>';
   grid.innerHTML = html;
   grid.querySelectorAll('.mode-card[data-n]').forEach(b => b.addEventListener('click', () => openNumber(+b.dataset.n)));
   if (!SHOW_ALL && okCount < total) {

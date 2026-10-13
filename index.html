@@ -580,9 +580,8 @@ Object.keys(OGE_PART2_TITLES).forEach(n => {
 
 /* Русский язык, ОГЭ (2026/2027 — 13 заданий): №2–12 — одна страница
    rus_oge.html на все номера (?n=5), задания и ключи — rus-oge-fipi.js, только
-   те, чей ключ принял сам сайт ФИПИ. №1 (изложение) и №13 (сочинение)
-   проверяет преподаватель — пока «скоро». Названия совпадают с NUMS в
-   rus_oge.html */
+   те, чей ключ принял сам сайт ФИПИ. №13 (сочинение) — rus_oge13.html,
+   №1 (изложение) пока «скоро». Названия совпадают с NUMS в rus_oge.html */
 const RUS_OGE_TITLES = {
   1: 'Сжатое изложение', 2: 'Грамматическая основа', 3: 'Характеристики предложений',
   4: 'Пунктуационные правила', 5: 'Расстановка запятых', 6: 'Объяснение написания',
@@ -590,10 +589,13 @@ const RUS_OGE_TITLES = {
   10: 'Содержание текста', 11: 'Средства выразительности', 12: 'Лексический анализ',
   13: 'Сочинение-рассуждение',
 };
+// №13 — отдельная страница: сочинение не проверить ключом, там темы, черновик,
+// самопроверка по критериям и образцы, а не поле ответа
+const RUS_OGE_PAGES = { 13: 'rus_oge13.html' };
 Object.keys(RUS_OGE_TITLES).forEach(k => {
   const n = +k, ready = n >= 2 && n <= 12;
-  TRAINERS['rus' + n] = { name: '№' + n + '. ' + RUS_OGE_TITLES[n],
-    href: ready ? 'rus_oge.html?n=' + n : null, fipi: ready };
+  const href = RUS_OGE_PAGES[n] || (ready ? 'rus_oge.html?n=' + n : null);
+  TRAINERS['rus' + n] = { name: '№' + n + '. ' + RUS_OGE_TITLES[n], href, fipi: !!href };
 });
 const rusIds = (from, to) => { const a = []; for (let n = from; n <= to; n++) a.push('rus' + n); return a; };
 
