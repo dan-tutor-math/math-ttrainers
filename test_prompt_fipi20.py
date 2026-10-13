@@ -77,9 +77,14 @@ def check(name, ok, extra=""):
 
 
 def load_fipi():
-    src = open(os.path.join(HERE, "oge-part2-fipi.js"), encoding="utf-8").read()
-    body = src[src.index("window.OGE_PART2_FIPI = ") + len("window.OGE_PART2_FIPI = "):].rstrip().rstrip(";")
-    return json.loads(body)
+    # оглавление + файлы номеров (с «раздельного файла» задания номера лежат отдельно)
+    def body(name, marker):
+        src = open(os.path.join(HERE, name), encoding="utf-8").read()
+        return json.loads(src[src.index(marker) + len(marker):].rstrip().rstrip(";"))
+    F = body("oge-part2-fipi.js", "window.OGE_PART2_FIPI = ")
+    for n, name in F["files"].items():
+        F["tasks"][n] = body(name, ".tasks['" + n + "'] = ")
+    return F
 
 
 def new_page(browser, url, wait=1200, width=1300, block_fipi=False):
@@ -89,7 +94,7 @@ def new_page(browser, url, wait=1200, width=1300, block_fipi=False):
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.route("https://**/*", lambda route: route.abort())
     if block_fipi:
-        page.route("**/oge-part2-fipi.js", lambda route: route.abort())
+        page.route("**/oge-part2-fipi*.js", lambda route: route.abort())
     page.goto(url)
     page.wait_for_timeout(wait)
     return ctx, page, errors
@@ -267,7 +272,7 @@ def test_without_fipi(browser):
           page.inner_text('#taskTitle') == '№0. Задание из демоверсии ОГЭ 2027' and 'Источник' not in page.inner_text('#egeQuestion'))
     check("без файла ФИПИ: без ошибок JS", not errors, str(errors[:1]))
     ctx.close()
-    for url in ("ege_prof.html?n=7", "ege_base.html?n=3", "oge_part2.html?n=21"):
+    for url in ("ege_prof.html?n=7", "ege_base.html?n=3", "oge_part2.html?n=22"):
         ctx, page, errors = new_page(browser, f"{BASE}/{url}")
         t = page.eval_on_selector('#pickerTitle', 'e => e.textContent')
         check(f"{url}: список прототипов как раньше", t.startswith('Прототипы задания №')

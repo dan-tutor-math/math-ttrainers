@@ -995,7 +995,10 @@ function genFrameFor(href, vw){
         (function poll(){
           let w = null;
           try { w = frame.contentWindow; } catch (e) {}
-          if (w && w.document && w.document.readyState === 'complete' && typeof w.tsGetState === 'function'){
+          // __fipiBusy: ОГЭ ч. 2 догружает задания ФИПИ своего номера отдельным
+          // файлом — без них «ещё такое же» взяло бы демоверсию
+          if (w && w.document && w.document.readyState === 'complete' && typeof w.tsGetState === 'function'
+              && !(typeof w.__fipiBusy === 'function' && w.__fipiBusy())){
             setTimeout(() => resolve(frame), 400);   // стартовые таймеры страницы (восстановление прогресса)
             return;
           }

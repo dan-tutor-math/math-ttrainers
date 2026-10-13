@@ -797,29 +797,65 @@ const EXAM = {
    EXAM): страница не знает ни одной формулы — добавление новых прототипов
    её не трогает. */
 const BANK = (EXAM.bank || { tasks: {} }).tasks;
-/* Задания из открытого банка ФИПИ лежат отдельным файлом (EXAM.fipi, файл
-   *-fipi.js): его собирает скрипт выгрузки, и руками он не правится, а банк
-   с демоверсией написан руками — смешивать их в одном файле нельзя, иначе
-   следующая сборка затрёт ручные правки. Здесь они сливаются: у номера
-   появляются разделы и группы, задания встают в конец списка прототипов.
-   Идея (hint) у заданий группы общая, критерии — общие на номер */
-(function mergeFipi(){
+/* Задания из открытого банка ФИПИ лежат отдельными файлами: их собирает
+   скрипт выгрузки, и руками они не правятся, а банк с демоверсией написан
+   руками — смешивать их в одном файле нельзя, иначе следующая сборка затрёт
+   ручные правки. EXAM.fipi — маленький оглавляющий файл (*-fipi.js):
+   files — какой файл у какого номера. Сами задания номера (сотни штук,
+   сотни килобайт) грузятся только когда этот номер открыли: страница
+   ОГЭ ч. 2 одна на шесть номеров, и тянуть банк всех номеров ради одного
+   незачем. Пришедшие задания сливаются с ручным банком: у номера появляются
+   разделы и группы, задания встают в конец списка прототипов. Идея (hint)
+   у заданий группы общая, критерии — общие на номер */
+function mergeFipiNumber(n){
   const F = EXAM.fipi;
-  if (!F || !F.tasks) return;
-  Object.keys(F.tasks).forEach(n => {
-    const t = BANK[n], src = F.tasks[n];
-    if (!t || !src) return;
-    t.sections = src.sections || [];
-    t.groups = src.groups || [];
-    const hint = {};
-    t.groups.forEach(g => { hint[g.id] = g.hint; });
-    const have = new Set(t.protos.map(p => p.id));
-    (src.protos || []).forEach(p => {
-      if (have.has(p.id)) return;   // такой id уже есть в ручном банке — ручной главнее
-      t.protos.push(Object.assign({ src: F.source, hint: hint[p.group], criteria: src.criteria }, p));
-    });
+  const t = BANK[n], src = F && F.tasks && F.tasks[n];
+  if (!t || !src) return;
+  t.sections = src.sections || [];
+  t.groups = src.groups || [];
+  const hint = {};
+  t.groups.forEach(g => { hint[g.id] = g.hint; });
+  const have = new Set(t.protos.map(p => p.id));
+  (src.protos || []).forEach(p => {
+    if (have.has(p.id)) return;   // такой id уже есть в ручном банке — ручной главнее
+    t.protos.push(Object.assign({ src: F.source, hint: hint[p.group], criteria: src.criteria }, p));
   });
-})();
+}
+const fipiState = {};     // номер → 'loading' | 'done' | 'failed'
+const fipiWaiters = {};
+// у номера есть файл ФИПИ, и он ещё не пришёл (и не упал)
+function fipiPending(n){
+  const F = EXAM.fipi;
+  return !!(F && F.files && F.files[n] && fipiState[n] !== 'done' && fipiState[n] !== 'failed');
+}
+/* cb — сразу, если ждать нечего; иначе после загрузки файла номера. Не
+   загрузился (нет сети) — cb всё равно зовётся: номер работает с тем, что
+   есть в ручном банке, как до банка ФИПИ */
+function ensureFipi(n, cb){
+  if (!fipiPending(n)) { cb(); return; }
+  (fipiWaiters[n] = fipiWaiters[n] || []).push(cb);
+  if (fipiState[n] === 'loading') return;
+  fipiState[n] = 'loading';
+  const done = ok => {
+    fipiState[n] = ok ? 'done' : 'failed';
+    if (ok) mergeFipiNumber(n);
+    const list = fipiWaiters[n] || [];
+    fipiWaiters[n] = [];
+    list.forEach(f => { try { f(); } catch (e) { console.error(e); } });
+  };
+  const tag = document.createElement('script');
+  tag.src = EXAM.fipi.files[n];
+  tag.onload = () => done(!!(EXAM.fipi.tasks && EXAM.fipi.tasks[n]));
+  tag.onerror = () => done(false);
+  document.head.appendChild(tag);
+}
+/* Доска (trainer-tasks.js) снимает задания в невидимом кадре этой страницы
+   и сразу зовёт openTask/pidAfter: пока файл номера в пути, кадр не готов */
+window.__fipiBusy = () => Object.keys(fipiState).some(n => fipiState[n] === 'loading');
+// задания, уже лежащие в оглавлении (если их туда положили), — сразу
+if (EXAM.fipi && EXAM.fipi.tasks) Object.keys(EXAM.fipi.tasks).forEach(n => {
+  if (!(EXAM.fipi.files && EXAM.fipi.files[n])) { mergeFipiNumber(n); fipiState[n] = 'done'; }
+});
 if (EXAM.boardPinned) document.documentElement.setAttribute('data-board-pinned', '');
 const FIGS = EXAM.figs || {};
 const NUMS = Object.keys(BANK).map(Number).sort((a, b) => a - b);
@@ -1291,6 +1327,12 @@ function protoPeek(p){
 }
 function renderPicker(){
   const t = task(S.n);
+  // файл ФИПИ номера ещё в пути — пока рисуем то, что есть, и перерисуем,
+  // когда он придёт (если к тому времени на экране всё ещё этот список)
+  if (fipiPending(S.n)) {
+    const n = S.n;
+    ensureFipi(n, () => { if (S.n === n && S.screen === 'picker') renderPicker(); });
+  }
   const list = protos(S.n);
   // источники всех заданий номера: «демоверсия ОГЭ 2027 и открытый банк заданий ФИПИ»
   const srcs = list.map(p => p.src || '').filter((x, i, all) => x && all.indexOf(x) === i);
@@ -1525,6 +1567,9 @@ function renderSolution(){
 let drawnTask = null;
 function openTask(n, pid){
   if (!task(n)) return;
+  // задания ФИПИ этого номера ещё не пришли: без них pid не найдётся и
+  // откроется демоверсия — открываем, когда файл номера загрузится
+  if (fipiPending(n)) { ensureFipi(n, () => openTask(n, pid)); return; }
   // задание на экране сейчас сменится — сперва снимок в конспект урока
   // вместе с заметками доски поверх него
   if (S.screen === 'task') snapshotAndClear('whole', els.workZone);
@@ -1659,7 +1704,7 @@ function render(){
 window.__examNav = {
   n: () => S.n,
   pid: () => (S.screen === 'task' && curProto) ? S.pid : null,
-  open: (n, pid) => { if (task(n)) openTask(n, pid && protoById(n, pid) ? pid : null); },
+  open: (n, pid) => { if (task(n)) ensureFipi(n, () => openTask(n, pid && protoById(n, pid) ? pid : null)); },
 };
 // сосед по списку прототипов этого номера, по кругу
 function protoNeighbour(delta){
@@ -2220,6 +2265,9 @@ function tsApplyState(state){
   if (window.__boardApplyState) window.__boardApplyState(state);
   if (typeof state.egeN === 'undefined') return; // снимок без задания (пустая сессия)
   if (!BANK[state.egeN]) return;
+  // в снимке задание ФИПИ, а файл номера ещё не пришёл — применим снимок
+  // целиком после загрузки, иначе вместо задания открылась бы демоверсия
+  if (fipiPending(state.egeN)) { ensureFipi(state.egeN, () => tsApplyState(state)); return; }
   if (EXAM.calcShared && window.__calcApplyState) window.__calcApplyState(state);
 
   // Сравниваем с прототипом, который реально откроется: неизвестный id (банк
