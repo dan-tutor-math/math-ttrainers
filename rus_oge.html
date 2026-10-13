@@ -211,7 +211,9 @@ h1{font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,5vw,34px);text-ali
 </style>
 </head>
 <body>
-<a class="home-btn" id="homeBtn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
+<!-- ?subject=rus: главная открывается сразу на русском, даже если ученик пришёл
+     по прямой ссылке и на главной ещё не выбирал предмет -->
+<a class="home-btn" id="homeBtn" href="index.html?subject=rus" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
 <button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
 <script>(function(){
   var btn=document.getElementById('themeToggle');

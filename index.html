@@ -8,6 +8,9 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0B0E1A">
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<!-- предмет ставим на <html> до первого кадра, как тему: от него зависит цвет
+     всей страницы, и без этого русский на мгновение мигал бы синим -->
+<script>(function(){var s='math';try{var q=new URLSearchParams(location.search).get('subject');s=q||localStorage.getItem('ogeNav:subject')||'math';}catch(e){}if(!/^(math|rus|soc|eng)$/.test(s))s='math';document.documentElement.setAttribute('data-subject',s);})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Тренажёры — Школа репетиторов</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -95,6 +98,18 @@ html[data-theme="dark"]{
 }
 html[data-theme="dark"] input{background:var(--card)}
 
+/* У каждого предмета свой цвет: им окрашены вкладки, кнопки капсул и пятно
+   фона. Меняем только --ink и его производные — все компоненты страницы
+   (и liquid-glass.css) уже берут цвет из них, отдельных правил не нужно.
+   Математика остаётся прежней синей. В тёмной теме тон светлее, чтобы белый
+   текст на активной вкладке читался так же */
+html[data-subject="rus"]{--ink:#9E2A47;--ink-active:#7E1F37;--hl-06:rgba(158,42,71,.06);--hl-10:rgba(158,42,71,.10);--blob-1:rgba(194,64,95,.16)}
+html[data-subject="soc"]{--ink:#17694F;--ink-active:#10523D;--hl-06:rgba(23,105,79,.06);--hl-10:rgba(23,105,79,.10);--blob-1:rgba(36,137,106,.16)}
+html[data-subject="eng"]{--ink:#5B3596;--ink-active:#47287A;--hl-06:rgba(91,53,150,.06);--hl-10:rgba(91,53,150,.10);--blob-1:rgba(122,82,184,.16)}
+html[data-theme="dark"][data-subject="rus"]{--ink:#C9506E;--ink-active:#D86A86;--hl-06:rgba(210,90,118,.10);--hl-10:rgba(210,90,118,.16);--blob-1:rgba(210,90,118,.22)}
+html[data-theme="dark"][data-subject="soc"]{--ink:#2F8F70;--ink-active:#3FA584;--hl-06:rgba(58,158,126,.10);--hl-10:rgba(58,158,126,.16);--blob-1:rgba(58,158,126,.22)}
+html[data-theme="dark"][data-subject="eng"]{--ink:#8462C8;--ink-active:#9878D6;--hl-06:rgba(148,116,208,.10);--hl-10:rgba(148,116,208,.16);--blob-1:rgba(148,116,208,.22)}
+
 *{box-sizing:border-box;margin:0;padding:0}
 body{
   background:
@@ -128,6 +143,27 @@ body > #resetProgressBtn, body > #themeToggle{display:none}
   h1{font-size:clamp(22px,7vw,30px);}
 }
 .nav-bar{position:sticky;top:10px;z-index:100;margin-bottom:16px;}
+/* предмет — уровнем выше вкладок «Экзамены / Классы / Основа»: у каждого
+   предмета своё дерево разделов. Капсула не липнет при прокрутке вместе с
+   вкладками — предмет за урок меняют редко, а место сверху на телефоне дорого */
+.subj-row{display:flex;justify-content:center;margin:2px 0 14px;}
+.subj-bar{display:inline-flex;gap:4px;padding:5px;border-radius:999px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);box-shadow:var(--shadow);max-width:100%;}
+.subj-btn{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:0 16px;border:none;border-radius:999px;background:none;cursor:pointer;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--muted-3);white-space:nowrap;}
+.subj-btn:hover{background:var(--hover-1);color:var(--pencil);}
+.subj-btn .dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;opacity:.55;}
+.subj-btn.active{background:#fff;color:var(--ink);font-weight:700;box-shadow:0 2px 10px rgba(20,30,60,.10);}
+.subj-btn.active .dot{opacity:1;}
+html[data-theme="dark"] .subj-btn.active{background:rgba(255,255,255,.14);color:#fff;}
+/* точки — цвета самих предметов, а не текущего акцента: по ним предмет
+   узнаётся ещё до того, как прочитано название */
+.subj-btn[data-id="math"] .dot{background:#1E6FC2}
+.subj-btn[data-id="rus"] .dot{background:#C2405F}
+.subj-btn[data-id="soc"] .dot{background:#24896A}
+.subj-btn[data-id="eng"] .dot{background:#7A52B8}
+@media (max-width:620px){
+  .subj-bar{flex-wrap:wrap;justify-content:center;border-radius:24px;}
+  .subj-btn{padding:0 12px;font-size:13px;min-height:38px;}
+}
 .nav-tabs,.nav-subtabs{display:flex;gap:6px;flex-wrap:wrap;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:18px;padding:7px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);}
 .nav-subtabs{margin-top:8px;padding:6px;border-radius:16px;}
 .nav-tab,.nav-subtab{flex:1 1 auto;text-align:center;font-family:var(--font-ui);color:var(--muted-3);background:none;border:none;border-radius:12px;padding:11px 12px;cursor:pointer;transition:background .15s,color .15s;white-space:nowrap;}
@@ -174,6 +210,10 @@ body > #resetProgressBtn, body > #themeToggle{display:none}
 .item-num{font-family:var(--font-mono);font-size:13px;color:var(--muted-1);min-width:22px;}
 .item-name{font-size:17px}
 .topic-item.soon{opacity:.5;cursor:default;pointer-events:none;}
+/* «банк ФИПИ» — задания открытого банка дословно, а не наши аналоги:
+   метка нужна, чтобы этому разделу доверяли так же, как сайту ФИПИ */
+.item-chip{margin-left:auto;flex:0 0 auto;font-family:var(--font-ui);font-size:11px;font-weight:600;letter-spacing:.02em;padding:4px 9px;border-radius:999px;color:var(--ink);background:var(--hl-10);white-space:nowrap;}
+html[data-theme="dark"] .item-chip{color:#fff;}
 .item-soon{margin-left:auto;font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-1);white-space:nowrap;}
 .group{margin:2px 4px 6px;border-radius:14px;background:var(--hover-1);overflow:hidden;}
 .group-header{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:none;border:none;cursor:pointer;text-align:left;font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--pencil);}
@@ -271,7 +311,7 @@ body .ts-share-pop{top:16px;right:calc(16px + var(--lg-menu-w, 48px) + 12px);max
 
 @media print{
   body{background:#fff !important;padding:0;}
-  h1, .sub, .nav-bar, .basket-toolbar, .basket-item .rm, .feedback, footer, .lg-side, .lg-menu{display:none !important;}
+  h1, .sub, .subj-row, .nav-bar, .basket-toolbar, .basket-item .rm, .feedback, footer, .lg-side, .lg-menu{display:none !important;}
   .topic, .basket-item{background:#fff !important;border:none !important;box-shadow:none !important;backdrop-filter:none !important;border-radius:0 !important;}
   .basket-item{border-bottom:1px solid #000 !important;padding:6px 0;}
   body, .wrap, .basket-item-text, .basket-item-src{color:#000 !important;}
@@ -396,14 +436,15 @@ body .ts-share-pop{top:16px;right:calc(16px + var(--lg-menu-w, 48px) + 12px);max
 
   // в «максимуме» преломляют и большие панели страницы; список тем
   // пересоздаётся при смене вкладки — поэтому слежение, а не разовый поиск
-  MathhGlass.autoRefract('.nav-tabs, .nav-subtabs, .topic, .feedback');
-  MathhGlass.pressable('.nav-tab, .nav-subtab');
+  MathhGlass.autoRefract('.subj-bar, .nav-tabs, .nav-subtabs, .topic, .feedback');
+  MathhGlass.pressable('.subj-btn, .nav-tab, .nav-subtab');
   // названия у кнопок левой капсулы — при наведении, справа от кнопки
   MathhGlass.tips('.lg-side > a, .lg-side > button', 'right');
 })();</script>
 <div class="wrap">
   <h1>Тренажёры</h1>
-  <div class="sub">выбери раздел — список тренажёров откроется ниже</div>
+  <div class="sub">выбери предмет и раздел — список тренажёров откроется ниже</div>
+  <div class="subj-row"><div class="subj-bar" id="subjBar" role="group" aria-label="Предмет"></div></div>
   <div class="nav-bar" id="navBar">
     <div class="nav-tabs" id="mainTabs"></div>
     <div class="nav-subtabs" id="subTabs" style="display:none"></div>
@@ -533,6 +574,29 @@ Object.keys(OGE_PART2_TITLES).forEach(n => {
   TRAINERS['oge' + n] = { name: '№' + n + '. ' + OGE_PART2_TITLES[n], href: 'oge_part2.html?n=' + n };
 });
 
+// №19–21 собраны из открытого банка ФИПИ дословно (oge19-fipi-bank.js,
+// oge-part2-fipi*.js) — у них метка «банк ФИПИ»
+['oge19', 'oge20', 'oge21'].forEach(id => { TRAINERS[id].fipi = true; });
+
+/* Русский язык, ОГЭ (2026/2027 — 13 заданий): №2–12 — одна страница
+   rus_oge.html на все номера (?n=5), задания и ключи — rus-oge-fipi.js, только
+   те, чей ключ принял сам сайт ФИПИ. №1 (изложение) и №13 (сочинение)
+   проверяет преподаватель — пока «скоро». Названия совпадают с NUMS в
+   rus_oge.html */
+const RUS_OGE_TITLES = {
+  1: 'Сжатое изложение', 2: 'Грамматическая основа', 3: 'Характеристики предложений',
+  4: 'Пунктуационные правила', 5: 'Расстановка запятых', 6: 'Объяснение написания',
+  7: 'Пропущенные буквы', 8: 'Формы слова', 9: 'Замена словосочетания',
+  10: 'Содержание текста', 11: 'Средства выразительности', 12: 'Лексический анализ',
+  13: 'Сочинение-рассуждение',
+};
+Object.keys(RUS_OGE_TITLES).forEach(k => {
+  const n = +k, ready = n >= 2 && n <= 12;
+  TRAINERS['rus' + n] = { name: '№' + n + '. ' + RUS_OGE_TITLES[n],
+    href: ready ? 'rus_oge.html?n=' + n : null, fipi: ready };
+});
+const rusIds = (from, to) => { const a = []; for (let n = from; n <= to; n++) a.push('rus' + n); return a; };
+
 /* ───────── дерево разделов ─────────
    у вкладки либо есть subtabs (тогда открываются они), либо сразу groups (плоская вкладка).
    soon:true — вкладка пока без тренажёров ("скоро"). items — id-шники из TRAINERS. */
@@ -596,6 +660,55 @@ const NAV = [
   ]},
 ];
 
+/* ───────── предметы ─────────
+   NAV выше — дерево математики. У других предметов дерево своё; пока в
+   них только экзамены, остальные вкладки появятся вместе с тренажёрами.
+   soonText — что написать вместо пустого списка */
+const SUBJECTS = [
+  { id: 'math', title: 'Математика', nav: NAV },
+  { id: 'rus',  title: 'Русский', nav: [
+    { id: 'exams', title: 'Экзамены', subtabs: [
+      { id: 'oge', title: 'ОГЭ', groups: [
+        { title: 'Часть 1 — изложение', items: ['rus1'] },
+        { title: 'Часть 2 — краткий ответ', items: rusIds(2, 12), continueNum: true },
+        { title: 'Часть 3 — сочинение', items: ['rus13'], continueNum: true },
+      ] },
+      { id: 'ege', title: 'ЕГЭ', groups: [], soon: true,
+        soonText: 'ЕГЭ по русскому готовим следующим — тоже по открытому банку ФИПИ.' },
+    ] },
+  ] },
+  { id: 'soc',  title: 'Обществознание', nav: [
+    { id: 'exams', title: 'Экзамены', subtabs: [
+      { id: 'oge', title: 'ОГЭ', groups: [], soon: true,
+        soonText: 'Обществознание готовим: первыми появятся задания открытого банка ФИПИ к ОГЭ.' },
+      { id: 'ege', title: 'ЕГЭ', groups: [], soon: true },
+    ] },
+  ] },
+  { id: 'eng',  title: 'Английский', nav: [
+    { id: 'exams', title: 'Экзамены', subtabs: [
+      { id: 'oge', title: 'ОГЭ', groups: [], soon: true,
+        soonText: 'Английский готовим: первыми появятся задания открытого банка ФИПИ к ОГЭ.' },
+      { id: 'ege', title: 'ЕГЭ', groups: [], soon: true },
+    ] },
+  ] },
+];
+const SUBJECT_KEY = 'ogeNav:subject';
+let curSubject = document.documentElement.getAttribute('data-subject') || 'math';
+if (!SUBJECTS.some(s => s.id === curSubject)) curSubject = 'math';
+function curNav(){ return SUBJECTS.find(s => s.id === curSubject).nav; }
+// ?subject=rus в адресе (кнопка «домой» в rus_oge.html) уже применён в <head>;
+// запоминаем его и убираем из адреса, чтобы он не перебивал дальнейший выбор
+(function(){
+  try {
+    const url = new URL(location.href);
+    if (url.searchParams.has('subject')) {
+      localStorage.setItem(SUBJECT_KEY, curSubject);
+      url.searchParams.delete('subject');
+      history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+    }
+  } catch(e){}
+})();
+
 // ── полный сброс прогресса: все тренажёры хранят решённые примеры, медали
 // и историю в localStorage под ключами вида 'ogeProg:<файл>:...' — все эти
 // файлы открыты с одного домена/источника, поэтому localStorage у них общий,
@@ -614,20 +727,47 @@ document.getElementById('resetProgressBtn').onclick = () => {
   alert('Готово — прогресс по всем тренажёрам сброшен.');
 };
 
+// у математики ключ прежний — открытая вкладка у старых пользователей не сбросится;
+// у остальных предметов свой ключ, чтобы при переключении туда и обратно
+// возвращаться в ту же вкладку
 const NAV_STATE_KEY = 'ogeNav:state';
+function navStateKey(){ return curSubject === 'math' ? NAV_STATE_KEY : NAV_STATE_KEY + ':' + curSubject; }
 let curTabId = null, curSubtabId = null;
 // «Подборка» — платформенная функция, не часть предметной навигации,
 // поэтому у неё свой флаг, а не место среди вкладок NAV (см. .basket-toggle)
 let basketOpen = false;
-(function restoreNavState(){
+function restoreNavState(){
+  curTabId = null; curSubtabId = null;
+  const nav = curNav();
   try {
-    const saved = JSON.parse(localStorage.getItem(NAV_STATE_KEY) || 'null');
-    if (saved && NAV.some(t => t.id === saved.tabId)) { curTabId = saved.tabId; curSubtabId = saved.subtabId || null; }
+    const saved = JSON.parse(localStorage.getItem(navStateKey()) || 'null');
+    if (saved && nav.some(t => t.id === saved.tabId)) { curTabId = saved.tabId; curSubtabId = saved.subtabId || null; }
   } catch(e){}
-  if (!curTabId) curTabId = NAV[0].id;
-})();
+  if (!curTabId) curTabId = nav[0].id;
+}
+restoreNavState();
 function saveNavState(){
-  try { localStorage.setItem(NAV_STATE_KEY, JSON.stringify({ tabId: curTabId, subtabId: curSubtabId })); } catch(e){}
+  try { localStorage.setItem(navStateKey(), JSON.stringify({ tabId: curTabId, subtabId: curSubtabId })); } catch(e){}
+}
+
+function renderSubjects(){
+  const bar = document.getElementById('subjBar');
+  bar.innerHTML = SUBJECTS.map(s =>
+    `<button class="subj-btn${s.id === curSubject ? ' active' : ''}" type="button" data-id="${s.id}" aria-pressed="${s.id === curSubject}">` +
+    `<span class="dot" aria-hidden="true"></span><span>${s.title}</span></button>`).join('');
+  bar.querySelectorAll('.subj-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.id === curSubject && !basketOpen) return;
+      curSubject = btn.dataset.id;
+      document.documentElement.setAttribute('data-subject', curSubject);
+      try { localStorage.setItem(SUBJECT_KEY, curSubject); } catch(e){}
+      basketOpen = false;
+      restoreNavState();
+      renderSubjects();
+      renderNav();
+      renderContent();
+    });
+  });
 }
 
 /* ii — порядковый номер внутри группы; base сдвигает нумерацию, чтобы в
@@ -649,6 +789,7 @@ function itemHTML(it, ii, base){
     <a class="topic-item" href="${it.href}">
       <span class="item-num">${num}</span>
       <span class="item-name">${it.name}</span>
+      ${it.fipi ? '<span class="item-chip">банк ФИПИ</span>' : ''}
     </a>
   `;
 }
@@ -657,7 +798,7 @@ function groupsCount(groups){
   return (groups||[]).reduce((sum,g)=>sum + g.items.filter(id=>TRAINERS[id] && TRAINERS[id].href).length, 0);
 }
 
-function getCurTab(){ return NAV.find(t => t.id === curTabId) || NAV[0]; }
+function getCurTab(){ const nav = curNav(); return nav.find(t => t.id === curTabId) || nav[0]; }
 function getCurSubtab(){
   const tab = getCurTab();
   if (!tab.subtabs) return null;
@@ -681,9 +822,10 @@ function updateBasketToggle(){
 
 function renderNav(){
   const mainEl = document.getElementById('mainTabs');
-  mainEl.innerHTML = NAV.map(t => {
+  mainEl.innerHTML = curNav().map(t => {
     const n = t.subtabs ? t.subtabs.reduce((s,st)=>s+groupsCount(st.groups),0) : groupsCount(t.groups);
-    return `<button class="nav-tab${(!basketOpen && t.id===curTabId)?' active':''}" data-id="${t.id}">${t.title}<span class="tcount"> · ${n}</span></button>`;
+    // «· 0» у предмета, который ещё готовим, читается как ошибка — нуль не пишем
+    return `<button class="nav-tab${(!basketOpen && t.id===curTabId)?' active':''}" data-id="${t.id}">${t.title}${n ? `<span class="tcount"> · ${n}</span>` : ''}</button>`;
   }).join('');
   mainEl.querySelectorAll('.nav-tab').forEach(btn=>{
     btn.addEventListener('click', ()=>{
@@ -727,7 +869,8 @@ function renderContent(){
   if (basketOpen) { renderBasketView(); return; }
   const def = getActiveDef();
   if (!def || def.soon || !(def.groups||[]).length) {
-    el.innerHTML = `<div class="topic"><div class="coming-soon-tab">🚧 Здесь пока нет тренажёров — они появятся в числе первых, когда будут готовы.</div></div>`;
+    const text = (def && def.soonText) || 'Здесь пока нет тренажёров — они появятся в числе первых, когда будут готовы.';
+    el.innerHTML = `<div class="topic"><div class="coming-soon-tab">🚧 ${text}</div></div>`;
     return;
   }
   let numBase = 0;
@@ -809,6 +952,7 @@ document.getElementById('basketToggle').addEventListener('click', () => {
   renderContent();
 });
 
+renderSubjects();
 renderNav();
 renderContent();
 
