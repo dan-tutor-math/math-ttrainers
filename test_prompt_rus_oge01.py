@@ -162,7 +162,13 @@ def main():
         print("2. список и навигация")
         check(pg.eval_on_selector_all("#textsGrid .mode-card", "els => els.length") == 43, "в списке 43 записи")
         card = pg.inner_text("#textsGrid .mode-card[data-i='0']")
-        check("аудио" in card and tasks[0]["p"][0][:25] not in card, f"в карточке автор и длина, без начала текста ({card.strip()[:60]})")
+        check("аудио" in card and "Л.В. Успенский. «С самого раннего детства и…»" in card,
+              f"в карточке название «И.О. Фамилия. «Первые слова…»» и длина ({card.strip()[:70]})")
+        names = pg.eval_on_selector_all("#textsGrid .mode-card .mtitle", "els => els.map(e => e.textContent)")
+        odd = [n for n in names if not re.match(r"^(?:(?:[А-ЯЁ]\.)+ [А-ЯЁ][а-яё]+\. )?«.+»$", n)]
+        check(not odd, f"все 43 названия в одном формате {odd[:5]}")
+        check("Н.П. Крыщук. «Испытания ждут дружбу всегда»" in names, "автор, которого нет в записи ФИПИ, дописан (Крыщук)")
+        check("И.А. Ефремов. «Мне повезло с учителями»" in names, "первые слова — только из первого предложения")
         check(pg.get_attribute("#homeBtn", "href") == "index.html?subject=rus", "«домой» — на русский язык главной")
         pg.click("#textsGrid .mode-card[data-i='3']")
         check(f"t={tasks[3]['id']}" in pg.url and pg.inner_text("#taskTitle") == "текст 4 из 43", "карточка открывает запись, адрес с ?t=")

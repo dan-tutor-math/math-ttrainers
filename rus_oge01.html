@@ -298,6 +298,7 @@ button.tag:hover{background:var(--ok);color:#fff}
 </div>
 
 <script src="rus-oge01-fipi.js"></script>
+<script src="rus-titles.js"></script>
 <script>
 (function(){
 'use strict';
@@ -306,6 +307,12 @@ const TASKS = DATA.tasks;
 const MIN_WORDS = 70;
 // на ОГЭ текст читают два раза — в «Экзамене» столько же
 const EXAM_PLAYS = 2;
+// В записи ФИПИ автор назван не всегда. Кого назвал эксперт по русскому, дописываем
+// здесь, а не в rus-oge01-fipi.js: тот файл пересобирается скриптом
+const AU_FIX = { B40EFA: 'По Н.П. Крыщуку' };
+const authorOf = t => t.au || AU_FIX[t.id] || '';
+// название как у учителей: «И.О. Фамилия. «Первые слова…»»
+const titleOf = t => RusTitles.title(authorOf(t), t.p[0]);
 
 // Критерии ИК1–ИК3 — по методическим рекомендациям ФИПИ 2026 (до 6 баллов).
 // Грамотность (ГК) и фактическую точность (ФК) ставит преподаватель.
@@ -352,12 +359,13 @@ function renderPicker(){
   $('taskArea').style.display = 'none';
   const done = TASKS.filter(t => results[t.id]).length;
   $('pageSub').textContent = `№1. Сжатое изложение · ${TASKS.length} аудиозаписи открытого банка ФИПИ` + (done ? ` · написано ${done}` : '');
-  // начало текста в списке не показываем: изложение пишут по слуху, тема должна быть сюрпризом
+  // в названии — автор и первые слова, как принято у учителей и в сборниках: по нему текст
+  // узнают и ищут; сам текст при этом остаётся скрыт до прослушивания
   $('textsGrid').innerHTML = TASKS.map((t, i) => {
     const r = results[t.id];
     const prog = r ? `<span class="mprog">✓${r.sc != null ? ' ' + r.sc + ' из ' + MAX_SCORE : ' написано'}</span>` : '';
     return `<button class="mode-card" data-i="${i}"><span class="mnum">${i + 1}</span>` +
-      `<span class="mtitle">${esc(t.au || 'Текст ' + (i + 1))}</span>${prog}` +
+      `<span class="mtitle">${esc(titleOf(t) || 'Текст ' + (i + 1))}</span>${prog}` +
       `<span class="msub">аудио ${mmss(t.dur)}</span></button>`;
   }).join('');
   $('textsGrid').querySelectorAll('.mode-card').forEach(b => b.addEventListener('click', () => openTask(+b.dataset.i)));
@@ -558,7 +566,7 @@ function renderText(){
   area.innerHTML = '<details class="text-box" open><summary>Текст изложения</summary><div class="text-body">' +
     t.p.map((p, k) => `<div class="mt" data-k="${k}"><div class="mt-head">Микротема ${k + 1}</div>` +
       `<div class="mt-sum">${esc(t.mt[k])}</div><p>${esc(p)}</p></div>`).join('') +
-    (t.au ? `<div class="text-tail"><p>(${esc(t.au)})</p></div>` : '') + '</div></details>';
+    (authorOf(t) ? `<div class="text-tail"><p>(${esc(authorOf(t))})</p></div>` : '') + '</div></details>';
 }
 function renderSample(){
   const area = $('sampleArea');
@@ -583,7 +591,7 @@ function showMt(k){
 
 function copyEssay(){
   const t = cur();
-  const text = `Сжатое изложение (ОГЭ, №1)\nТекст ${S.idx + 1}${t.au ? ' — ' + t.au : ''}, задание ФИПИ ${t.id}\n\n${$('essay').value}`;
+  const text = `Сжатое изложение (ОГЭ, №1)\nТекст ${S.idx + 1} — ${titleOf(t)}, задание ФИПИ ${t.id}\n\n${$('essay').value}`;
   const done = () => { $('copyBtn').textContent = 'Скопировано'; setTimeout(() => { if ($('copyBtn')) $('copyBtn').textContent = 'Скопировать для преподавателя'; }, 1600); };
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, done);
   else done();
