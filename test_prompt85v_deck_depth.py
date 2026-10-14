@@ -186,6 +186,20 @@ def main():
         f1 = page.evaluate("() => getComputedStyle(document.querySelector('#deckDepth .deck-card.k1')).filter")
         check(f0 == "none" and "blur" in f1, f"размытие только в «максимуме» ({f0} / {f1})")
 
+        # 6б. ручка ползунка непрозрачна и над отметками
+        kn = page.evaluate("""() => { const k = document.getElementById('deckKnob'), cs = getComputedStyle(k);
+          const t = document.querySelector('#deckScrub .deck-scrub-tick');
+          return { bg: cs.backgroundColor, z: parseInt(cs.zIndex) || 0, tz: t ? (parseInt(getComputedStyle(t).zIndex) || 0) : -1 }; }""")
+        check(not kn["bg"].startswith("rgba") and kn["z"] > kn["tz"], f"ручка непрозрачна и над отметками ({kn})")
+
+        # 6в. щелчок по процентам масштаба — «вписан», а не 100 %
+        page.evaluate("() => { setZoom(cam.zoom * 1.6, cam.x, cam.y, 0, 0); clampCam(); scheduleRedraw(); }")
+        page.wait_for_timeout(200)
+        page.click("#railZoomLabel")
+        page.wait_for_timeout(700)
+        zz = page.evaluate("() => [cam.zoom, deckFitZoom(deckCur()), deckFitted]")
+        check(abs(zz[0] - zz[1]) < 1e-6 and zz[2] and abs(zz[0] - 1) > .05, f"щелчок по процентам — слайд вписан ({zz[0]:.3f}, вписан {zz[1]:.3f})")
+
         # 7. «максимум»: стопка идёт за ручкой непрерывно, у отметки — примагничивается
         page.wait_for_timeout(300)
         sc = page.locator("#deckScrub").bounding_box()
@@ -194,7 +208,13 @@ def main():
         page.mouse.move(k["x"] + 16, k["y"] + 22)
         page.mouse.down()
         page.mouse.move(k["x"] + 16, k["y"] + 22 + 10, steps=2)
-        page.wait_for_timeout(700)       # мягкий вход в обзор закончился
+        # вход в обзор плавный: отдаление идёт кадр за кадром, без скачка
+        zs = page.evaluate("""() => new Promise(res => { const out = []; let n = 0;
+          const tick = () => { out.push(deckFx ? +deckFx.z.toFixed(3) : null); if (++n < 8) requestAnimationFrame(tick); else res(out); };
+          requestAnimationFrame(tick); })""")
+        mono = all(v is not None for v in zs) and all(zs[i] >= zs[i + 1] for i in range(len(zs) - 1)) and zs[0] > .6 and zs[-1] < zs[0]
+        check(mono, f"вход в обзор плавный, по кадрам: {zs}")
+        page.wait_for_timeout(700)       # вошли в обзор
         y_mid = sc["y"] + step * 2.4     # между третьим и четвёртым
         page.mouse.move(k["x"] + 16, y_mid, steps=6)
         page.wait_for_timeout(120)
@@ -208,8 +228,8 @@ def main():
         check(st["pos"] == 3 and not st["follow"], f"у отметки — примагнитилась к слайду ({st})")
         check(slide_no(page) == "4 / 5", f"текущий — четвёртый ({slide_no(page)})")
         page.mouse.up()
-        page.wait_for_timeout(800)
-        check(page.evaluate("() => deckFastPos === null && !deckFast && !deckSlideHidden()"), "отпустили — обычный вид")
+        page.wait_for_function("() => deckFastPos === null && !deckFast && !deckSlideHidden()", timeout=3000)
+        check(True, "отпустили — плавно вернулись в обычный вид")
 
         check(not errors, f"нет ошибок на странице ({errors[:3]})")
         browser.close()

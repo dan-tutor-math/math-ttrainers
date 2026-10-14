@@ -236,6 +236,45 @@ def main():
         page.wait_for_timeout(100)
         check(page.is_hidden("#deckMenu"), "Esc закрывает меню")
 
+        # 7б. ленту растягивают: по умолчанию миниатюры влезают целиком
+        fit = page.evaluate("""() => { const l = document.getElementById('deckStripList'), lr = l.getBoundingClientRect();
+          const boxes = [...l.querySelectorAll('.deck-thumb-box')].map(b => b.getBoundingClientRect().right);
+          return { over: l.scrollWidth > l.clientWidth + 1, inside: boxes.every(r => r <= lr.right + 0.5), tw: deckThumbW }; }""")
+        check(not fit["over"] and fit["inside"], f"по умолчанию миниатюры помещаются в ленту целиком ({fit})")
+        st0 = page.locator("#deckStrip").bounding_box()
+        hx = page.locator("#deckStrip [data-rs='x']").bounding_box()
+        page.mouse.move(hx["x"] + 5, hx["y"] + hx["height"] / 2)
+        page.mouse.down()
+        page.mouse.move(hx["x"] + 85, hx["y"] + hx["height"] / 2, steps=6)
+        page.mouse.up()
+        page.wait_for_timeout(400)
+        st1 = page.locator("#deckStrip").bounding_box()
+        tw1 = page.evaluate("() => deckThumbW")
+        check(abs(st1["width"] - st0["width"] - 80) < 3, f"правый край — ширина ({st0['width']:.0f} → {st1['width']:.0f})")
+        check(tw1 > fit["tw"] + 60, f"миниатюры стали крупнее ({fit['tw']} → {tw1})")
+        hy = page.locator("#deckStrip [data-rs='y']").bounding_box()
+        page.mouse.move(hy["x"] + hy["width"] / 2, hy["y"] + 5)
+        page.mouse.down()
+        page.mouse.move(hy["x"] + hy["width"] / 2, hy["y"] - 150, steps=6)
+        page.mouse.up()
+        page.wait_for_timeout(300)
+        st2 = page.locator("#deckStrip").bounding_box()
+        check(abs(st2["height"] - (st1["height"] - 155)) < 6, f"нижний край — высота ({st1['height']:.0f} → {st2['height']:.0f})")
+        # две перезагрузки за 4 с — защита от краш-цикла (№49) не откроет
+        # доску сама; её метку снимаем
+        page.evaluate("() => sessionStorage.clear()")
+        page.reload()
+        page.evaluate(BOOT_JS)
+        page.wait_for_function("() => typeof B !== 'undefined' && B && B.kind === 'deck' && boardActive", timeout=5000)
+        page.wait_for_timeout(400)
+        st3 = page.locator("#deckStrip").bounding_box()
+        check(abs(st3["width"] - st1["width"]) < 2 and abs(st3["height"] - st2["height"]) < 2, "размер ленты помнится после перезагрузки")
+        page.dblclick("#deckStrip [data-rs='x']")
+        page.dblclick("#deckStrip [data-rs='y']")
+        page.wait_for_timeout(300)
+        st4 = page.locator("#deckStrip").bounding_box()
+        check(abs(st4["width"] - st0["width"]) < 2 and abs(st4["height"] - st0["height"]) < 2, "двойной щелчок по краю — размер по умолчанию")
+
         # 8. свернуть ленту
         z_open = page.evaluate("() => cam.zoom")
         page.click("#deckStripToggle")
@@ -244,6 +283,9 @@ def main():
         z_closed = page.evaluate("() => cam.zoom")
         check(z_closed >= z_open, f"слайд не стал мельче ({z_open:.3f} → {z_closed:.3f})")
         page.wait_for_timeout(800)
+        # две перезагрузки за 4 с — защита от краш-цикла (№49) не откроет
+        # доску сама; её метку снимаем
+        page.evaluate("() => sessionStorage.clear()")
         page.reload()
         page.evaluate(BOOT_JS)
         page.wait_for_function("() => typeof B !== 'undefined' && B && B.kind === 'deck' && boardActive", timeout=5000)

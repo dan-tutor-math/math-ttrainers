@@ -7701,7 +7701,13 @@ function onZoomTap(){
   // только когда стало ясно, что второго нажатия не будет
   if (!zoomPopOpen){
     clearTimeout(zoomResetTimer);
-    zoomResetTimer = setTimeout(() => { zoomResetTimer = null; zoomAroundCenter(1); }, ZOOM_DBL_MS);
+    zoomResetTimer = setTimeout(() => {
+      zoomResetTimer = null;
+      // Промпт №85е: у презентации «обычный» масштаб — слайд вписан в
+      // экран (около 70 %), а не 100 %
+      if (B && B.kind === 'deck' && typeof deckResetZoom === 'function') deckResetZoom();
+      else zoomAroundCenter(1);
+    }, ZOOM_DBL_MS);
   }
 }
 zoomLabelEl.addEventListener('click', onZoomTap);

@@ -288,6 +288,14 @@ function deckGo(idx, dir){
   rememberView();
   return true;
 }
+// щелчок по процентам масштаба — слайд снова вписан в экран
+function deckResetZoom(){
+  const s = deckCur();
+  if (!s) return;
+  if (deckIsScroll()) deckScrollTo(s, true);
+  else { deckZf = 1; deckFitCam(s, 1); deckFitted = true; }
+  scheduleRedraw(); rememberView();
+}
 function deckStep(dir){ return deckGo(deckCurIndex() + dir, dir); }
 
 // сдвиг холста при перелистывании — CSS-анимацией самого холста: камера
@@ -405,7 +413,12 @@ document.getElementById('deckFlowS')?.addEventListener('click', () => deckSetFlo
    перерисовывал бы сорок картинок
    ═══════════════════════════════════════════════════════════════════════ */
 const DECK_STRIP_KEY = 'boardsDeckStrip';
-const DECK_THUMB_W = 116, DECK_THUMB_H = 80;
+// №85д: размер рамки миниатюры — от ширины ленты (ленту можно растянуть),
+// чтобы миниатюры всегда помещались целиком
+let deckThumbW = 116, deckThumbH = 80;
+let deckStripLastCW = -1;
+const DECK_STRIP_SIZE_KEY = 'boardsDeckStripSize';
+const DECK_STRIP_THUMB_DEF = 116;
 let deckStripSig = '', deckStripCurShown = null, deckLastRev = null;
 let deckSlotSig = {};
 const deckThumbDirty = new Set(), deckThumbVisible = new Set();
@@ -426,6 +439,90 @@ function deckSyncStrip(){
   el.classList.toggle('collapsed', !open);
   const t = document.getElementById('deckStripToggle');
   if (t){ t.textContent = open ? '‹' : '›'; t.title = open ? 'Свернуть ленту слайдов' : 'Показать ленту слайдов'; t.setAttribute('aria-label', t.title); }
+  if (on && open) deckApplyStripSize();
+}
+
+/* ── №85д: ленту можно растянуть: правый край — ширина, нижний — высота,
+   угол — оба. По умолчанию ширина ровно под миниатюры (с учётом полосы
+   прокрутки), высота — до дока. Размер — в localStorage ── */
+function deckStripSize(){
+  try { const v = JSON.parse(localStorage.getItem(DECK_STRIP_SIZE_KEY) || 'null'); return v && typeof v === 'object' ? v : {}; }
+  catch (e) { return {}; }
+}
+// ширина ленты, при которой миниатюра шириной tw помещается целиком
+function deckStripWidthFor(tw){
+  const el = document.getElementById('deckStrip'), list = document.getElementById('deckStripList');
+  if (!el || !list) return tw + 52;
+  const sb = Math.max(0, list.offsetWidth - list.clientWidth);              // полоса прокрутки
+  const cs = getComputedStyle(el), pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight) + parseFloat(cs.borderLeftWidth) + parseFloat(cs.borderRightWidth);
+  // номер (16) + зазор (4) + рамка + запас под «⋯» (8) + поля списка (4)
+  return Math.ceil(pad + sb + 16 + 4 + tw + 8 + 4);
+}
+function deckApplyStripSize(){
+  const el = document.getElementById('deckStrip'), list = document.getElementById('deckStripList');
+  if (!el || !list) return;
+  const sz = deckStripSize();
+  const w = sz.w || deckStripWidthFor(DECK_STRIP_THUMB_DEF);
+  el.style.width = Math.round(Math.max(130, Math.min(Math.max(160, window.innerWidth * .5), w))) + 'px';
+  if (sz.h){ el.style.bottom = 'auto'; el.style.height = Math.round(Math.max(160, Math.min(window.innerHeight - 84, sz.h))) + 'px'; }
+  else { el.style.bottom = ''; el.style.height = ''; }
+  // миниатюра — по фактической ширине списка (лента ещё не на экране —
+  // ширины нет, посчитаем, когда появится: deckStripUpdate)
+  if (!list.clientWidth) return;
+  deckStripLastCW = list.clientWidth;
+  const free = list.clientWidth - 16 - 4 - 8 - 4;
+  const tw = Math.max(60, Math.min(420, Math.floor(free)));
+  if (tw !== deckThumbW){
+    deckThumbW = tw; deckThumbH = Math.round(tw * 80 / 116);
+    el.style.setProperty('--deck-tw', tw + 'px');
+    el.style.setProperty('--deck-th', deckThumbH + 'px');
+    deckStripSig = '';                      // перестроить миниатюры в новом размере
+  }
+}
+(function(){
+  const el = document.getElementById('deckStrip');
+  if (!el) return;
+  let rs = null;   // { mode, x0, y0, w0, h0, t }
+  el.addEventListener('pointerdown', (e) => {
+    const hd = e.target.closest('[data-rs]');
+    if (!hd || e.button > 0) return;
+    e.preventDefault(); e.stopPropagation();
+    const r = el.getBoundingClientRect();
+    rs = { mode: hd.dataset.rs, x0: e.clientX, y0: e.clientY, w0: r.width, h0: r.height, t: 0 };
+    el.classList.add('resizing');
+    try { hd.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!rs) return;
+    const sz = deckStripSize();
+    if (rs.mode !== 'y') sz.w = Math.max(130, Math.min(Math.max(160, window.innerWidth * .5), rs.w0 + e.clientX - rs.x0));
+    if (rs.mode !== 'x') sz.h = Math.max(160, Math.min(window.innerHeight - 84, rs.h0 + e.clientY - rs.y0));
+    try { localStorage.setItem(DECK_STRIP_SIZE_KEY, JSON.stringify(sz)); } catch (err) {}
+    deckApplyStripSize();
+    // миниатюры и место под слайд — не чаще раза в 120 мс, пока тянут
+    const now = Date.now();
+    if (now - rs.t > 120){ rs.t = now; deckStripRefit(); }
+  });
+  const end = () => { if (!rs) return; rs = null; el.classList.remove('resizing'); deckApplyStripSize(); deckStripRefit(); };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  // двойной щелчок по краю — размер по умолчанию
+  el.addEventListener('dblclick', (e) => {
+    const hd = e.target.closest('[data-rs]');
+    if (!hd) return;
+    const sz = deckStripSize();
+    if (hd.dataset.rs !== 'y') delete sz.w;
+    if (hd.dataset.rs !== 'x') delete sz.h;
+    try { localStorage.setItem(DECK_STRIP_SIZE_KEY, JSON.stringify(sz)); } catch (err) {}
+    deckApplyStripSize(); deckStripRefit();
+  });
+  window.addEventListener('resize', () => { if (isDeckBoard() && deckStripOpen()) deckApplyStripSize(); });
+})();
+function deckStripRefit(){
+  if (!isDeckBoard() || !boardActive) return;
+  const s = deckCur();
+  if (s && (deckFitted || deckIsScroll())) deckShowSlide(s); else clampCam();
+  scheduleRedraw();
 }
 function deckSetStripOpen(v){
   try { localStorage.setItem(DECK_STRIP_KEY, v ? '1' : '0'); } catch (e) {}
@@ -440,7 +537,7 @@ function deckSetStripOpen(v){
 }
 
 function deckThumbSize(s){
-  const r = deckSlideRect(s), sc = Math.min(DECK_THUMB_W / r.w, DECK_THUMB_H / r.h);
+  const r = deckSlideRect(s), sc = Math.min(deckThumbW / r.w, deckThumbH / r.h);
   return { w: Math.max(8, Math.round(r.w * sc)), h: Math.max(8, Math.round(r.h * sc)), sc, r };
 }
 
@@ -449,6 +546,7 @@ function deckStripUpdate(){
   if (B.rev !== deckLastRev){ deckLastRev = B.rev; deckScheduleThumbs(); }
   const list = document.getElementById('deckStripList');
   if (!list || !deckStripOpen()) return;
+  if (list.clientWidth !== deckStripLastCW) deckApplyStripSize();
   const sl = deckSlides();
   const sig = deckStripSigOf(sl);
   if (sig !== deckStripSig){ deckStripSig = sig; deckStripCurShown = null; deckBuildStrip(list, sl); }
@@ -812,7 +910,38 @@ const deckCards = new Map();          // id слайда → { el, bw, dirty }
 const deckCardQueue = [];
 let deckDepthKey = '', deckDepthCurShown = null;
 
-function deckSlideHidden(){ return deckFast || Date.now() < deckAnimUntil; }
+function deckSlideHidden(){ return deckFast || Date.now() < deckAnimUntil || !!deckFx; }
+
+/* №85е: в «максимуме эффектов» вход в быстрое листание, ход за ручкой и
+   выход ведёт JS кадр за кадром: показанные положение стопки (pos) и
+   отдаление (z) плавно догоняют цель (экспоненциально, ~70 и ~140 мс).
+   CSS-анимация тут дёргалась: каждый сдвиг ручки перезапускал её, а по
+   окончании мягкого входа стопка прыгала к ручке. Пока deckFx жив, текущий
+   слайд — картинка в слое, холст его не рисует */
+let deckFx = null, deckFxRaf = 0;
+function deckFxTarget(){
+  return { pos: deckFastPos !== null ? deckFastPos : Math.max(0, deckCurIndex()), z: deckFast ? Math.min(deckZf, DECK_FAST_Z) : deckZf };
+}
+function deckFxStart(){
+  if (!deckFx) deckFx = { pos: Math.max(0, deckCurIndex()), z: deckZf, t: performance.now() };
+  if (!deckFxRaf) deckFxRaf = requestAnimationFrame(deckFxTick);
+}
+function deckFxTick(now){
+  deckFxRaf = 0;
+  if (!deckFx || !isDeckBoard() || !boardActive){ deckFx = null; return; }
+  // шаг кадра не больше 100 мс: после свёрнутой вкладки не прыгнуть разом
+  const dt = Math.max(1, Math.min(100, now - deckFx.t)); deckFx.t = now;
+  const T = deckFxTarget();
+  deckFx.pos += (T.pos - deckFx.pos) * (1 - Math.exp(-dt / 70));
+  deckFx.z += (T.z - deckFx.z) * (1 - Math.exp(-dt / 140));
+  if (!deckFast && Math.abs(T.pos - deckFx.pos) < .004 && Math.abs(T.z - deckFx.z) < .008){
+    deckFx = null; deckDepthKey = '';
+    scheduleRedraw();            // холст снова рисует слайд, картинка исчезает
+    return;
+  }
+  deckDepthSync();
+  deckFxRaf = requestAnimationFrame(deckFxTick);
+}
 function deckDepthParams(z){
   const K = DECK_KEYS, zz = Math.max(K[0].z, Math.min(K[2].z, z));
   let a = K[0], b = K[1];
@@ -859,6 +988,7 @@ function deckResetDepth(){
   deckCards.clear(); deckCardQueue.length = 0;
   deckDepthKey = ''; deckDepthCurShown = null;
   deckFast = false; deckAnimUntil = 0; deckFastPos = null; deckFastFollow = false; deckDepthFollowShown = false;
+  deckFx = null;
 }
 
 /* Расстановка слоя. Зовётся из каждого кадра доски, но DOM трогает, только
@@ -876,17 +1006,19 @@ function deckDepthSync(){
   let Z, cx, cy;
   if (hidden || deckFitted){
     const a = deckArea();
-    Z = fz * zf; cx = a.x + a.w / 2; cy = a.y + a.h / 2;
+    Z = fz * (deckFx ? deckFx.z : zf); cx = a.x + a.w / 2; cy = a.y + a.h / 2;
   } else {
     const r = deckSlideRect(cur);
     Z = cam.zoom; cx = (r.x + r.w / 2 - cam.x) * Z; cy = (r.y + r.h / 2 - cam.y) * Z;
   }
-  const p = deckDepthParams(deckFitted || hidden ? zf : 1);
-  const frac = deckFast && deckFastPos !== null;
-  const fpos = frac ? Math.max(0, Math.min(sl.length - 1, deckFastPos)) : ci;
+  // «максимум»: положение и отдаление ведёт deckFxTick, анимация CSS не нужна
+  const fxOn = !!deckFx;
+  const p = deckDepthParams(fxOn ? deckFx.z : (deckFitted || hidden ? zf : 1));
+  const frac = fxOn || (deckFast && deckFastPos !== null);
+  const fpos = fxOn ? Math.max(0, Math.min(sl.length - 1, deckFx.pos)) : frac ? Math.max(0, Math.min(sl.length - 1, deckFastPos)) : ci;
   // пока идёт мягкий вход в обзор (класс slow), за ручкой — с анимацией
   // (она догоняет плавно), потом — без неё, ровно с ручкой
-  const follow = frac && deckFastFollow && !L.classList.contains('slow');
+  const follow = fxOn || (frac && deckFastFollow && !L.classList.contains('slow'));
   const key = [cur.id, hidden, deckFast, flow, Math.round(Z * 1000), Math.round(cx), Math.round(cy), sl.length, deckStripSig, Math.round(fpos * 1000)].join('|');
   if (key === deckDepthKey) return;
   const old = deckDepthKey.split('|');
@@ -1025,7 +1157,7 @@ function deckScrubSync(){
     if (deckFast && deckMaxFx()){
       deckFastFollow = !snapped;
       deckFastPos = snapped || n < 2 ? i : y / r.height * (n - 1);
-      scheduleRedraw();
+      if (deckFx) deckFxStart(); else scheduleRedraw();
     }
     const s = deckSlides()[i];
     if (s && s.id !== deckCurId){
@@ -1047,7 +1179,11 @@ function deckScrubSync(){
       st.moved = true;
       sc.classList.add('drag');
       // в сплошной прокрутке соседи и так видны — без обзора
-      if (deckCur() && !deckReducedMotion() && !deckIsScroll()){ deckShowCurCard(); deckSlowFor(DECK_MODE_MS); deckFast = true; }
+      if (deckCur() && !deckReducedMotion() && !deckIsScroll()){
+        deckShowCurCard();
+        if (deckMaxFx()){ deckFast = true; deckFastPos = Math.max(0, deckCurIndex()); deckFxStart(); }
+        else { deckSlowFor(DECK_MODE_MS); deckFast = true; }
+      }
       scheduleRedraw();
     }
     follow(e.clientY);
@@ -1059,7 +1195,10 @@ function deckScrubSync(){
     sc.classList.remove('drag');
     if (st.moved){
       // обзор → свой масштаб, текущий слайд ещё 0,3 с картинкой
-      if (deckFast){ deckFastPos = null; deckFastFollow = false; deckSlowFor(DECK_MODE_MS); deckFlipAnim(DECK_MODE_MS); deckFast = false; }
+      if (deckFast && deckFx){
+        // «максимум»: стопка плавно доезжает до слайда и приближается обратно
+        deckFastPos = null; deckFastFollow = false; deckFast = false; deckFxStart();
+      } else if (deckFast){ deckFastPos = null; deckFastFollow = false; deckSlowFor(DECK_MODE_MS); deckFlipAnim(DECK_MODE_MS); deckFast = false; }
       rememberView();
       scheduleRedraw();
       return;
@@ -1267,43 +1406,67 @@ function deckLineColor(s){
   return B.gridColor ? resolveColor(B.gridColor) : themeVar('--grid');
 }
 // узор подложки по клеткам слайда; p0/p1 — его углы на экране
+// №87г: шаг узора — slide.bg.s в клетках (клетка = 0,5 см), меняется
+// ползунком. По умолчанию: клетка, линейка, точки — 1 клетка, широкая — 2,
+// косая (прописи) — 1 (высота рабочей строки)
+const DECK_BG_STEP = { grid: 1, thin: 1, wide: 2, dots: 1, kosaya: 1 };
+const DECK_STEP_MIN = .5, DECK_STEP_MAX = 6;
+function deckBgStepCells(s){
+  const k = deckBgKind(s);
+  const v = s.bg && typeof s.bg.s === 'number' ? s.bg.s : DECK_BG_STEP[k];
+  return Math.max(DECK_STEP_MIN, Math.min(DECK_STEP_MAX, v || 1));
+}
 function deckDrawPattern(c, s, r, p0, p1, camv){
-  const k = deckBgKind(s), cs = B.cellSize, cpx = cs * camv.zoom;
-  if (k === 'plain' || k === 'dark' || k === 'img') return;
+  const k = deckBgKind(s), cs = B.cellSize;
+  if (!DECK_BG_STEP[k]) return;
+  const u = deckBgStepCells(s) * cs, upx = u * camv.zoom;
   c.save();
   c.beginPath(); c.rect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y); c.clip();
   c.strokeStyle = c.fillStyle = deckLineColor(s);
   c.lineWidth = 1; c.globalAlpha = 0.55;
-  const hLines = step => {
-    for (let y = r.y + step; y < r.y + r.h - 0.5; y += step){
-      const sy = Math.round(worldToScreen({ x: 0, y }).y) + 0.5;
-      c.beginPath(); c.moveTo(p0.x, sy); c.lineTo(p1.x, sy); c.stroke();
-    }
+  const hLine = y => {
+    const sy = Math.round(worldToScreen({ x: 0, y }).y) + 0.5;
+    c.beginPath(); c.moveTo(p0.x, sy); c.lineTo(p1.x, sy); c.stroke();
   };
-  if (k === 'grid' && cpx > 4){
-    for (let x = r.x; x <= r.x + r.w + 0.5; x += cs){
+  const hLines = step => { for (let y = r.y + step; y < r.y + r.h - 0.5; y += step) hLine(y); };
+  if (k === 'grid' && upx > 4){
+    for (let x = r.x; x <= r.x + r.w + 0.5; x += u){
       const sx = Math.round(worldToScreen({ x, y: 0 }).x) + 0.5;
       c.beginPath(); c.moveTo(sx, p0.y); c.lineTo(sx, p1.y); c.stroke();
     }
-    hLines(cs);
-  } else if (k === 'thin' && cpx > 3){
-    hLines(cs);
-  } else if (k === 'wide' && cpx > 2){
+    hLines(u);
+  } else if (k === 'thin' && upx > 3){
+    hLines(u);
+  } else if (k === 'wide' && upx > 3){
     c.globalAlpha = 0.8;
-    hLines(cs * 2);
+    hLines(u);
     // поле тетради — красная линия слева
     const mx = Math.round(worldToScreen({ x: r.x + cs * 5, y: 0 }).x) + 0.5;
     c.strokeStyle = 'rgba(255,59,48,.5)'; c.lineWidth = 1.5;
     c.beginPath(); c.moveTo(mx, p0.y); c.lineTo(mx, p1.y); c.stroke();
-  } else if (k === 'dots' && cpx > 5){
+  } else if (k === 'dots' && upx > 5){
     c.globalAlpha = 0.9;
-    const d = Math.max(1.4, Math.min(2.6, cpx * 0.09));
-    for (let x = r.x + cs; x < r.x + r.w - 0.5; x += cs){
+    const d = Math.max(1.4, Math.min(2.6, upx * 0.09));
+    for (let x = r.x + u; x < r.x + r.w - 0.5; x += u){
       const sx = worldToScreen({ x, y: 0 }).x;
-      for (let y = r.y + cs; y < r.y + r.h - 0.5; y += cs){
+      for (let y = r.y + u; y < r.y + r.h - 0.5; y += u){
         const sy = worldToScreen({ x: 0, y }).y;
         c.fillRect(sx - d / 2, sy - d / 2, d, d);
       }
+    }
+  } else if (k === 'kosaya' && upx > 2){
+    // косая линейка прописей: строка — две основные линии (рабочая строка
+    // высотой u) и по вспомогательной сверху и снизу, между строками
+    // промежуток; плюс наклонные под 65° для наклона букв
+    for (let y0 = r.y; y0 + u * 4 < r.y + r.h; y0 += u * 5){
+      c.globalAlpha = 0.4; hLine(y0 + u); hLine(y0 + u * 4);
+      c.globalAlpha = 0.9; hLine(y0 + u * 2); hLine(y0 + u * 3);
+    }
+    c.globalAlpha = 0.3;
+    const k65 = 1 / Math.tan(65 * Math.PI / 180), dxAll = r.h * k65;
+    for (let x = r.x - dxAll; x < r.x + r.w; x += u * 3){
+      const a = worldToScreen({ x, y: r.y + r.h }), b = worldToScreen({ x: x + dxAll, y: r.y });
+      c.beginPath(); c.moveTo(a.x, a.y); c.lineTo(b.x, b.y); c.stroke();
     }
   }
   c.restore();
@@ -1350,6 +1513,22 @@ function deckSetBg(k){
     s.bg = { k };
     if (c) s.bg.c = c;
   });
+}
+let deckStepUndoDone = false;
+function deckSetStep(cells, live){
+  const d = deckObj();
+  if (!d || !deckMayEdit()) return;
+  if (!deckStepUndoDone){ pushUndo(); deckStepUndoDone = true; }
+  if (!live) deckStepUndoDone = false;
+  const v = Math.max(DECK_STEP_MIN, Math.min(DECK_STEP_MAX, cells));
+  (deckScopeAll() ? d.slides : [deckCur()].filter(Boolean)).forEach(s => {
+    if (!DECK_BG_STEP[deckBgKind(s)]) return;
+    s.bg = Object.assign({}, s.bg, { s: v });
+  });
+  saveDB();
+  deckMarkCardsDirty([...deckCards.keys()]);
+  scheduleRedraw();
+  deckSyncPop();
 }
 function deckSetLines(c){
   deckApplySlides(s => {
@@ -1399,14 +1578,29 @@ function deckSyncPop(){
   const cw = document.getElementById('deckCW'), ch = document.getElementById('deckCH');
   if (cw && document.activeElement !== cw) cw.value = s.w / 2;
   if (ch && document.activeElement !== ch) ch.value = s.h / 2;
-  document.getElementById('deckCustom').hidden = isStd && !pop.dataset.custom;
+  // поля своего размера: открылись «Своим…» — так и остаются (видно размер
+  // любого формата), «−» прячет их обратно
+  document.getElementById('deckCustom').hidden = !!pop.dataset.customHide || (isStd && !pop.dataset.custom);
+  // ползунок шага — только у узоров (клетка, линейки, точки, косая)
+  const stepRow = document.getElementById('deckStepRow'), hasStep = !!DECK_BG_STEP[k];
+  if (stepRow){
+    stepRow.hidden = !hasStep;
+    const inp = document.getElementById('deckStep');
+    if (hasStep && document.activeElement !== inp){ inp.value = deckBgStepCells(s); }
+    if (hasStep){
+      const cm = deckBgStepCells(s) / 2;
+      document.getElementById('deckStepV').textContent = (Math.round(cm * 100) / 100).toString().replace('.', ',') + ' см';
+      document.getElementById('deckStepLabel').textContent = k === 'grid' ? 'Размер клетки' : k === 'dots' ? 'Шаг точек' : k === 'kosaya' ? 'Высота строки' : 'Между линиями';
+    }
+    inp.disabled = !can;
+  }
 }
 function deckOpenPop(open){
   const pop = document.getElementById('deckSlidePop'), btn = document.getElementById('deckSlideBtn');
   if (!pop) return;
   pop.hidden = !open;
   if (btn) btn.setAttribute('aria-expanded', open);
-  if (open){ delete pop.dataset.custom; deckSyncPop(); }
+  if (open){ delete pop.dataset.custom; delete pop.dataset.customHide; deckSyncPop(); }
 }
 (function(){
   const pop = document.getElementById('deckSlidePop'), btn = document.getElementById('deckSlideBtn');
@@ -1415,7 +1609,8 @@ function deckOpenPop(open){
   pop.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b || b.disabled) return;
-    if (b.dataset.fmt === 'custom'){ pop.dataset.custom = '1'; deckSyncPop(); document.getElementById('deckCW')?.focus(); return; }
+    if (b.dataset.fmt === 'custom'){ pop.dataset.custom = '1'; delete pop.dataset.customHide; deckSyncPop(); document.getElementById('deckCW')?.focus(); return; }
+    if (b.id === 'deckCustomHide'){ delete pop.dataset.custom; pop.dataset.customHide = '1'; deckSyncPop(); return; }
     if (b.dataset.fmt){ const f = DECK_FORMATS[b.dataset.fmt]; if (f) deckSetFormat(f[0], f[1]); return; }
     if (b.dataset.bg === 'img'){ const inp = document.getElementById('deckBgFile'); inp.value = ''; inp.click(); return; }
     if (b.dataset.bg){ deckSetBg(b.dataset.bg); return; }
@@ -1429,6 +1624,11 @@ function deckOpenPop(open){
   pop.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && (e.target.id === 'deckCW' || e.target.id === 'deckCH')){ e.preventDefault(); document.getElementById('deckCApply').click(); }
   });
+  const step = document.getElementById('deckStep');
+  if (step){
+    step.addEventListener('input', () => deckSetStep(parseFloat(step.value), true));
+    step.addEventListener('change', () => deckSetStep(parseFloat(step.value), false));
+  }
   document.getElementById('deckBgFile')?.addEventListener('change', (e) => {
     const f = e.target.files && e.target.files[0];
     if (f) deckSetBgImage(f);
