@@ -97,6 +97,7 @@ function deckOnOpen(b){
   deckSyncStrip();
   deckResetDepth(); deckZf = 1; deckScrubTicks = -1;
   deckOpenPop(false);
+  if (b.kind === 'deck') deckLoadPresets();
   const sb = document.getElementById('deckSlideBtn');
   if (sb) sb.hidden = !(b.kind === 'deck');
   const isD = b.kind === 'deck';
@@ -610,15 +611,21 @@ function deckMoveSlide(from, to){
 // ── меню «⋯» миниатюры ──
 let deckMenuFor = null;
 function deckOpenMenu(id, anchor){
+  const r = anchor.getBoundingClientRect();
+  deckOpenMenuAt(id, r.right + 6, r.top);
+}
+// меню слайда в точке экрана (миниатюра, правая кнопка, двойное касание)
+function deckOpenMenuAt(id, x, y){
   const m = document.getElementById('deckMenu');
   if (!m) return;
   deckMenuFor = id;
   const one = deckSlides().length <= 1, can = deckMayEdit();
-  m.querySelectorAll('button').forEach(b => { b.disabled = !can || (b.dataset.act === 'del' && one); });
+  // сохранить себе шаблон можно и с чужой доски — она от этого не меняется
+  m.querySelectorAll('button').forEach(b => { b.disabled = b.dataset.act !== 'tpl' && (!can || (b.dataset.act === 'del' && one)); });
   m.hidden = false;
-  const r = anchor.getBoundingClientRect(), mw = m.offsetWidth, mh = m.offsetHeight;
-  m.style.left = Math.min(window.innerWidth - mw - 8, r.right + 6) + 'px';
-  m.style.top = Math.max(8, Math.min(window.innerHeight - mh - 8, r.top)) + 'px';
+  const mw = m.offsetWidth, mh = m.offsetHeight;
+  m.style.left = Math.max(8, Math.min(window.innerWidth - mw - 8, x)) + 'px';
+  m.style.top = Math.max(8, Math.min(window.innerHeight - mh - 8, y)) + 'px';
 }
 function deckCloseMenu(){ const m = document.getElementById('deckMenu'); if (m) m.hidden = true; deckMenuFor = null; }
 document.getElementById('deckMenu')?.addEventListener('click', (e) => {
@@ -626,7 +633,13 @@ document.getElementById('deckMenu')?.addEventListener('click', (e) => {
   if (!b || b.disabled) return;
   const id = deckMenuFor;
   deckCloseMenu();
-  if (b.dataset.act === 'dup') deckDuplicate(id);
+  if (b.dataset.act === 'tpl') deckSaveSlideTemplate(id);
+  else if (b.dataset.act === 'fmt'){
+    const i = deckSlides().findIndex(x => x.id === id), c = deckCurIndex();
+    if (i >= 0 && i !== c) deckGo(i, i > c ? 1 : -1);
+    deckOpenPop(true);
+  }
+  else if (b.dataset.act === 'dup') deckDuplicate(id);
   else if (b.dataset.act === 'ren') deckRename(id);
   else if (b.dataset.act === 'del') deckDelete(id);
 });
@@ -1373,6 +1386,12 @@ function deckSyncPop(){
     b.setAttribute('aria-pressed', b.dataset.fmt === key || (b.dataset.fmt === 'custom' && !isStd));
     b.disabled = !can;
   });
+  pop.querySelectorAll('[data-ufmt]').forEach(b => {
+    const f = deckPresets.formats.find(x => x.id === b.dataset.ufmt);
+    b.setAttribute('aria-pressed', !!f && f.w === s.w && f.h === s.h);
+    b.disabled = !can;
+  });
+  pop.querySelectorAll('[data-ubg], [data-tpl]').forEach(b => { b.disabled = !can; });
   const k = deckBgKind(s);
   pop.querySelectorAll('[data-bg]').forEach(b => { b.setAttribute('aria-pressed', b.dataset.bg === k); b.disabled = !can; });
   const c = (s.bg && s.bg.c) || '';
@@ -1419,4 +1438,254 @@ function deckOpenPop(open){
     deckOpenPop(false);
   }, true);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !pop.hidden) deckOpenPop(false); });
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════
+   СВОИ ШАБЛОНЫ (промпт №87б). Всё, что собрал сам, сохраняется и потом
+   выбирается рядом со встроенным:
+   - слайд целиком (формат, подложка, текст, картинки, их расстановка) —
+     «Сохранить как шаблон» в меню слайда; «Новый слайд из шаблона» в окне
+     «Слайд» (первым — «Пустой слайд»)
+   - подложка (узор, цвет линий, картинка) — «Мои подложки»
+   - формат («Свой…») — «Мои форматы»
+   Хранятся в IndexedDB этого браузера одной записью deckPresets (как доски,
+   не в облаке). Объекты шаблона — в координатах от левого верхнего угла
+   слайда, поэтому шаблон подходит к любому слоту
+   ═══════════════════════════════════════════════════════════════════════ */
+const DECK_PRESETS_KEY = 'deckPresets';
+let deckPresets = { slides: [], bgs: [], formats: [] };
+let deckPresetsLoaded = false;
+
+function deckLoadPresets(){
+  if (deckPresetsLoaded) return Promise.resolve();
+  return idbGet(DECK_PRESETS_KEY).then(v => {
+    if (v) deckPresets = { slides: v.slides || [], bgs: v.bgs || [], formats: v.formats || [] };
+    deckPresetsLoaded = true;
+    deckRenderPresets();
+  }).catch(() => { deckPresetsLoaded = true; });
+}
+function deckSavePresets(){
+  deckRenderPresets();
+  return idbPut(DECK_PRESETS_KEY, deckPresets).catch(e => alert('Не удалось сохранить шаблон: ' + (e && e.message || e)));
+}
+let deckToastTimer = null;
+function deckToast(msg){
+  const t = document.getElementById('deckToast');
+  if (!t) return;
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(deckToastTimer);
+  deckToastTimer = setTimeout(() => { t.hidden = true; }, 2200);
+}
+function deckMoveObj(o, dx, dy){
+  o.points = (o.points || []).map(p => ({ x: p.x + dx, y: p.y + dy }));
+  if (o.ctrl) o.ctrl = { x: o.ctrl.x + dx, y: o.ctrl.y + dy };
+}
+function deckAskName(def){
+  const v = prompt('Название шаблона:', def || '');
+  return v && v.trim() ? v.trim().slice(0, 60) : null;
+}
+// маленькая картинка слайда для плитки шаблона
+function deckPreviewOf(s){
+  const r = deckSlideRect(s), w = 160, h = Math.max(20, Math.round(160 * r.h / r.w));
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  deckRenderSlideId = s.id;
+  try { render(cv.getContext('2d'), w, h, { x: r.x, y: r.y, zoom: w / r.w, minLine: 1 }, false, 1); }
+  catch (e) {}
+  finally { deckRenderSlideId = null; activeCam = cam; }
+  try { return cv.toDataURL('image/jpeg', 0.8); } catch (e) { return ''; }
+}
+
+// ── слайд целиком ──
+function deckSaveSlideTemplate(id){
+  const s = deckSlides().find(x => x.id === id);
+  if (!s) return;
+  const name = deckAskName(s.name || 'Мой слайд');
+  if (!name) return;
+  const r = deckSlideRect(s), bgObj = deckBgImgObj(s);
+  const objects = deckSlotObjects(s).filter(o => !o.bgOf).map(o => {
+    const c = JSON.parse(JSON.stringify(o));
+    delete c.by; delete c.stack;
+    deckMoveObj(c, -r.x, -r.y);
+    return c;
+  });
+  const bg = Object.assign({}, s.bg || { k: 'grid' });
+  delete bg.img;
+  deckLoadPresets().then(() => {
+    deckPresets.slides.unshift({ id: uid(), name, w: s.w, h: s.h, bg, bgImg: bgObj ? bgObj.src : null, objects, preview: deckPreviewOf(s), at: nowTs() });
+    deckSavePresets();
+    deckToast('Шаблон «' + name + '» сохранён');
+  });
+}
+// новый слайд после текущего; t = null — «Пустой слайд» текущего формата
+function deckAddFromTemplate(t){
+  const d = deckObj();
+  if (!d || !deckMayEdit()) return;
+  pushUndo();
+  const cur = deckCur(), ns = deckNewSlide(deckNextSlot(d), cur);
+  if (t){
+    ns.w = t.w; ns.h = t.h;
+    ns.bg = Object.assign({}, t.bg || { k: 'grid' });
+    if (ns.bg.k === 'img' && !t.bgImg) ns.bg = { k: 'plain' };
+  } else ns.bg = { k: 'plain' };
+  const idx = deckCurIndex() + 1;
+  d.slides.splice(idx, 0, ns);
+  const r = deckSlideRect(ns);
+  if (t){
+    const groups = {};
+    (t.objects || []).forEach(o => {
+      const c = JSON.parse(JSON.stringify(o));
+      c.id = uid();
+      if (c.groupId) c.groupId = groups[c.groupId] || (groups[c.groupId] = uid());
+      deckMoveObj(c, r.x, r.y);
+      B.objects.push(c);
+    });
+    if (t.bgImg) deckPutBgImg(ns, t.bgImg);
+  }
+  saveDB();
+  deckGo(idx, 1);
+}
+
+// ── подложка и формат ──
+function deckPutBgImg(s, src, size){
+  const r = deckSlideRect(s), o = {
+    id: uid(), type: 'image', src, points: [{ x: r.x, y: r.y }], w: r.w, h: r.h,
+    natW: size && size.w, natH: size && size.h, locked: true, bgOf: s.id,
+  };
+  B.objects.splice(B.objects.findIndex(x => x.type === 'deck') + 1, 0, o);
+  s.bg = { k: 'img', img: o.id };
+}
+function deckSaveBgPreset(){
+  const s = deckCur();
+  if (!s) return;
+  const name = deckAskName('Моя подложка');
+  if (!name) return;
+  const bg = Object.assign({}, s.bg || { k: 'grid' }), o = deckBgImgObj(s);
+  delete bg.img;
+  deckLoadPresets().then(() => {
+    deckPresets.bgs.unshift({ id: uid(), name, bg, img: o ? o.src : null, at: nowTs() });
+    deckSavePresets();
+    deckToast('Подложка «' + name + '» сохранена');
+  });
+}
+function deckApplyBgPreset(p){
+  deckApplySlides(s => {
+    deckRemoveBgImg(s);
+    if (p.img) deckPutBgImg(s, p.img);
+    else s.bg = Object.assign({}, p.bg);
+  });
+}
+function deckSaveFormatPreset(){
+  const s = deckCur();
+  if (!s) return;
+  const name = deckAskName((s.w / 2) + ' × ' + (s.h / 2) + ' см');
+  if (!name) return;
+  deckLoadPresets().then(() => {
+    deckPresets.formats.unshift({ id: uid(), name, w: s.w, h: s.h, at: nowTs() });
+    deckSavePresets();
+    deckToast('Формат «' + name + '» сохранён');
+  });
+}
+function deckDeletePreset(kind, id){
+  const list = deckPresets[kind], p = list && list.find(x => x.id === id);
+  if (!p || !confirm('Удалить «' + p.name + '»?')) return;
+  deckPresets[kind] = list.filter(x => x.id !== id);
+  deckSavePresets();
+}
+function deckRenamePreset(kind, id){
+  const p = (deckPresets[kind] || []).find(x => x.id === id);
+  if (!p) return;
+  const name = deckAskName(p.name);
+  if (!name) return;
+  p.name = name;
+  deckSavePresets();
+}
+
+// ── плитки в окне «Слайд» ──
+function deckRenderPresets(){
+  const tl = document.getElementById('deckTplList'), bl = document.getElementById('deckMyBgs'), fl = document.getElementById('deckMyFmts');
+  const x = (kind, id) => `<span class="deck-ux" data-del="${kind}" data-id="${id}" title="Удалить" role="button" aria-label="Удалить">×</span>`;
+  if (tl){
+    tl.innerHTML = `<button class="deck-tpl" data-tpl=""><span class="deck-tpl-img blank"></span>Пустой слайд</button>`
+      + deckPresets.slides.map(t => `<button class="deck-tpl mine" data-tpl="${t.id}" title="${escHtml(t.name)} — щелчок: новый слайд; правая кнопка: переименовать">`
+        + `<span class="deck-tpl-img" style="aspect-ratio:${t.w}/${t.h}">${t.preview ? `<img src="${t.preview}" alt="">` : ''}</span>${escHtml(t.name)}${x('slides', t.id)}</button>`).join('');
+  }
+  if (bl){
+    bl.innerHTML = deckPresets.bgs.map(p => {
+      const st = p.img ? `background-image:url(${p.img});background-size:cover;background-position:center` : (p.bg.c ? `--lc:${p.bg.c}` : '');
+      return `<button class="mine" data-ubg="${p.id}" title="${escHtml(p.name)}"><i class="bgp ${p.img ? 'photo' : p.bg.k}" style="${st}"></i>${escHtml(p.name)}${x('bgs', p.id)}</button>`;
+    }).join('');
+  }
+  if (fl){
+    fl.innerHTML = deckPresets.formats.map(f => `<button class="mine" data-ufmt="${f.id}" title="${f.w / 2} × ${f.h / 2} см">${escHtml(f.name)}${x('formats', f.id)}</button>`).join('');
+  }
+  deckSyncPop();
+}
+(function(){
+  const pop = document.getElementById('deckSlidePop');
+  if (!pop) return;
+  pop.addEventListener('click', (e) => {
+    const del = e.target.closest('[data-del]');
+    if (del){ e.stopPropagation(); deckDeletePreset(del.dataset.del, del.dataset.id); return; }
+    const tpl = e.target.closest('[data-tpl]');
+    if (tpl){
+      const t = tpl.dataset.tpl ? deckPresets.slides.find(x => x.id === tpl.dataset.tpl) : null;
+      if (tpl.dataset.tpl && !t) return;
+      deckAddFromTemplate(t);
+      return;
+    }
+    const ub = e.target.closest('[data-ubg]');
+    if (ub){ const p = deckPresets.bgs.find(x => x.id === ub.dataset.ubg); if (p) deckApplyBgPreset(p); return; }
+    const uf = e.target.closest('[data-ufmt]');
+    if (uf){ const f = deckPresets.formats.find(x => x.id === uf.dataset.ufmt); if (f) deckSetFormat(f.w, f.h); return; }
+    if (e.target.closest('#deckSaveBg')){ deckSaveBgPreset(); return; }
+    if (e.target.closest('#deckSaveFmt')){ deckSaveFormatPreset(); return; }
+  }, true);
+  // правая кнопка по своей плитке — переименовать
+  pop.addEventListener('contextmenu', (e) => {
+    const el = e.target.closest('[data-tpl], [data-ubg], [data-ufmt]');
+    if (!el) return;
+    e.preventDefault();
+    if (el.dataset.tpl) deckRenamePreset('slides', el.dataset.tpl);
+    else if (el.dataset.ubg) deckRenamePreset('bgs', el.dataset.ubg);
+    else if (el.dataset.ufmt) deckRenamePreset('formats', el.dataset.ufmt);
+  });
+})();
+
+// ── меню слайда прямо на слайде: правая кнопка без перетаскивания (с
+// перетаскиванием она двигает доску) и двойное касание пальцем, когда
+// выбраны «выделение» или «рука» (ручкой двойное касание — две точки) ──
+(function(){
+  const cv = document.getElementById('boardCv');
+  if (!cv) return;
+  let rdown = null, lastTap = null;
+  function slideAt(clientX, clientY){
+    const s = deckCur();
+    if (!s) return null;
+    const cr = cv.getBoundingClientRect(), r = deckSlideRect(s);
+    const x = (clientX - cr.left) / cam.zoom + cam.x, y = (clientY - cr.top) / cam.zoom + cam.y;
+    return (x >= r.x && x <= r.x + r.w && y >= r.y && y <= r.y + r.h) ? s : null;
+  }
+  cv.addEventListener('pointerdown', (e) => {
+    if (!isDeckBoard() || !boardActive) return;
+    if (e.button === 2) rdown = { x: e.clientX, y: e.clientY };
+  }, true);
+  cv.addEventListener('pointerup', (e) => {
+    if (!isDeckBoard() || !boardActive || deckSlideHidden()) return;
+    if (e.button === 2 && rdown){
+      const moved = Math.hypot(e.clientX - rdown.x, e.clientY - rdown.y) > 5;
+      rdown = null;
+      const s = !moved && slideAt(e.clientX, e.clientY);
+      if (s) deckOpenMenuAt(s.id, e.clientX, e.clientY);
+      return;
+    }
+    if (e.pointerType === 'touch' && (tool === 'select' || tool === 'hand')){
+      const now = Date.now();
+      if (lastTap && now - lastTap.t < 320 && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < 24){
+        lastTap = null;
+        const s = slideAt(e.clientX, e.clientY);
+        if (s) deckOpenMenuAt(s.id, e.clientX, e.clientY);
+      } else lastTap = { t: now, x: e.clientX, y: e.clientY };
+    }
+  });
 })();
