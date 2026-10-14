@@ -779,6 +779,8 @@ function bumpRev(copy, a, b){
   return copy;
 }
 function saveDB(){
+  // Промпт №88: новое на слайде в «Конструкторе» — заготовка (deck-core.js)
+  if (typeof deckStampLayers === 'function') deckStampLayers();
   stampAuthors();
   touchBoard();
   clearTimeout(saveTimer);
@@ -1900,10 +1902,16 @@ window.setBoardAccess = function(access, userId){
     ? 'Только просмотр — рисовать на этой доске нельзя'
     : (boardAccess === 'own' ? 'Правится только то, что вы написали сами' : '');
   try { selectedId = null; multiSelectIds = []; clearEditLock(); updateContextMenu(); scheduleRedraw(); } catch (e) {}
+  // у ученика нет «Конструктора» — он всегда в «Уроке» (№88)
+  if (typeof deckSyncModeUI === 'function') deckSyncModeUI();
 };
 window.getBoardAccess = function(){ return boardAccess; };
 // объекты, пришедшие от собеседника, своими не считаются
-window.boardsNoteForeignObjects = function(ids){ (ids || []).forEach(id => knownObjIds.add(id)); };
+window.boardsNoteForeignObjects = function(ids){
+  (ids || []).forEach(id => knownObjIds.add(id));
+  // чужое заготовкой не метим (№88)
+  if (typeof deckNoteKnown === 'function') deckNoteKnown(ids);
+};
 // а это — «подпиши всё моё прямо сейчас»: вызывается ПЕРЕД тем, как в доску
 // вольют чужие изменения, иначе мой только что нарисованный штрих, ещё не
 // успевший попасть в сохранение, оказался бы записан в чужие
@@ -1915,6 +1923,9 @@ function mayTouch(obj){
   // Промпт №87: картинка-подложка слайда меняется только окном «Слайд» —
   // её не выделить рамкой, не стереть и не сдвинуть вместе с остальным
   if (obj && obj.bgOf) return false;
+  // Промпт №88: в «Уроке» заготовку слайда не трогает никто — ни ластик,
+  // ни выделение, ни перетаскивание; меняют её только в «Конструкторе»
+  if (obj && obj.lay === 'base' && typeof deckLessonMode === 'function' && deckLessonMode()) return false;
   if (boardAccess === 'full') return true;
   if (boardAccess === 'view') return false;
   return !!(obj && boardUserId && obj.by === boardUserId);

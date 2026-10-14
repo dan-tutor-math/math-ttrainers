@@ -98,6 +98,8 @@ function deckOnOpen(b){
   deckResetDepth(); deckZf = 1; deckScrubTicks = -1;
   deckOpenPop(false);
   if (b.kind === 'deck') deckLoadPresets();
+  // №88: презентация открывается в «Конструкторе»; что было на доске — «видено»
+  deckMode = 'edit'; deckResetSeen(); deckSyncModeUI();
   const sb = document.getElementById('deckSlideBtn');
   if (sb) sb.hidden = !(b.kind === 'deck');
   const isD = b.kind === 'deck';
@@ -718,8 +720,11 @@ function deckOpenMenuAt(id, x, y){
   if (!m) return;
   deckMenuFor = id;
   const one = deckSlides().length <= 1, can = deckMayEdit();
-  // сохранить себе шаблон можно и с чужой доски — она от этого не меняется
-  m.querySelectorAll('button').forEach(b => { b.disabled = b.dataset.act !== 'tpl' && (!can || (b.dataset.act === 'del' && one)); });
+  // сохранить себе шаблон можно и с чужой доски — она от этого не меняется;
+  // свои пометки стирает и ученик
+  const free = { tpl: 1, clear: 1, clearall: 1 };
+  m.querySelectorAll('button').forEach(b => { b.disabled = !free[b.dataset.act] && (!can || (b.dataset.act === 'del' && one)); });
+  m.querySelectorAll('[data-act="base"]').forEach(b => { b.hidden = !deckIsTeacher(); });
   m.hidden = false;
   const mw = m.offsetWidth, mh = m.offsetHeight;
   m.style.left = Math.max(8, Math.min(window.innerWidth - mw - 8, x)) + 'px';
@@ -732,6 +737,12 @@ document.getElementById('deckMenu')?.addEventListener('click', (e) => {
   const id = deckMenuFor;
   deckCloseMenu();
   if (b.dataset.act === 'tpl') deckSaveSlideTemplate(id);
+  else if (b.dataset.act === 'clear' || b.dataset.act === 'clearall'){
+    const i = deckSlides().findIndex(x => x.id === id), c = deckCurIndex();
+    if (b.dataset.act === 'clear' && i >= 0 && i !== c) deckGo(i, i > c ? 1 : -1);
+    deckClearNotes(b.dataset.act === 'clearall');
+  }
+  else if (b.dataset.act === 'base') deckMakeBase(id);
   else if (b.dataset.act === 'fmt'){
     const i = deckSlides().findIndex(x => x.id === id), c = deckCurIndex();
     if (i >= 0 && i !== c) deckGo(i, i > c ? 1 : -1);
@@ -1983,3 +1994,114 @@ function deckRenderPresets(){
     }
   });
 })();
+
+/* ═══════════════════════════════════════════════════════════════════════
+   КОНСТРУКТОР И УРОК (промпт №88). В «Конструкторе» всё новое на слайде —
+   заготовка (поле lay: 'base'), в «Уроке» — пометки (без lay). В уроке
+   заготовку не берут ластик, выделение, лассо и перетаскивание (mayTouch),
+   поэтому одну презентацию можно вести с разными учениками: «Очистить
+   пометки» стирает только пометки. Презентация открывается в
+   «Конструкторе»; у ученика (доступ не full) переключателя нет — он всегда
+   в «Уроке». Объекты без lay из старых презентаций — пометки; «Закрепить
+   как заготовку» в меню слайда делает заготовкой всё, что на нём есть.
+   Метка ставится не в шести местах, где доска создаёт объекты, а при
+   сохранении: всё, чего на доске раньше не было (deckSeen), в
+   «Конструкторе» получает lay. Чужое (от собеседника) и возвращённое
+   отменой — уже «виденное», его не метим
+   ═══════════════════════════════════════════════════════════════════════ */
+let deckMode = 'edit';                // 'edit' — Конструктор, 'lesson' — Урок
+const deckSeen = new Set();
+
+function deckIsTeacher(){ return typeof boardAccess === 'undefined' || boardAccess === 'full'; }
+function deckLessonMode(){ return isDeckBoard() && (deckMode === 'lesson' || !deckIsTeacher()); }
+function deckResetSeen(){
+  deckSeen.clear();
+  if (B && Array.isArray(B.objects)) B.objects.forEach(o => deckSeen.add(o.id));
+}
+function deckNoteKnown(ids){ (ids || []).forEach(id => deckSeen.add(id)); }
+// зовётся из saveDB — до того, как правка уйдёт на диск и в облако
+function deckStampLayers(){
+  if (!isDeckBoard() || !Array.isArray(B.objects)) return;
+  const stamp = !deckLessonMode();
+  B.objects.forEach(o => {
+    if (deckSeen.has(o.id)) return;
+    deckSeen.add(o.id);
+    if (stamp && o.type !== 'deck' && !o.bgOf && o.lay === undefined) o.lay = 'base';
+  });
+}
+function deckSetMode(m){
+  if (!deckIsTeacher()) m = 'lesson';
+  if (m === deckMode && document.documentElement.classList.contains(m === 'lesson' ? 'deck-lesson' : 'deck-edit')) return;
+  deckStampLayers();                  // всё созданное до переключения — по старому режиму
+  deckMode = m;
+  // выделенное в конструкторе — в уроке заготовка, её трогать нельзя
+  if (m === 'lesson'){
+    if (selectedId){ const o = B.objects.find(x => x.id === selectedId); if (o && o.lay === 'base') selectedId = null; }
+    multiSelectIds = multiSelectIds.filter(id => { const o = B.objects.find(x => x.id === id); return !(o && o.lay === 'base'); });
+    if (typeof updateContextMenu === 'function') updateContextMenu();
+  }
+  deckSyncModeUI();
+  scheduleRedraw();
+}
+function deckSyncModeUI(){
+  const on = isDeckBoard(), teacher = deckIsTeacher(), lesson = deckLessonMode();
+  const box = document.getElementById('deckModeSeg');
+  if (box) box.hidden = !on || !teacher;
+  document.getElementById('deckModeEdit')?.setAttribute('aria-pressed', !lesson);
+  document.getElementById('deckModeLesson')?.setAttribute('aria-pressed', lesson);
+  const lb = document.getElementById('deckLessonBtns');
+  if (lb) lb.hidden = !on || !lesson;
+  const cb = document.getElementById('deckCopyBtn');
+  if (cb) cb.hidden = !teacher;
+  document.documentElement.classList.toggle('deck-lesson', on && lesson);
+  document.documentElement.classList.toggle('deck-edit', on && !lesson);
+}
+
+// пометки слайда — всё, кроме заготовки, подложки и чужого
+function deckNotes(s){ return deckSlotObjects(s).filter(o => o.lay !== 'base' && !o.bgOf && mayTouch(o)); }
+function deckClearNotes(all){
+  const list = all ? deckSlides() : [deckCur()].filter(Boolean);
+  const gone = new Set();
+  list.forEach(s => deckNotes(s).forEach(o => gone.add(o.id)));
+  if (!gone.size){ deckToast('Пометок нет'); return; }
+  pushUndo();
+  B.objects = B.objects.filter(o => !gone.has(o.id));
+  if (selectedId && gone.has(selectedId)) selectedId = null;
+  multiSelectIds = multiSelectIds.filter(id => !gone.has(id));
+  saveDB(); scheduleRedraw();
+  deckToast(all ? 'Пометки стёрты на всех слайдах' : 'Пометки стёрты, заготовка осталась');
+}
+// всё, что на слайде, — в заготовку (старые презентации, где lay ещё не было)
+function deckMakeBase(id){
+  const s = deckSlides().find(x => x.id === id);
+  if (!s || !deckMayEdit()) return;
+  const list = deckSlotObjects(s).filter(o => o.lay !== 'base' && !o.bgOf);
+  if (!list.length){ deckToast('Всё на слайде уже заготовка'); return; }
+  pushUndo();
+  list.forEach(o => { o.lay = 'base'; });
+  saveDB(); scheduleRedraw();
+  deckToast('Слайд закреплён как заготовка');
+}
+// копия урока: вся презентация с пометками — отдельной доской в списке
+function deckSaveLessonCopy(){
+  if (!isDeckBoard() || !deckIsTeacher()) return;
+  deckStampLayers();
+  const d = new Date(), pad = n => String(n).padStart(2, '0');
+  const stamp = `${pad(d.getDate())}.${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const copy = JSON.parse(JSON.stringify(B));
+  ['cloudBoardId', 'cloudRole', 'syncedAt', 'pairMissing', 'view', 'refPanel'].forEach(k => delete copy[k]);
+  copy.id = uid();
+  copy.name = (B.name || 'Презентация') + ' · ' + stamp;
+  copy.createdAt = copy.updatedAt = nowTs();
+  copy.lastOpenedAt = null;
+  copy.rev = 1;
+  DB.boards.push(copy);
+  touchBoard(copy);
+  saveDB();
+  deckToast('Копия «' + copy.name + '» — в списке досок');
+}
+
+document.getElementById('deckModeEdit')?.addEventListener('click', () => deckSetMode('edit'));
+document.getElementById('deckModeLesson')?.addEventListener('click', () => deckSetMode('lesson'));
+document.getElementById('deckClearNotes')?.addEventListener('click', () => deckClearNotes(false));
+document.getElementById('deckCopyBtn')?.addEventListener('click', () => deckSaveLessonCopy());
