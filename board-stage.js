@@ -648,8 +648,11 @@
     // ученик смотрит, а не управляет: колесо, клавиши, жесты — мимо движка.
     // Кроме кнопки справочных материалов и её «свернуть» (на планшете
     // preventDefault у касания отменил бы и само нажатие) и текста в
-    // справочной панели — его можно листать
-    const REF_FREE = '#bdRefToggle, #bdRefClose, #bdRefTextarea, #bdViewerReload';
+    // справочной панели — его можно листать. Окна session-share.js поверх
+    // доски («Подключиться к сессии?» #tsInvite, «Занятие завершено»
+    // #tsEnded) — тоже: на телефоне preventDefault у touchstart отменяет
+    // клик, и кнопка в них «нажималась» (меняла цвет), но ничего не делала
+    const REF_FREE = '#bdRefToggle, #bdRefClose, #bdRefTextarea, #bdViewerReload, #tsInvite, #tsEnded';
     const block = (e) => {
       const t = e.target;
       if (e.type !== 'keydown' && t && t.closest && t.closest(REF_FREE)) return;

@@ -432,11 +432,42 @@ def part_m(browser):
     ctx.close()
 
 
+def part_n(browser):
+    # Доски у ученика гасят touchstart (preventDefault) — на телефоне это
+    # отменяло клик: кнопка в окне приглашения краснела, но не срабатывала
+    print("N. Телефон, ссылка на доски")
+    ctx = browser.new_context(is_mobile=True, has_touch=True, viewport={"width": 390, "height": 844}, device_scale_factor=2)
+    t = participant(ctx, "T", 1300, 820)
+    t.goto(f"{BASE}/boards.html")
+    t.wait_for_function("() => window.TrainerSession && window.TrainerSession.getCode()")
+    t.evaluate(BS.SEED_JS)
+    t.reload()
+    code = t54.wait_code(t)
+    t.evaluate(BS.BOOT_JS)
+    t.wait_for_function("() => window.getDB && window.getDB().boards.length >= 2")
+    t.evaluate("() => window.openBoard('bA')")
+    t.wait_for_function("() => window.getCurrentBoard() && window.getCurrentBoard().id === 'bA' && boardActive")
+    t.wait_for_timeout(1500)
+    link = t.evaluate("() => TrainerSession.getShareUrl()")
+    phone = participant(ctx, "S", 390, 844)
+    phone.goto(link)
+    info = wait_invite(phone, "ok")
+    check("N: на телефоне у досок — окно подключения", bool(info), info)
+    phone.tap("#tsInvMain")
+    try:
+        t11.wait_stage(phone)
+        got = frame_code(phone)
+    except Exception as e:
+        got = str(e)[:120]
+    check("N: касание «Подключиться» на досках — сцена с кодом учителя", got == code, got)
+    ctx.close()
+
+
 def run():
     with t11.local_server():
         with sync_playwright() as p:
             browser = p.chromium.launch()
-            for part in (part_a, part_b_to_k, part_l, part_m):
+            for part in (part_a, part_b_to_k, part_l, part_m, part_n):
                 try:
                     part(browser)
                 except Exception as e:
