@@ -881,6 +881,146 @@ function exportAllBoardsArchiveReady(){
   saveDB();
 }
 
+/* ═══ Промпт №88б: «Пересобрать хранилище» ═══
+   Три раза (№51 и дважды 15.10.2026) было одно и то же: данные целы и
+   весят сотни мегабайт, а страница досок у учителя при загрузке забирает
+   3 ГБ и падает, даже на списке, где ни одна доска не загружена. В
+   инкогнито с тем же аккаунтом всё летает — испорчено само хранилище
+   браузера (его файлы на диске), а не записи в нём. Лечит пересоздание:
+   записи те же, файлы новые (HANDOFF, раздел 6, «Если доски тормозят или
+   падают»). Раньше это делали руками из консоли — теперь одной кнопкой.
+   Порядок такой, чтобы потерять было нечего на любом шаге:
+   1) файл со всеми досками скачивается (страховка, формат «Выгрузить все
+      доски»); 2) все записи по одной копируются во временную базу — по
+      одной, чтобы больная вкладка не держала в памяти всё разом; 3) старая
+      база удаляется; 4) записи по одной возвращаются в новую; 5) временная
+      удаляется, страница перезагружается. Шаг пишется в localStorage: если
+      вкладка упадёт между 3 и 5, при следующей загрузке boardsAppBoot сам
+      доведёт перенос до конца (rebuildResume) */
+const IDB_TMP_NAME = 'ogeBoardsDB_rebuild';
+const REBUILD_KEY = 'boardsRebuildStage';
+function rawIdbOpen(name){
+  return new Promise((resolve, reject) => {
+    const q = indexedDB.open(name, 1);
+    q.onupgradeneeded = () => { if (!q.result.objectStoreNames.contains(IDB_STORE)) q.result.createObjectStore(IDB_STORE); };
+    q.onsuccess = () => resolve(q.result);
+    q.onerror = () => reject(q.error);
+  });
+}
+function rawIdbReq(db, mode, fn){
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, mode);
+    const req = fn(tx.objectStore(IDB_STORE));
+    let out;
+    req.onsuccess = () => { out = req.result; };
+    tx.oncomplete = () => resolve(out);
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error || new Error('операция прервана'));
+  });
+}
+// удаление базы ждёт, пока все соединения закроются: свои закрываем сами,
+// у соседних вкладок закрывает onversionchange (см. idbOpen). Если какая-то
+// вкладка не отпускает — просим её закрыть, а не бросаем на полпути
+function rawIdbDelete(name){
+  return new Promise((resolve, reject) => {
+    const q = indexedDB.deleteDatabase(name);
+    q.onsuccess = () => resolve();
+    q.onerror = () => reject(q.error);
+    q.onblocked = () => rebuildStatus('Закройте другие вкладки с досками — пересборка ждёт их');
+  });
+}
+// записи одной базы в другую, по одной (ключи — заранее одним списком)
+async function rawIdbCopy(from, to, onStep){
+  const keys = await rawIdbReq(from, 'readonly', st => st.getAllKeys());
+  for (let i = 0; i < keys.length; i++){
+    const v = await rawIdbReq(from, 'readonly', st => st.get(keys[i]));
+    await rawIdbReq(to, 'readwrite', st => st.put(v, keys[i]));
+    if (onStep) onStep(i + 1, keys.length);
+  }
+  const got = await rawIdbReq(to, 'readonly', st => st.count());
+  if (got < keys.length) throw new Error(`скопировано ${got} записей из ${keys.length}`);
+  return keys.length;
+}
+function rebuildStatus(text){
+  const btn = document.getElementById('blRebuild');
+  const lbl = btn && btn.querySelector('span');
+  if (lbl) lbl.textContent = text || 'Пересобрать хранилище';
+  if (btn) btn.disabled = !!text;
+}
+function rebuildStage(v){ try { if (v) localStorage.setItem(REBUILD_KEY, v); else localStorage.removeItem(REBUILD_KEY); } catch (e) {} }
+// архив по одной доске: строки досок складываются в Blob кусками, целиком
+// в память (как у «Выгрузить все доски») ничего не поднимается
+async function downloadArchiveStreamed(fileName){
+  const idx = await idbGet('db');
+  const boards = (idx && Array.isArray(idx.boards)) ? idx.boards : [];
+  const head = { __app: 'oge-boards', __kind: 'boards-archive', __version: 1, exportedAt: nowTs(), sortMode: idx && idx.sortMode, folders: (idx && idx.folders) || [] };
+  const parts = [JSON.stringify(head).slice(0, -1) + ',"boards":['];
+  for (let i = 0; i < boards.length; i++){
+    const b = boards[i];
+    const h = (await idbGet(IDB_BOARD_PREFIX + b.id)) || {};
+    parts.push((i ? ',' : '') + JSON.stringify(Object.assign({}, b, { objects: h.objects || [], imageLib: h.imageLib || [] })));
+    rebuildStatus(`Файл-страховка: ${i + 1} из ${boards.length}`);
+  }
+  parts.push(']}');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(parts, { type: 'application/json' }));
+  a.download = fileName;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+  return boards.length;
+}
+// шаги 4–5: из временной базы в новую и уборка; зовётся и кнопкой, и при
+// загрузке страницы, если прошлая пересборка оборвалась после удаления
+async function rebuildFinish(){
+  const tmp = await rawIdbOpen(IDB_TMP_NAME);
+  const main = await idbOpen();
+  await rawIdbCopy(tmp, main, (i, n) => rebuildStatus(`Запись заново: ${i} из ${n}`));
+  tmp.close();
+  rebuildStage('');
+  await rawIdbDelete(IDB_TMP_NAME);
+}
+async function rebuildStorage(){
+  if (!window.indexedDB) return;
+  if (!confirm('Пересобрать хранилище досок?\n\nЭто лечит случай, когда доски сильно тормозят или вкладка падает. '
+    + 'Сначала скачается файл со всеми досками (страховка), потом хранилище запишется заново. '
+    + 'Займёт до пары минут — вкладку не закрывайте.')) return;
+  try {
+    rebuildStatus('Сохраняю…');
+    await idbSaveDB();
+    const d = new Date(), pad = n => String(n).padStart(2, '0');
+    await downloadArchiveStreamed(`доски-пересборка-${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.boards.json`);
+    // временная база могла остаться от оборванной попытки — с чистого листа
+    await rawIdbDelete(IDB_TMP_NAME);
+    const tmp = await rawIdbOpen(IDB_TMP_NAME);
+    const main = await idbOpen();
+    await rawIdbCopy(main, tmp, (i, n) => rebuildStatus(`Копирую: ${i} из ${n}`));
+    tmp.close();
+    // с этого места записи живут во временной базе — шаг помечаем ДО удаления
+    rebuildStage('copied');
+    rebuildStatus('Удаляю старое хранилище…');
+    if (idbCurrentDb){ try { idbCurrentDb.close(); } catch (e) {} }
+    idbPromise = null; idbCurrentDb = null;
+    await rawIdbDelete(IDB_NAME);
+    await rebuildFinish();
+    rebuildStatus('Готово — перезагружаю');
+    location.hash = '';
+    location.reload();
+  } catch (err) {
+    console.error('[boards] пересборка хранилища:', err);
+    rebuildStatus('');
+    alert('Пересборка не удалась: ' + ((err && err.message) || err) + '\n\nДоски не потеряны: файл-страховка уже скачан, '
+      + 'а если старое хранилище успели удалить — записи лежат во временной базе и вернутся сами при следующей загрузке страницы.');
+  }
+}
+// оборвалась после удаления старой базы — доводим до конца до чтения досок
+function rebuildResume(){
+  let stage = null;
+  try { stage = localStorage.getItem(REBUILD_KEY); } catch (e) {}
+  if (stage !== 'copied' || !window.indexedDB) return Promise.resolve();
+  console.warn('[boards] прошлая пересборка хранилища оборвалась — дописываю записи из временной базы');
+  return rebuildFinish().catch(err => console.error('[boards] не удалось довести пересборку:', err));
+}
+
 /* ── окно выбора версии для спорной доски ─────────────────────────────
    Показываем по одной: что за доска, чем версии отличаются (когда над
    каждой работали, сколько весит), и галочку «так же для остальных» —
@@ -1668,6 +1808,7 @@ document.getElementById('blCreateFolder').addEventListener('click', () => {
   saveDB(); renderList();
 });
 document.getElementById('blExportAll').addEventListener('click', exportAllBoardsArchive);
+document.getElementById('blRebuild')?.addEventListener('click', rebuildStorage);
 document.getElementById('blSnapshots')?.addEventListener('click', openSnapshotsModal);
 document.getElementById('blImportBoard').addEventListener('click', () => {
   const input = document.getElementById('blImportFile');
@@ -8877,7 +9018,8 @@ document.addEventListener('keydown', (e) => {
   if (tool === 'eraser' && !e.ctrlKey && !e.metaKey && !e.altKey && (e.code === 'BracketLeft' || e.code === 'BracketRight')){
     e.preventDefault(); stepEraserSize(e.code === 'BracketRight' ? 1 : -1); return;
   }
-  const t = KEY_TOOL[e.key.toLowerCase()];
+  // e.key бывает пустым (автозаполнение браузера шлёт keydown без клавиши)
+  const t = KEY_TOOL[(e.key || '').toLowerCase()];
   if (t){ const btn = document.querySelector(`.bd-tool[data-tool="${t}"]`); if (btn) btn.click(); }
 });
 
@@ -9148,7 +9290,7 @@ window.boardsAppBoot = function(){
   // сначала дочитываем доски из IndexedDB (и, если надо, переносим туда
   // старые), и только потом рисуем список — иначе на экране мелькнул бы
   // пустой список или устаревшее содержимое
-  idbLoadDB().then(() => importNotesOutbox()).then(() => {
+  rebuildResume().then(() => idbLoadDB()).then(() => importNotesOutbox()).then(() => {
     if (DB.sortMode && sortLabels[DB.sortMode]){
       sortMode = DB.sortMode;
       const lbl = document.getElementById('blSortLabel');
