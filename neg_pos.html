@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B0E1A">
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тренажёр: положительные и отрицательные числа</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font-ui:'Onest',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,-apple-system,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#EEF1F7;
+  --blob-1:rgba(120,150,255,.16);
+  --blob-2:rgba(190,150,230,.14);
+  --glass:rgba(255,255,255,.55);
+  --glass-strong:rgba(255,255,255,.72);
+  --glass-border:rgba(255,255,255,.85);
+  --hl:rgba(0,76,153,.12);
+  --muted:#6E6E73;
+  --paper:#FDFCF7;
+  --grid:#DCE4F0;
+  --margin-red:#FF9F0A;
+  --ink:#004C99;
+  --pencil:#1D1D1F;
+  --ok:#248A3D;
+  --ok-tint:rgba(36,138,61,.12);
+  --bad:#D93025;
+  --bad-tint:rgba(217,48,37,.1);
+  --shadow:0 10px 34px rgba(20,30,60,.08);
+}
+html[data-theme="dark"]{
+  --bg:#0B0E1A;
+  --blob-1:rgba(90,110,255,.22);
+  --blob-2:rgba(150,90,220,.18);
+  --paper:#151A2C;
+  --glass:rgba(40,46,74,.5);
+  --glass-strong:rgba(46,53,84,.65);
+  --glass-border:rgba(255,255,255,.12);
+  --hl:rgba(74,147,240,.18);
+  --grid:#232A44;
+  --ink:#4A93F0;
+  --pencil:#F2F3F5;
+  --muted:#9A9AA2;
+  --ok:#5BB87A;
+  --ok-tint:rgba(91,184,122,.16);
+  --bad:#FF6961;
+  --bad-tint:rgba(255,105,97,.14);
+  --shadow:0 10px 40px rgba(0,0,0,.55);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--bg);
+  background-size:auto,auto,24px 24px,24px 24px,auto;
+  font-family:var(--font-ui);color:var(--pencil);min-height:100vh;padding:18px 12px 60px;
+}
+.home-btn,.theme-toggle{position:fixed;top:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;text-decoration:none;z-index:50}
+.home-btn{left:16px;font-size:19px}
+.theme-toggle{right:16px;font-size:17px}
+.home-btn:hover,.theme-toggle:hover{border-color:var(--ink)}
+.wrap{max-width:900px;margin:0 auto;display:grid;gap:18px;padding-top:4px}
+h1{font-weight:700;letter-spacing:-.02em;font-size:clamp(22px,4.6vw,34px);text-align:center;text-wrap:balance;padding:0 48px}
+.sub{font-weight:500;text-align:center;color:var(--muted);font-size:15px;margin-top:4px}
+.step{display:none;gap:16px}.step.show{display:grid}
+.pills{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.pill{font:600 14px var(--font-ui);padding:8px 16px;border-radius:999px;border:1px solid var(--glass-border);background:var(--glass);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);color:var(--pencil);cursor:pointer;transition:transform .15s}
+.pill:active{transform:scale(.96)}
+.pill:hover{border-color:var(--ink)}
+.pill.on{background:var(--ink);border-color:var(--ink);color:#fff;box-shadow:0 6px 16px rgba(0,76,153,.3)}
+.bar{display:flex;flex-wrap:wrap;gap:12px 20px;align-items:center;justify-content:space-between}
+.switch{display:inline-flex;align-items:center;gap:10px;font:600 15px var(--font-ui);cursor:pointer;background:none;border:0;color:var(--pencil)}
+.track{width:44px;height:26px;border-radius:999px;background:var(--muted);position:relative;transition:background .15s;flex:0 0 auto}
+.track::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .15s}
+.switch[aria-checked="true"] .track{background:var(--ink)}
+.switch[aria-checked="true"] .track::after{transform:translateX(18px)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:10px}
+.tile{position:relative;text-align:left;font:inherit;color:var(--pencil);background:var(--glass);border:1.5px solid var(--glass-border);border-radius:14px;padding:12px 14px;cursor:pointer;display:grid;gap:6px;min-width:0;align-content:start}
+.tile .t{font-weight:600;font-size:15px;padding-right:26px}
+.tile .ex{display:grid}
+.tile .exl{font:600 18px var(--font-mono);color:var(--ink);padding:5px 0;border-top:1px dashed var(--grid);overflow-wrap:anywhere}
+.tile .exl:first-child{border-top:0;padding-top:0}
+.tile .d{font-size:12.5px;color:var(--muted)}
+.tile::after{content:'';position:absolute;top:12px;right:12px;width:18px;height:18px;border-radius:5px;border:1.5px solid var(--muted)}
+.tile.on{border-color:var(--ink);background:var(--hl)}
+.tile.on::after{background:var(--ink);border-color:var(--ink);content:'✓';color:#fff;font-size:12px;line-height:15px;text-align:center}
+.sum{text-align:center;font-size:14px;color:var(--muted);min-height:20px}
+.cnt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;font-size:14px;color:var(--muted)}
+.btn{font:600 16px var(--font-ui);padding:11px 22px;border-radius:12px;border:0;background:var(--ink);color:#fff;cursor:pointer}
+.btn:disabled{opacity:.4;cursor:default}
+.go{justify-self:center;font-size:17px;padding:13px 30px}
+.topbar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:space-between}
+.board{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(250px,100%),1fr));gap:14px}
+.leaf{position:relative;background:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px),var(--paper);
+  background-size:24px 24px;border:1px solid var(--glass-border);border-radius:14px;box-shadow:var(--shadow);padding:40px 14px 16px 36px;display:grid;gap:14px;min-width:0}
+.leaf::before{content:'';position:absolute;top:0;bottom:0;left:24px;width:2px;background:var(--margin-red);opacity:.55}
+.leaf .no{position:absolute;top:10px;left:36px;font-size:12px;color:var(--muted)}
+.leaf .rf{position:absolute;top:6px;right:8px;width:28px;height:28px;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass-strong);color:var(--ink);cursor:pointer;font-size:15px}
+.leaf .rf:hover{border-color:var(--ink)}
+.leaf .tk{font:600 22px var(--font-mono);color:var(--ink);overflow-wrap:anywhere}
+.leaf .r2{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.leaf input{font:600 21px var(--font-mono);color:var(--ink);background:transparent;border:0;border-bottom:2.5px solid var(--ink);width:100%;max-width:150px;padding:4px 6px;outline:none}
+.leaf input:focus{background:var(--hl);border-radius:6px 6px 0 0}
+.leaf .btn{padding:8px 14px;font-size:14px}
+.leaf .verdict{font-weight:600;font-size:14px;border-radius:10px;padding:6px 10px;min-height:32px}
+.leaf .verdict:empty{padding:0}
+.leaf.ok{outline:2px solid var(--ok)}
+.leaf.ok .verdict{background:var(--ok-tint);color:var(--ok)}
+.leaf.bad .verdict{background:var(--bad-tint);color:var(--bad)}
+.note{font-size:13px;color:var(--muted);text-align:center}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+@media (max-width:420px){.leaf .tk{font-size:20px}}
+</style>
+</head>
+<body>
+<a class="home-btn" id="homeBtn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
+<button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему" type="button">🌙</button>
+<script>(function(){
+  var btn=document.getElementById('themeToggle');
+  function apply(t, persist){
+    document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    if (persist) { try{ localStorage.setItem('theme', t); }catch(e){} }
+  }
+  apply(document.documentElement.getAttribute('data-theme') || 'light', false);
+  btn.addEventListener('click', function(){
+    apply(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark', true);
+  });
+})();</script>
+
+<div class="wrap">
+  <header>
+    <h1>Положительные и отрицательные числа</h1>
+    <p class="sub">Решите пример и введите ответ. Запятая или точка — как удобно.</p>
+  </header>
+
+  <div class="step show" id="step1">
+    <div class="pills" id="sections" role="group" aria-label="Действия">
+      <button class="pill on" type="button" data-sec="as">Сложение и вычитание</button>
+      <button class="pill" type="button" data-sec="md">Умножение и деление</button>
+    </div>
+    <div class="bar">
+      <button class="switch" id="dec" type="button" role="switch" aria-checked="false"><span class="track"></span>Десятичные дроби</button>
+      <div class="pills"><button class="pill" type="button" id="all">Выбрать все</button><button class="pill" type="button" id="none">Снять все</button></div>
+    </div>
+    <div class="tiles" id="tiles"></div>
+    <p class="sum" id="sum"></p>
+    <div class="cnt">Сколько заданий на доске: <span class="pills" id="cnt1"></span></div>
+    <button class="btn go" type="button" id="start">Начать →</button>
+  </div>
+
+  <div class="step" id="step2">
+    <div class="topbar">
+      <button class="pill" type="button" id="back">← К выбору типов</button>
+      <div class="cnt"><span class="pills" id="cnt2"></span></div>
+      <button class="pill on" type="button" id="refAll">⟳ Обновить все</button>
+    </div>
+    <div class="board" id="board"></div>
+    <p class="note" id="boardNote"></p>
+  </div>
+</div>
+
+<script>
+(function(){
+  /* Числа хранятся целыми в тысячных долях: так сумма и разность десятичных
+     дробей считаются без ошибок двоичной арифметики (0,1 + 0,2 и т. п.). */
+  var U = 1000;
+  function ri(a, b){ return a + Math.floor(Math.random() * (b - a + 1)); }
+  function pick(a){ return a[Math.floor(Math.random() * a.length)]; }
+
+  // Положительное число в тысячных. dec=false — целое, иначе 1–3 знака после запятой
+  function posNum(dec, lo, hi){
+    if (!dec) return ri(lo, hi) * U;
+    var d = pick([1, 1, 2, 2, 3]), step = Math.pow(10, 3 - d);
+    var v = ri(lo * Math.pow(10, d) + 1, hi * Math.pow(10, d)) * step;
+    return v % U === 0 ? v + step : v;       // в режиме дробей число не должно оказаться целым
+  }
+  // Число из значения в шкале 1/scale: знак, запятая, без хвостовых нулей
+  function fmt(v, scale){
+    var neg = v < 0, a = Math.abs(v), digits = String(scale).length - 1;
+    var s = String(a); while (s.length <= digits) s = '0' + s;
+    var ip = s.slice(0, s.length - digits), fp = s.slice(s.length - digits).replace(/0+$/, '');
+    return (neg ? '−' : '') + ip + (fp ? ',' + fp : '');
+  }
+  // Первое число без скобок; отрицательное второе — в скобках (правило преподавателя)
+  function first(v){ return fmt(v, U); }
+  function second(v){ return v < 0 ? '(' + fmt(v, U) + ')' : fmt(v, U); }
+
+  var TYPES = {
+    as: [
+      { t: 'Числа одного знака', d: 'Оба положительные или оба отрицательные', g: function(dec){
+          var A = posNum(dec, 1, 20), B = posNum(dec, 1, 20), neg = Math.random() < .5;
+          return neg ? { text: first(-A) + ' − ' + second(B), ans: -(A + B), sc: U }
+                     : { text: first(A) + ' + ' + second(B), ans: A + B, sc: U }; } },
+      { t: 'Числа разных знаков', d: 'Один отрицательный, другой положительный', g: function(dec){
+          var A = posNum(dec, 1, 20), B = posNum(dec, 1, 20); if (A === B) B += dec ? 1 : U;
+          return Math.random() < .5 ? { text: first(-A) + ' + ' + second(B), ans: B - A, sc: U }
+                                    : { text: first(A) + ' − ' + second(B), ans: A - B, sc: U }; } },
+      { t: 'Конфликт знаков: + (−)', d: 'Прибавить отрицательное', g: function(dec){
+          var A = posNum(dec, 1, 20) * pick([-1, 1]), B = posNum(dec, 1, 20);
+          return { text: first(A) + ' + ' + second(-B), ans: A - B, sc: U }; } },
+      { t: 'Конфликт знаков: − (−)', d: 'Вычесть отрицательное', g: function(dec){
+          var A = posNum(dec, 1, 20) * pick([-1, 1]), B = posNum(dec, 1, 20);
+          return { text: first(A) + ' − ' + second(-B), ans: A + B, sc: U }; } }
+    ],
+    md: [
+      { t: 'Умножение: одинаковые знаки', d: 'Минус на минус даёт плюс', g: function(dec){ return mul(dec, true); } },
+      { t: 'Умножение: разные знаки', d: 'Результат отрицательный', g: function(dec){ return mul(dec, false); } },
+      { t: 'Деление: одинаковые знаки', d: 'Результат положительный', g: function(dec){ return div(dec, true); } },
+      { t: 'Деление: разные знаки', d: 'Результат отрицательный', g: function(dec){ return div(dec, false); } }
+    ]
+  };
+  function sg(same){ var m = pick([-1, 1]); return [m, same ? m : -m]; }
+  // Дробный множитель с одним знаком после запятой, не целый (0,2 … 9,9)
+  function d1(){ var x = ri(2, 99); return (x % 10 ? x : x + 1) * 100; }
+  function mul(dec, same){
+    var s = sg(same), a = dec ? d1() : ri(2, 12) * U, b = dec ? pick([d1(), ri(2, 9) * U]) : ri(2, 9) * U;
+    a *= s[0]; b *= s[1];
+    return { text: first(a) + ' · ' + second(b), ans: a * b, sc: U * U };
+  }
+  function div(dec, same){
+    var s = sg(same), b, q;
+    if (dec){ b = d1(); q = pick([d1(), ri(2, 9) * U]); } else { b = ri(2, 9) * U; q = ri(2, 12) * U; }
+    var a = b * q / U;                       // делимое = делитель · частное, ответ всегда конечная дробь
+    var A = a * s[0], B = b * s[1], Q = q * s[0] * s[1];
+    return { text: first(A) + ' : ' + second(B), ans: Q, sc: U };
+  }
+
+  var sec = 'as', dec = false, cnt = 5, on = { as: new Set([2, 3]), md: new Set([0]) }, leaves = [];
+  try {
+    var saved = JSON.parse(localStorage.getItem('negpos_state') || 'null');
+    if (saved) { dec = !!saved.dec; if ([3, 5, 10].indexOf(saved.cnt) >= 0) cnt = saved.cnt;
+      on = { as: new Set(), md: new Set() };
+      // Берём только существующие плитки: старое сохранение не должно ронять генератор
+      ['as', 'md'].forEach(function(k){ (saved[k] || []).forEach(function(i){ if (TYPES[k][i]) on[k].add(i); }); }); }
+  } catch (e) {}
+  function save(){ try{ localStorage.setItem('negpos_state', JSON.stringify({ dec: dec, cnt: cnt, as: [...on.as], md: [...on.md] })); }catch(e){} }
+  var $ = function(id){ return document.getElementById(id); };
+
+  function gen(s, k, d){ return TYPES[s][k].g(d); }
+  function pool(){ var r = []; ['as', 'md'].forEach(function(s){ on[s].forEach(function(k){ r.push({ s: s, k: k }); }); }); return r; }
+  // Пример, которого ещё нет на доске (skip — лист, который сейчас заменяется)
+  function unique(skip){
+    var used = {}; leaves.forEach(function(l, i){ if (i !== skip) used[l.text] = 1; });
+    var p = pool(), t, n = 0;
+    do { var ty = pick(p); t = gen(ty.s, ty.k, dec); n++; } while (used[t.text] && n < 80);
+    return t;
+  }
+
+  function drawTiles(){
+    $('tiles').innerHTML = '';
+    TYPES[sec].forEach(function(x, k){
+      var b = document.createElement('button'); b.type = 'button';
+      b.className = 'tile' + (on[sec].has(k) ? ' on' : ''); b.setAttribute('aria-pressed', on[sec].has(k));
+      b.setAttribute('data-sec', sec); b.setAttribute('data-k', k);
+      var t = document.createElement('span'); t.className = 't'; t.textContent = x.t;
+      var ex = document.createElement('span'); ex.className = 'ex';
+      var e1 = x.g(dec), e2 = x.g(dec), n = 0; while (e2.text === e1.text && n++ < 20) e2 = x.g(dec);
+      [e1, e2].forEach(function(e){ var q = document.createElement('span'); q.className = 'exl'; q.textContent = e.text; ex.appendChild(q); });
+      var d = document.createElement('span'); d.className = 'd'; d.textContent = x.d;
+      b.appendChild(t); b.appendChild(ex); b.appendChild(d);
+      b.onclick = function(){ on[sec].has(k) ? on[sec].delete(k) : on[sec].add(k); save(); drawStep1(); };
+      $('tiles').appendChild(b);
+    });
+  }
+  function drawStep1(){
+    drawTiles();
+    document.querySelectorAll('#sections .pill').forEach(function(p){ p.classList.toggle('on', p.dataset.sec === sec); });
+    var n = on.as.size + on.md.size;
+    $('sum').textContent = n ? 'Выбрано типов: ' + n + (on.as.size && on.md.size ? ' (пойдут вперемешку)' : '') : 'Выберите хотя бы один тип';
+    $('start').disabled = !n;
+    $('dec').setAttribute('aria-checked', dec);
+    cntBtns();
+  }
+  function cntBtns(){
+    ['cnt1', 'cnt2'].forEach(function(id){
+      $(id).innerHTML = '';
+      [3, 5, 10].forEach(function(v){
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'pill' + (v === cnt ? ' on' : ''); b.textContent = v;
+        b.setAttribute('data-cnt', v);
+        b.onclick = function(){ cnt = v; save(); cntBtns(); if ($('step2').classList.contains('show')) resize(); };
+        $(id).appendChild(b);
+      });
+    });
+  }
+
+  /* Ответ → число в шкале 1/sc; null, если запись не похожа на число */
+  function parseAns(str, sc){
+    var s = String(str).replace(/[−–—]/g, '-').replace(/\s+/g, '').replace(',', '.');
+    if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
+    return Math.round(parseFloat(s) * sc);
+  }
+  function renderLeaf(i){
+    var l = leaves[i], d = document.createElement('div'); d.className = 'leaf'; d.setAttribute('data-i', i);
+    d.innerHTML = '<span class="no"></span><button class="rf" type="button" title="Обновить этот пример" aria-label="Обновить этот пример">⟳</button>' +
+      '<div class="tk task"></div><div class="r2"><span class="tk">=</span><input class="ans" autocomplete="off" inputmode="text" aria-label="Ответ"></div>' +
+      '<div class="r2"><button class="btn chk" type="button">Проверить</button></div><div class="verdict" role="status"></div>';
+    d.querySelector('.no').textContent = 'пример №' + (i + 1);
+    d.querySelector('.task').textContent = l.text;
+    var inp = d.querySelector('input'), v = d.querySelector('.verdict');
+    function check(){
+      if (l.done) return;
+      var got = parseAns(inp.value, l.sc);
+      d.classList.remove('ok', 'bad');
+      if (got === null){ d.classList.add('bad'); v.textContent = 'Введите число, например −6,98'; return; }
+      if (got === l.ans){ l.done = true; d.classList.add('ok'); v.textContent = 'Верно'; inp.readOnly = true; counter(); }
+      else { d.classList.add('bad'); v.textContent = 'Неверно, попробуйте ещё раз'; }
+    }
+    d.querySelector('.chk').onclick = check;
+    inp.addEventListener('keydown', function(e){ if (e.key === 'Enter') check(); });
+    d.querySelector('.rf').onclick = function(){ leaves[i] = unique(i); render(); };
+    return d;
+  }
+  function counter(){
+    var n = leaves.filter(function(l){ return l.done; }).length;
+    $('boardNote').textContent = 'Решено: ' + n + ' из ' + leaves.length + '. ⟳ на листе меняет один пример, «Обновить все» — всю доску.';
+  }
+  function render(){
+    $('board').innerHTML = '';
+    leaves.forEach(function(l, i){
+      var d = renderLeaf(i); $('board').appendChild(d);
+      if (l.done){ d.classList.add('ok'); d.querySelector('.verdict').textContent = 'Верно'; var inp = d.querySelector('input'); inp.value = l.shown || ''; inp.readOnly = true; }
+    });
+    counter();
+  }
+  function deal(){
+    leaves = []; for (var i = 0; i < cnt; i++){ leaves.push(unique(-1)); }
+    render();
+  }
+  // Смена количества не стирает уже решённое: лишние листы отрезаются с конца, недостающие добавляются
+  function resize(){
+    while (leaves.length > cnt) leaves.pop();
+    while (leaves.length < cnt) leaves.push(unique(-1));
+    render();
+  }
+  // Запоминаем, что ученик ввёл в решённый лист, чтобы render его не стёр
+  document.addEventListener('input', function(e){
+    var d = e.target.closest && e.target.closest('.leaf'); if (!d || !e.target.classList.contains('ans')) return;
+    leaves[+d.getAttribute('data-i')].shown = e.target.value;
+  });
+
+  document.querySelectorAll('#sections .pill').forEach(function(p){ p.onclick = function(){ sec = p.dataset.sec; drawStep1(); }; });
+  $('dec').onclick = function(){ dec = !dec; save(); drawStep1(); };
+  $('all').onclick = function(){ TYPES[sec].forEach(function(_, k){ on[sec].add(k); }); save(); drawStep1(); };
+  $('none').onclick = function(){ on[sec].clear(); save(); drawStep1(); };
+  $('start').onclick = function(){ if (!pool().length) return; $('step1').classList.remove('show'); $('step2').classList.add('show'); deal(); };
+  $('back').onclick = function(){ $('step2').classList.remove('show'); $('step1').classList.add('show'); drawStep1(); };
+  $('refAll').onclick = deal;
+  drawStep1();
+
+  // Для теста: генератор снаружи
+  window.NEGPOS = { TYPES: TYPES, gen: gen, parseAns: parseAns };
+})();
+</script>
+</body>
+</html>
