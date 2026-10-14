@@ -7875,9 +7875,13 @@ function objectBBox(obj){
   return { minX,minY,maxX,maxY };
 }
 function findContentSheets(){
-  if (!B.objects.length) return [];
+  // служебный объект презентации стоит на (-1e7, -1e7) — с ним рамка
+  // «всего нарисованного» растягивалась на ~100 млн листов: в PDF лишний
+  // пустой лист, а перебор ниже идёт по всем объектам для каждого листа —
+  // на сотне штрихов это минуты, вкладка висит (промпт №88а)
+  const boxes = B.objects.filter(o => o.type !== 'deck').map(objectBBox);
+  if (!boxes.length) return [];
   const sw = sheetWpx(), sh = sheetHpx();
-  const boxes = B.objects.map(objectBBox);
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
   boxes.forEach(b => { minX=Math.min(minX,b.minX); minY=Math.min(minY,b.minY); maxX=Math.max(maxX,b.maxX); maxY=Math.max(maxY,b.maxY); });
   const colFrom = Math.floor(minX/sw), colTo = Math.floor(maxX/sw);
