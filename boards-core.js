@@ -2726,6 +2726,9 @@ function renderObject(c, obj, camv, opts){
   c.save();
   c.strokeStyle = color; c.fillStyle = color;
   c.lineWidth = Math.max(0.5, obj.width || 1) * camv.zoom;
+  // Промпт №85: в миниатюре слайда (масштаб ~0,08) штрих иначе тоньше
+  // пикселя и почти не виден
+  if (camv.minLine && c.lineWidth < camv.minLine) c.lineWidth = camv.minLine;
   c.lineCap = 'round'; c.lineJoin = 'round';
   if (obj.opacity != null) c.globalAlpha = obj.opacity;
   c.setLineDash(obj.dash ? [obj.width*3.4*camv.zoom, obj.width*2.4*camv.zoom] : []);
