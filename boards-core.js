@@ -1545,10 +1545,10 @@ function renderList(){
       <div class="bl-card" data-board="${b.id}">
         ${b.pairMissing ? `<span class="bl-pair-dot" title="При последнем переносе пары для этой доски не нашлось — возможно, её удалили на другом устройстве или она создана только здесь"></span>` : ''}
         <button class="bl-card-menu" data-menu="board:${b.id}">⋯</button>
-        <div class="bl-card-icon">${boardIcon()}</div>
+        <div class="bl-card-icon">${b.kind === 'deck' && typeof deckIcon === 'function' ? deckIcon() : boardIcon()}</div>
         <div class="bl-card-body">
           <div class="bl-card-name">${escHtml(b.name)}</div>
-          <div class="bl-card-meta">Создана ${fmtDate(b.createdAt)}</div>
+          <div class="bl-card-meta">${b.kind === 'deck' ? 'Презентация · с' : 'С'}оздана ${fmtDate(b.createdAt)}</div>
         </div>
       </div>`;
   });
@@ -1926,6 +1926,8 @@ function stampAuthors(){
 
 function clampCam(){
   if (!B || !cssW || !cssH) return;
+  // Промпт №84: у презентации камера упирается в текущий слайд, а не в полотно
+  if (B.kind === 'deck' && typeof deckClampCam === 'function'){ deckClampCam(); return; }
   const tw = totalW(), th = totalH();
   const viewW = cssW / cam.zoom, viewH = cssH / cam.zoom;
   if (viewW >= tw + PAN_MARGIN*2) cam.x = (tw - viewW) / 2;
@@ -2149,6 +2151,8 @@ function openBoardReady(b, id){
   b.lastOpenedAt = nowTs();
   B = b;
   B.objects = B.objects || [];
+  // Промпт №84: презентация — та же доска, отличаются только слайды (deck-core.js)
+  if (typeof deckOnOpen === 'function') deckOnOpen(B);
   B.recentColors = B.recentColors && B.recentColors.length ? B.recentColors : PALETTE.map(p => p.tok);
   B.colorUsage = B.colorUsage || {};
   B.cellSize = B.cellSize || 24;
@@ -2248,6 +2252,7 @@ function openBoardReady(b, id){
       cam.x = sheetCenterX - cssW/2/cam.zoom;
       cam.y = sheetCenterY - cssH/2/cam.zoom;
     }
+    if (B.kind === 'deck' && typeof deckOpenCam === 'function') deckOpenCam();
     clampCam();
     // с этого момента камера — вид этой доски; до восстановления в ней была
     // камера прошлой доски, и запомнить её сюда значило бы открыть доску
@@ -2711,6 +2716,7 @@ function renderImageObject(c, obj, camv){
 }
 
 function renderObject(c, obj, camv, opts){
+  if (obj.type === 'deck') return;   // служебный список слайдов презентации (промпт №84)
   if (obj.type === 'image'){ renderImageObject(c, obj, camv); return; }
   // Промпт №17, этап 2: тело — 'poly' с полем solid, points — его рамка.
   // Без модуля (старая вкладка) рисуется хотя бы рамка
@@ -3119,7 +3125,10 @@ function render(c, w, h, camv, isScreen, renderDpr){
 
   c.save();
   c.setTransform(renderDpr,0,0,renderDpr,0,0);
-  drawSheetsAndGrid(c, camv, w, h);
+  const isDeck = B.kind === 'deck' && typeof deckDrawBackground === 'function';
+  if (isDeck) deckDrawBackground(c, camv, w, h, isScreen);
+  else drawSheetsAndGrid(c, camv, w, h);
+  const deckClip = isDeck && deckClipSlide(c, camv);
   // раньше рисовали ВСЕ объекты доски на каждый кадр, даже те, что на других
   // страницах далеко за пределами экрана — при доске из десятков рисунков
   // это означало сотни лишних c.stroke()/fillText() на каждое движение пера.
@@ -3139,6 +3148,7 @@ function render(c, w, h, camv, isScreen, renderDpr){
     if (b.maxX < visMinX || b.minX > visMaxX || b.maxY < visMinY || b.minY > visMaxY) return;
     renderObject(c, o, camv);
   });
+  if (deckClip) c.restore();
   if (isScreen) drawDraftPreview(c, camv);
   // рамку выделения редактируемого текста тоже прячем: она старого размера
   // и с ручками, а у поля ввода свои рамка и ручки ширины
@@ -3728,6 +3738,7 @@ function hitTestObject(obj, pt, tol){
   // Промпт №41: чужой объект просто «не ловится» — ни ластиком, ни выделением,
   // ни за ручки. Одна проверка закрывает сразу все способы его тронуть.
   if (!mayTouch(obj)) return false;
+  if (obj.type==='deck') return false;   // список слайдов не ловится ничем (промпт №84)
   if (obj.type==='pen' || obj.type==='line'){
     for (let i=0;i<obj.points.length-1;i++) if (distToSeg(pt,obj.points[i],obj.points[i+1])<=tol) return true;
     return obj.points.length===1 && dist(pt,obj.points[0])<=tol;
@@ -4506,6 +4517,8 @@ canvas.addEventListener('wheel', (e) => {
       return;
     }
   }
+  // Промпт №84: в презентации колесо листает слайды, пока слайд вписан в экран
+  if (B.kind === 'deck' && typeof deckWheel === 'function' && deckWheel(e)) return;
   cam.x += e.deltaX/cam.zoom; cam.y += e.deltaY/cam.zoom; clampCam(); scheduleRedraw();
   // Промпт №54: на тачпаде Mac это основной способ двигать доску, а вид
   // запоминался только при перетаскивании и масштабе — при падении вкладки
@@ -7776,14 +7789,18 @@ document.getElementById('railFullscreen').addEventListener('click', () => {
 document.getElementById('railExport').addEventListener('click', () => {
   // печатаем не всё 200×200-полотно (оно огромное), а тот единственный
   // лист, что сейчас в центре экрана — как «текущая страница» в тетради
-  const sw = sheetWpx(), sh = sheetHpx();
+  let sw = sheetWpx(), sh = sheetHpx();
   const col = Math.floor(((cam.x+cssW/2/cam.zoom)) / sw);
   const row = Math.floor(((cam.y+cssH/2/cam.zoom)) / sh);
   const scale = 2;
+  let fx = col*sw, fy = row*sh;
+  // Промпт №84: у презентации «текущая страница» — текущий слайд
+  const dr = (B.kind === 'deck' && typeof deckCurRect === 'function') ? deckCurRect() : null;
+  if (dr){ sw = dr.w; sh = dr.h; fx = dr.x; fy = dr.y; }
   const off = document.createElement('canvas');
   off.width = Math.round(sw*scale); off.height = Math.round(sh*scale);
   const octx = off.getContext('2d');
-  const fakeCam = { x: col*sw, y: row*sh, zoom: scale };
+  const fakeCam = { x: fx, y: fy, zoom: scale };
   try {
     render(octx, off.width, off.height, fakeCam, false, 1);
     activeCam = cam; // вернуть боевую камеру для следующей обычной перерисовки
