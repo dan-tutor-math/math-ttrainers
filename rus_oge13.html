@@ -286,6 +286,7 @@ button.tag:hover{background:var(--ok);color:#fff}
 </div>
 
 <script src="rus-oge13-fipi.js"></script>
+<script src="rus-titles.js"></script>
 <script>
 (function(){
 'use strict';
@@ -331,19 +332,13 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':
 // слова считаем как ФИПИ: любые слова, в том числе служебные; дефис не делит слово
 function countWords(s){ return (String(s).match(/[0-9A-Za-zА-Яа-яЁё]+(?:-[0-9A-Za-zА-Яа-яЁё]+)*/g) || []).length; }
 
-function authorOf(t){
-  const x = DATA.texts[t.t]; const tail = x && x.tail[0] || '';
-  const m = tail.match(/По\s+(.+?)\*?\s*\)/);
-  // автор в ФИПИ дан в дательном падеже («По Ю.М. Нагибину») — так и показываем, с «По»
-  return m ? 'По ' + m[1].replace(/\*/g, '').trim() : '';
-}
-function firstWords(t){
+// название как у учителей: «И.О. Фамилия. «Первые слова…»». Автор у ФИПИ — в подписи
+// «(По Ю.М. Нагибину*)», первые слова — из первого предложения с номером (не реплики «–»)
+function titleOf(t){
   const x = DATA.texts[t.t]; if (!x) return '';
-  for (const p of x.p) for (const s of p) if (s[0] > 0) {
-    const w = s[1].split(/\s+/).slice(0, 7).join(' ');
-    return w + (s[1].split(/\s+/).length > 7 ? '…' : '');
-  }
-  return '';
+  let first = '';
+  for (const p of x.p) { for (const s of p) if (s[0] > 0) { first = s[1]; break; } if (first) break; }
+  return RusTitles.title(x.tail[0] || '', first);
 }
 
 // ── Список текстов ─────────────────────────────────────────────────────────
@@ -357,8 +352,7 @@ function renderPicker(){
     const r = results[t.id];
     const prog = r ? `<span class="mprog">✓ ${KINDS[r.k]}${r.sc != null ? ' · ' + r.sc + ' из ' + MAX_SCORE : ''}</span>` : '';
     return `<button class="mode-card" data-i="${i}"><span class="mnum">${i + 1}</span>` +
-      `<span class="mtitle">${esc(authorOf(t) || 'Текст ' + (i + 1))}</span>${prog}` +
-      `<span class="msub">«${esc(firstWords(t))}»</span></button>`;
+      `<span class="mtitle">${esc(titleOf(t) || 'Текст ' + (i + 1))}</span>${prog}</button>`;
   }).join('');
   $('textsGrid').querySelectorAll('.mode-card').forEach(b => b.addEventListener('click', () => openTask(+b.dataset.i)));
 }
@@ -574,7 +568,7 @@ function showInText(nums){
 
 function copyEssay(){
   const t = cur();
-  const text = `Сочинение ${KINDS[S.k]} — тема: ${t.th[S.k]}\nТекст ${S.idx + 1}, задание ФИПИ ${t.id}\n\n${$('essay').value}`;
+  const text = `Сочинение ${KINDS[S.k]} — тема: ${t.th[S.k]}\nТекст ${S.idx + 1} — ${titleOf(t)}, задание ФИПИ ${t.id}\n\n${$('essay').value}`;
   const done = () => { $('copyBtn').textContent = 'Скопировано'; setTimeout(() => { if ($('copyBtn')) $('copyBtn').textContent = 'Скопировать для преподавателя'; }, 1600); };
   if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, done);
   else done();

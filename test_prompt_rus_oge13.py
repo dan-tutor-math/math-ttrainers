@@ -135,7 +135,14 @@ def main():
         check(pg.eval_on_selector_all("#textsGrid .mode-card", "els => els.length") == 99, "в списке 99 текстов")
         check(pg.get_attribute("#homeBtn", "href") == "index.html?subject=rus", "«домой» — на русский язык главной")
         first = pg.inner_text("#textsGrid .mode-card .mtitle")
-        check(len(first) > 2, f"у карточки автор текста ({first})")
+        check(first == "Ю.М. Нагибин. «В нашей паре я был…»", f"название «И.О. Фамилия. «Первые слова…»» ({first})")
+        names = pg.eval_on_selector_all("#textsGrid .mode-card .mtitle", "els => els.map(e => e.textContent)")
+        odd = [n for n in names if not re.match(r"^(?:[А-ЯЁ]\.)+ [А-ЯЁ][а-яё]+(?:-[А-ЯЁ][а-яё]+)?\. «.+»$", n)]
+        check(not odd, f"все 99 названий в одном формате {odd[:5]}")
+        check(not [n for n in names if "По " in n.split(".")[0] or "*" in n], "автор в именительном, без «По» и звёздочки")
+        for want in ("В.А. Осеева-Хмелёва. «Динка огляделась»", "Т.Н. Толстая. «", "Л.Н. Толстой. «", "Л.А. Кассиль. «",
+                     "О.Ю. Рой. «", "К.Г. Паустовский. «", "Е. Чепилка. «", "С.А. Лубенец. «", "Ю.М. Нагибин. «Мама, смотри!»"):
+            check(any(n.startswith(want) for n in names), f"есть название {want}…")
         pg.click("#textsGrid .mode-card[data-i='2']")
         check(f"t={tasks[2]['id']}" in pg.url, "карточка открывает текст, адрес с ?t=")
         check(pg.inner_text("#taskTitle") == "текст 3 из 99", "заголовок «текст 3 из 99»")
