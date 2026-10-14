@@ -97,7 +97,7 @@ function deckOnOpen(b){
   deckResetDepth(); deckZf = 1; deckScrubTicks = -1;
   const isD = b.kind === 'deck';
   const layer = document.getElementById('deckDepth'), scr = document.getElementById('deckScrub');
-  if (layer) layer.hidden = !isD;
+  if (layer) layer.hidden = !isD || deckFlow() === 'scroll';
   if (scr) scr.hidden = !isD;
   // Промпт №85б: у презентации таблетка (PNG, масштаб, PDF…) — в верхней строке
   if (typeof applyDockLayout === 'function') applyDockLayout();
@@ -137,6 +137,7 @@ function deckArea(){
 }
 // «вписан» оставляет по краям, куда листают, место под выглядывающих соседей
 function deckFitZoom(s){
+  // (в сплошной прокрутке свой масштаб — deckScrollFit)
   const r = deckSlideRect(s), a = deckArea(), v = deckFlow() !== 'h';
   const aw = a.w - (v ? 0 : 2 * DECK_PEEK_PX), ah = a.h - (v ? 2 * DECK_PEEK_PX : 0);
   return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.min(Math.max(40, aw) / r.w, Math.max(30, ah) / r.h)));
@@ -154,6 +155,7 @@ function deckFitCam(s, zf){
    слайд меньше, чем «вписан», нельзя — иначе было бы видно пустое полотно
    и соседние слоты */
 function deckClampCam(){
+  if (deckIsScroll()){ deckScrollClamp(); return; }
   const sl = deckSlides();
   if (!sl.length) return;
   const cy = cam.y + cssH / 2 / cam.zoom;
@@ -186,13 +188,21 @@ function deckOpenCam(){
 
 function deckDrawBackground(c, camv, w, h, isScreen){
   // отмена или собеседник убрали слайд, на котором стоит камера, — переезжаем
-  // на ближайший оставшийся, иначе на экране было бы пустое полотно
-  if (isScreen && camv === cam && deckSlides().length && !deckSlideAtY(cam.y + cssH / 2 / cam.zoom)){
+  // на ближайший оставшийся, иначе на экране было бы пустое полотно. В
+  // сплошной прокрутке середина экрана законно бывает на чужом слайде
+  const scroll = deckIsScroll();
+  if (isScreen && camv === cam && deckSlides().length && (scroll ? !deckSlides().some(x => x.id === deckCurId) : !deckSlideAtY(cam.y + cssH / 2 / cam.zoom))){
     const s0 = deckCur();
-    if (s0){ deckFitCam(s0); deckFitted = true; camv = cam; }
+    if (s0){ deckShowSlide(s0); camv = cam; }
   }
+  if (isScreen && scroll && camv === cam) deckRenderScrollOthers(c, camv, w, h);
   const s = deckDrawnSlide();
   if (!s) return;
+  deckDrawPaper(c, s, camv);
+  if (isScreen){ deckUpdateNav(); deckStripUpdate(); deckDepthSync(); deckScrubSync(); }
+}
+// бумага, тень и сетка одного слайда — по текущей activeCam
+function deckDrawPaper(c, s, camv){
   const r = deckSlideRect(s);
   const p0 = worldToScreen({ x: r.x, y: r.y }), p1 = worldToScreen({ x: r.x + r.w, y: r.y + r.h });
   c.save();
@@ -218,7 +228,6 @@ function deckDrawBackground(c, camv, w, h, isScreen){
       c.restore();
     }
   }
-  if (isScreen){ deckUpdateNav(); deckStripUpdate(); deckDepthSync(); deckScrubSync(); }
 }
 // объекты рисуются только в пределах слайда, как в показе PowerPoint:
 // и у ученика, и в выгрузке слайд выглядит одинаково
@@ -234,17 +243,32 @@ function deckClipSlide(c, camv){
 // для «Скачать PNG»: выгружаем текущий слайд, а не лист А4 полотна
 function deckCurRect(){ const s = deckCur(); return s ? deckSlideRect(s) : null; }
 
+// листание: 'v' лента по одному, 'scroll' сплошная прокрутка (№86), 'h' галерея
 function deckFlow(){
-  try { return localStorage.getItem(DECK_FLOW_KEY) === 'h' ? 'h' : 'v'; } catch (e) { return 'v'; }
+  try { const f = localStorage.getItem(DECK_FLOW_KEY); return f === 'h' || f === 'scroll' ? f : 'v'; } catch (e) { return 'v'; }
 }
 function deckSetFlow(f){
+  const was = deckFlow();
   try { localStorage.setItem(DECK_FLOW_KEY, f); } catch (e) {}
   deckSyncFlowUI();
+  if (!isDeckBoard() || !boardActive || was === f) return;
+  // текущий слайд при смене режима остаётся текущим
+  const s = deckCur();
+  deckResetDepth();
+  if (s){
+    if (f === 'scroll') deckScrollTo(s, true);
+    else { deckCurId = s.id; deckZf = 1; deckFitCam(s, 1); deckFitted = true; }
+  }
+  scheduleRedraw(); rememberView();
 }
 function deckSyncFlowUI(){
   const f = deckFlow();
   document.getElementById('deckFlowV')?.setAttribute('aria-pressed', f === 'v');
+  document.getElementById('deckFlowS')?.setAttribute('aria-pressed', f === 'scroll');
   document.getElementById('deckFlowH')?.setAttribute('aria-pressed', f === 'h');
+  // в сплошной прокрутке соседи и так видны — слоя глубины нет
+  const L = document.getElementById('deckDepth');
+  if (L) L.hidden = !isDeckBoard() || f === 'scroll';
 }
 
 let deckNavShown = '';
@@ -263,6 +287,7 @@ function deckGo(idx, dir){
   const sl = deckSlides();
   if (idx < 0 || idx >= sl.length) return false;
   const s = sl[idx];
+  if (deckIsScroll()){ deckScrollTo(s); scheduleRedraw(); rememberView(); return true; }
   // №85в: текущий слайд картинкой уезжает назад, новый выезжает вперёд;
   // без слоя глубины (или при «меньше движения») — старый сдвиг холста
   if (dir && !deckFlipAnim()) deckAnimate(dir);
@@ -308,7 +333,7 @@ function deckAddSlide(){
    слайд — колесо двигает его, как обычную доску (возвращаем false) */
 let deckWheelAcc = 0, deckWheelLocked = false, deckWheelTimer = null;
 function deckWheel(e){
-  if (!deckFitted) return false;
+  if (!deckFitted || deckIsScroll()) return false;   // в сплошной прокрутке колесо прокручивает
   let d = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
   if (e.deltaMode === 1) d *= 16;
   clearTimeout(deckWheelTimer);
@@ -329,7 +354,8 @@ window.addEventListener('resize', () => {
   if (!isDeckBoard() || !boardActive) return;
   const wasFitted = deckFitted;
   requestAnimationFrame(() => {
-    if (wasFitted){ const s = deckCur(); if (s){ deckFitCam(s, deckZf); deckFitted = true; scheduleRedraw(); } }
+    if (deckIsScroll()){ clampCam(); scheduleRedraw(); }
+    else if (wasFitted){ const s = deckCur(); if (s){ deckFitCam(s, deckZf); deckFitted = true; scheduleRedraw(); } }
     deckScrubTicks = -1;
   });
 });
@@ -379,6 +405,7 @@ document.getElementById('deckNext')?.addEventListener('click', () => deckStep(1)
 document.getElementById('deckAdd')?.addEventListener('click', () => deckAddSlide());
 document.getElementById('deckFlowV')?.addEventListener('click', () => deckSetFlow('v'));
 document.getElementById('deckFlowH')?.addEventListener('click', () => deckSetFlow('h'));
+document.getElementById('deckFlowS')?.addEventListener('click', () => deckSetFlow('scroll'));
 
 /* ═══════════════════════════════════════════════════════════════════════
    ЛЕНТА МИНИАТЮР (промпт №85). Миниатюра — тот же render() доски в
@@ -973,8 +1000,7 @@ function deckScrubSync(){
     knob.style.top = (Math.abs(y - tickY) < DECK_SCRUB_MAGNET ? tickY : y) + 'px';
     const s = deckSlides()[i];
     if (s && s.id !== deckCurId){
-      deckCurId = s.id;
-      deckFitCam(s, deckZf); deckFitted = true;
+      deckShowSlide(s);
       scheduleRedraw();
     }
   }
@@ -991,7 +1017,8 @@ function deckScrubSync(){
       if (Math.abs(e.clientY - st.y0) < DECK_SCRUB_MOVE) return;
       st.moved = true;
       sc.classList.add('drag');
-      if (deckCur() && !deckReducedMotion()){ deckShowCurCard(); deckSlowFor(DECK_MODE_MS); deckFast = true; }
+      // в сплошной прокрутке соседи и так видны — без обзора
+      if (deckCur() && !deckReducedMotion() && !deckIsScroll()){ deckShowCurCard(); deckSlowFor(DECK_MODE_MS); deckFast = true; }
       scheduleRedraw();
     }
     follow(e.clientY);
@@ -1049,4 +1076,140 @@ function deckScrubSync(){
     e.preventDefault(); e.stopImmediatePropagation();
     deckGo(hit, hit > ci ? 1 : -1);
   }, true);
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════
+   СПЛОШНАЯ ПРОКРУТКА (промпт №86): слайды столбиком в порядке показа, как
+   страницы PDF, колесо прокручивает плавно. Слоты на полотне не двигаются:
+   у каждого слайда свой сдвиг «столбик ↔ полотно» (deckScrollLayout).
+   Камера всегда в координатах ТЕКУЩЕГО слайда, поэтому рисование, выделение,
+   ручки, текст и задания работают на нём без переделки; остальные видимые
+   слайды рисуются копией камеры со своим сдвигом. Когда середина экрана
+   переходит на другой слайд или его касаются, камера незаметно
+   пересчитывается в его координаты — на экране ничего не дёргается
+   ═══════════════════════════════════════════════════════════════════════ */
+const DECK_SCROLL_GAP_CELLS = 2;
+let deckPointerDown = false;
+
+function deckIsScroll(){ return deckFlow() === 'scroll'; }
+// столбик: где каждый слайд, в координатах столбика; off — что прибавить к
+// мировой точке слайда, чтобы получить точку столбика
+function deckScrollLayout(){
+  const sl = deckSlides(), cell = B.cellSize || 24, gap = DECK_SCROLL_GAP_CELLS * cell;
+  let Wmax = 0;
+  sl.forEach(s => { Wmax = Math.max(Wmax, s.w * cell); });
+  const off = new Map();
+  let y = 0;
+  sl.forEach(s => {
+    const r = deckSlideRect(s);
+    off.set(s.id, { x: (Wmax - r.w) / 2 - r.x, y: y - r.y, top: y, h: r.h });
+    y += r.h + gap;
+  });
+  return { off, Wmax, H: Math.max(0, y - gap) };
+}
+function deckScrollFit(L){
+  const a = deckArea();
+  return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, a.w / Math.max(1, L.Wmax)));
+}
+// замена deckClampCam в сплошной прокрутке. keep — не менять текущий слайд
+// (только что перешли на него кнопкой, щелчком, ползунком)
+function deckScrollClamp(keep){
+  const sl = deckSlides();
+  if (!sl.length) return;
+  const L = deckScrollLayout(), a = deckArea(), fit = deckScrollFit(L);
+  cam.zoom = Math.max(fit * DECK_ZMIN, Math.min(ZOOM_MAX, cam.zoom || fit));
+  const z = cam.zoom;
+  let cur = deckCur(), oc = L.off.get(cur.id);
+  let dx = cam.x + oc.x, dy = cam.y + oc.y;          // камера в координатах столбика
+  const m = 24 / z;
+  if (a.w / z >= L.Wmax) dx = L.Wmax / 2 - (a.x + a.w / 2) / z;
+  else dx = clamp(dx, -a.x / z - m, L.Wmax + m - (a.x + a.w) / z);
+  const minY = -a.y / z - m, maxY = L.H + m - (a.y + a.h) / z;
+  dy = maxY < minY ? (minY + maxY) / 2 : clamp(dy, minY, maxY);
+  // текущий — слайд у середины свободной области. Пока палец или перо на
+  // холсте, что-то выделено или правится текст — не меняем: штрих, рамка
+  // выделения и поле ввода живут в координатах своего слайда
+  const busy = deckPointerDown || selectedId || (multiSelectIds && multiSelectIds.length) || (typeof textEditSession !== 'undefined' && textEditSession);
+  if (!keep && !busy){
+    const mid = dy + (a.y + a.h / 2) / z;
+    let best = cur, bd = Infinity;
+    sl.forEach(s => {
+      const o = L.off.get(s.id);
+      const d = mid < o.top ? o.top - mid : mid > o.top + o.h ? mid - o.top - o.h : 0;
+      if (d < bd){ bd = d; best = s; }
+    });
+    cur = best; deckCurId = cur.id; oc = L.off.get(cur.id);
+  }
+  cam.x = dx - oc.x; cam.y = dy - oc.y;
+  deckFitted = false; deckZf = 1;
+}
+// показать слайд: верх слайда — у верха свободной области
+function deckScrollTo(s, fitZoom){
+  const L = deckScrollLayout(), a = deckArea(), o = L.off.get(s.id);
+  if (!o) return;
+  if (fitZoom || !cam.zoom) cam.zoom = deckScrollFit(L);
+  deckCurId = s.id;
+  const z = Math.max(deckScrollFit(L) * DECK_ZMIN, cam.zoom);
+  cam.zoom = z;
+  cam.x = (L.Wmax / 2 - (a.x + a.w / 2) / z) - o.x;
+  cam.y = (o.top - (a.y + 12) / z) - o.y;
+  deckScrollClamp(true);
+}
+// переход на слайд в любом режиме листания
+function deckShowSlide(s){
+  if (deckIsScroll()) deckScrollTo(s);
+  else { deckCurId = s.id; deckFitCam(s, deckZf); deckFitted = true; }
+}
+
+// остальные видимые слайды — до текущего (его нарисует render() как обычно)
+function deckRenderScrollOthers(c, camv, w, h){
+  const L = deckScrollLayout(), cur = deckCur();
+  if (!cur) return;
+  const oc = L.off.get(cur.id), z = camv.zoom;
+  const dy0 = camv.y + oc.y, dy1 = dy0 + h / z;
+  deckSlides().forEach(s => {
+    if (s.id === cur.id) return;
+    const o = L.off.get(s.id);
+    if (o.top > dy1 || o.top + o.h < dy0) return;
+    const cv = { x: camv.x + oc.x - o.x, y: camv.y + oc.y - o.y, zoom: z };
+    activeCam = cv;
+    deckDrawPaper(c, s, cv);
+    const r = deckSlideRect(s);
+    const p0 = worldToScreen({ x: r.x, y: r.y }), p1 = worldToScreen({ x: r.x + r.w, y: r.y + r.h });
+    c.save();
+    c.beginPath(); c.rect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y); c.clip();
+    const pad = 80 / z, vx0 = cv.x - pad, vy0 = cv.y - pad, vx1 = cv.x + w / z + pad, vy1 = cv.y + h / z + pad;
+    B.objects.forEach(ob => {
+      if (ob.type === 'deck') return;
+      const b = objectBBox(ob);
+      if (b.maxX < vx0 || b.minX > vx1 || b.maxY < vy0 || b.minY > vy1) return;
+      renderObject(c, ob, cv);
+    });
+    c.restore();
+  });
+  activeCam = camv;
+}
+
+// касание другого слайда — сначала делаем его текущим (камера в его
+// координатах), потом доска обрабатывает касание как обычно
+(function(){
+  const cv = document.getElementById('boardCv');
+  if (!cv) return;
+  cv.addEventListener('pointerdown', (e) => {
+    if (!isDeckBoard() || !boardActive || !deckIsScroll()) return;
+    deckPointerDown = true;
+    const L = deckScrollLayout(), cur = deckCur();
+    if (!cur) return;
+    const cr = cv.getBoundingClientRect(), oc = L.off.get(cur.id);
+    const dy = (e.clientY - cr.top) / cam.zoom + cam.y + oc.y;
+    const s = deckSlides().find(x => { const o = L.off.get(x.id); return dy >= o.top && dy <= o.top + o.h; });
+    if (!s || s.id === cur.id) return;
+    const o = L.off.get(s.id);
+    cam.x += oc.x - o.x; cam.y += oc.y - o.y;
+    deckCurId = s.id;
+    scheduleRedraw();
+  }, true);
+  const up = () => { deckPointerDown = false; };
+  window.addEventListener('pointerup', up, true);
+  window.addEventListener('pointercancel', up, true);
 })();
