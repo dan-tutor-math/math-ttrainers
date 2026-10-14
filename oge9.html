@@ -386,6 +386,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .sol .frac .num{padding:0 6px 3px;}
 .sol .frac .den{padding:3px 6px 0;border-top:1.5px solid currentColor;}
 .sol-note{font-size:14px;color:var(--muted-3);margin-top:6px;}
+.source-note{font-family:var(--font-ui);font-weight:500;font-size:12.5px;color:var(--muted-3);margin:12px 0 0;}
 .example-history-prompt .expr-display{font-size:16px;padding:2px 0;text-align:left;}
 .example-history-prompt .task-note{font-size:12px;text-align:left;}
 
@@ -587,6 +588,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
     <div class="mode-card random" data-id="random">
       <div class="mtitle">🎲 Случайно — из всех типов</div>
     </div>
+    <!-- фильтр «Задания ФИПИ / На основе ФИПИ» (fipi-mix.js) -->
+    <div id="fipiFilter"></div>
     <div id="modesGrid"></div>
   </div>
 
@@ -613,12 +616,17 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
     <div class="panel coming-soon" id="comingSoonPanel" style="display:none"></div>
 
+    <!-- плашка «задания ФИПИ этого вида решены» — снаружи #questionPanel:
+         в «Подборку» и на доску ей не нужно -->
+    <div class="fipi-notice" id="fipiNotice" style="display:none"></div>
     <div class="panel" id="questionPanel" style="display:none">
       <div class="prompt" id="questionPromptText"></div>
       <div class="input-answer-row" id="inputAnswerArea">
         <input type="text" inputmode="decimal" class="answer-input" id="answerInput" placeholder="?" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
         <button class="check-btn" id="checkAnswerBtn">Проверить</button>
       </div>
+      <!-- подпись источника — внутри #questionPanel: едет в «Подборку» и на доску, как в №19 -->
+      <div class="source-note" id="sourceNote" style="display:none"></div>
     </div>
 
     <!-- «Тренировка»: разбор по кнопке. Снаружи #questionPanel нарочно — он
@@ -688,9 +696,10 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
 <script src="keypad.js"></script>
-<script src="fipi-split.js"></script>
 <script src="exam-nav.js"></script>
 <script src="trainer-multi.js"></script>
+<script src="fipi-mix.js"></script>
+<script src="oge9-fipi-bank.js"></script>
 <script>
 /* ═══════════════ утилиты ═══════════════ */
 const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -1080,6 +1089,37 @@ const GROUPS = [
     { id: 'p14', title: '14. ax² + bx + c = 0, меньший корень', ex: '2x² − 3x + 1 = 0', gen: gen_p14 },
   ]},
 ];
+/* ═══════════════ задания из открытого банка ФИПИ ═══════════════
+   Все 111 заданий №9 банка ФИПИ (КЭС 3.1, краткий ответ) — oge9-fipi-bank.js,
+   собран скриптами fipi-pilot/tools/n9_*.py. Уравнение — как у ФИПИ (MathML
+   или набор по картинке), решение по шагам наше, теми же строками, что у
+   генераторов выше. Группы банка — ровно наши 14 видов (fipiN = прототип N),
+   поэтому отдельных карточек у банка нет: задания ФИПИ встают внутрь своего
+   прототипа (fipiList), и общее правило fipi-mix.js «сначала ФИПИ, когда
+   решены — на основе ФИПИ» решает, что выдать. Наш генератор при этом не
+   меняется — он и есть «на основе ФИПИ».
+   Ученику — только задания, ответ которых принял сам сайт ФИПИ (checked):
+   неподтверждённый ключ не показываем, как в русском; ?all=1 — предпросмотр
+   преподавателя со всеми. */
+const FIPI_PAGE = 'oge9';
+const FIPI_BANK = window.OGE9_FIPI || null;
+const FIPI_ALL = new URLSearchParams(location.search).get('all') === '1';
+if (FIPI_BANK && window.FipiMix) {
+  GROUPS.forEach(g => g.modes.forEach(m => {
+    if (m.demo) return;
+    const list = FIPI_BANK.tasks.filter(t => t.g === 'fipi' + m.id.slice(1) && (t.checked || FIPI_ALL));
+    if (!list.length) return;
+    // поле unchecked — только когда оно есть: ключ со значением undefined
+    // пропадает в снимке сессии, и задание у ученика «не совпадало» бы с учительским
+    m.fipiList = list.map(t => ({ fipi: t.fipi, make: () => Object.assign({
+      prompt: linPrompt(t.verb, t.eq) + (t.which ? rootsQuestion(t.which) : ''),
+      correctValue: t.ans,
+      explain: t.explain,
+    }, t.checked ? {} : { unchecked: true }) }));
+    const own = m.gen;
+    m.gen = () => FipiMix.next(FIPI_PAGE, m.id, m.fipiList, own);
+  }));
+}
 const ALL_MODES = GROUPS.flatMap(g => g.modes);
 // «Случайно» берёт только генераторы: нулевой тип из демоверсии — всегда одно
 // и то же задание, в случайной подборке оно выпадало бы снова и снова
@@ -1254,6 +1294,11 @@ function playMedalAnimation(tier) {
 }
 
 function recordSolve() {
+  // задание ФИПИ пройдено — в своём виде оно больше не выпадет, пока не решены остальные
+  if (window.FipiMix && curTask && curTask.fipi) {
+    const fm = ALL_MODES.find(x => x.fipiList && x.fipiList.some(f => f.fipi === curTask.fipi));
+    if (fm) FipiMix.markDone(FIPI_PAGE, fm.id, curTask);
+  }
   // ввод текстом всегда завершается показом верного значения (даже после ошибок) —
   // "верно"/"неверно" тут не различаем, только было ли по пути 🟡-исправление (hadError)
   const gotItRight = true;
@@ -1283,7 +1328,9 @@ function renderPicker() {
         const p = loadProg(m.id);
         const meds = p && p.medals;
         const badges = meds ? ['gold', 'silver', 'bronze'].filter(t => meds[t]).map(t => `${MEDAL_EMOJI[t]}${meds[t]}`).join(' ') : '';
-        return `<div class="mode-card${m.demo ? ' demo' : ''}" data-id="${m.id}"><div class="mtitle">${m.title}</div>${m.ex ? `<div class="msub">${m.ex}</div>` : ''}${badges ? `<div class="mode-medals">${badges}</div>` : ''}</div>`;
+        // «10+ заданий»: сколько заданий ФИПИ у вида и что дальше генератор (fipi-mix.js)
+        const fl = window.FipiMix && m.fipiList ? FipiMix.countLabel(FIPI_PAGE, m.id, m.fipiList) : '';
+        return `<div class="mode-card${m.demo ? ' demo' : ''}" data-id="${m.id}"><div class="mtitle">${m.title}</div>${m.ex ? `<div class="msub">${m.ex}</div>` : ''}${fl ? `<div class="msub fipi-count">${fl}</div>` : ''}${badges ? `<div class="mode-medals">${badges}</div>` : ''}</div>`;
       }).join('')}
       ${g.mix ? `<div class="mode-card mix" data-id="${g.mix}"><div class="mtitle">🎲 ${RANDOM_TITLES[g.mix]}</div></div>` : ''}
     </div>
@@ -1295,8 +1342,7 @@ function renderPicker() {
   // привязывать отдельно (раньше эта кнопка была нерабочей)
   const randomCard = document.querySelector('.mode-card.random[data-id]');
   if (randomCard) randomCard.onclick = () => { curMode = randomCard.dataset.id; openTask(); };
-  // промпт №22: колонки «ФИПИ» и «Наши» — карточки переносятся вместе с
-  // обработчиками, поэтому раскладываем уже после того, как их привязали
+  // колонки «ФИПИ» и «Наши» (промпт №22) выключены: fipi-split.js не подключён
   if (window.FipiSplit) FipiSplit.apply(els.modesGrid);
 }
 
@@ -1456,6 +1502,15 @@ function renderCurrentTask() {
   window.scrollTo(0, 0);
   els.questionPanel.style.display = 'block';
   els.questionPromptText.innerHTML = curTask.prompt;
+  // подпись источника — по полю задания, а не по типу: так она приходит и со
+  // снимком сессии, и с восстановленным из памяти заданием
+  const note = document.getElementById('sourceNote');
+  const src = window.FipiMix ? FipiMix.sourceText(curTask) : '';
+  note.textContent = src + (curTask.unchecked ? ' (ответ ещё не сверен с сайтом ФИПИ)' : '');
+  note.style.display = src ? 'block' : 'none';
+  const notice = document.getElementById('fipiNotice');
+  notice.textContent = curTask.fipiNotice || '';
+  notice.style.display = curTask.fipiNotice ? 'block' : 'none';
 
   els.answerInput.value = '';
   els.answerInput.classList.remove('good', 'bad', 'shake');
@@ -1478,6 +1533,9 @@ function newTask() {
   // совпавшее с недавним (целиком или ответом подряд), перегенерируется
   // (no-repeat.js); avoid — заменяемое задание на экране
   curTask = NoRepeat.pick('oge9:' + curMode, () => m.gen(), { avoid: [curTask] });
+  // память «ФИПИ решены / плашка показана» меняется только для выбранного
+  // кандидата — NoRepeat зовёт генератор по нескольку раз
+  if (window.FipiMix && m.fipiList) FipiMix.commit(FIPI_PAGE, m.id, curTask, m.fipiList);
   taskAnswered = false;
   hadWrongPick = false;
 
@@ -1658,6 +1716,9 @@ function syncKeypadVisibility(){
 setupFloatingKeypad();
 
 renderPicker();
+// фильтр «Задания ФИПИ / На основе ФИПИ» — только если банк загрузился;
+// смена фильтра меняет подписи «10+ заданий» на карточках
+if (window.FipiMix && FIPI_BANK) FipiMix.mountFilter(document.getElementById('fipiFilter'), () => renderPicker());
 
 
 /* ═══ Промпт №32: совместная работа не только на доске, но и в самом задании ═══

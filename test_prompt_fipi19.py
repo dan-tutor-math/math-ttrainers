@@ -110,8 +110,7 @@ def test_bank_data(bank):
 def test_picker_and_task(browser, bank):
     ctx, page, errors = new_page(browser, f"{BASE}/oge19.html")
     cards = page.eval_on_selector_all('#modesGrid .mode-card', 'es => es.map(e => [e.dataset.id, e.innerText])')
-    # с промпта №22 — колонки: «ФИПИ» (№0 и банк) слева, «Наши» (прежний тип) справа
-    check("выбор: демоверсия, прежний тип и тип ФИПИ", [c[0] for c in cards] == ['demo2027', 'fipi', 'geom'], str(cards))
+    check("выбор: демоверсия, прежний тип и тип ФИПИ", [c[0] for c in cards] == ['demo2027', 'geom', 'fipi'], str(cards))
     fipi_card = dict(cards).get('fipi', '')
     check("выбор: на карточке название и источник",
           'Задания из открытого банка ФИПИ' in fipi_card and 'источник: открытый банк заданий ФИПИ' in fipi_card

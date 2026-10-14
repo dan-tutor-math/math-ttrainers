@@ -84,6 +84,10 @@ def open_page(browser, width=1300, height=1000, fake=False, url="oge9.html", rea
     page = ctx.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
+    # с «„ФИПИ, потом на основе ФИПИ“» прототип сначала выдаёт задания банка
+    # ФИПИ (их проверяет test_prompt_fipi9.py); здесь — наши генераторы, поэтому
+    # фильтр «только на основе ФИПИ»
+    page.add_init_script("""try { localStorage.setItem('fipiMix:filter', JSON.stringify({ fipi: false, own: true })); } catch (e) {}""")
     if fake:
         page.add_init_script("try { localStorage.setItem('tsStage:direct', '1'); } catch (e) {}")
         page.route("**/supabase-js.umd.js", lambda route: route.fulfill(

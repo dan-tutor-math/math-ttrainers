@@ -227,13 +227,10 @@ def test_mcq_pages(browser):
         check(f"{slug}/{mid}: без ошибок JS", not errors, str(errors[:1]))
         ctx.close()
 
-    # №15–18: нулевой тип первым в каждой из четырёх групп. С промпта №22
-    # нулевые типы — в колонке «ФИПИ» (fipi-split.js), по одному под заголовком
-    # своего номера; первая карточка группы — в порядке реестра GROUPS
+    # №15–18: нулевой тип первым в каждой из четырёх групп
     ctx, page, errors = new_page(browser, f"{BASE}/oge15_18.html")
-    firsts = page.evaluate("GROUPS.map(g => g.modes[0].id)")
-    fipi = page.eval_on_selector_all('#modesGrid .fs-fipi .modes', 'gs => gs.map(g => g.querySelector(".mode-card").dataset.id)')
-    check("oge15_18: в каждой группе нулевой тип первым", firsts == fipi == ["demo15", "demo16", "demo17", "demo18"], f"{firsts} {fipi}")
+    firsts = page.eval_on_selector_all('#modesGrid .modes', 'gs => gs.map(g => g.querySelector(".mode-card").dataset.id)')
+    check("oge15_18: в каждой группе нулевой тип первым", firsts == ["demo15", "demo16", "demo17", "demo18"], str(firsts))
     ctx.close()
 
 
@@ -324,8 +321,7 @@ def test_oge19(browser):
     ctx, page, errors = new_page(browser, f"{BASE}/oge19.html")
     cards = page.eval_on_selector_all('#modesGrid .mode-card', 'es => es.map(e => [e.dataset.id, e.innerText])')
     # третьим с правки «банк ФИПИ №19» идёт тип 'fipi' — его проверяет test_prompt_fipi19.py
-    # с промпта №22 карточки ФИПИ (№0 и банк) стоят в левой колонке, прежний тип — в правой
-    check("oge19: экран выбора — нулевой тип и прежний", [c[0] for c in cards] == ['demo2027', 'fipi', 'geom'], str(cards))
+    check("oge19: экран выбора — нулевой тип и прежний", [c[0] for c in cards][:2] == ['demo2027', 'geom'], str(cards))
     check("oge19: задания до выбора типа не видно", page.eval_on_selector('#taskArea', 'e => e.style.display') == 'none')
     st = page.evaluate("window.__trainerState.get()")
     check("oge19: экран выбора в общем снимке", st.get("picker") is True and st.get("curMode") is None, str(st)[:80])
@@ -371,9 +367,7 @@ TIRE_ANS = ["195", "107,25", "549,8", "2,75", "1,4"]
 
 def test_tires(browser):
     ctx, page, errors = new_page(browser, f"{BASE}/oge1_5.html")
-    # с промпта №22 «Шины» есть в обеих колонках: Шина 0 — в «ФИПИ», Шина 1 — в «Наших»
-    tires = page.evaluate('''() => [".fs-fipi", ".fs-ours"].map(c => document.querySelector("#modesGrid " + c + " .modes .mode-card"))
-        .map(e => [e.dataset.id, e.innerText])''')
+    tires = page.eval_on_selector_all('#modesGrid .modes', 'gs => [...gs[0].querySelectorAll(".mode-card")].map(e => [e.dataset.id, e.innerText])')
     check("oge1_5: в «Шинах» две темы — Шина 0 (демоверсия) и прежняя Шина 1",
           [t[0] for t in tires] == ['tire_demo2027', 'tire_set1'] and 'Демоверсия ОГЭ 2027' in tires[0][1]
           and tires[1][1].startswith('Шина 1'), str(tires))
