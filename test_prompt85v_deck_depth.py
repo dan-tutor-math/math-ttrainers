@@ -14,6 +14,8 @@
      сдвиг — включает, слайд меняется следом, отпустили — выключилось
   5. Щелчок по выглядывающему соседу открывает его
   6. Размытие соседей — только в режиме «максимум эффектов»
+  7. В «максимуме» стопка при быстром листании идёт за ручкой непрерывно
+     (дробное положение) и примагничивается у отметки слайда
 """
 import os
 import subprocess
@@ -183,6 +185,31 @@ def main():
         page.evaluate("() => document.documentElement.setAttribute('data-fx', 'full')")
         f1 = page.evaluate("() => getComputedStyle(document.querySelector('#deckDepth .deck-card.k1')).filter")
         check(f0 == "none" and "blur" in f1, f"размытие только в «максимуме» ({f0} / {f1})")
+
+        # 7. «максимум»: стопка идёт за ручкой непрерывно, у отметки — примагничивается
+        page.wait_for_timeout(300)
+        sc = page.locator("#deckScrub").bounding_box()
+        k = page.locator("#deckKnob").bounding_box()
+        step = sc["height"] / 4          # пять слайдов — четыре промежутка
+        page.mouse.move(k["x"] + 16, k["y"] + 22)
+        page.mouse.down()
+        page.mouse.move(k["x"] + 16, k["y"] + 22 + 10, steps=2)
+        page.wait_for_timeout(700)       # мягкий вход в обзор закончился
+        y_mid = sc["y"] + step * 2.4     # между третьим и четвёртым
+        page.mouse.move(k["x"] + 16, y_mid, steps=6)
+        page.wait_for_timeout(120)
+        st = page.evaluate("""() => ({ pos: deckFastPos, follow: deckFastFollow,
+          inst: document.querySelector('#deckDepth .deck-card.k0, #deckDepth .deck-card.k1').classList.contains('instant') })""")
+        check(st["pos"] is not None and 2.3 < st["pos"] < 2.5 and st["follow"] and st["inst"],
+              f"между отметками стопка стоит дробно и идёт ровно за ручкой ({st})")
+        page.mouse.move(k["x"] + 16, sc["y"] + step * 3 + 3, steps=3)
+        page.wait_for_timeout(120)
+        st = page.evaluate("() => ({ pos: deckFastPos, follow: deckFastFollow })")
+        check(st["pos"] == 3 and not st["follow"], f"у отметки — примагнитилась к слайду ({st})")
+        check(slide_no(page) == "4 / 5", f"текущий — четвёртый ({slide_no(page)})")
+        page.mouse.up()
+        page.wait_for_timeout(800)
+        check(page.evaluate("() => deckFastPos === null && !deckFast && !deckSlideHidden()"), "отпустили — обычный вид")
 
         check(not errors, f"нет ошибок на странице ({errors[:3]})")
         browser.close()

@@ -790,6 +790,11 @@ function deckSlowFor(ms){
   deckSlowTimer = setTimeout(() => L.classList.remove('slow'), ms + 30);
 }
 let deckFast = false, deckAnimUntil = 0, deckAnimTimer = null;
+// №85г: в «максимуме эффектов» стопка при быстром листании идёт за ручкой
+// ползунка непрерывно: deckFastPos — дробный номер слайда (2,4 — между
+// вторым и третьим), deckFastFollow — ручка вне «магнита» отметки
+let deckFastPos = null, deckFastFollow = false, deckDepthFollowShown = false;
+function deckMaxFx(){ return document.documentElement.getAttribute('data-fx') === 'full'; }
 const deckCards = new Map();          // id слайда → { el, bw, dirty }
 const deckCardQueue = [];
 let deckDepthKey = '', deckDepthCurShown = null;
@@ -840,7 +845,7 @@ function deckResetDepth(){
   if (L) L.innerHTML = '';
   deckCards.clear(); deckCardQueue.length = 0;
   deckDepthKey = ''; deckDepthCurShown = null;
-  deckFast = false; deckAnimUntil = 0;
+  deckFast = false; deckAnimUntil = 0; deckFastPos = null; deckFastFollow = false; deckDepthFollowShown = false;
 }
 
 /* Расстановка слоя. Зовётся из каждого кадра доски, но DOM трогает, только
@@ -864,21 +869,37 @@ function deckDepthSync(){
     Z = cam.zoom; cx = (r.x + r.w / 2 - cam.x) * Z; cy = (r.y + r.h / 2 - cam.y) * Z;
   }
   const p = deckDepthParams(deckFitted || hidden ? zf : 1);
-  const key = [cur.id, hidden, deckFast, flow, Math.round(Z * 1000), Math.round(cx), Math.round(cy), sl.length, deckStripSig].join('|');
+  const frac = deckFast && deckFastPos !== null;
+  const fpos = frac ? Math.max(0, Math.min(sl.length - 1, deckFastPos)) : ci;
+  // пока идёт мягкий вход в обзор (класс slow), за ручкой — с анимацией
+  // (она догоняет плавно), потом — без неё, ровно с ручкой
+  const follow = frac && deckFastFollow && !L.classList.contains('slow');
+  const key = [cur.id, hidden, deckFast, flow, Math.round(Z * 1000), Math.round(cx), Math.round(cy), sl.length, deckStripSig, Math.round(fpos * 1000)].join('|');
   if (key === deckDepthKey) return;
-  const animate = cur.id !== deckDepthCurShown || hidden !== (deckDepthKey.split('|')[1] === 'true') || deckFast !== (deckDepthKey.split('|')[2] === 'true');
-  deckDepthKey = key; deckDepthCurShown = cur.id;
+  const old = deckDepthKey.split('|');
+  const animate = !follow && (cur.id !== deckDepthCurShown || hidden !== (old[1] === 'true') || deckFast !== (old[2] === 'true') || deckDepthFollowShown || frac);
+  deckDepthKey = key; deckDepthCurShown = cur.id; deckDepthFollowShown = follow;
 
+  const lo = Math.max(0, Math.floor(fpos) - 3), hi = Math.min(sl.length - 1, Math.ceil(fpos) + 3);
   const want = new Set();
-  for (let k = -3; k <= 3; k++){ const s = sl[ci + k]; if (s) want.add(s.id); }
+  for (let i = lo; i <= hi; i++) want.add(sl[i].id);
   deckCards.forEach((c, id) => { if (!want.has(id)){ c.el.remove(); deckCards.delete(id); } });
   const rc = deckSlideRect(cur), alongCur = (flow === 'v' ? rc.h : rc.w) * Z;
   // размер элемента — при «вписан», остальное (масштаб, место) — одним
   // transform: тогда и отдаление в обзор, и возврат анимируются целиком
   const Zref = fz, zs = Z / Zref;
-  for (let k = -3; k <= 3; k++){
-    const s = sl[ci + k];
-    if (!s) continue;
+  // положение слайда на целом расстоянии k от текущего; дробное — между ними
+  const pose = (k, alongN) => {
+    if (k === 0) return { off: 0, ang: 0, sc: 1, op: hidden ? 1 : 0 };
+    const a = Math.min(3, Math.abs(k)), sgn = Math.sign(k), ns = a === 1 ? p.s : p.s * .82;
+    const peek1 = Math.max(DECK_PEEK_PX, p.peek * p.s * alongN);
+    let off = alongCur / 2 + peek1 - ns * alongN / 2;
+    if (a >= 2) off += p.peek * p.s * alongN * .62 + 14;
+    if (a >= 3) off += alongN * .2;
+    return { off: off * sgn, ang: p.tilt * (a >= 2 ? 1.25 : 1) * sgn, sc: ns, op: a === 1 ? p.op : a === 2 ? p.op2 : 0 };
+  };
+  for (let i = lo; i <= hi; i++){
+    const s = sl[i], kf = i - fpos;
     let c = deckCards.get(s.id), fresh = false;
     if (!c){
       const el = document.createElement('canvas');
@@ -889,32 +910,26 @@ function deckDepthSync(){
       deckCards.set(s.id, c);
       fresh = true;
     }
-    const r = deckSlideRect(s), w = r.w * Z, h = r.h * Z, a = Math.abs(k), sgn = Math.sign(k);
-    const wr = r.w * Zref, hr = r.h * Zref;
+    const r = deckSlideRect(s), w = r.w * Z, h = r.h * Z;
+    const wr = r.w * Zref, hr = r.h * Zref, alongN = flow === 'v' ? h : w;
     c.want = w;
-    let t = `scale(${zs})`, op = 1;
-    if (k !== 0){
-      const ns = a === 1 ? p.s : p.s * .82, alongN = (flow === 'v' ? h : w);
-      const peek1 = Math.max(DECK_PEEK_PX, p.peek * p.s * alongN);
-      let off = alongCur / 2 + peek1 - ns * alongN / 2;
-      if (a >= 2) off += p.peek * p.s * alongN * .62 + 14;
-      if (a >= 3) off += alongN * .2;
-      off *= sgn;
-      const ang = p.tilt * (a >= 2 ? 1.25 : 1);
-      const tr = flow === 'v' ? `translateY(${off}px)` : `translateX(${off}px)`;
-      const rot = ang ? (flow === 'v' ? ` rotateX(${-sgn * ang}deg)` : ` rotateY(${sgn * ang}deg)`) : '';
-      t = `${tr}${rot} scale(${ns * zs})`;
-      op = a === 1 ? p.op : a === 2 ? p.op2 : 0;
-    } else op = hidden ? 1 : 0;
+    const k0 = Math.floor(kf), t = kf - k0, A = pose(k0, alongN), Bp = t ? pose(k0 + 1, alongN) : A;
+    const m = key2 => A[key2] + (Bp[key2] - A[key2]) * t;
+    const off = m('off'), ang = m('ang'), sc = m('sc'), op = m('op'), a = Math.abs(kf);
+    const tr = off ? (flow === 'v' ? `translateY(${off}px) ` : `translateX(${off}px) `) : '';
+    const rot = ang ? (flow === 'v' ? `rotateX(${-ang}deg) ` : `rotateY(${ang}deg) `) : '';
     const el = c.el;
     // новый и центральный при выходе из листания — без анимации: холст
     // уже рисует слайд сам, картинка должна исчезнуть сразу
-    el.classList.toggle('instant', fresh || !animate || (k === 0 && !hidden));
-    el.className = el.className.replace(/\bk\d\b/g, '').trim() + ' k' + Math.min(a, 3);
+    el.classList.toggle('instant', fresh || !animate || (a < .5 && !hidden));
+    el.className = el.className.replace(/\bk\d\b/g, '').trim() + ' k' + Math.min(Math.round(a), 3);
     el.style.width = wr + 'px'; el.style.height = hr + 'px';
-    el.style.transform = `translate(${cx - wr / 2}px, ${cy - hr / 2}px) ` + t;
+    el.style.transform = `translate(${cx - wr / 2}px, ${cy - hr / 2}px) ${tr}${rot}scale(${sc * zs})`;
     el.style.opacity = op;
-    el.style.zIndex = 30 - a;
+    // «максимум»: размытие растёт с удалённостью плавно, а не скачком на
+    // середине пути (иначе при непрерывной прокрутке слайд «щёлкает»)
+    el.style.filter = deckMaxFx() && a > .02 ? `blur(${(Math.min(a, 1) * 1.4 + Math.max(0, Math.min(a, 2) - 1)).toFixed(2)}px)` : '';
+    el.style.zIndex = 100 - Math.round(a * 10);
     if (fresh || c.dirty || (c.bw && w * Math.min(2, window.devicePixelRatio || 1) > c.bw * 1.35 && c.bw < DECK_CARD_MAXW)) deckQueueCard(s.id);
   }
   if (animate) void L.offsetWidth;
@@ -990,7 +1005,15 @@ function deckScrubSync(){
   function follow(clientY){
     const { y, r, n, i } = idxAt(clientY);
     const tickY = n > 1 ? i / (n - 1) * r.height : 0;
-    knob.style.top = (Math.abs(y - tickY) < DECK_SCRUB_MAGNET ? tickY : y) + 'px';
+    const snapped = Math.abs(y - tickY) < DECK_SCRUB_MAGNET;
+    knob.style.top = (snapped ? tickY : y) + 'px';
+    // «максимум эффектов»: стопка идёт за ручкой непрерывно, у отметки —
+    // примагничивается к слайду
+    if (deckFast && deckMaxFx()){
+      deckFastFollow = !snapped;
+      deckFastPos = snapped || n < 2 ? i : y / r.height * (n - 1);
+      scheduleRedraw();
+    }
     const s = deckSlides()[i];
     if (s && s.id !== deckCurId){
       deckShowSlide(s);
@@ -1023,7 +1046,7 @@ function deckScrubSync(){
     sc.classList.remove('drag');
     if (st.moved){
       // обзор → свой масштаб, текущий слайд ещё 0,3 с картинкой
-      if (deckFast){ deckSlowFor(DECK_MODE_MS); deckFlipAnim(DECK_MODE_MS); deckFast = false; }
+      if (deckFast){ deckFastPos = null; deckFastFollow = false; deckSlowFor(DECK_MODE_MS); deckFlipAnim(DECK_MODE_MS); deckFast = false; }
       rememberView();
       scheduleRedraw();
       return;
