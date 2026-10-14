@@ -103,6 +103,11 @@ html[data-board="on"] .wrap [contenteditable="true"],
 html[data-board="on"] .wrap [role="button"]{pointer-events:auto;position:relative;z-index:3;}
 html[data-board="on"] .wrap,
 html[data-board="on"] .wrap *{backdrop-filter:none!important;-webkit-backdrop-filter:none!important;}
+/* кнопка «История примеров» растянута на всю ширину карточки, а при включённой
+   доске кнопки ловят нажатие сами (см. выше) — из-за этого пустая часть строки
+   под интерфейсом «мёртвая»: линию через неё провести можно, начать нельзя.
+   Сжимаем кнопку до содержимого — кликабельным остаётся только видимый ярлык */
+html[data-board="on"] .wrap .example-history-toggle{width:fit-content;max-width:100%;margin-left:0;margin-right:auto;}
 /* элементы вроде mainPanel.reveal заканчивают анимацию появления с "мёртвым"
    transform:translateY(0) (matrix identity) — он визуально ничего не делает,
    но по спецификации CSS всё равно создаёт свой контекст наложения и не даёт
