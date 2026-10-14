@@ -82,6 +82,8 @@ function deckOnOpen(b){
   deckStripSig = ''; deckStripCurShown = null; deckLastRev = null;
   deckSlotSig = {}; deckThumbDirty.clear();
   deckSyncStrip();
+  // Промпт №85б: у презентации таблетка (PNG, масштаб, PDF…) — в верхней строке
+  if (typeof applyDockLayout === 'function') applyDockLayout();
   const nav = document.getElementById('deckNav');
   if (nav) nav.hidden = b.kind !== 'deck';
   document.documentElement.classList.toggle('deck-mode', b.kind === 'deck');
@@ -382,8 +384,6 @@ function deckSyncStrip(){
   el.classList.toggle('collapsed', !open);
   const t = document.getElementById('deckStripToggle');
   if (t){ t.textContent = open ? '‹' : '›'; t.title = open ? 'Свернуть ленту слайдов' : 'Показать ленту слайдов'; t.setAttribute('aria-label', t.title); }
-  document.documentElement.classList.toggle('deck-strip-open', on && open);
-  document.documentElement.classList.toggle('deck-strip-closed', on && !open);
 }
 function deckSetStripOpen(v){
   try { localStorage.setItem(DECK_STRIP_KEY, v ? '1' : '0'); } catch (e) {}
@@ -407,7 +407,7 @@ function deckStripUpdate(){
   const list = document.getElementById('deckStripList');
   if (!list || !deckStripOpen()) return;
   const sl = deckSlides();
-  const sig = sl.map(s => s.id + ':' + s.w + 'x' + s.h + ':' + (s.name || '')).join('|');
+  const sig = deckStripSigOf(sl);
   if (sig !== deckStripSig){ deckStripSig = sig; deckStripCurShown = null; deckBuildStrip(list, sl); }
   const cur = deckCur(), cid = cur && cur.id;
   if (cid !== deckStripCurShown){
@@ -590,67 +590,126 @@ document.addEventListener('pointerdown', (e) => {
 }, true);
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') deckCloseMenu(); });
 
-// ── щелчок открывает слайд, перетаскивание меняет порядок (мышь, перо, палец) ──
+// после перестановки переставляем готовые узлы ленты, а не строим её заново:
+// миниатюры не мигают пустыми, пока перерисуются
+function deckStripSigOf(sl){ return sl.map(s => s.id + ':' + s.w + 'x' + s.h + ':' + (s.name || '')).join('|'); }
+function deckStripReorderDom(){
+  const list = document.getElementById('deckStripList');
+  if (!list) return;
+  const sl = deckSlides(), map = {};
+  list.querySelectorAll('.deck-thumb').forEach(el => { map[el.dataset.id] = el; });
+  if (sl.some(s => !map[s.id])) return;   // состав поменялся — пусть строится заново
+  sl.forEach((s, i) => { list.appendChild(map[s.id]); map[s.id].querySelector('.deck-thumb-n').textContent = i + 1; });
+  deckStripSig = deckStripSigOf(sl);
+}
+
+/* ── щелчок открывает слайд, перетаскивание меняет порядок ──
+   Как перенос значков на Android: миниатюра «поднимается» (крупнее, с
+   тенью) и едет за пальцем, соседние плавно расступаются, отпустили —
+   встаёт в щель. Мышью и пером тащим сразу; пальцем — после удержания,
+   иначе нельзя было бы прокрутить длинную ленту */
 (function(){
   const list = document.getElementById('deckStripList');
   if (!list) return;
-  let drag = null;   // { id, from, x0, y0, moving, line }
-  function dropIndex(y){
-    const items = [...list.querySelectorAll('.deck-thumb')];
-    for (let i = 0; i < items.length; i++){
-      const r = items[i].getBoundingClientRect();
-      if (y < r.top + r.height / 2) return i;
-    }
-    return items.length;
+  const GAP = 10, LONG_MS = 320;
+  let drag = null;   // { id, from, el, x0, y0, st0, pid, touch, timer, moving, items, h, to }
+  function contentY(clientY){ return clientY - list.getBoundingClientRect().top + list.scrollTop; }
+  function lift(){
+    if (!drag || drag.moving || !deckMayEdit()) return;
+    drag.moving = true;
+    const els = [...list.querySelectorAll('.deck-thumb')];
+    drag.items = els.map(el => { const r = el.getBoundingClientRect(); return { el, h: r.height, mid: contentY(r.top) + r.height / 2 }; });
+    drag.from = els.indexOf(drag.el);
+    drag.h = drag.items[drag.from].h + GAP;
+    drag.to = drag.from;
+    list.classList.add('sorting');
+    drag.el.classList.add('lifted');
+    try { list.setPointerCapture(drag.pid); } catch (e) {}
+    if (drag.touch && navigator.vibrate){ try { navigator.vibrate(12); } catch (e) {} }
   }
-  function placeLine(idx){
-    const items = [...list.querySelectorAll('.deck-thumb')];
-    const lr = list.getBoundingClientRect();
-    let y;
-    if (idx < items.length) y = items[idx].getBoundingClientRect().top - 5;
-    else { const last = items[items.length - 1]; y = last ? last.getBoundingClientRect().bottom + 3 : lr.top; }
-    drag.line.style.top = (y - lr.top + list.scrollTop) + 'px';
+  function follow(clientY){
+    const dy = clientY - drag.y0 + (list.scrollTop - drag.st0);
+    drag.el.style.transform = `translateY(${dy}px) scale(1.06)`;
+    const center = drag.items[drag.from].mid + dy;
+    // куда встанет: сколько остальных миниатюр выше её середины
+    let to = 0;
+    drag.items.forEach((it, i) => { if (i !== drag.from && it.mid < center) to++; });
+    drag.to = to;
+    drag.items.forEach((it, i) => {
+      if (i === drag.from) return;
+      let shift = 0;
+      if (drag.from < to && i > drag.from && i <= to) shift = -drag.h;
+      else if (to < drag.from && i >= to && i < drag.from) shift = drag.h;
+      it.el.style.transform = shift ? `translateY(${shift}px)` : '';
+    });
+  }
+  function drop(){
+    const d = drag; drag = null;
+    let off = 0;
+    if (d.to > d.from) for (let i = d.from + 1; i <= d.to; i++) off += d.items[i].h + GAP;
+    else for (let i = d.to; i < d.from; i++) off -= d.items[i].h + GAP;
+    d.el.classList.remove('lifted');
+    d.el.classList.add('settling');
+    d.el.style.transform = `translateY(${off}px)`;
+    setTimeout(() => {
+      // анимации выключаем до того, как снять сдвиги и переставить узлы, —
+      // тогда всё встаёт на место за один кадр, без обратного проезда
+      list.classList.remove('sorting');
+      d.el.classList.remove('settling');
+      d.items.forEach(it => { it.el.style.transform = ''; });
+      if (d.to !== d.from){ deckMoveSlide(d.from, d.to > d.from ? d.to + 1 : d.to); deckStripReorderDom(); }
+    }, 190);
+  }
+  function cancel(){
+    if (!drag) return;
+    clearTimeout(drag.timer);
+    if (drag.moving){
+      list.classList.remove('sorting');
+      drag.el.classList.remove('lifted');
+      drag.items.forEach(it => { it.el.style.transform = ''; });
+    }
+    drag = null;
   }
   list.addEventListener('pointerdown', (e) => {
     if (e.button > 0) return;
     const menuBtn = e.target.closest('.deck-thumb-menu');
     if (menuBtn){ e.preventDefault(); const m = document.getElementById('deckMenu'); if (m && !m.hidden && deckMenuFor === menuBtn.dataset.id) deckCloseMenu(); else deckOpenMenu(menuBtn.dataset.id, menuBtn); return; }
     const th = e.target.closest('.deck-thumb');
-    if (!th) return;
-    const ids = deckSlides().map(s => s.id);
-    drag = { id: th.dataset.id, from: ids.indexOf(th.dataset.id), x0: e.clientX, y0: e.clientY, moving: false, line: null };
-    try { list.setPointerCapture(e.pointerId); } catch (err) {}
+    if (!th || drag) return;
+    drag = { id: th.dataset.id, el: th, from: deckSlides().findIndex(s => s.id === th.dataset.id),
+             x0: e.clientX, y0: e.clientY, st0: list.scrollTop, pid: e.pointerId,
+             touch: e.pointerType === 'touch', timer: null, moving: false };
+    if (drag.touch) drag.timer = setTimeout(lift, LONG_MS);
+    else { try { list.setPointerCapture(e.pointerId); } catch (err) {} }
   });
   list.addEventListener('pointermove', (e) => {
-    if (!drag) return;
+    if (!drag || e.pointerId !== drag.pid) return;
     if (!drag.moving){
-      if (Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0) < 6 || !deckMayEdit()) return;
-      drag.moving = true;
-      list.querySelector(`.deck-thumb[data-id="${drag.id}"]`)?.classList.add('dragging');
-      drag.line = document.createElement('div');
-      drag.line.className = 'deck-drop-line';
-      list.appendChild(drag.line);
+      const dist = Math.hypot(e.clientX - drag.x0, e.clientY - drag.y0);
+      // палец сдвинулся до удержания — это прокрутка ленты, не перенос
+      if (drag.touch){ if (dist > 8) cancel(); return; }
+      if (dist < 6) return;
+      lift();
+      if (!drag || !drag.moving) return;
     }
     // у края ленты — прокручиваем её, чтобы дотащить до невидимых слайдов
     const lr = list.getBoundingClientRect();
-    if (e.clientY < lr.top + 24) list.scrollTop -= 12;
-    else if (e.clientY > lr.bottom - 24) list.scrollTop += 12;
-    placeLine(dropIndex(e.clientY));
+    if (e.clientY < lr.top + 28) list.scrollTop -= 12;
+    else if (e.clientY > lr.bottom - 28) list.scrollTop += 12;
+    follow(e.clientY);
   });
-  function finish(e, cancel){
-    if (!drag) return;
-    const d = drag; drag = null;
-    if (d.line) d.line.remove();
-    list.querySelector('.deck-thumb.dragging')?.classList.remove('dragging');
-    if (cancel) return;
-    if (d.moving) deckMoveSlide(d.from, dropIndex(e.clientY));
-    else {
-      const cur = deckCurIndex();
-      if (d.from !== cur) deckGo(d.from, d.from > cur ? 1 : -1);
-    }
-  }
-  list.addEventListener('pointerup', (e) => finish(e, false));
-  list.addEventListener('pointercancel', (e) => finish(e, true));
+  // палец после удержания не должен прокручивать ленту вместо переноса
+  list.addEventListener('touchmove', (e) => { if (drag && drag.moving) e.preventDefault(); }, { passive: false });
+  list.addEventListener('contextmenu', (e) => { if (e.target.closest('.deck-thumb')) e.preventDefault(); });
+  list.addEventListener('pointerup', (e) => {
+    if (!drag || e.pointerId !== drag.pid) return;
+    clearTimeout(drag.timer);
+    if (drag.moving){ drop(); return; }
+    const from = drag.from; drag = null;
+    const cur = deckCurIndex();
+    if (from >= 0 && from !== cur) deckGo(from, from > cur ? 1 : -1);
+  });
+  list.addEventListener('pointercancel', cancel);
 })();
 
 document.getElementById('deckStripToggle')?.addEventListener('click', () => deckSetStripOpen(!deckStripOpen()));

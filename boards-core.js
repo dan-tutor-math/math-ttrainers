@@ -4805,7 +4805,9 @@ function applyDockLayout(){
   // между соседями), поэтому дублируем её сюда явно
   optbar.style.setProperty('--dock-scale', dockScale);
   railEl.classList.remove('pos-left','pos-top');
-  railEl.classList.add(dockPos === 'left' ? 'pos-top' : 'pos-left');
+  // у презентации (промпт №85б) таблетка всегда в верхней строке: слева
+  // от слайда стоит лента миниатюр
+  railEl.classList.add(dockPos === 'left' || (B && B.kind === 'deck') ? 'pos-top' : 'pos-left');
   // сохранённое смещение могло остаться от другого края или другого окна —
   // подрезаем, чтобы панель не открылась наполовину за экраном
   clampDockOffset();

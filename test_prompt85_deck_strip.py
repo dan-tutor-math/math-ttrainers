@@ -116,6 +116,14 @@ def main():
 
         # 1. лента
         check(page.is_visible("#deckStrip"), "лента миниатюр видна")
+        rail = page.evaluate("""() => {
+          const r = document.getElementById('bdRail'), rr = r.getBoundingClientRect();
+          const back = document.getElementById('bdBack').getBoundingClientRect();
+          const name = document.getElementById('bdName').getBoundingClientRect();
+          return { top: r.classList.contains('pos-top'), afterBack: rr.left >= back.right,
+                   beforeName: rr.right <= name.left, inBar: rr.bottom <= 60 };
+        }""")
+        check(all(rail.values()), f"таблетка в верхней строке между «Назад» и названием ({rail})")
         check(len(thumbs(page)) == 1, "одна миниатюра")
         page.click("#deckAdd")
         page.click("#deckAdd")
@@ -189,8 +197,19 @@ def main():
         page.mouse.down()
         page.mouse.move(src["x"] + 60, src["y"] + 20, steps=4)
         page.mouse.move(dst["x"] + 60, dst["y"] + 8, steps=10)
+        page.wait_for_timeout(250)
+        mid = page.evaluate("""() => {
+          const t = [...document.querySelectorAll('#deckStripList .deck-thumb')];
+          return { lifted: t[3].classList.contains('lifted'),
+                   moved: t[3].style.transform.includes('scale'),
+                   shifted: t.slice(0, 3).every(el => (el.style.transform.startsWith('translateY(') && !el.style.transform.startsWith('translateY(-'))) };
+        }""")
+        check(mid["lifted"] and mid["moved"], f"миниатюра поднялась и едет за курсором ({mid})")
+        check(mid["shifted"], "остальные миниатюры расступились вниз")
         page.mouse.up()
-        page.wait_for_timeout(300)
+        page.wait_for_timeout(400)
+        check(page.evaluate("() => !document.querySelector('#deckStripList .lifted, #deckStripList .settling') && [...document.querySelectorAll('#deckStripList .deck-thumb')].every(el => !el.style.transform)"),
+              "после отпускания сдвиги сняты")
         after = slide_ids(page)
         check(after == [before[3], before[0], before[1], before[2]], "четвёртый слайд перетащили в начало")
         pts_after = page.evaluate("() => JSON.stringify(B.objects.filter(o => o.type !== 'deck').map(o => o.points))")
