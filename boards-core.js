@@ -3122,9 +3122,16 @@ function render(c, w, h, camv, isScreen, renderDpr){
   c.save();
   c.setTransform(renderDpr,0,0,renderDpr,0,0);
   c.clearRect(0,0,w,h);
-  const bg = themeVar('--bg');
-  c.fillStyle = bg; c.fillRect(0,0,w,h);
+  // Промпт №85в: у презентации на экране вне слайда холст прозрачный — позади
+  // него слой #deckDepth с соседними слайдами (deck-core.js)
+  const deckScreen = isScreen && B.kind === 'deck' && typeof deckDepthSync === 'function';
+  if (!deckScreen){
+    const bg = themeVar('--bg');
+    c.fillStyle = bg; c.fillRect(0,0,w,h);
+  }
   c.restore();
+  // пока листают, текущий слайд — картинка в слое, холст его не рисует
+  if (deckScreen && deckSlideHidden()){ deckDepthSync(); deckScrubSync(); deckUpdateNav(); deckStripUpdate(); return; }
 
   c.save();
   c.setTransform(renderDpr,0,0,renderDpr,0,0);

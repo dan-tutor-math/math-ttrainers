@@ -152,14 +152,20 @@ def main():
         page.keyboard.press("ArrowDown")
         check(wait_no(page, "3 / 3"), "↓ в ленте → 3 / 3")
 
-        # колесо: серия событий одного жеста листает ровно один слайд
-        page.mouse.move(640, 400)
-        for _ in range(6):
-            page.mouse.wheel(0, -60)
-            page.wait_for_timeout(20)
-        page.wait_for_timeout(400)
+        # колесо: серия событий одного жеста листает ровно один слайд. События
+        # шлём из самой страницы с шагом 20 мс, как тачпад: mouse.wheel в
+        # браузере без экрана ждёт кадра, а кадры при анимации слоя глубины
+        # там идут медленно — паузы выходили больше 180 мс
+        page.evaluate("""() => new Promise(res => {
+          const cv = document.getElementById('boardCv'); let n = 0;
+          const tick = () => {
+            cv.dispatchEvent(new WheelEvent('wheel', { deltaY: -60, clientX: 640, clientY: 400, bubbles: true, cancelable: true }));
+            if (++n < 6) setTimeout(tick, 20); else setTimeout(res, 400);
+          };
+          tick();
+        })""")
         check(slide_no(page) == "2 / 3", f"жест колесом вверх — ровно один слайд ({slide_no(page)})")
-        page.mouse.wheel(0, 120)
+        page.evaluate("""() => document.getElementById('boardCv').dispatchEvent(new WheelEvent('wheel', { deltaY: 120, clientX: 640, clientY: 400, bubbles: true, cancelable: true }))""")
         page.wait_for_timeout(400)
         check(slide_no(page) == "3 / 3", "колесо вниз → 3 / 3")
 
