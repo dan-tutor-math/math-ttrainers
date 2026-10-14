@@ -52,7 +52,8 @@ function deckNewSlide(slot, like){
   return {
     id: uid(), slot,
     w: like ? like.w : DECK_DEF_W, h: like ? like.h : DECK_DEF_H,
-    bg: like && like.bg ? Object.assign({}, like.bg) : { k: 'grid' },
+    // картинка-подложка — объект своего слайда, новому достаётся чистый лист
+    bg: like && like.bg ? (like.bg.k === 'img' ? { k: 'plain' } : Object.assign({}, like.bg)) : { k: 'grid' },
   };
 }
 function deckSlideRect(s){
@@ -95,6 +96,9 @@ function deckOnOpen(b){
   deckSlotSig = {}; deckThumbDirty.clear();
   deckSyncStrip();
   deckResetDepth(); deckZf = 1; deckScrubTicks = -1;
+  deckOpenPop(false);
+  const sb = document.getElementById('deckSlideBtn');
+  if (sb) sb.hidden = !(b.kind === 'deck');
   const isD = b.kind === 'deck';
   const layer = document.getElementById('deckDepth'), scr = document.getElementById('deckScrub');
   if (layer) layer.hidden = !isD || deckFlow() === 'scroll';
@@ -190,6 +194,7 @@ function deckDrawBackground(c, camv, w, h, isScreen){
   // отмена или собеседник убрали слайд, на котором стоит камера, — переезжаем
   // на ближайший оставшийся, иначе на экране было бы пустое полотно. В
   // сплошной прокрутке середина экрана законно бывает на чужом слайде
+  deckInkOnDark = false;
   const scroll = deckIsScroll();
   if (isScreen && camv === cam && deckSlides().length && (scroll ? !deckSlides().some(x => x.id === deckCurId) : !deckSlideAtY(cam.y + cssH / 2 / cam.zoom))){
     const s0 = deckCur();
@@ -199,7 +204,7 @@ function deckDrawBackground(c, camv, w, h, isScreen){
   const s = deckDrawnSlide();
   if (!s) return;
   deckDrawPaper(c, s, camv);
-  if (isScreen){ deckUpdateNav(); deckStripUpdate(); deckDepthSync(); deckScrubSync(); }
+  if (isScreen){ deckUpdateNav(); deckStripUpdate(); deckDepthSync(); deckScrubSync(); deckSyncPop(); }
 }
 // бумага, тень и сетка одного слайда — по текущей activeCam
 function deckDrawPaper(c, s, camv){
@@ -207,33 +212,17 @@ function deckDrawPaper(c, s, camv){
   const p0 = worldToScreen({ x: r.x, y: r.y }), p1 = worldToScreen({ x: r.x + r.w, y: r.y + r.h });
   c.save();
   c.shadowColor = 'rgba(20,30,60,.18)'; c.shadowBlur = 30; c.shadowOffsetY = 8;
-  c.fillStyle = themeVar('--paper');
+  c.fillStyle = deckBgKind(s) === 'dark' ? DECK_DARK_PAPER : themeVar('--paper');
   c.fillRect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y);
   c.restore();
-  if (!s.bg || s.bg.k === 'grid'){
-    const cell = B.cellSize * camv.zoom;
-    if (cell > 4){
-      c.save();
-      c.beginPath(); c.rect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y); c.clip();
-      c.strokeStyle = B.gridColor ? resolveColor(B.gridColor) : themeVar('--grid');
-      c.lineWidth = 1; c.globalAlpha = 0.55;
-      for (let x = r.x; x <= r.x + r.w + 0.5; x += B.cellSize){
-        const sx = Math.round(worldToScreen({ x, y: 0 }).x) + 0.5;
-        c.beginPath(); c.moveTo(sx, p0.y); c.lineTo(sx, p1.y); c.stroke();
-      }
-      for (let y = r.y; y <= r.y + r.h + 0.5; y += B.cellSize){
-        const sy = Math.round(worldToScreen({ x: 0, y }).y) + 0.5;
-        c.beginPath(); c.moveTo(p0.x, sy); c.lineTo(p1.x, sy); c.stroke();
-      }
-      c.restore();
-    }
-  }
+  deckDrawPattern(c, s, r, p0, p1, camv);   // №87: клетка, линейки, точки…
 }
 // объекты рисуются только в пределах слайда, как в показе PowerPoint:
 // и у ученика, и в выгрузке слайд выглядит одинаково
 function deckClipSlide(c, camv){
   const s = deckDrawnSlide();
   if (!s) return false;
+  deckInkOnDark = deckBgKind(s) === 'dark';
   const r = deckSlideRect(s);
   const p0 = worldToScreen({ x: r.x, y: r.y }), p1 = worldToScreen({ x: r.x + r.w, y: r.y + r.h });
   c.save();
@@ -572,7 +561,11 @@ function deckDuplicate(id){
     delete c.stack;   // и не часть чужой стопки заданий (как при вставке)
     if (c.groupId) c.groupId = groups[c.groupId] || (groups[c.groupId] = uid());
     deckShiftObj(c, dy);
-    B.objects.push(c);
+    if (c.bgOf){
+      // картинка-подложка копии — тоже в самый низ и копии же принадлежит
+      c.bgOf = ns.id; ns.bg = { k: 'img', img: c.id };
+      B.objects.splice(B.objects.findIndex(x => x.type === 'deck') + 1, 0, c);
+    } else B.objects.push(c);
   });
   d.slides.splice(i + 1, 0, ns);
   saveDB();
@@ -645,7 +638,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') deckCloseM
 
 // после перестановки переставляем готовые узлы ленты, а не строим её заново:
 // миниатюры не мигают пустыми, пока перерисуются
-function deckStripSigOf(sl){ return sl.map(s => s.id + ':' + s.w + 'x' + s.h + ':' + (s.name || '')).join('|'); }
+function deckStripSigOf(sl){ return sl.map(s => s.id + ':' + s.w + 'x' + s.h + ':' + (s.name || '') + ':' + (s.bg ? s.bg.k + (s.bg.c || '') + (s.bg.img || '') : '')).join('|'); }
 function deckStripReorderDom(){
   const list = document.getElementById('deckStripList');
   if (!list) return;
@@ -1178,6 +1171,7 @@ function deckRenderScrollOthers(c, camv, w, h){
     const p0 = worldToScreen({ x: r.x, y: r.y }), p1 = worldToScreen({ x: r.x + r.w, y: r.y + r.h });
     c.save();
     c.beginPath(); c.rect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y); c.clip();
+    deckInkOnDark = deckBgKind(s) === 'dark';
     const pad = 80 / z, vx0 = cv.x - pad, vy0 = cv.y - pad, vx1 = cv.x + w / z + pad, vy1 = cv.y + h / z + pad;
     B.objects.forEach(ob => {
       if (ob.type === 'deck') return;
@@ -1187,6 +1181,7 @@ function deckRenderScrollOthers(c, camv, w, h){
     });
     c.restore();
   });
+  deckInkOnDark = false;
   activeCam = camv;
 }
 
@@ -1212,4 +1207,193 @@ function deckRenderScrollOthers(c, camv, w, h){
   const up = () => { deckPointerDown = false; };
   window.addEventListener('pointerup', up, true);
   window.addEventListener('pointercancel', up, true);
+})();
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ФОРМАТ И ПОДЛОЖКА СЛАЙДА (промпт №87). Кнопка в полосе листания →
+   окно: формат (готовые и свой в сантиметрах, 1 клетка = 0,5 см),
+   подложка, цвет линий, «этот слайд / все слайды». Смена формата объекты
+   не двигает: левый верхний угол слайда на месте, вышедшее за край
+   обрезается при показе, но не удаляется. Своя картинка-подложка —
+   закреплённое изображение в самом низу слайда (поле bgOf), а не строка в
+   объекте deck: иначе вся картинка уходила бы в облако при каждом листании
+   ═══════════════════════════════════════════════════════════════════════ */
+const DECK_FORMATS = { '64x36': [64, 36], '56x42': [56, 42], '40x57': [40, 57], '57x40': [57, 40], '48x48': [48, 48] };
+const DECK_DARK_PAPER = '#1B2230', DECK_DARK_INK = '#F2F3F5';
+// перо по умолчанию ('--pencil') на тёмной подложке рисуется светлым;
+// ставит deckClipSlide для слайда, который сейчас рисуется (resolveColor)
+let deckInkOnDark = false;
+
+function deckBgKind(s){ return (s && s.bg && s.bg.k) || 'grid'; }
+function deckLineColor(s){
+  if (s.bg && s.bg.c) return s.bg.c;
+  if (deckBgKind(s) === 'dark') return 'rgba(255,255,255,.16)';
+  return B.gridColor ? resolveColor(B.gridColor) : themeVar('--grid');
+}
+// узор подложки по клеткам слайда; p0/p1 — его углы на экране
+function deckDrawPattern(c, s, r, p0, p1, camv){
+  const k = deckBgKind(s), cs = B.cellSize, cpx = cs * camv.zoom;
+  if (k === 'plain' || k === 'dark' || k === 'img') return;
+  c.save();
+  c.beginPath(); c.rect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y); c.clip();
+  c.strokeStyle = c.fillStyle = deckLineColor(s);
+  c.lineWidth = 1; c.globalAlpha = 0.55;
+  const hLines = step => {
+    for (let y = r.y + step; y < r.y + r.h - 0.5; y += step){
+      const sy = Math.round(worldToScreen({ x: 0, y }).y) + 0.5;
+      c.beginPath(); c.moveTo(p0.x, sy); c.lineTo(p1.x, sy); c.stroke();
+    }
+  };
+  if (k === 'grid' && cpx > 4){
+    for (let x = r.x; x <= r.x + r.w + 0.5; x += cs){
+      const sx = Math.round(worldToScreen({ x, y: 0 }).x) + 0.5;
+      c.beginPath(); c.moveTo(sx, p0.y); c.lineTo(sx, p1.y); c.stroke();
+    }
+    hLines(cs);
+  } else if (k === 'thin' && cpx > 3){
+    hLines(cs);
+  } else if (k === 'wide' && cpx > 2){
+    c.globalAlpha = 0.8;
+    hLines(cs * 2);
+    // поле тетради — красная линия слева
+    const mx = Math.round(worldToScreen({ x: r.x + cs * 5, y: 0 }).x) + 0.5;
+    c.strokeStyle = 'rgba(255,59,48,.5)'; c.lineWidth = 1.5;
+    c.beginPath(); c.moveTo(mx, p0.y); c.lineTo(mx, p1.y); c.stroke();
+  } else if (k === 'dots' && cpx > 5){
+    c.globalAlpha = 0.9;
+    const d = Math.max(1.4, Math.min(2.6, cpx * 0.09));
+    for (let x = r.x + cs; x < r.x + r.w - 0.5; x += cs){
+      const sx = worldToScreen({ x, y: 0 }).x;
+      for (let y = r.y + cs; y < r.y + r.h - 0.5; y += cs){
+        const sy = worldToScreen({ x: 0, y }).y;
+        c.fillRect(sx - d / 2, sy - d / 2, d, d);
+      }
+    }
+  }
+  c.restore();
+}
+
+// ── картинка-подложка: закреплённое изображение во весь слайд ──
+function deckBgImgObj(s){ return s.bg && s.bg.img ? B.objects.find(o => o.id === s.bg.img) : null; }
+function deckRemoveBgImg(s){
+  if (!s.bg || !s.bg.img) return;
+  const id = s.bg.img;
+  B.objects = B.objects.filter(o => o.id !== id);
+}
+function deckFitBgImg(s){
+  const o = deckBgImgObj(s);
+  if (!o) return;
+  const r = deckSlideRect(s);
+  o.points = [{ x: r.x, y: r.y }]; o.w = r.w; o.h = r.h;
+}
+
+function deckScopeAll(){ return document.querySelector('input[name="deckScope"]:checked')?.value === 'all'; }
+// одна правка списка слайдов — один шаг отмены
+function deckApplySlides(fn){
+  const d = deckObj();
+  if (!d || !deckMayEdit()) return;
+  pushUndo();
+  const list = deckScopeAll() ? d.slides : [deckCur()].filter(Boolean);
+  list.forEach(fn);
+  saveDB();
+  deckMarkCardsDirty([...deckCards.keys()]);
+  const s = deckCur();
+  if (s && (deckFitted || deckIsScroll())) deckShowSlide(s); else clampCam();
+  scheduleRedraw();
+  deckSyncPop();
+}
+function deckSetFormat(w, h){
+  w = Math.max(4, Math.min(DECK_MAX_CELLS, Math.round(w)));
+  h = Math.max(4, Math.min(DECK_MAX_CELLS, Math.round(h)));
+  deckApplySlides(s => { s.w = w; s.h = h; deckFitBgImg(s); });
+}
+function deckSetBg(k){
+  deckApplySlides(s => {
+    deckRemoveBgImg(s);
+    const c = s.bg && s.bg.c;
+    s.bg = { k };
+    if (c) s.bg.c = c;
+  });
+}
+function deckSetLines(c){
+  deckApplySlides(s => {
+    s.bg = Object.assign({}, s.bg || { k: 'grid' });
+    if (c) s.bg.c = c; else delete s.bg.c;
+  });
+}
+async function deckSetBgImage(file){
+  if (!file || !deckMayEdit()) return;
+  let src, size;
+  try { src = await fileToDataUrl(file); size = await loadImageSize(src); }
+  catch (e) { alert('Не удалось открыть картинку: ' + (e && e.message || e)); return; }
+  deckApplySlides(s => {
+    deckRemoveBgImg(s);
+    const r = deckSlideRect(s), o = {
+      id: uid(), type: 'image', src, points: [{ x: r.x, y: r.y }], w: r.w, h: r.h,
+      natW: size && size.w, natH: size && size.h, locked: true, bgOf: s.id,
+    };
+    // сразу за объектом deck — в самом низу, под всем, что на слайде
+    const di = B.objects.findIndex(x => x.type === 'deck');
+    B.objects.splice(di + 1, 0, o);
+    s.bg = { k: 'img', img: o.id };
+  });
+}
+
+// ── окно «Слайд» ──
+function deckSyncPop(){
+  const pop = document.getElementById('deckSlidePop');
+  if (!pop || pop.hidden) return;
+  const s = deckCur();
+  if (!s) return;
+  const key = s.w + 'x' + s.h, isStd = !!DECK_FORMATS[key], can = deckMayEdit();
+  pop.querySelectorAll('[data-fmt]').forEach(b => {
+    b.setAttribute('aria-pressed', b.dataset.fmt === key || (b.dataset.fmt === 'custom' && !isStd));
+    b.disabled = !can;
+  });
+  const k = deckBgKind(s);
+  pop.querySelectorAll('[data-bg]').forEach(b => { b.setAttribute('aria-pressed', b.dataset.bg === k); b.disabled = !can; });
+  const c = (s.bg && s.bg.c) || '';
+  pop.querySelectorAll('[data-lc]').forEach(b => { b.setAttribute('aria-pressed', b.dataset.lc === c); b.disabled = !can; });
+  const cw = document.getElementById('deckCW'), ch = document.getElementById('deckCH');
+  if (cw && document.activeElement !== cw) cw.value = s.w / 2;
+  if (ch && document.activeElement !== ch) ch.value = s.h / 2;
+  document.getElementById('deckCustom').hidden = isStd && !pop.dataset.custom;
+}
+function deckOpenPop(open){
+  const pop = document.getElementById('deckSlidePop'), btn = document.getElementById('deckSlideBtn');
+  if (!pop) return;
+  pop.hidden = !open;
+  if (btn) btn.setAttribute('aria-expanded', open);
+  if (open){ delete pop.dataset.custom; deckSyncPop(); }
+}
+(function(){
+  const pop = document.getElementById('deckSlidePop'), btn = document.getElementById('deckSlideBtn');
+  if (!pop || !btn) return;
+  btn.addEventListener('click', () => deckOpenPop(pop.hidden));
+  pop.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b || b.disabled) return;
+    if (b.dataset.fmt === 'custom'){ pop.dataset.custom = '1'; deckSyncPop(); document.getElementById('deckCW')?.focus(); return; }
+    if (b.dataset.fmt){ const f = DECK_FORMATS[b.dataset.fmt]; if (f) deckSetFormat(f[0], f[1]); return; }
+    if (b.dataset.bg === 'img'){ const inp = document.getElementById('deckBgFile'); inp.value = ''; inp.click(); return; }
+    if (b.dataset.bg){ deckSetBg(b.dataset.bg); return; }
+    if (b.dataset.lc !== undefined){ deckSetLines(b.dataset.lc); return; }
+    if (b.id === 'deckCApply'){
+      const w = parseFloat(String(document.getElementById('deckCW').value).replace(',', '.'));
+      const h = parseFloat(String(document.getElementById('deckCH').value).replace(',', '.'));
+      if (isFinite(w) && isFinite(h) && w > 0 && h > 0) deckSetFormat(w * 2, h * 2);
+    }
+  });
+  pop.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && (e.target.id === 'deckCW' || e.target.id === 'deckCH')){ e.preventDefault(); document.getElementById('deckCApply').click(); }
+  });
+  document.getElementById('deckBgFile')?.addEventListener('change', (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (f) deckSetBgImage(f);
+  });
+  document.addEventListener('pointerdown', (e) => {
+    if (pop.hidden || pop.contains(e.target) || btn.contains(e.target)) return;
+    deckOpenPop(false);
+  }, true);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !pop.hidden) deckOpenPop(false); });
 })();

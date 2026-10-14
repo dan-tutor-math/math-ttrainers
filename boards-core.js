@@ -1192,6 +1192,8 @@ try {
     .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 } catch (e) {}
 function resolveColor(tok){
+  // Промпт №87: на тёмной подложке слайда перо по умолчанию светлое
+  if (tok === '--pencil' && typeof deckInkOnDark !== 'undefined' && deckInkOnDark) return DECK_DARK_INK;
   if (typeof tok === 'string' && tok.indexOf('--') === 0) return themeVar(tok) || '#000';
   return tok || '#000';
 }
@@ -1910,6 +1912,9 @@ window.boardsStampMine = function(){ stampAuthors(); };
 function mayDraw(){ return boardAccess !== 'view'; }
 // можно ли трогать конкретный объект — выделять, двигать, стирать
 function mayTouch(obj){
+  // Промпт №87: картинка-подложка слайда меняется только окном «Слайд» —
+  // её не выделить рамкой, не стереть и не сдвинуть вместе с остальным
+  if (obj && obj.bgOf) return false;
   if (boardAccess === 'full') return true;
   if (boardAccess === 'view') return false;
   return !!(obj && boardUserId && obj.by === boardUserId);
