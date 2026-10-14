@@ -1453,20 +1453,113 @@ function deckOpenPop(open){
    слайда, поэтому шаблон подходит к любому слоту
    ═══════════════════════════════════════════════════════════════════════ */
 const DECK_PRESETS_KEY = 'deckPresets';
-let deckPresets = { slides: [], bgs: [], formats: [] };
+let deckPresets = { slides: [], bgs: [], formats: [], gone: [] };
 let deckPresetsLoaded = false;
 
-function deckLoadPresets(){
-  if (deckPresetsLoaded) return Promise.resolve();
-  return idbGet(DECK_PRESETS_KEY).then(v => {
-    if (v) deckPresets = { slides: v.slides || [], bgs: v.bgs || [], formats: v.formats || [] };
+/* №87в: шаблоны привязаны к аккаунту. Вошли — главная копия в облаке
+   (таблица deck_templates, deck-templates-schema.sql), в браузере — её
+   копия под ключом deckPresets:<id аккаунта>: окно открывается сразу и
+   работает без связи. Сохранённое без связи помечено _dirty и уедет при
+   следующей возможности; удалённое ждёт в gone. Без входа (или пока
+   таблицы нет) — только браузер, ключ deckPresets, как раньше; при первом
+   входе это всё уезжает в аккаунт */
+const DECK_TPL_TABLE = 'deck_templates';
+const DECK_TPL_KINDS = [['slides', 'slide'], ['bgs', 'bg'], ['formats', 'format']];
+let deckPresetsUser = null;     // чей набор загружен: id аккаунта или '' (без входа)
+let deckCloudOff = false;       // таблицы ещё нет — молча работаем в браузере
+let deckPushing = null;
+
+function deckUserId(){ return (window.CURRENT_USER && window.CURRENT_USER.id) || ''; }
+function deckPresetsKey(u){ return u ? DECK_PRESETS_KEY + ':' + u : DECK_PRESETS_KEY; }
+function deckNormPresets(v){ return { slides: (v && v.slides) || [], bgs: (v && v.bgs) || [], formats: (v && v.formats) || [], gone: (v && v.gone) || [] }; }
+// id шаблона — uuid, его же получит строка в облаке
+function deckNewPresetId(){
+  if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+  const b = new Uint8Array(16);
+  (window.crypto || {}).getRandomValues ? crypto.getRandomValues(b) : b.forEach((_, i) => { b[i] = Math.random() * 256 | 0; });
+  b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+  const h = [...b].map(x => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+}
+function deckCloudOn(){ return !!(window.SB && deckPresetsUser && !deckCloudOff); }
+function deckCloudFail(err){
+  const msg = String((err && (err.message || err.code)) || err);
+  // таблицы нет (SQL ещё не выполнен) — больше не пытаемся до перезагрузки
+  if (/deck_templates|42P01|PGRST20[45]|does not exist|schema cache/i.test(msg)) deckCloudOff = true;
+  console.warn('Шаблоны презентаций: облако недоступно —', msg);
+}
+
+function deckLoadPresets(force){
+  const u = deckUserId();
+  if (deckPresetsLoaded && deckPresetsUser === u && !force) return Promise.resolve();
+  deckPresetsUser = u;
+  return idbGet(deckPresetsKey(u)).then(v => {
+    if (deckPresetsUser !== u) return;
+    deckPresets = deckNormPresets(v);
     deckPresetsLoaded = true;
     deckRenderPresets();
+    if (u) return deckCloudPull(u);
   }).catch(() => { deckPresetsLoaded = true; });
 }
 function deckSavePresets(){
   deckRenderPresets();
-  return idbPut(DECK_PRESETS_KEY, deckPresets).catch(e => alert('Не удалось сохранить шаблон: ' + (e && e.message || e)));
+  return idbPut(deckPresetsKey(deckPresetsUser), deckPresets)
+    .catch(e => alert('Не удалось сохранить шаблон: ' + (e && e.message || e)))
+    .then(() => deckCloudPush());
+}
+// в облако — то, что ещё не там, и удаления. Один проход за раз
+function deckCloudPush(){
+  if (!deckCloudOn()) return Promise.resolve();
+  if (deckPushing) return deckPushing.then(() => deckCloudPush());
+  const u = deckPresetsUser;
+  deckPushing = (async () => {
+    for (const [k, kind] of DECK_TPL_KINDS){
+      for (const p of deckPresets[k].slice()){
+        if (!p._dirty) continue;
+        const { id, name, _dirty, ...data } = p;
+        const { error } = await window.SB.from(DECK_TPL_TABLE).upsert({ id, kind, name, data });
+        if (error){ deckCloudFail(error); return; }
+        delete p._dirty;
+      }
+    }
+    for (const id of deckPresets.gone.slice()){
+      const { error } = await window.SB.from(DECK_TPL_TABLE).delete().eq('id', id);
+      if (error){ deckCloudFail(error); return; }
+      deckPresets.gone = deckPresets.gone.filter(x => x !== id);
+    }
+    if (deckPresetsUser === u) await idbPut(deckPresetsKey(u), deckPresets).catch(() => {});
+  })().catch(deckCloudFail).finally(() => { deckPushing = null; });
+  return deckPushing;
+}
+// при открытии: шаблоны без входа — в аккаунт, несохранённое — в облако,
+// потом список из облака (там то, что сохранено и на других устройствах)
+async function deckCloudPull(u){
+  if (!window.SB || deckCloudOff) return;
+  try {
+    const old = await idbGet(DECK_PRESETS_KEY);
+    if (old && DECK_TPL_KINDS.some(([k]) => (old[k] || []).length)){
+      DECK_TPL_KINDS.forEach(([k]) => (old[k] || []).forEach(p => deckPresets[k].push(Object.assign({}, p, { id: deckNewPresetId(), _dirty: true }))));
+      await idbPut(deckPresetsKey(u), deckPresets);
+      await idbDelete(DECK_PRESETS_KEY);
+    }
+  } catch (e) {}
+  await deckCloudPush();
+  if (deckCloudOff || deckPresetsUser !== u) return;
+  let res;
+  try { res = await window.SB.from(DECK_TPL_TABLE).select('id,kind,name,data,created_at').order('created_at', { ascending: false }); }
+  catch (e) { deckCloudFail(e); return; }
+  if (res.error){ deckCloudFail(res.error); return; }
+  if (deckPresetsUser !== u) return;
+  const fresh = deckNormPresets({ gone: deckPresets.gone });
+  (res.data || []).forEach(r => {
+    const pair = DECK_TPL_KINDS.find(([, kind]) => kind === r.kind);
+    if (pair && !deckPresets.gone.includes(r.id)) fresh[pair[0]].push(Object.assign({}, r.data, { id: r.id, name: r.name }));
+  });
+  // не уехавшее (нет связи) — остаётся и уедет потом
+  DECK_TPL_KINDS.forEach(([k]) => deckPresets[k].filter(p => p._dirty && !fresh[k].some(x => x.id === p.id)).forEach(p => fresh[k].unshift(p)));
+  deckPresets = fresh;
+  await idbPut(deckPresetsKey(u), deckPresets).catch(() => {});
+  deckRenderPresets();
 }
 let deckToastTimer = null;
 function deckToast(msg){
@@ -1512,7 +1605,7 @@ function deckSaveSlideTemplate(id){
   const bg = Object.assign({}, s.bg || { k: 'grid' });
   delete bg.img;
   deckLoadPresets().then(() => {
-    deckPresets.slides.unshift({ id: uid(), name, w: s.w, h: s.h, bg, bgImg: bgObj ? bgObj.src : null, objects, preview: deckPreviewOf(s), at: nowTs() });
+    deckPresets.slides.unshift({ id: deckNewPresetId(), _dirty: true, name, w: s.w, h: s.h, bg, bgImg: bgObj ? bgObj.src : null, objects, preview: deckPreviewOf(s), at: nowTs() });
     deckSavePresets();
     deckToast('Шаблон «' + name + '» сохранён');
   });
@@ -1563,7 +1656,7 @@ function deckSaveBgPreset(){
   const bg = Object.assign({}, s.bg || { k: 'grid' }), o = deckBgImgObj(s);
   delete bg.img;
   deckLoadPresets().then(() => {
-    deckPresets.bgs.unshift({ id: uid(), name, bg, img: o ? o.src : null, at: nowTs() });
+    deckPresets.bgs.unshift({ id: deckNewPresetId(), _dirty: true, name, bg, img: o ? o.src : null, at: nowTs() });
     deckSavePresets();
     deckToast('Подложка «' + name + '» сохранена');
   });
@@ -1581,7 +1674,7 @@ function deckSaveFormatPreset(){
   const name = deckAskName((s.w / 2) + ' × ' + (s.h / 2) + ' см');
   if (!name) return;
   deckLoadPresets().then(() => {
-    deckPresets.formats.unshift({ id: uid(), name, w: s.w, h: s.h, at: nowTs() });
+    deckPresets.formats.unshift({ id: deckNewPresetId(), _dirty: true, name, w: s.w, h: s.h, at: nowTs() });
     deckSavePresets();
     deckToast('Формат «' + name + '» сохранён');
   });
@@ -1590,6 +1683,7 @@ function deckDeletePreset(kind, id){
   const list = deckPresets[kind], p = list && list.find(x => x.id === id);
   if (!p || !confirm('Удалить «' + p.name + '»?')) return;
   deckPresets[kind] = list.filter(x => x.id !== id);
+  if (deckPresetsUser) deckPresets.gone.push(id);
   deckSavePresets();
 }
 function deckRenamePreset(kind, id){
@@ -1597,7 +1691,7 @@ function deckRenamePreset(kind, id){
   if (!p) return;
   const name = deckAskName(p.name);
   if (!name) return;
-  p.name = name;
+  p.name = name; p._dirty = true;
   deckSavePresets();
 }
 
