@@ -273,7 +273,7 @@ a.mode-card{text-decoration:none;box-sizing:border-box}
 const EXAM_ATTEMPTS = 3;
 
 // Названия номеров — по демоверсии ФИПИ (структура ОГЭ-2026/2027: 13 заданий;
-// №13 сочинение — на отдельной странице rus_oge13.html, №1 изложение пока нет).
+// №1 изложение и №13 сочинение — на отдельных страницах rus_oge01.html и rus_oge13.html).
 const NUMS = [
   {n:2,  title:'Грамматическая основа', part:2},
   {n:3,  title:'Характеристики предложений', part:2},
@@ -376,13 +376,12 @@ function renderPicker(){
       ${solved ? `<span class="mprog">✓ ${solved} из ${list.length}</span>` : ''}
       <span class="msub">${sub}</span></button>`;
   });
-  // №13 живёт на своей странице (там темы, черновик и образцы), отсюда — ссылка;
-  // №1 без аудиозаписи изложения не сделать, поэтому пока выключен
+  // №1 и №13 живут на своих страницах (там аудио или темы, черновик и образцы), отсюда — ссылки
   html += '<div class="section-title">Изложение и сочинение</div>' +
+    '<a class="mode-card" id="izlLink" href="rus_oge01.html"><span class="mtitle">№1. Сжатое изложение</span>' +
+    '<span class="msub">43 аудиозаписи ФИПИ · микротемы, самопроверка и образцы</span></a>' +
     '<a class="mode-card" id="essayLink" href="rus_oge13.html"><span class="mtitle">№13. Сочинение-рассуждение</span>' +
-    '<span class="msub">99 текстов ФИПИ · темы 13.1–13.3, самопроверка и образцы</span></a>' +
-    '<button class="mode-card" disabled><span class="mtitle">№1. Сжатое изложение</span>' +
-    '<span class="msub">скоро</span></button>';
+    '<span class="msub">99 текстов ФИПИ · темы 13.1–13.3, самопроверка и образцы</span></a>';
   grid.innerHTML = html;
   grid.querySelectorAll('.mode-card[data-n]').forEach(b => b.addEventListener('click', () => openNumber(+b.dataset.n)));
   if (!SHOW_ALL && okCount < total) {

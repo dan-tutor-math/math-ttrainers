@@ -14,7 +14,7 @@
      показывает и прячет ответ, подсмотренное не идёт в «верно»;
   5. №5 и №7 принимают цифры в любом порядке, строковые ответы — без учёта
      регистра и «ё/е»;
-  6. карточка №13 ведёт на rus_oge13.html; ◀ ▶ ходят по кругу, адрес ?n=…&t=… открывает то же задание;
+  6. карточки №1 и №13 ведут на rus_oge01.html и rus_oge13.html; ◀ ▶ ходят по кругу, адрес ?n=…&t=… открывает то же задание;
   7. тёмная тема и ширина телефона — без ошибок JS и без горизонтальной прокрутки.
 
 Совместного режима у этой страницы пока нет — проверять на сайте руками нечего.
@@ -152,6 +152,7 @@ def main():
         enabled = sorted(int(x) for x in pg.eval_on_selector_all(".mode-card[data-n]:not([disabled])", "els => els.map(e => e.dataset.n)"))
         check(enabled == ok_nums, f"включены номера с подтверждёнными ответами: {enabled}")
         check(pg.get_attribute("#essayLink", "href") == "rus_oge13.html", "карточка №13 ведёт на страницу сочинения")
+        check(pg.get_attribute("#izlLink", "href") == "rus_oge01.html", "карточка №1 ведёт на страницу изложения")
         pool = pg.evaluate("Object.fromEntries(Object.entries(window.__rusOge.POOL).map(([k,v]) => [k, v.every(t => t.ok)]))")
         check(all(pool.values()), "в задания ученика не попало ни одного несверенного ответа")
         pg.goto(BASE + "/rus_oge.html?all=1")

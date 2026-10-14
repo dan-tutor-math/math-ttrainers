@@ -7,7 +7,7 @@
      6 классе) — старые тесты главной на это опираются;
   2. метка «банк ФИПИ» — у №19–21 математики и у №2–12 русского, больше ни у кого;
   3. «Русский» перекрашивает страницу в малиновый, показывает ОГЭ: №1–13 со
-     сквозной нумерацией, №2–12 ведут в rus_oge.html?n=…, №13 — в rus_oge13.html, №1 — «скоро»;
+     сквозной нумерацией, №2–12 ведут в rus_oge.html?n=…, №1 — в rus_oge01.html, №13 — в rus_oge13.html;
   4. у каждого предмета своя запомненная вкладка; предмет помнится после
      перезагрузки; математика хранит вкладку под прежним ключом ogeNav:state;
   5. обществознание и английский — свой текст «готовим»;
@@ -150,12 +150,12 @@ def main():
         check(titles == ["Часть 1 — изложение", "Часть 2 — краткий ответ", "Часть 3 — сочинение"], f"три части: {titles}")
         items = pg.evaluate(ITEMS)
         check([i["num"] for i in items] == [f"{n:02d}" for n in range(1, 14)], "сквозная нумерация 01–13")
-        check([i["href"] for i in items if i["href"]] == [f"rus_oge.html?n={n}" for n in range(2, 13)] + ["rus_oge13.html"], "№2–12 ведут в rus_oge.html?n=…, №13 — в rus_oge13.html")
-        check([i["name"] for i in items if i["soon"]] == ["№1. Сжатое изложение"], "«скоро» — только №1")
+        check([i["href"] for i in items if i["href"]] == ["rus_oge01.html"] + [f"rus_oge.html?n={n}" for n in range(2, 13)] + ["rus_oge13.html"], "№1 — rus_oge01.html, №2–12 — rus_oge.html?n=…, №13 — rus_oge13.html")
+        check(not any(i["soon"] for i in items), "у русского ОГЭ «скоро» больше нет")
         check(not any(i["chip"] for i in items), "у русского меток «банк ФИПИ» тоже нет (промпт №22)")
         check(items[4]["name"] == "№5. Расстановка запятых", f"названия как в rus_oge.html: {items[4]['name']}")
         cnt = pg.inner_text(".nav-tab.active")
-        check("12" in cnt, f"счётчик вкладки — 12 готовых ({cnt.strip()})")
+        check("13" in cnt, f"счётчик вкладки — 13 готовых ({cnt.strip()})")
         check(pg.evaluate("localStorage.getItem('ogeNav:subject')") == "rus", "предмет запомнен")
 
         print("4. вкладки у каждого предмета свои")
