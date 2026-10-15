@@ -2788,6 +2788,10 @@ function getImg(src){
     // пустой до первого движения в ней (ученик на демонстрации, у которого
     // картинка приходит позже панели, так её и не видел)
     im.onload = () => { scheduleRedraw(); rfScheduleRedraw(); };
+    // Промпт №89: картинка с сервера (хранилище файлов Supabase, image-store.js)
+    // — с разрешением CORS, иначе холст «запачкается» и «Скачать PNG» / PDF
+    // откажут. Бакет отдаёт Access-Control-Allow-Origin: *
+    if (/^https?:/.test(src)) im.crossOrigin = 'anonymous';
     im.src = src;
     imgCache[src] = im;
   }
