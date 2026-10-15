@@ -2780,6 +2780,23 @@ function strokeSmoothThroughPoints(c, pts){
 
 /* ── изображения: кэш загруженных <img>, чтобы не пересоздавать их каждый кадр ── */
 const imgCache = {};
+/* Промпт №89б: картинка из хранилища файлов хранится в доске не полным
+   адресом, а ключом «img:<путь в бакете>» — адрес сервера подставляется
+   здесь, при показе (IMG_BASE_URL в supabase-config.js). Переезд на другой
+   сервер (Selectel) тогда меняет одну строку настроек, а не ссылки в
+   каждой доске каждого учителя */
+const IMG_KEY_PREFIX = 'img:';
+function imgUrl(src){
+  if (typeof src !== 'string' || !src.startsWith(IMG_KEY_PREFIX)) return src;
+  return (window.IMG_BASE_URL || '') + src.slice(IMG_KEY_PREFIX.length);
+}
+// картинка с сервера — с разрешением CORS, иначе холст «запачкается» и
+// «Скачать PNG» / PDF / обрезка и поворот откажут
+function setImgSrc(im, src){
+  const u = imgUrl(src);
+  if (/^https?:/.test(u)) im.crossOrigin = 'anonymous';
+  im.src = u;
+}
 function getImg(src){
   if (!imgCache[src]){
     const im = new Image();
@@ -2788,11 +2805,7 @@ function getImg(src){
     // пустой до первого движения в ней (ученик на демонстрации, у которого
     // картинка приходит позже панели, так её и не видел)
     im.onload = () => { scheduleRedraw(); rfScheduleRedraw(); };
-    // Промпт №89: картинка с сервера (хранилище файлов Supabase, image-store.js)
-    // — с разрешением CORS, иначе холст «запачкается» и «Скачать PNG» / PDF
-    // откажут. Бакет отдаёт Access-Control-Allow-Origin: *
-    if (/^https?:/.test(src)) im.crossOrigin = 'anonymous';
-    im.src = src;
+    setImgSrc(im, src);
     imgCache[src] = im;
   }
   return imgCache[src];
@@ -6368,7 +6381,7 @@ function buildSolutionToggle(rec, obj){
   const img = document.createElement('img');
   img.alt = 'Решение и ответ';
   img.draggable = false;
-  img.src = obj.sol.src;
+  setImgSrc(img, obj.sol.src);
   panel.appendChild(img);
   rec.root.appendChild(btn);
   rec.root.appendChild(panel);
@@ -8142,7 +8155,7 @@ function loadImageEl(src){
     const im = new Image();
     im.onload = () => resolve(im);
     im.onerror = reject;
-    im.src = src;
+    setImgSrc(im, src);
   });
 }
 function hasTransparency(canvas, ctx){
@@ -8187,7 +8200,7 @@ function loadImageSize(src){
     const im = new Image();
     im.onload = () => resolve({ w: im.naturalWidth || 300, h: im.naturalHeight || 200 });
     im.onerror = () => resolve({ w: 300, h: 200 });
-    im.src = src;
+    setImgSrc(im, src);
   });
 }
 function viewportCenterWorld(){ return { x: cam.x + cssW/2/cam.zoom, y: cam.y + cssH/2/cam.zoom }; }
@@ -8241,7 +8254,7 @@ function setCropUI(){
   if (reset) reset.style.display = '';
 }
 function previewHTML(src){
-  return `<img src="${src}" alt="">
+  return `<img src="${imgUrl(src)}" alt="">
     <div class="bd-crop-box" id="imgCropBox" style="display:none"><i class="nw"></i><i class="n"></i><i class="ne"></i><i class="e"></i><i class="se"></i><i class="s"></i><i class="sw"></i><i class="w"></i></div>
     <div class="bd-crop-hint" id="imgCropHint">Потяните рамку по картинке, чтобы обрезать</div>`;
 }
@@ -8264,7 +8277,7 @@ function cropDataUrl(src, rect){
       } catch (e) { resolve(null); }
     };
     im.onerror = () => resolve(null);
-    im.src = src;
+    setImgSrc(im, src);
   });
 }
 function hasAlpha(canvas){
@@ -8292,7 +8305,7 @@ function rotateDataUrl(src, dir){
       } catch (e) { resolve(null); }
     };
     im.onerror = () => resolve(null);
-    im.src = src;
+    setImgSrc(im, src);
   });
 }
 
@@ -8350,7 +8363,7 @@ function renderImageLibrary(){
   const lib = (B && B.imageLib) || [];
   if (!lib.length){ box.style.display='none'; wrap.innerHTML=''; return; }
   box.style.display = 'block';
-  wrap.innerHTML = lib.slice().reverse().map(it => `<img src="${it.src}" data-id="${it.id}" title="Вставить снова">`).join('');
+  wrap.innerHTML = lib.slice().reverse().map(it => `<img src="${imgUrl(it.src)}" data-id="${it.id}" title="Вставить снова">`).join('');
   wrap.querySelectorAll('img').forEach(img => {
     img.addEventListener('click', async () => {
       const it = lib.find(x=>x.id===img.dataset.id);

@@ -1,7 +1,7 @@
 """
 Промпт №89: картинки досок — файлами в хранилище Supabase (image-store.js).
 
-Хранилище файлов подменено заглушкой, картинка по ссылке отдаётся с другого
+Хранилище файлов подменено заглушкой (№89, №89б — ключ img: вместо адреса), картинка по ссылке отдаётся с другого
 адреса (как настоящий бакет, с CORS). Проверяем: вставленная картинка
 уезжает в хранилище и в доске становится ссылкой — и на доске, и в разборе
 задания (sol); одинаковые картинки заливаются один раз; в хранилище
@@ -75,6 +75,7 @@ DATA = "data:image/png;base64," + base64.b64encode(PNG).decode()
 
 STUB_JS = """(fail) => {
   window.CURRENT_USER = { id: 'u1' };
+  window.IMG_BASE_URL = 'http://localhost:9001/fakestore/';
   window.__up = [];
   window.SB = { storage: { from: () => ({
     upload: async (path, blob) => { if (fail) return { data: null, error: { message: 'Bucket not found' } };
@@ -115,13 +116,18 @@ def main():
         st = page.evaluate("""() => { const im = B.objects.filter(o => o.type === 'image');
           return { srcs: im.map(o => o.src), sol: im[1].sol.src, up: window.__up.slice() }; }""")
         print("загружено:", st["up"])
-        check(all(s.startswith("http://localhost:9001/fakestore/u1/") for s in st["srcs"]) and st["sol"] == st["srcs"][0],
-              "картинки и разбор задания стали ссылками в папке пользователя")
+        check(all(s.startswith("img:u1/") for s in st["srcs"]) and st["sol"] == st["srcs"][0],
+              "картинки и разбор задания стали ключами img: в папке пользователя (адреса сервера в доске нет)")
         check(len(st["up"]) == 1 and st["up"][0].endswith(".png"), "одинаковая картинка залита один раз, имя — по содержимому")
 
         page.wait_for_timeout(800)
         saved = page.evaluate("async () => { const h = await idbGet('boarddata:' + B.id); return JSON.stringify(h.objects); }")
-        check("data:image" not in saved and "fakestore" in saved, "в хранилище браузера ссылка, а не base64")
+        check("data:image" not in saved and "img:u1/" in saved and "fakestore" not in saved, "в хранилище браузера ключ, а не base64 и не адрес")
+
+        # полные адреса, записанные до №89б, переписываются в ключи
+        page.evaluate("() => { B.objects.push({ id: uid(), type: 'image', src: IMG_BASE_URL + 'u1/old.png', points: [{ x: 500, y: 100 }], w: 40, h: 40 }); saveDB(); }")
+        page.wait_for_function("() => B.objects.some(o => o.src === 'img:u1/old.png')", timeout=8000)
+        check(True, "старый полный адрес переписан в ключ img:")
 
         page.evaluate("() => scheduleRedraw()")
         page.wait_for_timeout(400)

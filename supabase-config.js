@@ -10,6 +10,10 @@ window.SUPABASE_CONFIG = {
   url: 'https://nctwdjyxlwnsbdkmisje.supabase.co',
   anonKey: 'sb_publishable_S0ruXCX_UXlIkPAboUlAPg_SYP72WVi'
 };
+// Где лежат файлы картинок досок (промпт №89б). В досках хранится только
+// ключ «img:<путь>», адрес подставляется при показе — при переезде на другой
+// сервер меняется только эта строка
+window.IMG_BASE_URL = window.SUPABASE_CONFIG.url + '/storage/v1/object/public/board-images/';
 
 /* Предохранитель realtime (промпт №88г). Когда вебсокет к Supabase не
    поднимается (у учителя 15.10.2026: «WebSocket … failed» и «falling back
