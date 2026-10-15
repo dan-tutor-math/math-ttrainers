@@ -45,19 +45,20 @@
   // бакета — их переводим в ключ «img:…» без всякой заливки
   function isFullUrl(src) { return typeof src === 'string' && !!window.IMG_BASE_URL && src.startsWith(window.IMG_BASE_URL); }
 
-  // все места открытой доски, где у картинки есть src: сама доска, панель
-  // заметок, разбор у задания с тренажёра (sol)
-  function holders(test) {
+  // все места доски, где у картинки есть src: сама доска и разбор у задания
+  // с тренажёра (sol). Панель заметок (refPanel) — нет: она живёт только в
+  // браузере, на сервер не ездит, и уборка мусора (gc ниже) по базе не
+  // увидела бы, что её картинка ещё нужна
+  function holders(test, board) {
     test = test || isData;
+    board = board || (typeof B !== 'undefined' ? B : null);
     const out = [];
-    if (typeof B === 'undefined' || !B || !Array.isArray(B.objects)) return out;
-    const add = (o) => {
+    if (!board || !Array.isArray(board.objects)) return out;
+    board.objects.forEach((o) => {
       if (!o) return;
       if (o.type === 'image' && test(o.src)) out.push({ o, k: 'src' });
       if (o.sol && test(o.sol.src)) out.push({ o: o.sol, k: 'src' });
-    };
-    B.objects.forEach(add);
-    if (B.refPanel && Array.isArray(B.refPanel.imageObjects)) B.refPanel.imageObjects.forEach(add);
+    });
     return out;
   }
 
@@ -110,11 +111,35 @@
     return key;
   }
 
+  // любая доска целиком (перенос на сервер, cloud-migrate.js): все её
+  // картинки — в хранилище. Бросает ошибку, если хранилище недоступно, —
+  // тогда переносить доску на сервер нельзя: в базу уехали бы мегабайты
+  async function convertBoard(board) {
+    if (!client() || !userId()) throw new Error('нет входа');
+    let n = 0;
+    for (const h of holders(isFullUrl, board)) { h.o[h.k] = 'img:' + h.o[h.k].slice(window.IMG_BASE_URL.length); n++; }
+    const srcs = Array.from(new Set(holders(isData, board).map(h => h.o[h.k])));
+    for (const src of srcs) {
+      let key;
+      try { key = await upload(src); }
+      catch (err) { if (/bucket not found|not found|row-level security|unauthorized|403|404/i.test(String((err && err.message) || err))) off = true; throw err; }
+      holders(isData, board).forEach(h => { if (h.o[h.k] === src) { h.o[h.k] = key; n++; } });
+    }
+    return n;
+  }
+
+  // облачная доска сохраняет правки по снимку «до» (pushUndo, boards-cloud.js):
+  // без него подмена картинки на ключ осталась бы только в этом браузере
+  function beginEdit() {
+    if (typeof B !== 'undefined' && B && B.cloudBoardId && typeof pushUndo === 'function') pushUndo();
+  }
+
   async function tick() {
     if (off || busy || !client() || !userId()) return;
     if (typeof boardActive !== 'undefined' && !boardActive) return;
     const legacy = holders(isFullUrl);
     if (legacy.length){
+      beginEdit();
       legacy.forEach(h => { h.o[h.k] = 'img:' + h.o[h.k].slice(window.IMG_BASE_URL.length); });
       if (typeof saveDB === 'function') saveDB();
       if (typeof scheduleRedraw === 'function') scheduleRedraw();
@@ -138,6 +163,7 @@
       // пока заливали, доску могли закрыть или сменить — тогда в следующий раз
       if (typeof B === 'undefined' || !B || B.id !== boardId) return;
       let n = 0;
+      if (holders().some(h => h.o[h.k] === src)) beginEdit();
       holders().forEach(h => { if (h.o[h.k] === src) { h.o[h.k] = key; n++; } });
       if (n){
         if (typeof saveDB === 'function') saveDB();
@@ -147,6 +173,42 @@
   }
   setInterval(() => { tick().catch(() => { busy = false; }); }, TICK_MS);
 
-  // для тестов и консоли: сколько картинок на открытой доске ещё текстом
-  window.ImageStore = { pending: () => holders().length, isOff: () => off, tick };
+  /* ── уборка мусора (№90) ──
+     Картинка, которую убрали со всех досок, остаётся файлом навсегда. Раз в
+     сутки сервер называет файлы этого учителя старше 30 дней, на которые не
+     ссылается ни один объект ни одной доски в базе (функция
+     board_images_garbage, boards-server-schema.sql), и мы их удаляем.
+     Удалять файлы может только Storage API (прямое удаление строк из
+     storage.objects Supabase запрещает), поэтому это делает сайт, а не
+     задание в базе. Запускаем, только когда ВСЕ доски этого браузера уже на
+     сервере: иначе картинка доски, которая ещё не переехала, выглядела бы
+     для сервера мусором. Картинки панели заметок (они только в браузере)
+     из списка вычёркиваем сами */
+  const GC_KEY = 'boardsImgGcAt', GC_EVERY_MS = 24 * 3600 * 1000;
+  async function gc(force) {
+    const sb = client();
+    if (off || !sb || !userId() || typeof getDB !== 'function') return { skipped: 'нет входа или хранилища' };
+    let last = 0;
+    try { last = +localStorage.getItem(GC_KEY) || 0; } catch (e) {}
+    if (!force && Date.now() - last < GC_EVERY_MS) return { skipped: 'рано' };
+    const boards = getDB().boards || [];
+    if (boards.some(b => !b.cloudBoardId)) return { skipped: 'не все доски на сервере' };
+    const res = await sb.rpc('board_images_garbage', { min_age_days: 30 });
+    if (res.error) { console.warn('[картинки] уборка недоступна:', res.error.message || res.error); return { skipped: 'нет функции' }; }
+    const keep = new Set();
+    boards.forEach(b => ((b.refPanel && b.refPanel.imageObjects) || []).forEach(o => {
+      if (typeof o.src === 'string' && o.src.startsWith('img:')) keep.add(o.src.slice(4));
+    }));
+    const names = (res.data || []).map(r => (typeof r === 'string' ? r : r.name)).filter(n => n && !keep.has(n));
+    for (let i = 0; i < names.length; i += 100) {
+      const r = await sb.storage.from(BUCKET).remove(names.slice(i, i + 100));
+      if (r.error) { console.warn('[картинки] не удалось удалить:', r.error.message || r.error); return { removed: i }; }
+    }
+    try { localStorage.setItem(GC_KEY, String(Date.now())); } catch (e) {}
+    return { removed: names.length };
+  }
+  setTimeout(() => { gc().catch(() => {}); setInterval(() => { gc().catch(() => {}); }, 3600 * 1000); }, 30000);
+
+  // для переноса досок, тестов и консоли
+  window.ImageStore = { pending: () => holders().length, isOff: () => off, tick, convertBoard, gc };
 })();
