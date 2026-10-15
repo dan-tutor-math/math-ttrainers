@@ -12,7 +12,10 @@
   D. автопроверка: верный ответ с запятой и точкой, минус-знаки разных видов,
      неверный ответ, «не число»; решённый лист закрепляется;
   E. из двух плашек сразу — примеры вперемешку (и сложение, и умножение);
-  F. телефон 375 и 320 px без прокрутки вбок; ссылка на странице в каталоге.
+  F. телефон 375 и 320 px без прокрутки вбок; ссылка на странице в каталоге;
+  G. галочки внутри плиток: главная ставит/снимает оба варианта, «–» при одном,
+     на доску идут только отмеченные варианты знаков, выбор переживает
+     перезагрузку, старое сохранение (только номера плиток) читается.
 
 Запуск: python3 test_prompt_neg_pos.py (сервер поднимается сам).
 """
@@ -84,7 +87,7 @@ def select_only(page, sections_ks):
         page.click(f'#sections [data-sec="{sec}"]')
         page.click("#none")
         for k in sections_ks.get(sec, []):
-            page.click(f'.tile[data-k="{k}"]')
+            page.click(f'.tile[data-k="{k}"] .main')
 
 
 def board_texts(page):
@@ -234,6 +237,55 @@ def main():
             ov2 = pg.evaluate("document.documentElement.scrollWidth > innerWidth")
             check(f"F. {w} px: без прокрутки вбок (выбор и доска)", not ov1 and not ov2)
             check(f"F. {w} px: без ошибок JS", not errs, str(errs))
+        # ── G. галочки внутри плиток ────────────────────────────────────
+        pg, errs = open_page(browser)
+        bad = []
+        for sec in ("as", "md"):
+            for k in range(4):
+                for vi, m in enumerate((1, -1)):
+                    ts = pg.evaluate("([s,k,m]) => Array.from({length:200}, () => NEGPOS.gen(s,k,false,m).text)", [sec, k, m])
+                    bad += [(sec, k, m, t) for t in ts if t.startswith("−") != (m < 0)]
+        check("G. генератор: вариант задаёт знак первого числа", not bad, str(bad[:4]))
+        tile = lambda k: pg.locator(f'.tile[data-k="{k}"]')
+        pressed = lambda k: tile(k).locator(".main").get_attribute("aria-pressed")
+        pg.click('#sections [data-sec="md"]')
+        pg.click("#none")
+        pg.click('#sections [data-sec="as"]')
+        pg.click("#none")
+        tile(0).locator(".main").click()
+        check("G. главная галочка ставит оба варианта",
+              pressed(0) == "true" and tile(0).locator(".sb.on").count() == 2)
+        tile(0).locator('.sb[data-v="1"]').click()
+        check("G. снят один вариант — главная «–»",
+              pressed(0) == "mixed" and tile(0).locator(".main .box.part").count() == 1 and "on" in tile(0).get_attribute("class"))
+        pg.click('#cnt1 [data-cnt="10"]')
+        only_pos = True
+        for _ in range(5):
+            pg.click("#start")
+            only_pos &= all(not t.startswith("−") and " + " in t for t in board_texts(pg))
+            pg.click("#back")
+        check("G. на доске только «оба положительные»", only_pos)
+        tile(0).locator(".main").click()
+        check("G. главная при «–» ставит оба", pressed(0) == "true")
+        tile(0).locator(".main").click()
+        check("G. главная при обоих снимает оба",
+              pressed(0) == "false" and tile(0).locator(".sb.on").count() == 0 and pg.is_disabled("#start"))
+        pg.click('#sections [data-sec="md"]')
+        pg.click("#none")
+        tile(1).locator('.sb[data-v="1"]').click()
+        pg.click("#start")
+        ts = board_texts(pg)
+        check("G. «минус на плюс»: первое отрицательное, второе положительное",
+              all(t.startswith("−") and "(" not in t for t in ts), str(ts))
+        pg.reload(wait_until="domcontentloaded")
+        pg.click('#sections [data-sec="md"]')
+        check("G. выбор вариантов переживает перезагрузку",
+              pressed(1) == "mixed" and tile(1).locator('.sb[data-v="1"]').get_attribute("aria-pressed") == "true")
+        pg.evaluate("localStorage.setItem('negpos_state', JSON.stringify({dec:false,cnt:5,as:[2],md:[]}))")
+        pg.reload(wait_until="domcontentloaded")
+        check("G. старое сохранение: плитка включена целиком", pressed(2) == "true" and pressed(0) == "false")
+        check("G. без ошибок JS", not errs, str(errs))
+
         idx = open(os.path.join(HERE, "index.html"), encoding="utf-8").read()
         check("F. в каталоге на главной есть ссылка", "href: 'neg_pos.html'" in idx)
         check("A. страница без ошибок JS", not errors, str(errors))

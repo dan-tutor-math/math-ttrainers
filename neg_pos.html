@@ -86,15 +86,23 @@ h1{font-weight:700;letter-spacing:-.02em;font-size:clamp(22px,4.6vw,34px);text-a
 .switch[aria-checked="true"] .track{background:var(--ink)}
 .switch[aria-checked="true"] .track::after{transform:translateX(18px)}
 .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(210px,100%),1fr));gap:10px}
-.tile{position:relative;text-align:left;font:inherit;color:var(--pencil);background:var(--glass);border:1.5px solid var(--glass-border);border-radius:14px;padding:12px 14px;cursor:pointer;display:grid;gap:6px;min-width:0;align-content:start}
-.tile .t{font-weight:600;font-size:15px;padding-right:26px}
-.tile .ex{display:grid}
-.tile .exl{font:600 18px var(--font-mono);color:var(--ink);padding:5px 0;border-top:1px dashed var(--grid);overflow-wrap:anywhere}
-.tile .exl:first-child{border-top:0;padding-top:0}
-.tile .d{font-size:12.5px;color:var(--muted)}
-.tile::after{content:'';position:absolute;top:12px;right:12px;width:18px;height:18px;border-radius:5px;border:1.5px solid var(--muted)}
+.tile{position:relative;color:var(--pencil);background:var(--glass);border:1.5px solid var(--glass-border);border-radius:14px;display:grid;min-width:0;align-content:start}
 .tile.on{border-color:var(--ink);background:var(--hl)}
-.tile.on::after{background:var(--ink);border-color:var(--ink);content:'✓';color:#fff;font-size:12px;line-height:15px;text-align:center}
+.tile .main{position:relative;text-align:left;font:inherit;color:inherit;background:none;border:0;border-radius:12px 12px 0 0;padding:12px 14px 8px;cursor:pointer;display:grid;gap:4px}
+.tile .t{font-weight:600;font-size:15px;padding-right:26px}
+.tile .d{font-size:12.5px;color:var(--muted)}
+.box{width:18px;height:18px;border-radius:5px;border:1.5px solid var(--muted);flex:0 0 auto;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:700;line-height:1}
+.box.on,.box.part{background:var(--ink);border-color:var(--ink)}
+.box.on::after{content:'✓'}
+.box.part::after{content:'–'}
+.main .box{position:absolute;top:12px;right:12px}
+.subs{display:grid;gap:2px;padding:0 6px 8px}
+.subs .sb{display:flex;align-items:center;gap:10px;text-align:left;font:inherit;color:var(--pencil);background:none;border:0;border-top:1px dashed var(--grid);border-radius:10px;padding:8px;cursor:pointer;width:100%;min-width:0}
+.subs .sb:hover{background:var(--hl)}
+.sb .lb{display:grid;gap:2px;min-width:0}
+.sb .l{font-size:13px;color:var(--muted)}
+.sb .exl{font:600 18px var(--font-mono);color:var(--ink);overflow-wrap:anywhere}
+.sb:not(.on) .exl{opacity:.4}
 .sum{text-align:center;font-size:14px;color:var(--muted);min-height:20px}
 .cnt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;font-size:14px;color:var(--muted)}
 .btn{font:600 16px var(--font-ui);padding:11px 22px;border-radius:12px;border:0;background:var(--ink);color:#fff;cursor:pointer}
@@ -197,88 +205,117 @@ h1{font-weight:700;letter-spacing:-.02em;font-size:clamp(22px,4.6vw,34px);text-a
   function first(v){ return fmt(v, U); }
   function second(v){ return v < 0 ? '(' + fmt(v, U) + ')' : fmt(v, U); }
 
+  /* v — галочки внутри плитки: [подпись, знак m]. m — знак первого числа,
+     g(dec, m) строит пример ровно этого варианта, чтобы можно было убрать,
+     например, «оба отрицательные» и оставить только «оба положительные». */
+  var SAME = [['Оба положительные', 1], ['Оба отрицательные', -1]],
+      FIRST = [['Первое положительное', 1], ['Первое отрицательное', -1]],
+      MSAME = [['Плюс на плюс', 1], ['Минус на минус', -1]],
+      MDIFF = [['Плюс на минус', 1], ['Минус на плюс', -1]];
   var TYPES = {
     as: [
-      { t: 'Числа одного знака', d: 'Оба положительные или оба отрицательные', g: function(dec){
-          var A = posNum(dec, 1, 20), B = posNum(dec, 1, 20), neg = Math.random() < .5;
-          return neg ? { text: first(-A) + ' − ' + second(B), ans: -(A + B), sc: U }
-                     : { text: first(A) + ' + ' + second(B), ans: A + B, sc: U }; } },
-      { t: 'Числа разных знаков', d: 'Один отрицательный, другой положительный', g: function(dec){
+      { t: 'Числа одного знака', d: 'Оба положительные или оба отрицательные', v: SAME, g: function(dec, m){
+          var A = posNum(dec, 1, 20), B = posNum(dec, 1, 20);
+          return m < 0 ? { text: first(-A) + ' − ' + second(B), ans: -(A + B), sc: U }
+                       : { text: first(A) + ' + ' + second(B), ans: A + B, sc: U }; } },
+      { t: 'Числа разных знаков', d: 'Один отрицательный, другой положительный', v: FIRST, g: function(dec, m){
           var A = posNum(dec, 1, 20), B = posNum(dec, 1, 20); if (A === B) B += dec ? 1 : U;
-          return Math.random() < .5 ? { text: first(-A) + ' + ' + second(B), ans: B - A, sc: U }
-                                    : { text: first(A) + ' − ' + second(B), ans: A - B, sc: U }; } },
-      { t: 'Конфликт знаков: + (−)', d: 'Прибавить отрицательное', g: function(dec){
-          var A = posNum(dec, 1, 20) * pick([-1, 1]), B = posNum(dec, 1, 20);
+          return m < 0 ? { text: first(-A) + ' + ' + second(B), ans: B - A, sc: U }
+                       : { text: first(A) + ' − ' + second(B), ans: A - B, sc: U }; } },
+      { t: 'Конфликт знаков: + (−)', d: 'Прибавить отрицательное', v: FIRST, g: function(dec, m){
+          var A = posNum(dec, 1, 20) * m, B = posNum(dec, 1, 20);
           return { text: first(A) + ' + ' + second(-B), ans: A - B, sc: U }; } },
-      { t: 'Конфликт знаков: − (−)', d: 'Вычесть отрицательное', g: function(dec){
-          var A = posNum(dec, 1, 20) * pick([-1, 1]), B = posNum(dec, 1, 20);
+      { t: 'Конфликт знаков: − (−)', d: 'Вычесть отрицательное', v: FIRST, g: function(dec, m){
+          var A = posNum(dec, 1, 20) * m, B = posNum(dec, 1, 20);
           return { text: first(A) + ' − ' + second(-B), ans: A + B, sc: U }; } }
     ],
     md: [
-      { t: 'Умножение: одинаковые знаки', d: 'Минус на минус даёт плюс', g: function(dec){ return mul(dec, true); } },
-      { t: 'Умножение: разные знаки', d: 'Результат отрицательный', g: function(dec){ return mul(dec, false); } },
-      { t: 'Деление: одинаковые знаки', d: 'Результат положительный', g: function(dec){ return div(dec, true); } },
-      { t: 'Деление: разные знаки', d: 'Результат отрицательный', g: function(dec){ return div(dec, false); } }
+      { t: 'Умножение: одинаковые знаки', d: 'Минус на минус даёт плюс', v: MSAME, g: function(dec, m){ return mul(dec, true, m); } },
+      { t: 'Умножение: разные знаки', d: 'Результат отрицательный', v: MDIFF, g: function(dec, m){ return mul(dec, false, m); } },
+      { t: 'Деление: одинаковые знаки', d: 'Результат положительный', v: MSAME, g: function(dec, m){ return div(dec, true, m); } },
+      { t: 'Деление: разные знаки', d: 'Результат отрицательный', v: MDIFF, g: function(dec, m){ return div(dec, false, m); } }
     ]
   };
-  function sg(same){ var m = pick([-1, 1]); return [m, same ? m : -m]; }
+  function sg(same, m){ return [m, same ? m : -m]; }
   // Дробный множитель с одним знаком после запятой, не целый (0,2 … 9,9)
   function d1(){ var x = ri(2, 99); return (x % 10 ? x : x + 1) * 100; }
-  function mul(dec, same){
-    var s = sg(same), a = dec ? d1() : ri(2, 12) * U, b = dec ? pick([d1(), ri(2, 9) * U]) : ri(2, 9) * U;
+  function mul(dec, same, m){
+    var s = sg(same, m), a = dec ? d1() : ri(2, 12) * U, b = dec ? pick([d1(), ri(2, 9) * U]) : ri(2, 9) * U;
     a *= s[0]; b *= s[1];
     return { text: first(a) + ' · ' + second(b), ans: a * b, sc: U * U };
   }
-  function div(dec, same){
-    var s = sg(same), b, q;
+  function div(dec, same, m){
+    var s = sg(same, m), b, q;
     if (dec){ b = d1(); q = pick([d1(), ri(2, 9) * U]); } else { b = ri(2, 9) * U; q = ri(2, 12) * U; }
     var a = b * q / U;                       // делимое = делитель · частное, ответ всегда конечная дробь
     var A = a * s[0], B = b * s[1], Q = q * s[0] * s[1];
     return { text: first(A) + ' : ' + second(B), ans: Q, sc: U };
   }
 
-  var sec = 'as', dec = false, cnt = 5, on = { as: new Set([2, 3]), md: new Set([0]) }, leaves = [];
+  // on[раздел][плитка][вариант] — стоит ли галочка у варианта
+  function preset(s, ks){ return TYPES[s].map(function(x, k){ return x.v.map(function(){ return ks.indexOf(k) >= 0; }); }); }
+  var sec = 'as', dec = false, cnt = 5, on = { as: preset('as', [2, 3]), md: preset('md', [0]) }, leaves = [];
   try {
     var saved = JSON.parse(localStorage.getItem('negpos_state') || 'null');
     if (saved) { dec = !!saved.dec; if ([3, 5, 10].indexOf(saved.cnt) >= 0) cnt = saved.cnt;
-      on = { as: new Set(), md: new Set() };
-      // Берём только существующие плитки: старое сохранение не должно ронять генератор
-      ['as', 'md'].forEach(function(k){ (saved[k] || []).forEach(function(i){ if (TYPES[k][i]) on[k].add(i); }); }); }
+      on = { as: preset('as', []), md: preset('md', []) };
+      /* Сохранение: 'плитка.вариант'. Старое сохранение хранило только номер
+         плитки — тогда включаем у неё все варианты. Несуществующее пропускаем,
+         чтобы старое сохранение не роняло генератор. */
+      ['as', 'md'].forEach(function(s){ (saved[s] || []).forEach(function(e){
+        var p = String(e).split('.'), k = +p[0], row = on[s][k]; if (!row) return;
+        if (p.length < 2) row.fill(true); else if (+p[1] in row) row[+p[1]] = true; }); }); }
   } catch (e) {}
-  function save(){ try{ localStorage.setItem('negpos_state', JSON.stringify({ dec: dec, cnt: cnt, as: [...on.as], md: [...on.md] })); }catch(e){} }
+  function picked(s){ var r = []; on[s].forEach(function(row, k){ row.forEach(function(b, vi){ if (b) r.push(k + '.' + vi); }); }); return r; }
+  function save(){ try{ localStorage.setItem('negpos_state', JSON.stringify({ dec: dec, cnt: cnt, as: picked('as'), md: picked('md') })); }catch(e){} }
+  function typesOn(s){ return on[s].filter(function(row){ return row.indexOf(true) >= 0; }).length; }
   var $ = function(id){ return document.getElementById(id); };
 
-  function gen(s, k, d){ return TYPES[s][k].g(d); }
-  function pool(){ var r = []; ['as', 'md'].forEach(function(s){ on[s].forEach(function(k){ r.push({ s: s, k: k }); }); }); return r; }
+  // m не задан — вариант знака случайный (так генератор зовёт тест)
+  function gen(s, k, d, m){ return TYPES[s][k].g(d, m === undefined ? TYPES[s][k].v[pick([0, 1])][1] : m); }
+  function pool(){ var r = []; ['as', 'md'].forEach(function(s){ on[s].forEach(function(row, k){ row.forEach(function(b, vi){
+    if (b) r.push({ s: s, k: k, m: TYPES[s][k].v[vi][1] }); }); }); }); return r; }
   // Пример, которого ещё нет на доске (skip — лист, который сейчас заменяется)
   function unique(skip){
     var used = {}; leaves.forEach(function(l, i){ if (i !== skip) used[l.text] = 1; });
     var p = pool(), t, n = 0;
-    do { var ty = pick(p); t = gen(ty.s, ty.k, dec); n++; } while (used[t.text] && n < 80);
+    do { var ty = pick(p); t = gen(ty.s, ty.k, dec, ty.m); n++; } while (used[t.text] && n < 80);
     return t;
   }
 
   function drawTiles(){
     $('tiles').innerHTML = '';
     TYPES[sec].forEach(function(x, k){
-      var b = document.createElement('button'); b.type = 'button';
-      b.className = 'tile' + (on[sec].has(k) ? ' on' : ''); b.setAttribute('aria-pressed', on[sec].has(k));
-      b.setAttribute('data-sec', sec); b.setAttribute('data-k', k);
-      var t = document.createElement('span'); t.className = 't'; t.textContent = x.t;
-      var ex = document.createElement('span'); ex.className = 'ex';
-      var e1 = x.g(dec), e2 = x.g(dec), n = 0; while (e2.text === e1.text && n++ < 20) e2 = x.g(dec);
-      [e1, e2].forEach(function(e){ var q = document.createElement('span'); q.className = 'exl'; q.textContent = e.text; ex.appendChild(q); });
-      var d = document.createElement('span'); d.className = 'd'; d.textContent = x.d;
-      b.appendChild(t); b.appendChild(ex); b.appendChild(d);
-      b.onclick = function(){ on[sec].has(k) ? on[sec].delete(k) : on[sec].add(k); save(); drawStep1(); };
-      $('tiles').appendChild(b);
+      var row = on[sec][k], n = row.filter(Boolean).length, all = n === row.length;
+      var tile = document.createElement('div'); tile.className = 'tile' + (n ? ' on' : '');
+      tile.setAttribute('role', 'group'); tile.setAttribute('aria-label', x.t);
+      tile.setAttribute('data-sec', sec); tile.setAttribute('data-k', k);
+      // Главная галочка: включает оба варианта; если включены оба — снимает оба
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'main';
+      b.setAttribute('aria-pressed', all ? 'true' : n ? 'mixed' : 'false');
+      b.innerHTML = '<span class="t"></span><span class="d"></span><span class="box"></span>';
+      b.querySelector('.t').textContent = x.t; b.querySelector('.d').textContent = x.d;
+      b.querySelector('.box').className = 'box' + (all ? ' on' : n ? ' part' : '');
+      b.onclick = function(){ on[sec][k] = row.map(function(){ return !all; }); save(); drawStep1(); };
+      var subs = document.createElement('div'); subs.className = 'subs';
+      x.v.forEach(function(v, vi){
+        var sb = document.createElement('button'); sb.type = 'button'; sb.className = 'sb' + (row[vi] ? ' on' : '');
+        sb.setAttribute('aria-pressed', row[vi]); sb.setAttribute('data-v', vi);
+        sb.innerHTML = '<span class="box"></span><span class="lb"><span class="l"></span><span class="exl"></span></span>';
+        sb.querySelector('.box').className = 'box' + (row[vi] ? ' on' : '');
+        sb.querySelector('.l').textContent = v[0]; sb.querySelector('.exl').textContent = x.g(dec, v[1]).text;
+        sb.onclick = function(){ row[vi] = !row[vi]; save(); drawStep1(); };
+        subs.appendChild(sb);
+      });
+      tile.appendChild(b); tile.appendChild(subs);
+      $('tiles').appendChild(tile);
     });
   }
   function drawStep1(){
     drawTiles();
     document.querySelectorAll('#sections .pill').forEach(function(p){ p.classList.toggle('on', p.dataset.sec === sec); });
-    var n = on.as.size + on.md.size;
-    $('sum').textContent = n ? 'Выбрано типов: ' + n + (on.as.size && on.md.size ? ' (пойдут вперемешку)' : '') : 'Выберите хотя бы один тип';
+    var n = typesOn('as') + typesOn('md');
+    $('sum').textContent = n ? 'Выбрано типов: ' + n + ', вариантов внутри: ' + pool().length + (typesOn('as') && typesOn('md') ? ' (пойдут вперемешку)' : '') : 'Выберите хотя бы один тип';
     $('start').disabled = !n;
     $('dec').setAttribute('aria-checked', dec);
     cntBtns();
@@ -352,8 +389,8 @@ h1{font-weight:700;letter-spacing:-.02em;font-size:clamp(22px,4.6vw,34px);text-a
 
   document.querySelectorAll('#sections .pill').forEach(function(p){ p.onclick = function(){ sec = p.dataset.sec; drawStep1(); }; });
   $('dec').onclick = function(){ dec = !dec; save(); drawStep1(); };
-  $('all').onclick = function(){ TYPES[sec].forEach(function(_, k){ on[sec].add(k); }); save(); drawStep1(); };
-  $('none').onclick = function(){ on[sec].clear(); save(); drawStep1(); };
+  $('all').onclick = function(){ on[sec].forEach(function(row){ row.fill(true); }); save(); drawStep1(); };
+  $('none').onclick = function(){ on[sec].forEach(function(row){ row.fill(false); }); save(); drawStep1(); };
   $('start').onclick = function(){ if (!pool().length) return; $('step1').classList.remove('show'); $('step2').classList.add('show'); deal(); };
   $('back').onclick = function(){ $('step2').classList.remove('show'); $('step1').classList.add('show'); drawStep1(); };
   $('refAll').onclick = deal;
