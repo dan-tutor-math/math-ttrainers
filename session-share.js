@@ -135,6 +135,8 @@
       heartbeatCallback: (status) => { try { onSocketHeartbeat(status); } catch (e) {} },
     },
   });
+  // без связи сообщения не копятся в очередях библиотеки (supabase-config.js)
+  if (window.rtGuard) window.rtGuard(SB);
 
   // код читается «безопасным для устной диктовки» алфавитом — без 0/O/1/I/L,
   // чтобы не путать при звонке (см. комментарий в trainer_sessions.sql)

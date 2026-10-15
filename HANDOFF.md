@@ -3726,6 +3726,16 @@ Realtime в работах не нужен. Из песочницы до Supabas
   данные из-под них. Такой код должен «застолбить» доски на время своей
   работы (см. `pinAllBoards`/`unpinAllBoards`), а не полагаться на то, что
   никто больше их не тронет
+- Вебсокет к Supabase не поднимается («WebSocket … failed», «Realtime send()
+  is automatically falling back to REST API» в консоли) — библиотека не
+  выбрасывает ничего: исходящее копится в её очередях (sendBuffer сокета,
+  pushBuffer канала), а каждая рассылка (курсор, пульс, вид доски) уходит
+  отдельным HTTP-запросом. В песочнице за 5 с простоя — 53 запроса и
+  очередь, которая не убывает. У учителя 15.10.2026 страница досок держала
+  1,7 ГБ на ПУСТОЙ доске в чистом Chrome. Предохранитель `rtGuard` в
+  supabase-config.js (№88г): без подключённого канала рассылки не шлём,
+  очереди держим не длиннее 20. Новый клиент Supabase — обязательно через
+  `rtGuard(createClient(...))`. Тест: `test_prompt88g_realtime_guard.py`
 - Падает или виснет страница досок — ПЕРВЫМ делом инкогнито с тем же
   аккаунтом (раздел 6, «Если доски тормозят или падают»). Работает там —
   испорчен профиль браузера, в коде не копать: 15.10.2026 на это ушло полдня
@@ -6605,6 +6615,11 @@ Realtime в работах не нужен. Из песочницы до Supabas
   консоли у пользователя (выводит путь вида `DB.boards.3.objects.12.x`):
   `(()=>{const seen=new Set(),bad=[];const walk=(v,p,d)=>{if(bad.length>8||d>14||v===null)return;const t=typeof v;if(t==='function'){bad.push(p+' — функция');return}if(t!=='object')return;if(v instanceof Node||v instanceof Window){bad.push(p+' — '+v.constructor.name);return}if(seen.has(v))return;seen.add(v);try{structuredClone(v);return}catch(e){}const ks=Object.keys(v);if(!ks.length)bad.push(p+' — '+(v.constructor&&v.constructor.name));ks.forEach(k=>walk(v[k],p+'.'+k,d+1))};walk(getDB(),'DB',0);return bad.length?bad.join('\n'):'всё сохраняемо'})()`
   Тест пересборки переведён на обычные доски
+- Промпт №88г — предохранитель realtime (`rtGuard`, supabase-config.js) на
+  всех клиентах: доски, совместная сессия, работы. Главный подозреваемый в
+  гигабайтах памяти у учителя (раздел 8): вебсокет у него не поднимался, и
+  библиотека копила сообщения и слала их HTTP-запросами. Тест:
+  `test_prompt88g_realtime_guard.py`
 - Промпт №85г — в «максимуме эффектов» быстрое листание ползунком
   непрерывное (стопка идёт за ручкой, у отметки примагничивается). Раздел 6б.
   Тест: `test_prompt85v_deck_depth.py`

@@ -312,7 +312,7 @@
     return;
   }
 
-  const sb = window.supabase.createClient(cfg.url, cfg.anonKey);
+  const sb = (window.rtGuard || (c => c))(window.supabase.createClient(cfg.url, cfg.anonKey));
   window.SB = sb; // остальным модулям (совместное редактирование, шаринг) — тот же клиент
 
   // Все обращения к серверной функции входа и списка почт

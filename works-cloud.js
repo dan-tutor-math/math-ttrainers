@@ -23,7 +23,7 @@
     if (!cfg.url || !cfg.anonKey || !window.supabase) return null;
     // тот же ключ хранения сессии, что у досок (supabase-js сам берёт его из
     // адреса проекта): учитель, вошедший на «Досках», здесь уже вошёл
-    sb = window.supabase.createClient(cfg.url, cfg.anonKey);
+    sb = (window.rtGuard || (c => c))(window.supabase.createClient(cfg.url, cfg.anonKey));
     return sb;
   }
 
