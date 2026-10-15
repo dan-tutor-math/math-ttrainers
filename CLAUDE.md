@@ -8,6 +8,7 @@
 - Сборки нет: статические файлы, публикация — пуш в main
 - База и realtime: Supabase, проект nctwdjyxlwnsbdkmisje
 - Общие модули: session-share.js (совместные сессии), trainer-board.js (доска), trainer-multi.js (несколько заданий на экране), basket-core.js (подборка), lesson-history.js. Приложение досок: boards.html, boards-core.js, boards-cloud.js
+- Презентации (deck-core.js, №84–88) с 15.10.2026 на паузе: убраны из main, лежат в ветке presentations-paused — HANDOFF раздел 6б, плашка в начале
 - Вне репозитория: ../fipi-pilot (выгрузка и сверка банка ФИПИ), ../claude-notes/*.md (заметки по банку ФИПИ, по предметам). Открывать только когда задача про них
 
 ## HANDOFF.md — НЕ ЧИТАТЬ ЦЕЛИКОМ

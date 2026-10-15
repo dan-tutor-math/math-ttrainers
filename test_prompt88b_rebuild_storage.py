@@ -112,7 +112,7 @@ def main():
         stroke(page, 500, 400)
         page.evaluate("() => backToList()")
         page.wait_for_timeout(400)
-        page.click("#blCreateDeck")
+        page.click("#blCreateBoard")
         page.wait_for_timeout(700)
         stroke(page, 520, 420)
         stroke(page, 520, 470)
