@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0B0E1A">
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тренажёр: состав числа</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --font-ui:'Onest',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,-apple-system,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#EEF1F7;
+  --blob-1:rgba(120,150,255,.16);
+  --blob-2:rgba(190,150,230,.14);
+  --glass:rgba(255,255,255,.55);
+  --glass-strong:rgba(255,255,255,.72);
+  --glass-border:rgba(255,255,255,.85);
+  --hl:rgba(0,76,153,.12);
+  --muted:#6E6E73;
+  --paper:#FDFCF7;
+  --grid:#DCE4F0;
+  --margin-red:#FF9F0A;
+  --ink:#004C99;
+  --pencil:#1D1D1F;
+  --ok:#248A3D;
+  --ok-tint:rgba(36,138,61,.14);
+  --bad:#D93025;
+  --bad-tint:rgba(217,48,37,.12);
+  --shadow:0 10px 34px rgba(20,30,60,.08);
+  --roof-text:#fff;
+}
+html[data-theme="dark"]{
+  --bg:#0B0E1A;
+  --blob-1:rgba(90,110,255,.22);
+  --blob-2:rgba(150,90,220,.18);
+  --paper:#151A2C;
+  --glass:rgba(40,46,74,.5);
+  --glass-strong:rgba(46,53,84,.65);
+  --glass-border:rgba(255,255,255,.12);
+  --hl:rgba(74,147,240,.18);
+  --grid:#232A44;
+  --ink:#4A93F0;
+  --pencil:#F2F3F5;
+  --muted:#9A9AA2;
+  --ok:#5BB87A;
+  --ok-tint:rgba(91,184,122,.18);
+  --bad:#FF6961;
+  --bad-tint:rgba(255,105,97,.16);
+  --shadow:0 10px 40px rgba(0,0,0,.55);
+  --roof-text:#0B0E1A;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  background:
+    radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
+    radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+    var(--bg);
+  background-size:auto,auto,24px 24px,24px 24px,auto;
+  font-family:var(--font-ui);color:var(--pencil);min-height:100vh;padding:18px 12px 60px;
+}
+.home-btn,.theme-toggle{position:fixed;top:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;text-decoration:none;z-index:50}
+.home-btn{left:16px;font-size:19px}
+.theme-toggle{right:16px;font-size:17px}
+.home-btn:hover,.theme-toggle:hover{border-color:var(--ink)}
+.wrap{max-width:900px;margin:0 auto;display:grid;gap:18px;padding-top:4px}
+h1{font-weight:700;letter-spacing:-.02em;font-size:clamp(22px,4.6vw,34px);text-align:center;text-wrap:balance;padding:0 48px}
+.sub{font-weight:500;text-align:center;color:var(--muted);font-size:15px;margin-top:4px}
+.step{display:none;gap:16px}.step.show{display:grid}
+.lbl{font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);text-align:center}
+.block{display:grid;gap:10px}
+.pills{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.pill{font:600 14px var(--font-ui);padding:8px 16px;border-radius:999px;border:1px solid var(--glass-border);background:var(--glass);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);color:var(--pencil);cursor:pointer;transition:transform .15s}
+.pill:active{transform:scale(.96)}
+.pill:hover{border-color:var(--ink)}
+.pill.on{background:var(--ink);border-color:var(--ink);color:#fff;box-shadow:0 6px 16px rgba(0,76,153,.3)}
+.pill.num{min-width:46px;font:700 18px var(--font-mono);padding:9px 0}
+.reset{width:42px;height:42px;align-self:center;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass-strong);color:var(--ink);cursor:pointer;font-size:18px}
+.reset:hover{border-color:var(--ink)}
+.reset:disabled{opacity:.35;cursor:default}
+.bar{display:flex;flex-wrap:wrap;gap:12px 24px;align-items:center;justify-content:center}
+.switch{display:inline-flex;align-items:center;gap:10px;font:600 15px var(--font-ui);cursor:pointer;background:none;border:0;color:var(--pencil)}
+.track{width:44px;height:26px;border-radius:999px;background:var(--muted);position:relative;transition:background .15s;flex:0 0 auto}
+.track::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:transform .15s}
+.switch[aria-checked="true"] .track{background:var(--ink)}
+.switch[aria-checked="true"] .track::after{transform:translateX(18px)}
+
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(220px,100%),1fr));gap:10px}
+.tile{position:relative;text-align:left;font:inherit;color:var(--pencil);background:var(--glass);border:1.5px solid var(--glass-border);border-radius:14px;padding:12px 14px;cursor:pointer;display:grid;gap:6px;min-width:0;align-content:start}
+.tile:hover{border-color:var(--ink)}
+.tile .t{font-weight:600;font-size:15px;padding-right:26px}
+.tile .d{font-size:12.5px;color:var(--muted)}
+.tile .pv{display:grid;justify-items:center;gap:6px;padding:4px 0}
+.tile::after{content:'';position:absolute;top:12px;right:12px;width:18px;height:18px;border-radius:5px;border:1.5px solid var(--muted)}
+.tile.on{border-color:var(--ink);background:var(--hl)}
+.tile.on::after{background:var(--ink);border-color:var(--ink);content:'✓';color:#fff;font-size:12px;font-weight:700;line-height:15px;text-align:center}
+.chips{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
+.chip{font:600 12px var(--font-mono);color:var(--ink);border:1.5px solid var(--ink);border-radius:6px;padding:2px 6px;background:var(--paper)}
+.mini-eq{font:600 12px var(--font-mono);color:var(--ink);text-align:center;line-height:1.5;white-space:pre}
+.twinmini{display:flex;gap:8px;align-items:flex-end}
+
+.sum{text-align:center;font-size:14px;color:var(--muted);min-height:20px}
+.cnt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;font-size:14px;color:var(--muted)}
+.btn{font:600 16px var(--font-ui);padding:11px 22px;border-radius:12px;border:0;background:var(--ink);color:#fff;cursor:pointer}
+.btn:disabled{opacity:.4;cursor:default}
+.go{justify-self:center;font-size:17px;padding:13px 30px}
+.topbar{display:flex;flex-wrap:wrap;gap:10px 14px;align-items:center;justify-content:space-between}
+.score{font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:999px;padding:8px 14px}
+.note{font-size:13px;color:var(--muted);text-align:center}
+.note.warn{color:var(--bad)}
+.note:empty{display:none}
+
+.board{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(240px,100%),1fr));gap:14px;align-items:start}
+.leaf{position:relative;background:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px),var(--paper);
+  background-size:24px 24px;border:1px solid var(--glass-border);border-radius:14px;box-shadow:var(--shadow);padding:38px 14px 16px 36px;display:grid;gap:12px;min-width:0}
+.leaf::before{content:'';position:absolute;top:0;bottom:0;left:24px;width:2px;background:var(--margin-red);opacity:.55}
+.leaf .no{position:absolute;top:10px;left:36px;font-size:12px;color:var(--muted)}
+.leaf .rf{position:absolute;top:6px;right:8px;width:28px;height:28px;border-radius:50%;border:1px solid var(--glass-border);background:var(--glass-strong);color:var(--ink);cursor:pointer;font-size:15px}
+.leaf .rf:hover{border-color:var(--ink)}
+.leaf .ask{font-size:13.5px;font-weight:600;text-align:center}
+.leaf .row{display:flex;justify-content:center}
+.leaf .btn{padding:8px 16px;font-size:14px}
+.leaf.ok{outline:2.5px solid var(--ok)}
+.leaf.bad{outline:2.5px solid var(--bad)}
+.stage{display:grid;gap:12px}
+.verdict{font-weight:600;font-size:13.5px;padding:6px 12px;border-radius:10px;text-align:center}
+.verdict:empty{display:none}
+.verdict.ok{background:var(--ok-tint);color:var(--ok)}
+.verdict.bad{background:var(--bad-tint);color:var(--bad)}
+
+/* Домик: треугольная крыша и этажи по два окошка */
+.house{width:100%;max-width:190px;margin:0 auto;display:grid;justify-items:center}
+.roof{width:100%;height:78px;background:var(--ink);clip-path:polygon(50% 0,100% 100%,0 100%);
+  display:flex;align-items:flex-end;justify-content:center;padding-bottom:9px;color:var(--roof-text);font:700 28px var(--font-mono)}
+.roof input{width:52px;text-align:center;font:700 24px var(--font-mono);color:var(--roof-text);background:transparent;border:0;border-bottom:2.5px solid var(--roof-text);outline:none;padding:0;border-radius:0}
+.roof.ok{background:var(--ok)}.roof.bad{background:var(--bad)}
+.body{width:calc(100% - 22px);border:2.5px solid var(--ink);border-top:0;background:var(--paper)}
+.floor{display:grid;grid-template-columns:1fr 1fr;border-top:2px solid var(--ink)}
+.floor:first-child{border-top-width:2.5px}
+.floor.pick{cursor:pointer}
+.floor.pick:hover{background:var(--hl)}
+.floor.marked{background:var(--hl);box-shadow:inset 0 0 0 2px var(--margin-red)}
+.floor.ok{background:var(--ok-tint)}.floor.bad{background:var(--bad-tint)}
+.win{min-height:44px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:4px;font:600 22px var(--font-mono);color:var(--ink)}
+.win+.win{border-left:2px solid var(--ink)}
+.win.ok{background:var(--ok-tint)}.win.bad{background:var(--bad-tint)}
+.win input,.eq input{width:50px;text-align:center;font:600 21px var(--font-mono);color:var(--ink);background:transparent;border:0;border-bottom:2px dashed var(--ink);outline:none;padding:2px 0;border-radius:4px 4px 0 0}
+.win input:focus,.eq input:focus{background:var(--hl);border-bottom-style:solid}
+/* Точки по пять в ряд — как на счётных карточках, 7 читается как 5 и 2 */
+.dots{display:flex;flex-wrap:wrap;gap:2px;max-width:38px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--margin-red)}
+.mini{max-width:110px;width:110px}
+.mini .roof{height:34px;font-size:15px;padding-bottom:3px}
+.mini .body{width:calc(100% - 12px)}
+.mini .win{min-height:22px;font-size:13px;padding:1px}
+.mini .win.e{color:var(--muted)}
+.twinmini .mini{width:78px}
+
+/* Домик и примеры */
+.eqs{display:grid;gap:6px;justify-content:center}
+.eq{display:flex;align-items:center;gap:6px;font:600 20px var(--font-mono);color:var(--ink);padding:3px 8px;border-radius:8px}
+.eq input{width:42px;font-size:20px}
+.eq.ok{background:var(--ok-tint)}.eq.bad{background:var(--bad-tint)}
+
+/* Карточки */
+.tray{display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.card{min-width:44px;height:44px;padding:0 10px;border-radius:10px;border:2px solid var(--ink);background:var(--paper);color:var(--ink);font:700 20px var(--font-mono);cursor:pointer;box-shadow:0 2px 0 var(--ink)}
+.card.used{opacity:.2;cursor:default;box-shadow:none}
+.card.sel{background:var(--ink);color:#fff}
+.card.pairc{font-size:16px}
+.slot{width:46px;height:32px;border:0;border-bottom:2px dashed var(--ink);background:transparent;color:var(--ink);font:600 21px var(--font-mono);cursor:pointer;border-radius:6px 6px 0 0}
+.slot.active{background:var(--hl);border-bottom-style:solid;box-shadow:inset 0 0 0 2px var(--margin-red)}
+.slot.filled{border-bottom-style:solid}
+
+/* Пропавший этаж */
+.lost{display:grid;justify-items:center;gap:6px}
+.lost .lt{font-size:13px;color:var(--muted);font-weight:600}
+.lostfloor{width:min(168px,100%);border:2px dashed var(--ink);border-radius:4px;background:var(--paper)}
+.lostfloor .win+.win{border-left:2px dashed var(--ink)}
+
+/* Два домика */
+.twins{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:end}
+.house.small{max-width:104px}
+.small .roof{height:50px;font-size:20px;padding-bottom:5px}
+.small .body{width:calc(100% - 14px)}
+.small .win{min-height:36px;font-size:17px;padding:2px}
+.small .body:empty{min-height:40px;border-top:2.5px solid var(--ink)}
+.small .body:empty::after{content:'пусто';display:block;text-align:center;color:var(--muted);font:500 12px var(--font-ui);padding-top:12px}
+.house.target.armed{cursor:pointer}
+.house.target.armed .body{box-shadow:0 0 0 3px var(--margin-red)}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+</style>
+</head>
+<body>
+<a class="home-btn" id="homeBtn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
+<button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему" type="button">🌙</button>
+<script>(function(){
+  var btn=document.getElementById('themeToggle');
+  function apply(t, persist){
+    document.documentElement.setAttribute('data-theme', t);
+    btn.textContent = t === 'dark' ? '☀️' : '🌙';
+    if (persist) { try{ localStorage.setItem('theme', t); }catch(e){} }
+  }
+  apply(document.documentElement.getAttribute('data-theme') || 'light', false);
+  btn.addEventListener('click', function(){
+    apply(document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark', true);
+  });
+})();</script>
+
+<div class="wrap">
+  <header>
+    <h1>Состав числа: домики</h1>
+    <p class="sub">На крыше живёт число, на каждом этаже — две его части.</p>
+  </header>
+
+  <div class="step show" id="step1">
+    <div class="block">
+      <p class="lbl">Какие домики</p>
+      <div class="pills" id="nums" role="group" aria-label="Числа на крыше"></div>
+    </div>
+    <div class="block">
+      <p class="lbl">Типы заданий</p>
+      <div class="tiles" id="tiles"></div>
+    </div>
+    <div class="bar">
+      <button class="switch" id="zero" type="button" role="switch" aria-checked="false"><span class="track"></span>С нулём (0 и 10)</button>
+      <button class="switch" id="dotsSw" type="button" role="switch" aria-checked="true"><span class="track"></span>Точки-подсказки</button>
+    </div>
+    <p class="sum" id="sum"></p>
+    <div class="cnt">Сколько домиков на доске: <span class="pills" id="cnt1"></span></div>
+    <button class="btn go" type="button" id="start">Начать →</button>
+  </div>
+
+  <div class="step" id="step2">
+    <div class="topbar">
+      <button class="pill" type="button" id="back">← К настройке</button>
+      <span class="score" id="score">Построено домиков: 0</span>
+      <button class="pill on" type="button" id="refAll">⟳ Новые домики</button>
+    </div>
+    <p class="note warn" id="short"></p>
+    <div class="board" id="board"></div>
+    <p class="note">⟳ на листе меняет один домик. Enter — к следующему окошку.</p>
+  </div>
+</div>
+
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  function rnd(n){ return Math.floor(Math.random() * n); }
+  function pick(a){ return a[rnd(a.length)]; }
+  function shuffle(a){ a = a.slice(); for (var i = a.length - 1; i > 0; i--){ var j = rnd(i + 1), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function el(tag, cls, txt){ var e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; }
+  function btn(cls, txt){ var b = el('button', cls, txt); b.type = 'button'; return b; }
+  function numInput(lbl){ var i = el('input', 'ans'); i.inputMode = 'numeric'; i.maxLength = 2; i.autocomplete = 'off'; i.setAttribute('aria-label', lbl); return i; }
+  function val(inp){ return inp.value === '' ? null : +inp.value; }
+  function mark(e, ok){ e.classList.remove('ok', 'bad'); e.classList.add(ok ? 'ok' : 'bad'); }
+
+  /* ───── превью на плитках выбора ───── */
+  function miniHouse(n, f){
+    var h = el('div', 'house mini'), body = el('div', 'body');
+    h.append(el('div', 'roof', n), body);
+    f.forEach(function(p){ var row = el('div', 'floor');
+      p.forEach(function(v){ row.appendChild(el('div', 'win' + (v === null ? ' e' : ''), v === null ? '□' : v)); });
+      body.appendChild(row); });
+    return h;
+  }
+  function chips(a){ var c = el('div', 'chips'); a.forEach(function(t){ c.appendChild(el('span', 'chip', t)); }); return c; }
+  function twin(a, b){ var c = el('div', 'twinmini'); c.append(a, b); return c; }
+
+  var MODES = [
+    { id: 'pair',    t: 'Найди соседа',   d: 'В каждом этаже одно окошко пустое. Этажи вразброс.', ask: 'Кто живёт в пустом окошке?',
+      pv: function(){ return [miniHouse(6, [[2, null], [null, 1], [3, null]])]; } },
+    { id: 'order',   t: 'По порядку',     d: 'Левые окошки идут 1, 2, 3… Видна закономерность.', ask: 'Заполни правые окошки',
+      pv: function(){ return [miniHouse(5, [[1, null], [2, null], [3, null]])]; } },
+    { id: 'empty',   t: 'Пустой домик',   d: 'Заселить все этажи самому. Пары не повторяются.', ask: 'Засели все этажи — пары не повторяются',
+      pv: function(){ return [miniHouse(4, [[null, null], [null, null], [null, null]])]; } },
+    { id: 'roof',    t: 'Кто на крыше?',  d: 'Этажи заполнены, нужно узнать число на крыше.', ask: 'Какое число живёт на крыше?',
+      pv: function(){ return [miniHouse('?', [[3, 4], [5, 2], [1, 6]])]; } },
+    { id: 'error',   t: 'Найди ошибку',   d: 'На одном этаже живёт чужая пара. Нажми на него.', ask: 'Нажми на этаж с ошибкой',
+      pv: function(){ return [miniHouse(7, [[3, 4], [5, 3], [1, 6]])]; } },
+    { id: 'family',  t: 'Домик и примеры', d: 'Один этаж — четыре примера: два на сложение, два на вычитание.', ask: 'Запиши четыре примера с этого этажа',
+      pv: function(){ var c = el('div', 'mini-eq', '3 + 7 = 10   7 + 3 = 10\n10 − 3 = 7   10 − 7 = 3'); return [miniHouse(10, [[3, 7]]), c]; } },
+    { id: 'cards',   t: 'Расселение',     d: 'Без клавиатуры: ставь карточки в окошки. Одна-две карточки лишние.', ask: 'Поставь карточки в окошки. Есть лишние!',
+      pv: function(){ return [miniHouse(5, [[2, null], [null, 4]]), chips(['3', '2', '1'])]; } },
+    { id: 'missing', t: 'Пропавший этаж', d: 'Этажи по порядку, но одного не хватает. Какого?', ask: 'Какой этаж пропал?',
+      pv: function(){ return [miniHouse(5, [[1, 4], [2, 3], [4, 1]]), chips(['□ и □'])]; } },
+    { id: 'whose',   t: 'Чей жилец?',     d: 'Два домика и пары-карточки. Каждую пару — в свой домик.', ask: 'Расставь пары по домикам',
+      pv: function(){ return [twin(miniHouse(7, [[3, 4]]), miniHouse(8, [[5, 3]])), chips(['2 и 6', '1 и 6'])]; } }
+  ];
+  var MODE_IDS = MODES.map(function(m){ return m.id; });
+  var COUNTS = [1, 3, 6, 9, 12];
+
+  var nums = [10], modes = ['pair', 'error'], zero = false, dots = true, cnt = 3, built = 0, houses = [];
+  try {
+    var saved = JSON.parse(localStorage.getItem('sostav_state') || 'null');
+    if (saved) {
+      // Чужие значения отбрасываем, чтобы старое сохранение не роняло генератор
+      nums = (saved.nums || []).filter(function(n){ return n >= 2 && n <= 10 && n === Math.floor(n); });
+      modes = (saved.modes || []).filter(function(m){ return MODE_IDS.indexOf(m) >= 0; });
+      zero = !!saved.zero; dots = saved.dots !== false;
+      if (COUNTS.indexOf(saved.cnt) >= 0) cnt = saved.cnt;
+    }
+  } catch (e) {}
+  function save(){ try{ localStorage.setItem('sostav_state', JSON.stringify({ nums: nums, modes: modes, zero: zero, dots: dots, cnt: cnt })); }catch(e){} }
+  function toggle(arr, v){ var i = arr.indexOf(v); if (i >= 0) arr.splice(i, 1); else arr.push(v); }
+
+  /* ───── генератор ───── */
+  function pairs(N, z){ var lo = z ? 0 : 1, a = []; for (var i = lo; i <= N - lo; i++) a.push([i, N - i]); return a; }
+  function floors(P, show){ return P.map(function(p){ return { l: p[0], r: p[1], show: typeof show === 'function' ? show() : show }; }); }
+  function half(){ return Math.random() < .5 ? 'l' : 'r'; }
+
+  // Домик для числа N и типа mode. z — режим «с нулём», others — остальные выбранные числа (для «Чей жилец?»)
+  function make(N, mode, z, others){
+    var P = pairs(N, z);
+    // Без нуля у 2 и 3 всего один-два этажа — искать ошибку или пропажу не из чего
+    if ((mode === 'missing' || mode === 'error') && P.length < 3) mode = 'pair';
+    var h = { N: N, mode: mode };
+    if (mode === 'pair')  h.floors = floors(shuffle(P), half);
+    if (mode === 'order') h.floors = floors(P, 'l');
+    if (mode === 'empty') h.floors = floors(P, 'none');
+    if (mode === 'roof')  h.floors = floors(shuffle(P).slice(0, 3), 'both');
+    if (mode === 'error') {
+      h.floors = floors(shuffle(P).slice(0, 4), 'both'); h.wrong = rnd(h.floors.length);
+      var f = h.floors[h.wrong]; f.r = f.r === 0 ? 1 : f.r + (Math.random() < .5 ? 1 : -1);
+    }
+    if (mode === 'family') h.floors = floors([pick(P)], 'both');
+    if (mode === 'cards') {
+      // С нулём у 2 и 3 нужные числа могут занять весь ряд 0…N — один этаж убираем, чтобы осталась лишняя карточка
+      h.floors = floors(shuffle(P).slice(0, Math.min(4, z ? P.length - 1 : P.length)), half);
+      var need = h.floors.map(function(f){ return f.show === 'l' ? f.r : f.l; });
+      // Лишние карточки — числа, которых в ответах нет: иначе лишняя ничем не отличалась бы от нужной
+      var spare = [];
+      for (var v = z ? 0 : 1; v <= N; v++) if (need.indexOf(v) < 0) spare.push(v);
+      h.cards = shuffle(need.concat(shuffle(spare).slice(0, 1 + rnd(2))));
+    }
+    if (mode === 'missing') { var k = rnd(P.length); h.miss = P[k]; h.floors = floors(P.filter(function(_, j){ return j !== k; }), 'both'); }
+    if (mode === 'whose') {
+      var o = (others || []).filter(function(x){ return x !== N; });
+      // Одно выбранное число — второй домик соседний: пары 9 и 10 различить труднее всего
+      var N2 = o.length ? pick(o) : (N < 10 ? N + 1 : N - 1);
+      h.Ns = [N, N2].sort(function(a, b){ return a - b; });
+      var a = 2 + rnd(2);
+      h.cards = shuffle(
+        shuffle(pairs(h.Ns[0], z)).slice(0, a).map(function(p){ return { l: p[0], r: p[1] }; }).concat(
+        shuffle(pairs(h.Ns[1], z)).slice(0, 5 - a).map(function(p){ return { l: p[0], r: p[1] }; })));
+    }
+    // Ключ для «на доске без повторов»: для «Найди соседа» и «Расселения» важен и порядок этажей
+    h.key = JSON.stringify(h);
+    return h;
+  }
+  function gen(){ return make(pick(nums), pick(modes), zero, nums); }
+
+  function dotsEl(n){ var d = el('span', 'dots'); for (var i = 0; i < n; i++) d.appendChild(el('span', 'dot')); return d; }
+  function addFloor(body, f, opt){
+    opt = opt || {};
+    var showDots = opt.showDots === undefined ? dots : opt.showDots;
+    var row = el('div', 'floor'), wins = [];
+    ['l', 'r'].forEach(function(side){
+      var w = el('div', 'win');
+      if (f.show === 'both' || f.show === side) { w.appendChild(el('span', 'v', f[side])); if (showDots) w.appendChild(dotsEl(f[side])); }
+      else if (opt.slots) { var b = btn('slot'); b.setAttribute('aria-label', 'Пустое окошко'); w.appendChild(b); }
+      else w.appendChild(numInput('Окошко'));
+      row.appendChild(w); wins.push(w);
+    });
+    body.appendChild(row);
+    return { el: row, wins: wins, f: f };
+  }
+  function buildHouse(N, fl, opt){
+    opt = opt || {};
+    var h = el('div', 'house' + (opt.small ? ' small' : '')), roof = el('div', 'roof'), body = el('div', 'body'), roofIn = null;
+    h.append(roof, body);
+    if (opt.roofHidden) { roofIn = numInput('Число на крыше'); roof.appendChild(roofIn); } else roof.textContent = N;
+    return { el: h, roof: roof, body: body, roofIn: roofIn, fls: fl.map(function(f){ return addFloor(body, f, opt); }) };
+  }
+
+  /* ───── задания: каждое строит лист и возвращает проверку ─────
+     Проверка отдаёт {good, msg}; good === null — проверять ещё рано (не всё заполнено) */
+  var BUILD = {
+    std: function(h, st){
+      var H = buildHouse(h.N, h.floors); st.appendChild(H.el);
+      return function(){
+        var good = true;
+        H.fls.forEach(function(F){ F.wins.forEach(function(w, s){ var inp = w.querySelector('input'); if (!inp) return;
+          var ok = val(inp) === F.f[s ? 'r' : 'l']; good = good && ok; mark(w, ok); }); });
+        return { good: good, msg: 'Красные окошки ещё не на месте' };
+      };
+    },
+    empty: function(h, st){
+      var H = buildHouse(h.N, h.floors); st.appendChild(H.el);
+      return function(){
+        var good = true, seen = {};
+        H.fls.forEach(function(F){
+          var a = val(F.wins[0].querySelector('input')), b = val(F.wins[1].querySelector('input'));
+          var ok = a !== null && b !== null && a + b === h.N && !seen[a + '|' + b] && (zero || (a > 0 && b > 0));
+          if (ok) seen[a + '|' + b] = 1; good = good && ok; F.wins.forEach(function(w){ mark(w, ok); });
+        });
+        return { good: good, msg: 'Красные этажи неверные или повторяются' };
+      };
+    },
+    roof: function(h, st){
+      var H = buildHouse(h.N, h.floors, { roofHidden: true }); st.appendChild(H.el);
+      return function(){ var good = val(H.roofIn) === h.N; H.roof.className = 'roof ' + (good ? 'ok' : 'bad');
+        return { good: good, msg: 'Сложи числа на любом этаже' }; };
+    },
+    error: function(h, st, clear){
+      // Точки здесь выключены: по ним ошибка находится пересчётом, а не составом числа
+      var H = buildHouse(h.N, h.floors, { showDots: false }); st.appendChild(H.el);
+      var marked = -1;
+      H.fls.forEach(function(F, k){
+        F.el.classList.add('pick'); F.el.tabIndex = 0; F.el.setAttribute('role', 'button');
+        function p(){ marked = marked === k ? -1 : k;
+          H.fls.forEach(function(x, j){ x.el.classList.toggle('marked', j === marked); x.el.classList.remove('ok', 'bad'); }); clear(); }
+        F.el.onclick = p;
+        F.el.onkeydown = function(e){ if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); p(); } };
+      });
+      return function(){
+        if (marked < 0) return { good: null, msg: 'Сначала нажми на этаж' };
+        var good = marked === h.wrong; H.fls[marked].el.classList.remove('marked'); mark(H.fls[marked].el, good);
+        return { good: good, msg: 'Этот этаж правильный — сложи его окошки' };
+      };
+    },
+    family: function(h, st){
+      var H = buildHouse(h.N, h.floors); st.appendChild(H.el);
+      var l = h.floors[0].l, r = h.floors[0].r, box = el('div', 'eqs'); st.appendChild(box);
+      var rows = ['+', '+', '−', '−'].map(function(op){
+        var row = el('div', 'eq'), a = numInput('Число'), b = numInput('Число');
+        if (op === '+') row.append(a, el('span', '', '+'), b, el('span', '', '= ' + h.N));
+        else row.append(el('span', '', h.N + ' −'), a, el('span', '', '='), b);
+        box.appendChild(row); return { row: row, a: a, b: b };
+      });
+      return function(){
+        var good = true, msg = 'Красные примеры неверные';
+        var v = rows.map(function(x){ return [val(x.a), val(x.b)]; });
+        var ok = v.map(function(p){ return p[0] !== null && p[1] !== null && ((p[0] === l && p[1] === r) || (p[0] === r && p[1] === l)); });
+        // Пара из двух разных чисел даёт два разных примера на каждое действие — повтор не засчитываем
+        if (l !== r) {
+          if (ok[0] && ok[1] && v[0][0] === v[1][0]) { ok[1] = false; msg = 'Во втором примере на сложение поменяй числа местами'; }
+          if (ok[2] && ok[3] && v[2][0] === v[3][0]) { ok[3] = false; msg = 'Во втором примере на вычитание вычти другое число'; }
+        }
+        rows.forEach(function(x, k){ mark(x.row, ok[k]); good = good && ok[k]; });
+        return { good: good, msg: msg };
+      };
+    },
+    cards: function(h, st, clear){
+      var H = buildHouse(h.N, h.floors, { slots: true }); st.appendChild(H.el);
+      var slots = [];
+      H.fls.forEach(function(F){ F.wins.forEach(function(w, s){ var b = w.querySelector('.slot'); if (b) slots.push({ b: b, w: w, want: F.f[s ? 'r' : 'l'], card: -1 }); }); });
+      var tray = el('div', 'tray'); st.appendChild(tray);
+      // Активное окошко — куда встанет следующая карточка; после каждой переходит к первому пустому
+      var active = 0;
+      function paint(){ slots.forEach(function(s, i){ s.b.classList.toggle('active', i === active); s.w.classList.remove('ok', 'bad'); }); }
+      var cards = h.cards.map(function(v, ci){
+        var b = btn('card', v); tray.appendChild(b);
+        b.onclick = function(){
+          if (active < 0) return;
+          var s = slots[active]; s.card = ci; s.b.textContent = v; s.b.classList.add('filled');
+          b.disabled = true; b.classList.add('used');
+          active = slots.findIndex(function(x){ return x.card < 0; }); paint(); clear();
+        };
+        return b;
+      });
+      slots.forEach(function(s, i){ s.b.onclick = function(){
+        if (s.card >= 0) { cards[s.card].disabled = false; cards[s.card].classList.remove('used'); s.card = -1; s.b.textContent = ''; s.b.classList.remove('filled'); }
+        active = i; paint(); clear();
+      }; });
+      paint();
+      return function(){
+        if (slots.some(function(s){ return s.card < 0; })) return { good: null, msg: 'Ещё есть пустые окошки' };
+        var good = true;
+        slots.forEach(function(s){ var ok = h.cards[s.card] === s.want; good = good && ok; mark(s.w, ok); });
+        return { good: good, msg: 'Нажми на красную карточку, чтобы вернуть её' };
+      };
+    },
+    missing: function(h, st){
+      var H = buildHouse(h.N, h.floors); st.appendChild(H.el);
+      var box = el('div', 'lost'), row = el('div', 'floor lostfloor'), a = numInput('Левое окошко'), b = numInput('Правое окошко');
+      [a, b].forEach(function(x){ var w = el('div', 'win'); w.appendChild(x); row.appendChild(w); });
+      box.append(el('span', 'lt', 'Пропал этаж:'), row); st.appendChild(box);
+      return function(){
+        var ka = val(a) === h.miss[0], kb = val(b) === h.miss[1];
+        mark(a.parentNode, ka); mark(b.parentNode, kb);
+        // Переставленная пара — это другой, уже стоящий в домике этаж
+        var swapped = val(a) === h.miss[1] && val(b) === h.miss[0];
+        return { good: ka && kb, msg: swapped ? 'Такой этаж уже есть — посмотри на порядок' : 'Посмотри, какого числа слева не хватает' };
+      };
+    },
+    whose: function(h, st, clear){
+      var tw = el('div', 'twins'); st.appendChild(tw);
+      var Hs = h.Ns.map(function(n){ var H = buildHouse(n, [], { small: true }); H.el.classList.add('target');
+        H.el.setAttribute('aria-label', 'Домик ' + n); tw.appendChild(H.el); return H; });
+      var tray = el('div', 'tray'); st.appendChild(tray);
+      var sel = -1, place = h.cards.map(function(){ return -1; });
+      var btns = h.cards.map(function(c, ci){ var b = btn('card pairc', c.l + ' и ' + c.r);
+        b.onclick = function(){ sel = sel === ci ? -1 : ci; paint(); }; tray.appendChild(b); return b; });
+      function paint(){
+        btns.forEach(function(b, ci){ b.classList.toggle('sel', ci === sel); b.hidden = place[ci] >= 0; });
+        Hs.forEach(function(H){ H.el.classList.toggle('armed', sel >= 0); });
+      }
+      function redraw(){
+        Hs.forEach(function(H, hi){ H.body.innerHTML = '';
+          h.cards.forEach(function(c, ci){ if (place[ci] !== hi) return;
+            var F = addFloor(H.body, { l: c.l, r: c.r, show: 'both' }, { showDots: false });
+            F.el.classList.add('pick'); F.el.setAttribute('data-ci', ci); F.el.title = 'Вернуть карточку';
+            // С выбранной карточкой нажатие на этаж — это «поставь в этот домик», а не «верни»
+            F.el.onclick = function(e){ if (sel >= 0) return; e.stopPropagation(); place[ci] = -1; redraw(); }; }); });
+        paint(); clear();
+      }
+      Hs.forEach(function(H, hi){ H.el.onclick = function(){ if (sel < 0) return; place[sel] = hi; sel = -1; redraw(); }; });
+      paint();
+      return function(){
+        if (place.some(function(p){ return p < 0; })) return { good: null, msg: 'Расставь все карточки' };
+        var good = true;
+        Hs.forEach(function(H, hi){ Array.prototype.forEach.call(H.body.children, function(row){
+          var c = h.cards[+row.getAttribute('data-ci')], ok = c.l + c.r === h.Ns[hi]; good = good && ok; mark(row, ok); }); });
+        return { good: good, msg: 'Сложи пару и сравни с крышей. Красную пару нажми, чтобы вернуть' };
+      };
+    }
+  };
+  BUILD.pair = BUILD.order = BUILD.std;
+
+  /* ───── шаг 1: настройка ───── */
+  function drawStep1(){
+    $('nums').innerHTML = '';
+    for (var n = 2; n <= 10; n++) (function(n){
+      var on = nums.indexOf(n) >= 0, b = btn('pill num' + (on ? ' on' : ''), n);
+      b.setAttribute('aria-pressed', on); b.setAttribute('data-n', n);
+      b.onclick = function(){ toggle(nums, n); save(); drawStep1(); };
+      $('nums').appendChild(b);
+    })(n);
+    var rs = btn('reset', '⟳'); rs.id = 'resetNums'; rs.title = 'Сбросить выбор домиков'; rs.setAttribute('aria-label', rs.title);
+    rs.disabled = !nums.length; rs.onclick = function(){ nums = []; save(); drawStep1(); };
+    $('nums').appendChild(rs);
+
+    $('tiles').innerHTML = '';
+    MODES.forEach(function(m){
+      var on = modes.indexOf(m.id) >= 0, b = btn('tile' + (on ? ' on' : ''));
+      b.setAttribute('aria-pressed', on); b.setAttribute('data-mode', m.id);
+      var pv = el('span', 'pv'); pv.append.apply(pv, m.pv());
+      b.append(el('span', 't', m.t), pv, el('span', 'd', m.d));
+      b.onclick = function(){ toggle(modes, m.id); save(); drawStep1(); };
+      $('tiles').appendChild(b);
+    });
+
+    $('zero').setAttribute('aria-checked', zero);
+    $('dotsSw').setAttribute('aria-checked', dots);
+    var ok = nums.length && modes.length;
+    $('sum').textContent = !nums.length ? 'Выберите хотя бы одно число' : !modes.length ? 'Выберите хотя бы один тип заданий' :
+      'Домики: ' + nums.slice().sort(function(a, b){ return a - b; }).join(', ') + ' · типов заданий: ' + modes.length +
+      (nums.length > 1 || modes.length > 1 ? ' (вперемешку)' : '');
+    $('start').disabled = !ok;
+    $('cnt1').innerHTML = '';
+    COUNTS.forEach(function(v){
+      var b = btn('pill' + (v === cnt ? ' on' : ''), v); b.setAttribute('data-cnt', v);
+      b.onclick = function(){ cnt = v; save(); drawStep1(); };
+      $('cnt1').appendChild(b);
+    });
+  }
+
+  /* ───── шаг 2: доска ───── */
+  // Домик, которого ещё нет на доске (skip — лист, который сейчас заменяется); null — разные кончились
+  function unique(skip){
+    var used = {}; houses.forEach(function(h, i){ if (i !== skip) used[h.key] = 1; });
+    for (var n = 0; n < 150; n++) { var h = gen(); if (!used[h.key]) return h; }
+    return null;
+  }
+  function deal(){
+    houses = [];
+    while (houses.length < cnt) { var h = unique(-1); if (!h) break; houses.push(h); }
+    // Например, «По порядку» с одним числом — домик всегда один и тот же. Лучше меньше листов, чем копии
+    $('short').textContent = houses.length < cnt
+      ? 'Разных домиков с такими настройками только ' + houses.length + '. Добавьте числа или типы заданий, чтобы их стало больше.' : '';
+    $('board').innerHTML = '';
+    houses.forEach(function(h, i){ $('board').appendChild(leaf(h, i)); });
+  }
+
+  function leaf(h, i){
+    var m = MODES[MODE_IDS.indexOf(h.mode)];
+    var d = el('div', 'leaf'); d.setAttribute('data-i', i); d.setAttribute('data-mode', h.mode);
+    var rf = btn('rf', '⟳'); rf.title = 'Другой домик'; rf.setAttribute('aria-label', rf.title);
+    var stage = el('div', 'stage'), go = btn('btn check', 'Проверить'), row = el('div', 'row'), verdict = el('p', 'verdict');
+    row.appendChild(go);
+    d.append(el('span', 'no', 'домик №' + (i + 1)), rf, el('p', 'ask', m.ask), stage, row, verdict);
+    function clear(){ d.classList.remove('ok', 'bad'); verdict.className = 'verdict'; verdict.textContent = ''; }
+    var test = BUILD[h.mode](h, stage, clear);
+    var inputs = Array.prototype.slice.call(stage.querySelectorAll('input'));
+    inputs.forEach(function(inp, j){
+      // Только цифры: у первоклассника лишний пробел или буква не должны превращаться в «неверно»
+      inp.oninput = function(){ inp.value = inp.value.replace(/\D/g, ''); var c = inp.closest('.win,.eq'); if (c) c.classList.remove('ok', 'bad'); clear(); };
+      inp.onkeydown = function(e){ if (e.key === 'Enter') { e.preventDefault(); if (inputs[j + 1]) inputs[j + 1].focus(); else check(); } };
+    });
+    function check(){
+      clear();
+      var res = test();
+      if (res.good === null) { verdict.textContent = res.msg; verdict.classList.add('bad'); return; }
+      d.classList.add(res.good ? 'ok' : 'bad'); verdict.classList.add(res.good ? 'ok' : 'bad');
+      verdict.textContent = res.good ? 'Домик построен!' : res.msg;
+      if (res.good && !h.done) { h.done = true; built++; $('score').textContent = 'Построено домиков: ' + built; }
+    }
+    go.onclick = check;
+    rf.onclick = function(){
+      var nh = unique(i);
+      if (!nh) { verdict.className = 'verdict bad'; verdict.textContent = 'Других домиков с такими настройками нет'; return; }
+      houses[i] = nh; d.replaceWith(leaf(nh, i));
+    };
+    return d;
+  }
+
+  $('zero').onclick = function(){ zero = !zero; save(); drawStep1(); };
+  $('dotsSw').onclick = function(){ dots = !dots; save(); drawStep1(); };
+  $('start').onclick = function(){ if (!nums.length || !modes.length) return; $('step1').classList.remove('show'); $('step2').classList.add('show'); deal(); };
+  $('back').onclick = function(){ $('step2').classList.remove('show'); $('step1').classList.add('show'); drawStep1(); };
+  $('refAll').onclick = deal;
+  drawStep1();
+
+  // Для теста: генератор снаружи
+  window.SOSTAV = { make: make, pairs: pairs, houses: function(){ return houses; } };
+})();
+</script>
+</body>
+</html>

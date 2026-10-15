@@ -504,6 +504,8 @@ const TRAINERS = {
   frac_mul: { name: 'Умножение дробей',               href: 'fraction_multiply.html' },
   frac_div: { name: 'Деление дробей',                 href: 'fraction_divide.html' },
   neg_pos:  { name: 'Сложение и вычитание положительных и отрицательных чисел', href: 'neg_pos.html' },
+  // Состав числа для 1 класса: домики 2–10, девять типов заданий на одной странице
+  sostav:   { name: 'Состав числа: домики',           href: 'sostav.html' },
   powers:   { name: 'Действия со степенями',          href: 'powers.html' },
   // Промпт №65: НОД — три раздела (перебор, разложение, Евклид) в одном файле
   gcd:      { name: 'Наибольший общий делитель (НОД)', href: 'gcd.html' },
@@ -616,6 +618,9 @@ const NAV = [
     { id: 'vpr',      title: 'ВПР / МЦКО',    groups: [], soon: true },
   ]},
   { id: 'grades', title: 'Классы', subtabs: [
+    { id: 'g1', title: '1 класс', groups: [
+      { title: 'Состав числа', items: ['sostav'] },
+    ]},
     { id: 'g5', title: '5 класс', groups: [
       { title: 'Действия с числами', items: ['add_col','sub_col','mul_col','div_col'] },
       { title: 'Действия с дробями', items: ['frac_mul','frac_div'] },
@@ -649,6 +654,7 @@ const NAV = [
     ]},
   ]},
   { id: 'base', title: 'Основа', groups: [
+    { title: 'Состав числа', items: ['sostav'] },
     { title: 'Действия с числами', items: ['add_col','sub_col','mul_col','div_col'] },
     { title: 'Положительные и отрицательные числа', items: ['neg_pos'] },
     { title: 'Действия с дробями', items: ['frac_mul','frac_div','oge6'] },
