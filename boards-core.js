@@ -5624,13 +5624,21 @@ function visibleBoardRect(){
   const sx1 = Math.max(sx0 + 80, cssW - 16), sy1 = Math.max(sy0 + 80, cssH - 84);
   return { x: cam.x + sx0 / cam.zoom, y: cam.y + sy0 / cam.zoom, w: (sx1 - sx0) / cam.zoom, h: (sy1 - sy0) / cam.zoom };
 }
-// ближайшее к центру области свободное место (перебор по сетке), или null
-function nearestFreeSpot(area, w, h, obs, cx, cy, gap){
+// ближайшее к центру области свободное место (перебор по сетке), или null.
+// snap — поправка места (раскладка стопки: не поперёк границы листа);
+// поправленное место должно остаться внутри области
+function nearestFreeSpot(area, w, h, obs, cx, cy, gap, snap){
   const step = Math.max(8, 16 / cam.zoom);
   const G = gap > 0 ? gap : TASK_GAP;
   let best = null, bestD = Infinity;
-  for (let x = area.x; x + w <= area.x + area.w + 0.01; x += step){
-    for (let y = area.y; y + h <= area.y + area.h + 0.01; y += step){
+  for (let x0 = area.x; x0 + w <= area.x + area.w + 0.01; x0 += step){
+    for (let y0 = area.y; y0 + h <= area.y + area.h + 0.01; y0 += step){
+      let x = x0, y = y0;
+      if (snap){
+        const s = snap({ x, y, w, h });
+        x = s.x; y = s.y;
+        if (x + w > area.x + area.w + 0.01 || y + h > area.y + area.h + 0.01) continue;
+      }
       const d = (x + w / 2 - cx) ** 2 + (y + h / 2 - cy) ** 2;
       if (d >= bestD) continue;
       if (!rectHits({ x, y, w, h }, obs, G)){ best = { x, y, w, h }; bestD = d; }
@@ -5739,8 +5747,16 @@ async function taskImageSize(dataUrl){
      Такое задание помечается стопкой исходного (без номера), чтобы оно
      считалось её частью для «видна ли стопка» и «последнее добавленное»,
      но в раскладку столбиков не вмешивалось.
-   В объекте: stack = { id, i?, x0, y0 } (i — место в раскладке, x0/y0 —
-   левый верхний угол стопки), gap — отступ между заданиями этой стопки. */
+   В объекте: stack = { id, i?, x0, y0, c?, b? } (i — место в раскладке,
+   x0/y0 — левый верхний угол стопки, c — столбик, b — ряд столбиков),
+   gap — отступ между заданиями этой стопки.
+
+   Раскладка по листу (после №13): раньше столбики уходили вправо без конца
+   и ложились поперёк границ листов. Теперь стопка начинается в левом
+   верхнем углу экрана, но не поперёк границы (тогда — на соседний лист
+   справа/снизу), столбики идут вправо только до правого края ЭТОГО листа,
+   дальше — новый ряд столбиков ниже от того же левого края, что и первое
+   задание; низ листа — продолжение с верха листа под ним. */
 const STACK_ROWS = 3;           // заданий в столбике стопки
 // «в целом немного меньше»: не впритык три на экран, а с запасом в десятую
 // часть — между стопкой и краем экрана остаётся воздух
@@ -5796,49 +5812,95 @@ function widthForNewTask(gen){
   const st = currentTaskStack();
   return st ? widthLike(st.last, gen) : null;
 }
-// куда в стопке st ложится следующее задание размером w×h
+// куда в стопке st ложится следующее задание размером w×h.
+// Раскладка по листу (см. «Раскладка по листу» выше): столбики по три вправо
+// до правого края листа, где стопка началась; дальше — новый ряд столбиков
+// под этим от того же левого края; лист кончился — лист ниже
 function stackSlot(st, w, h){
   const flow = st.members.filter(o => Number.isFinite(o.stack.i));
   const g = taskGapOf(flow[0] || st.last);
   const i = flow.length ? Math.max(...flow.map(o => o.stack.i)) + 1 : 0;
-  const col = Math.floor(i / STACK_ROWS);
-  const colOf = o => Math.floor(o.stack.i / STACK_ROWS);
-  const inCol = flow.filter(o => colOf(o) === col).map(objectBBox);
-  let x, y;
-  if (inCol.length){
-    // под нижним заданием своего столбика, по его левому краю
-    x = Math.min(...inCol.map(b => b.minX));
-    y = Math.max(...inCol.map(b => b.maxY)) + g;
-  } else {
-    // новый столбик: справа от самого широкого задания предыдущего
-    let c = col - 1, prev = [];
-    while (c >= 0 && !(prev = flow.filter(o => colOf(o) === c).map(objectBBox)).length) c--;
-    x = prev.length ? Math.max(...prev.map(b => b.maxX)) + g + (col - 1 - c) * (w + g) : st.x0 + col * (w + g);
-    y = st.y0;
+  // стопки до раскладки по листу не знают c/b: столбик — по номеру, ряд один
+  const colOf = o => Number.isFinite(o.stack.c) ? o.stack.c : Math.floor(o.stack.i / STACK_ROWS);
+  const bandOf = o => Number.isFinite(o.stack.b) ? o.stack.b : 0;
+  const sw = sheetWpx(), sh = sheetHpx();
+  const left = st.x0;
+  const pageL = Math.floor(st.x0 / sw) * sw + g, right = pageL - g + sw - g;
+  const pageBottom = top => (Math.floor(top / sh) + 1) * sh - g;
+  // задание шире, чем осталось от начала стопки до края листа (другой
+  // тренажёр крупнее), — новый ряд начинается левее, но в пределах листа
+  const bandX = () => (left + w <= right) ? left : Math.max(pageL, right - w);
+  let c = 0, b = 0, colX = left, colR = left + w, y = st.y0, k = 0, bandTop = st.y0, bandBot = st.y0;
+  if (flow.length){
+    const last = flow.reduce((a, o) => o.stack.i > a.stack.i ? o : a);
+    c = colOf(last); b = bandOf(last);
+    const col = flow.filter(o => colOf(o) === c).map(objectBBox);
+    const band = flow.filter(o => bandOf(o) === b).map(objectBBox);
+    colX = Math.min(...col.map(q => q.minX)); colR = Math.max(...col.map(q => q.maxX));
+    y = Math.max(...col.map(q => q.maxY)) + g; k = col.length;
+    bandTop = Math.min(...band.map(q => q.minY)); bandBot = Math.max(...band.map(q => q.maxY));
   }
-  // на месте чужое задание (другая стопка, «+») — сдвигаемся дальше в том же
-  // направлении, как «ещё такое же»: вниз по столбику или вправо для нового
   const obs = taskObstacles();
-  const r = { x, y, w, h };
-  for (let guard = 0; guard < 500; guard++){
-    const hit = rectHits(r, obs, g - 0.5);
-    if (!hit) break;
-    if (inCol.length) r.y = hit.y1 + g; else r.x = hit.x1 + g;
+  for (let guard = 0; guard < 2000; guard++){
+    if (k < STACK_ROWS && y + h <= pageBottom(bandTop)){
+      const r = { x: colX, y, w, h };
+      // на месте чужое задание (другая стопка, «+») — обходим вниз по столбику
+      const hit = rectHits(r, obs, g - 0.5);
+      if (!hit) return { slot: r, i, gap: g, c, b };
+      y = hit.y1 + g; bandBot = Math.max(bandBot, hit.y1);
+      continue;
+    }
+    // столбик полон или упёрся в низ листа — новый столбик справа, если он
+    // помещается до правого края листа: через край на соседний лист не прыгаем
+    const nx = colR + g;
+    c++; k = 0;
+    if (nx + w <= right){ colX = nx; colR = nx + w; y = bandTop; continue; }
+    // не помещается — новый ряд под этим, от того же левого края, откуда
+    // начали (учитель начал там, где ему удобно, — и продолжаем там же);
+    // ниже на листе места нет — с верха листа под ним
+    b++;
+    let top = bandBot + g;
+    if (top + h > pageBottom(bandTop)) top = (Math.floor(bandTop / sh) + 1) * sh + g;
+    colX = bandX(); colR = colX + w; y = top; bandTop = top; bandBot = top;
   }
-  return { slot: r, i, gap: g };
+  return { slot: findFreeSpotInView(w, h), i, gap: g, c, b };
 }
-// первое задание новой стопки — в левом верхнем углу видимой части;
-// сначала ищем место, где поместится весь столбик, потом — хотя бы задание
+// задание не ложится поперёк границы листа: пересекает её — переезжает на
+// соседний лист справа (снизу), к самому краю с отступом g. Задание крупнее
+// листа так не поставить — остаётся как есть
+function snapIntoSheet(r, g){
+  const sw = sheetWpx(), sh = sheetHpx();
+  let x = r.x, y = r.y;
+  if (r.w <= sw - 2 * g){
+    const p = Math.floor(x / sw);
+    if (x < p * sw + g) x = p * sw + g;
+    else if (x + r.w > (p + 1) * sw - g) x = (p + 1) * sw + g;
+  }
+  if (r.h <= sh - 2 * g){
+    const p = Math.floor(y / sh);
+    if (y < p * sh + g) y = p * sh + g;
+    else if (y + r.h > (p + 1) * sh - g) y = (p + 1) * sh + g;
+  }
+  return { x, y, w: r.w, h: r.h };
+}
+// первое задание новой стопки — в левом верхнем углу видимой части (там, где
+// учитель сейчас работает, а не в углу листа: угол часто уже занят), но не
+// поперёк границы листа (snapIntoSheet). Сначала ищем место, где поместится
+// весь столбик, потом — хотя бы задание
 function newStackSpot(w, h, g){
   const v = visibleBoardRect();
   const obs = taskObstacles();
   const area = { x: v.x + g, y: v.y + g, w: Math.max(0, v.w - 2 * g), h: Math.max(0, v.h - 2 * g) };
+  const snap = r => snapIntoSheet(r, g);
   const colH = Math.min(area.h, STACK_ROWS * h + (STACK_ROWS - 1) * g);
-  let r = nearestFreeSpot(area, w, colH, obs, area.x + w / 2, area.y + colH / 2, g);
+  let r = nearestFreeSpot(area, w, colH, obs, area.x + w / 2, area.y + colH / 2, g, snap);
   if (r) return { x: r.x, y: r.y, w, h };
-  r = nearestFreeSpot(area, w, h, obs, area.x + w / 2, area.y + h / 2, g);
+  r = nearestFreeSpot(area, w, h, obs, area.x + w / 2, area.y + h / 2, g, snap);
   if (r) return r;
-  return findFreeSpotInView(w, h);
+  // на экране не нашлось — как раньше, но тоже на лист, если там свободно
+  const f = findFreeSpotInView(w, h);
+  const s = snapIntoSheet(f, g);
+  return rectHits(s, obs, g - 0.5) ? f : s;
 }
 
 // снимок задания; sol — разбор «Тренировки» (trainerSolutionHTML): тогда
@@ -5886,12 +5948,12 @@ async function insertTaskImage(dataUrl, task, gen, beside, shot, cw){
     if (st){
       const p = stackSlot(st, sz.w, sz.h);
       pt = { x: p.slot.x, y: p.slot.y }; gap = p.gap;
-      stack = { id: st.id, i: p.i, x0: st.x0, y0: st.y0 };
+      stack = { id: st.id, i: p.i, x0: st.x0, y0: st.y0, c: p.c, b: p.b };
     } else {
       gap = taskGapFor(sz.h);
       const spot = newStackSpot(sz.w, sz.h, gap);
       pt = { x: spot.x, y: spot.y };
-      stack = { id: 'st' + uid(), i: 0, x0: pt.x, y0: pt.y };
+      stack = { id: 'st' + uid(), i: 0, x0: pt.x, y0: pt.y, c: 0, b: 0 };
     }
   }
   // Промпт №66: задание с тренажёра сразу закреплено — ластиком его не
