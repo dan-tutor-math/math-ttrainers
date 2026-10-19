@@ -2918,7 +2918,10 @@
   // ------------------------------------------------------------------
   window.cloudImportSharedBoards = async function () {
     if (!window.CURRENT_USER) return;
-    const { data: boardsRows, error } = await window.SB.from('boards').select('id, title, owner');
+    // №93: created_at — настоящее время создания доски. Раньше заглушке
+    // ставили «сейчас», и у всех подтянутых из облака досок «Создана»
+    // совпадало с моментом открытия страницы (в инкогнито — каждый раз)
+    const { data: boardsRows, error } = await window.SB.from('boards').select('id, title, owner, created_at');
     if (error || !boardsRows) return;
     const db = window.getDB();
     if (!db) return;
@@ -2926,11 +2929,19 @@
     const roleByBoard = new Map((accessRows || []).map(r => [r.board_id, r.role]));
     let changed = false;
     boardsRows.forEach(row => {
-      if (db.boards.some(b => b.cloudBoardId === row.id)) return;
+      const born = Date.parse(row.created_at || '') || 0;
+      const have = db.boards.find(b => b.cloudBoardId === row.id);
+      if (have) {
+        // заглушки, заведённые до №93, чиним на месте. Берём более раннее из
+        // двух: у перенесённой из браузера доски (№90) своё время старше
+        // строки в базе, его не трогаем
+        if (born && (!have.createdAt || born < have.createdAt)) { have.createdAt = born; changed = true; }
+        return;
+      }
       const role = row.owner === window.CURRENT_USER.id ? 'owner' : (roleByBoard.get(row.id) || 'editor');
       db.boards.push({
         id: window.uid(), name: row.title || 'Общая доска', folderId: null,
-        createdAt: window.nowTs(), updatedAt: window.nowTs(), lastOpenedAt: null,
+        createdAt: born || window.nowTs(), updatedAt: born || window.nowTs(), lastOpenedAt: null,
         cellSize: 24, sheetCols: 76, sheetRows: 54, sheetCount: 1, pageOrder: 'h',
         objects: [], recentColors: [], colorUsage: {},
         cloudBoardId: row.id, cloudRole: role,
