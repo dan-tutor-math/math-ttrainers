@@ -288,6 +288,9 @@ function idbLoadDB(){
         // каждой доски подгружаются лениво — при её открытии (см.
         // ensureBoardLoaded, вызывается из openBoard)
         DB = saved;
+        // раздутый список удалённых (см. pruneDeleted) схлопываем сразу, а не
+        // на первом сохранении: иначе первое слияние склеит 2^24 + 2^24
+        DB.deleted = pruneDeleted(DB.deleted);
         return true;
       }
       // старый формат — доски уже полные (со штрихами и картинками), просто
@@ -468,9 +471,25 @@ function noteDeleted(kind, id){
   DB.deleted = DB.deleted || [];
   DB.deleted.push({ kind, id, at: nowTs() });
 }
+// Одна запись на доску/папку. mergeDbs складывает список с диска и из памяти
+// через concat, а после записи оба списка одинаковые — без схлопывания
+// дублей список удваивался на каждом сохранении. С 13.09 по 19.10.2026 так
+// одна удалённая доска разрослась у учителя до 16,7 млн копий (2^24): гигабайты
+// памяти при открытии списка, DataCloneError при записи, зависание даже в
+// чистом браузере — хватало удалить одну доску (раздел 6 HANDOFF). Здесь же
+// уже раздутый список чинится сам на первом слиянии
 function pruneDeleted(list){
   const edge = nowTs() - DELETED_KEEP_MS;
-  return (list || []).filter(d => d && d.id && (d.at || 0) > edge);
+  const byKey = new Map();
+  const src = list || [];
+  for (let i = 0; i < src.length; i++) {
+    const d = src[i];
+    if (!d || !d.id || !((d.at || 0) > edge)) continue;
+    const key = (d.kind || '') + '|' + d.id;
+    const was = byKey.get(key);
+    if (!was || (d.at || 0) > (was.at || 0)) byKey.set(key, d);
+  }
+  return Array.from(byKey.values());
 }
 function stamp(b){ return Math.max(b && b.updatedAt || 0, b && b.createdAt || 0); }
 // «чья версия главнее»: сперва номер правки, при равенстве — время
