@@ -2145,6 +2145,10 @@
     const cb = board && board.cloudBoardId;
     if (!cb || !Array.isArray(board.objects) || !window.idbGet || !window.idbPut) return Promise.resolve(false);
     if (!board.objects.length && !force) return Promise.resolve(false);
+    // №92: версии — снимки доски с картинками в хранилище браузера, самый
+    // тяжёлый его жилец. Когда места нет (инкогнито, забитый диск), без них:
+    // доска и так в облаке, а версия, упирающаяся в квоту, роняла запись досок
+    if (window.boardsCloudOnly && window.boardsCloudOnly()) return Promise.resolve(false);
     // снимок — сразу, синхронно: к моменту записи доска уже будет другой
     const sig = boardSig(board.objects);
     const imgs = new Map();

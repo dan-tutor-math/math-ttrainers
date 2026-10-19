@@ -447,6 +447,64 @@ function showSaveFailedWarning(err){
     });
   } catch (e) {}
 }
+/* ═══ Промпт №92: облачные доски — без копии в браузере, когда места нет ═══
+   У облачной доски главная копия в базе, а запись в IndexedDB — только кэш,
+   чтобы быстрее открывалась. В инкогнито (особенно Яндекс) браузер даёт
+   сайту крошечное хранилище, кэш упирался в него, и учитель видел красную
+   плашку «Доска не сохраняется» и перезагрузки — хотя ни один штрих не
+   терялся. Теперь при нехватке места (или маленькой квоте с самого
+   начала) облачные доски просто перестают кэшироваться: открываются из
+   облака, пишут в облако, а кэш чужих облачных досок освобождается, чтобы
+   влез индекс и доски, которые есть только здесь. Доски без облака
+   сохраняются как раньше — для них плашка остаётся, там потеря реальна */
+const CLOUD_ONLY_QUOTA = 300 * 1024 * 1024;   // меньше — это инкогнито или забитый диск
+let cloudOnly = false;
+// облачная доска, которая уже целиком в базе (перенос №90 не на середине)
+function isFullyCloud(b){ return !!(b && b.cloudBoardId && !b.cloudPendingId); }
+function skipLocalCopy(b){ return cloudOnly && isFullyCloud(b); }
+function hasLocalOnlyAtRisk(ids){
+  return (ids || []).some(id => { const b = DB.boards.find(x => x.id === id); return b && !isFullyCloud(b); });
+}
+function enterCloudOnly(why){
+  if (cloudOnly) return;
+  cloudOnly = true;
+  console.info('[boards] облачные доски работают без копии в браузере (' + why + ')');
+  clearSaveFailedWarning();
+  // кэш облачных досок, которые сейчас не в памяти, — освобождаем: это
+  // копия базы, а место нужно индексу и доскам, которых больше нигде нет
+  (DB.boards || []).forEach(b => {
+    if (isFullyCloud(b) && b.objects === undefined) idbDelete(IDB_BOARD_PREFIX + b.id).catch(() => {});
+  });
+  if (why === 'quota' || why === 'small') showCloudOnlyNote();
+}
+function showCloudOnlyNote(){
+  try {
+    if (document.getElementById('cloudOnlyNote')) return;
+    const n = document.createElement('div');
+    n.id = 'cloudOnlyNote';
+    n.textContent = 'В браузере мало места — общие доски открываются прямо из облака, без копии на этом устройстве. Записи не теряются.';
+    n.style.cssText = 'position:fixed;left:50%;bottom:72px;transform:translateX(-50%);z-index:9000;max-width:min(560px,90vw);'
+      + 'padding:8px 14px;border-radius:10px;background:var(--glass-strong,rgba(255,255,255,.95));'
+      + 'border:1px solid var(--glass-border,rgba(0,0,0,.1));box-shadow:0 4px 16px rgba(0,0,0,.12);'
+      + 'font:13px/1.35 system-ui,sans-serif;color:var(--ink,#1b2230);text-align:center;cursor:pointer';
+    n.addEventListener('click', () => n.remove());
+    document.body.appendChild(n);
+    setTimeout(() => n.remove(), 9000);
+  } catch (e) {}
+}
+// квоту смотрим сразу: в инкогнито лучше не начинать кэшировать вовсе, чем
+// упереться посреди урока
+function checkQuotaForCloudOnly(){
+  try {
+    if (!(navigator.storage && navigator.storage.estimate)) return Promise.resolve();
+    return navigator.storage.estimate().then(est => {
+      if (est && est.quota && est.quota < CLOUD_ONLY_QUOTA) enterCloudOnly('small');
+    }).catch(() => {});
+  } catch (e) { return Promise.resolve(); }
+}
+window.boardsCloudOnly = () => cloudOnly;
+window.__cloudOnlyTest = { isOn: () => cloudOnly, enter: enterCloudOnly, check: checkQuotaForCloudOnly };
+
 function clearSaveFailedWarning(){
   saveFailedWarned = false;
   const bar = document.getElementById('saveFailBanner');
@@ -679,8 +737,11 @@ function idbSaveDB(){
   maybeSnapshot().catch(() => {});
   const toFlush = Array.from(dirtyBoardIds);
   dirtyBoardIds = new Set();
+  // №92: дошли ли до записи тяжёлых частей — значит, список досок записался
+  let indexSaved = false;
   return idbSaveIndexMerged()
     .then(({ activeLost }) => {
+      indexSaved = true;
       const jobs = [];
       if (activeLost) {
         jobs.push(refreshActivePayloadIfLost(true));
@@ -699,7 +760,7 @@ function idbSaveDB(){
         // heavyOf() тогда писал бы вместо настоящих штрихов пустой массив —
         // ровно так пропал целый урок после переноса доски в архив. Пишем
         // тяжёлую часть только у доски, которая реально лежит в памяти
-        if (b && b.objects !== undefined) jobs.push(idbPut(IDB_BOARD_PREFIX + id, heavyOf(b)));
+        if (b && b.objects !== undefined && !skipLocalCopy(b)) jobs.push(idbPut(IDB_BOARD_PREFIX + id, heavyOf(b)));
       });
       return Promise.all(jobs);
     })
@@ -719,6 +780,13 @@ function idbSaveDB(){
          (приватное окно): тогда именно её и прочитает следующая загрузка. */
       if (idbWorks) {
         console.error('[boards] сохранение не прошло:', err);
+        // №92: не пишется только копия облачных досок — не беда, главная
+        // копия в облаке. Переходим на работу без копии и молчим; красная
+        // плашка — только если под угрозой доска, которая есть лишь здесь
+        // Не записался сам список досок — под угрозой и доски только-здесь
+        // (их названия, папки), поэтому молчим, лишь если таких нет совсем
+        const atRisk = indexSaved ? hasLocalOnlyAtRisk(toFlush) : DB.boards.some(b => !isFullyCloud(b));
+        if (!atRisk) { enterCloudOnly(isQuotaError(err) ? 'quota' : 'error'); return false; }
         showSaveFailedWarning(err);
         return false;
       }
@@ -9388,7 +9456,7 @@ window.boardsAppBoot = function(){
   // сначала дочитываем доски из IndexedDB (и, если надо, переносим туда
   // старые), и только потом рисуем список — иначе на экране мелькнул бы
   // пустой список или устаревшее содержимое
-  rebuildResume().then(() => idbLoadDB()).then(() => importNotesOutbox()).then(() => {
+  rebuildResume().then(() => idbLoadDB()).then(() => checkQuotaForCloudOnly()).then(() => importNotesOutbox()).then(() => {
     if (DB.sortMode && sortLabels[DB.sortMode]){
       sortMode = DB.sortMode;
       const lbl = document.getElementById('blSortLabel');
