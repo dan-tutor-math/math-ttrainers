@@ -23,13 +23,17 @@
 window.EGE_PROF_FIPI = {
  "source": "Открытый банк заданий ФИПИ",
  "files": {
+  "1": "ege-prof-fipi1.js",
   "2": "ege-prof-fipi2.js",
+  "3": "ege-prof-fipi3.js",
   "4": "ege-prof-fipi4.js",
   "5": "ege-prof-fipi5.js",
   "7": "ege-prof-fipi7.js",
   "8": "ege-prof-fipi8.js",
+  "9": "ege-prof-fipi9.js",
   "10": "ege-prof-fipi10.js",
-  "11": "ege-prof-fipi11.js"
+  "11": "ege-prof-fipi11.js",
+  "12": "ege-prof-fipi12.js"
  },
  "tasks": {}
 };

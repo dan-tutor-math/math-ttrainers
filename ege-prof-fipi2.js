@@ -29,6 +29,12 @@
    "hint": "Найдите координаты обоих векторов-сумм, потом перемножьте соответствующие координаты и сложите."
   },
   {
+   "id": "grid",
+   "section": "coord",
+   "title": "Векторы на клетчатой плоскости",
+   "hint": "Координаты вектора: из координат конца вычтите координаты начала (по клеткам). Дальше — как с векторами в координатах."
+  },
+  {
    "id": "angle",
    "section": "coord",
    "title": "Скалярное произведение по длинам и углу",
@@ -321,6 +327,66 @@
     "$$\\vec a + \\vec b = (4;\\ -3)$$ $$7\\vec a - \\vec b = (12;\\ 11)$$",
     "Скалярное произведение — сумма произведений координат:",
     "$$4 \\cdot 12 + (-3) \\cdot 11 = 15$$"
+   ]
+  },
+  {
+   "id": "2.fipi.579B74",
+   "group": "grid",
+   "fipi": "579B74",
+   "text": "На координатной плоскости изображены векторы $\\vec a$ и $\\vec b$, координатами которых являются целые числа. Найдите длину вектора $\\vec a + 4\\vec b$.<div class=\"ege-fig\"><img src=\"ege-prof-fipi-img/579B74_1.png\" alt=\"Рисунок к заданию\" style=\"display:block;margin:0 auto;width:100%;max-width:420px;height:auto;background:#fff;border-radius:6px;padding:4px;box-sizing:border-box\"></div>",
+   "answer": "11",
+   "steps": [
+    "Координаты вектора — разность координат конца и начала: $\\vec a$ из $(1;\\ 1)$ в $(4;\\ 5)$, $\\vec b$ из $(3;\\ 3)$ в $(5;\\ 2)$:",
+    "$$\\vec a\\,(3;\\ 4)$$ $$\\vec b\\,(2;\\ -1)$$",
+    "$$\\vec a + 4\\vec b = (11;\\ 0)$$ $$|\\vec a + 4\\vec b| = \\sqrt{11^2 + 0^2} = 11$$"
+   ]
+  },
+  {
+   "id": "2.fipi.A288A1",
+   "group": "grid",
+   "fipi": "A288A1",
+   "text": "На координатной плоскости изображены векторы $\\vec a$ и $\\vec b$, координатами которых являются целые числа. Найдите скалярное произведение $\\vec a \\cdot \\vec b$.<div class=\"ege-fig\"><img src=\"ege-prof-fipi-img/A288A1_1.png\" alt=\"Рисунок к заданию\" style=\"display:block;margin:0 auto;width:100%;max-width:420px;height:auto;background:#fff;border-radius:6px;padding:4px;box-sizing:border-box\"></div>",
+   "answer": "1",
+   "steps": [
+    "Координаты вектора — разность координат конца и начала: $\\vec a$ из $(1;\\ 1)$ в $(3;\\ 4)$, $\\vec b$ из $(3;\\ 3)$ в $(5;\\ 2)$:",
+    "$$\\vec a\\,(2;\\ 3)$$ $$\\vec b\\,(2;\\ -1)$$",
+    "$$\\vec a \\cdot \\vec b = 2 \\cdot 2 + 3 \\cdot (-1) = 1$$"
+   ]
+  },
+  {
+   "id": "2.fipi.3F02c4",
+   "group": "grid",
+   "fipi": "3F02c4",
+   "text": "На координатной плоскости изображены векторы $\\vec a$ и $\\vec b$, координатами которых являются целые числа. Найдите длину вектора $\\vec a + \\vec b$.<div class=\"ege-fig\"><img src=\"ege-prof-fipi-img/3F02c4_1.png\" alt=\"Рисунок к заданию\" style=\"display:block;margin:0 auto;width:100%;max-width:420px;height:auto;background:#fff;border-radius:6px;padding:4px;box-sizing:border-box\"></div>",
+   "answer": "10",
+   "steps": [
+    "Координаты вектора — разность координат конца и начала: $\\vec a$ из $(1;\\ 1)$ в $(3;\\ 5)$, $\\vec b$ из $(2;\\ 1)$ в $(6;\\ 5)$:",
+    "$$\\vec a\\,(2;\\ 4)$$ $$\\vec b\\,(4;\\ 4)$$",
+    "$$\\vec a + \\vec b = (6;\\ 8)$$ $$|\\vec a + \\vec b| = \\sqrt{6^2 + 8^2} = 10$$"
+   ]
+  },
+  {
+   "id": "2.fipi.E5399A",
+   "group": "grid",
+   "fipi": "E5399A",
+   "text": "На координатной плоскости изображены векторы $\\vec a$ и $\\vec b$, координатами которых являются целые числа. Найдите скалярное произведение $\\vec a \\cdot \\vec b$.<div class=\"ege-fig\"><img src=\"ege-prof-fipi-img/E5399A_1.png\" alt=\"Рисунок к заданию\" style=\"display:block;margin:0 auto;width:100%;max-width:420px;height:auto;background:#fff;border-radius:6px;padding:4px;box-sizing:border-box\"></div>",
+   "answer": "71",
+   "steps": [
+    "Координаты вектора — разность координат конца и начала: $\\vec a$ из $(1;\\ 2)$ в $(9;\\ 7)$, $\\vec b$ из $(1;\\ 1)$ в $(8;\\ 4)$:",
+    "$$\\vec a\\,(8;\\ 5)$$ $$\\vec b\\,(7;\\ 3)$$",
+    "$$\\vec a \\cdot \\vec b = 8 \\cdot 7 + 5 \\cdot 3 = 71$$"
+   ]
+  },
+  {
+   "id": "2.fipi.0432E9",
+   "group": "grid",
+   "fipi": "0432E9",
+   "text": "На координатной плоскости изображены векторы $\\vec a$ и $\\vec b$, координатами которых являются целые числа. Найдите скалярное произведение $\\vec a \\cdot \\vec b$.<div class=\"ege-fig\"><img src=\"ege-prof-fipi-img/0432E9_1.png\" alt=\"Рисунок к заданию\" style=\"display:block;margin:0 auto;width:100%;max-width:420px;height:auto;background:#fff;border-radius:6px;padding:4px;box-sizing:border-box\"></div>",
+   "answer": "41",
+   "steps": [
+    "Координаты вектора — разность координат конца и начала: $\\vec a$ из $(1;\\ 2)$ в $(8;\\ 5)$, $\\vec b$ из $(1;\\ 1)$ в $(6;\\ 3)$:",
+    "$$\\vec a\\,(7;\\ 3)$$ $$\\vec b\\,(5;\\ 2)$$",
+    "$$\\vec a \\cdot \\vec b = 7 \\cdot 5 + 3 \\cdot 2 = 41$$"
    ]
   },
   {

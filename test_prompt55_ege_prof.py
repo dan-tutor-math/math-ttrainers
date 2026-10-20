@@ -329,6 +329,9 @@ def test_bank(browser):
       for (const n of nums) {
         const t = BANK[n];
         for (const p of t.protos) {
+          // задания банка ФИПИ (ege-prof-fipiN.js) подмешиваются в номер, когда его открыли, —
+          // их проверяет test_prompt_fipi_ege.py, здесь считаем только демоверсию
+          if (p.fipi) continue;
           protos++;
           // рисунки, на которые ссылается прототип, должны существовать
           const keys = [];

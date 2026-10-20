@@ -1,8 +1,7 @@
 """
 Правка «банк ФИПИ ЕГЭ профиль»: в ЕГЭ профиль (ege_prof.html) — задания первой
-части из открытого банка ФИПИ (ege.fipi.ru) без чертежей: №2 (векторы в
-координатах), №4, №5 (вероятность), №7 (уравнения), №8 (вычисления), №10
-(прикладные), №11 (текстовые) — номера ЕГЭ-2027. Механика страницы та же, что у
+части из открытого банка ФИПИ (ege.fipi.ru): №1–5, 7–12 (номера ЕГЭ-2027), у
+заданий с чертежом — картинка ФИПИ из ege-prof-fipi-img/. Механика страницы та же, что у
 ОГЭ ч. 2 (test_prompt_fipi20.py / fipi21): оглавление ege-prof-fipi.js и файл на
 номер, грузится по требованию.
 
@@ -16,7 +15,7 @@
      «группа · задание 1 из N», подпись источника с номером из строчных букв,
      ◀ ▶ внутри группы, верный ответ засчитан, решение открывается;
   5. снимок совместной сессии у ученика открывает то же задание;
-  6. раздельный файл: на №1 файлы номеров не грузятся; стрелка к №8 с
+  6. раздельный файл: на №6 файлы номеров не грузятся; стрелка к №8 с
      запомненным заданием грузит файл и открывает именно его;
   7. номера с чертежами (№1, №3, №9, №12) не задеты: только демоверсия;
   8. телефон 375 px — без прокрутки вбок.
@@ -39,7 +38,8 @@ from playwright.sync_api import sync_playwright
 PORT = 9161
 BASE = f"http://127.0.0.1:{PORT}"
 HERE = os.path.dirname(os.path.abspath(__file__))
-COUNTS = {"2": 26, "4": 60, "5": 50, "7": 54, "8": 60, "10": 58, "11": 62}
+COUNTS = {"1": 58, "2": 31, "3": 57, "4": 60, "5": 50, "7": 54, "8": 60, "9": 56, "10": 58, "11": 62, "12": 58}
+IMG_RE = re.compile(r'<img src="(ege-prof-fipi-img/[^"]+)"')
 SRC_RE = re.compile(r"Источник: открытый банк заданий ФИПИ, задание ([0-9A-Za-z]{6})")
 
 
@@ -94,7 +94,12 @@ def new_page(browser, url, wait=1200, width=1300):
 
 
 def test_data(F):
-    check("данные: номера с файлами — 2, 4, 5, 7, 8, 10, 11", sorted(F["files"], key=int) == sorted(COUNTS, key=int), str(F["files"]))
+    check("данные: номера с файлами — 1–5, 7–12", sorted(F["files"], key=int) == sorted(COUNTS, key=int), str(F["files"]))
+    imgs = [m for t in F["tasks"].values() for p in t["protos"] for m in IMG_RE.findall(p["text"])]
+    missing = [m for m in imgs if not os.path.exists(os.path.join(HERE, m))]
+    check(f"данные: чертежи ФИПИ ({len(imgs)}) лежат в репозитории", imgs and not missing, str(missing[:3]))
+    nofig = [p["fipi"] for n in ("1", "3", "9", "12") for p in F["tasks"][n]["protos"] if not IMG_RE.search(p["text"])]
+    check("данные: у каждого задания №1, 3, 9, 12 есть чертёж", not nofig, str(nofig[:5]))
     for n, cnt in COUNTS.items():
         t = F["tasks"][n]
         ps = t["protos"]
@@ -104,7 +109,7 @@ def test_data(F):
         check(f"данные №{n}: у каждого группа, условие, ответ, решение; группы в разделах",
               all(p["group"] in gids and p["text"] and p["answer"] and p["steps"] and p["id"] == f"{n}.fipi.{p['fipi']}" for p in ps)
               and all(g["section"] in sids and g["hint"] for g in t["groups"]))
-        bad = [p["fipi"] for p in ps if p["text"].count("$") % 2 or any(s.count("$") % 2 for s in p["steps"]) or "⟦" in p["text"]
+        bad = [p["fipi"] for p in ps if re.sub(r"<[^>]+>", "", p["text"]).count("$") % 2 or any(s.count("$") % 2 for s in p["steps"]) or "⟦" in p["text"]
                or not re.fullmatch(r"-?\d+(,\d+)?", p["answer"])]
         check(f"данные №{n}: нет непарных $, картинок-меток, ответ по форме бланка", not bad, str(bad[:5]))
     ids = [p["fipi"] for t in F["tasks"].values() for p in t["protos"]]
@@ -217,9 +222,9 @@ def test_lazy(browser, F):
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.on("request", lambda r: got.append(r.url.rsplit('/', 1)[-1]))
     page.route("https://**/*", lambda route: route.abort())
-    page.goto(f"{BASE}/ege_prof.html?n=1")
+    page.goto(f"{BASE}/ege_prof.html?n=6")
     page.wait_for_timeout(1200)
-    check("раздельно: на №1 файлы номеров не грузятся",
+    check("раздельно: на №6 (без банка ФИПИ) файлы номеров не грузятся",
           'ege-prof-fipi.js' in got and not any(re.fullmatch(r"ege-prof-fipi\d+\.js", u) for u in got), str([u for u in got if 'fipi' in u]))
     p = F["tasks"]["8"]["protos"][17]
     page.evaluate("(pid) => window.__examNav.open(8, pid)", p["id"])
@@ -233,12 +238,27 @@ def test_lazy(browser, F):
 def test_untouched(browser):
     ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=1")
     bad = []
-    for n in (1, 3, 9, 12, 13):
+    for n in (6, 13, 14):
         page.evaluate("(n) => new Promise(r => ensureFipi(n, r))", n)
         cnt = page.evaluate("(n) => protos(n).filter(p => p.fipi).length", n)
         if cnt:
             bad.append((n, cnt))
-    check("номера с чертежами (1, 3, 9, 12) и №13 — без заданий ФИПИ", not bad, str(bad))
+    check("№6 (случайная величина), №13 и часть 2 — без заданий ФИПИ", not bad, str(bad))
+    ctx.close()
+
+
+def test_figure(browser, F):
+    """Чертёж ФИПИ в условии: картинка загрузилась, у неё белая подложка (тёмная тема)."""
+    p = F["tasks"]["9"]["protos"][0]
+    ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=9")
+    page.evaluate("(pid) => window.__examNav.open(9, pid)", p["id"])
+    page.wait_for_timeout(800)
+    info = page.evaluate("""() => { const im = document.querySelector('#egeQuestion .ege-fig img');
+        return im && { w: im.naturalWidth, bg: getComputedStyle(im).backgroundColor }; }""")
+    check("чертёж №9 загрузился, подложка белая", bool(info) and info["w"] > 50 and info["bg"] == "rgb(255, 255, 255)", str(info))
+    peek = page.evaluate("() => protoPeek(curProto)")
+    check("в подписи карточки нет разметки картинки", "<img" not in peek and "ege-fig" not in peek)
+    check("чертёж: без ошибок JS", not errors, str(errors[:1]))
     ctx.close()
 
 
@@ -262,6 +282,7 @@ def main():
         test_picker_and_task(browser, F)
         test_lazy(browser, F)
         test_untouched(browser)
+        test_figure(browser, F)
         test_phone(browser)
         browser.close()
     failed = [n for n, ok in results if not ok]
