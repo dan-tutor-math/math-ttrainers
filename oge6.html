@@ -416,6 +416,16 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .soft-btn:hover{border-color:var(--ink)}
 .soft-btn:active{transform:scale(.96)}
 .explain .answer-line{margin-top:10px;}
+/* решение столбиком с вертикальными дробями — те же правила, что в №9 */
+.sol{display:flex;flex-direction:column;gap:8px;margin:8px 0 4px;font-size:18px;color:var(--muted-5);}
+.sol-line{line-height:1.5;}
+.sol .frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.25;margin:0 3px;font-size:.92em;}
+.sol .frac .num{padding:0 6px 3px;}
+.sol .frac .den{padding:3px 6px 0;border-top:1.5px solid currentColor;}
+.sol .frac .frac{font-size:.85em;}
+.sol-note{font-size:14px;color:var(--muted-3);margin-top:6px;}
+.mode-card .msub{font-family:var(--font-ui);font-weight:500;font-size:13px;color:var(--muted-2);white-space:nowrap;}
+.source-note{font-family:var(--font-ui);font-weight:500;font-size:12.5px;color:var(--muted-3);margin:12px 0 0;}
 </style>
 </head>
 <body>
@@ -552,6 +562,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
     <div class="mode-card random" data-id="random">
       <div class="mtitle">🎲 Случайно — из всех типов</div>
     </div>
+    <!-- фильтр «Задания ФИПИ / На основе ФИПИ» (fipi-mix.js) -->
+    <div id="fipiFilter"></div>
     <div id="modesGrid"></div>
   </div>
 
@@ -578,12 +590,17 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
     <div class="panel coming-soon" id="comingSoonPanel" style="display:none"></div>
 
+    <!-- плашка «задания ФИПИ этого вида решены» — снаружи #questionPanel:
+         в «Подборку» и на доску ей не нужно -->
+    <div class="fipi-notice" id="fipiNotice" style="display:none"></div>
     <div class="panel" id="questionPanel" style="display:none">
       <div class="prompt" id="questionPromptText"></div>
       <div class="input-answer-row" id="inputAnswerArea">
         <input type="text" inputmode="decimal" class="answer-input" id="answerInput" placeholder="?" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
         <button class="check-btn" id="checkAnswerBtn">Проверить</button>
       </div>
+      <!-- подпись источника — внутри #questionPanel: едет в «Подборку» и на доску, как в №9 и №19 -->
+      <div class="source-note" id="sourceNote" style="display:none"></div>
     </div>
 
     <!-- «Тренировка»: разбор по кнопке. Снаружи #questionPanel нарочно — он
@@ -655,6 +672,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="keypad.js"></script>
 <script src="exam-nav.js"></script>
 <script src="trainer-multi.js"></script>
+<script src="fipi-mix.js"></script>
+<script src="oge6-fipi-bank.js"></script>
 <script>
 /* ═══════════════ утилиты ═══════════════ */
 const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -741,32 +760,152 @@ const ADD_SUB_POOL = [2,4,5,10,20,25,50];
 // специально строится кратным их "плохой" части, чтобы она сократилась без остатка
 const MD_POOL = [2,3,4,5,6,7,9,10,12,14,15,18,20,21,25,28,30,35];
 
-/* ═══════════════ 9 прототипов задания 6 ОГЭ ═══════════════ */
+/* ═══════════════ 9 прототипов задания 6 ОГЭ ═══════════════
+   У каждого прототипа две половины: build_pN(числа) строит условие и решение,
+   gen_pN() только подбирает числа. Так задания открытого банка ФИПИ (в банке
+   лежат одни их числа, oge6-fipi-bank.js) и наши «на основе ФИПИ» получают
+   одну и ту же запись и одни и те же шаги решения — по построению, а не потому,
+   что их аккуратно переписали одинаково. Решение — столбиком, одно
+   преобразование в строке, обыкновенные дроби вертикально. */
+
+// решение столбиком; note — пояснение над строками (какой общий знаменатель и т. п.)
+function sol(lines, note){
+  return (note ? `<div class="sol-note">${note}</div>` : '')
+    + '<div class="sol">' + lines.map(l => `<div class="sol-line">${l}</div>`).join('') + '</div>';
+}
+const F = renderFrac;
+// дробь со знаком перед ней: «−» не внутри числителя, как пишут в тетради
+function fracS(n, d){ return n < 0 ? '−' + F(-n, d) : F(n, d); }
+function intS(n){ return (n < 0 ? '−' : '') + Math.abs(n); }
+// хвост решения после «= num/den»: сокращение (если есть) и десятичная запись
+function fracTail(num, den){
+  const [n, d] = reduceFrac(num, den);
+  if (d === 1) return [`= ${intS(n)}`];
+  const out = [];
+  if (n !== num || d !== den) out.push(`= ${fracS(n, d)}`);
+  out.push(`= ${exactDecimal(n, d).str}`);
+  return out;
+}
+const PROMPT6 = 'Найдите значение выражения:';
+const OPS = { '+': '+', '-': '−', '*': '·', ':': ':' };
+function exprFF(a, b, op, c, d){
+  return exprWrap(`${F(a,b)}<span class="op">${OPS[op]}</span>${F(c,d)}`);
+}
+
+// 1–2. a/b ± c/d: к общему знаменателю, потом числители
+function buildAddSub(a, b, op, c, d){
+  const L = lcm(b, d), an = a*(L/b), cn = c*(L/d);
+  const r = op === '+' ? an + cn : an - cn;
+  const lines = [];
+  const same = b === L && d === L;
+  lines.push(`${F(a,b)} ${OPS[op]} ${F(c,d)} = ` + (same ? fracS(r, L) : `${F(an,L)} ${OPS[op]} ${F(cn,L)}`));
+  if (!same) lines.push(`= ${fracS(r, L)}`);
+  return {
+    prompt: PROMPT6 + exprFF(a, b, op, c, d),
+    correctValue: exactDecimal(r, L).value,
+    explain: sol(lines.concat(fracTail(r, L)), same ? '' : `Общий знаменатель — ${L}.`),
+  };
+}
+function build_p1(a, b, c, d){ return buildAddSub(a, b, '+', c, d); }
+function build_p2(a, b, c, d){ return buildAddSub(a, b, '-', c, d); }
+
+// 3. a/b · c/d: числитель на числитель, знаменатель на знаменатель
+function build_p3(a, b, c, d){
+  const num = a*c, den = b*d;
+  const lines = [
+    `${F(a,b)} · ${F(c,d)} = ${F(`${a} · ${c}`, `${b} · ${d}`)}`,
+    `= ${F(num, den)}`,
+  ];
+  return {
+    prompt: PROMPT6 + exprFF(a, b, '*', c, d),
+    correctValue: exactDecimal(num, den).value,
+    explain: sol(lines.concat(fracTail(num, den))),
+  };
+}
+
+// 4. a/b : c/d = a/b · d/c
+function build_p4(a, b, c, d){
+  const num = a*d, den = b*c;
+  const lines = [
+    `${F(a,b)} : ${F(c,d)} = ${F(a,b)} · ${F(d,c)}`,
+    `= ${F(`${a} · ${d}`, `${b} · ${c}`)}`,
+    `= ${F(num, den)}`,
+  ];
+  return {
+    prompt: PROMPT6 + exprFF(a, b, ':', c, d),
+    correctValue: exactDecimal(num, den).value,
+    explain: sol(lines.concat(fracTail(num, den)), 'Деление на дробь — умножение на обратную ей дробь.'),
+  };
+}
+
+// 5–7. десятичные с одним знаком после запятой; xI, yI — число × 10
+function decExpr(xI, op, yI){
+  return exprWrap(`${fmtDecimalFromInt(xI,1)}<span class="op">${OPS[op]}</span>${fmtDecimalFromInt(yI,1)}`);
+}
+function build_p5(xI, yI){
+  const s = xI + yI;
+  return {
+    prompt: PROMPT6 + decExpr(xI, '+', yI),
+    correctValue: s/10,
+    explain: sol([`${fmtDecimalFromInt(xI,1)} + ${fmtDecimalFromInt(yI,1)} = ${exactDecimal(s, 10).str}`],
+      'Складываем поразрядно: запятая под запятой.'),
+  };
+}
+function build_p6(xI, yI){
+  const r = xI - yI, X = fmtDecimalFromInt(xI,1), Y = fmtDecimalFromInt(yI,1);
+  // из меньшего большее: вычитаем наоборот и ставим минус — так ошибаются реже
+  const lines = r < 0
+    ? [`${X} − ${Y} = −(${Y} − ${X})`, `= ${exactDecimal(r, 10).str}`]
+    : [`${X} − ${Y} = ${exactDecimal(r, 10).str}`];
+  return {
+    prompt: PROMPT6 + decExpr(xI, '-', yI),
+    correctValue: r/10,
+    explain: sol(lines, r < 0 ? 'Вычитаемое больше уменьшаемого — ответ отрицательный.' : 'Вычитаем поразрядно: запятая под запятой.'),
+  };
+}
+function build_p7(xI, yI){
+  const p = xI * yI, full = fmtDecimalFromInt(p, 2), short = exactDecimal(p, 100).str;
+  const lines = [`${xI} · ${yI} = ${p}`, `${fmtDecimalFromInt(xI,1)} · ${fmtDecimalFromInt(yI,1)} = ${full}`];
+  if (short !== full) lines.push(`= ${short}`);
+  return {
+    prompt: PROMPT6 + decExpr(xI, '*', yI),
+    correctValue: p/100,
+    explain: sol(lines, 'Умножаем как целые, не глядя на запятые. В множителях вместе два знака после запятой — в произведении отделяем запятой две цифры справа.'),
+  };
+}
+
+// 8. десятичная дробь, записанная дробью: числитель и знаменатель × 10
+function build_p8(xI, yI){
+  const X = fmtDecimalFromInt(xI,1), Y = fmtDecimalFromInt(yI,1);
+  const lines = [`${F(X, Y)} = ${F(xI, yI)}`].concat(fracTail(xI, yI));
+  return {
+    prompt: PROMPT6 + exprWrap(F(X, Y)),
+    correctValue: exactDecimal(xI, yI).value,
+    explain: sol(lines, 'Умножаем числитель и знаменатель на 10 — запятые уходят, значение дроби не меняется.'),
+  };
+}
+
+// 9. 1/(1/p + 1/q): сначала знаменатель, потом 1 делим на него
+function build_p9(p, q){
+  const L = lcm(p, q), s = L/p + L/q;
+  const [n, d] = reduceFrac(s, L);
+  const first = `${F(1,p)} + ${F(1,q)} = ${F(L/p, L)} + ${F(L/q, L)} = ${F(s, L)}` + (n !== s ? ` = ${F(n, d)}` : '');
+  const lines = [first, `${F(1, `${F(1,p)} + ${F(1,q)}`)} = 1 : ${F(n, d)} = ${F(d, n)}`].concat(fracTail(d, n).slice(-1));
+  return {
+    prompt: PROMPT6 + exprWrap(F('1', `${F(1,p)}<span class="op">+</span>${F(1,q)}`)),
+    correctValue: exactDecimal(L, s).value,
+    explain: sol(lines, 'Сначала знаменатель большой дроби, потом делим на него единицу.'),
+  };
+}
 
 function gen_p1_frac_add(){
   const b = pick(ADD_SUB_POOL), d = pick(ADD_SUB_POOL);
-  const a = ri(1, b*2), c = ri(1, d*2);
-  const L = lcm(b,d);
-  const an = a*(L/b), cn = c*(L/d);
-  const { str, value } = exactDecimal(an+cn, L);
-  return {
-    prompt: `Найдите значение выражения:` + exprWrap(`${renderFrac(a,b)}<span class="op">+</span>${renderFrac(c,d)}`),
-    correctValue: value,
-    explain: `Общий знаменатель — ${L}. ${a}/${b} = ${an}/${L}, ${c}/${d} = ${cn}/${L}. ${an}/${L} + ${cn}/${L} = ${an+cn}/${L} = ${str}.`
-  };
+  return build_p1(ri(1, b*2), b, ri(1, d*2), d);
 }
 
 function gen_p2_frac_sub(){
   const b = pick(ADD_SUB_POOL), d = pick(ADD_SUB_POOL);
-  const a = ri(1, b*2), c = ri(1, d*2);
-  const L = lcm(b,d);
-  const an = a*(L/b), cn = c*(L/d);
-  const { str, value } = exactDecimal(an-cn, L);
-  return {
-    prompt: `Найдите значение выражения:` + exprWrap(`${renderFrac(a,b)}<span class="op">−</span>${renderFrac(c,d)}`),
-    correctValue: value,
-    explain: `Общий знаменатель — ${L}. ${a}/${b} = ${an}/${L}, ${c}/${d} = ${cn}/${L}. ${an}/${L} − ${cn}/${L} = ${an-cn}/${L} = ${str}.`
-  };
+  return build_p2(ri(1, b*2), b, ri(1, d*2), d);
 }
 
 // выбирает вторую "ногу" пары так, чтобы суммарный запас двоек/пятёрок не превышал 2 —
@@ -785,13 +924,7 @@ function gen_p3_frac_mul(){
   const be = twoFiveSplit(b), de = twoFiveSplit(d);
   const a = be.bad * ri(1, Math.max(1, Math.round(b*2/be.bad)));
   const c = de.bad * ri(1, Math.max(1, Math.round(d*2/de.bad)));
-  const num = a*c, den = b*d;
-  const { str, value } = exactDecimal(num, den);
-  return {
-    prompt: `Найдите значение выражения:` + exprWrap(`${renderFrac(a,b)}<span class="op">·</span>${renderFrac(c,d)}`),
-    correctValue: value,
-    explain: `${a}/${b} · ${c}/${d} = (${a}·${c})/(${b}·${d}) = ${num}/${den} = ${str}.`
-  };
+  return build_p3(a, b, c, d);
 }
 
 function gen_p4_frac_div(){
@@ -799,54 +932,17 @@ function gen_p4_frac_div(){
   const be = twoFiveSplit(b), ce = twoFiveSplit(c2);
   const a = be.bad * ri(1, Math.max(1, Math.round(b*2/be.bad)));
   const d2 = ce.bad * ri(1, Math.max(1, Math.round(c2*2/ce.bad)));
-  const num = a*d2, den = b*c2;
-  const { str, value } = exactDecimal(num, den);
-  return {
-    prompt: `Найдите значение выражения:` + exprWrap(`${renderFrac(a,b)}<span class="op">:</span>${renderFrac(c2,d2)}`),
-    correctValue: value,
-    explain: `${a}/${b} : ${c2}/${d2} = ${a}/${b} · ${d2}/${c2} = (${a}·${d2})/(${b}·${c2}) = ${num}/${den} = ${str}.`
-  };
+  return build_p4(a, b, c2, d2);
 }
 
-function gen_p5_dec_add(){
-  const xI = ri(11,98), yI = ri(11,98);
-  const sumI = xI + yI;
-  return {
-    prompt: `Найдите значение выражения:` + exprWrap(`${fmtDecimalFromInt(xI,1)}<span class="op">+</span>${fmtDecimalFromInt(yI,1)}`),
-    correctValue: sumI/10,
-    explain: `${fmtDecimalFromInt(xI,1)} + ${fmtDecimalFromInt(yI,1)} = ${fmtDecimalFromInt(sumI,1)}.`
-  };
-}
-
-function gen_p6_dec_sub(){
-  const xI = ri(11,98), yI = ri(11,98);
-  const diffI = xI - yI;
-  return {
-    prompt: `Найдите значение выражения:` + exprWrap(`${fmtDecimalFromInt(xI,1)}<span class="op">−</span>${fmtDecimalFromInt(yI,1)}`),
-    correctValue: diffI/10,
-    explain: `${fmtDecimalFromInt(xI,1)} − ${fmtDecimalFromInt(yI,1)} = ${fmtDecimalFromInt(diffI,1)}.`
-  };
-}
-
-function gen_p7_dec_mul(){
-  const xI = ri(11,98), yI = ri(11,98);
-  const prodI = xI * yI;
-  return {
-    prompt: `Найдите значение выражения:` + exprWrap(`${fmtDecimalFromInt(xI,1)}<span class="op">·</span>${fmtDecimalFromInt(yI,1)}`),
-    correctValue: prodI/100,
-    explain: `${fmtDecimalFromInt(xI,1)} · ${fmtDecimalFromInt(yI,1)} = ${fmtDecimalFromInt(prodI,2)}.`
-  };
-}
+function gen_p5_dec_add(){ return build_p5(ri(11,98), ri(11,98)); }
+function gen_p6_dec_sub(){ return build_p6(ri(11,98), ri(11,98)); }
+function gen_p7_dec_mul(){ return build_p7(ri(11,98), ri(11,98)); }
 
 function gen_p8_dec_div(){
   const q = ri(2,15);
   const yI = ri(2,20);
-  const xI = yI * q;
-  return {
-    prompt: `Найдите значение выражения:` + exprWrap(renderFrac(fmtDecimalFromInt(xI,1), fmtDecimalFromInt(yI,1))),
-    correctValue: q,
-    explain: `${fmtDecimalFromInt(xI,1)} : ${fmtDecimalFromInt(yI,1)} = ${q}.`
-  };
+  return build_p8(yI * q, yI);
 }
 
 function gen_p9_nested(){
@@ -860,14 +956,9 @@ function gen_p9_nested(){
   } while (decimalPlaces(reduceFrac(L, innerNum)[1]) > 2 && tries < 200);
   if (decimalPlaces(reduceFrac(L, innerNum)[1]) > 2) {
     // подстраховка: пример из настоящего ОГЭ, если случайный перебор не уложился в лимит попыток
-    p = 30; q = 42; L = lcm(p,q); innerNum = L/p + L/q;
+    p = 30; q = 42;
   }
-  const { str, value } = exactDecimal(L, innerNum);
-  return {
-    prompt: `Найдите значение выражения:` + exprWrap(renderFrac('1', `${renderFrac(1,p)}<span class="op">+</span>${renderFrac(1,q)}`)),
-    correctValue: value,
-    explain: `1/${p} + 1/${q} = ${L/p}/${L} + ${L/q}/${L} = ${innerNum}/${L}. Вся дробь равна 1 : ${innerNum}/${L} = ${L}/${innerNum} = ${str}.`
-  };
+  return build_p9(p, q);
 }
 
 /* ═══════════════ демоверсия ОГЭ-2027 ═══════════════
@@ -905,6 +996,34 @@ const GROUPS = [
     { id: 'p9', title: 'Многоэтажная дробь', gen: gen_p9_nested },
   ]},
 ];
+/* ═══════════════ задания из открытого банка ФИПИ ═══════════════
+   Все 81 задание №6 банка ФИПИ (КЭС 1.2/1.3, краткий ответ) — oge6-fipi-bank.js,
+   собран скриптами fipi-pilot/tools/n6_*.py. Виды банка — ровно наши 9
+   прототипов (fipiN = прототип N), поэтому отдельных карточек у банка нет:
+   задания ФИПИ встают внутрь своего прототипа (fipiList), а правило
+   fipi-mix.js «сначала ФИПИ, когда решены — на основе ФИПИ» решает, что выдать.
+   В банке только числа задания: условие и решение строит build_pN — тот же,
+   что у генератора, поэтому запись у задания ФИПИ и у нашего одинаковая.
+   Ученику — только задания, ответ которых принял сам сайт ФИПИ (checked);
+   ?all=1 — предпросмотр преподавателя со всеми. */
+const FIPI_PAGE = 'oge6';
+const FIPI_BANK = window.OGE6_FIPI || null;
+const FIPI_ALL = new URLSearchParams(location.search).get('all') === '1';
+const FIPI_BUILD = { p1: build_p1, p2: build_p2, p3: build_p3, p4: build_p4, p5: build_p5,
+  p6: build_p6, p7: build_p7, p8: build_p8, p9: build_p9 };
+if (FIPI_BANK && window.FipiMix) {
+  GROUPS.forEach(g => g.modes.forEach(m => {
+    if (m.demo || !FIPI_BUILD[m.id]) return;
+    const list = FIPI_BANK.tasks.filter(t => t.g === 'fipi' + m.id.slice(1) && (t.checked || FIPI_ALL));
+    if (!list.length) return;
+    // поле unchecked — только когда оно есть: ключ со значением undefined
+    // пропадает в снимке сессии, и задание у ученика «не совпадало» бы с учительским
+    m.fipiList = list.map(t => ({ fipi: t.fipi, make: () => Object.assign(
+      FIPI_BUILD[m.id](...t.args), t.checked ? {} : { unchecked: true }) }));
+    const own = m.gen;
+    m.gen = () => FipiMix.next(FIPI_PAGE, m.id, m.fipiList, own);
+  }));
+}
 const ALL_MODES = GROUPS.flatMap(g => g.modes);
 // «Случайно» берёт только генераторы: нулевой тип из демоверсии — всегда одно
 // и то же задание, в случайной подборке оно выпадало бы снова и снова
@@ -1057,6 +1176,11 @@ function playMedalAnimation(tier) {
 }
 
 function recordSolve() {
+  // задание ФИПИ пройдено — в своём виде оно больше не выпадет, пока не решены остальные
+  if (window.FipiMix && curTask && curTask.fipi) {
+    const fm = ALL_MODES.find(x => x.fipiList && x.fipiList.some(f => f.fipi === curTask.fipi));
+    if (fm) FipiMix.markDone(FIPI_PAGE, fm.id, curTask);
+  }
   // ввод текстом всегда завершается показом верного значения (даже после ошибок) —
   // "верно"/"неверно" тут не различаем, только было ли по пути 🟡-исправление (hadError)
   const gotItRight = true;
@@ -1086,7 +1210,9 @@ function renderPicker() {
         const p = loadProg(m.id);
         const meds = p && p.medals;
         const badges = meds ? ['gold', 'silver', 'bronze'].filter(t => meds[t]).map(t => `${MEDAL_EMOJI[t]}${meds[t]}`).join(' ') : '';
-        return `<div class="mode-card${m.demo ? ' demo' : ''}" data-id="${m.id}"><div class="mtitle">${m.title}</div>${badges ? `<div class="mode-medals">${badges}</div>` : ''}</div>`;
+        // «10+ заданий»: сколько заданий ФИПИ у вида и что дальше генератор (fipi-mix.js)
+        const fl = window.FipiMix && m.fipiList ? FipiMix.countLabel(FIPI_PAGE, m.id, m.fipiList) : '';
+        return `<div class="mode-card${m.demo ? ' demo' : ''}" data-id="${m.id}"><div class="mtitle">${m.title}</div>${fl ? `<div class="msub fipi-count">${fl}</div>` : ''}${badges ? `<div class="mode-medals">${badges}</div>` : ''}</div>`;
       }).join('')}
     </div>
   `).join('');
@@ -1257,6 +1383,15 @@ function renderCurrentTask() {
   window.scrollTo(0, 0);
   els.questionPanel.style.display = 'block';
   els.questionPromptText.innerHTML = curTask.prompt;
+  // подпись источника — по полю задания, а не по типу: так она приходит и со
+  // снимком сессии, и с восстановленным из памяти заданием
+  const note = document.getElementById('sourceNote');
+  const src = window.FipiMix ? FipiMix.sourceText(curTask) : '';
+  note.textContent = src + (curTask.unchecked ? ' (ответ ещё не сверен с сайтом ФИПИ)' : '');
+  note.style.display = src ? 'block' : 'none';
+  const notice = document.getElementById('fipiNotice');
+  notice.textContent = curTask.fipiNotice || '';
+  notice.style.display = curTask.fipiNotice ? 'block' : 'none';
 
   els.answerInput.value = '';
   els.answerInput.classList.remove('good', 'bad', 'shake');
@@ -1279,6 +1414,9 @@ function newTask() {
   // совпавшее с недавним (целиком или ответом подряд), перегенерируется
   // (no-repeat.js); avoid — заменяемое задание на экране
   curTask = NoRepeat.pick('oge6:' + curMode, () => m.gen(), { avoid: [curTask] });
+  // память «ФИПИ решены / плашка показана» меняется только для выбранного
+  // кандидата — NoRepeat зовёт генератор по нескольку раз
+  if (window.FipiMix && m.fipiList) FipiMix.commit(FIPI_PAGE, m.id, curTask, m.fipiList);
   taskAnswered = false;
   hadWrongPick = false;
 
@@ -1457,6 +1595,9 @@ function syncKeypadVisibility(){
 setupFloatingKeypad();
 
 renderPicker();
+// фильтр «Задания ФИПИ / На основе ФИПИ» — только если банк загрузился;
+// смена фильтра меняет подписи «10+ заданий» на карточках
+if (window.FipiMix && FIPI_BANK) FipiMix.mountFilter(document.getElementById('fipiFilter'), () => renderPicker());
 
 
 /* ═══ Промпт №32: совместная работа не только на доске, но и в самом задании ═══
