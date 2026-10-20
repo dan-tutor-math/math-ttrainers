@@ -57,3 +57,71 @@ window.rtGuard = function (client) {
   }, 2000);
   return client;
 };
+
+/* Сторож запросов к базе (№93 «связь с доской»). Урок 19.10.2026: у ученика
+   жёлтая плашка «Связь с базой сбоит — догружаю доску» висела до конца урока,
+   новое на доске больше не появлялось, картинка задания — «Загрузка…», его
+   курсор у учителя то появлялся, то пропадал. Supabase стоит за Cloudflare
+   (в ответе сервера `server: cloudflare`), а часть российских провайдеров с
+   9 июня 2025 года пропускает к Cloudflare только первые ~16 КБ соединения:
+   дальше данные не идут, а ошибки нет — запрос висит бесконечно.
+   Один такой запрос держал навсегда загрузку доски (а пока она не кончилась,
+   сверка раз в полминуты не запускается) или очередь записей
+   (cloudWriteChain, следующие правки ждут предыдущую).
+   Встроенный таймаут библиотеки (`db.timeout`) не спасает: он снимается,
+   как только пришли заголовки ответа, а виснет обычно тело — заголовки
+   в первые 16 КБ влезают. Поэтому здесь: запрос обрывается, если
+   `idleMs` не пришло ни байта — ни заголовков, ни очередного куска тела.
+   Медленный, но живой ответ не обрывается. Обрыв — обычная ошибка
+   (AbortError): загрузка уходит на повтор, запись — в недописанное,
+   которое повторит сверка; вход (`/auth/`) считает её сетевой и сессию не
+   теряет. Хранилище картинок (`/storage/`) не трогаем: выгрузка картинки
+   по медленному каналу может честно идти дольше.
+   `stalls` — когда обрывали: по ним доска подсказывает сменить сеть */
+window.sbGuardedFetch = (function () {
+  const GUARDED = /\/(rest|auth|functions)\/v1\//;
+  const NO_BODY = [101, 204, 205, 304];
+  function guarded(input, init) {
+    const url = typeof input === 'string' ? input : (input && input.url) || String(input);
+    if (!GUARDED.test(url) || typeof AbortController !== 'function') return fetch(input, init);
+    const ctl = new AbortController();
+    const outer = init && init.signal;
+    const onOuter = () => ctl.abort();
+    if (outer) { if (outer.aborted) ctl.abort(); else outer.addEventListener('abort', onOuter, { once: true }); }
+    let timer = null, stalled = false;
+    const arm = () => {
+      clearTimeout(timer);
+      timer = setTimeout(() => { stalled = true; ctl.abort(); }, guarded.idleMs);
+    };
+    const finish = () => { clearTimeout(timer); if (outer) outer.removeEventListener('abort', onOuter); };
+    arm();
+    return fetch(input, Object.assign({}, init, { signal: ctl.signal })).then(async (res) => {
+      if (!res.body || NO_BODY.indexOf(res.status) >= 0) { finish(); return res; }
+      // тело читаем здесь же, под тем же сторожем: каждый кусок — заново
+      // отсчёт; иначе зависание тела досталось бы res.json() библиотеки
+      arm();
+      const reader = res.body.getReader();
+      const parts = [];
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        parts.push(value);
+        arm();
+      }
+      finish();
+      return new Response(new Blob(parts), { status: res.status, statusText: res.statusText, headers: res.headers });
+    }).catch((e) => {
+      finish();
+      if (stalled) {
+        const now = Date.now();
+        guarded.stalls.push(now);
+        while (guarded.stalls.length && now - guarded.stalls[0] > 10 * 60 * 1000) guarded.stalls.shift();
+        console.warn('[связь] запрос к базе оборван: ' + guarded.idleMs / 1000 + ' с без ответа', url.split('?')[0]);
+      }
+      throw e;
+    });
+  }
+  guarded.idleMs = 20000;
+  guarded.stalls = [];
+  return guarded;
+})();

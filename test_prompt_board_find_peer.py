@@ -23,7 +23,7 @@ test_prompt10 (сообщения собеседника подаём рукам
      подсвечивается
   7. Человек сам сдвинул камеру посреди полёта — полёт прекращается
   8. Участник только с курсором (без `here`) тоже в списке
-  9. `bye` — кнопка пропадает; молчит дольше 16 с — тоже
+  9. `bye` — кнопка пропадает; молчит дольше 16 с — блёклая (№93)
  10. Узкий экран: остаётся квадратик с буквой, панель не залезает под «⋯»
  11. Уход с доски — список пуст, собеседникам ушёл `bye`
 """
@@ -195,7 +195,14 @@ def run():
             page.wait_for_timeout(4500)
             emit(page, "here", {"uid": "S", "name": "Аня", "cx": 1100, "cy": 900, "z": 1})
         page.wait_for_timeout(1200)
-        check(page.locator("#bdPeers .bd-peer[data-uid='Q']").count() == 0, "9. молчит дольше 16 с — пропал")
+        # №93: замолчавший не пропадает, а становится блёклым («нет связи») —
+        # при рвущейся связи кнопка иначе мигала; пропадает после долгой
+        # тишины (проверено в test_prompt93_live_link.py)
+        q = page.locator("#bdPeers .bd-peer[data-uid='Q']")
+        check(q.count() == 1 and "is-stale" in (q.get_attribute("class") or ""),
+              "9. молчит дольше 16 с — кнопка блёклая, не пропала")
+        check("is-stale" not in (page.get_attribute("#bdPeers .bd-peer[data-uid='S']", "class") or ""),
+              "9. живой участник — обычная кнопка")
         check(page.locator("#bdPeers .bd-peer[data-uid='S']").count() == 1, "9. живой участник остался")
         check(page.inner_text("#bdPeers .bd-peer[data-uid='S'] .bd-peer-name") == "Аня", "9. новое имя подхватилось")
 

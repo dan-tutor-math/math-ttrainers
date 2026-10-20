@@ -76,6 +76,10 @@ FAKE_LIB = r"""
     delays: { upsert: [], delete: [], select: [] },
     selectErrors: [],          // по одному на запрос select: true — сбой
     sent: [], handlers: [], log: [], selects: [], maxIn: 0,
+    subs: [], manualSubscribe: false,
+    // ответ о подписке последнему каналу — как его подаёт библиотека
+    status(st){ const x = F.subs[F.subs.length - 1];
+      x.ch.state = st === 'SUBSCRIBED' ? 'joined' : (st === 'CLOSED' ? 'closed' : 'errored'); x.cb(st); },
     emit(kind, payload){
       F.handlers.forEach(h => {
         if (kind === 'postgres_changes' && h.type === 'postgres_changes') h.cb(payload);
@@ -148,7 +152,12 @@ FAKE_LIB = r"""
       channel(){
         const ch = {
           on(type, filter, cb){ F.handlers.push({ type, filter, cb }); return ch; },
-          subscribe(){ return ch; },
+          // №93: доска следит за ответами о подписке (нет связи — плашка),
+          // поэтому канал, как настоящий, вскоре отвечает «подключён».
+          // manualSubscribe — ответы подаёт сам тест (__fake.status)
+          subscribe(cb){ F.subs.push({ ch, cb });
+            if (cb && !F.manualSubscribe) setTimeout(() => { ch.state = 'joined'; cb('SUBSCRIBED'); }, 0);
+            return ch; },
           send(msg){ F.sent.push(clone(msg)); return Promise.resolve('ok'); },
         };
         return ch;

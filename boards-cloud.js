@@ -86,7 +86,9 @@
     #bdCloudLoad .bd-cl-retry{flex:none;font:inherit;font-weight:700;border:0;border-radius:8px;
       padding:5px 12px;cursor:pointer;background:#fff;color:#c0392b;}
     #bdCloudLoad .bd-cl-retry:disabled{opacity:.7;cursor:default;}
-    #bdCloudLoad .bd-cl-retry[hidden]{display:none;}
+    #bdCloudLoad .bd-cl-retry[hidden],#bdCloudLoad .bd-cl-check[hidden]{display:none;}
+    #bdCloudLoad .bd-cl-check{flex:none;font:inherit;font-weight:700;border:1px solid currentColor;border-radius:8px;
+      padding:4px 10px;cursor:pointer;background:transparent;color:inherit;white-space:nowrap;}
 
     /* ── Промпт №83: вход по списку почт ── */
     .ag-pw-hint{font-size:12.5px;color:var(--muted-2);margin:-4px 0 10px;line-height:1.4;}
@@ -312,7 +314,10 @@
     return;
   }
 
-  const sb = (window.rtGuard || (c => c))(window.supabase.createClient(cfg.url, cfg.anonKey));
+  // sbGuardedFetch (supabase-config.js) — запрос, по которому долго не
+  // приходит ни байта, обрывается, а не висит до конца урока
+  const sbOpts = window.sbGuardedFetch ? { global: { fetch: window.sbGuardedFetch } } : undefined;
+  const sb = (window.rtGuard || (c => c))(window.supabase.createClient(cfg.url, cfg.anonKey, sbOpts));
   window.SB = sb; // остальным модулям (совместное редактирование, шаринг) — тот же клиент
 
   // Все обращения к серверной функции входа и списка почт
@@ -867,6 +872,10 @@
     .bd-peer-dot svg{position:absolute;right:-4px;bottom:-4px;width:13px;height:13px;border-radius:50%;
       background:var(--glass-strong);color:var(--pencil);padding:1px;box-sizing:border-box;}
     .bd-peer-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    /* №93: от человека давно ничего не приходит — связь пропала (или ушёл,
+       не попрощавшись). Кнопка остаётся, но блёклая, пунктиром */
+    .bd-peer.is-stale{opacity:.5;border-style:dashed;}
+    .bd-peer.is-stale .bd-peer-dot{filter:grayscale(1);}
     /* на узком экране в панели тесно — остаётся только квадратик с буквой,
        полное имя в подсказке (title) */
     @media (max-width:760px){
@@ -1105,7 +1114,12 @@
   // экрана человека: курсор точнее (туда человек показывает)
   // ------------------------------------------------------------------
   const HERE_EVERY = 5000;
-  const PEER_TTL = 16000;          // три пропущенных `here` подряд — ушёл
+  // №93: замолчал — кнопка не пропадает, а становится блёклой («нет
+  // связи»); пропадает только после долгой тишины или `bye`. Раньше при
+  // рвущейся связи ученика его кнопка у учителя то исчезала, то появлялась,
+  // и было непонятно, ушёл он или у него пропал интернет
+  let PEER_TTL = 16000;            // три пропущенных `here` подряд — нет связи
+  let PEER_GONE = 90000;           // столько молчит — ушёл (закрыл ноутбук без `bye`)
   const PEER_COLORS = ['#3b82f6', '#e8590c', '#2f9e44', '#9c36b5', '#c2255c', '#0c8599', '#f08c00', '#5f3dc4'];
   let peers = new Map();           // uid -> { name, cx, cy, zoom, lastSeen }
   let hereLastSentAt = 0;
@@ -1152,35 +1166,39 @@
       || Math.hypot(v.x - p.x, v.y - p.y) * v.zoom > Math.min(window.innerWidth, window.innerHeight) / 4;
     if (far) sendHere();
   }
+  // true — кнопку надо перерисовать: человек новый или снова на связи
   function touchPeer(uid, name) {
     let p = peers.get(uid);
     const isNew = !p;
     if (!p) { p = {}; peers.set(uid, p); }
     if (name) p.name = name;
     p.lastSeen = Date.now();
-    return isNew;
+    const back = !!p.stale;
+    p.stale = false;
+    return isNew || back;
   }
   function cloudHandleHere(payload) {
     if (!payload || !cloudBoardId || !payload.uid) return;
     if (window.CURRENT_USER && payload.uid === window.CURRENT_USER.id) return;
     if (payload.bye) { if (peers.delete(payload.uid)) renderPeers(); return; }
-    const isNew = touchPeer(payload.uid, payload.name || '');
+    const changed = touchPeer(payload.uid, payload.name || '');
     const p = peers.get(payload.uid);
     if (typeof payload.cx === 'number' && typeof payload.cy === 'number') { p.cx = payload.cx; p.cy = payload.cy; p.zoom = payload.z; }
     // ответ новенькому — с небольшим разбросом, чтобы при пяти участниках
     // ответы не летели в канал одной пачкой
     if (payload.ask) setTimeout(() => sendHere(), 50 + Math.random() * 250);
-    if (isNew || p.shownName !== p.name) renderPeers();
+    if (changed || p.shownName !== p.name) renderPeers();
   }
   function renderPeers() {
     const list = Array.from(peers.entries())
-      .map(([uid, p]) => ({ uid, name: p.name || 'Участник' }))
+      .map(([uid, p]) => ({ uid, name: p.name || 'Участник', stale: !!p.stale }))
       .sort((a, b) => a.name.localeCompare(b.name, 'ru'));
     peers.forEach(p => { p.shownName = p.name; });
     const locate = '<svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="5.5" stroke="currentColor" stroke-width="2.2"/><path d="M12 2.5v4M12 17.5v4M2.5 12h4M17.5 12h4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>';
-    peersBar.innerHTML = list.map(({ uid, name }) => {
+    peersBar.innerHTML = list.map(({ uid, name, stale }) => {
       const letter = escHtml((name.trim()[0] || '?').toUpperCase());
-      return `<button type="button" class="bd-peer" data-uid="${escHtml(uid)}" title="Найти на доске: ${escHtml(name)}">`
+      const title = stale ? `${name} — нет связи с доской. Нажмите — туда, где был` : `Найти на доске: ${name}`;
+      return `<button type="button" class="bd-peer${stale ? ' is-stale' : ''}" data-uid="${escHtml(uid)}" title="${escHtml(title)}">`
         + `<span class="bd-peer-dot" style="background:${peerColor(uid)}">${letter}${locate}</span>`
         + `<span class="bd-peer-name">${escHtml(name)}</span></button>`;
     }).join('');
@@ -1223,9 +1241,13 @@
     if (!cloudBoardId) return;
     if (cloudChannel && Date.now() - hereLastSentAt >= HERE_EVERY - 100) sendHere();
     const now = Date.now();
-    let gone = false;
-    peers.forEach((p, uid) => { if (now - p.lastSeen > PEER_TTL) { peers.delete(uid); gone = true; } });
-    if (gone) renderPeers();
+    let changed = false;
+    peers.forEach((p, uid) => {
+      const quiet = now - p.lastSeen;
+      if (quiet > PEER_GONE) { peers.delete(uid); changed = true; }
+      else if (quiet > PEER_TTL && !p.stale) { p.stale = true; changed = true; }
+    });
+    if (changed) renderPeers();
   }, 1000);
 
   function computeDiff(beforeArr, afterArr) {
@@ -1394,8 +1416,12 @@
     el = document.createElement('div');
     el.id = 'bdCloudLoad';
     el.setAttribute('role', 'status');
-    el.innerHTML = '<span class="bd-cl-text"></span><button type="button" class="bd-cl-retry">Повторить</button>';
+    el.innerHTML = '<span class="bd-cl-text"></span><button type="button" class="bd-cl-check">Проверить связь</button>'
+      + '<button type="button" class="bd-cl-retry">Повторить</button>';
     el.querySelector('.bd-cl-retry').addEventListener('click', retryLoadNow);
+    // №94: плашка о сбое — ровно тот момент, когда человек спрашивает
+    // «у меня что-то с интернетом?»; ответ — проверка в один клик
+    el.querySelector('.bd-cl-check').addEventListener('click', () => { if (window.MathhNetCheck) window.MathhNetCheck.open(); });
     // внутри экрана доски: на списке досок плашки не видно в любом случае
     (document.getElementById('screenBoard') || document.body).appendChild(el);
     return el;
@@ -1411,6 +1437,8 @@
     el.querySelector('.bd-cl-text').textContent = text;
     const btn = el.querySelector('.bd-cl-retry');
     btn.hidden = !retry;
+    // обычная «загружается…» — не сбой, проверку не предлагаем
+    el.querySelector('.bd-cl-check').hidden = kind === 'wait' || !window.MathhNetCheck;
     // пока попытка идёт, вторую по кнопке не запускаем — просто видно, что пробуем
     const busy = cloudLoadState === 'loading';
     btn.disabled = busy;
@@ -1418,23 +1446,35 @@
   }
   function renderLoadBanner() {
     const s = cloudLoadState;
-    if (!cloudBoardId || s === 'idle' || s === 'done') { hideLoadBanner(); return; }
+    // №93: о связи плашка говорит и на загруженной доске — без связи новое
+    // от собеседника не приходит, хотя загрузка давно кончилась
+    const lost = liveLostLong();
+    liveBannerOn = lost;
+    if (!cloudBoardId || s === 'idle' || (s === 'done' && !lost)) { hideLoadBanner(); return; }
     if (cloudLoadTrouble === 'bad') {
       clearTimeout(loadBannerTimer); loadBannerTimer = null;
       showLoadBanner('bad', 'Доска загружена не полностью — часть записей может быть не видна. '
-        + 'Не пишите на пустых местах, пока не догрузится.', true);
+        + 'Не пишите на пустых местах, пока не догрузится.' + netHint(), true);
+      return;
+    }
+    if (lost) {
+      clearTimeout(loadBannerTimer); loadBannerTimer = null;
+      showLoadBanner('warn', 'Нет связи с доской — переподключаюсь. Пока связи нет, новое от собеседника сюда не приходит.' + netHint(), false);
       return;
     }
     if (cloudLoadTrouble === 'warn') {
       clearTimeout(loadBannerTimer); loadBannerTimer = null;
-      showLoadBanner('warn', 'Связь с базой сбоит — догружаю доску. Пока не догрузится, часть записей может быть не видна.', false);
+      showLoadBanner('warn', 'Связь с базой сбоит — догружаю доску. Пока не догрузится, часть записей может быть не видна.' + netHint(), false);
       return;
     }
-    // обычная первая загрузка: показываем, только если затянулась
+    // обычная первая загрузка: показываем, только если затянулась. Связь
+    // только что вернулась — её плашку убираем сразу, не ждём таймера
+    const cur = document.getElementById('bdCloudLoad');
+    if (cur && cur.classList.contains('open') && !cur.classList.contains('wait')) hideLoadBanner();
     if (loadBannerTimer) return;
     loadBannerTimer = setTimeout(() => {
       loadBannerTimer = null;
-      if (cloudLoadState === 'loading' && cloudBoardId && !cloudLoadTrouble) {
+      if (cloudLoadState === 'loading' && cloudBoardId && !cloudLoadTrouble && !liveLostLong()) {
         showLoadBanner('wait', 'Доска загружается из облака…', false);
       }
     }, LOAD_BANNER_DELAY_MS);
@@ -1745,6 +1785,9 @@
     // «Найти участника»
     peers: () => Array.from(peers.keys()),
     hereState: () => ({ at: hereLastSentAt, now: Date.now(), channel: !!cloudChannel, board: cloudBoardId }),
+    // №93 «связь с доской»
+    live: () => ({ live: cloudLive, ever: cloudLiveEver, lostAt: cloudLiveLostAt, drops: cloudLiveDrops.length, troubles: netTroubles() }),
+    setLiveTimes: (bannerMs, peerTtl, peerGone) => { LIVE_BANNER_MS = bannerMs; PEER_TTL = peerTtl; PEER_GONE = peerGone; },
   };
 
   function pushDiffToSupabase(boardId, liveDiff) {
@@ -2339,7 +2382,14 @@
     // запроса, до нас не доходило вовсе (до сверки через полминуты). Пришедшее
     // во время загрузки ложится на доску и сравнивается с ответом базы по
     // номерам версий — порядок прихода ничего не решает
-    cloudChannel = window.SB.channel('board_objects:' + boardId)
+    liveReset();
+    openCloudChannel(boardId);
+    startReconcile(boardId);
+    cloudInitialLoad(boardId, board, cloudLoadGen, 0);
+  }
+
+  function openCloudChannel(boardId) {
+    const ch = window.SB.channel('board_objects:' + boardId)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'board_objects', filter: 'board_id=eq.' + boardId }, cloudHandleRemoteChange)
       // курсоры — тем же каналом, но отдельным типом сообщений: broadcast
       // ничего не пишет в базу (в отличие от postgres_changes выше), это
@@ -2362,15 +2412,98 @@
         const revs = payload.revs || {};
         const { ids, expect } = wantedFromAnnounce(b, payload.ids.map(id => ({ id, rv: revs[id] })));
         if (ids.length) fetchHeavyObjects(cloudBoardId, ids, 0, expect);
-      })
-      .subscribe((status) => {
-        // «я пришёл, кто здесь?» — только когда канал действительно
-        // подключён: отправленное раньше сервер молча выбросит
-        if (status === 'SUBSCRIBED') sendHere({ ask: true });
       });
-    startReconcile(boardId);
-    cloudInitialLoad(boardId, board, cloudLoadGen, 0);
+    // канал запоминаем ДО подписки: ответ о подписке сверяется с ним — так
+    // запоздалое «закрыт» от канала прошлой доски не трогает нынешний
+    cloudChannel = ch;
+    ch.subscribe((status) => liveStatus(ch, boardId, status));
   }
+
+  /* №93 «связь с доской». Живая связь (вебсокет) у ученика на уроке
+     19.10.2026 то рвалась, то возвращалась (провайдер режет связь с
+     Cloudflare, см. sbGuardedFetch в supabase-config.js) — и ничего этого
+     не было видно: у учителя кнопка ученика и его курсор мигали, у ученика
+     переставало появляться новое на доске. Библиотека сама переподключает
+     сокет и заново подписывает канал, но:
+     - всё, что собеседник сделал, пока связи не было, до нас не доходило
+       до сверки раз в полминуты — а сверка не шла вовсе, пока висела
+       загрузка доски. Теперь сразу после переподключения — сверка;
+     - связи нет дольше LIVE_BANNER_MS — плашка на доске («Нет связи с
+       доской — переподключаюсь»), а не тишина;
+     - канал, закрытый не нами (CLOSED сам по себе, без ухода с доски),
+       библиотека заново не открывает — открываем сами через 2 с;
+     - связь рвалась не раз за последние минуты — в плашке совет сменить
+       сеть: дело не в доске, и перезагрузка тут не поможет */
+  let LIVE_BANNER_MS = 6000;
+  const NET_HINT_WINDOW_MS = 5 * 60 * 1000;
+  let cloudLive = false;        // канал сейчас подключён
+  let cloudLiveEver = false;    // был ли подключён хоть раз за это открытие
+  let cloudLiveLostAt = 0;      // с какого момента связи нет (0 — связь есть)
+  let cloudLiveDrops = [];      // когда связь пропадала после подключения
+  let liveBannerOn = false;
+  let reopenTimer = null;
+  function liveReset() {
+    cloudLive = false; cloudLiveEver = false;
+    // открыли доску — связи ещё нет: если подключение так и не случится,
+    // плашка покажется так же, как при обрыве
+    cloudLiveLostAt = Date.now();
+    cloudLiveDrops = [];
+    liveBannerOn = false;
+    clearTimeout(reopenTimer); reopenTimer = null;
+  }
+  function liveLostLong() {
+    return !!cloudBoardId && !cloudLive && cloudLiveLostAt > 0 && Date.now() - cloudLiveLostAt >= LIVE_BANNER_MS;
+  }
+  function liveStatus(ch, boardId, status) {
+    if (ch !== cloudChannel || boardId !== cloudBoardId) return;
+    if (status === 'SUBSCRIBED') {
+      const back = cloudLiveEver && !cloudLive;
+      cloudLive = true; cloudLiveEver = true; cloudLiveLostAt = 0;
+      // «я пришёл, кто здесь?» — только когда канал действительно
+      // подключён: отправленное раньше сервер молча выбросит
+      sendHere({ ask: true });
+      // пока связи не было, рассылки собеседника пропали — забираем из базы
+      if (back) setTimeout(() => { if (cloudChannel === ch) reconcileOnce(boardId); }, 300);
+      renderLoadBanner();
+      return;
+    }
+    // CHANNEL_ERROR, TIMED_OUT, CLOSED
+    if (cloudLive) { cloudLiveDrops.push(Date.now()); cloudLiveLostAt = Date.now(); }
+    else if (!cloudLiveLostAt) cloudLiveLostAt = Date.now();
+    cloudLive = false;
+    if (status === 'CLOSED') {
+      // после ошибки и таймаута библиотека переподписывает канал сама, после
+      // закрытия — нет. Наш собственный уход с доски сюда не попадает:
+      // cloudTeardownSubscription обнуляет cloudChannel раньше
+      clearTimeout(reopenTimer);
+      reopenTimer = setTimeout(() => {
+        reopenTimer = null;
+        if (cloudChannel !== ch || cloudBoardId !== boardId) return;
+        // как при уходе с доски: старый канал не должен отвечать в liveStatus
+        cloudChannel = null;
+        try { window.SB.removeChannel(ch); } catch (e) {}
+        openCloudChannel(boardId);
+      }, 2000);
+    }
+  }
+  // сколько раз за последние минуты связь рвалась: обрывы сокета плюс
+  // запросы к базе, оборванные сторожем за молчание
+  function netTroubles() {
+    const now = Date.now();
+    cloudLiveDrops = cloudLiveDrops.filter(t => now - t < NET_HINT_WINDOW_MS);
+    const stalls = (window.sbGuardedFetch && window.sbGuardedFetch.stalls || []).filter(t => now - t < NET_HINT_WINDOW_MS);
+    return cloudLiveDrops.length + stalls.length;
+  }
+  function netHint() {
+    return netTroubles() >= 2
+      ? ' Связь рвётся уже не первый раз — похоже, её режут по дороге к серверу доски. Помогает другая сеть: например, раздать интернет с телефона.'
+      : '';
+  }
+  // плашка о связи появляется и уходит по времени, а не по событию: «нет
+  // связи 6 с» — это момент, о котором сам канал ничего не сообщает
+  setInterval(() => {
+    if (liveLostLong() !== liveBannerOn) renderLoadBanner();
+  }, 1000);
 
   // Промпт №10: загрузка общей доски при входе — слиянием, а не заменой.
   // Подробности — в комментарии у cloudSeen выше
@@ -2550,9 +2683,14 @@
       // сбоя всё равно есть подстраховка по таймауту (setInterval выше)
       try { cloudChannel.send({ type: 'broadcast', event: 'cursor', payload: { uid: window.CURRENT_USER ? window.CURRENT_USER.id : null, leave: true } }); } catch (e) {}
       try { cloudChannel.send({ type: 'broadcast', event: 'here', payload: { uid: window.CURRENT_USER ? window.CURRENT_USER.id : null, bye: true } }); } catch (e) {}
-      window.SB.removeChannel(cloudChannel);
+      // обнуляем ДО removeChannel: его «закрыт» не должен выглядеть как
+      // обрыв связи и открывать канал заново (liveStatus)
+      const ch = cloudChannel;
       cloudChannel = null;
+      window.SB.removeChannel(ch);
     }
+    clearTimeout(reopenTimer); reopenTimer = null;
+    cloudLive = false; cloudLiveLostAt = 0;
     stopCursorAnim();
     clearAllCursors();
     clearPeers();
