@@ -76,9 +76,14 @@
    масштабируется transform'ом. Так шрифт поля остаётся «настоящим»
    (16+ px): iOS не увеличивает страницу при касании поля, а поле на
    картинке и живое совпадают при любом масштабе.
-   Изначально — естественный размер (масштаб 1, как в тренажёре), уже —
-   только если не влезает по ширине. Уголок справа снизу — сузить или
-   растянуть, как задание на доске; двойной щелчок — обратно к естественному. */
+   Ширина задания — доля ширины колонки (S.fill), а не абсолютный масштаб:
+   по умолчанию задание во всю колонку, какое бы окно ни было у ученика —
+   снимок из тренажёра часто вдвое уже колонки, и задание терялось
+   посередине пустой карточки. Доля, а не масштаб, — чтобы после смены
+   окна (телефон ↔ ноутбук, поворот) задание снова вставало по колонке.
+   Уголок справа снизу сужает (и обратно растягивает до колонки);
+   двойной щелчок — снова во всю ширину. Снимок сделан в 2–3× разрешении,
+   поэтому растяжение не мылит картинку. */
 .tc-zone{position:relative;margin:0 auto 12px;}
 .tc-wrap{position:relative;}
 .tc-box{position:absolute;left:0;top:0;transform-origin:0 0;}
@@ -257,7 +262,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&am
    notes — заметки ученика по id задания (тоже только в браузере). */
 const S = {
   work: null, settings: {}, blocks: null, att: null, answers: {}, drafts: {}, notes: {}, cur: 0, finished: false,
-  activeMs: 0, taskMs: 0, tick: null, view: 'one', zoom: 1, notesOn: false,
+  activeMs: 0, taskMs: 0, tick: null, view: 'one', fill: 1, notesOn: false,
 };
 const feedbackEnd = () => S.settings.feedback === 'end';
 const maxTries = () => {
@@ -275,7 +280,7 @@ function isFinal(a){ return !!a && !feedbackEnd() && (a.status === 'ok' || a.sta
 
 const LS = {
   idx: () => 'work:idx:' + code, drafts: () => 'work:drafts:' + code, queue: () => 'work:queue:' + code,
-  view: () => 'work:view:' + code, notes: () => 'work:notes:' + code, zoom: 'work:zoom', notesOn: 'work:notesOn',
+  view: () => 'work:view:' + code, notes: () => 'work:notes:' + code, fill: 'work:fill', notesOn: 'work:notesOn',
 };
 function lsGet(k, d){ try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
 function lsSet(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
@@ -386,7 +391,7 @@ async function boot(){
   if (!opened){ fail('Работа не найдена', 'Проверь ссылку — может быть, она скопировалась не целиком.'); return; }
   S.work = opened.work;
   S.settings = (opened.work && opened.work.settings) || {};
-  S.zoom = Number(lsGet(LS.zoom, 1)) || 1;
+  S.fill = clampFill(Number(lsGet(LS.fill, 1)) || 1);
   S.notesOn = !!lsGet(LS.notesOn, false);
   S.notes = lsGet(LS.notes(), {}) || {};
   initView();
@@ -704,15 +709,18 @@ function renderCard(v){
     }
   }
   const rz = el('div', 'tc-resize');
-  rz.title = 'Потяните, чтобы сузить или растянуть задание; двойной щелчок — естественный размер';
+  rz.title = 'Потяните, чтобы сузить или растянуть задание; двойной щелчок — во всю ширину';
   wireResize(rz, v);
   wrap.appendChild(box);
   wrap.appendChild(rz);
   v.box = box; v.W = W; v.H = H;
 }
 
-// масштаб: естественный (1) или заданный уголком (S.zoom), но не шире колонки
-function kFor(avail, W){ return Math.max(0.25, Math.min(S.zoom, avail / W)); }
+// масштаб: доля колонки, заданная уголком (S.fill, по умолчанию вся колонка).
+// Ключ хранения новый (work:fill): старый work:zoom значил «1 = как в тренажёре»,
+// и у тех, кто его трогал, задание осталось бы узким.
+function clampFill(f){ return Math.max(0.3, Math.min(1, f)); }
+function kFor(avail, W){ return Math.max(0.25, avail * S.fill / W); }
 function availOf(v){
   const cs = getComputedStyle(v.root);
   return v.root.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 4;
@@ -745,18 +753,18 @@ function wireResize(rz, v){
   rz.addEventListener('pointerdown', e => {
     e.preventDefault(); e.stopPropagation();
     rz.setPointerCapture(e.pointerId);
-    st = { x: e.clientX, w: v.W * (v.k || 1) };
+    st = { x: e.clientX, w: v.W * (v.k || 1), avail: availOf(v) };
   });
   rz.addEventListener('pointermove', e => {
     if (!st) return;
     const w = Math.max(160, st.w + (e.clientX - st.x));
-    S.zoom = Math.max(0.3, Math.min(2.5, w / v.W));
+    S.fill = clampFill(w / st.avail);
     fitAll();
   });
-  const end = () => { if (!st) return; st = null; lsSet(LS.zoom, S.zoom); };
+  const end = () => { if (!st) return; st = null; lsSet(LS.fill, S.fill); };
   rz.addEventListener('pointerup', end);
   rz.addEventListener('pointercancel', end);
-  rz.addEventListener('dblclick', () => { S.zoom = 1; lsSet(LS.zoom, 1); fitAll(); });
+  rz.addEventListener('dblclick', () => { S.fill = 1; lsSet(LS.fill, 1); fitAll(); });
 }
 
 /* ── заметки ──

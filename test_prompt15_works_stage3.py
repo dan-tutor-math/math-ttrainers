@@ -1,6 +1,6 @@
 """
 Промпт №15 «работы», доработки после проверки (этап 3): теория к заданию,
-естественный размер и уголок «сузить / растянуть», заметки ученика, вид
+ширина во всю колонку и уголок «сузить / растянуть», заметки ученика, вид
 «по одному / списком» и запрет переключать, превью поменьше, «вверх / вниз»
 для нового задания, своё число попыток.
 
@@ -14,9 +14,11 @@
   B. теория: задание ОГЭ №1–5 («Шина 1») уносит в работу теорию картинкой
      в двух темах, в превью — пометка, у варианта — теория образца;
   C. ученик, «по одному» с разрешением переключать: теория над заданием
-     открыта; карточка в естественном размере (масштаб 1, не растянута);
-     уголок сужает и растягивает, размер помнится после перезагрузки,
-     двойной щелчок — обратно к естественному; «Списком» — все задания,
+     открыта; карточка во всю ширину колонки (№95: раньше — масштаб 1,
+     и узкий снимок терялся посреди карточки), в том числе после смены
+     окна; уголок сужает, размер помнится после перезагрузки и держится
+     долей колонки при смене окна, растянуть можно до колонки, не шире;
+     двойной щелчок — снова во всю ширину; «Списком» — все задания,
      выбор помнится; номер в списке — прокрутка к заданию;
   D. заметки: включить — холст ловит перо, штрих сохраняется и переживает
      перезагрузку, поле для записей под карточкой, ластик стирает штрих,
@@ -57,6 +59,19 @@ def save(tp):
 
 def wrap_w(page, sel=".titem.cur .tc-wrap"):
     return page.evaluate(f"() => document.querySelector('{sel}').getBoundingClientRect().width")
+
+
+def col_w(page):
+    # ширина колонки задания — так же, как её считает availOf в work.html
+    return page.evaluate("() => { const r = document.querySelector('.titem.cur'), cs = getComputedStyle(r); "
+                         "return r.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 4; }")
+
+
+def drag_corner(page, dx):
+    rz = page.locator(".titem.cur .tc-resize").bounding_box()
+    page.mouse.move(rz["x"] + rz["width"] / 2, rz["y"] + rz["height"] / 2); page.mouse.down()
+    page.mouse.move(rz["x"] + rz["width"] / 2 + dx, rz["y"] + 10, steps=6); page.mouse.up()
+    page.wait_for_timeout(100)
 
 
 def run():
@@ -139,25 +154,32 @@ def run():
         sp.fill("#wName", "Оля"); sp.click("#wStart")
         sp.wait_for_selector("#scrTask:not([hidden])")
         W0 = bl[0]["hot"]["w"]
+        w_full = col_w(sp)
         w_nat = wrap_w(sp)
-        check("C1 карточка в естественном размере (масштаб 1)", abs(w_nat - W0) < 1.5, f"{w_nat} vs {W0}")
+        check("C1 карточка во всю ширину колонки", abs(w_nat - w_full) < 1.5, f"{w_nat} vs колонка {w_full}")
+        check("C1a снимок уже колонки — значит, задание растянуто", W0 < w_full - 50, f"снимок {W0}, колонка {w_full}")
         check("C2 переключатель вида есть", sp.is_visible("#wView") and "active" in sp.get_attribute('#wView button[data-v="one"]', "class"))
         check("C3 попыток — 7", "7 из 7" in sp.inner_text(".titem.cur .tries"))
+        # окно уже — задание снова по колонке
+        sp.set_viewport_size({"width": 700, "height": 900}); sp.wait_for_timeout(250)
+        check("C1b окно уже — снова во всю колонку", abs(wrap_w(sp) - col_w(sp)) < 1.5, f"{wrap_w(sp)} vs {col_w(sp)}")
+        sp.set_viewport_size({"width": 1200, "height": 900}); sp.wait_for_timeout(250)
         # уголок
-        rz = sp.locator(".titem.cur .tc-resize").bounding_box()
-        sp.mouse.move(rz["x"] + rz["width"] / 2, rz["y"] + rz["height"] / 2); sp.mouse.down()
-        sp.mouse.move(rz["x"] - 120, rz["y"] + 10, steps=6); sp.mouse.up()
+        drag_corner(sp, -260)
         w_small = wrap_w(sp)
-        check("C4 уголок сужает", w_small < w_nat - 100, f"{w_nat} → {w_small}")
-        rz = sp.locator(".titem.cur .tc-resize").bounding_box()
-        sp.mouse.move(rz["x"] + rz["width"] / 2, rz["y"] + rz["height"] / 2); sp.mouse.down()
-        sp.mouse.move(rz["x"] + 260, rz["y"] + 10, steps=6); sp.mouse.up()
-        w_big = wrap_w(sp)
-        check("C5 и растягивает больше естественного", w_big > w_nat + 80, f"{w_nat} → {w_big}")
+        check("C4 уголок сужает", w_small < w_nat - 200, f"{w_nat} → {w_small}")
         sp.reload(); sp.wait_for_selector("#scrTask:not([hidden])")
-        check("C6 размер помнится после перезагрузки", abs(wrap_w(sp) - w_big) < 2)
+        check("C6 размер помнится после перезагрузки", abs(wrap_w(sp) - w_small) < 2, f"{wrap_w(sp)} vs {w_small}")
+        sp.set_viewport_size({"width": 700, "height": 900}); sp.wait_for_timeout(250)
+        frac = wrap_w(sp) / col_w(sp)
+        check("C6b при смене окна держится та же доля колонки", abs(frac - w_small / w_full) < 0.02, f"{frac:.3f} vs {w_small / w_full:.3f}")
+        sp.set_viewport_size({"width": 1200, "height": 900}); sp.wait_for_timeout(250)
+        drag_corner(sp, 600)
+        w_big = wrap_w(sp)
+        check("C5 растягивается обратно до колонки, не шире", abs(w_big - w_full) < 1.5, f"{w_small} → {w_big}, колонка {w_full}")
+        drag_corner(sp, -200)
         sp.dblclick(".titem.cur .tc-resize")
-        check("C7 двойной щелчок — естественный размер", abs(wrap_w(sp) - W0) < 1.5)
+        check("C7 двойной щелчок — снова во всю ширину", abs(wrap_w(sp) - w_full) < 1.5)
         # теория
         sp.click(".num[data-i='2']")
         th = sp.evaluate("() => { const d = document.querySelector('.titem.cur details.theory'); return d ? [d.open, d.querySelector('img').src.slice(0, 30)] : null; }")
@@ -202,13 +224,20 @@ def run():
             let k = 0; for (let i = 3; i < x.length; i += 4) if (x[i] > 0) k++; return k; }""")
         check("D5 штрихи нарисованы на холсте", px > 50, str(px))
         sp.click(".titem.cur .notes-bar .er")
+        # карточка во всю колонку высокая (№95): после перезагрузки страница
+        # остаётся прокрученной к полю записей, и верх холста — за краем окна;
+        # прокручиваем так, чтобы холст был ниже липкой панели номеров
+        sp.evaluate("""() => { const r = document.querySelector('.titem.cur .notes-cv').getBoundingClientRect(),
+            t = document.querySelector('.topbar').getBoundingClientRect(); scrollBy(0, r.top - t.bottom - 40); }"""); sp.wait_for_timeout(100)
         cv = sp.locator(".titem.cur .notes-cv").bounding_box()
         sp.mouse.move(cv["x"] + 60, cv["y"] + 35); sp.mouse.down(); sp.mouse.move(cv["x"] + 80, cv["y"] + 45, steps=4); sp.mouse.up()
         n = sp.evaluate(f"() => (window.__work.S.notes[{json.dumps(tid0)}] || []).length")
         check("D6 ластик стёр штрих целиком", n == 1, str(n))
+        sp.evaluate("() => document.querySelector('.titem.cur .tc-in').scrollIntoView({block: 'center'})"); sp.wait_for_timeout(100)
         hit = sp.evaluate("() => { const i = document.querySelector('.titem.cur .tc-in'); const r = i.getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === i; }")
         check("D7 пока заметки включены — поле под холстом", hit is False)
         sp.click("#wNotes")
+        sp.evaluate("() => document.querySelector('.titem.cur .tc-in').scrollIntoView({block: 'center'})"); sp.wait_for_timeout(100)
         hit = sp.evaluate("() => { const i = document.querySelector('.titem.cur .tc-in'); const r = i.getBoundingClientRect(); return document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2) === i; }")
         check("D8 выключили — поле ответа снова нажимается", hit is True)
         check("D9 штрих на поле записей виден и при выключенных заметках", sp.is_visible(".titem.cur .scratch"))
