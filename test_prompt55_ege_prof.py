@@ -129,7 +129,9 @@ def test_navigation(browser):
     check("сначала открывается список прототипов",
           page.evaluate("S.screen") == "picker"
           and page.eval_on_selector('#taskArea', 'e => e.style.display') == 'none')
-    check("в списке три прототипа №7", page.eval_on_selector_all('.mode-card', 'e => e.length') == 3)
+    # с банком ФИПИ (test_prompt_fipi_ege.py) ниже демоверсии идут карточки групп
+    # (data-gid) — прототипы демоверсии считаем отдельно, по data-pid
+    check("в списке три прототипа №7", page.eval_on_selector_all('.mode-card[data-pid]', 'e => e.length') == 3)
 
     open_proto(page, 3)
     check("карточка прототипа открывает задание",
