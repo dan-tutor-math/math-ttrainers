@@ -154,6 +154,44 @@ html[data-theme="dark"] .bl-card-menu:hover{background:rgba(255,255,255,.18);}
 .bl-sort-pop button{display:block;width:100%;text-align:left;background:none;border:none;padding:8px 10px;border-radius:8px;font-size:13.5px;color:var(--pencil);cursor:pointer;}
 .bl-sort-pop button:hover{background:var(--hover-1);}
 .bl-sort-pop button.active{color:var(--ink);font-weight:700;}
+/* ── множественный выбор досок (⌘/Ctrl+щелчок, кнопка «Выбрать») ──
+   Кружок-галочка в левом верхнем углу появляется только в режиме выбора:
+   в обычном списке он был бы лишним шумом на каждой карточке */
+.bl-check{position:absolute;top:8px;left:8px;z-index:2;width:22px;height:22px;border-radius:50%;border:2px solid var(--muted-1);background:var(--glass-strong);display:none;align-items:center;justify-content:center;pointer-events:none;}
+.bl-check::after{content:"";width:5px;height:10px;border:solid #fff;border-width:0 2.4px 2.4px 0;transform:translateY(-1px) rotate(45deg);opacity:0;}
+.bl-grid.bl-selecting .bl-check{display:flex;}
+.bl-card.bl-selected .bl-check{display:flex;background:var(--ink);border-color:var(--ink);}
+.bl-card.bl-selected .bl-check::after{opacity:1;}
+.bl-card.bl-selected{border-color:var(--ink);box-shadow:0 0 0 2px var(--ink), inset 0 1px 0 var(--glass-inset), var(--shadow);}
+.bl-card.bl-selected .bl-card-icon{background:var(--hl-14);}
+.bl-btn.active{background:var(--ink);color:#fff;border-color:var(--ink);}
+.bl-selbar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:450;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;width:max-content;max-width:calc(100vw - 24px);padding:9px 10px 9px 16px;border-radius:16px;background:var(--glass-strong);border:1px solid var(--glass-border);box-shadow:inset 0 1px 0 var(--glass-inset), 0 14px 40px rgba(20,30,60,.22);backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);}
+.bl-selbar[hidden]{display:none;}
+.bl-selcount{font-weight:700;font-size:13.5px;color:var(--pencil);margin-right:6px;white-space:nowrap;}
+.bl-selbar .bl-btn{padding:8px 12px;}
+.bl-selbar .bl-btn:disabled{opacity:.4;cursor:default;transform:none;border-color:var(--glass-border);}
+.bl-selbar .bl-btn.danger{color:var(--teacher);}
+.bl-selbar .bl-btn.danger:hover:not(:disabled){border-color:var(--teacher);}
+.bl-selbar .bl-sel-x{width:34px;height:34px;padding:0;justify-content:center;color:var(--muted-2);}
+.bl-sel-pop{z-index:460;max-height:50vh;overflow:auto;min-width:200px;}
+.bl-sel-pop button{display:flex;align-items:center;gap:8px;}
+.bl-sel-pop button svg{width:15px;height:15px;flex:none;color:var(--folder);}
+.bl-sel-pop button.bl-sel-new{color:var(--ink);font-weight:600;border-top:1px solid var(--glass-border);border-radius:0 0 8px 8px;margin-top:3px;}
+.bl-tabs-backdrop{position:fixed;inset:0;z-index:600;background:rgba(10,14,30,.35);display:flex;align-items:center;justify-content:center;padding:16px;}
+.bl-tabs-modal{width:min(420px,100%);max-height:80vh;display:flex;flex-direction:column;gap:10px;padding:18px;border-radius:18px;background:var(--glass-strong);border:1px solid var(--glass-border);box-shadow:var(--shadow);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);}
+.bl-tabs-title{font-weight:700;font-size:16px;color:var(--pencil);}
+.bl-tabs-note{font-size:13px;line-height:1.45;color:var(--muted-2);}
+.bl-tabs-list{display:flex;flex-direction:column;gap:4px;overflow:auto;}
+.bl-tabs-link{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:10px;color:var(--ink);font-weight:600;font-size:14px;text-decoration:none;background:var(--hl-06);}
+.bl-tabs-link:hover{background:var(--hl-10);}
+.bl-tabs-link svg{width:16px;height:16px;flex:none;}
+.bl-tabs-link span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bl-tabs-link em{display:none;font-style:normal;font-weight:500;font-size:12px;color:var(--ok);}
+.bl-tabs-link.done em{display:inline;}
+.bl-tabs-actions{display:flex;justify-content:flex-end;}
+/* панель внизу не должна закрывать последний ряд карточек */
+.bl-main:has(.bl-grid.bl-selecting){padding-bottom:120px;}
+@media (max-width:640px){ .bl-selcount{width:100%;text-align:center;margin:0 0 2px;} .bl-selbar{bottom:12px;width:calc(100vw - 24px);padding:9px 10px;gap:6px;} .bl-selbar .bl-btn{padding:8px 10px;font-size:13px;} .bl-main:has(.bl-grid.bl-selecting){padding-bottom:170px;} }
 @media (max-width:640px){ .bl-sidebar{display:none;} .bl-main{padding:18px 14px 50px;} }
 
 /* ═══════════════ экран 2 — сама доска ═══════════════ */
@@ -1210,6 +1248,12 @@ function resolveBasketTexInHtml(html){
           Загрузить из файла
         </button>
         <input type="file" id="blImportFile" accept=".json,application/json" style="display:none">
+        <!-- множественный выбор без клавиатуры (планшет); с клавиатурой то же
+             самое — ⌘/Ctrl+щелчок по карточкам -->
+        <button class="bl-btn" id="blSelectBtn" title="Выбрать несколько досок — то же, что ⌘/Ctrl+щелчок по карточкам">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="17" height="17" rx="4" stroke="currentColor" stroke-width="1.8"/><path d="M8 12.2l2.7 2.7L16.2 9.3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span>Выбрать</span>
+        </button>
         <div class="bl-sort">
           <button class="bl-btn" id="blSortBtn">
             <svg viewBox="0 0 24 24" fill="none"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l3-3M17 20l-3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1226,6 +1270,27 @@ function resolveBasketTexInHtml(html){
       </div>
     </div>
     <div class="bl-grid" id="blGrid"></div>
+  </div>
+  <!-- панель действий над выбранными досками; внутри #screenList, чтобы
+       сама пряталась вместе со списком, когда открыта доска -->
+  <div class="bl-selbar" id="blSelBar" hidden>
+    <span class="bl-selcount" id="blSelCount"></span>
+    <button class="bl-btn" id="blSelMove" title="Переложить выбранные доски в папку">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="1.8"/></svg>
+      В папку
+    </button>
+    <button class="bl-btn" id="blSelTabs" title="Открыть каждую выбранную доску в новой вкладке">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M14 4h6v6M20 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      Открыть во вкладках
+    </button>
+    <button class="bl-btn danger" id="blSelDelete">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Удалить
+    </button>
+    <button class="bl-btn" id="blSelAll" title="Выбрать всё на экране (⌘/Ctrl+A)">Все</button>
+    <button class="bl-btn bl-sel-x" id="blSelCancel" title="Снять выделение (Esc)" aria-label="Снять выделение">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+    </button>
   </div>
 </div>
 

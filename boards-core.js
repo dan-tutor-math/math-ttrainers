@@ -1556,6 +1556,9 @@ function ensureDragStyle(){
     .bl-nav-item.bl-drop-into{ outline:2px solid var(--ink,#1b3b6f); outline-offset:-2px; border-radius:10px; }
     .bl-drop-line{ position:fixed; z-index:9998; width:3px; border-radius:2px;
       background:var(--ink,#1b3b6f); pointer-events:none; }
+    .bl-drag-count{ position:absolute; top:8px; left:8px; min-width:24px; height:24px; padding:0 7px;
+      border-radius:12px; background:var(--ink,#1b3b6f); color:#fff; font-weight:800; font-size:13px;
+      display:flex; align-items:center; justify-content:center; z-index:3; }
   `;
   document.head.appendChild(st);
 }
@@ -1594,6 +1597,9 @@ function resolveDropTarget(x, y){
   const card = el.closest('.bl-card');
   if (!card || card === blDragState.card) return null;
   const kind = blCardKind(card);
+  // Множественный выбор: тащим всю выделенную пачку — бросить её на одну из
+  // своих же карточек некуда (ни «внутрь», ни «рядом с собой»)
+  if (blDragState.group && blDragState.group.includes(card.dataset.folder || card.dataset.board)) return null;
 
   // доска на папку — внутрь папки
   if (blDragState.kind === 'board' && kind === 'folder'){
@@ -1630,24 +1636,42 @@ function moveInArray(arr, id, targetId, after){
   return true;
 }
 
+// Перестановка сразу нескольких выделенных: вынимаем их все (в том порядке,
+// в каком они уже стояли между собой) и вставляем подряд у цели. Цель —
+// никогда не из самой пачки (resolveDropTarget такое отсекает)
+function moveGroupInArray(arr, ids, targetId, after){
+  const set = new Set(ids);
+  if (set.has(targetId)) return false;
+  const moving = arr.filter(x => set.has(x.id));
+  if (!moving.length) return false;
+  const rest = arr.filter(x => !set.has(x.id));
+  let to = rest.findIndex(x => x.id === targetId);
+  if (to < 0) return false;
+  if (after) to += 1;
+  rest.splice(to, 0, ...moving);
+  arr.length = 0;
+  arr.push(...rest);
+  return true;
+}
+
 // состояние перетаскивания передаём явно: к моменту применения броска
 // blDragState уже сброшен (перетаскивание закончилось), и брать данные
 // оттуда нельзя — именно на этом сначала и споткнулись
 function applyDrop(st, t){
   if (!t || !st) return false;
   const { id, kind } = st;
+  // st.group — id выделенных карточек того же вида, что и тащимая (сама она
+  // в их числе). Без выделения — пачка из одной карточки, как раньше
+  const group = (st.group && st.group.length) ? st.group : [id];
   if (t.type === 'into'){
     if (kind !== 'board') return false;
-    const b = DB.boards.find(x => x.id === id);
-    if (!b) return false;
-    if ((b.folderId || null) === (t.folderId || null)) return false;
-    b.folderId = t.folderId || null;
-    touchBoard(b);
-    return true;
+    return moveBoardsToFolder(group, t.folderId || null) > 0;
   }
   const arr = kind === 'folder' ? DB.folders : DB.boards;
   const targetId = kind === 'folder' ? t.card.dataset.folder : t.card.dataset.board;
-  if (!moveInArray(arr, id, targetId, t.after)) return false;
+  const ok = group.length > 1 ? moveGroupInArray(arr, group, targetId, t.after)
+                              : moveInArray(arr, id, targetId, t.after);
+  if (!ok) return false;
   // ручная расстановка имеет смысл только в своём порядке — переключаемся,
   // иначе список тут же пересортировался бы по дате и перестановка пропала
   if (sortMode !== 'my'){
@@ -1671,7 +1695,16 @@ function onCardPointerDown(e){
     startX: e.clientX, startY: e.clientY,
     moved: false, ghost: null, target: null,
     pointerId: e.pointerId,
+    group: null,
   };
+  // Тащат выделенную карточку — едет вся выделенная пачка её вида. Тащат
+  // невыделенную — только её, выделение не трогаем (как в Finder)
+  const myKey = blSelKey(blDragState.kind, blDragState.id);
+  if (blSel.has(myKey) && blSel.size > 1){
+    const prefix = blDragState.kind === 'folder' ? 'f:' : 'b:';
+    const g = [...blSel].filter(k => k.startsWith(prefix)).map(k => k.slice(2));
+    if (g.length > 1) blDragState.group = g;
+  }
   try { card.setPointerCapture(e.pointerId); } catch (err) {}
   card.addEventListener('pointermove', onCardPointerMove);
   card.addEventListener('pointerup', onCardPointerUp);
@@ -1690,6 +1723,16 @@ function onCardPointerMove(e){
     ghost.className = 'bl-card bl-drag-ghost';
     ghost.style.width = r.width + 'px';
     ghost.style.height = r.height + 'px';
+    if (blDragState.group){
+      const badge = document.createElement('span');
+      badge.className = 'bl-drag-count';
+      badge.textContent = blDragState.group.length;
+      ghost.appendChild(badge);
+      blDragState.group.forEach(gid => {
+        const sel = blDragState.kind === 'folder' ? `[data-folder="${gid}"]` : `[data-board="${gid}"]`;
+        document.querySelector('#blGrid .bl-card' + sel)?.classList.add('bl-dragging');
+      });
+    }
     document.body.appendChild(ghost);
     blDragState.ghost = ghost;
     card.classList.add('bl-dragging');
@@ -1710,7 +1753,7 @@ function onCardPointerUp(e){
   card.removeEventListener('pointerup', onCardPointerUp);
   card.removeEventListener('pointercancel', onCardPointerUp);
   try { card.releasePointerCapture(st.pointerId); } catch (err) {}
-  card.classList.remove('bl-dragging');
+  document.querySelectorAll('.bl-card.bl-dragging').forEach(c => c.classList.remove('bl-dragging'));
   if (st.ghost) st.ghost.remove();
   hideDropMarks();
   document.body.style.userSelect = '';
@@ -1755,6 +1798,7 @@ function renderList(){
     document.querySelector('.bl-empty')?.remove();
     grid.insertAdjacentHTML('beforebegin', '');
     grid.innerHTML = `<div class="bl-empty" style="grid-column:1/-1">Здесь пока пусто — создайте первую доску или папку кнопками выше.</div>`;
+    blSyncSelection();
     return;
   }
 
@@ -1763,6 +1807,7 @@ function renderList(){
     const n = DB.boards.filter(b => b.folderId === f.id).length;
     html += `
       <div class="bl-card folder" data-folder="${f.id}">
+        <span class="bl-check" aria-hidden="true"></span>
         <button class="bl-card-menu" data-menu="folder:${f.id}">⋯</button>
         <div class="bl-card-icon">${folderIcon()}</div>
         <div class="bl-card-body">
@@ -1774,6 +1819,7 @@ function renderList(){
   sortedBoards.forEach(b => {
     html += `
       <div class="bl-card" data-board="${b.id}">
+        <span class="bl-check" aria-hidden="true"></span>
         ${b.pairMissing ? `<span class="bl-pair-dot" title="При последнем переносе пары для этой доски не нашлось — возможно, её удалили на другом устройстве или она создана только здесь"></span>` : ''}
         <button class="bl-card-menu" data-menu="board:${b.id}">⋯</button>
         <div class="bl-card-icon">${b.kind === 'deck' && typeof deckIcon === 'function' ? deckIcon() : boardIcon()}</div>
@@ -1791,6 +1837,7 @@ function renderList(){
     card.addEventListener('click', (e) => {
       if (blSuppressClick) return;
       if (e.target.closest('.bl-card-menu')) return;
+      if (blHandleSelectClick(e, card)) return;
       curFolderId = card.dataset.folder;
       searchQuery = ''; document.getElementById('blSearch').value = '';
       renderList();
@@ -1800,13 +1847,308 @@ function renderList(){
     card.addEventListener('click', (e) => {
       if (blSuppressClick) return;
       if (e.target.closest('.bl-card-menu')) return;
+      if (blHandleSelectClick(e, card)) return;
       openBoard(card.dataset.board);
     });
   });
   grid.querySelectorAll('.bl-card-menu').forEach(btn => {
     btn.addEventListener('click', (e) => { e.stopPropagation(); openCardMenu(btn); });
   });
+  blSyncSelection();
 }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Множественный выбор в списке досок
+
+   ⌘ (на Windows — Ctrl) + щелчок по карточке добавляет её в выделение или
+   убирает, Shift + щелчок выделяет подряд от последней отмеченной, ⌘/Ctrl+A —
+   всё, что видно на экране. Снизу всплывает панель с действиями над всей
+   пачкой: «В папку», «Открыть во вкладках», «Удалить». Выделенные доски
+   можно и просто перетащить на папку — поедут все.
+
+   Пока что-то выделено, обычный щелчок по карточке тоже отмечает её, а не
+   открывает доску: иначе, набрав пять досок, легко промахнуться мимо ⌘ и
+   вместо шестой отметки уйти с экрана, потеряв выбор. Так же устроены
+   галереи на телефоне. Для планшета без клавиатуры — кнопка «Выбрать»
+   в шапке: включает тот же режим без ⌘.
+
+   Выделение хранится ключами «b:<id>» и «f:<id>» — у досок и папок id из
+   одного генератора, но смешивать их в одном множестве без вида опасно.
+   Выделение живёт только в этой вкладке и только среди видимого: при
+   переходе в другую папку, поиске, удалении доски в соседней вкладке оно
+   само подрезается до того, что осталось на экране (blSyncSelection).
+   ═══════════════════════════════════════════════════════════════════════ */
+const blSel = new Set();
+let blSelAnchor = null;     // ключ карточки, от которой считает Shift+щелчок
+let blSelectMode = false;   // режим «Выбрать» с кнопки (для планшета)
+
+function blSelKey(kind, id){ return (kind === 'folder' ? 'f:' : 'b:') + id; }
+function blCardKey(card){ return card.dataset.folder ? 'f:' + card.dataset.folder : 'b:' + card.dataset.board; }
+function blSelectionActive(){ return blSelectMode || blSel.size > 0; }
+function blSelectedIds(prefix){ return [...blSel].filter(k => k.startsWith(prefix)).map(k => k.slice(2)); }
+
+// true — щелчок ушёл на выделение и открывать доску/папку не надо
+function blHandleSelectClick(e, card){
+  const key = blCardKey(card);
+  const cards = [...document.querySelectorAll('#blGrid .bl-card')];
+  if (e.shiftKey && (blSelAnchor || blSelectionActive())){
+    const keys = cards.map(blCardKey);
+    let a = keys.indexOf(blSelAnchor), b = keys.indexOf(key);
+    if (a < 0) a = b;
+    const [lo, hi] = a < b ? [a, b] : [b, a];
+    for (let i = lo; i <= hi; i++) blSel.add(keys[i]);
+    blSyncSelection();
+    return true;
+  }
+  // Ctrl+щелчок на Mac — это правая кнопка (contextmenu, а не click), так
+  // что ctrlKey здесь приходит только с Windows/Linux, где он и есть «⌘»
+  if (e.metaKey || e.ctrlKey || e.shiftKey || blSelectionActive()){
+    if (blSel.has(key)) blSel.delete(key); else blSel.add(key);
+    blSelAnchor = key;
+    blSyncSelection();
+    return true;
+  }
+  return false;
+}
+
+function blClearSelection(){
+  blSel.clear();
+  blSelAnchor = null;
+  blSelectMode = false;
+  blSyncSelection();
+}
+
+function blSelectAllVisible(){
+  document.querySelectorAll('#blGrid .bl-card').forEach(c => blSel.add(blCardKey(c)));
+  blSyncSelection();
+}
+
+// подрезаем выделение до видимого, расставляем отметки, показываем панель
+function blSyncSelection(){
+  const grid = document.getElementById('blGrid');
+  if (!grid) return;
+  const visible = new Set([...grid.querySelectorAll('.bl-card')].map(blCardKey));
+  [...blSel].forEach(k => { if (!visible.has(k)) blSel.delete(k); });
+  if (blSelAnchor && !visible.has(blSelAnchor)) blSelAnchor = null;
+  grid.querySelectorAll('.bl-card').forEach(c => c.classList.toggle('bl-selected', blSel.has(blCardKey(c))));
+  grid.classList.toggle('bl-selecting', blSelectionActive());
+  const pick = document.getElementById('blSelectBtn');
+  if (pick){
+    pick.classList.toggle('active', blSelectionActive());
+    const lbl = pick.querySelector('span');
+    if (lbl) lbl.textContent = blSelectionActive() ? 'Готово' : 'Выбрать';
+  }
+  blRenderSelBar();
+}
+
+function blPlural(n, one, few, many){
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return one;
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+  return many;
+}
+function blCountText(nb, nf){
+  const parts = [];
+  if (nb) parts.push(`${nb} ${blPlural(nb, 'доска', 'доски', 'досок')}`);
+  if (nf) parts.push(`${nf} ${blPlural(nf, 'папка', 'папки', 'папок')}`);
+  return parts.join(' и ');
+}
+
+function blRenderSelBar(){
+  const bar = document.getElementById('blSelBar');
+  if (!bar) return;
+  const show = blSelectionActive() && screenList.style.display !== 'none';
+  bar.hidden = !show;
+  if (!show){ document.getElementById('blSelFolderPop')?.remove(); return; }
+  const nb = blSelectedIds('b:').length, nf = blSelectedIds('f:').length;
+  document.getElementById('blSelCount').textContent =
+    (nb || nf) ? 'Выбрано: ' + blCountText(nb, nf) : 'Отметьте доски щелчком';
+  // в папку и во вкладки — только доски: папку в папку не кладём, а
+  // «открыть папку во вкладке» смысла не имеет
+  document.getElementById('blSelMove').disabled = !nb;
+  document.getElementById('blSelTabs').disabled = !nb;
+  document.getElementById('blSelDelete').disabled = !(nb || nf);
+}
+
+// Перенос пачки досок в папку (folderId === null — «без папки», в корень).
+// touchBoard — как у перетаскивания одной доски: правка должна дойти до
+// соседних вкладок и облака, а выгруженной доске это не вредит (промпт №52)
+function moveBoardsToFolder(ids, folderId){
+  let n = 0;
+  ids.forEach(id => {
+    const b = DB.boards.find(x => x.id === id);
+    if (!b || (b.folderId || null) === (folderId || null)) return;
+    b.folderId = folderId || null;
+    touchBoard(b);
+    n++;
+  });
+  return n;
+}
+
+// Общее удаление и для меню «⋯», и для пачки. Папка уходит вместе с
+// досками внутри — так было всегда, и подтверждение об этом предупреждает
+function deleteListItems(boardIds, folderIds){
+  const fset = new Set(folderIds);
+  const bset = new Set(boardIds);
+  DB.boards.forEach(b => { if (b.folderId && fset.has(b.folderId)) bset.add(b.id); });
+  bset.forEach(id => {
+    if (!DB.boards.some(b => b.id === id)) return;
+    noteDeleted('board', id);
+    idbDelete(IDB_BOARD_PREFIX + id);   // отдельная запись доски — мусор без неё не подчистится сама
+  });
+  fset.forEach(id => noteDeleted('folder', id));
+  DB.boards = DB.boards.filter(b => !bset.has(b.id));
+  DB.folders = DB.folders.filter(f => !fset.has(f.id));
+  return bset.size;
+}
+
+function blDeleteSelected(){
+  const bIds = blSelectedIds('b:'), fIds = blSelectedIds('f:');
+  if (!bIds.length && !fIds.length) return;
+  const fset = new Set(fIds);
+  const inside = DB.boards.filter(b => b.folderId && fset.has(b.folderId) && !bIds.includes(b.id)).length;
+  let msg = `Удалить ${blCountText(bIds.length, fIds.length)}`;
+  if (inside) msg += ` (и ${inside} ${blPlural(inside, 'доску', 'доски', 'досок')} внутри ${fIds.length > 1 ? 'папок' : 'папки'})`;
+  if (!confirm(msg + '? Это нельзя отменить.')) return;
+  deleteListItems(bIds, fIds);
+  blSel.clear(); blSelAnchor = null;
+  saveDB(); renderList();
+}
+
+function blOpenMovePop(){
+  const old = document.getElementById('blSelFolderPop');
+  if (old){ old.remove(); return; }
+  const ids = blSelectedIds('b:');
+  if (!ids.length) return;
+  const pop = document.createElement('div');
+  pop.className = 'bl-menu-pop bl-sel-pop';
+  pop.id = 'blSelFolderPop';
+  let html = `<button data-folder="">${allIcon()}Без папки</button>`;
+  DB.folders.forEach(f => { html += `<button data-folder="${f.id}">${folderIcon()}${escHtml(f.name)}</button>`; });
+  html += `<button data-folder="__new" class="bl-sel-new">+ Новая папка…</button>`;
+  pop.innerHTML = html;
+  document.body.appendChild(pop);
+  const r = document.getElementById('blSelMove').getBoundingClientRect();
+  // панель внизу экрана — список раскрываем вверх, над кнопкой
+  pop.style.position = 'fixed';
+  pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pop.offsetWidth - 8)) + 'px';
+  pop.style.top = Math.max(8, r.top - pop.offsetHeight - 8) + 'px';
+  pop.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const btn = e.target.closest('button[data-folder]');
+    if (!btn) return;
+    let fid = btn.dataset.folder || null;
+    if (fid === '__new'){
+      const name = prompt('Название папки:', 'Новая папка');
+      if (!name || !name.trim()) return;
+      fid = uid();
+      DB.folders.push({ id: fid, name: name.trim(), createdAt: nowTs() });
+    }
+    pop.remove();
+    moveBoardsToFolder(ids, fid);
+    blSel.clear(); blSelAnchor = null;
+    saveDB(); renderList();
+  });
+}
+
+/* Открыть выбранные доски каждую в своей вкладке. Каждая вкладка — обычный
+   адрес boards.html#board=<id>, его и так понимает старт приложения
+   (boardsAppBoot), а соседние вкладки с досками уже умеют жить вместе
+   (слияние при сохранении, раздел 6 HANDOFF).
+
+   Грабли: браузеры на один щелчок разрешают открыть только ОДНО новое окно
+   (Chrome, Safari — «активация пользователя» тратится на первом
+   window.open), остальные молча блокируют и возвращают null. Обойти это
+   нельзя, поэтому: что открылось — открылось, а для заблокированных
+   показываем окно с обычными ссылками (щелчок по ссылке — новый жест,
+   его не блокируют) и подсказкой разрешить всплывающие окна для сайта —
+   после этого в следующий раз все откроются сразу. */
+function blOpenSelectedInTabs(){
+  const ids = blSelectedIds('b:').filter(id => DB.boards.some(b => b.id === id));
+  if (!ids.length) return;
+  if (ids.length > 8 && !confirm(`Открыть ${ids.length} ${blPlural(ids.length, 'вкладку', 'вкладки', 'вкладок')}?`)) return;
+  // без ?invite и прочего из адреса этой вкладки — нужна чистая ссылка на доску
+  const base = location.href.split('#')[0].split('?')[0];
+  const blocked = [];
+  ids.forEach(id => {
+    let w = null;
+    try { w = window.open(base + '#board=' + encodeURIComponent(id), '_blank'); } catch (e) {}
+    if (!w) { blocked.push(id); return; }
+    // не 'noopener' в самом window.open: с ним он всегда возвращает null, и
+    // заблокированную вкладку было бы не отличить от открытой
+    try { w.opener = null; } catch (e) {}
+  });
+  if (blocked.length) blShowBlockedTabs(base, blocked, ids.length);
+  else blClearSelection();
+}
+
+function blShowBlockedTabs(base, ids, total){
+  document.getElementById('blTabsModal')?.remove();
+  const wrap = document.createElement('div');
+  wrap.id = 'blTabsModal';
+  wrap.className = 'bl-tabs-backdrop';
+  const opened = total - ids.length;
+  const links = ids.map(id => {
+    const b = DB.boards.find(x => x.id === id);
+    return `<a class="bl-tabs-link" href="${base}#board=${encodeURIComponent(id)}" target="_blank" rel="noopener">${boardIcon()}<span>${escHtml(b ? b.name : id)}</span><em>открыта</em></a>`;
+  }).join('');
+  wrap.innerHTML = `
+    <div class="bl-tabs-modal" role="dialog" aria-label="Открыть во вкладках">
+      <div class="bl-tabs-title">${opened ? `Открылась ${opened} ${blPlural(opened, 'вкладка', 'вкладки', 'вкладок')} из ${total}` : 'Браузер не дал открыть вкладки'}</div>
+      <div class="bl-tabs-note">Браузер заблокировал остальные как всплывающие окна. Разрешите их для этого сайта — значок в правом конце адресной строки, — и в следующий раз откроются все сразу. А пока откройте нужные по ссылкам:</div>
+      <div class="bl-tabs-list">${links}</div>
+      <div class="bl-tabs-actions"><button class="bl-btn primary" id="blTabsClose">Готово</button></div>
+    </div>`;
+  document.body.appendChild(wrap);
+  wrap.querySelectorAll('.bl-tabs-link').forEach(a => a.addEventListener('click', () => a.classList.add('done')));
+  const close = () => { wrap.remove(); blClearSelection(); };
+  wrap.querySelector('#blTabsClose').addEventListener('click', close);
+  wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+}
+
+(function initSelectionUi(){
+  document.getElementById('blSelectBtn')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (blSelectionActive()) blClearSelection();
+    else { blSelectMode = true; blSyncSelection(); }
+  });
+  document.getElementById('blSelMove')?.addEventListener('click', (e) => { e.stopPropagation(); blOpenMovePop(); });
+  document.getElementById('blSelTabs')?.addEventListener('click', (e) => { e.stopPropagation(); blOpenSelectedInTabs(); });
+  document.getElementById('blSelDelete')?.addEventListener('click', (e) => { e.stopPropagation(); blDeleteSelected(); });
+  document.getElementById('blSelAll')?.addEventListener('click', (e) => { e.stopPropagation(); blSelectAllVisible(); });
+  document.getElementById('blSelCancel')?.addEventListener('click', (e) => { e.stopPropagation(); blClearSelection(); });
+
+  // щелчок по пустому месту списка снимает выделение, как в проводнике;
+  // по кнопкам шапки и боковой колонке — нет, это уже другие действия
+  document.addEventListener('click', (e) => {
+    if (!blSelectionActive()) return;
+    const t = e.target;
+    if (!t.closest('.bl-main') || t.closest('.bl-card') || t.closest('button') || t.closest('a') || t.closest('input')) return;
+    blClearSelection();
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('#blSelFolderPop') && !e.target.closest('#blSelMove')) document.getElementById('blSelFolderPop')?.remove();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (boardActive || screenList.style.display === 'none') return;
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || (document.activeElement && document.activeElement.isContentEditable)) return;
+    if (document.getElementById('blTabsModal')){
+      if (e.key === 'Escape') document.getElementById('blTabsClose')?.click();
+      return;
+    }
+    if ((e.metaKey || e.ctrlKey) && !e.altKey && e.key.toLowerCase() === 'a'){
+      if (!document.querySelector('#blGrid .bl-card')) return;
+      e.preventDefault();
+      blSelectAllVisible();
+      return;
+    }
+    if (!blSelectionActive()) return;
+    if (e.key === 'Escape'){ e.preventDefault(); blClearSelection(); return; }
+    if ((e.key === 'Delete' || e.key === 'Backspace') && blSel.size){ e.preventDefault(); blDeleteSelected(); }
+  });
+})();
 
 function closeAnyMenu(){ document.querySelectorAll('.bl-menu-pop').forEach(m => m.remove()); }
 document.addEventListener('click', (e) => {
@@ -1841,15 +2183,10 @@ function openCardMenu(btn){
       if (kind === 'folder'){
         const n = DB.boards.filter(b => b.folderId === id).length;
         if (!confirm(`Удалить папку и ${n} досок в ней? Это нельзя отменить.`)) return;
-        DB.boards.filter(b => b.folderId === id).forEach(b => { noteDeleted('board', b.id); idbDelete(IDB_BOARD_PREFIX + b.id); });
-        noteDeleted('folder', id);
-        DB.boards = DB.boards.filter(b => b.folderId !== id);
-        DB.folders = DB.folders.filter(f => f.id !== id);
+        deleteListItems([], [id]);
       } else {
         if (!confirm('Удалить доску? Это нельзя отменить.')) return;
-        noteDeleted('board', id);
-        idbDelete(IDB_BOARD_PREFIX + id);   // отдельная запись доски — мусор без неё не подчистится сама
-        DB.boards = DB.boards.filter(b => b.id !== id);
+        deleteListItems([id], []);
       }
       saveDB(); renderList();
     } else if (act === 'export'){
@@ -9401,7 +9738,8 @@ window.__imgCacheHas = function(src){ return Object.prototype.hasOwnProperty.cal
 // истории отмены на тяжёлых досках, а не только на глаз по .length стека
 window.__undoStackInfo = function(){ return { count: undoStack.length, bytes: undoBytes, limit: UNDO_LIMIT, budget: UNDO_BYTES_BUDGET }; };
 window.getCurrentBoard = function(){ return B; };
-window.__applyDrop = function(st, t){ return applyDrop(st, t); };   // для проверок: перенос в папку без мыши
+window.__applyDrop = function(st, t){ return applyDrop(st, t); };
+window.__blSelection = function(){ return [...blSel]; };   // для проверок: что сейчас выделено в списке   // для проверок: перенос в папку без мыши
 window.boardsRedraw = function(){ scheduleRedraw(); updateContextMenu(); };
 window.boardsClearSelection = function(){ selectedId = null; multiSelectIds = []; clearEditLock(); };
 // Промпт №10 (новый список): записать на диск содержимое общей доски, которое
