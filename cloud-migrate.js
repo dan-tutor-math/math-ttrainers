@@ -31,7 +31,8 @@
       && typeof getDB === 'function' && Array.isArray(getDB().boards));
   }
   function isOpen(b) { return typeof boardActive !== 'undefined' && boardActive && typeof B !== 'undefined' && B && B.id === b.id; }
-  function pendingBoards() { return ready() ? getDB().boards.filter(b => !b.cloudBoardId && !isOpen(b)) : []; }
+  // доски из корзины на сервер не везём: через 5 дней их всё равно сотрут
+  function pendingBoards() { return ready() ? getDB().boards.filter(b => !b.cloudBoardId && !b.trashedAt && !isOpen(b)) : []; }
 
   // плашка «переношу» — только на списке досок и только пока идёт перенос
   function status(text) {

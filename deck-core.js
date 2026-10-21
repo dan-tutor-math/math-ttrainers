@@ -403,7 +403,7 @@ function deckIcon(){
 function deckCreate(){
   const b = {
     id: uid(), name: 'Презентация без названия', kind: 'deck',
-    folderId: (curFolderId && curFolderId !== '__recent') ? curFolderId : null,
+    folderId: (curFolderId && curFolderId !== '__recent' && curFolderId !== '__trash') ? curFolderId : null,
     createdAt: nowTs(), updatedAt: nowTs(), lastOpenedAt: null,
     cellSize: 24, sheetCols: 76, sheetRows: 54, sheetCount: 1, pageOrder: 'h',
     objects: [deckNewObj()], recentColors: PALETTE.map(p => p.tok), colorUsage: {},

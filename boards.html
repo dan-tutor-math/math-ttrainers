@@ -167,6 +167,8 @@ html[data-theme="dark"] .bl-card-menu:hover{background:rgba(255,255,255,.18);}
 .bl-btn.active{background:var(--ink);color:#fff;border-color:var(--ink);}
 .bl-selbar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:450;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:center;width:max-content;max-width:calc(100vw - 24px);padding:9px 10px 9px 16px;border-radius:16px;background:var(--glass-strong);border:1px solid var(--glass-border);box-shadow:inset 0 1px 0 var(--glass-inset), 0 14px 40px rgba(20,30,60,.22);backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);}
 .bl-selbar[hidden]{display:none;}
+/* у .bl-btn свой display — без этого атрибут hidden на кнопках панели не прятал бы их */
+.bl-selbar .bl-btn[hidden]{display:none;}
 .bl-selcount{font-weight:700;font-size:13.5px;color:var(--pencil);margin-right:6px;white-space:nowrap;}
 .bl-selbar .bl-btn{padding:8px 12px;}
 .bl-selbar .bl-btn:disabled{opacity:.4;cursor:default;transform:none;border-color:var(--glass-border);}
@@ -189,6 +191,12 @@ html[data-theme="dark"] .bl-card-menu:hover{background:rgba(255,255,255,.18);}
 .bl-tabs-link em{display:none;font-style:normal;font-weight:500;font-size:12px;color:var(--ok);}
 .bl-tabs-link.done em{display:inline;}
 .bl-tabs-actions{display:flex;justify-content:flex-end;}
+/* корзина: пункт слева под папками, подпись к заголовку, плашка «Вернуть» */
+.bl-nav-trash{margin-top:8px;}
+.bl-title-note{font-weight:500;font-size:13px;color:var(--muted-1);margin-left:4px;}
+.bl-toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:455;display:flex;align-items:center;gap:14px;max-width:calc(100vw - 24px);padding:10px 10px 10px 16px;border-radius:14px;background:var(--glass-strong);border:1px solid var(--glass-border);box-shadow:inset 0 1px 0 var(--glass-inset), 0 14px 40px rgba(20,30,60,.22);backdrop-filter:blur(22px) saturate(180%);-webkit-backdrop-filter:blur(22px) saturate(180%);font-size:13.5px;color:var(--pencil);}
+.bl-toast[hidden]{display:none;}
+.bl-toast button{border:none;background:var(--ink);color:#fff;font-weight:700;font-size:13px;border-radius:9px;padding:7px 12px;cursor:pointer;white-space:nowrap;}
 /* панель внизу не должна закрывать последний ряд карточек */
 .bl-main:has(.bl-grid.bl-selecting){padding-bottom:120px;}
 @media (max-width:640px){ .bl-selcount{width:100%;text-align:center;margin:0 0 2px;} .bl-selbar{bottom:12px;width:calc(100vw - 24px);padding:9px 10px;gap:6px;} .bl-selbar .bl-btn{padding:8px 10px;font-size:13px;} .bl-main:has(.bl-grid.bl-selecting){padding-bottom:170px;} }
@@ -1283,7 +1291,16 @@ function resolveBasketTexInHtml(html){
       <svg viewBox="0 0 24 24" fill="none"><path d="M14 4h6v6M20 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 14v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
       Открыть во вкладках
     </button>
-    <button class="bl-btn danger" id="blSelDelete">
+    <!-- в корзине вместо «В папку / Во вкладках / Удалить» -->
+    <button class="bl-btn" id="blSelRestore" hidden title="Вернуть выбранные доски из корзины">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 12a8 8 0 1 0 2.4-5.7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="4,4 4,9 9,9" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Восстановить
+    </button>
+    <button class="bl-btn danger" id="blSelPurge" hidden title="Стереть выбранные доски совсем — и в браузере, и на сервере">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Удалить навсегда
+    </button>
+    <button class="bl-btn danger" id="blSelDelete" title="В корзину — 5 дней доски можно восстановить">
       <svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Удалить
     </button>

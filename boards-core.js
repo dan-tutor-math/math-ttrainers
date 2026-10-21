@@ -1470,17 +1470,20 @@ function fmtDate(ts){
 }
 
 function renderNav(){
-  const recentCount = DB.boards.filter(b => b.lastOpenedAt).length;
+  const live = liveBoards();
+  const recentCount = live.filter(b => b.lastOpenedAt).length;
+  const trashCount = DB.boards.length - live.length;
   let html = `
     <button class="bl-nav-item${curFolderId==='__recent'?' active':''}" data-nav="__recent">${clockIcon()}Недавние<span class="cnt">${recentCount}</span></button>
-    <button class="bl-nav-item${curFolderId===null?' active':''}" data-nav="__root">${allIcon()}Все доски<span class="cnt">${DB.boards.length}</span></button>
+    <button class="bl-nav-item${curFolderId===null?' active':''}" data-nav="__root">${allIcon()}Все доски<span class="cnt">${live.length}</span></button>
     <div class="bl-folders">
   `;
   DB.folders.forEach(f => {
-    const n = DB.boards.filter(b => b.folderId === f.id).length;
+    const n = live.filter(b => b.folderId === f.id).length;
     html += `<button class="bl-nav-item bl-folder-item${curFolderId===f.id?' active':''}" data-nav="${f.id}">${folderIcon()}${escHtml(f.name)}<span class="cnt">${n}</span></button>`;
   });
   html += '</div>';
+  html += `<button class="bl-nav-item bl-nav-trash${curFolderId==='__trash'?' active':''}" data-nav="__trash" title="Удалённые доски — 5 дней их можно восстановить">${trashIcon()}Корзина<span class="cnt">${trashCount}</span></button>`;
   document.getElementById('blNav').innerHTML = html;
   document.querySelectorAll('.bl-nav-item').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1497,20 +1500,27 @@ function renderNav(){
 function escHtml(s){ return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function currentBoardsAndFolders(){
+  // доски из корзины видны только в самой корзине — ни в поиске, ни в
+  // «Недавних», ни в папках, из которых их удалили
+  const live = liveBoards();
   if (searchQuery){
     const q = searchQuery.toLowerCase();
     return {
       folders: DB.folders.filter(f => f.name.toLowerCase().includes(q)),
-      boards: DB.boards.filter(b => b.name.toLowerCase().includes(q)),
+      boards: live.filter(b => b.name.toLowerCase().includes(q)),
     };
   }
+  if (inTrashView()){
+    // свежеудалённые сверху: их чаще всего и хотят вернуть
+    return { folders: [], boards: DB.boards.filter(isTrashed).sort((a, b) => (b.trashedAt || 0) - (a.trashedAt || 0)) };
+  }
   if (curFolderId === '__recent'){
-    return { folders: [], boards: DB.boards.filter(b => b.lastOpenedAt) };
+    return { folders: [], boards: live.filter(b => b.lastOpenedAt) };
   }
   if (curFolderId === null){
-    return { folders: DB.folders, boards: DB.boards.filter(b => !b.folderId) };
+    return { folders: DB.folders, boards: live.filter(b => !b.folderId) };
   }
-  return { folders: [], boards: DB.boards.filter(b => b.folderId === curFolderId) };
+  return { folders: [], boards: live.filter(b => b.folderId === curFolderId) };
 }
 
 function sortBoards(list){
@@ -1591,6 +1601,7 @@ function resolveDropTarget(x, y){
   if (nav && blDragState.kind === 'board'){
     const v = nav.dataset.nav;
     if (v === '__recent') return null;
+    if (v === '__trash') return { type: 'trash', el: nav };
     return { type: 'into', folderId: v === '__root' ? null : v, el: nav };
   }
 
@@ -1615,7 +1626,7 @@ function resolveDropTarget(x, y){
 function showDropTarget(t){
   hideDropMarks();
   if (!t) return;
-  if (t.type === 'into'){ t.el.classList.add('bl-drop-into'); return; }
+  if (t.type === 'into' || t.type === 'trash'){ t.el.classList.add('bl-drop-into'); return; }
   const line = blDropLine();
   line.style.display = 'block';
   line.style.height = t.rect.height + 'px';
@@ -1663,6 +1674,12 @@ function applyDrop(st, t){
   // st.group — id выделенных карточек того же вида, что и тащимая (сама она
   // в их числе). Без выделения — пачка из одной карточки, как раньше
   const group = (st.group && st.group.length) ? st.group : [id];
+  if (t.type === 'trash'){
+    if (kind !== 'board') return false;
+    const n = trashBoards(group);
+    if (n) blTrashToast(group);
+    return n > 0;
+  }
   if (t.type === 'into'){
     if (kind !== 'board') return false;
     return moveBoardsToFolder(group, t.folderId || null) > 0;
@@ -1686,6 +1703,7 @@ function applyDrop(st, t){
 function onCardPointerDown(e){
   if (e.button !== undefined && e.button !== 0) return;      // только левая кнопка
   if (e.target.closest('.bl-card-menu')) return;             // меню «⋯» — не перетаскивание
+  if (inTrashView()) return;                                 // в корзине порядок и папки не нужны
   const card = e.currentTarget;
   ensureDragStyle();
   blDragState = {
@@ -1779,10 +1797,11 @@ function initCardDnd(grid){
 function renderList(){
   renderNav();
   const { folders, boards } = currentBoardsAndFolders();
-  const sortedBoards = sortBoards(boards);
+  const sortedBoards = inTrashView() ? boards : sortBoards(boards);
 
   let titleHtml = '';
   if (searchQuery) titleHtml = `${allIcon()} Результаты поиска «${escHtml(searchQuery)}»`;
+  else if (inTrashView()) titleHtml = `${trashIcon()} Корзина <span class="bl-title-note">доски удаляются насовсем через 5 дней</span>`;
   else if (curFolderId === '__recent') titleHtml = `${clockIcon()} Недавние`;
   else if (curFolderId === null) titleHtml = `${allIcon()} Все доски`;
   else {
@@ -1797,14 +1816,16 @@ function renderList(){
     grid.insertAdjacentHTML('afterend', '');
     document.querySelector('.bl-empty')?.remove();
     grid.insertAdjacentHTML('beforebegin', '');
-    grid.innerHTML = `<div class="bl-empty" style="grid-column:1/-1">Здесь пока пусто — создайте первую доску или папку кнопками выше.</div>`;
+    grid.innerHTML = inTrashView()
+      ? `<div class="bl-empty" style="grid-column:1/-1">Корзина пуста. Удалённые доски лежат здесь 5 дней — пока они тут, их можно восстановить.</div>`
+      : `<div class="bl-empty" style="grid-column:1/-1">Здесь пока пусто — создайте первую доску или папку кнопками выше.</div>`;
     blSyncSelection();
     return;
   }
 
   let html = '';
   folders.forEach(f => {
-    const n = DB.boards.filter(b => b.folderId === f.id).length;
+    const n = liveBoards().filter(b => b.folderId === f.id).length;
     html += `
       <div class="bl-card folder" data-folder="${f.id}">
         <span class="bl-check" aria-hidden="true"></span>
@@ -1825,7 +1846,7 @@ function renderList(){
         <div class="bl-card-icon">${b.kind === 'deck' && typeof deckIcon === 'function' ? deckIcon() : boardIcon()}</div>
         <div class="bl-card-body">
           <div class="bl-card-name">${escHtml(b.name)}</div>
-          <div class="bl-card-meta">${b.kind === 'deck' ? 'Презентация · с' : 'С'}оздана ${fmtDate(b.createdAt)}</div>
+          <div class="bl-card-meta">${isTrashed(b) ? trashLeftText(b) : `${b.kind === 'deck' ? 'Презентация · с' : 'С'}оздана ${fmtDate(b.createdAt)}`}</div>
         </div>
       </div>`;
   });
@@ -1855,6 +1876,141 @@ function renderList(){
     btn.addEventListener('click', (e) => { e.stopPropagation(); openCardMenu(btn); });
   });
   blSyncSelection();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Корзина досок
+
+   «Удалить» больше не стирает доску сразу: у неё ставится trashedAt, и
+   5 дней она лежит в «Корзине» (пункт в левой колонке), откуда её можно
+   восстановить. Через 5 дней, или по «Удалить навсегда», доска стирается
+   целиком: запись в браузере (deleteListItems) и, если она облачная и
+   моя, — на сервере вместе со всеми объектами (boards-cloud.js,
+   onBoardsPurged → boards_delete_now, boards-trash-schema.sql).
+
+   Поле trashedAt лежит в самой доске, а не отдельным списком: так оно
+   разносится между вкладками тем же слиянием по rev, что и название
+   (touchBoard). Восстановление ставит trashedAt = 0, а не delete: слияние
+   переливает поля через Object.assign, и удалённый ключ у одной вкладки
+   не стёр бы его у другой — доска осталась бы в корзине.
+
+   Сам движок про сервер ничего не знает (как и с onBoardOpened): сообщает
+   облачному модулю через необязательные onBoardsTrashed / onBoardsRestored
+   / onBoardsPurged.
+   ═══════════════════════════════════════════════════════════════════════ */
+const TRASH_KEEP_MS = 5 * 24 * 3600 * 1000;
+
+function isTrashed(b){ return !!(b && b.trashedAt); }
+function liveBoards(){ return DB.boards.filter(b => !b.trashedAt); }
+function inTrashView(){ return curFolderId === '__trash' && !searchQuery; }
+function trashIcon(){
+  return '<svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+function trashLeftText(b){
+  const left = (b.trashedAt || 0) + TRASH_KEEP_MS - nowTs();
+  if (left <= 3600 * 1000) return 'В корзине · удалится в течение часа';
+  if (left < 24 * 3600 * 1000){
+    const h = Math.ceil(left / 3600000);
+    return `В корзине · удалится через ${h} ${blPlural(h, 'час', 'часа', 'часов')}`;
+  }
+  const d = Math.ceil(left / (24 * 3600 * 1000));
+  return `В корзине · удалится через ${d} ${blPlural(d, 'день', 'дня', 'дней')}`;
+}
+function callBoardsHook(name, arg){
+  if (typeof window[name] !== 'function') return;
+  try { window[name](arg); } catch (e) { console.warn('[корзина] ' + name + ':', e); }
+}
+
+// в корзину; возвращает, сколько досок ушло (уже лежавшие там не считаются)
+function trashBoards(ids){
+  const list = [];
+  ids.forEach(id => {
+    const b = DB.boards.find(x => x.id === id);
+    if (!b || b.trashedAt) return;
+    b.trashedAt = nowTs();
+    b.trashSource = '';            // удалил сам человек, а не пришло с сервера
+    touchBoard(b);
+    list.push(b);
+  });
+  if (list.length) callBoardsHook('onBoardsTrashed', list);
+  return list.length;
+}
+
+function restoreBoards(ids){
+  const list = [];
+  ids.forEach(id => {
+    const b = DB.boards.find(x => x.id === id);
+    if (!b || !b.trashedAt) return;
+    b.trashedAt = 0;
+    b.trashSource = '';
+    // папку, из которой доску удалили, могли удалить следом — тогда в корень
+    if (b.folderId && !DB.folders.some(f => f.id === b.folderId)) b.folderId = null;
+    touchBoard(b);
+    list.push(b);
+  });
+  if (list.length) callBoardsHook('onBoardsRestored', list);
+  return list.length;
+}
+
+// Папка удаляется сразу (пустая обёртка, восстанавливать в ней нечего), её
+// доски — в корзину. Возвращает id досок, ушедших в корзину
+function trashFolders(folderIds){
+  const fset = new Set(folderIds);
+  const inside = liveBoards().filter(b => b.folderId && fset.has(b.folderId)).map(b => b.id);
+  trashBoards(inside);
+  fset.forEach(id => noteDeleted('folder', id));
+  DB.folders = DB.folders.filter(f => !fset.has(f.id));
+  return inside;
+}
+
+// Насовсем. Хук зовём ДО удаления: облачному модулю нужно видеть, нет ли в
+// списке второй карточки той же облачной доски (тогда сервер не трогаем)
+function purgeBoards(ids){
+  const list = ids.map(id => DB.boards.find(x => x.id === id)).filter(Boolean);
+  if (!list.length) return 0;
+  callBoardsHook('onBoardsPurged', list);
+  deleteListItems(list.map(b => b.id), []);
+  return list.length;
+}
+
+// Просроченное в корзине — насовсем. Зовётся при старте и раз в час.
+// Открытую сейчас доску не трогаем (её могли открыть по старой ссылке)
+function purgeExpiredTrash(quiet){
+  const edge = nowTs() - TRASH_KEEP_MS;
+  const ids = DB.boards
+    .filter(b => b.trashedAt && b.trashedAt < edge && !(boardActive && B && B.id === b.id))
+    .map(b => b.id);
+  if (!ids.length) return 0;
+  purgeBoards(ids);
+  saveDB();
+  if (!quiet && !boardActive) renderList();
+  return ids.length;
+}
+setInterval(() => { try { purgeExpiredTrash(); } catch (e) {} }, 3600 * 1000);
+
+// Внизу на 6 секунд: «2 доски в корзине · Вернуть»
+let blToastTimer = null;
+function blTrashToast(ids){
+  let el = document.getElementById('blToast');
+  if (!el){
+    el = document.createElement('div');
+    el.id = 'blToast';
+    el.className = 'bl-toast';
+    el.setAttribute('role', 'status');
+    (document.getElementById('screenList') || document.body).appendChild(el);
+  }
+  const n = ids.length;
+  el.innerHTML = `<span>${n === 1 ? 'Доска в корзине' : `${n} ${blPlural(n, 'доска', 'доски', 'досок')} в корзине`} — 5 дней её можно восстановить</span><button type="button" id="blToastUndo">Вернуть</button>`;
+  if (n > 1) el.querySelector('span').textContent = `${n} ${blPlural(n, 'доска', 'доски', 'досок')} в корзине — 5 дней их можно восстановить`;
+  el.hidden = false;
+  el.querySelector('#blToastUndo').addEventListener('click', (e) => {
+    e.stopPropagation();
+    restoreBoards(ids);
+    saveDB(); renderList();
+    el.hidden = true;
+  });
+  clearTimeout(blToastTimer);
+  blToastTimer = setTimeout(() => { el.hidden = true; }, 6000);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1902,7 +2058,8 @@ function blHandleSelectClick(e, card){
   }
   // Ctrl+щелчок на Mac — это правая кнопка (contextmenu, а не click), так
   // что ctrlKey здесь приходит только с Windows/Linux, где он и есть «⌘»
-  if (e.metaKey || e.ctrlKey || e.shiftKey || blSelectionActive()){
+  // в корзине доску не открыть — щелчок по ней всегда отмечает
+  if (e.metaKey || e.ctrlKey || e.shiftKey || blSelectionActive() || inTrashView()){
     if (blSel.has(key)) blSel.delete(key); else blSel.add(key);
     blSelAnchor = key;
     blSyncSelection();
@@ -1960,9 +2117,18 @@ function blRenderSelBar(){
   const show = blSelectionActive() && screenList.style.display !== 'none';
   bar.hidden = !show;
   if (!show){ document.getElementById('blSelFolderPop')?.remove(); return; }
+  // плашка «Доска в корзине · Вернуть» стоит на том же месте — панель главнее
+  const toast = document.getElementById('blToast');
+  if (toast) toast.hidden = true;
   const nb = blSelectedIds('b:').length, nf = blSelectedIds('f:').length;
   document.getElementById('blSelCount').textContent =
     (nb || nf) ? 'Выбрано: ' + blCountText(nb, nf) : 'Отметьте доски щелчком';
+  const trash = inTrashView();
+  ['blSelMove', 'blSelTabs', 'blSelDelete'].forEach(id => { document.getElementById(id).hidden = trash; });
+  ['blSelRestore', 'blSelPurge'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el){ el.hidden = !trash; el.disabled = !nb; }
+  });
   // в папку и во вкладки — только доски: папку в папку не кладём, а
   // «открыть папку во вкладке» смысла не имеет
   document.getElementById('blSelMove').disabled = !nb;
@@ -2002,15 +2168,42 @@ function deleteListItems(boardIds, folderIds){
   return bset.size;
 }
 
+// «Удалить» на панели — в корзину. Доски без подтверждения (их можно
+// вернуть кнопкой внизу или из корзины), с папками — спрашиваем: папка
+// сама не восстанавливается
 function blDeleteSelected(){
+  if (inTrashView()) { blPurgeSelected(); return; }
   const bIds = blSelectedIds('b:'), fIds = blSelectedIds('f:');
   if (!bIds.length && !fIds.length) return;
-  const fset = new Set(fIds);
-  const inside = DB.boards.filter(b => b.folderId && fset.has(b.folderId) && !bIds.includes(b.id)).length;
-  let msg = `Удалить ${blCountText(bIds.length, fIds.length)}`;
-  if (inside) msg += ` (и ${inside} ${blPlural(inside, 'доску', 'доски', 'досок')} внутри ${fIds.length > 1 ? 'папок' : 'папки'})`;
-  if (!confirm(msg + '? Это нельзя отменить.')) return;
-  deleteListItems(bIds, fIds);
+  if (fIds.length){
+    const fset = new Set(fIds);
+    const inside = liveBoards().filter(b => b.folderId && fset.has(b.folderId) && !bIds.includes(b.id)).length;
+    let msg = `Удалить ${blCountText(bIds.length, fIds.length)}?`;
+    msg += inside ? ` Доски из ${fIds.length > 1 ? 'папок' : 'папки'} (${inside}) тоже уйдут в корзину.` : '';
+    msg += ' Доски можно восстановить из корзины в течение 5 дней, папки — нет.';
+    if (!confirm(msg)) return;
+  }
+  const trashed = bIds.filter(id => trashBoards([id]));
+  const fromFolders = fIds.length ? trashFolders(fIds) : [];
+  blSel.clear(); blSelAnchor = null;
+  saveDB(); renderList();
+  const all = trashed.concat(fromFolders);
+  if (all.length) blTrashToast(all);
+}
+
+function blRestoreSelected(){
+  const ids = blSelectedIds('b:');
+  if (!ids.length) return;
+  restoreBoards(ids);
+  blSel.clear(); blSelAnchor = null;
+  saveDB(); renderList();
+}
+
+function blPurgeSelected(){
+  const ids = blSelectedIds('b:');
+  if (!ids.length) return;
+  if (!confirm(`Удалить навсегда ${blCountText(ids.length, 0)}? Восстановить ${ids.length === 1 ? 'её' : 'их'} будет нельзя.`)) return;
+  purgeBoards(ids);
   blSel.clear(); blSelAnchor = null;
   saveDB(); renderList();
 }
@@ -2115,6 +2308,8 @@ function blShowBlockedTabs(base, ids, total){
   document.getElementById('blSelMove')?.addEventListener('click', (e) => { e.stopPropagation(); blOpenMovePop(); });
   document.getElementById('blSelTabs')?.addEventListener('click', (e) => { e.stopPropagation(); blOpenSelectedInTabs(); });
   document.getElementById('blSelDelete')?.addEventListener('click', (e) => { e.stopPropagation(); blDeleteSelected(); });
+  document.getElementById('blSelRestore')?.addEventListener('click', (e) => { e.stopPropagation(); blRestoreSelected(); });
+  document.getElementById('blSelPurge')?.addEventListener('click', (e) => { e.stopPropagation(); blPurgeSelected(); });
   document.getElementById('blSelAll')?.addEventListener('click', (e) => { e.stopPropagation(); blSelectAllVisible(); });
   document.getElementById('blSelCancel')?.addEventListener('click', (e) => { e.stopPropagation(); blClearSelection(); });
 
@@ -2160,7 +2355,11 @@ function openCardMenu(btn){
   const [kind, id] = btn.dataset.menu.split(':');
   const pop = document.createElement('div');
   pop.className = 'bl-menu-pop';
-  pop.innerHTML = `
+  const trashed = kind === 'board' && isTrashed(DB.boards.find(x => x.id === id));
+  pop.innerHTML = trashed ? `
+    <button data-act="restore">Восстановить</button>
+    <button data-act="purge" class="danger">Удалить навсегда</button>
+  ` : `
     <button data-act="rename">Переименовать</button>
     ${kind==='board' ? `<button data-act="move">Переместить…</button>` : ''}
     ${kind==='board' ? `<button data-act="export">Экспортировать в файл</button>` : ''}
@@ -2180,14 +2379,25 @@ function openCardMenu(btn){
       const name = prompt('Новое название:', item.name);
       if (name && name.trim()){ item.name = name.trim(); touchBoard(item); saveDB(); renderList(); }
     } else if (act === 'delete'){
+      // Корзина: доска не стирается сразу, а 5 дней лежит в «Корзине»
+      // (trashBoards). Поэтому у доски подтверждения больше нет — вместо
+      // него внизу «Вернуть». Папку же спрашиваем: сама папка не
+      // восстанавливается, её доски из корзины вернутся в «Все доски»
       if (kind === 'folder'){
-        const n = DB.boards.filter(b => b.folderId === id).length;
-        if (!confirm(`Удалить папку и ${n} досок в ней? Это нельзя отменить.`)) return;
-        deleteListItems([], [id]);
+        const n = liveBoards().filter(b => b.folderId === id).length;
+        if (n && !confirm(`Удалить папку? ${n} ${blPlural(n, 'доска', 'доски', 'досок')} из неё ${n === 1 ? 'уйдёт' : 'уйдут'} в корзину — 5 дней их можно восстановить.`)) return;
+        const moved = trashFolders([id]);
+        if (moved.length) blTrashToast(moved);
       } else {
-        if (!confirm('Удалить доску? Это нельзя отменить.')) return;
-        deleteListItems([id], []);
+        if (trashBoards([id])) blTrashToast([id]);
       }
+      saveDB(); renderList();
+    } else if (act === 'restore'){
+      restoreBoards([id]);
+      saveDB(); renderList();
+    } else if (act === 'purge'){
+      if (!confirm('Удалить доску навсегда? Восстановить её будет нельзя.')) return;
+      purgeBoards([id]);
       saveDB(); renderList();
     } else if (act === 'export'){
       const b = DB.boards.find(x => x.id === id);
@@ -2217,7 +2427,7 @@ document.getElementById('blSearch').addEventListener('input', (e) => {
 document.getElementById('blCreateBoard').addEventListener('click', () => {
   const b = {
     id: uid(), name: 'Доска без названия',
-    folderId: (curFolderId && curFolderId !== '__recent') ? curFolderId : null,
+    folderId: (curFolderId && curFolderId !== '__recent' && curFolderId !== '__trash') ? curFolderId : null,
     createdAt: nowTs(), updatedAt: nowTs(), lastOpenedAt: null,
     cellSize: 24, sheetCols: 76, sheetRows: 54, sheetCount: 1, pageOrder: 'h',
     objects: [], recentColors: PALETTE.map(p => p.tok), colorUsage: {},
@@ -9738,8 +9948,9 @@ window.__imgCacheHas = function(src){ return Object.prototype.hasOwnProperty.cal
 // истории отмены на тяжёлых досках, а не только на глаз по .length стека
 window.__undoStackInfo = function(){ return { count: undoStack.length, bytes: undoBytes, limit: UNDO_LIMIT, budget: UNDO_BYTES_BUDGET }; };
 window.getCurrentBoard = function(){ return B; };
-window.__applyDrop = function(st, t){ return applyDrop(st, t); };
-window.__blSelection = function(){ return [...blSel]; };   // для проверок: что сейчас выделено в списке   // для проверок: перенос в папку без мыши
+window.__applyDrop = function(st, t){ return applyDrop(st, t); };   // для проверок: перенос в папку без мыши
+window.__blSelection = function(){ return [...blSel]; };   // для проверок: что сейчас выделено в списке
+window.__purgeExpiredTrash = function(){ return purgeExpiredTrash(); };   // для проверок: уборка корзины без ожидания часа
 window.boardsRedraw = function(){ scheduleRedraw(); updateContextMenu(); };
 window.boardsClearSelection = function(){ selectedId = null; multiSelectIds = []; clearEditLock(); };
 // Промпт №10 (новый список): записать на диск содержимое общей доски, которое
@@ -9801,7 +10012,9 @@ window.boardsAppBoot = function(){
       if (lbl) lbl.textContent = sortLabels[sortMode];
     }
     loadClipboard();
+    purgeExpiredTrash(true);
     renderList();
+    if (window.onBoardsBooted) { try { window.onBoardsBooted(); } catch (e) { console.warn(e); } }
     // Промпт №49: если открытие ИМЕННО этой доски роняет вкладку (браузер
     // сам её перезагружает после краша), в адресе остаётся #board=<id> — и
     // код ниже тут же открыл бы её снова, получая бесконечный цикл
@@ -9813,7 +10026,7 @@ window.boardsAppBoot = function(){
     // «пережито», второй раз не повторяем попытку, а просто остаёмся на
     // списке и убираем хэш из адреса
     const m = /board=([^&]+)/.exec(location.hash);
-    if (m && DB.boards.some(b=>b.id===m[1])) {
+    if (m && DB.boards.some(b=>b.id===m[1] && !b.trashedAt)) {
       let prevAttempt = null;
       try { prevAttempt = sessionStorage.getItem(AUTO_OPEN_GUARD_KEY); } catch(e){}
       if (prevAttempt === m[1]) {

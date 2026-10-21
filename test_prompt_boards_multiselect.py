@@ -13,8 +13,8 @@
   3. Shift+щелчок выделяет подряд; Esc снимает всё; ⌘+A выделяет всё.
   4. «В папку» переносит всю пачку, штрихи выгруженных досок на диске целы.
   5. Перетаскивание одной из выделенных на папку уносит все выделенные.
-  6. «Удалить» удаляет пачку (после подтверждения), записи досок с диска
-     подчищены, в списке «удалённых» они есть.
+  6. «Удалить» отправляет пачку в корзину (без подтверждения — её можно
+     вернуть), штрихи на диске целы.
   7. «Открыть во вкладках» открывает каждую доску в новой вкладке на этой
      самой доске; если браузер заблокировал часть вкладок — окно со
      ссылками на остальные.
@@ -208,31 +208,26 @@ def run():
         check("перетаскивание одной из выделенных унесло обе в папку «Уроки»", fid["b3"] == "fB" and fid["b4"] == "fB")
         check("после переноса пачки ничего не открылось", not board_open())
 
-        # ── 6. удаление пачки (две доски внутри «Уроков») ──
+        # ── 6. удаление пачки (две доски внутри «Уроков») — в корзину ──
         page.click('#blGrid .bl-card[data-folder="fB"] .bl-card-name')   # заходим в папку
         page.wait_for_selector(card("b3"))
         page.click(card("b3"), modifiers=["Meta"])
         page.click(card("b4"), modifiers=["Meta"])
         msgs = []
-        page.once("dialog", lambda d: (msgs.append(d.message), d.accept()))
+        on_dialog = lambda d: (msgs.append(d.message), d.accept())
+        page.on("dialog", on_dialog)
         page.click("#blSelDelete")
         page.wait_for_timeout(600)
-        ids = page.evaluate("() => window.getDB().boards.map(b => b.id)")
-        check("подтверждение называет число досок", bool(msgs) and "2 доски" in msgs[0])
-        check("обе выделенные доски удалены", "b3" not in ids and "b4" not in ids)
-        check("третья доска в папке осталась", "bIn" in ids)
-        check("удалённые попали в список «удалённых»",
-              page.evaluate("() => ['b3','b4'].every(id => window.getDB().deleted.some(d => d.id === id))"))
-        check("записи удалённых досок подчищены с диска", read_payload(page, "b3") is None and read_payload(page, "b4") is None)
-
-        # отказ от подтверждения ничего не удаляет
-        page.click(card("bIn"), modifiers=["Meta"])
-        page.once("dialog", lambda d: d.dismiss())
-        page.click("#blSelDelete")
-        page.wait_for_timeout(200)
-        check("«Отмена» в подтверждении ничего не удаляет",
-              page.evaluate("() => window.getDB().boards.some(b => b.id === 'bIn')"))
-        page.keyboard.press("Escape")
+        trashed = page.evaluate("() => window.getDB().boards.filter(b => b.trashedAt).map(b => b.id).sort()")
+        check("доски без подтверждения (их можно вернуть)", not msgs)
+        check("обе выделенные доски ушли в корзину", trashed == ["b3", "b4"])
+        check("из папки они пропали, третья доска осталась",
+              page.evaluate("() => [...document.querySelectorAll('#blGrid .bl-card[data-board]')].map(c => c.dataset.board)") == ["bIn"])
+        check("внизу «2 доски в корзине · Вернуть»",
+              page.evaluate("() => !document.getElementById('blToast').hidden") and "2 доски в корзине" in page.inner_text("#blToast"))
+        check("штрихи досок в корзине на диске целы", len((read_payload(page, "b3") or {}).get("objects", [])) == 1)
+        page.remove_listener("dialog", on_dialog)
+        page.evaluate("() => { const t = document.getElementById('blToast'); if (t) t.hidden = true; }")
 
         # ── 7. открыть во вкладках ──
         page.click('.bl-nav-item[data-nav="fA"]')

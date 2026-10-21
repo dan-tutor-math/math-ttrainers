@@ -2921,14 +2921,23 @@
     // №93: created_at — настоящее время создания доски. Раньше заглушке
     // ставили «сейчас», и у всех подтянутых из облака досок «Создана»
     // совпадало с моментом открытия страницы (в инкогнито — каждый раз)
-    const { data: boardsRows, error } = await window.SB.from('boards').select('id, title, owner, created_at');
+    // «Корзина досок»: trashed_at появляется после boards-trash-schema.sql.
+    // Пока файл не запущен, такой запрос — ошибка; тогда спрашиваем по-старому
+    let { data: boardsRows, error } = await window.SB.from('boards').select('id, title, owner, created_at, trashed_at');
+    if (error) ({ data: boardsRows, error } = await window.SB.from('boards').select('id, title, owner, created_at'));
     if (error || !boardsRows) return;
     const db = window.getDB();
     if (!db) return;
+    // облачные доски, стёртые здесь насовсем: пока сервер их не стёр (нет
+    // связи, не запущен SQL), строка в базе ещё есть — заново не заводим
+    const goneCloud = new Set((db.deleted || []).filter(d => d.kind === 'cloud').map(d => d.id));
+    const rowIds = new Set(boardsRows.map(r => r.id));
+    const now = window.nowTs();
     const { data: accessRows } = await window.SB.from('board_access').select('board_id, role').eq('user_id', window.CURRENT_USER.id);
     const roleByBoard = new Map((accessRows || []).map(r => [r.board_id, r.role]));
     let changed = false;
     boardsRows.forEach(row => {
+      if (goneCloud.has(row.id)) return;
       const born = Date.parse(row.created_at || '') || 0;
       const have = db.boards.find(b => b.cloudBoardId === row.id);
       if (have) {
@@ -2936,8 +2945,22 @@
         // двух: у перенесённой из браузера доски (№90) своё время старше
         // строки в базе, его не трогаем
         if (born && (!have.createdAt || born < have.createdAt)) { have.createdAt = born; changed = true; }
+        // Корзина на другом устройстве: владелец удалил доску там — здесь
+        // она тоже уходит в корзину (у всех её карточек). Вернул там —
+        // возвращается и здесь, но только если в корзину её положил сервер,
+        // а не человек на этом устройстве (trashSource)
+        const serverTrashed = Date.parse(row.trashed_at || '') || 0;
+        db.boards.forEach(b => {
+          if (b.cloudBoardId !== row.id) return;
+          if (serverTrashed && !b.trashedAt && !b.cloudRestorePending) {
+            b.trashedAt = serverTrashed; b.trashSource = 'server'; window.touchBoard(b); changed = true;
+          } else if (!serverTrashed && b.trashedAt && b.trashSource === 'server') {
+            b.trashedAt = 0; b.trashSource = ''; window.touchBoard(b); changed = true;
+          }
+        });
         return;
       }
+      if (row.trashed_at) return;   // в корзине у владельца — новую карточку не заводим
       const role = row.owner === window.CURRENT_USER.id ? 'owner' : (roleByBoard.get(row.id) || 'editor');
       db.boards.push({
         id: window.uid(), name: row.title || 'Общая доска', folderId: null,
@@ -2948,6 +2971,97 @@
       });
       changed = true;
     });
+    // Доски, которых на сервере больше нет (владелец стёр, доступ убрали), —
+    // в корзину, а не насовсем: если это ошибка (в браузере вошли под
+    // другой почтой), за 5 дней всё вернётся само при входе нужного
+    // человека. Сервер отдаёт не больше 1000 строк — при длинном списке
+    // «нет в ответе» не значит «нет на сервере», тогда ничего не трогаем
+    if (boardsRows.length < 900) {
+      db.boards.forEach(b => {
+        if (!b.cloudBoardId || b.cloudPendingId || b.trashedAt || rowIds.has(b.cloudBoardId)) return;
+        if (window.getCurrentBoard && window.getCurrentBoard() === b) return;
+        b.trashedAt = now; b.trashSource = 'server'; window.touchBoard(b); changed = true;
+      });
+    }
     if (changed) { window.saveDB(); if (window.renderList) window.renderList(); }
   };
+
+  /* ═══ Корзина досок: что делать на сервере (boards-trash-schema.sql) ═══
+     Движок (boards-core.js, блок «Корзина досок») сам решает, что лежит в
+     корзине, и зовёт эти хуки. Здесь — только сервер:
+     - в корзину / из корзины — пометка trashed_at у МОЕЙ доски, чтобы
+       другие устройства тоже её спрятали или вернули;
+     - насовсем — boards_delete_now: моя доска стирается целиком, у чужой
+       убирается только мой доступ.
+     Сервер трогаем, только если в списке нет второй живой карточки той же
+     облачной доски: после пересборки хранилища заглушки бывают дважды
+     (HANDOFF, раздел 6), и удаление лишней не должно стирать доску.
+     Карточки, которые в корзину положил сам сервер (trashSource 'server'),
+     на сервер ничего не шлют — там их судьбу уже решил владелец.
+     Не дошло (нет связи, SQL не запущен) — флаг остаётся и вызов
+     повторяется при следующем входе (cloudTrashReconcile). */
+  function cloudTwinAlive(b, except) {
+    return window.getDB().boards.some(x => x !== b && x.cloudBoardId === b.cloudBoardId
+      && !x.trashedAt && !(except && except.has(x.id)));
+  }
+  async function cloudRpc(name, args) {
+    if (!window.SB || !window.CURRENT_USER) return { error: 'нет входа' };
+    try { return await window.SB.rpc(name, args); } catch (e) { return { error: e }; }
+  }
+  function cloudMarkDone(list, flag) {
+    list.forEach(b => { if (b[flag]) { b[flag] = false; window.touchBoard(b); } });
+    window.saveDB();
+  }
+  window.onBoardsTrashed = function (list) {
+    const mine = list.filter(b => b.cloudBoardId && !b.cloudPendingId && b.trashSource !== 'server' && !cloudTwinAlive(b));
+    if (!mine.length) return;
+    mine.forEach(b => { b.cloudTrashPending = true; b.cloudRestorePending = false; });
+    cloudRpc('boards_trash', { p_boards: mine.map(b => b.cloudBoardId) })
+      .then(r => { if (!r.error) cloudMarkDone(mine, 'cloudTrashPending'); });
+  };
+  window.onBoardsRestored = function (list) {
+    const mine = list.filter(b => b.cloudBoardId && !b.cloudPendingId);
+    if (!mine.length) return;
+    mine.forEach(b => { b.cloudRestorePending = true; b.cloudTrashPending = false; });
+    cloudRpc('boards_restore', { p_boards: mine.map(b => b.cloudBoardId) })
+      .then(r => { if (!r.error) cloudMarkDone(mine, 'cloudRestorePending'); });
+  };
+  window.onBoardsPurged = function (list) {
+    const purging = new Set(list.map(b => b.id));
+    const ids = [];
+    list.forEach(b => {
+      if (!b.cloudBoardId || b.cloudPendingId || b.trashSource === 'server') return;
+      // вторая карточка той же доски (живая или в корзине, но не стираемая
+      // сейчас) — сервер не трогаем
+      if (window.getDB().boards.some(x => !purging.has(x.id) && x.cloudBoardId === b.cloudBoardId)) return;
+      if (ids.includes(b.cloudBoardId)) return;
+      ids.push(b.cloudBoardId);
+      // след «стёрта насовсем»: пока он есть (90 дней), импорт не заведёт
+      // доску заново, а вход повторит стирание на сервере
+      window.noteDeleted('cloud', b.cloudBoardId);
+    });
+    if (ids.length) cloudRpc('boards_delete_now', { p_boards: ids });
+  };
+  // При каждом входе: дослать то, что не дошло, и стереть мою просроченную
+  // корзину на сервере (вдруг браузер, где доску удалили, больше не открывали)
+  window.cloudTrashReconcile = async function () {
+    const db = window.getDB && window.getDB();
+    if (!db || !window.CURRENT_USER) return;
+    const tr = db.boards.filter(b => b.cloudTrashPending && b.trashedAt);
+    if (tr.length) {
+      const r = await cloudRpc('boards_trash', { p_boards: tr.map(b => b.cloudBoardId) });
+      if (!r.error) cloudMarkDone(tr, 'cloudTrashPending');
+    }
+    const rs = db.boards.filter(b => b.cloudRestorePending && !b.trashedAt);
+    if (rs.length) {
+      const r = await cloudRpc('boards_restore', { p_boards: rs.map(b => b.cloudBoardId) });
+      if (!r.error) cloudMarkDone(rs, 'cloudRestorePending');
+    }
+    const gone = [...new Set((db.deleted || []).filter(d => d.kind === 'cloud').map(d => d.id))];
+    if (gone.length) await cloudRpc('boards_delete_now', { p_boards: gone });
+    await cloudRpc('boards_purge_trash', {});
+  };
+  // движок досок зовёт это, когда список загружен из хранилища (вход к этому
+  // моменту уже есть — boardsAppBoot запускается после него)
+  window.onBoardsBooted = function () { window.cloudTrashReconcile(); };
 })();
