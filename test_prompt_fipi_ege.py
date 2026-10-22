@@ -17,7 +17,8 @@
   5. снимок совместной сессии у ученика открывает то же задание;
   6. раздельный файл: на №6 файлы номеров не грузятся; стрелка к №8 с
      запомненным заданием грузит файл и открывает именно его;
-  7. номера с чертежами (№1, №3, №9, №12) не задеты: только демоверсия;
+  7. №6, №13 и номера части 2, кроме №14 и №16 (их проверяет
+     test_prompt_fipi_ege_p2.py), — без заданий ФИПИ;
   8. телефон 375 px — без прокрутки вбок.
 
 Совместный режим здесь без сети: живьём его нужно перепроверять на сайте.
@@ -94,7 +95,9 @@ def new_page(browser, url, wait=1200, width=1300):
 
 
 def test_data(F):
-    check("данные: номера с файлами — 1–5, 7–12", sorted(F["files"], key=int) == sorted(COUNTS, key=int), str(F["files"]))
+    # №14 и №16 (часть 2) проверяет test_prompt_fipi_ege_p2.py
+    check("данные: номера с файлами — 1–5, 7–12 и часть 2 (14, 16)",
+          sorted(F["files"], key=int) == sorted(list(COUNTS) + ["14", "16"], key=int), str(F["files"]))
     imgs = [m for t in F["tasks"].values() for p in t["protos"] for m in IMG_RE.findall(p["text"])]
     missing = [m for m in imgs if not os.path.exists(os.path.join(HERE, m))]
     check(f"данные: чертежи ФИПИ ({len(imgs)}) лежат в репозитории", imgs and not missing, str(missing[:3]))
@@ -121,6 +124,8 @@ def test_katex(browser, F):
     ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=2")
     chunks = []
     for n, t in F["tasks"].items():
+        if n not in COUNTS:
+            continue
         for g in t["groups"]:
             chunks.append((n, "группа " + g["id"], g["title"]))
             chunks.append((n, "идея " + g["id"], g["hint"]))
@@ -238,12 +243,12 @@ def test_lazy(browser, F):
 def test_untouched(browser):
     ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=1")
     bad = []
-    for n in (6, 13, 14):
+    for n in (6, 13, 15, 17, 18, 19, 20):
         page.evaluate("(n) => new Promise(r => ensureFipi(n, r))", n)
         cnt = page.evaluate("(n) => protos(n).filter(p => p.fipi).length", n)
         if cnt:
             bad.append((n, cnt))
-    check("№6 (случайная величина), №13 и часть 2 — без заданий ФИПИ", not bad, str(bad))
+    check("№6 (случайная величина), №13 и часть 2, кроме №14 и №16, — без заданий ФИПИ", not bad, str(bad))
     ctx.close()
 
 
