@@ -49,9 +49,17 @@
     const dy = (oy1 - destRect.top) * destScaleY;
     const dw = (ox2 - ox1) * destScaleX;
     const dh = (oy2 - oy1) * destScaleY;
+    // html2canvas оставляет на своём холсте сдвиг: клон задания лежит за
+    // краем экрана, и после отрисовки у контекста остаётся translate(10000, 0).
+    // Без сброса записи доски уходили на 10 000 пикселей вбок, и в историю
+    // урока не попадали вовсе (найдено тестом скорости №3)
+    const dctx = destCanvas.getContext('2d');
+    dctx.save();
     try {
-      destCanvas.getContext('2d').drawImage(srcCanvas, sx, sy, sw, sh, dx, dy, dw, dh);
+      dctx.setTransform(1, 0, 0, 1, 0, 0);
+      dctx.drawImage(srcCanvas, sx, sy, sw, sh, dx, dy, dw, dh);
     } catch (e) {}
+    dctx.restore();
   }
 
   // ── детач-клон: копируем узел, ставим его за пределы экрана с ЯВНО заданными
@@ -92,15 +100,34 @@
   }
 
   async function capture(scope, targetEl) {
-    if (!targetEl || !window.html2canvas) return null;
+    if (!targetEl) return null;
+    // html2canvas догружается в фоне (lazy-libs.js). Если снимок попросили
+    // раньше — всё, что зависит от момента (рамки, клон задания, записи на
+    // доске), берём СЕЙЧАС, а ждём библиотеку уже потом: к её приходу
+    // задание на экране может смениться
+    const lateLib = !window.html2canvas;
+    if (lateLib && !window.MathhLibs) return null;
     // ── все прямоугольники — синхронно, одним снимком времени ──
     const targetRect = targetEl.getBoundingClientRect();
     if (targetRect.width <= 0 || targetRect.height <= 0) return null;
     const bridge = window.__boardCanvasEl ? window.__boardCanvasEl() : null;
-    const sheetInfo = bridge && bridge.sheet ? { canvas: bridge.sheet.inkCanvas, rect: bridge.sheet.rect() } : null;
-    const bgInfo = bridge && bridge.bg ? { canvas: bridge.bg.inkCanvas, rect: bridge.bg.rect() } : null;
+    let sheetInfo = bridge && bridge.sheet ? { canvas: bridge.sheet.inkCanvas, rect: bridge.sheet.rect() } : null;
+    let bgInfo = bridge && bridge.bg ? { canvas: bridge.bg.inkCanvas, rect: bridge.bg.rect() } : null;
 
     const { holder, clone } = detachedClone(targetEl);
+    if (lateLib) {
+      // холсты записей живые: смена задания их очистит, пока ждём библиотеку
+      const copy = (info) => {
+        if (!info || !info.canvas) return info;
+        const c = document.createElement('canvas');
+        c.width = info.canvas.width; c.height = info.canvas.height;
+        c.getContext('2d').drawImage(info.canvas, 0, 0);
+        return { canvas: c, rect: info.rect };
+      };
+      sheetInfo = copy(sheetInfo); bgInfo = copy(bgInfo);
+      try { await window.MathhLibs.load('html2canvas'); }
+      catch (e) { holder.remove(); return null; }
+    }
     let domCanvas;
     try {
       domCanvas = await window.html2canvas(clone, {
@@ -155,7 +182,11 @@
   function onCountChange(cb) { countChangeCb = cb; }
 
   async function downloadPdf() {
-    if (!snapshots.length || !window.jspdf) return false;
+    if (!snapshots.length) return false;
+    // jsPDF догружается в фоне (lazy-libs.js); нажали раньше — дожидаемся
+    if (!window.jspdf) {
+      try { await window.MathhLibs.load('jspdf'); } catch (e) { return false; }
+    }
     const { jsPDF } = window.jspdf;
     let doc = null;
     for (const snap of snapshots) {

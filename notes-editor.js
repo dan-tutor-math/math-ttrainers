@@ -891,7 +891,11 @@
   /* ── PDF ── */
   async function buildPdf() {
     if (!pages.length) { toast('В конспекте нет страниц'); return; }
-    if (!window.jspdf) { toast('Не загрузилась библиотека PDF'); return; }
+    if (!window.jspdf) {
+      // jsPDF догружается в фоне (lazy-libs.js) — нажали раньше, дожидаемся
+      try { await window.MathhLibs.load('jspdf'); }
+      catch (e) { toast('Не загрузилась библиотека PDF'); return; }
+    }
     commitText(); await flushSave();
     const btn = $('edPdf'); const was = btn.textContent;
     btn.classList.add('busy');

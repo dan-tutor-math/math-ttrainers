@@ -1232,11 +1232,65 @@
   // теперь работает постоянно, с момента загрузки страницы, и от data-board
   // больше не зависит — а вот интерактивность (рисование, тулбар) по-прежнему
   // включается только явно, см. isBoardInteractiveTarget/CSS выше.
+  /* Правка скорости №4: цикл по-прежнему крутится всегда (см. выше, почему),
+     но холсты перерисовывает, только если что-то изменилось. Раньше оба
+     холста размером во весь экран стирались и рисовались заново 60 раз в
+     секунду даже на пустой доске — это 40–50% времени процессора на
+     телефоне в простое, и в каждой карточке «+» свой такой цикл.
+
+     Почему отпечаток, а не «перерисуй, когда позвали». Штрихи меняются из
+     многих мест: свои, входящие снимки собеседника, слияние, отмена,
+     очистка над заданием. Пропусти вызов в одном — у ученика не появится
+     запись учителя (ровно такие ошибки чинили в промптах №22 и №23).
+     Отпечаток же сам замечает любое изменение данных, кто бы их ни менял.
+
+     Что в нём и почему:
+     — у массивов завершённых штрихов — сам массив (отмена и снимки его
+       заменяют), длина и сумма номеров штрихов: слияние может заменить
+       штрих другим при той же длине;
+     — у штрихов, которые рисуются прямо сейчас (свой и собеседника), —
+       число точек и координаты последней: «линия» меняет вторую точку на
+       месте, не добавляя новую;
+     — масштаб, сдвиг, прокрутка (фон рисуется с учётом прокрутки страницы),
+       размер холстов (смена размера стирает холст) и цвет сетки (тема). */
+  const strokeIds = new WeakMap();
+  let strokeIdNext = 1;
+  function strokeId(s){
+    let id = strokeIds.get(s);
+    if (!id) { id = strokeIdNext++; strokeIds.set(s, id); }
+    return id;
+  }
+  const arrRefs = new WeakMap();
+  let arrRefNext = 1;
+  function arrSig(arr){
+    let ref = arrRefs.get(arr);
+    if (!ref) { ref = arrRefNext++; arrRefs.set(arr, ref); }
+    let ids = 0;
+    for (let i = 0; i < arr.length; i++) ids += strokeId(arr[i]);
+    return ref + ':' + arr.length + ':' + ids;
+  }
+  function liveSig(s){
+    if (!s || !s.points || !s.points.length) return '-';
+    const p = s.points[s.points.length - 1];
+    return strokeId(s) + ':' + s.points.length + ':' + p.x + ',' + p.y;
+  }
+  function liveMapSig(map){
+    let out = map.size + '';
+    map.forEach((s, k) => { out += '|' + k + '=' + liveSig(s); });
+    return out;
+  }
+  let lastSheetSig = '', lastBgSig = '';
   let rafHandle = null;
   function boardLoop(){
     syncBoardTarget();
-    redraw();
-    redrawBg();
+    const sheetSig = [arrSig(strokes), liveSig(currentStroke), liveMapSig(remoteStrokes),
+      viewScale, panX, panY, dpr, canvas.width, canvas.height].join(';');
+    const gridColor = getComputedStyle(document.documentElement).getPropertyValue('--grid');
+    const bgSig = [arrSig(bgStrokes), liveSig(bgCurrentStroke), liveMapSig(bgRemoteStrokes),
+      bgViewScale, bgPanX, bgPanY, window.scrollX, window.scrollY, dpr,
+      canvasBg.width, canvasBg.height, gridColor].join(';');
+    if (sheetSig !== lastSheetSig) { lastSheetSig = sheetSig; redraw(); }
+    if (bgSig !== lastBgSig) { lastBgSig = bgSig; redrawBg(); }
     rafHandle = requestAnimationFrame(boardLoop);
   }
   function ensureLoopRunning(){

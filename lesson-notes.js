@@ -57,7 +57,8 @@
   /* ── html2canvas: на тренажёрах без своей истории урока его нет —
      подгружаем сами, заранее, чтобы к первому нажатию он уже был ── */
   function ensureH2C() {
-    if (window.html2canvas || document.querySelector('script[data-ln-h2c]')) return;
+    // тег мог вставить и общий загрузчик lazy-libs.js — второй раз не качаем
+    if (window.html2canvas || document.querySelector('script[data-ln-h2c], script[src="html2canvas.min.js"]')) return;
     const s = document.createElement('script');
     s.src = 'html2canvas.min.js';
     s.async = true;

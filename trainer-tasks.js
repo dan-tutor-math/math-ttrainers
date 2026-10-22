@@ -311,6 +311,11 @@ function wrapIntoCard(content, card, scale, cssW, cssH){
 // сейчас на странице (перестройка задания под новую ширину, промпт №70);
 // opts.width — ширина узла в CSS-пикселях: текст и формулы переносятся по ней
 async function captureTrainerNode(el, task, opts){
+  // html2canvas догружается в фоне (lazy-libs.js); попросили раньше — ждём.
+  // Ждём в самом начале, до того как что-то мерить на странице
+  if (typeof html2canvas !== 'function' && window.MathhLibs) {
+    try { await window.MathhLibs.load('html2canvas'); } catch (e) {}
+  }
   if (typeof html2canvas !== 'function') throw new Error('html2canvas not loaded');
   opts = opts || {};
   const doc = el.ownerDocument;

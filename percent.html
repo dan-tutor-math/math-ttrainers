@@ -10,9 +10,9 @@
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Проценты — 5–6 класс</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Onest:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+<link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/onest-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="onest.css">
 <style>
 :root{
   --font-ui:'Onest',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
@@ -1083,8 +1083,7 @@ html[data-theme="dark"] .tile:hover{box-shadow:inset 0 1px 0 var(--glass-inset),
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
 <script src="keypad.js"></script>
-<script src="html2canvas.min.js"></script>
-<script src="jspdf.umd.min.js"></script>
+<script src="lazy-libs.js" data-preload="html2canvas jspdf"></script>
 <script src="lesson-history.js"></script>
 <script src="percent-bank.js"></script>
 <script>

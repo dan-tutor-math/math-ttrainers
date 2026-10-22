@@ -8828,6 +8828,16 @@ document.getElementById('pdfDownloadBtn').addEventListener('click', async () => 
   const btn = document.getElementById('pdfDownloadBtn');
   const origText = btn.textContent;
   btn.textContent = 'Сохраняем…'; btn.disabled = true;
+  // jsPDF догружается в фоне (lazy-libs.js); нажали раньше — дожидаемся.
+  // Отдельно от try ниже: там сообщение про картинки с чужих сайтов
+  if (!window.jspdf) {
+    try { await window.MathhLibs.load('jspdf'); }
+    catch (e) {
+      btn.textContent = origText; btn.disabled = false;
+      alert('Не загрузилась библиотека PDF — проверьте интернет и попробуйте ещё раз.');
+      return;
+    }
+  }
   try {
     const sw = sheetWpx(), sh = sheetHpx();
     const scale = 2;
@@ -9361,6 +9371,25 @@ function renderBasketPicker(){
   });
 }
 
+/* Текст стилей KaTeX для картинок через SVG foreignObject. SVG-картинка не
+   может подгрузить ничего внешнего — ни файл стилей, ни шрифт по адресу, —
+   поэтому стили KaTeX вклеиваются в неё текстом, а шрифты в katex-*.css
+   лежат внутри файла (base64), а не отдельными файлами. Раньше этот текст
+   брали из встроенного <style id="katexCssBlock">; с выносом KaTeX в общий
+   файл (чтобы браузер кэшировал его один раз на все страницы) читаем
+   правила уже загруженного файла — он с того же сайта, доступ к правилам
+   открыт. Кэшируем: формул на доске бывает много, а текст — 370 КБ */
+let katexCssCache = '';
+function katexCssText(){
+  if (katexCssCache) return katexCssCache;
+  const link = document.getElementById('katexCss');
+  try {
+    const rules = link && link.sheet && link.sheet.cssRules;
+    if (rules && rules.length) katexCssCache = Array.from(rules, r => r.cssText).join('\n');
+  } catch (e) { /* файл ещё не загружен — вернём пусто, попробуем в следующий раз */ }
+  return katexCssCache;
+}
+
 /* HTML-снимок задания → PNG data:URL. foreignObject рендерится как
    отдельный, независимый от страницы документ — поэтому нужные классы
    заданий и реальные цвета текущей темы встраиваются прямо в svg своим
@@ -9387,8 +9416,7 @@ function rasterizeBasketItem(item){
     const pencil = cs.getPropertyValue('--pencil').trim() || '#1D1D1F';
     const paper = cs.getPropertyValue('--paper').trim() || '#FDFCF7';
 
-    const katexCssText = (document.getElementById('katexCssBlock') || {}).textContent || '';
-    const embeddedCss = katexCssText + `
+    const embeddedCss = katexCssText() + `
       .katex{visibility:visible;}
       .basket-item-text{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',Arial,sans-serif;font-size:15px;line-height:1.5;white-space:pre-line;color:${pencil};}
       .basket-frac{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;vertical-align:middle;margin:0 4px;line-height:1.2;position:relative;top:.12em;white-space:nowrap;}
@@ -9468,11 +9496,10 @@ function rasterizeFormula(latex, fontSizePx){
     const W = w + pad*2, H = h + pad*2;
     const cs = getComputedStyle(document.documentElement);
     const pencil = cs.getPropertyValue('--pencil').trim() || '#1D1D1F';
-    const katexCssText = (document.getElementById('katexCssBlock') || {}).textContent || '';
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}">
       <foreignObject width="100%" height="100%">
         <div xmlns="http://www.w3.org/1999/xhtml" style="width:${W}px;height:${H}px;box-sizing:border-box;padding:${pad}px;font-size:${fontSizePx}px;line-height:1.25;color:${pencil};">
-          <style>${katexCssText}.katex{visibility:visible;}</style>
+          <style>${katexCssText()}.katex{visibility:visible;}</style>
           ${html}
         </div>
       </foreignObject>
