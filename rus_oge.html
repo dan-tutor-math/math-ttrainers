@@ -108,6 +108,9 @@ a.mode-card{text-decoration:none;box-sizing:border-box}
 .mode-card .mtitle{font-weight:600;font-size:15px;line-height:1.3;flex:1 1 260px;}
 .mode-card .msub{font-size:13px;font-weight:500;color:var(--muted-3);flex:1 1 100%;}
 .mode-card .mprog{font-size:13px;font-weight:600;color:var(--ok);}
+.mode-card .mbad{font-size:13px;font-weight:600;color:var(--teacher);}
+.mode-card.all-card .mtitle{font-weight:700}
+.picker-head{display:flex;margin-bottom:4px}
 
 .task-head{display:flex;flex-wrap:wrap;row-gap:8px;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
 .corner{display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;gap:8px;}
@@ -256,7 +259,7 @@ a.mode-card{text-decoration:none;box-sizing:border-box}
     <div class="stats">
       <div class="stat"><div class="v" id="statOk">0</div><div class="l">верно</div></div>
       <div class="stat"><div class="v" id="statBad">0</div><div class="l">неверно</div></div>
-      <div class="stat"><div class="v" id="statDone">0</div><div class="l">решено в номере</div></div>
+      <div class="stat"><div class="v" id="statDone">0</div><div class="l" id="statDoneL">решено в номере</div></div>
     </div>
 
     <div class="panel" id="questionPanel"></div>
@@ -307,6 +310,19 @@ DATA.tasks.forEach(t => {
   if (!SHOW_ALL && !t.ok) return;
   (POOL[t.n] = POOL[t.n] || []).push(t);
 });
+// Подтемы внутри номера (по списку преподавателя русского): DATA.topics[n] — порядок и
+// названия, у задания tp — его подтемы. Задание может попасть в несколько подтем (в №3–4
+// одно задание бывает сразу про ССП и про вводные слова), поэтому tp — массив.
+// Номер без подтем открывается сразу заданиями, как раньше.
+const TOPICS = DATA.topics || {};
+function topicsOf(n){
+  // подтему без подтверждённых заданий не показываем: кнопка в пустоту хуже, чем её нет
+  return (TOPICS[n] || []).filter(tp => (POOL[n] || []).some(t => (t.tp || []).includes(tp.id)));
+}
+function listOf(n, topic){
+  const all = POOL[n] || [];
+  return topic ? all.filter(t => (t.tp || []).includes(topic)) : all;
+}
 
 // ── Память ───────────────────────────────────────────────────────────────────
 const LS = {
@@ -319,7 +335,7 @@ let results = LS.get('rusOge:results', {});
 let mode = LS.get('rusOge:mode', 'exam');
 
 // ── Состояние экрана ────────────────────────────────────────────────────────
-const S = { screen:'picker', n:null, idx:0, picked:new Set(), tries:0, done:false, revealed:false, last:null };
+const S = { screen:'picker', n:null, topic:null, list:[], idx:0, picked:new Set(), tries:0, done:false, revealed:false, last:null };
 
 const $ = id => document.getElementById(id);
 
@@ -371,6 +387,8 @@ function renderPicker(){
     let sub;
     if (!list.length) sub = all ? `${all} заданий · ответы ещё сверяются с сайтом ФИПИ` : 'скоро';
     else sub = SHOW_ALL ? `${list.length} заданий (предпросмотр, вместе с несверенными)` : `${list.length} заданий · ответы подтверждены сайтом ФИПИ`;
+    const tc = topicsOf(m.n).length;
+    if (list.length && tc) sub += ` · ${tc} ${plural(tc, 'тема', 'темы', 'тем')}`;
     html += `<button class="mode-card" data-n="${m.n}"${list.length ? '' : ' disabled'}>
       <span class="mtitle">№${m.n}. ${m.title}</span>
       ${solved ? `<span class="mprog">✓ ${solved} из ${list.length}</span>` : ''}
@@ -383,48 +401,106 @@ function renderPicker(){
     '<a class="mode-card" id="essayLink" href="rus_oge13.html"><span class="mtitle">№13. Сочинение-рассуждение</span>' +
     '<span class="msub">99 текстов ФИПИ · темы 13.1–13.3, самопроверка и образцы</span></a>';
   grid.innerHTML = html;
-  grid.querySelectorAll('.mode-card[data-n]').forEach(b => b.addEventListener('click', () => openNumber(+b.dataset.n)));
+  grid.querySelectorAll('.mode-card[data-n]').forEach(b => b.addEventListener('click', () => {
+    const n = +b.dataset.n;
+    topicsOf(n).length ? renderTopics(n) : openNumber(n);
+  }));
   if (!SHOW_ALL && okCount < total) {
     $('pageSub').textContent = `задания из открытого банка ФИПИ · сверено с ФИПИ ${okCount} из ${total}`;
   }
 }
 
+function plural(k, one, few, many){
+  const a = k % 10, b = k % 100;
+  return a === 1 && b !== 11 ? one : a >= 2 && a <= 4 && (b < 12 || b > 14) ? few : many;
+}
+// счёт по списку заданий: сколько решено верно и сколько провалено — по подтемам это
+// и есть подсказка репетитору, что повторять с учеником
+function tally(list){
+  let ok = 0, bad = 0;
+  list.forEach(t => { if (results[t.id] === 'ok') ok++; else if (results[t.id] === 'bad') bad++; });
+  return {ok, bad};
+}
+function progSpans(list){
+  const c = tally(list);
+  return (c.ok ? `<span class="mprog">✓ ${c.ok} из ${list.length}</span>` : '') +
+    (c.bad ? `<span class="mbad">✗ ${c.bad}</span>` : '');
+}
+
+// ── Экран подтем номера ─────────────────────────────────────────────────────
+function renderTopics(n){
+  const meta = NUMS.find(m => m.n === n);
+  S.screen = 'topics'; S.n = n; S.topic = null;
+  $('pickerArea').style.display = '';
+  $('taskArea').style.display = 'none';
+  $('pageSub').textContent = `№${n}. ${meta.title}`;
+  const url = new URL(location.href);
+  url.searchParams.set('n', n); url.searchParams.delete('t'); url.searchParams.delete('tp');
+  history.replaceState(null, '', url);
+  const all = POOL[n] || [];
+  let html = '<div class="picker-head"><button class="back-btn" id="topicsBack">← все номера</button></div>';
+  html += `<button class="mode-card all-card" data-tp="">
+    <span class="mtitle">Все задания №${n} вперемешку</span>${progSpans(all)}
+    <span class="msub">${all.length} заданий</span></button>`;
+  html += '<div class="section-title">По темам</div>';
+  topicsOf(n).forEach(tp => {
+    const list = listOf(n, tp.id);
+    html += `<button class="mode-card" data-tp="${tp.id}">
+      <span class="mtitle">${escapeHTML(tp.title)}</span>${progSpans(list)}
+      <span class="msub">${list.length} ${plural(list.length, 'задание', 'задания', 'заданий')}</span></button>`;
+  });
+  const grid = $('modesGrid');
+  grid.innerHTML = html;
+  $('topicsBack').addEventListener('click', goPicker);
+  grid.querySelectorAll('.mode-card[data-tp]').forEach(b => b.addEventListener('click', () => openNumber(n, null, b.dataset.tp || null)));
+}
+
 // ── Номер и задание ─────────────────────────────────────────────────────────
-function openNumber(n, id){
-  const list = POOL[n] || [];
+function openNumber(n, id, topic){
+  if (topic && !topicsOf(n).some(tp => tp.id === topic)) topic = null;
+  const list = listOf(n, topic);
   if (!list.length) return;
-  S.screen = 'task'; S.n = n;
+  S.screen = 'task'; S.n = n; S.topic = topic || null; S.list = list;
   let idx = id ? list.findIndex(t => t.id === id) : -1;
   if (idx < 0) {
-    // возвращаемся туда, где остановились, а если номер новый — к первому нерешённому
-    const last = LS.get('rusOge:last:' + n, null);
+    // возвращаемся туда, где остановились, а если номер новый — к первому нерешённому;
+    // у каждой подтемы своё «где остановились», иначе вход в тему прыгал бы в чужую
+    const last = LS.get(lastKey(), null);
     idx = last ? list.findIndex(t => t.id === last) : -1;
     if (idx < 0) idx = Math.max(0, list.findIndex(t => !results[t.id]));
   }
   openTask(idx);
 }
 
+function lastKey(){ return 'rusOge:last:' + S.n + (S.topic ? ':' + S.topic : ''); }
+
 function openTask(idx){
-  const list = POOL[S.n];
+  const list = S.list;
   S.idx = (idx + list.length) % list.length;
   S.picked = new Set(); S.tries = 0; S.done = false; S.revealed = false; S.last = null;
   const t = list[S.idx];
-  LS.set('rusOge:last:' + S.n, t.id);
+  LS.set(lastKey(), t.id);
   const url = new URL(location.href);
   url.searchParams.set('n', S.n); url.searchParams.set('t', t.id);
+  if (S.topic) url.searchParams.set('tp', S.topic); else url.searchParams.delete('tp');
   history.replaceState(null, '', url);
   renderTask(true);
 }
 
-function curTask(){ return POOL[S.n][S.idx]; }
+function curTask(){ return S.list[S.idx]; }
+function topicTitle(){
+  const tp = S.topic && (TOPICS[S.n] || []).find(x => x.id === S.topic);
+  return tp ? tp.title : '';
+}
 
 function renderTask(animate){
   const t = curTask();
   const meta = NUMS.find(m => m.n === S.n);
   $('pickerArea').style.display = 'none';
   $('taskArea').style.display = '';
-  $('pageSub').textContent = `№${S.n}. ${meta.title}`;
-  $('taskTitle').textContent = `задание ${S.idx + 1} из ${POOL[S.n].length}`;
+  $('pageSub').textContent = `№${S.n}. ${meta.title}` + (S.topic ? ` · ${topicTitle()}` : '');
+  $('taskTitle').textContent = `задание ${S.idx + 1} из ${S.list.length}`;
+  $('backBtn').textContent = topicsOf(S.n).length ? '← темы' : '← все задания';
   $('tabPractice').classList.toggle('active', mode === 'practice');
   $('tabExam').classList.toggle('active', mode === 'exam');
   $('modeHint').textContent = mode === 'exam'
@@ -610,22 +686,24 @@ function toggleReveal(){
 function escapeHTML(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 function renderStats(){
-  const list = POOL[S.n] || [];
-  let ok = 0, bad = 0;
-  list.forEach(t => { if (results[t.id] === 'ok') ok++; else if (results[t.id] === 'bad') bad++; });
+  const list = S.list || [];
+  const {ok, bad} = tally(list);
   $('statOk').textContent = ok;
   $('statBad').textContent = bad;
+  $('statDoneL').textContent = S.topic ? 'решено в теме' : 'решено в номере';
   $('statDone').textContent = `${list.filter(t => results[t.id]).length} из ${list.length}`;
 }
 
 // ── Кнопки ──────────────────────────────────────────────────────────────────
-$('backBtn').addEventListener('click', () => {
-  S.screen = 'picker';
+function goPicker(){
+  S.screen = 'picker'; S.topic = null;
   const url = new URL(location.href);
-  url.searchParams.delete('n'); url.searchParams.delete('t');
+  url.searchParams.delete('n'); url.searchParams.delete('t'); url.searchParams.delete('tp');
   history.replaceState(null, '', url);
   renderPicker();
-});
+}
+// из задания — на шаг назад: в номере с подтемами это экран тем, а не список номеров
+$('backBtn').addEventListener('click', () => topicsOf(S.n).length ? renderTopics(S.n) : goPicker());
 $('prevBtn').addEventListener('click', () => openTask(S.idx - 1));
 $('nextBtnTop').addEventListener('click', () => openTask(S.idx + 1));
 function setMode(m){
@@ -640,11 +718,15 @@ $('tabExam').addEventListener('click', () => setMode('exam'));
 
 // ── Старт ───────────────────────────────────────────────────────────────────
 const startN = +params.get('n');
-if (startN && (POOL[startN] || []).length) openNumber(startN, params.get('t'));
+if (startN && (POOL[startN] || []).length) {
+  // ?n=9 без задания — экран тем номера (на него ведёт «← темы» и обновление страницы)
+  if (!params.get('t') && topicsOf(startN).length) renderTopics(startN);
+  else openNumber(startN, params.get('t'), params.get('tp'));
+}
 else renderPicker();
 
 // для тестов: состояние страницы без доступа к замыканию
-window.__rusOge = { S, POOL, checkAnswer, answerText, normDigits, EXAM_ATTEMPTS };
+window.__rusOge = { S, POOL, TOPICS, topicsOf, checkAnswer, answerText, normDigits, EXAM_ATTEMPTS };
 })();
 </script>
 </body>
