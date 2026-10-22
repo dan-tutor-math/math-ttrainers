@@ -15,6 +15,8 @@
   5. №5 и №7 принимают цифры в любом порядке, строковые ответы — без учёта
      регистра и «ё/е»;
   6. карточки №1 и №13 ведут на rus_oge01.html и rus_oge13.html; ◀ ▶ ходят по кругу, адрес ?n=…&t=… открывает то же задание;
+     «← все задания» ведёт на главную (index.html?subject=rus), а не на свой список
+     номеров — он остался только для предпросмотра ?all=1; голый rus_oge.html — тоже на главную;
   7. тёмная тема и ширина телефона — без ошибок JS и без горизонтальной прокрутки;
   8. подтемы внутри номера (список преподавателя): у каждого задания №8, 9, 11, 12
      есть подтема, в каждой подтеме из файла есть подтверждённые задания, №9 размечен
@@ -176,16 +178,18 @@ def main():
         print("2. только подтверждённые ФИПИ")
         pg = new_page()
         pg.goto(BASE + "/rus_oge.html")
-        ok_nums = sorted({t["n"] for t in D["tasks"] if t["ok"]})
-        enabled = sorted(int(x) for x in pg.eval_on_selector_all(".mode-card[data-n]:not([disabled])", "els => els.map(e => e.dataset.n)"))
-        check(enabled == ok_nums, f"включены номера с подтверждёнными ответами: {enabled}")
-        check(pg.get_attribute("#essayLink", "href") == "rus_oge13.html", "карточка №13 ведёт на страницу сочинения")
-        check(pg.get_attribute("#izlLink", "href") == "rus_oge01.html", "карточка №1 ведёт на страницу изложения")
+        pg.wait_for_url(lambda u: "/index.html" in u, timeout=5000)
+        check("/index.html" in pg.url, "rus_oge.html без номера уводит на главную, к номерам русского")
+        pg.wait_for_timeout(500)
+        check(pg.get_by_text("№2. Грамматическая основа").first.is_visible(), "на главной открыт русский с его номерами")
+        pg.goto(BASE + "/rus_oge.html?n=2")
         pool = pg.evaluate("Object.fromEntries(Object.entries(window.__rusOge.POOL).map(([k,v]) => [k, v.every(t => t.ok)]))")
         check(all(pool.values()), "в задания ученика не попало ни одного несверенного ответа")
         pg.goto(BASE + "/rus_oge.html?all=1")
         enabled_all = pg.eval_on_selector_all(".mode-card[data-n]:not([disabled])", "els => els.length")
         check(enabled_all == 11, "?all=1 — открыты все 11 номеров")
+        check(pg.get_attribute("#essayLink", "href") == "rus_oge13.html", "карточка №13 ведёт на страницу сочинения")
+        check(pg.get_attribute("#izlLink", "href") == "rus_oge01.html", "карточка №1 ведёт на страницу изложения")
         t_un = next((t for t in D["tasks"] if not t["ok"]), None)
         if t_un:
             pg.goto(BASE + f"/rus_oge.html?all=1&n={t_un['n']}&t={t_un['id']}")
@@ -264,13 +268,17 @@ def main():
         pg.goto(url)
         check(pg.evaluate("window.__rusOge.POOL[6][window.__rusOge.S.idx].id") == last_id, "адрес ?n=…&t=… открывает то же задание")
         pg.click("#backBtn")
-        check(pg.is_visible("#modesGrid"), "«← все задания» возвращает к выбору номера")
+        check(pg.is_visible("#modesGrid"), "в предпросмотре ?all=1 «← все задания» — к его списку номеров")
+        pg.goto(BASE + "/rus_oge.html?n=6")
+        pg.click("#backBtn")
+        pg.wait_for_url(lambda u: "/index.html" in u, timeout=5000)
+        check("/index.html" in pg.url, "у ученика «← все задания» ведёт на главную, не на копию списка")
 
         print("8. подтемы на экране выбора")
         pg = new_page()
-        pg.goto(BASE + "/rus_oge.html")
-        check("тем" in pg.inner_text('.mode-card[data-n="9"] .msub'), "у №9 на карточке написано число тем")
-        pg.click('.mode-card[data-n="9"]')
+        pg.goto(BASE + "/rus_oge.html?all=1")
+        check("тем" in pg.inner_text('.mode-card[data-n="9"] .msub'), "в предпросмотре у №9 на карточке написано число тем")
+        pg.goto(BASE + "/rus_oge.html?n=9")
         check(pg.is_visible("#topicsBack") and not pg.is_visible("#taskArea"), "№9 открывает экран тем, а не задание")
         topics9 = pg.evaluate("window.__rusOge.topicsOf(9).map(x => x.id)")
         cards = pg.eval_on_selector_all('.mode-card[data-tp]', "els => els.map(e => e.dataset.tp)")
@@ -302,8 +310,9 @@ def main():
         pg.goto(BASE + "/rus_oge.html?n=9")
         check(pg.is_visible("#topicsBack"), "адрес ?n=9 без задания — экран тем")
         pg.click("#topicsBack")
-        check(pg.is_visible('.mode-card[data-n="2"]'), "«← все номера» возвращает к выбору номера")
-        pg.click('.mode-card[data-n="2"]')
+        pg.wait_for_url(lambda u: "/index.html" in u, timeout=5000)
+        check("/index.html" in pg.url, "с экрана тем «← все задания» — на главную")
+        pg.goto(BASE + "/rus_oge.html?n=2")
         check(pg.is_visible("#taskArea"), "№2 без подтем открывается сразу заданием")
         check(pg.inner_text("#backBtn") == "← все задания", "и кнопка назад у него прежняя")
         pm = new_page(390, 844, "dark")

@@ -305,6 +305,10 @@ const params = new URLSearchParams(location.search);
 // не подтвердил. Ученику по умолчанию — только подтверждённые: неверный ключ хуже,
 // чем меньше заданий.
 const SHOW_ALL = params.get('all') === '1';
+// Список номеров у ученика один — на главной (index.html, вкладка «Русский»). Свой
+// экран выбора номера у этой страницы остался только для предпросмотра ?all=1:
+// иначе «← все задания» вёл на вторую, похожую, но другую копию главной.
+const HOME = 'index.html?subject=rus';
 const POOL = {};
 DATA.tasks.forEach(t => {
   if (!SHOW_ALL && !t.ok) return;
@@ -438,7 +442,7 @@ function renderTopics(n){
   url.searchParams.set('n', n); url.searchParams.delete('t'); url.searchParams.delete('tp');
   history.replaceState(null, '', url);
   const all = POOL[n] || [];
-  let html = '<div class="picker-head"><button class="back-btn" id="topicsBack">← все номера</button></div>';
+  let html = '<div class="picker-head"><button class="back-btn" id="topicsBack">← все задания</button></div>';
   html += `<button class="mode-card all-card" data-tp="">
     <span class="mtitle">Все задания №${n} вперемешку</span>${progSpans(all)}
     <span class="msub">${all.length} заданий</span></button>`;
@@ -696,6 +700,7 @@ function renderStats(){
 
 // ── Кнопки ──────────────────────────────────────────────────────────────────
 function goPicker(){
+  if (!SHOW_ALL) { location.href = HOME; return; }
   S.screen = 'picker'; S.topic = null;
   const url = new URL(location.href);
   url.searchParams.delete('n'); url.searchParams.delete('t'); url.searchParams.delete('tp');
@@ -723,7 +728,9 @@ if (startN && (POOL[startN] || []).length) {
   if (!params.get('t') && topicsOf(startN).length) renderTopics(startN);
   else openNumber(startN, params.get('t'), params.get('tp'));
 }
-else renderPicker();
+else if (SHOW_ALL) renderPicker();
+// старая закладка на rus_oge.html без номера — на главную, к номерам русского
+else location.replace(HOME);
 
 // для тестов: состояние страницы без доступа к замыканию
 window.__rusOge = { S, POOL, TOPICS, topicsOf, checkAnswer, answerText, normDigits, EXAM_ATTEMPTS };
