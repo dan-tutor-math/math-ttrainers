@@ -6,10 +6,9 @@
    выделения, облака, ученика), поэтому здесь только то, чем она
    отличается: где лежат слайды, как их показывать и листать.
 
-   Подключается ДО boards-core.js: доска может открыться сразу при загрузке
-   (по хэшу #board=…), и к этому моменту хуки отсюда уже должны быть.
-   Функции читают B, cam, cssW и прочее из boards-core.js только в момент
-   вызова — к тому времени всё объявлено.
+   №96: подгружается по требованию (ensureDeckModule в boards-core.js),
+   когда открывают презентацию, — уже ПОСЛЕ boards-core.js. Функции читают
+   B, cam, cssW и прочее из boards-core.js только в момент вызова.
    ═══════════════════════════════════════════════════════════════════════ */
 
 // размер слайда по умолчанию — 16:9 в клетках доски (64×36 по 24 px):
@@ -31,7 +30,9 @@ const DECK_PEEK_PX = 40;              // сколько видно соседа 
 // Промпт №85: render() рисует для миниатюры не текущий слайд, а этот
 let deckRenderSlideId = null;
 
-function isDeckBoard(){ return !!(B && B.kind === 'deck'); }
+// №96: у ученика (доска учителя, board-stage.js) презентация только
+// рисуется — ни листания, ни ленты, ни меню: всё это проверяет isDeckBoard
+function isDeckBoard(){ return !!(B && B.kind === 'deck') && !window.deckViewerMode; }
 function deckObj(){ return (B && Array.isArray(B.objects)) ? B.objects.find(o => o.type === 'deck') : null; }
 function deckSlides(){ const d = deckObj(); return d && Array.isArray(d.slides) ? d.slides : []; }
 function deckCur(){
@@ -127,6 +128,40 @@ function deckOnOpen(b){
   deckSyncFlowUI();
 }
 
+/* №96: доска учителя у ученика (board-stage.js, совместная сессия по коду).
+   Камеру там ведёт учитель, поэтому от модуля презентаций ученику нужно
+   только одно: знать, какой слайд на экране, чтобы нарисовать его бумагу и
+   обрезать объекты по его краю. Какой слайд — учитель присылает вместе с
+   видом (ds), как и режим листания (fl): у ученика в localStorage может быть
+   свой режим, а слайды должны стоять так же, как у учителя */
+let deckViewerFlow = null, deckViewerSlide = null;
+function deckViewerOpen(b){
+  window.deckViewerMode = true;
+  b.kind = 'deck';
+  const d = Array.isArray(b.objects) ? b.objects.find(o => o.type === 'deck') : null;
+  if (d && Array.isArray(d.slides)) d.slides.forEach((s, i) => {
+    if (typeof s.slot !== 'number') s.slot = i;
+    s.w = Math.max(4, Math.min(DECK_MAX_CELLS, s.w || DECK_DEF_W));
+    s.h = Math.max(4, Math.min(DECK_MAX_CELLS, s.h || DECK_DEF_H));
+    if (!s.bg) s.bg = { k: 'grid' };
+  });
+  deckCurId = null;
+}
+function deckViewerClose(){ window.deckViewerMode = false; deckViewerFlow = null; deckViewerSlide = null; deckCurId = null; }
+function deckViewerView(v){
+  if (!v) return;
+  deckViewerFlow = v.fl || null;
+  deckViewerSlide = v.ds || null;
+}
+function deckViewerSync(){
+  const sl = deckSlides();
+  if (!sl.length) return;
+  const byId = deckViewerSlide && sl.find(s => s.id === deckViewerSlide);
+  // старый учитель (страница из кэша) слайд не присылает — берём по середине экрана
+  const s = byId || deckSlideNearY(cam.y + cssH / 2 / cam.zoom) || deckCur() || sl[0];
+  deckCurId = s.id;
+}
+
 // Свободная часть холста, куда вписывается слайд: между верхней полосой,
 // панелью масштаба, доком, лентой и полосой листания. Панели переносятся к
 // любому краю (промпт №9), поэтому край берём по форме и месту: высокая
@@ -175,6 +210,7 @@ function deckFitCam(s, zf){
    слайд меньше, чем «вписан», нельзя — иначе было бы видно пустое полотно
    и соседние слоты */
 function deckClampCam(){
+  if (window.deckViewerMode){ deckViewerSync(); return; }   // №96: камеру ведёт учитель
   if (deckIsScroll()){ deckScrollClamp(); return; }
   const sl = deckSlides();
   if (!sl.length) return;
@@ -212,6 +248,15 @@ function deckDrawBackground(c, camv, w, h, isScreen){
   // сплошной прокрутке середина экрана законно бывает на чужом слайде
   deckInkOnDark = false;
   const scroll = deckIsScroll();
+  // №96: у ученика камера учительская — не двигаем её и не трогаем ленту и
+  // полосу листания (их у ученика нет), только бумага слайда
+  if (window.deckViewerMode){
+    if (isScreen && camv === cam) deckViewerSync();
+    if (isScreen && scroll && camv === cam) deckRenderScrollOthers(c, camv, w, h);
+    const sv = deckDrawnSlide();
+    if (sv) deckDrawPaper(c, sv, camv);
+    return;
+  }
   if (isScreen && camv === cam && deckSlides().length && (scroll ? !deckSlides().some(x => x.id === deckCurId) : !deckSlideAtY(cam.y + cssH / 2 / cam.zoom))){
     const s0 = deckCur();
     if (s0){ deckShowSlide(s0); camv = cam; }
@@ -228,7 +273,7 @@ function deckDrawPaper(c, s, camv){
   const p0 = worldToScreen({ x: r.x, y: r.y }), p1 = worldToScreen({ x: r.x + r.w, y: r.y + r.h });
   c.save();
   c.shadowColor = 'rgba(20,30,60,.18)'; c.shadowBlur = 30; c.shadowOffsetY = 8;
-  c.fillStyle = deckBgKind(s) === 'dark' ? DECK_DARK_PAPER : themeVar('--paper');
+  c.fillStyle = deckPaperColor(s);
   c.fillRect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y);
   c.restore();
   deckDrawPattern(c, s, r, p0, p1, camv);   // №87: клетка, линейки, точки…
@@ -238,7 +283,7 @@ function deckDrawPaper(c, s, camv){
 function deckClipSlide(c, camv){
   const s = deckDrawnSlide();
   if (!s) return false;
-  deckInkOnDark = deckBgKind(s) === 'dark';
+  deckInkOnDark = deckIsDarkBg(s);
   const r = deckSlideRect(s);
   const p0 = worldToScreen({ x: r.x, y: r.y }), p1 = worldToScreen({ x: r.x + r.w, y: r.y + r.h });
   c.save();
@@ -250,6 +295,7 @@ function deckCurRect(){ const s = deckCur(); return s ? deckSlideRect(s) : null;
 
 // листание: 'v' лента по одному, 'scroll' сплошная прокрутка (№86), 'h' галерея
 function deckFlow(){
+  if (window.deckViewerMode && deckViewerFlow) return deckViewerFlow;   // №96: как у учителя
   try { const f = localStorage.getItem(DECK_FLOW_KEY); return f === 'h' || f === 'scroll' ? f : 'v'; } catch (e) { return 'v'; }
 }
 function deckSetFlow(f){
@@ -346,6 +392,7 @@ function deckAddSlide(){
    слайд — колесо двигает его, как обычную доску (возвращаем false) */
 let deckWheelAcc = 0, deckWheelLocked = false, deckWheelTimer = null;
 function deckWheel(e){
+  if (window.deckViewerMode) return false;   // №96: у ученика листает учитель
   if (!deckFitted || deckIsScroll()) return false;   // в сплошной прокрутке колесо прокручивает
   let d = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
   if (e.deltaMode === 1) d *= 16;
@@ -364,7 +411,7 @@ function deckWheel(e){
 // окно поменяло размер — вписанный слайд остаётся вписанным (а не
 // становится «увеличенным» из-за уменьшившегося окна)
 window.addEventListener('resize', () => {
-  if (!isDeckBoard() || !boardActive) return;
+  if (!isDeckBoard() || !boardActive) return;   // у ученика isDeckBoard() — false (№96)
   const wasFitted = deckFitted;
   requestAnimationFrame(() => {
     if (deckIsScroll()){ clampCam(); scheduleRedraw(); }
@@ -396,14 +443,10 @@ document.addEventListener('keydown', (e) => {
   deckStep(dir);
 });
 
-function deckIcon(){
-  return '<svg viewBox="0 0 24 24" fill="none"><rect x="2.5" y="4" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="8.5" y="10" width="13" height="9" rx="1.5" fill="var(--paper)" stroke="currentColor" stroke-width="1.6"/></svg>';
-}
-
 function deckCreate(){
   const b = {
     id: uid(), name: 'Презентация без названия', kind: 'deck',
-    folderId: (curFolderId && curFolderId !== '__recent' && curFolderId !== '__trash') ? curFolderId : null,
+    folderId: curRealFolderId(),
     createdAt: nowTs(), updatedAt: nowTs(), lastOpenedAt: null,
     cellSize: 24, sheetCols: 76, sheetRows: 54, sheetCount: 1, pageOrder: 'h',
     objects: [deckNewObj()], recentColors: PALETTE.map(p => p.tok), colorUsage: {},
@@ -412,7 +455,7 @@ function deckCreate(){
   openBoard(b.id);
 }
 
-document.getElementById('blCreateDeck')?.addEventListener('click', () => deckCreate());
+// «Создать презентацию» подключает boards-core.js: модуль ещё не загружен (№96)
 document.getElementById('deckPrev')?.addEventListener('click', () => deckStep(-1));
 document.getElementById('deckNext')?.addEventListener('click', () => deckStep(1));
 document.getElementById('deckAdd')?.addEventListener('click', () => deckAddSlide());
@@ -621,7 +664,7 @@ function deckRefreshThumbs(){
   B.objects.forEach(o => {
     if (o.type === 'deck') return;
     const b = objectBBox(o), slot = Math.floor(((b.minY + b.maxY) / 2) / deckPitchPx());
-    sig[slot] = (sig[slot] || 0) + 1 + b.minX + b.minY * 3 + b.maxX * 7 + b.maxY * 11 + (o.content ? o.content.length : 0) + String(o.color || '').length;
+    sig[slot] = (sig[slot] || 0) + 1 + b.minX + b.minY * 3 + b.maxX * 7 + b.maxY * 11 + (o.content ? o.content.length : 0) + String(o.color || '').length + (typeof bxSig === 'function' ? bxSig(o) : 0);
   });
   deckSlides().forEach(s => {
     const v = sig[s.slot] || 0;
@@ -648,7 +691,7 @@ function deckRenderThumb(id){
   deckRenderSlideId = id;
   try { render(el.getContext('2d'), t.w, t.h, { x: t.r.x, y: t.r.y, zoom: t.sc, minLine: 1 }, false, pd); }
   catch (e) {}
-  finally { deckRenderSlideId = null; activeCam = cam; }
+  finally { deckRenderSlideId = null; activeCam = cam; deckInkSync(); }
   const loading = deckSlotObjects(s).some(o => { if (o.type !== 'image') return false; const im = getImg(o.src); return !(im.complete && im.naturalWidth); });
   if (loading) deckThumbDirty.add(id);
   return loading;
@@ -773,7 +816,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') deckCloseM
 
 // после перестановки переставляем готовые узлы ленты, а не строим её заново:
 // миниатюры не мигают пустыми, пока перерисуются
-function deckStripSigOf(sl){ return sl.map(s => s.id + ':' + s.w + 'x' + s.h + ':' + (s.name || '') + ':' + (s.bg ? s.bg.k + (s.bg.c || '') + (s.bg.img || '') : '')).join('|'); }
+function deckStripSigOf(sl){ return sl.map(s => s.id + ':' + s.w + 'x' + s.h + ':' + (s.name || '') + ':' + (s.bg ? s.bg.k + (s.bg.c || '') + (s.bg.f || '') + (s.bg.img || '') : '')).join('|'); }
 function deckStripReorderDom(){
   const list = document.getElementById('deckStripList');
   if (!list) return;
@@ -987,7 +1030,7 @@ function deckRenderCard(id, cssWpx){
   deckRenderSlideId = id;
   try { render(card.el.getContext('2d'), bw, bh, { x: r.x, y: r.y, zoom: bw / r.w, minLine: 1 }, false, 1); }
   catch (e) {}
-  finally { deckRenderSlideId = null; activeCam = cam; }
+  finally { deckRenderSlideId = null; activeCam = cam; deckInkSync(); }
   const loading = deckSlotObjects(s).some(o => { if (o.type !== 'image') return false; const im = getImg(o.src); return !(im.complete && im.naturalWidth); });
   if (loading){ card.dirty = true; setTimeout(() => deckQueueCard(id), 900); }
 }
@@ -1370,7 +1413,7 @@ function deckRenderScrollOthers(c, camv, w, h){
     const p0 = worldToScreen({ x: r.x, y: r.y }), p1 = worldToScreen({ x: r.x + r.w, y: r.y + r.h });
     c.save();
     c.beginPath(); c.rect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y); c.clip();
-    deckInkOnDark = deckBgKind(s) === 'dark';
+    deckInkOnDark = deckIsDarkBg(s);
     const pad = 80 / z, vx0 = cv.x - pad, vy0 = cv.y - pad, vx1 = cv.x + w / z + pad, vy1 = cv.y + h / z + pad;
     B.objects.forEach(ob => {
       if (ob.type === 'deck') return;
@@ -1380,8 +1423,8 @@ function deckRenderScrollOthers(c, camv, w, h){
     });
     c.restore();
   });
-  deckInkOnDark = false;
   activeCam = camv;
+  deckInkSync();
 }
 
 // касание другого слайда — сначала делаем его текущим (камера в его
@@ -1422,11 +1465,29 @@ const DECK_DARK_PAPER = '#1B2230', DECK_DARK_INK = '#F2F3F5';
 // перо по умолчанию ('--pencil') на тёмной подложке рисуется светлым;
 // ставит deckClipSlide для слайда, который сейчас рисуется (resolveColor)
 let deckInkOnDark = false;
+// миниатюра, соседняя карточка или соседний слайд в сплошной прокрутке
+// рисуются со своим флагом — после них флаг снова по ТЕКУЩЕМУ слайду: по нему
+// цвет пера в палитре и курсоре (иначе на тёмном слайде перо иногда
+// становилось тёмным, если последней дорисовалась миниатюра светлого)
+function deckInkSync(){ const s = deckCur(); deckInkOnDark = !!s && deckIsDarkBg(s); }
+// №98: подложка «цвет» (bg.f) — фон слайда из PowerPoint. Тёмный цвет —
+// перо по умолчанию светлое, как на тёмной подложке
+function deckPaperColor(s){
+  const k = deckBgKind(s);
+  if (k === 'dark') return DECK_DARK_PAPER;
+  if (k === 'fill' && s.bg.f) return s.bg.f;
+  return themeVar('--paper');
+}
+function deckIsDarkBg(s){
+  const k = deckBgKind(s);
+  if (k === 'dark') return true;
+  return k === 'fill' && typeof bxLuma === 'function' && bxLuma(s.bg.f) < 0.45;
+}
 
 function deckBgKind(s){ return (s && s.bg && s.bg.k) || 'grid'; }
 function deckLineColor(s){
   if (s.bg && s.bg.c) return s.bg.c;
-  if (deckBgKind(s) === 'dark') return 'rgba(255,255,255,.16)';
+  if (deckIsDarkBg(s)) return 'rgba(255,255,255,.16)';
   return B.gridColor ? resolveColor(B.gridColor) : themeVar('--grid');
 }
 // узор подложки по клеткам слайда; p0/p1 — его углы на экране
@@ -1809,7 +1870,7 @@ function deckPreviewOf(s){
   deckRenderSlideId = s.id;
   try { render(cv.getContext('2d'), w, h, { x: r.x, y: r.y, zoom: w / r.w, minLine: 1 }, false, 1); }
   catch (e) {}
-  finally { deckRenderSlideId = null; activeCam = cam; }
+  finally { deckRenderSlideId = null; activeCam = cam; deckInkSync(); }
   try { return cv.toDataURL('image/jpeg', 0.8); } catch (e) { return ''; }
 }
 
@@ -2118,3 +2179,81 @@ document.getElementById('deckModeEdit')?.addEventListener('click', () => deckSet
 document.getElementById('deckModeLesson')?.addEventListener('click', () => deckSetMode('lesson'));
 document.getElementById('deckClearNotes')?.addEventListener('click', () => deckClearNotes(false));
 document.getElementById('deckCopyBtn')?.addEventListener('click', () => deckSaveLessonCopy());
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   №97–100: «Вставить» (блоки и таблицы — board-boxes.js) и «Файл» (импорт
+   PPTX/PDF и выгрузка — deck-io.js). deck-io.js тяжёлый по смыслу (разбор
+   файлов, библиотеки), поэтому грузится только по нажатию «Файл»
+   ═══════════════════════════════════════════════════════════════════════ */
+function deckMenuToggle(menuId, btnId, open){
+  const m = document.getElementById(menuId), b = document.getElementById(btnId);
+  if (!m || !b) return;
+  const on = open === undefined ? m.hidden : open;
+  ['deckInsertMenu', 'deckFileMenu'].forEach(id => { const x = document.getElementById(id); if (x && id !== menuId) x.hidden = true; });
+  ['deckInsertBtn', 'deckFileBtn'].forEach(id => document.getElementById(id)?.setAttribute('aria-expanded', 'false'));
+  m.hidden = !on;
+  b.setAttribute('aria-expanded', on ? 'true' : 'false');
+  if (!on) return;
+  const r = b.getBoundingClientRect();
+  m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, r.left)) + 'px';
+  m.style.top = (r.bottom + 8) + 'px';
+}
+document.getElementById('deckInsertBtn')?.addEventListener('click', () => {
+  document.querySelectorAll('#deckInsertMenu button').forEach(b => { b.disabled = typeof bxInsert !== 'function' || !mayDraw(); });
+  deckMenuToggle('deckInsertMenu', 'deckInsertBtn');
+});
+document.getElementById('deckFileBtn')?.addEventListener('click', () => {
+  document.querySelectorAll('#deckFileMenu [data-file="import"]').forEach(b => { b.disabled = !deckMayEdit(); });
+  deckMenuToggle('deckFileMenu', 'deckFileBtn');
+});
+document.addEventListener('pointerdown', (e) => {
+  if (e.target.closest('#deckInsertMenu,#deckFileMenu,#deckInsertBtn,#deckFileBtn')) return;
+  deckMenuToggle('deckInsertMenu', 'deckInsertBtn', false);
+  deckMenuToggle('deckFileMenu', 'deckFileBtn', false);
+});
+document.getElementById('deckInsertMenu')?.addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-ins]');
+  if (!b || b.disabled) return;
+  deckMenuToggle('deckInsertMenu', 'deckInsertBtn', false);
+  const s = deckCur();
+  if (!s || typeof bxInsert !== 'function') return;
+  // новый объект — посередине текущего слайда
+  const r = deckSlideRect(s);
+  bxInsert(b.dataset.ins, { x: r.x + r.w / 2, y: r.y + r.h / 2 });
+});
+let deckIoPromise = null;
+function deckIoEnsure(){
+  if (typeof deckIoImportFile === 'function') return Promise.resolve();
+  if (deckIoPromise) return deckIoPromise;
+  deckIoPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'deck-io.js';
+    s.onload = () => resolve();
+    s.onerror = () => { s.remove(); deckIoPromise = null; reject(new Error('deck-io.js')); };
+    document.head.appendChild(s);
+  });
+  return deckIoPromise;
+}
+document.getElementById('deckFileMenu')?.addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-file]');
+  if (!b || b.disabled) return;
+  deckMenuToggle('deckFileMenu', 'deckFileBtn', false);
+  const act = b.dataset.file;
+  if (act === 'import'){ document.getElementById('deckImportFile')?.click(); deckIoEnsure().catch(() => {}); return; }
+  deckIoEnsure().then(() => (act === 'pdf' ? deckIoExportPdf() : deckIoExportPptx()), () => deckToast('Не удалось загрузить выгрузку — проверьте связь'));
+});
+document.getElementById('deckImportFile')?.addEventListener('change', (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  deckIoEnsure().then(() => deckIoImportFile(f), () => deckToast('Не удалось загрузить импорт — проверьте связь'));
+});
+// шрифт догрузился (board-boxes.js) — миниатюры и соседние слайды перерисовать
+function deckThumbsInvalidate(){
+  if (!isDeckBoard()) return;
+  deckSlotSig = {};
+  deckSlides().forEach(sl => deckThumbDirty.add(sl.id));
+  if (typeof deckMarkCardsDirty === 'function') deckMarkCardsDirty(deckSlides().map(sl => sl.id));
+  deckScheduleThumbs(true);
+}

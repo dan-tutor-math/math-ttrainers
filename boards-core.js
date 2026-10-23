@@ -1461,6 +1461,76 @@ function clockIcon(){
 function allIcon(){
   return '<svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="7" height="7" rx="1.4" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="3" width="7" height="7" rx="1.4" stroke="currentColor" stroke-width="1.6"/><rect x="3" y="14" width="7" height="7" rx="1.4" stroke="currentColor" stroke-width="1.6"/><rect x="14" y="14" width="7" height="7" rx="1.4" stroke="currentColor" stroke-width="1.6"/></svg>';
 }
+// значок презентации живёт здесь, а не в deck-core.js: список досок рисуется
+// до того, как модуль презентаций подгружен (№96)
+function deckIcon(){
+  return '<svg viewBox="0 0 24 24" fill="none"><rect x="2.5" y="4" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="8.5" y="10" width="13" height="9" rx="1.5" fill="var(--paper)" stroke="currentColor" stroke-width="1.6"/></svg>';
+}
+// разделы списка, которые не папки: доску в них не «кладут», новая доска из
+// них создаётся в корне
+function isSpecialNav(v){ return v === '__recent' || v === '__trash' || v === '__decks'; }
+function curRealFolderId(){ return (curFolderId && !isSpecialNav(curFolderId)) ? curFolderId : null; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Промпт №96: презентации — свой раздел и свой код, который подгружается,
+   только когда открыта презентация.
+
+   Зачем. Презентации растут: впереди импорт PPTX и PDF, экспорт, шрифты,
+   редактор форматированного текста — это в разы тяжелее листания слайдов.
+   Обычная доска этого кода не выполняет и даже не скачивает: сломался
+   импорт — доски этого не заметят, а страница досок не тяжелеет.
+
+   Как. Модули презентаций (DECK_MODULES) — обычные скрипты, грузятся по
+   порядку тегом <script> при первом открытии презентации (openBoard,
+   deckAdopt, «Создать презентацию», доска учителя у ученика). Хуки в этом
+   файле и раньше вызывали их через typeof — без модуля они молчат. Чтобы
+   урок не сорвался, если связь пропадёт уже после загрузки страницы,
+   файлы заранее скачиваются в кэш браузера (fetch без выполнения).
+   ═══════════════════════════════════════════════════════════════════════ */
+const DECK_MODULES = ['deck-core.js'];
+let deckLoadPromise = null;
+function deckModuleReady(){ return typeof deckOnOpen === 'function'; }
+// признак презентации — служебный объект слайдов: у облачной доски с другого
+// устройства поля kind в индексе может не быть (раздел 6б)
+function boardIsDeck(b){
+  return !!b && (b.kind === 'deck' || (Array.isArray(b.objects) && b.objects.some(o => o && o.type === 'deck')));
+}
+function ensureDeckModule(){
+  if (deckModuleReady()) return Promise.resolve();
+  if (deckLoadPromise) return deckLoadPromise;
+  deckLoadPromise = DECK_MODULES.reduce((p, src) => p.then(() => new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => resolve();
+    s.onerror = () => { s.remove(); reject(new Error('не загрузился ' + src)); };
+    document.head.appendChild(s);
+  })), Promise.resolve()).catch(err => {
+    // следующая попытка — заново: связь могла вернуться
+    deckLoadPromise = null;
+    throw err;
+  });
+  return deckLoadPromise;
+}
+function deckLoadFailed(){
+  alert('Не удалось загрузить презентации — проверьте связь с интернетом и попробуйте ещё раз.');
+}
+// прогрев кэша: скачать, но не выполнять. Через пару секунд после старта,
+// чтобы не мешать первой отрисовке
+setTimeout(() => {
+  // только на странице досок: тренажёры тоже подключают этот файл, а
+  // презентаций там нет
+  if (deckModuleReady() || typeof fetch !== 'function' || !document.getElementById('blCreateDeck')) return;
+  DECK_MODULES.forEach(src => { fetch(src, { cache: 'force-cache' }).catch(() => {}); });
+}, 2500);
+// облачная доска приходит без kind, а её объекты — уже после открытия
+// (boards-cloud.js зовёт window.deckAdopt). Пока модуля нет — подгружаем и
+// передаём настоящему deckAdopt из deck-core.js (он заменит эту заглушку)
+window.deckAdopt = function deckAdoptStub(b){
+  if (typeof B === 'undefined' || b !== B || !boardIsDeck(b)) return;
+  ensureDeckModule().then(() => {
+    if (window.deckAdopt !== deckAdoptStub && b === B) window.deckAdopt(b);
+  }, deckLoadFailed);
+};
 
 function fmtDate(ts){
   if (!ts) return '';
@@ -1476,6 +1546,7 @@ function renderNav(){
   let html = `
     <button class="bl-nav-item${curFolderId==='__recent'?' active':''}" data-nav="__recent">${clockIcon()}Недавние<span class="cnt">${recentCount}</span></button>
     <button class="bl-nav-item${curFolderId===null?' active':''}" data-nav="__root">${allIcon()}Все доски<span class="cnt">${live.length}</span></button>
+    <button class="bl-nav-item${curFolderId==='__decks'?' active':''}" data-nav="__decks" title="Все презентации из всех папок">${deckIcon()}Презентации<span class="cnt">${live.filter(boardIsDeck).length}</span></button>
     <div class="bl-folders">
   `;
   DB.folders.forEach(f => {
@@ -1493,6 +1564,7 @@ function renderNav(){
       searchQuery = '';
       document.getElementById('blSearch').value = '';
       renderList();
+      syncListHash();
     });
   });
 }
@@ -1516,6 +1588,10 @@ function currentBoardsAndFolders(){
   }
   if (curFolderId === '__recent'){
     return { folders: [], boards: live.filter(b => b.lastOpenedAt) };
+  }
+  // №96: «Презентации» — все презентации, в какой бы папке они ни лежали
+  if (curFolderId === '__decks'){
+    return { folders: [], boards: live.filter(boardIsDeck) };
   }
   if (curFolderId === null){
     return { folders: DB.folders, boards: live.filter(b => !b.folderId) };
@@ -1600,7 +1676,7 @@ function resolveDropTarget(x, y){
   const nav = el.closest('.bl-nav-item');
   if (nav && blDragState.kind === 'board'){
     const v = nav.dataset.nav;
-    if (v === '__recent') return null;
+    if (v === '__recent' || v === '__decks') return null;
     if (v === '__trash') return { type: 'trash', el: nav };
     return { type: 'into', folderId: v === '__root' ? null : v, el: nav };
   }
@@ -1803,6 +1879,7 @@ function renderList(){
   if (searchQuery) titleHtml = `${allIcon()} Результаты поиска «${escHtml(searchQuery)}»`;
   else if (inTrashView()) titleHtml = `${trashIcon()} Корзина <span class="bl-title-note">доски удаляются насовсем через 5 дней</span>`;
   else if (curFolderId === '__recent') titleHtml = `${clockIcon()} Недавние`;
+  else if (curFolderId === '__decks') titleHtml = `${deckIcon()} Презентации`;
   else if (curFolderId === null) titleHtml = `${allIcon()} Все доски`;
   else {
     const f = DB.folders.find(x => x.id === curFolderId);
@@ -2427,7 +2504,7 @@ document.getElementById('blSearch').addEventListener('input', (e) => {
 document.getElementById('blCreateBoard').addEventListener('click', () => {
   const b = {
     id: uid(), name: 'Доска без названия',
-    folderId: (curFolderId && curFolderId !== '__recent' && curFolderId !== '__trash') ? curFolderId : null,
+    folderId: curRealFolderId(),
     createdAt: nowTs(), updatedAt: nowTs(), lastOpenedAt: null,
     cellSize: 24, sheetCols: 76, sheetRows: 54, sheetCount: 1, pageOrder: 'h',
     objects: [], recentColors: PALETTE.map(p => p.tok), colorUsage: {},
@@ -2435,6 +2512,19 @@ document.getElementById('blCreateBoard').addEventListener('click', () => {
   DB.boards.push(b); saveDB();
   openBoard(b.id);
 });
+// №96: «Создать презентацию» — сначала подгружаем модуль презентаций
+document.getElementById('blCreateDeck')?.addEventListener('click', () => {
+  ensureDeckModule().then(() => deckCreate(), deckLoadFailed);
+});
+// раздел «Презентации» — свой адрес boards.html#decks: его можно держать
+// закладкой или открыть кнопкой с главной. replaceState — чтобы переключение
+// разделов не копило шаги «Назад» в браузере
+function syncListHash(){
+  if (boardActive) return;
+  const want = curFolderId === '__decks' ? '#decks' : '';
+  if ((location.hash || '') === want) return;
+  try { history.replaceState(null, '', location.pathname + location.search + want); } catch (e) {}
+}
 document.getElementById('blCreateFolder').addEventListener('click', () => {
   const name = prompt('Название папки:', 'Новая папка');
   if (!name || !name.trim()) return;
@@ -2932,7 +3022,11 @@ function openBoard(id){
   // Промпт №47: у этой доски могут быть ещё не подгружены штрихи/картинки
   // (см. ensureBoardLoaded) — раньше это делалось для ВСЕХ досок сразу при
   // заходе на сайт; теперь только для той, что реально открывают
-  ensureBoardLoaded(b).then(() => openBoardReady(b, id), alertBoardReadFailed);
+  ensureBoardLoaded(b).then(() => {
+    // №96: презентацию открываем, когда подгружен её модуль; обычной доске ждать нечего
+    if (!boardIsDeck(b) || deckModuleReady()) return openBoardReady(b, id);
+    return ensureDeckModule().then(() => openBoardReady(b, id), deckLoadFailed);
+  }, alertBoardReadFailed);
 }
 function openBoardReady(b, id){
   // «Вид и вкладки»: недописанный вид прошлой доски — дописать сейчас, пока
@@ -3068,7 +3162,7 @@ function backToList(){
   viewReady = false;
   screenBoard.style.display = 'none';
   screenList.style.display = 'flex';
-  location.hash = '';
+  location.hash = curFolderId === '__decks' ? 'decks' : '';
   // Промпт №39: записываем сразу, но НЕ через saveDB() — он отмечает доску как
   // изменённую, а просто «зашёл и вышел» правкой не является: иначе при
   // переносе досок между компьютерами каждая открытая доска выглядела бы
@@ -3471,6 +3565,8 @@ function renderImageObject(c, obj, camv){
   const w = p1.x - p0.x, h = p1.y - p0.y;
   const im = getImg(obj.src);
   c.save();
+  // Промпт №97: картинку можно повернуть на любой угол (board-boxes.js)
+  if (obj.rot && typeof bxImageTransform === 'function') bxImageTransform(c, obj);
   if (im.complete && im.naturalWidth){
     // Промпт №70: задание с тренажёра — карточка со скруглёнными углами.
     // Обрезаем векторным контуром на каждом кадре: край ровный и чёткий при
@@ -3526,6 +3622,8 @@ function renderImageObject(c, obj, camv){
 function renderObject(c, obj, camv, opts){
   if (obj.type === 'deck') return;   // служебный список слайдов презентации (промпт №84)
   if (obj.type === 'image'){ renderImageObject(c, obj, camv); return; }
+  // Промпт №97: блок и таблица «как в презентации» (board-boxes.js)
+  if (obj.type === 'box' || obj.type === 'table'){ if (typeof bxRender === 'function') bxRender(c, obj, camv); return; }
   // Промпт №17, этап 2: тело — 'poly' с полем solid, points — его рамка.
   // Без модуля (старая вкладка) рисуется хотя бы рамка
   if (obj.solid && typeof figRenderSolid === 'function'){ figRenderSolid(c, obj, camv); return; }
@@ -3643,6 +3741,8 @@ function drawAngleArcAndLabel(c, v, a, b, camv, width){
 }
 
 function getHandles(obj){
+  // Промпт №97: рамка с 8 ручками и поворотом (board-boxes.js)
+  if (typeof bxHandles === 'function'){ const bh = bxHandles(obj); if (bh) return bh; }
   // Промпт №17 «фигуры»: у готовой фигуры свои ручки — вершины с
   // сохранением вида, поворот и масштаб (board-figures.js)
   if ((obj.fig || obj.solid) && typeof figHandles === 'function'){ const fh = figHandles(obj); if (fh) return fh; }
@@ -3702,6 +3802,8 @@ function getHandles(obj){
       const w = pv ? pv.w : obj.w, x0 = (pv && pv.side === 'iw') ? p.x + obj.w - w : p.x;
       hs.push({role:'iw',x:x0,y:p.y+obj.h/2}, {role:'ie',x:x0+w,y:p.y+obj.h/2});
     }
+    // Промпт №97: ручка поворота над картинкой
+    if (typeof bxImageRotHandle === 'function'){ const rh = bxImageRotHandle(obj); if (rh) hs.push(rh); }
     return hs;
   }
   return [];
@@ -3710,6 +3812,7 @@ function applyHandle(obj, role, pt){
   const rawPt = pt;
   pt = maybeSnap(pt);
   if ((obj.fig || obj.solid) && typeof figApplyHandle === 'function' && figApplyHandle(obj, role, pt, rawPt)) return;   // Промпт №17
+  if (typeof bxApplyHandle === 'function' && bxApplyHandle(obj, role, pt, rawPt)) return;   // Промпт №97
   // Промпт №69: прямая с закреплённым центром. Центр переносит прямую
   // целиком; конец только задаёт направление — длина и центр не меняются.
   // Для поворота берём точку курсора без прилипания к клеткам: прилипание
@@ -3836,6 +3939,7 @@ function applyHandle(obj, role, pt){
 
 function drawSelection(c, obj, camv){
   if ((obj.fig || obj.solid) && typeof figDrawSelection === 'function' && figDrawSelection(c, obj, camv)) return;   // Промпт №17
+  if (typeof bxDrawSelection === 'function' && bxDrawSelection(c, obj, camv)) return;   // Промпт №97
   const handles = getHandles(obj);
   if (obj.type === 'text'){
     // Промпт №69: рамка текста — видно, где он будет переноситься
@@ -3857,9 +3961,11 @@ function drawSelection(c, obj, camv){
       c.beginPath(); c.arc(s.x, s.y, 5, 0, Math.PI*2); c.fill(); c.stroke(); c.restore();
       return;
     }
+    if (h.role === 'bx-rot') return;   // ручку поворота картинки рисует board-boxes.js
     c.beginPath(); c.arc(s.x, s.y, 5, 0, Math.PI*2); c.fill(); c.stroke();
   });
   c.restore();
+  if (obj.type === 'image' && typeof bxDrawImageRotKnob === 'function') bxDrawImageRotKnob(c, obj);   // №97
 }
 
 function drawDraftPreview(c, camv){
@@ -3932,7 +4038,8 @@ function render(c, w, h, camv, isScreen, renderDpr){
   c.clearRect(0,0,w,h);
   // Промпт №85в: у презентации на экране вне слайда холст прозрачный — позади
   // него слой #deckDepth с соседними слайдами (deck-core.js)
-  const deckScreen = isScreen && B.kind === 'deck' && typeof deckDepthSync === 'function';
+  // у ученика (доска учителя, board-stage.js) слоя глубины нет — фон обычный
+  const deckScreen = isScreen && B.kind === 'deck' && typeof deckDepthSync === 'function' && !window.deckViewerMode;
   if (!deckScreen){
     const bg = themeVar('--bg');
     c.fillStyle = bg; c.fillRect(0,0,w,h);
@@ -3984,6 +4091,7 @@ function render(c, w, h, camv, isScreen, renderDpr){
   if (isScreen && dragMode === 'lasso' && lassoPts) drawLasso(c);
   c.restore();
   if (isScreen){ updateUnlockBtn(); updateContextMenu(); }
+  if (isScreen && typeof bxEditorSync === 'function') bxEditorSync();   // №97: поле правки блока идёт за камерой
 }
 function drawMultiOutline(c, obj, camv){
   const b = objectBBox(obj);
@@ -4508,6 +4616,10 @@ canvas.addEventListener('dblclick', (e) => {
     if (hit && hit.type === 'text'){
       armedHandId = null; selectedId = hit.id;
       openTextEditor(hit, null);
+    } else if (hit && (hit.type === 'box' || hit.type === 'table') && typeof bxOpenEditor === 'function'){
+      // Промпт №97: двойной щелчок по блоку или ячейке таблицы — правка текста
+      armedHandId = null; selectedId = hit.id;
+      bxOpenEditor(hit, pt);
     } else if (hit && hit.type === 'image' && hit.isFormula){
       armedHandId = null; selectedId = hit.id;
       openFormulaEditor(hit);
@@ -4557,6 +4669,7 @@ function hitTestObject(obj, pt, tol){
   // ни за ручки. Одна проверка закрывает сразу все способы его тронуть.
   if (!mayTouch(obj)) return false;
   if (obj.type==='deck') return false;   // список слайдов не ловится ничем (промпт №84)
+  if (typeof bxHitTest === 'function'){ const r = bxHitTest(obj, pt, tol); if (r !== undefined) return r; }   // №97
   if (obj.type==='pen' || obj.type==='line'){
     for (let i=0;i<obj.points.length-1;i++) if (distToSeg(pt,obj.points[i],obj.points[i+1])<=tol) return true;
     return obj.points.length===1 && dist(pt,obj.points[0])<=tol;
@@ -5126,6 +5239,13 @@ canvas.addEventListener('pointerdown', (e) => {
 
   if (tool === 'text'){
     if (textEditSession) return; // поле уже открыто — этот клик его закроет через blur, сам по себе новый текст не начинает
+    // Промпт №97: «Текст» по блоку или таблице — правка их текста, а не новая надпись поверх
+    if (typeof bxOpenEditor === 'function'){
+      for (let i=B.objects.length-1;i>=0;i--){
+        const o = B.objects[i];
+        if ((o.type === 'box' || o.type === 'table') && hitTestObject(o, pt, 8/cam.zoom)){ selectedId = o.id; bxOpenEditor(o, pt); return; }
+      }
+    }
     let hitText = null;
     for (let i=B.objects.length-1;i>=0;i--){
       if (B.objects[i].type === 'text' && hitTestObject(B.objects[i], pt, 8/cam.zoom)){ hitText = B.objects[i]; break; }
@@ -8706,6 +8826,8 @@ document.getElementById('railExport').addEventListener('click', () => {
 
 /* ── экспорт в PDF («конспект») — только те листы, где есть хоть что-то нарисованное ── */
 function objectBBox(obj){
+  // Промпт №97: блок, таблица, повёрнутая картинка — рамка с учётом поворота
+  if (typeof bxBBox === 'function'){ const bb = bxBBox(obj); if (bb) return bb; }
   if (obj.type === 'text'){
     const p = obj.points[0];
     return { minX:p.x, minY:p.y, maxX:p.x+(obj.w||10), maxY:p.y+(obj.h||20) };
@@ -8790,6 +8912,12 @@ function updatePdfModalUI(){
   renderSheetThumb(document.getElementById('pdfPagePreview'), s);
 }
 function openPdfModal(){
+  // №100: у презентации «PDF» — по слайду на страницу (deck-io.js), а не
+  // листы А4 бесконечной доски
+  if (B && B.kind === 'deck' && typeof deckIoEnsure === 'function'){
+    deckIoEnsure().then(() => deckIoExportPdf(), () => alert('Не удалось загрузить выгрузку — проверьте связь'));
+    return;
+  }
   pdfPages = findContentSheets();
   pdfIncluded = {};
   pdfPages.forEach(s => { pdfIncluded[sheetKey(s)] = true; });
@@ -9654,6 +9782,7 @@ document.addEventListener('paste', async (e) => {
   if (!boardActive) return;
   const tag = (document.activeElement && document.activeElement.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  if (document.activeElement && document.activeElement.isContentEditable) return;   // №97: вставка в текст блока
   const items = (e.clipboardData && e.clipboardData.items) || [];
   for (const item of items){
     if (item.type && item.type.startsWith('image/')){
@@ -9720,6 +9849,9 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && document.getElementById('pdfModalBackdrop').classList.contains('open')){ closePdfModal(); return; }
   const tag = (document.activeElement && document.activeElement.tagName) || '';
   if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+  // №97: в поле правки блока (contenteditable) клавиши — его: Backspace
+  // стирает букву, а не выделенный объект; Ctrl+Z — отмена набора
+  if (document.activeElement && document.activeElement.isContentEditable) return;
   if ((e.ctrlKey||e.metaKey) && e.key.toLowerCase()==='z'){
     e.preventDefault();
     if (lastActiveSurface === 'notes'){ if (e.shiftKey) rfDoRedo(); else rfDoUndo(); }
@@ -10040,6 +10172,7 @@ window.boardsAppBoot = function(){
     }
     loadClipboard();
     purgeExpiredTrash(true);
+    if (/^#decks\b/.test(location.hash)) curFolderId = '__decks';   // №96
     renderList();
     if (window.onBoardsBooted) { try { window.onBoardsBooted(); } catch (e) { console.warn(e); } }
     // Промпт №49: если открытие ИМЕННО этой доски роняет вкладку (браузер

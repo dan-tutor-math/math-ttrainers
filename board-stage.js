@@ -389,6 +389,13 @@
     function sendView(force) {
       if (!boardOpen()) return;
       const v = { x: +cam.x.toFixed(2), y: +cam.y.toFixed(2), zoom: +cam.zoom.toFixed(4), inset: boardInset };
+      // №96: у презентации — какой слайд на экране и как листаются слайды:
+      // ученик рисует бумагу и обрезку именно этого слайда
+      if (B && B.kind === 'deck' && typeof deckCur === 'function') {
+        const ds = deckCur();
+        if (ds) v.ds = ds.id;
+        v.fl = deckFlow();
+      }
       const key = JSON.stringify(v);
       if (!force && key === lastView) return;
       lastView = key;
@@ -870,12 +877,32 @@
     }
     function openViewerBoard() {
       B = VB;
+      viewerDeckSetup();
       screenList.style.display = 'none';
       screenBoard.style.display = 'block';
       boardActive = true;
       resizeCanvas();
       applyView();
       scheduleRedraw();
+    }
+    /* №96: учитель показывает презентацию — модуль презентаций у ученика
+       подгружается только сейчас (ensureDeckModule, boards-core.js). Пока он
+       грузится, доска рисуется как обычная — это доли секунды */
+    function viewerDeckSetup() {
+      const isDeck = VB.objects.some((o) => o && o.type === 'deck');
+      if (!isDeck) {
+        delete VB.kind;
+        if (typeof deckViewerClose === 'function') deckViewerClose();
+        return;
+      }
+      const go = () => {
+        if (B !== VB || !VB.objects.some((o) => o && o.type === 'deck')) return;
+        deckViewerOpen(VB);
+        if (view) deckViewerView(view);
+        scheduleRedraw();
+      };
+      if (typeof deckViewerOpen === 'function') go();
+      else if (typeof ensureDeckModule === 'function') ensureDeckModule().then(go, () => {});
     }
     let helloAt = 0;
     function hello() { helloAt = Date.now(); TS.broadcastEvent('bd_hello', { v: PROTO, gz: CAN_GUNZIP }); }
@@ -982,6 +1009,7 @@
     TS.onEvent('bd_view', (v) => {
       if (!v) return;
       view = v;
+      if (typeof deckViewerView === 'function') deckViewerView(v);
       applyView();
     });
     TS.onEvent('bd_live', (l) => {

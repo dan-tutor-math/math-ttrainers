@@ -15,7 +15,8 @@
 
    Подключение: <script src="lazy-libs.js" data-preload="html2canvas jspdf">
    — в data-preload то, что нужно этой странице. Снаружи:
-   window.MathhLibs.load('html2canvas' | 'jspdf') → Promise с библиотекой. */
+   window.MathhLibs.load('html2canvas' | 'jspdf' | 'jszip' | 'pptxgen' | 'pdfjs')
+   → Promise с библиотекой. */
 (function () {
   'use strict';
   if (window.MathhLibs) return;
@@ -23,6 +24,11 @@
   const LIBS = {
     html2canvas: { src: 'html2canvas.min.js', get: () => window.html2canvas },
     jspdf: { src: 'jspdf.umd.min.js', get: () => window.jspdf },
+    // №96: импорт и экспорт презентаций — только по нажатию, без предзагрузки.
+    // pptxgenjs ищет JSZip глобально, поэтому сначала он (needs)
+    jszip: { src: 'jszip.min.js', get: () => window.JSZip },
+    pptxgen: { src: 'pptxgen.min.js', get: () => window.PptxGenJS, needs: ['jszip'] },
+    pdfjs: { src: 'pdf.min.js', get: () => window.pdfjsLib },
   };
   const pending = {};
 
@@ -31,6 +37,11 @@
     if (!lib) return Promise.reject(new Error('неизвестная библиотека ' + name));
     if (lib.get()) return Promise.resolve(lib.get());
     if (pending[name]) return pending[name];
+    if (lib.needs && lib.needs.some((n) => !LIBS[n].get())) {
+      pending[name] = Promise.all(lib.needs.map(load)).then(() => { delete pending[name]; return load(name); },
+        (e) => { delete pending[name]; throw e; });
+      return pending[name];
+    }
     pending[name] = new Promise((resolve, reject) => {
       // тег с тем же адресом мог уже вставить кто-то другой (lesson-notes.js
       // сам догружает html2canvas) — тогда ждём его, а не качаем второй раз
