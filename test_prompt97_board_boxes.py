@@ -77,7 +77,10 @@ def main():
         page.wait_for_function("() => B && B.kind === 'deck' && boardActive")
 
         print("1. Надпись и правка")
-        page.click("#dtb-text")  # №101: «Вставить» стала значками панели
+        # №101–102: «Надпись» в панели, потом щелчок по слайду
+        page.click("#dtb-text")
+        mid = page.evaluate(SCREEN, page.evaluate("() => { const r = deckSlideRect(deckCur()); return { x: r.x + r.w / 2, y: r.y + r.h / 2 }; }"))
+        page.mouse.click(mid["x"], mid["y"])
         page.wait_for_selector(".bx-ed")
         tid = page.evaluate("() => B.objects[B.objects.length - 1].id")
         page.keyboard.press("Control+a")
@@ -132,8 +135,11 @@ def main():
         check(page.evaluate("(id) => B.objects.find(o => o.id === id).text.paras.every(p => p.al === 'c')", tid), "по центру — все абзацы")
 
         print("6. Фигура: поворот и размер")
+        # №102: фигура из галереи, потом щелчок по слайду — размер по умолчанию
         page.click("#deckShapesBtn")
-        page.click("#deckInsertMenu [data-ins='star5']")
+        page.click("#dtbPopShapes [data-geom='star5']")
+        mid = page.evaluate(SCREEN, page.evaluate("() => { const r = deckSlideRect(deckCur()); return { x: r.x + r.w / 2, y: r.y + r.h / 2 }; }"))
+        page.mouse.click(mid["x"], mid["y"])
         page.wait_for_timeout(300)
         sid = page.evaluate("() => B.objects[B.objects.length - 1].id")
         c = page.evaluate("(id) => { const o = B.objects.find(o => o.id === id); return bxCenter(o); }", sid)
@@ -155,7 +161,8 @@ def main():
         check(res["w"] != 240 or res["h"] != 240, "размер изменился", str(res))
 
         print("7. Таблица")
-        page.click("#dtb-table")
+        page.click("#deckTableBtn")
+        page.click("#dtbPopTable i[data-r='3'][data-c='3']")
         page.wait_for_selector(".bx-ed")
         tbid = page.evaluate("() => B.objects[B.objects.length - 1].id")
         page.keyboard.type("x")

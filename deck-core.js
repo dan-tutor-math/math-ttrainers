@@ -2190,15 +2190,16 @@ document.getElementById('deckCopyBtn')?.addEventListener('click', () => deckSave
    №97–100: вставка блоков и таблиц (board-boxes.js) и «Файл» (импорт
    PPTX/PDF и выгрузка — deck-io.js). deck-io.js тяжёлый по смыслу (разбор
    файлов, библиотеки), поэтому грузится только по нажатию «Файл».
-   №101: кнопки «Вставить» больше нет — надпись, таблица и «Фигуры ▾» стали
-   значками панели (deck-toolbar.js); меню фигур — прежнее #deckInsertMenu
+   №101–102: кнопки «Вставить» больше нет — надпись, фигуры, линии,
+   таблица и прочее стали значками панели со своими галереями
+   (deck-toolbar.js); отсюда им нужен только deckInsertAt
    ═══════════════════════════════════════════════════════════════════════ */
 function deckMenuToggle(menuId, btnId, open){
   const m = document.getElementById(menuId), b = document.getElementById(btnId);
   if (!m || !b) return;
   const on = open === undefined ? m.hidden : open;
-  ['deckInsertMenu', 'deckFileMenu'].forEach(id => { const x = document.getElementById(id); if (x && id !== menuId) x.hidden = true; });
-  ['deckShapesBtn', 'deckFileBtn', 'dtbMoreBtn'].forEach(id => document.getElementById(id)?.setAttribute('aria-expanded', 'false'));
+  ['deckFileMenu'].forEach(id => { const x = document.getElementById(id); if (x && id !== menuId) x.hidden = true; });
+  ['deckFileBtn', 'dtbMoreBtn'].forEach(id => document.getElementById(id)?.setAttribute('aria-expanded', 'false'));
   m.hidden = !on;
   b.setAttribute('aria-expanded', on ? 'true' : 'false');
   if (!on) return;
@@ -2211,17 +2212,10 @@ document.getElementById('deckFileBtn')?.addEventListener('click', () => {
   deckMenuToggle('deckFileMenu', 'deckFileBtn');
 });
 document.addEventListener('pointerdown', (e) => {
-  if (e.target.closest('#deckInsertMenu,#deckFileMenu,#deckShapesBtn,#deckFileBtn')) return;
-  deckMenuToggle('deckInsertMenu', 'deckShapesBtn', false);
+  if (e.target.closest('#deckFileMenu,#deckFileBtn')) return;
   deckMenuToggle('deckFileMenu', 'deckFileBtn', false);
 });
-document.getElementById('deckInsertMenu')?.addEventListener('click', (e) => {
-  const b = e.target.closest('button[data-ins]');
-  if (!b || b.disabled) return;
-  deckMenuToggle('deckInsertMenu', 'deckShapesBtn', false);
-  deckInsertAt(b.dataset.ins);
-});
-// общий обработчик вставки: меню фигур и значки панели (deck-toolbar.js)
+// общий обработчик вставки: значки и галереи панели (deck-toolbar.js)
 function deckInsertAt(kind){
   const s = deckCur();
   if (!s || typeof bxInsert !== 'function') return null;
