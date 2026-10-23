@@ -166,15 +166,22 @@ def add_one_card(page):
     page.click('.add-qty-btn[data-n="1"]')
     page.wait_for_function("""() => {
         const f = document.querySelector('.tm-card iframe');
+        // ждём не только задание в кадре, но и снимок карточки у страницы: он
+        // появляется, когда страница уже применила к кадру свой тип и уровень
+        // и попросила новый пример. Раньше тест мог прочитать кадр в промежутке
+        // (кадр загрузился, уровень ещё не применён) и увидеть уровень 0
+        const c = window.__cardsGetState && window.__cardsGetState().__cards;
         try { const s = f && f.contentWindow.__trainerState && f.contentWindow.__trainerState.get();
-              return !!(s && (s.curTask || s.P)); } catch (e) { return false; }
+              return !!(s && (s.curTask || s.P)) && !!(c && c[0] && c[0].state); } catch (e) { return false; }
     }""", timeout=10000)
     return card_frame(page)
 
 
 def check_cards(browser, failures, errors):
     # тренажёры с экраном выбора типа: карточка того же типа, задание видно
-    for slug in ("oge6", "oge7"):
+    # oge7 — уже на лёгких карточках (task-cards.js), его проверяет
+    # test_prompt_cards1_oge7.py; здесь — тренажёры, которые ещё на кадрах
+    for slug in ("oge6",):
         ctx = browser.new_context()
         page = new_page(ctx, errors)
         page.goto(f"{BASE}/{slug}.html")

@@ -420,7 +420,9 @@ def test_history_basket_board(browser):
 
 def test_oge_cards_only_task(browser):
     """Кадры trainer-multi.js: в добавленной карточке ОГЭ — только задание."""
-    for slug in ["oge19", "oge7", "oge9", "addition"]:
+    # oge7 — уже на лёгких карточках без кадров (task-cards.js, тест
+    # test_prompt_cards1_oge7.py), здесь только тренажёры с кадрами
+    for slug in ["oge19", "oge9", "addition"]:
         ctx, page, errors = new_page(browser, f"{BASE}/{slug}.html", wait=1500)
         # у ОГЭ сначала экран выбора типа — открываем первый тип, как ученик
         if page.evaluate("!!document.querySelector('#pickerArea .mode-card:not(.demo), .modes .mode-card:not(.demo)')"):

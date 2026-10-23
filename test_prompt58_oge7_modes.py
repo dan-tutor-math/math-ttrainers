@@ -301,28 +301,31 @@ def add_card(page, n_before):
 
 
 def test_cards(browser):
+    # Лёгкие карточки (task-cards.js): у №7 карточка — не кадр, а задание прямо
+    # на странице. Подробно её проверяет test_prompt_cards1_oge7.py; здесь —
+    # то, что этот тест проверял у кадров: режим карточки и сохранность ответа
     ctx, page, errors = new_page(browser, f"{BASE}/oge7.html")
     open_type(page, 'sqrt_bracket')
     page.click('#tabPractice')
     page.wait_for_timeout(200)
-    add_card(page, 0)
-    fr = card_frames(page)[0]
-    check("карточка: режим как у основной страницы", fr.evaluate("curSubMode") == 'practice')
-    check("карточка: своих вкладок нет, кнопка решения есть",
-          fr.evaluate("getComputedStyle(document.querySelector('.submode-tabs')).display") == 'none'
-          and fr.evaluate("els.solBtnRow.style.display") == 'flex')
+    if not page.evaluate("document.getElementById('addRail').classList.contains('open')"):
+        page.click('#addRailToggle')
+    page.click('.add-qty-btn[data-n="1"]')
+    page.wait_for_timeout(400)
+    check("карточка: в «Тренировке» есть кнопка решения",
+          page.evaluate("!!document.querySelector('.tc-card .tc-sol')"))
     page.click('#tabExam')
-    page.wait_for_timeout(1000)
-    check("карточка: переключается вместе с основной страницей",
-          fr.evaluate("curSubMode") == 'exam' and fr.evaluate("els.solBtnRow.style.display") == 'none')
-
-    ci = fr.evaluate("curTask.correctIndex")
-    fr.click(f'#mcqOptions .mcq-btn[data-i="{ci}"]')
     page.wait_for_timeout(500)
-    add_card(page, 1)
+    check("карточка: переключается вместе с основной страницей",
+          not page.evaluate("!!document.querySelector('.tc-card .tc-sol')"))
+    ci = page.evaluate("TaskCards._cards()[0].task.correctIndex")
+    page.click(f'.tc-card:nth-child(1) .mcq-btn[data-i="{ci}"]')
+    page.wait_for_timeout(200)
+    page.click('.add-qty-btn[data-n="1"]')
+    page.wait_for_timeout(300)
     check("карточка: новая «+» не стирает ответ в уже стоящей",
-          fr.evaluate("taskAnswered") is True
-          and fr.evaluate("document.querySelectorAll('#mcqOptions .mcq-btn.correct').length") == 1)
+          page.evaluate("TaskCards._cards()[0].answered") is True
+          and page.evaluate("document.querySelectorAll('.tc-card:nth-child(1) .mcq-btn.correct').length") == 1)
     check("карточки: без ошибок JS", not errors, str(errors[:1]))
     ctx.close()
 

@@ -819,7 +819,7 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
 <script src="session-share.js"></script>
 <script src="keypad.js"></script>
 <script src="exam-nav.js"></script>
-<script src="trainer-multi.js"></script>
+<script src="task-cards.js"></script>
 <script>
 /* ═══════════════ утилиты ═══════════════ */
 const ri = (a,b)=>a+Math.floor(Math.random()*(b-a+1));
@@ -2193,8 +2193,12 @@ function playMedalAnimation(tier) {
 }
 
 function recordSolve() {
-  const gotItRight = curProg.pickedIndex === curTask.correctIndex;
-  curProg.history.unshift({ prompt: curTask.prompt, correct: gotItRight, hadError: !!curProg.hadWrongPick, answer: curTask.options[curTask.correctIndex] });
+  recordSolveEntry(curTask, curProg.pickedIndex === curTask.correctIndex, !!curProg.hadWrongPick);
+}
+// общий учёт для основного задания и карточек «+» (task-cards.js): карточки
+// тоже идут в историю примеров и в счёт медалей, как раньше шли кадры
+function recordSolveEntry(task, gotItRight, hadError) {
+  curProg.history.unshift({ prompt: task.prompt, correct: gotItRight, hadError: hadError, answer: task.options[task.correctIndex] });
   curProg.history = curProg.history.slice(0, 5);
   curProg.solvedInBatch = (curProg.solvedInBatch || 0) + 1;
 
@@ -2939,6 +2943,43 @@ function tsApplyStateFromPeer(state){
   tsApplyState(state);
   try { tsPeerSig = tsWatchSig(tsGetState()); } catch (e) {}
 }
+/* ── карточки «+» — прямо на странице из данных задания (task-cards.js),
+   а не копиями всей страницы в iframe, как было с trainer-multi.js ── */
+if (window.TaskCards) TaskCards.mount({
+  trainerId: 'oge7',
+  gen(avoid) {
+    // «вперемешку» — тип выбирается для каждой карточки свой, как у основного
+    return NoRepeat.pick('oge7:' + curMode, () => {
+      const m = curMode === 'random' ? pick(MODES.filter(x => !x.demo)) : MODES.find(x => x.id === curMode);
+      return m.gen();
+    }, { avoid });
+  },
+  current: () => curTask,
+  // в карточку и в общий снимок — только то, что она рисует; шаги «Обучения»
+  // карточке не нужны (решения по шагам у неё нет), а весят они много
+  slim: (t) => ({ prompt: t.prompt, numline: t.numline || null, options: t.options,
+    correctIndex: t.correctIndex, explain: t.explain, plan: t.plan || null }),
+  typeKey: () => curMode,
+  isTaskScreen: () => els.taskArea.style.display !== 'none' && els.picker.style.display === 'none',
+  subMode: () => curSubMode,
+  anchor: () => els.mainPanel,
+  title: () => els.taskTitle.textContent,
+  onResult(kind, firstTry, task) {
+    if (kind === 'wrong') {
+      streak = 0; totalErrors++;
+      if (firstTry && curMode !== 'random') { curProg.errorsInBatch = (curProg.errorsInBatch || 0) + 1; saveProg(curMode, curProg); }
+    } else if (kind === 'solved') {
+      streak++; totalSolved++;
+      if (curMode !== 'random') recordSolveEntry(task, true, !firstTry);
+    } else if (kind === 'revealed') {
+      totalSolved++;
+      if (curMode !== 'random') recordSolveEntry(task, false, true);
+    }
+    els.stSolved.textContent = totalSolved;
+    els.stErrors.textContent = totalErrors;
+    els.stStreak.textContent = streak;
+  },
+});
 window.__trainerState = { get: tsGetState, apply: tsApplyState,
   newTask: function(){ if (curMode) newTask(); } };
 if (window.TrainerSession) {
