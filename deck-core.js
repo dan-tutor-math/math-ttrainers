@@ -126,6 +126,8 @@ function deckOnOpen(b){
   if (nav) nav.hidden = b.kind !== 'deck';
   document.documentElement.classList.toggle('deck-mode', b.kind === 'deck');
   deckSyncFlowUI();
+  // №101: панель инструментов (deck-toolbar.js) — видимость, свёрнута ли, «⋯»
+  if (typeof deckTbSync === 'function') deckTbSync();
 }
 
 /* №96: доска учителя у ученика (board-stage.js, совместная сессия по коду).
@@ -2129,6 +2131,9 @@ function deckSyncModeUI(){
   if (cb) cb.hidden = !teacher;
   document.documentElement.classList.toggle('deck-lesson', on && lesson);
   document.documentElement.classList.toggle('deck-edit', on && !lesson);
+  // в «Уроке» появляются «Очистить пометки» и «Копия урока» — полоса шире,
+  // на узком экране что-то должно уйти в «⋯» (deck-toolbar.js)
+  if (typeof deckTbSync === 'function') deckTbSync();
 }
 
 // пометки слайда — всё, кроме заготовки, подложки и чужого
@@ -2182,16 +2187,18 @@ document.getElementById('deckCopyBtn')?.addEventListener('click', () => deckSave
 
 
 /* ═══════════════════════════════════════════════════════════════════════
-   №97–100: «Вставить» (блоки и таблицы — board-boxes.js) и «Файл» (импорт
+   №97–100: вставка блоков и таблиц (board-boxes.js) и «Файл» (импорт
    PPTX/PDF и выгрузка — deck-io.js). deck-io.js тяжёлый по смыслу (разбор
-   файлов, библиотеки), поэтому грузится только по нажатию «Файл»
+   файлов, библиотеки), поэтому грузится только по нажатию «Файл».
+   №101: кнопки «Вставить» больше нет — надпись, таблица и «Фигуры ▾» стали
+   значками панели (deck-toolbar.js); меню фигур — прежнее #deckInsertMenu
    ═══════════════════════════════════════════════════════════════════════ */
 function deckMenuToggle(menuId, btnId, open){
   const m = document.getElementById(menuId), b = document.getElementById(btnId);
   if (!m || !b) return;
   const on = open === undefined ? m.hidden : open;
   ['deckInsertMenu', 'deckFileMenu'].forEach(id => { const x = document.getElementById(id); if (x && id !== menuId) x.hidden = true; });
-  ['deckInsertBtn', 'deckFileBtn'].forEach(id => document.getElementById(id)?.setAttribute('aria-expanded', 'false'));
+  ['deckShapesBtn', 'deckFileBtn', 'dtbMoreBtn'].forEach(id => document.getElementById(id)?.setAttribute('aria-expanded', 'false'));
   m.hidden = !on;
   b.setAttribute('aria-expanded', on ? 'true' : 'false');
   if (!on) return;
@@ -2199,29 +2206,29 @@ function deckMenuToggle(menuId, btnId, open){
   m.style.left = Math.max(8, Math.min(window.innerWidth - m.offsetWidth - 8, r.left)) + 'px';
   m.style.top = (r.bottom + 8) + 'px';
 }
-document.getElementById('deckInsertBtn')?.addEventListener('click', () => {
-  document.querySelectorAll('#deckInsertMenu button').forEach(b => { b.disabled = typeof bxInsert !== 'function' || !mayDraw(); });
-  deckMenuToggle('deckInsertMenu', 'deckInsertBtn');
-});
 document.getElementById('deckFileBtn')?.addEventListener('click', () => {
   document.querySelectorAll('#deckFileMenu [data-file="import"]').forEach(b => { b.disabled = !deckMayEdit(); });
   deckMenuToggle('deckFileMenu', 'deckFileBtn');
 });
 document.addEventListener('pointerdown', (e) => {
-  if (e.target.closest('#deckInsertMenu,#deckFileMenu,#deckInsertBtn,#deckFileBtn')) return;
-  deckMenuToggle('deckInsertMenu', 'deckInsertBtn', false);
+  if (e.target.closest('#deckInsertMenu,#deckFileMenu,#deckShapesBtn,#deckFileBtn')) return;
+  deckMenuToggle('deckInsertMenu', 'deckShapesBtn', false);
   deckMenuToggle('deckFileMenu', 'deckFileBtn', false);
 });
 document.getElementById('deckInsertMenu')?.addEventListener('click', (e) => {
   const b = e.target.closest('button[data-ins]');
   if (!b || b.disabled) return;
-  deckMenuToggle('deckInsertMenu', 'deckInsertBtn', false);
+  deckMenuToggle('deckInsertMenu', 'deckShapesBtn', false);
+  deckInsertAt(b.dataset.ins);
+});
+// общий обработчик вставки: меню фигур и значки панели (deck-toolbar.js)
+function deckInsertAt(kind){
   const s = deckCur();
-  if (!s || typeof bxInsert !== 'function') return;
+  if (!s || typeof bxInsert !== 'function') return null;
   // новый объект — посередине текущего слайда
   const r = deckSlideRect(s);
-  bxInsert(b.dataset.ins, { x: r.x + r.w / 2, y: r.y + r.h / 2 });
-});
+  return bxInsert(kind, { x: r.x + r.w / 2, y: r.y + r.h / 2 });
+}
 let deckIoPromise = null;
 function deckIoEnsure(){
   if (typeof deckIoImportFile === 'function') return Promise.resolve();

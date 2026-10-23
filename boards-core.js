@@ -1487,7 +1487,9 @@ function curRealFolderId(){ return (curFolderId && !isSpecialNav(curFolderId)) ?
    урок не сорвался, если связь пропадёт уже после загрузки страницы,
    файлы заранее скачиваются в кэш браузера (fetch без выполнения).
    ═══════════════════════════════════════════════════════════════════════ */
-const DECK_MODULES = ['deck-core.js'];
+// №101: deck-toolbar.js — панель инструментов презентации, строго после
+// deck-core.js (берёт его узлы и функции)
+const DECK_MODULES = ['deck-core.js', 'deck-toolbar.js'];
 let deckLoadPromise = null;
 function deckModuleReady(){ return typeof deckOnOpen === 'function'; }
 // признак презентации — служебный объект слайдов: у облачной доски с другого

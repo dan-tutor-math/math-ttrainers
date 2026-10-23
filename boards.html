@@ -1371,8 +1371,7 @@ function resolveBasketTexInHtml(html){
     <button class="deck-nav-btn" id="deckNext" title="Следующий слайд (PageDown)" aria-label="Следующий слайд"><svg viewBox="0 0 24 24" fill="none"><path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <span class="deck-sep"></span>
     <button class="deck-nav-btn wide" id="deckSlideBtn" title="Формат и подложка слайда" aria-haspopup="dialog" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="5" width="17" height="14" rx="2" stroke="currentColor" stroke-width="1.7"/><path d="M3.5 10h17M3.5 14.5h17" stroke="currentColor" stroke-width="1.2" opacity=".55"/></svg>&nbsp;Слайд</button>
-    <!-- №97: вставка блоков и таблиц; №98–100: импорт и выгрузка PPTX/PDF -->
-    <button class="deck-nav-btn wide" id="deckInsertBtn" title="Вставить надпись, фигуру или таблицу" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="17" height="17" rx="3" stroke="currentColor" stroke-width="1.7"/><path d="M12 8v8M8 12h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>&nbsp;Вставить</button>
+    <!-- №98–100: импорт и выгрузка PPTX/PDF. №101: «Вставить» стала значками панели (deck-toolbar.js строит её сам) -->
     <button class="deck-nav-btn wide" id="deckFileBtn" title="Импорт из PowerPoint или PDF, выгрузка" aria-haspopup="menu" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none"><path d="M6 3.5h8l4.5 4.5v12a.5.5 0 0 1-.5.5H6a.5.5 0 0 1-.5-.5v-16a.5.5 0 0 1 .5-.5z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M14 3.5V8h4.5M9 13.5h6M9 16.5h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>&nbsp;Файл</button>
     <span class="deck-sep"></span>
     <button class="deck-nav-btn" id="deckFlowV" title="Лента: листать вверх и вниз" aria-label="Листать вверх и вниз"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3v18M7 8l5-5 5 5M7 16l5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -1451,9 +1450,6 @@ function resolveBasketTexInHtml(html){
   </div>
   <div class="deck-toast" id="deckToast" hidden role="status"></div>
   <div class="deck-menu" id="deckInsertMenu" hidden role="menu">
-    <button data-ins="text" role="menuitem">Надпись</button>
-    <button data-ins="table" role="menuitem">Таблица</button>
-    <span class="deck-menu-sep"></span>
     <button data-ins="rect" role="menuitem">Прямоугольник</button>
     <button data-ins="roundRect" role="menuitem">Скруглённый прямоугольник</button>
     <button data-ins="ellipse" role="menuitem">Овал</button>

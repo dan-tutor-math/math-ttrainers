@@ -3,7 +3,7 @@
 HANDOFF.md раздел 6в).
 
 Проверяем:
-  1. «Вставить → Надпись»: поле правки открывается, набор, Enter — два
+  1. «Надпись» в панели: поле правки открывается, набор, Enter — два
      абзаца; выделенное слово жирным и красным с панели — в модели свой кусок
   2. Текст рисуется на холсте (в рамке блока есть «чернила»), шрифт свой
      (Carlito вместо Calibri) подгружается
@@ -77,8 +77,7 @@ def main():
         page.wait_for_function("() => B && B.kind === 'deck' && boardActive")
 
         print("1. Надпись и правка")
-        page.click("#deckInsertBtn")
-        page.click("#deckInsertMenu [data-ins='text']")
+        page.click("#dtb-text")  # №101: «Вставить» стала значками панели
         page.wait_for_selector(".bx-ed")
         tid = page.evaluate("() => B.objects[B.objects.length - 1].id")
         page.keyboard.press("Control+a")
@@ -133,7 +132,7 @@ def main():
         check(page.evaluate("(id) => B.objects.find(o => o.id === id).text.paras.every(p => p.al === 'c')", tid), "по центру — все абзацы")
 
         print("6. Фигура: поворот и размер")
-        page.click("#deckInsertBtn")
+        page.click("#deckShapesBtn")
         page.click("#deckInsertMenu [data-ins='star5']")
         page.wait_for_timeout(300)
         sid = page.evaluate("() => B.objects[B.objects.length - 1].id")
@@ -156,8 +155,7 @@ def main():
         check(res["w"] != 240 or res["h"] != 240, "размер изменился", str(res))
 
         print("7. Таблица")
-        page.click("#deckInsertBtn")
-        page.click("#deckInsertMenu [data-ins='table']")
+        page.click("#dtb-table")
         page.wait_for_selector(".bx-ed")
         tbid = page.evaluate("() => B.objects[B.objects.length - 1].id")
         page.keyboard.type("x")
