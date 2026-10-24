@@ -217,6 +217,7 @@ function dtbBuild(){
   dtbBuildSettings();
   dtbBuildPops();
   dtbBuildArrangePops();
+  dtbBuildSlideMenu();
   dtbPlaceInit();
 }
 
@@ -470,6 +471,7 @@ function dtbBuildPops(){
   });
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dtbPopToggle(null); });
 }
+// №104: «slide» дописывает dtbBuildSlideMenu
 const DTB_POP_IDS = { shapes: 'dtbPopShapes', lines: 'dtbPopLines', table: 'dtbPopTable', arrange: 'dtbPopArrange', styles: 'dtbPopStyles' };
 const DTB_POP_BTNS = { shapes: 'deckShapesBtn', lines: 'deckLinesBtn', table: 'deckTableBtn', arrange: 'deckArrangeBtn', styles: 'deckStylesBtn' };
 function dtbPopToggle(kind, anchor){
@@ -973,6 +975,110 @@ function deckTbSelTick(){
   dtbLayout();
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   №104 (шаг 4 плана): «Слайд ▾» — новый слайд по макету, шаблоны, формат
+   и подложка (прежнее окно #deckSlidePop), дублировать, скрыть из показа,
+   переименовать, удалить. Сами действия — в deck-core.js (те же, что в
+   меню «⋯» миниатюры), здесь только меню и макеты
+   ═══════════════════════════════════════════════════════════════════════ */
+
+// макеты: блоки-заполнители в долях слайда. ph — подсказка, пока блок пуст
+// (рисует board-boxes.js, только в «Конструкторе»); sz — в пунктах
+const DTB_LAYOUTS = [
+  { id: 'blank', label: 'Пустой', boxes: [] },
+  { id: 'title', label: 'Титульный', boxes: [
+    { x: .08, y: .24, w: .84, h: .26, sz: 40, b: true, al: 'c', an: 'b', ph: 'Заголовок слайда' },
+    { x: .14, y: .53, w: .72, h: .16, sz: 22, al: 'c', an: 't', c: '#595959', ph: 'Подзаголовок' }] },
+  { id: 'titleText', label: 'Заголовок и текст', boxes: [
+    { x: .06, y: .05, w: .88, h: .16, sz: 32, b: true, al: 'l', an: 'b', ph: 'Заголовок слайда' },
+    { x: .06, y: .25, w: .88, h: .67, sz: 20, al: 'l', an: 't', body: true, ph: 'Текст слайда' }] },
+  { id: 'twoCols', label: 'Две колонки', boxes: [
+    { x: .06, y: .05, w: .88, h: .16, sz: 32, b: true, al: 'l', an: 'b', ph: 'Заголовок слайда' },
+    { x: .06, y: .25, w: .425, h: .67, sz: 20, al: 'l', an: 't', body: true, ph: 'Текст слева' },
+    { x: .515, y: .25, w: .425, h: .67, sz: 20, al: 'l', an: 't', body: true, ph: 'Текст справа' }] },
+  { id: 'titleOnly', label: 'Только заголовок', boxes: [
+    { x: .06, y: .05, w: .88, h: .16, sz: 32, b: true, al: 'l', an: 'b', ph: 'Заголовок слайда' }] }
+];
+// объекты макета для прямоугольника слайда r (в единицах доски)
+function dtbLayoutObjects(layout, r){
+  const ppt = typeof bxPxPerPt === 'function' ? bxPxPerPt() : 1;
+  return layout.boxes.map(b => {
+    const sz = b.sz * ppt;
+    const tx = bxTextOf('', { sz, c: b.c || '#1D1D1F', f: BX_DEF_FONT, b: b.b || undefined });
+    tx.anchor = b.an;
+    // без маркера списка: у пустого абзаца с маркером точка видна и в «Уроке»,
+    // и в показе, где подсказки уже нет
+    tx.paras = [{ runs: [], esz: sz, al: b.al }];
+    return { id: uid(), type: 'box', geom: 'rect', fill: null, line: null, ph: b.ph,
+      w: r.w * b.w, h: r.h * b.h, points: [{ x: r.x + r.w * b.x, y: r.y + r.h * b.y }], text: tx };
+  });
+}
+// эскиз макета для меню: те же доли, что у блоков
+function dtbLayoutSvg(layout){
+  const W = 64, H = 36;
+  const rects = layout.boxes.map(b => {
+    const x = b.x * W, y = b.y * H, w = b.w * W, h = b.h * H;
+    if (b.body) return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="1" fill="none" stroke="currentColor" stroke-opacity=".35" stroke-dasharray="2 1.5"/>' +
+      [0, 1, 2].map(k => '<path d="M' + (x + 3) + ' ' + (y + 5 + k * 5) + 'h' + Math.max(4, w * .6) + '" stroke="currentColor" stroke-opacity=".6" stroke-width="1.4"/>').join('');
+    return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="1" fill="currentColor" fill-opacity="' + (b.b ? '.35' : '.18') + '"/>';
+  }).join('');
+  return '<svg viewBox="0 0 64 36" width="64" height="36" aria-hidden="true"><rect x=".5" y=".5" width="63" height="35" rx="2" fill="var(--paper,#fff)" stroke="currentColor" stroke-opacity=".3"/>' + rects + '</svg>';
+}
+
+function dtbBuildSlideMenu(){
+  const host = document.getElementById('deckFileMenu')?.parentElement || document.body;
+  const p = document.createElement('div');
+  p.className = 'dtb-pop dtb-list';
+  p.id = 'dtbPopSlide';
+  p.hidden = true;
+  p.setAttribute('role', 'menu');
+  p.innerHTML = '<div class="dtb-pop-h">Новый слайд</div><div class="dtb-layouts">' +
+    DTB_LAYOUTS.map(l => '<button type="button" role="menuitem" data-layout="' + l.id + '" title="' + l.label + '">' + dtbLayoutSvg(l) + '<span>' + l.label + '</span></button>').join('') + '</div>' +
+    '<button type="button" role="menuitem" data-sl="pop">Шаблоны, формат и подложка…</button>' +
+    '<span class="deck-menu-sep"></span>' +
+    '<button type="button" role="menuitem" data-sl="dup">Дублировать слайд</button>' +
+    '<button type="button" role="menuitem" data-sl="hide">Скрыть из показа</button>' +
+    '<button type="button" role="menuitem" data-sl="ren">Переименовать…</button>' +
+    '<button type="button" role="menuitem" data-sl="del" class="danger">Удалить слайд</button>';
+  host.appendChild(p);
+  document.getElementById('deckSlideBtn')?.setAttribute('aria-haspopup', 'menu');
+  DTB_POP_IDS.slide = 'dtbPopSlide';
+  DTB_POP_BTNS.slide = 'deckSlideBtn';
+  p.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b || b.disabled) return;
+    dtbPopToggle(null);
+    const s = deckCur();
+    if (b.dataset.layout){
+      const l = DTB_LAYOUTS.find(x => x.id === b.dataset.layout);
+      deckAddSlide(l && l.boxes.length ? (r) => dtbLayoutObjects(l, r) : null);
+      return;
+    }
+    if (!s) return;
+    const a = b.dataset.sl;
+    if (a === 'pop') deckOpenPop(true);
+    else if (a === 'dup') deckDuplicate(s.id);
+    else if (a === 'hide') deckToggleHide(s.id);
+    else if (a === 'ren') deckRename(s.id);
+    else if (a === 'del') deckDelete(s.id);
+  });
+}
+// зовёт deck-core.js по щелчку «Слайд»
+function dtbSlideMenu(btn){
+  const p = document.getElementById('dtbPopSlide');
+  if (!p) return;
+  if (typeof deckOpenPop === 'function') deckOpenPop(false);
+  const s = deckCur(), can = typeof deckMayEdit === 'function' && deckMayEdit();
+  p.querySelectorAll('button').forEach(b => {
+    // открыть окно формата можно всегда (там же свои шаблоны), менять — только с правом
+    b.disabled = b.dataset.sl === 'pop' ? false : (!can || (b.dataset.sl === 'del' && deckSlides().length <= 1));
+  });
+  const hb = p.querySelector('[data-sl="hide"]');
+  if (hb) hb.textContent = s && s.hide ? 'Показывать в показе' : 'Скрыть из показа';
+  const anchor = btn && !btn.classList.contains('dtb-off') ? btn : document.getElementById('dtbMoreBtn');
+  dtbPopToggle('slide', anchor);
+}
+
 /* Настройки досок (шестерёнка «Настройки листа»): вид панели презентации.
    Пункт виден только в презентации (CSS по html.deck-mode). «Гибрид» (№102)
    — та же строка с крупными галереями; «Лента» выбирается и запоминается,
@@ -1092,6 +1198,17 @@ function dtbInjectStyle(){
     '.dtb-styles button{border:none;background:none;padding:3px;border-radius:9px;cursor:pointer}',
     '.dtb-styles button:hover{background:var(--hover-2)}',
     '.dtb-styles i{display:flex;align-items:center;justify-content:center;height:34px;border-radius:6px;border:2px solid;font-style:normal;font-family:var(--font-ui);font-weight:700;font-size:13px}',
+    // №104: меню «Слайд ▾» — плитки макетов
+    '.dtb-layouts{display:grid;grid-template-columns:repeat(3,auto);gap:4px;margin:2px 4px 6px}',
+    '.dtb-list .dtb-layouts button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 4px;font-size:11.5px;color:var(--muted-3);text-align:center}',
+    '.dtb-layouts svg{color:var(--ink)}',
+    '.dtb-list button.danger{color:var(--teacher)}',
+    '.dtb-list .deck-menu-sep{display:block;height:1px;background:var(--glass-border);margin:4px 6px}',
+    // скрытый из показа слайд в ленте (разметку строит deck-core.js)
+    '.deck-thumb.hid .deck-thumb-box{opacity:.42}',
+    '.deck-thumb.hid .deck-thumb-n{text-decoration:line-through}',
+    '.deck-thumb-hid{position:absolute;left:2px;top:22px;width:16px;height:16px;color:var(--muted-2)}',
+    '.deck-thumb-hid svg{width:16px;height:16px;display:block}',
     // пункт настроек — только в презентации
     'html:not(.deck-mode) .dtb-set{display:none}',
     // подпись над кнопками: три варианта в одну строку рядом с ней не влезают

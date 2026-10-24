@@ -85,7 +85,8 @@ def wait_no(page, want, timeout=2000):
 
 def pop_open(page):
     if page.is_hidden("#deckSlidePop"):
-        page.click("#deckSlideBtn")
+        page.click("#deckSlideBtn")  # №104: «Слайд ▾» — меню, окно формата — его пункт
+        page.click("#dtbPopSlide [data-sl='pop']")
     page.wait_for_selector("#deckSlidePop:not([hidden])")
 
 

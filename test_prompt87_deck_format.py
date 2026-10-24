@@ -130,7 +130,8 @@ def main():
         pts0 = page.evaluate("() => JSON.stringify(B.objects.filter(o => o.type === 'pen').map(o => o.points))")
 
         # 1. А4 книжный только для текущего
-        page.click("#deckSlideBtn")
+        page.click("#deckSlideBtn")  # №104: «Слайд ▾» — меню, окно формата — его пункт
+        page.click("#dtbPopSlide [data-sl='pop']")
         check(page.is_visible("#deckSlidePop"), "окно «Слайд» открылось")
         check(page.is_hidden("#deckCustom"), "поля своего размера скрыты, пока не нажали «Свой…»")
         page.click("#deckSlidePop [data-fmt='40x57']")

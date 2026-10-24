@@ -116,7 +116,8 @@ def main():
         page.click("#blCreateDeck")
         page.wait_for_function("() => typeof B !== 'undefined' && B && B.kind === 'deck' && boardActive")
         page.wait_for_timeout(300)
-        page.click("#deckSlideBtn")
+        page.click("#deckSlideBtn")  # №104: «Слайд ▾» — меню, окно формата — его пункт
+        page.click("#dtbPopSlide [data-sl='pop']")
 
         # 1. поля своего размера и «−»
         page.click("#deckSlidePop [data-fmt='custom']")
@@ -150,7 +151,8 @@ def main():
         check(page.evaluate("() => deckCur().bg.s") is None, "Ctrl+Z вернул шаг по умолчанию")
 
         # 3. линейка с шагом 2
-        page.click("#deckSlideBtn")
+        page.click("#deckSlideBtn")  # №104: «Слайд ▾» — меню, окно формата — его пункт
+        page.click("#dtbPopSlide [data-sl='pop']")
         page.click("#deckSlidePop [data-bg='thin']")
         check(page.inner_text("#deckStepLabel") == "Между линиями", "у линейки — «Между линиями»")
         set_step(page, 2)

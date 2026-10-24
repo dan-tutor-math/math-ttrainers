@@ -783,6 +783,38 @@ function bxRenderBox(c, o, camv){
     const fr = bxTextFrame(o.text, Math.max(4, w - ins[0] - ins[2]), Math.max(4, h - ins[1] - ins[3]));
     bxDrawLayout(c, fr.lay, (-w / 2 + ins[0] + fr.ox) * z, (-h / 2 + ins[1] + fr.oy) * z, z, fr.iw);
   }
+  if (o.ph && !bxHasText(o.text) && bxShowHints(o)) bxDrawHint(c, o, w, h, z);
+  c.restore();
+}
+/* №104: заполнитель макета слайда («Заголовок слайда», «Текст слайда»).
+   Пока блок пуст, в «Конструкторе» видны пунктирная рамка и серая подсказка,
+   как в PowerPoint. Только на экране учителя: не в миниатюрах и выгрузке
+   (там deckRenderSlideId), не в «Уроке», не у ученика (deckViewerMode) */
+function bxShowHints(o){
+  if (typeof isDeckBoard !== 'function' || !isDeckBoard()) return false;
+  if (typeof deckRenderSlideId !== 'undefined' && deckRenderSlideId) return false;
+  if (typeof activeCam !== 'undefined' && typeof cam !== 'undefined' && activeCam !== cam) return false;
+  if (typeof deckLessonMode === 'function' && deckLessonMode()) return false;
+  return !(bxEditing && bxEditing.id === o.id);
+}
+function bxDrawHint(c, o, w, h, z){
+  const tx = o.text || {}, p0 = (tx.paras && tx.paras[0]) || {}, def = tx.def || {};
+  c.save();
+  c.setLineDash([5, 4]);
+  c.strokeStyle = 'rgba(120,128,140,.55)';
+  c.lineWidth = 1;
+  c.strokeRect(-w * z / 2 + 0.5, -h * z / 2 + 0.5, w * z - 1, h * z - 1);
+  c.setLineDash([]);
+  const sz = (p0.esz || def.sz || 24) * z;
+  c.font = (def.b ? 'bold ' : '') + sz + 'px "' + bxFace(def.f || BX_DEF_FONT) + '", sans-serif';
+  c.fillStyle = 'rgba(110,118,130,.75)';
+  const pad = tx.pad || [10, 5, 10, 5], al = p0.al || 'l', an = tx.anchor || 't';
+  c.textAlign = al === 'c' ? 'center' : al === 'r' ? 'right' : 'left';
+  c.textBaseline = an === 'm' ? 'middle' : an === 'b' ? 'bottom' : 'top';
+  // маркер списка пустого абзаца рисует сама раскладка — подсказка правее него
+  const x = al === 'c' ? 0 : al === 'r' ? w * z / 2 - pad[2] * z : -w * z / 2 + pad[0] * z + (p0.bu ? sz * 0.9 : 0);
+  const y = an === 'm' ? 0 : an === 'b' ? h * z / 2 - pad[3] * z : -h * z / 2 + pad[1] * z;
+  c.fillText(o.ph, x, y, Math.max(10, w * z - (pad[0] + pad[2]) * z));
   c.restore();
 }
 

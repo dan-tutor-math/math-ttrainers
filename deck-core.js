@@ -376,14 +376,16 @@ function deckAnimate(dir){
 function deckNextSlot(d){ return d.slides.reduce((m, s) => Math.max(m, s.slot), -1) + 1; }
 
 // новый слайд — после текущего, того же формата и с той же подложкой,
-// в новом слоте (номера слотов никогда не переиспользуются)
-function deckAddSlide(){
+// в новом слоте (номера слотов никогда не переиспользуются).
+// №104: build(rect) — объекты макета («Заголовок и текст»…), тем же шагом отмены
+function deckAddSlide(build){
   if (!isDeckBoard() || !mayDraw()) return;
   const d = deckObj(), cur = deckCur();
   if (!d) return;
   pushUndo();
   const s = deckNewSlide(deckNextSlot(d), cur);
   d.slides.splice(deckCurIndex() + 1, 0, s);
+  if (typeof build === 'function') (build(deckSlideRect(s)) || []).forEach(o => B.objects.push(o));
   saveDB();
   deckGo(d.slides.indexOf(s), 1);
 }
@@ -627,8 +629,10 @@ function deckBuildStrip(list, sl){
   list.innerHTML = sl.map((s, i) => {
     const t = deckThumbSize(s);
     const name = s.name ? escHtml(s.name) : '';
-    return `<div class="deck-thumb" data-id="${s.id}" title="${name || 'Слайд ' + (i + 1)}">`
+    // №104: скрытый из показа — бледный, номер зачёркнут, значок «глаз»
+    return `<div class="deck-thumb${s.hide ? ' hid' : ''}" data-id="${s.id}" title="${(name || 'Слайд ' + (i + 1)) + (s.hide ? ' — скрыт из показа' : '')}">`
       + `<span class="deck-thumb-n">${i + 1}</span>`
+      + (s.hide ? `<span class="deck-thumb-hid" aria-label="Скрыт из показа"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 12s3.5-6 9-6 9 6 9 6-3.5 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="2.6"/><path d="M4 20L20 4"/></svg></span>` : '')
       + `<span class="deck-thumb-main"><span class="deck-thumb-box"><canvas style="width:${t.w}px;height:${t.h}px"></canvas></span>`
       + (name ? `<span class="deck-thumb-name">${name}</span>` : '') + `</span>`
       + `<button class="deck-thumb-menu" data-id="${s.id}" aria-label="Действия со слайдом" title="Дублировать, переименовать, удалить">⋯</button></div>`;
@@ -745,6 +749,17 @@ function deckDelete(id){
   if (s.id === deckCurId || !deckSlides().some(x => x.id === deckCurId)) deckGo(Math.min(i, d.slides.length - 1), 0);
   else scheduleRedraw();
 }
+// №104: скрытый слайд остаётся в ленте и листается при правке, но в
+// режиме показа (шаг 5) пропускается — как «Скрыть слайд» в PowerPoint
+function deckToggleHide(id){
+  const d = deckObj();
+  if (!d || !deckMayEdit()) return;
+  const s = d.slides.find(x => x.id === id);
+  if (!s) return;
+  pushUndo();
+  if (s.hide) delete s.hide; else s.hide = true;
+  saveDB(); scheduleRedraw();
+}
 function deckRename(id){
   const d = deckObj();
   if (!d || !deckMayEdit()) return;
@@ -783,6 +798,8 @@ function deckOpenMenuAt(id, x, y){
   const free = { tpl: 1, clear: 1, clearall: 1 };
   m.querySelectorAll('button').forEach(b => { b.disabled = !free[b.dataset.act] && (!can || (b.dataset.act === 'del' && one)); });
   m.querySelectorAll('[data-act="base"]').forEach(b => { b.hidden = !deckIsTeacher(); });
+  const hs = deckSlides().find(x => x.id === id);
+  m.querySelectorAll('[data-act="hide"]').forEach(b => { b.textContent = hs && hs.hide ? 'Показывать в показе' : 'Скрыть из показа'; });
   m.hidden = false;
   const mw = m.offsetWidth, mh = m.offsetHeight;
   m.style.left = Math.max(8, Math.min(window.innerWidth - mw - 8, x)) + 'px';
@@ -807,6 +824,7 @@ document.getElementById('deckMenu')?.addEventListener('click', (e) => {
     deckOpenPop(true);
   }
   else if (b.dataset.act === 'dup') deckDuplicate(id);
+  else if (b.dataset.act === 'hide') deckToggleHide(id);
   else if (b.dataset.act === 'ren') deckRename(id);
   else if (b.dataset.act === 'del') deckDelete(id);
 });
@@ -818,7 +836,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') deckCloseM
 
 // после перестановки переставляем готовые узлы ленты, а не строим её заново:
 // миниатюры не мигают пустыми, пока перерисуются
-function deckStripSigOf(sl){ return sl.map(s => s.id + ':' + s.w + 'x' + s.h + ':' + (s.name || '') + ':' + (s.bg ? s.bg.k + (s.bg.c || '') + (s.bg.f || '') + (s.bg.img || '') : '')).join('|'); }
+function deckStripSigOf(sl){ return sl.map(s => s.id + ':' + s.w + 'x' + s.h + ':' + (s.name || '') + ':' + (s.hide ? 'H' : '') + ':' + (s.bg ? s.bg.k + (s.bg.c || '') + (s.bg.f || '') + (s.bg.img || '') : '')).join('|'); }
 function deckStripReorderDom(){
   const list = document.getElementById('deckStripList');
   if (!list) return;
@@ -1692,7 +1710,8 @@ function deckOpenPop(open){
 (function(){
   const pop = document.getElementById('deckSlidePop'), btn = document.getElementById('deckSlideBtn');
   if (!pop || !btn) return;
-  btn.addEventListener('click', () => deckOpenPop(pop.hidden));
+  // №104: в панели (deck-toolbar.js) «Слайд ▾» — меню, а это окно — его пункт
+  btn.addEventListener('click', () => { if (typeof dtbSlideMenu === 'function'){ dtbSlideMenu(btn); return; } deckOpenPop(pop.hidden); });
   pop.addEventListener('click', (e) => {
     const b = e.target.closest('button');
     if (!b || b.disabled) return;
