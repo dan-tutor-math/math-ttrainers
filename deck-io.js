@@ -1160,8 +1160,11 @@ function ioDialog(){
     <div class="io-btns"><button class="deck-pop-link" id="ioCancel">Отмена</button><button class="io-go" id="ioGo">Импортировать</button></div>`;
   (typeof screenBoard !== 'undefined' && screenBoard ? screenBoard : document.body).appendChild(el);
   const st = document.createElement('style');
+  // №106: у .deck-pop-sec свой display, он сильнее атрибута hidden — без
+  // правила ниже в окне выгрузки торчали разделы импорта («Куда», «Страницы»)
   st.textContent = `
 .io-dlg{gap:12px}
+.io-dlg .deck-pop-sec[hidden]{display:none}
 .io-dlg .io-info{font-size:13px;color:var(--muted-1);line-height:1.4}
 .io-dlg .io-opt{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;line-height:1.35;color:var(--pencil);cursor:pointer}
 .io-dlg .io-opt input{margin-top:3px}
@@ -1555,6 +1558,30 @@ async function ioImportPdf(file){
    объектами PowerPoint. Спрашиваем одно: с пометками урока или только
    заготовку
    ═══════════════════════════════════════════════════════════════════════ */
+/* №106: размеры слайдов презентации — группами, самый частый первым. В PPTX
+   размер слайда один на весь файл (так устроен формат), поэтому при разных
+   форматах учитель выбирает, какой взять; по умолчанию — у большинства
+   слайдов, а не у первого (раньше альбомная презентация с одним книжным
+   первым слайдом выгружалась вся книжной) */
+function ioSizeGroups(){
+  const groups = [];
+  deckSlides().forEach((s, i) => {
+    const key = (+s.w).toFixed(2) + 'x' + (+s.h).toFixed(2);
+    let g = groups.find(x => x.key === key);
+    if (!g){ g = { key, w: +s.w, h: +s.h, n: 0, first: i }; groups.push(g); }
+    g.n++;
+  });
+  groups.sort((a, b) => b.n - a.n || a.first - b.first);
+  return groups;
+}
+function ioSizeLabel(g){
+  const r = g.w / g.h, cm = (v) => String(Math.round(v * 5) / 10).replace('.', ',');
+  const ratio = Math.abs(r - 16 / 9) < 0.02 || Math.abs(1 / r - 16 / 9) < 0.02 ? '16:9'
+    : Math.abs(r - 4 / 3) < 0.02 || Math.abs(1 / r - 4 / 3) < 0.02 ? '4:3'
+    : Math.abs(r - Math.SQRT2) < 0.02 || Math.abs(1 / r - Math.SQRT2) < 0.02 ? 'как А4' : '';
+  const orient = Math.abs(r - 1) < 0.02 ? 'Квадрат' : r > 1 ? 'Альбомный' : 'Книжный';
+  return orient + (ratio ? ' ' + ratio : '') + ', ' + cm(g.w) + ' × ' + cm(g.h) + ' см — ' + ioPlural(g.n, 'слайд', 'слайда', 'слайдов');
+}
 function ioAskExport(kind){
   return new Promise((resolve) => {
     const d = ioDialog();
@@ -1576,12 +1603,25 @@ function ioAskExport(kind){
       modeSec.after(ex);
     }
     ex.hidden = false;
+    // разные размеры слайдов: для PPTX — выбор размера файла, для PDF —
+    // только успокоить (там у каждой страницы свой размер)
+    let sz = d.querySelector('#ioSizeSec');
+    if (!sz){ sz = document.createElement('div'); sz.className = 'deck-pop-sec'; sz.id = 'ioSizeSec'; ex.after(sz); }
+    const groups = ioSizeGroups();
+    sz.hidden = groups.length < 2;
+    if (groups.length > 1){
+      sz.innerHTML = kind === 'pptx'
+        ? `<div class="deck-pop-h">Размер слайдов в PowerPoint</div>
+           <small class="deck-pop-note">В файле PowerPoint размер слайда один на всю презентацию. Слайды другого размера будут вписаны в него целиком, по краям — тёмные поля. В PDF каждый слайд сохраняет свой размер.</small>`
+          + groups.map((g, i) => `<label class="io-opt"><input type="radio" name="ioSize" value="${i}"${i ? '' : ' checked'}> <span>${ioSizeLabel(g)}</span></label>`).join('')
+        : `<small class="deck-pop-note">Слайды разного размера — в PDF у каждой страницы будет размер своего слайда.</small>`;
+    }
     d.querySelector('#ioGo').textContent = 'Скачать';
     d.querySelector('#ioProg').hidden = true;
     d.querySelector('#ioGo').disabled = false; d.querySelector('#ioCancel').disabled = false;
     d.hidden = false;
     const finish = (v) => {
-      modeSec.hidden = whereSec.hidden = false; ex.hidden = true;
+      modeSec.hidden = whereSec.hidden = false; ex.hidden = true; sz.hidden = true;
       d.querySelector('#ioGo').textContent = 'Импортировать';
       d.querySelector('#ioGo').onclick = d.querySelector('#ioCancel').onclick = null;
       resolve(v);
@@ -1589,8 +1629,10 @@ function ioAskExport(kind){
     d.querySelector('#ioCancel').onclick = () => { d.hidden = true; finish(null); };
     d.querySelector('#ioGo').onclick = () => {
       const v = d.querySelector('input[name="ioEx"]:checked').value;
+      const si = d.querySelector('input[name="ioSize"]:checked');
+      const g = groups[si ? +si.value : 0];
       d.querySelector('#ioGo').disabled = true; d.querySelector('#ioCancel').disabled = true;
-      finish({ base: v === 'base' });
+      finish({ base: v === 'base', size: g ? { w: g.w, h: g.h } : null });
     };
   });
 }
@@ -1784,9 +1826,11 @@ async function deckIoExportPptx(){
     const PptxGenJS = await MathhLibs.load('pptxgen');
     const pptx = new PptxGenJS();
     const sl = deckSlides();
-    // размер слайда в PPTX один на всю презентацию — берём первый; слайды
-    // другого формата вписываются в него по центру
-    const W = ioIn(deckSlideRect(sl[0]).w), H = ioIn(deckSlideRect(sl[0]).h);
+    // размер слайда в PPTX один на всю презентацию — выбранный в окне (по
+    // умолчанию у большинства слайдов, №106); слайды другого формата
+    // вписываются в него по центру
+    const cell = B.cellSize || 24, size = opt.size || { w: sl[0].w, h: sl[0].h };
+    const W = ioIn(size.w * cell), H = ioIn(size.h * cell);
     pptx.defineLayout({ name: 'MATHH', width: +W.toFixed(4), height: +H.toFixed(4) });
     pptx.layout = 'MATHH';
     pptx.title = B.name || 'Презентация';
@@ -1806,10 +1850,24 @@ async function deckIoExportPptx(){
       const slide = pptx.addSlide();
       // фон: цвет — цветом, остальное (узор, картинка, тёмная бумага) — картинкой
       const kind = deckBgKind(s), bgObj = objs.find(o => o.bgOf === s.id);
-      if (kind === 'fill' && s.bg.f && !bgObj) slide.background = { color: ioHexNo(s.bg.f) };
-      else {
-        const cv = ioRenderSlide(s, bgObj ? [bgObj] : [], Math.min(2400, sr.w * 1.5));
-        slide.background = { data: ioPptxData(cv.toDataURL('image/jpeg', 0.9)) };
+      // №106: слайд другой формы занимает не всю страницу. Фон страницы —
+      // тёмные поля, а фон слайда — прямоугольником по его месту (раньше фон
+      // растягивался на всю страницу, и слайд казался другой ориентации)
+      const exact = Math.abs(sw * k - W) < 0.01 && Math.abs(sh * k - H) < 0.01;
+      const fillBg = kind === 'fill' && s.bg.f && !bgObj;
+      if (exact){
+        if (fillBg) slide.background = { color: ioHexNo(s.bg.f) };
+        else {
+          const cv = ioRenderSlide(s, bgObj ? [bgObj] : [], Math.min(2400, sr.w * 1.5));
+          slide.background = { data: ioPptxData(cv.toDataURL('image/jpeg', 0.9)) };
+        }
+      } else {
+        slide.background = { color: '1B1B1F' };
+        if (fillBg) slide.addShape('rect', { x: ox, y: oy, w: sw * k, h: sh * k, fill: { color: ioHexNo(s.bg.f) }, line: { type: 'none' }, objectName: 'mx:bg' });
+        else {
+          const cv = ioRenderSlide(s, bgObj ? [bgObj] : [], Math.min(2400, sr.w * 1.5));
+          slide.addImage({ data: ioPptxData(cv.toDataURL('image/jpeg', 0.9)), x: ox, y: oy, w: sw * k, h: sh * k });
+        }
       }
       let pend = [];
       const flush = () => {
@@ -1888,7 +1946,7 @@ async function deckIoExportPptx(){
     blob = await ioPptxFix(blob, fixes);
     ioDownload(blob, ioFileName('pptx'));
     ioDialog().hidden = true;
-    if (mixed) deckToast('Слайды разного размера вписаны в размер первого — в PPTX он один на файл');
+    if (mixed) deckToast('Слайды другого размера вписаны в выбранный — в PPTX размер один на файл');
   } catch (e) {
     console.error('[deck-io] PPTX', e);
     ioDialog().hidden = true;
