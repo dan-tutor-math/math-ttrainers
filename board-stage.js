@@ -395,6 +395,8 @@
         const ds = deckCur();
         if (ds) v.ds = ds.id;
         v.fl = deckFlow();
+        // №105: режим показа — ученику тоже только слайд (deckViewerView)
+        if (typeof dtbShowOn === 'function' && dtbShowOn()) v.sh = 1;
       }
       const key = JSON.stringify(v);
       if (!force && key === lastView) return;

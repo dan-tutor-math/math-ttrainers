@@ -230,6 +230,14 @@ def run_stage(browser):
     st.wait_for_timeout(300)
     check("7: PageDown у ученика ничего не листает", st.evaluate("() => [cam.x, cam.y, cam.zoom].join(',')") == cam0)
 
+    # №105: учитель включил режим показа — у ученика тоже только слайд
+    teacher.evaluate("() => dtbShowStart(false)")
+    ok = wait_js(st, "() => document.documentElement.classList.contains('deck-show')", 5000)
+    check("7 (№105): учитель в показе — у ученика вид показа", ok)
+    teacher.evaluate("() => dtbShowStop()")
+    ok = wait_js(st, "() => !document.documentElement.classList.contains('deck-show')", 5000)
+    check("7 (№105): учитель вышел из показа — у ученика снято", ok)
+
     teacher.evaluate("() => { backToList(); }")
     teacher.wait_for_timeout(300)
     teacher.evaluate("() => window.openBoard('bPlain')")

@@ -127,10 +127,12 @@ def main():
         page.keyboard.press("Escape")
         page.mouse.click(700, 500)
 
-        print("5. Показ — пока место")
+        print("5. Показ (подробно — test_prompt105_deck_show.py)")
         page.click("#dtb-show")
-        page.wait_for_timeout(150)
-        check("Режим показа" in page.inner_text("#deckToast"), "«Показ» сообщает, что режим скоро")
+        page.wait_for_timeout(300)
+        check(page.evaluate("() => document.documentElement.classList.contains('deck-show')"), "«Показ» включает режим показа")
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(300)
 
         print("6. Сворачивание")
         zoom_open = page.evaluate("() => cam.zoom")

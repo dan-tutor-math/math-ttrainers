@@ -149,9 +149,15 @@ function deckViewerOpen(b){
   });
   deckCurId = null;
 }
-function deckViewerClose(){ window.deckViewerMode = false; deckViewerFlow = null; deckViewerSlide = null; deckCurId = null; }
+function deckViewerClose(){
+  window.deckViewerMode = false; deckViewerFlow = null; deckViewerSlide = null; deckCurId = null;
+  document.documentElement.classList.remove('deck-show');
+}
 function deckViewerView(v){
   if (!v) return;
+  // №105: учитель в режиме показа — и у ученика только слайд и пометки
+  // (тот же CSS html.deck-show, что у учителя: панели доски спрятаны)
+  document.documentElement.classList.toggle('deck-show', !!v.sh);
   deckViewerFlow = v.fl || null;
   deckViewerSlide = v.ds || null;
 }
@@ -173,6 +179,11 @@ function deckViewerSync(){
 // Возвращает прямоугольник в координатах холста
 function deckArea(){
   const W = window.innerWidth, H = window.innerHeight, gap = 14;
+  // №105: в показе интерфейса нет — слайд на всю вкладку с узким полем
+  if (document.documentElement.classList.contains('deck-show')){
+    const m = 8, x0 = Math.max(m, m - boardInset);
+    return { x: x0, y: m, w: Math.max(80, Math.min(cssW, W - boardInset) - x0 - m), h: Math.max(60, Math.min(cssH, H) - 2 * m) };
+  }
   const ins = { l: 16, t: 16, r: 16, b: 16 };
   const top = document.querySelector('.bd-topbar');
   if (top) ins.t = Math.max(ins.t, top.getBoundingClientRect().bottom + gap);
@@ -196,7 +207,9 @@ function deckArea(){
 function deckFitZoom(s){
   // (в сплошной прокрутке свой масштаб — deckScrollFit)
   const r = deckSlideRect(s), a = deckArea(), v = deckFlow() !== 'h';
-  const aw = a.w - (v ? 0 : 2 * DECK_PEEK_PX), ah = a.h - (v ? 2 * DECK_PEEK_PX : 0);
+  // в показе соседи не выглядывают — места под них не оставляем
+  const peek = document.documentElement.classList.contains('deck-show') ? 0 : DECK_PEEK_PX;
+  const aw = a.w - (v ? 0 : 2 * peek), ah = a.h - (v ? 2 * peek : 0);
   return Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.min(Math.max(40, aw) / r.w, Math.max(30, ah) / r.h)));
 }
 function deckFitCam(s, zf){
@@ -296,13 +309,20 @@ function deckClipSlide(c, camv){
 function deckCurRect(){ const s = deckCur(); return s ? deckSlideRect(s) : null; }
 
 // листание: 'v' лента по одному, 'scroll' сплошная прокрутка (№86), 'h' галерея
+// №105: в режиме показа листание — по одному слайду, даже если учитель
+// работает в сплошной прокрутке; его выбор в localStorage не трогаем
+let deckFlowOverride = null;
 function deckFlow(){
   if (window.deckViewerMode && deckViewerFlow) return deckViewerFlow;   // №96: как у учителя
+  if (deckFlowOverride) return deckFlowOverride;
   try { const f = localStorage.getItem(DECK_FLOW_KEY); return f === 'h' || f === 'scroll' ? f : 'v'; } catch (e) { return 'v'; }
 }
-function deckSetFlow(f){
+// temp — только на время показа (deckFlowOverride), null — снять
+function deckSetFlow(f, temp){
   const was = deckFlow();
-  try { localStorage.setItem(DECK_FLOW_KEY, f); } catch (e) {}
+  if (temp) deckFlowOverride = f || null;
+  else try { localStorage.setItem(DECK_FLOW_KEY, f); } catch (e) {}
+  f = deckFlow();
   deckSyncFlowUI();
   if (!isDeckBoard() || !boardActive || was === f) return;
   // текущий слайд при смене режима остаётся текущим
@@ -359,7 +379,11 @@ function deckResetZoom(){
   else { deckZf = 1; deckFitCam(s, 1); deckFitted = true; }
   scheduleRedraw(); rememberView();
 }
-function deckStep(dir){ return deckGo(deckCurIndex() + dir, dir); }
+function deckStep(dir){
+  // №105: в показе листание пропускает скрытые слайды (deck-toolbar.js)
+  if (typeof dtbShowOn === 'function' && dtbShowOn()) return dtbShowStep(dir);
+  return deckGo(deckCurIndex() + dir, dir);
+}
 
 // сдвиг холста при перелистывании — CSS-анимацией самого холста: камера
 // прыгает на другой слот мгновенно, а глазу нужно видеть направление
@@ -1185,7 +1209,9 @@ function deckShowCurCard(){
 // Зовётся ДО смены текущего слайда
 function deckFlipAnim(ms){
   const L = deckDepthLayer();
-  if (!L || L.hidden || deckReducedMotion()) return false;
+  // №105: в показе слой глубины спрятан CSS-ом — слайд картинкой на нём не
+  // увидеть, холст же на время анимации пустел бы
+  if (!L || L.hidden || deckReducedMotion() || document.documentElement.classList.contains('deck-show')) return false;
   ms = ms || DECK_ANIM_MS;
   if (!deckSlideHidden()) deckShowCurCard();
   deckAnimUntil = Math.max(deckAnimUntil, Date.now() + ms);
