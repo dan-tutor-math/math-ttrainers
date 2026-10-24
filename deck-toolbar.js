@@ -26,7 +26,7 @@
 const DTB_STYLE_KEY = 'boardsDeckBarStyle';   // ribbon | line | hybrid
 const DTB_OPEN_KEY = 'boardsDeckBarOpen';     // '1' раскрыта, '0' свёрнута
 const DTB_STYLES = [
-  { id: 'ribbon', label: 'Лента', soon: true, title: 'Вкладки и крупные значки, как в PowerPoint' },
+  { id: 'ribbon', label: 'Лента', title: 'Вкладки и крупные значки с подписями, как в PowerPoint' },
   { id: 'line', label: 'Одна строка', title: 'Одна строка значков, как в Google Slides' },
   { id: 'hybrid', label: 'Гибрид', title: 'Одна строка, а фигуры, линии и таблица — крупными галереями с подписями' }
 ];
@@ -60,6 +60,7 @@ function dtbSvg(name, cls){
    pop — выпадающая галерея (кнопка с «▾»; dtbPopToggle),
    run — обработчик новой кнопки; у узла по умолчанию его же click(),
    enabled — можно ли нажать сейчас, keep — никогда не уходит в «⋯»,
+   short — подпись под значком в ленте (№107), ribbonOnly — кнопка только в ленте,
    prio — чем меньше, тем раньше уходит в «⋯» на узком экране: сначала
    режимы ленты, потом редкая вставка; пометки урока — последними, на уроке
    они нужнее всего */
@@ -93,13 +94,16 @@ const DECK_CMDS = [
   { id: 'prev', group: 'nav', node: 'deckPrev', label: 'Предыдущий слайд', keep: true },
   { id: 'no', group: 'nav', node: 'deckNo', label: 'Номер слайда', keep: true },
   { id: 'next', group: 'nav', node: 'deckNext', label: 'Следующий слайд', keep: true },
-  { id: 'flowV', group: 'flow', node: 'deckFlowV', label: 'Листать вверх и вниз', prio: 1 },
-  { id: 'flowS', group: 'flow', node: 'deckFlowS', label: 'Сплошная прокрутка', prio: 1 },
-  { id: 'flowH', group: 'flow', node: 'deckFlowH', label: 'Листать вбок', prio: 1 },
+  { id: 'flowV', group: 'flow', short: 'По одному', node: 'deckFlowV', label: 'Листать вверх и вниз', prio: 1 },
+  { id: 'flowS', group: 'flow', short: 'Сплошная', node: 'deckFlowS', label: 'Сплошная прокрутка', prio: 1 },
+  { id: 'flowH', group: 'flow', short: 'Вбок', node: 'deckFlowH', label: 'Листать вбок', prio: 1 },
   { id: 'clear', group: 'lesson', node: 'deckClearNotes', label: 'Очистить пометки', prio: 6 },
   { id: 'copy', group: 'lesson', node: 'deckCopyBtn', label: 'Копия урока', prio: 5 },
   // №105: показ с текущего слайда (F5 — с начала, Shift+F5 — с текущего)
-  { id: 'show', group: 'show', icon: 'show', label: 'Показ', title: 'Показ слайдов на всю вкладку (F5 — с начала, Shift+F5 — с текущего)', prio: 3, wide: true,
+  // №107: в ленте на вкладке «Показ» — две кнопки, как в PowerPoint
+  { id: 'showFirst', group: 'show', icon: 'show', label: 'С начала', title: 'Показ с первого слайда (F5)', ribbonOnly: true,
+    run: () => dtbShowStart(true) },
+  { id: 'show', group: 'show', icon: 'show', label: 'Показ', short: 'С текущего', title: 'Показ слайдов на всю вкладку (F5 — с начала, Shift+F5 — с текущего)', prio: 3, wide: true,
     run: () => dtbShowStart(false) }
 ];
 // раскладка «одна строка» (вариант Б): порядок групп слева направо
@@ -122,7 +126,8 @@ function dtbCmdEl(c){ return document.getElementById(c.node || c.btnId || ('dtb-
 // «Очистить пометки» вне «Урока»…) — без учёта ухода в «⋯»
 function dtbAvailable(c){
   const el = dtbCmdEl(c);
-  if (dtbFmtOn() ? DTB_FMT_HIDE.includes(c.group) : (c.group === 'format' || c.group === 'arrange')) return false;
+  if (dtbStyle() === 'ribbon'){ if (!dtbFmtOn() && (c.group === 'format' || c.group === 'arrange')) return false; }
+  else if (dtbFmtOn() ? DTB_FMT_HIDE.includes(c.group) : (c.group === 'format' || c.group === 'arrange')) return false;
   // группы полосы прячет сама раскладка (dtbLayout) — их hidden не в счёт
   return !!el && !el.hidden && !el.parentElement?.closest('[hidden]:not(.dtb-grp)');
 }
@@ -158,12 +163,16 @@ function dtbBuild(){
       el.className = 'deck-nav-btn dtb-btn' + (c.wide ? ' wide' : '');
       el.title = c.title || c.label;
       el.setAttribute('aria-label', c.label);
-      el.innerHTML = dtbSvg(c.icon) + (c.wide ? '<span class="dtb-lbl">' + c.label + '</span>' : '') + (c.pop ? dtbSvg('caret', 'dtb-caret') : '');
+      // подпись: у «широких» видна всегда, у остальных — только в ленте (dtb-lbl-r)
+      el.innerHTML = dtbSvg(c.icon) + (c.wide ? '<span class="dtb-lbl">' + (c.short ? '<span class="dtb-lbl-l">' + c.label + '</span><span class="dtb-lbl-r">' + c.short + '</span>' : c.label) + '</span>'
+        : '<span class="dtb-lbl-r">' + (c.short || c.label) + '</span>') + (c.pop ? dtbSvg('caret', 'dtb-caret') : '');
       if (c.pop){ el.setAttribute('aria-haspopup', 'menu'); el.setAttribute('aria-expanded', 'false'); }
       el.addEventListener('click', (e) => dtbRun(c, e));
     }
     if (!el) return;
     el.dataset.cmd = c.id;
+    // у готовых кнопок-значков (режимы ленты) подписи нет — для ленты добавляем
+    if (c.node && c.short && el.tagName === 'BUTTON' && !el.querySelector('.dtb-lbl-r')) el.insertAdjacentHTML('beforeend', '<span class="dtb-lbl-r">' + c.short + '</span>');
     // «Очистить пометки» и «Копия урока» живут в своём контейнере, который
     // прячет deckSyncModeUI, — переносим контейнер целиком
     const host = c.group === 'lesson' ? document.getElementById('deckLessonBtns') : null;
@@ -214,6 +223,7 @@ function dtbBuild(){
   // ленту миниатюр сворачивают и растягивают — место под полосу меняется
   const strip = document.getElementById('deckStrip');
   if (strip && typeof ResizeObserver === 'function') new ResizeObserver(() => dtbScheduleLayout()).observe(strip);
+  dtbBuildRibbon(nav);
   dtbBuildSettings();
   dtbBuildPops();
   dtbBuildArrangePops();
@@ -287,6 +297,7 @@ function deckTbSync(){
   const open = dtbOpen();
   nav.classList.toggle('dtb-closed', !open);
   nav.dataset.style = dtbStyle();
+  dtbApplyStyle(nav);
   const fold = document.getElementById('dtbFoldBtn');
   if (fold){
     fold.innerHTML = dtbSvg(open ? 'up' : 'down');
@@ -320,6 +331,8 @@ function dtbLayout(){
     // группа без видимых кнопок — прячем, вместе с её разделителем
     const any = [...g.querySelectorAll('[data-cmd]')].some(el => !el.classList.contains('dtb-off') && !el.hidden && !el.parentElement.closest('[hidden]:not(.dtb-grp)'));
     const fmt = nav.classList.contains('dtb-fmt'), gg = g.dataset.g;
+    // лента: видны группы активной вкладки (их и так немного — без «⋯»)
+    if (nav.classList.contains('dtb-ribbon')){ const t = dtbTabOf(gg); g.hidden = !any || !t || t.id !== dtbCurTab(); return; }
     g.hidden = !any || (fmt ? DTB_FMT_HIDE.includes(gg) : (gg === 'format' || gg === 'arrange'));
   });
   syncGroups();
@@ -334,7 +347,10 @@ function dtbLayout(){
   const avail = Math.max(200, W - 12 - x0);
   nav.style.left = (x0 + avail / 2) + 'px';
   nav.style.maxWidth = avail + 'px';
-  if (nav.classList.contains('dtb-closed')) return;
+  // лента — во всю ширину свободного места, как в PowerPoint; кнопкам
+  // вкладки места хватает, лишнее переносится на вторую строку
+  nav.style.width = nav.classList.contains('dtb-ribbon') ? avail + 'px' : '';
+  if (nav.classList.contains('dtb-closed') || nav.classList.contains('dtb-ribbon')) return;
   // ширину меряем по содержимому (scrollWidth): сама полоса ограничена
   // max-width и шире экрана не станет, даже когда кнопки уже не влезают
   const wide = () => nav.scrollWidth + 2 > Math.min(avail, nav.clientWidth + 2) || nav.getBoundingClientRect().width > avail;
@@ -349,6 +365,103 @@ function dtbLayout(){
     dtbCmdEl(c)?.classList.add('dtb-off');
     syncGroups();
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   №107: вариант А — «Лента», как в PowerPoint. Те же группы и кнопки, что
+   у строки (реестр один), только разложены по вкладкам: строка вкладок
+   (.dtb-tabrow) и под ней панель (.dtb-panel) с группами активной вкладки.
+   Переключение вида переносит группы между полосой и панелью, ничего не
+   пересоздавая — обработчики и состояние кнопок остаются прежними.
+   Свёрнута — видна только строка вкладок; щелчок по вкладке открывает её
+   поверх слайда (.dtb-peek), команда или щелчок мимо — прячет. Место под
+   слайд (deckArea) считается по самой полосе, а раскрытая поверх панель
+   стоит absolute и в расчёт не попадает — слайд не прыгает
+   ═══════════════════════════════════════════════════════════════════════ */
+const DTB_TABS = [
+  { id: 'home', label: 'Главная', groups: ['slide', 'mode', 'nav', 'flow', 'lesson'] },
+  { id: 'insert', label: 'Вставка', groups: ['insert'] },
+  { id: 'format', label: 'Формат', groups: ['format', 'arrange'], ctx: true },
+  { id: 'show', label: 'Показ', groups: ['show'] }
+];
+const DTB_TAB_KEY = 'boardsDeckRibbonTab';
+let dtbTab = 'home', dtbTabBack = null;
+try { const t = localStorage.getItem(DTB_TAB_KEY); if (t && t !== 'format' && DTB_TABS.some(x => x.id === t)) dtbTab = t; } catch (e) {}
+function dtbTabOf(g){ return DTB_TABS.find(t => t.groups.includes(g)) || null; }
+// «Формат» есть, только пока что-то выделено
+function dtbCurTab(){ return dtbTab === 'format' && !dtbFmtOn() ? (dtbTabBack || 'home') : dtbTab; }
+
+function dtbBuildRibbon(nav){
+  const row = document.createElement('div');
+  row.className = 'dtb-tabrow';
+  row.innerHTML = '<div class="dtb-tabs" role="tablist" aria-label="Вкладки панели">' + DTB_TABS.map(t =>
+    '<button type="button" role="tab" class="dtb-tab' + (t.ctx ? ' ctx' : '') + '" data-tab="' + t.id + '" aria-selected="false">' + t.label + '</button>').join('') + '</div>';
+  const panel = document.createElement('div');
+  panel.className = 'dtb-panel';
+  row.hidden = panel.hidden = true;
+  nav.prepend(panel);
+  nav.prepend(row);
+  row.addEventListener('click', (e) => {
+    const b = e.target.closest('.dtb-tab');
+    if (!b) return;
+    const id = b.dataset.tab;
+    // свёрнутая лента: та же вкладка второй раз — спрятать, другая — показать её
+    const peek = nav.classList.contains('dtb-closed');
+    if (peek && nav.classList.contains('dtb-peek') && dtbCurTab() === id){ dtbPeek(false); return; }
+    dtbTab = id; dtbTabBack = id === 'format' ? dtbTabBack : null;
+    if (id !== 'format') try { localStorage.setItem(DTB_TAB_KEY, id); } catch (er) {}
+    dtbSyncTabs();
+    if (peek) dtbPeek(true);
+  });
+  // двойной щелчок по вкладке — свернуть или закрепить ленту (как в PowerPoint)
+  row.addEventListener('dblclick', (e) => { if (e.target.closest('.dtb-tab')){ dtbPeek(false); dtbSetOpen(!dtbOpen()); } });
+  // команда в раскрытой поверх панели выполнена — панель прячется; галереи
+  // (кнопки с «▾») открываются под ней, поэтому их не трогаем
+  panel.addEventListener('click', (e) => {
+    const b = e.target.closest('button');
+    if (!b || !nav.classList.contains('dtb-peek') || b.getAttribute('aria-haspopup') || b.closest('.bx-bar')) return;
+    setTimeout(() => dtbPeek(false), 0);
+  });
+  document.addEventListener('pointerdown', (e) => {
+    if (!nav.classList.contains('dtb-peek')) return;
+    if (e.target.closest('#deckNav, .dtb-pop, #dtbMoreMenu, .deck-menu, .deck-pop, .bx-pal')) return;
+    dtbPeek(false);
+  });
+}
+function dtbPeek(on){
+  const nav = document.getElementById('deckNav');
+  if (nav) nav.classList.toggle('dtb-peek', !!on && nav.classList.contains('dtb-closed'));
+}
+// раскладка по виду: лента — группы в панель под вкладками; строка и гибрид
+// — группы прямо в полосе, перед хвостом («⋯», свернуть)
+function dtbApplyStyle(nav){
+  const ribbon = dtbStyle() === 'ribbon';
+  const row = nav.querySelector('.dtb-tabrow'), panel = nav.querySelector('.dtb-panel'), tail = nav.querySelector('.dtb-tail');
+  if (!row || !panel || !tail) return;
+  const was = nav.classList.contains('dtb-ribbon');
+  if (ribbon !== was){
+    const groups = DTB_LINE_GROUPS.map(g => nav.querySelector('.dtb-grp[data-g="' + g + '"]')).filter(Boolean);
+    if (ribbon){ groups.forEach(g => panel.appendChild(g)); row.appendChild(tail); }
+    else { nav.appendChild(tail); groups.forEach(g => nav.insertBefore(g, tail)); }
+    row.hidden = panel.hidden = !ribbon;
+    nav.classList.toggle('dtb-ribbon', ribbon);
+    dtbPeek(false);
+    // высота полосы другая — слайд вписывается заново
+    requestAnimationFrame(() => { if (typeof deckStripRefit === 'function') deckStripRefit(); });
+  }
+  DECK_CMDS.forEach(c => { if (c.ribbonOnly){ const el = dtbCmdEl(c); if (el) el.hidden = !ribbon; } });
+  dtbSyncTabs();
+}
+function dtbSyncTabs(){
+  const nav = document.getElementById('deckNav');
+  if (!nav || !nav.classList.contains('dtb-ribbon')) return;
+  const cur = dtbCurTab(), fmt = dtbFmtOn();
+  nav.querySelectorAll('.dtb-tab').forEach(b => {
+    b.hidden = b.dataset.tab === 'format' && !fmt;
+    b.setAttribute('aria-selected', b.dataset.tab === cur ? 'true' : 'false');
+  });
+  dtbScheduleLayout();
+  dtbLayout();
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -972,7 +1085,13 @@ function deckTbSelTick(){
     el.hidden = !fmt;
     el.disabled = !c.enabled();
   });
-  if (was !== fmt){ dtbPopToggle(null); dtbBarDdClose(); }
+  if (was !== fmt){
+    dtbPopToggle(null); dtbBarDdClose();
+    // лента: выделили — открывается «Формат», сняли — прежняя вкладка
+    if (fmt){ if (dtbTab !== 'format'){ dtbTabBack = dtbTab; dtbTab = 'format'; } }
+    else if (dtbTab === 'format') dtbTab = dtbTabBack || 'home';
+    dtbSyncTabs();
+  }
   dtbLayout();
 }
 
@@ -1298,7 +1417,9 @@ function dtbSyncSettings(){
   const s = DTB_STYLES.find(x => x.id === st);
   if (note) note.textContent = s && s.soon
     ? '«' + s.label + '» запомнили — она появится в одном из следующих обновлений, пока панель в одну строку.'
-    : st === 'hybrid'
+    : st === 'ribbon'
+      ? 'Вкладки «Главная», «Вставка», «Показ»; «Формат» — когда что-то выделено. Двойной щелчок по вкладке сворачивает ленту.'
+      : st === 'hybrid'
       ? 'Фигуры, линии и таблица открываются крупными галереями с подписями.'
       : 'Панель сворачивается кнопкой справа или двойным щелчком по её пустому месту.';
 }
@@ -1321,6 +1442,40 @@ function dtbInjectStyle(){
     '.dtb .dtb-lbl{font-size:13px}',
     '.dtb .deck-nav-btn svg.dtb-caret{width:12px;height:12px;margin-left:1px;opacity:.6}',
     '.dtb .deck-lesson-btns{gap:2px}',
+    // №107: «10 / 13» не переносится на две строки — номер не сжимается
+    '.dtb .deck-no{white-space:nowrap;flex:none;min-width:54px}',
+    '.dtb .dtb-lbl-r{display:none}',
+    '.dtb .dtb-btn.wide .dtb-lbl-l{display:inline}',
+    // №107: лента (вариант А) — вкладки сверху, под ними группы крупных значков
+    '.deck-nav.dtb.dtb-ribbon{flex-direction:column;align-items:stretch;padding:0;border-radius:14px}',
+    '.dtb-tabrow{display:flex;align-items:center;justify-content:space-between;padding:2px 6px 0 10px;border-bottom:1px solid var(--glass-border)}',
+    '.dtb-tabs{display:flex;gap:2px}',
+    // у строки вкладок и панели свой display — без этого правила hidden не прячет
+    '.dtb-tabrow[hidden],.dtb-panel[hidden]{display:none}',
+    '.dtb-tab{border:none;background:none;font:600 13px var(--font-ui);color:var(--muted-2);padding:7px 10px 6px;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}',
+    '.dtb-tab:hover{color:var(--ink)}',
+    '.dtb-tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}',
+    '.dtb-tab.ctx{color:var(--teacher)}',
+    '.dtb-tab.ctx[aria-selected="true"]{border-bottom-color:var(--teacher)}',
+    '.dtb-tab[hidden]{display:none}',
+    '.dtb-ribbon .dtb-tail{border-left:none!important;padding:0}',
+    '.dtb-panel{display:flex;flex-wrap:wrap;align-items:stretch;padding:6px 6px 5px;row-gap:4px}',
+    '.dtb-ribbon .dtb-grp{padding:0 8px;align-items:center}',
+    '.dtb-ribbon .dtb-panel > .dtb-grp:not([hidden]) ~ .dtb-grp:not([hidden]){border-left:1px solid var(--glass-border)}',
+    '.dtb-ribbon .dtb-panel .deck-nav-btn.dtb-btn,.dtb-ribbon .dtb-grp[data-g="flow"] .deck-nav-btn,.dtb-ribbon #deckSlideBtn,.dtb-ribbon #deckFileBtn{position:relative;flex-direction:column;height:56px;min-width:58px;padding:4px 6px 3px;gap:3px;font-size:11.5px;font-weight:600}',
+    '.dtb-ribbon .dtb-panel .deck-nav-btn.dtb-btn svg,.dtb-ribbon .dtb-grp[data-g="flow"] .deck-nav-btn svg,.dtb-ribbon #deckSlideBtn svg,.dtb-ribbon #deckFileBtn svg{width:22px;height:22px}',
+    '.dtb-ribbon .dtb-lbl-r{display:block;white-space:nowrap;line-height:1.1}',
+    '.dtb-ribbon .dtb-btn.wide .dtb-lbl-l{display:none}',
+    '.dtb-ribbon .dtb-btn.wide .dtb-lbl{font-size:11.5px}',
+    '.dtb-ribbon .dtb-panel svg.dtb-caret{position:absolute;right:2px;top:6px;width:10px!important;height:10px!important}',
+    // свёрнута — только вкладки; щелчок по вкладке открывает её поверх слайда
+    '.deck-nav.dtb.dtb-ribbon.dtb-closed{padding:0}',
+    '.dtb-ribbon.dtb-closed .dtb-tabrow{border-bottom:none}',
+    '.dtb-ribbon.dtb-closed .dtb-panel{display:none}',
+    '.dtb-ribbon.dtb-closed.dtb-peek .dtb-panel{display:flex;position:absolute;left:-1px;right:-1px;top:calc(100% + 4px);border-radius:14px;background:var(--glass-strong);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);box-shadow:var(--shadow)}',
+    '.dtb-ribbon.dtb-closed.dtb-peek .dtb-grp:not([hidden]){display:inline-flex!important}',
+    '.dtb-ribbon.dtb-closed .dtb-tail{display:inline-flex}',
+    '.deck-nav.dtb-ribbon.dtb-closed #dtbFoldBtn{height:30px;min-width:34px}',
     // свёрнута — тонкая полоска с одной кнопкой «⌄» (шире, чем выше: deckArea
     // по форме считает её верхней панелью)
     '.deck-nav.dtb.dtb-closed{padding:1px 14px;border-radius:12px}',

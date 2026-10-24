@@ -9,7 +9,7 @@ claude/presentations-toolbar-plan.md; HANDOFF.md раздел 6д).
   3. Каждая кнопка вставки создаёт свой объект: надпись, таблица, все фигуры
      из «Фигуры ▾»; кнопки гаснут без права рисовать
   4. «Файл» открывает импорт и выгрузку
-  5. «Показ» пока только место — сообщение «скоро»
+  5. «Показ» включает режим показа
   6. Сворачивание кнопкой и двойным щелчком, слайд крупнее; свёрнутость
      помнится после перезагрузки
   7. Вид панели в настройках (шестерёнка) сохраняется после перезагрузки
@@ -169,11 +169,11 @@ def main():
         page.click("#bdGear")
         check(page.evaluate(VISIBLE, "#dtbStyleRow"), "в настройках есть «Вид панели презентации»")
         labels = page.evaluate("() => [...document.querySelectorAll('#dtbStyleRow [data-dtbstyle]')].map(b => b.textContent)")
-        check(len(labels) == 3 and "скоро" in labels[0] and "скоро" not in labels[1] and "скоро" not in labels[2], "три вида, «скоро» — только лента (гибрид с №102)", str(labels))
+        check(len(labels) == 3 and not any("скоро" in x for x in labels), "три вида, все работают (лента с №107)", str(labels))
         page.click("#dtbStyleRow [data-dtbstyle='ribbon']")
         check(page.evaluate("() => localStorage.getItem('boardsDeckBarStyle')") == "ribbon", "выбор записан")
-        check("запомнили" in page.inner_text("#dtbStyleNote"), "подсказка: появится позже")
-        check(page.evaluate(VISIBLE, "#dtb-text"), "пока «лента» — полоса прежняя, одной строкой")
+        check("Вкладки" in page.inner_text("#dtbStyleNote"), "подсказка про вкладки")
+        check(page.evaluate("() => document.getElementById('deckNav').classList.contains('dtb-ribbon')"), "полоса стала лентой (подробно — test_prompt107_deck_ribbon.py)")
         open_deck_after_reload(page)
         check(page.evaluate("() => document.querySelector('#dtbStyleRow [data-dtbstyle=\"ribbon\"]').classList.contains('active')"), "после перезагрузки выбрана «Лента»")
         page.evaluate("() => localStorage.setItem('boardsDeckBarStyle', 'line')")
