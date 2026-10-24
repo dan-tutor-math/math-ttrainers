@@ -1326,7 +1326,10 @@ function bxOpenEditor(o, pt){
   if (typeof scheduleRedraw === 'function') scheduleRedraw();
 }
 function bxEditorSync(){
-  if (!bxEd) { bxSelectionTick(); bxBarFollow(); return; }
+  // №103: панель презентации (deck-toolbar.js) меняет правую часть полосы
+  // на оформление, когда что-то выделено, — узнаёт об этом здесь, раз в
+  // кадр, ПОСЛЕ bxSelectionTick (он показывает или прячет панель оформления)
+  if (!bxEd) { bxSelectionTick(); bxBarFollow(); if (typeof deckTbSelTick === 'function') deckTbSelTick(); return; }
   const o = bxFindObj(bxEd.id);
   if (!o || !boardActive){ bxCloseEditor(false); return; }
   bxEd.o = o;
@@ -1340,6 +1343,7 @@ function bxEditorSync(){
   w.style.height = (o.type === 'table' || (bxEd.tx && bxEd.tx.fit === 'grow')) ? 'auto' : R.h + 'px';
   w.style.transform = `translate(${cr.left + sc.x}px, ${cr.top + sc.y}px) rotate(${o.rot || 0}deg) scale(${z}) translate(${-R.w / 2}px, ${-R.h / 2}px)`;
   bxBarFollow();
+  if (typeof deckTbSelTick === 'function') deckTbSelTick();
 }
 // закрыть: true — сохранить, false — просто убрать поле
 function bxCloseEditor(save){
@@ -1477,6 +1481,8 @@ function bxShowBar(){
 // панель — над объектом (если сверху нет места — под ним), целиком в окне
 function bxBarFollow(){
   if (!bxBarEl || bxBarEl.hidden || !bxBarFor) return;
+  // №103: в презентации панель вставлена в верхнюю полосу и стоит на месте
+  if (bxBarEl.dataset.docked) return;
   const o = bxFindObj(bxBarFor);
   if (!o){ bxBarEl.hidden = true; return; }
   const bb = bxBBox(o) || objectBBox(o);

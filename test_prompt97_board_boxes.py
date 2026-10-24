@@ -131,6 +131,7 @@ def main():
         page.click(".bx-bar [data-bx='b']")
         allb = page.evaluate("(id) => B.objects.find(o => o.id === id).text.paras.every(p => p.runs.every(r => r.b))", tid)
         check(allb, "Ж — весь текст жирный")
+        page.click(".bx-bar .dtb-dd[data-dd='al'] .dtb-dd-btn")  # №103: выравнивание — в выпадающем списке
         page.click(".bx-bar [data-bx='al-c']")
         check(page.evaluate("(id) => B.objects.find(o => o.id === id).text.paras.every(p => p.al === 'c')", tid), "по центру — все абзацы")
 
@@ -166,8 +167,10 @@ def main():
         page.wait_for_selector(".bx-ed")
         tbid = page.evaluate("() => B.objects[B.objects.length - 1].id")
         page.keyboard.type("x")
+        page.click(".bx-bar .dtb-dd[data-dd='tbl'] .dtb-dd-btn")  # №103: строки и столбцы — в выпадающем списке
         page.click(".bx-bar [data-bx='col+']")
         page.wait_for_timeout(150)
+        page.click(".bx-bar .dtb-dd[data-dd='tbl'] .dtb-dd-btn")
         page.click(".bx-bar [data-bx='row+']")
         page.wait_for_timeout(150)
         page.keyboard.type(" — очень длинный текст в ячейке, чтобы строка таблицы выросла по высоте")
