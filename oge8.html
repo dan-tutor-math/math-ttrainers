@@ -276,6 +276,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
   padding:11px 18px;cursor:pointer;transition:transform .12s, border-color .12s;font-family:var(--font-ui);
 }
 .mode-card:hover{border-color:var(--ink); transform:translateX(3px)}
+.mode-card:focus-visible{outline:3px solid var(--ink);outline-offset:2px;border-color:var(--ink)}
 .mode-card .mtitle{font-weight:600;font-size:15px;color:var(--pencil);line-height:1.3;flex:1 1 260px;margin:0;}
 .mode-card.random{background:linear-gradient(135deg, var(--hl-10), transparent);border-color:var(--ink);margin-bottom:14px;}
 /* нулевой тип — задание из демоверсии ФИПИ: выделен так же, как «Случайно»,
@@ -453,6 +454,10 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .keypad-toggle{position:fixed;top:160px;right:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:18px;cursor:pointer;align-items:center;justify-content:center;box-shadow:var(--shadow);z-index:50;transition:transform .15s;}
 .keypad-toggle:active{transform:scale(.92)}
 @media(max-width:1250px){.keypad-float,.keypad-toggle{top:auto;bottom:16px;right:16px}}
+/* Запас под прижатой к низу клавиатурой: без него то, что лежит под ней в
+   конце страницы (кнопки «+», счёт), не прокрутить из-под панели. Высоту
+   панели ставит syncKeypadVisibility — у раскладок разное число рядов */
+@media(max-width:1250px){body.kp-open{padding-bottom:calc(var(--kp-h, 300px) + 32px)}}
 .explain{font-family:var(--font-ui);font-size:15px;color:var(--muted-4);line-height:1.55;}
 .explain b{color:var(--ink)}
 .next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:14px;box-shadow:0 6px 18px var(--ok-shadow);transition:transform .15s;}
@@ -1773,6 +1778,22 @@ function snapshotAndClear(scope, targetEl){
   else finish();
 }
 
+/* Карточки типов — div, а не button: FipiSplit переносит их между колонками,
+   и вёрстка карточки (flex, медали) на кнопке разъехалась бы. Поэтому роль и
+   фокус ставим вручную, иначе с клавиатуры тип не выбрать, а экранный диктор
+   не знает, что это кнопка. Пробел — как у настоящей кнопки, без прокрутки */
+function makeCardKeyboardable(card) {
+  card.setAttribute('role', 'button');
+  card.tabIndex = 0;
+  if (card._kbReady) return;
+  card._kbReady = true;
+  card.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    card.click();
+  });
+}
+
 function renderPicker() {
   els.modesGrid.innerHTML = GROUPS.map(g => `
     <div class="group-title">${g.title}</div>
@@ -1787,11 +1808,15 @@ function renderPicker() {
   `).join('');
   els.modesGrid.querySelectorAll('.mode-card').forEach(card => {
     card.onclick = guardStudentAction('switchTask', () => { curMode = card.dataset.id; openTask(); });
+    makeCardKeyboardable(card);
   });
   // карточка «🎲 Случайно» живёт вне #modesGrid статично в разметке — её нужно
   // привязывать отдельно (раньше эта кнопка была нерабочей)
   const randomCard = document.querySelector('.mode-card.random[data-id]');
-  if (randomCard) randomCard.onclick = guardStudentAction('switchTask', () => { curMode = randomCard.dataset.id; openTask(); });
+  if (randomCard) {
+    randomCard.onclick = guardStudentAction('switchTask', () => { curMode = randomCard.dataset.id; openTask(); });
+    makeCardKeyboardable(randomCard);
+  }
   // промпт №22: колонки «ФИПИ» и «Наши» — карточки переносятся вместе с
   // обработчиками, поэтому раскладываем уже после того, как их привязали
   if (window.FipiSplit) FipiSplit.apply(els.modesGrid);
@@ -1901,6 +1926,9 @@ function renderCurrentTask() {
   els.showSolutionBtn.style.display = (curSubMode === 'practice') ? 'inline-flex' : 'none';
   els.showSolutionBtn.textContent = 'Показать решение и ответ';
   syncKeypadVisibility();
+  // после плавного роста панели (setupAutoHeightAnimation, 280 мс) — раньше
+  // её высота ещё не окончательная и подъём вышел бы недостаточным
+  setTimeout(keepTaskClearOfKeypad, 350);
 }
 
 function newTask(opts) {
@@ -2452,7 +2480,7 @@ function setupFloatingKeypad(){
   kb.innerHTML = Keypad.keys([]);
   Keypad.bind(kb, keypadPress);
   document.getElementById('kpClose').onclick = ()=>{ keypadOpen=false; syncKeypadVisibility(); };
-  document.getElementById('kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(); };
+  document.getElementById('kpToggle').onclick = ()=>{ keypadOpen=true; syncKeypadVisibility(); keepTaskClearOfKeypad(); };
   makeKeypadDraggable(document.getElementById('keypadFloat'), document.getElementById('kpDragHandle'));
 }
 function makeKeypadDraggable(floatEl, handleEl){
@@ -2514,8 +2542,49 @@ function syncKeypadVisibility(){
   const needsInput = els.taskArea.style.display !== 'none' &&
     els.questionPanel.style.display !== 'none' &&
     !els.answerInput.disabled;
-  document.getElementById('keypadFloat').style.display = (needsInput && keypadOpen) ? 'block' : 'none';
+  const kp = document.getElementById('keypadFloat');
+  const shown = needsInput && keypadOpen;
+  kp.style.display = shown ? 'block' : 'none';
   document.getElementById('kpToggle').style.display = (needsInput && !keypadOpen) ? 'flex' : 'none';
+  document.body.classList.toggle('kp-open', shown);
+  if (shown) document.body.style.setProperty('--kp-h', kp.offsetHeight + 'px');
+}
+
+/* На телефоне клавиатура прижата к низу и закрывала поле ответа и
+   «Проверить»: ученик видел половину задания. Не двигаем панель (её место
+   учитель может выбрать сам, перетащив), а поднимаем страницу, пока условие
+   и поле ответа не окажутся над ней. Если всё условие не влезает, главное —
+   строка ответа. Клавиатуру уже перетаскивали (makeKeypadDraggable ставит
+   ей top) — место выбрано руками, страницу не трогаем. По положению это
+   не определить: на 320×568 нетронутая панель выше половины экрана */
+function keepTaskClearOfKeypad(){
+  const kp = document.getElementById('keypadFloat');
+  if (!kp || kp.style.display === 'none' || kp.style.top) return;
+  const k = kp.getBoundingClientRect();
+  const q = document.getElementById('card1Question').getBoundingClientRect();
+  const row = document.getElementById('inputAnswerArea').getBoundingClientRect();
+  if (q.right <= k.left || q.left >= k.right) return;
+  let limit = k.top - 12;
+  // «+» (.add-rail) закреплена слева посередине экрана: условие, стоящее над
+  // клавиатурой, на телефоне ложилось под неё началом формулы. Если карточка
+  // помещается выше «+», ставим её туда. Карточка, которая и после подъёма
+  // над клавиатурой останется целиком ниже «+», ей не мешает
+  const rail = document.querySelector('.add-rail');
+  // у position:fixed offsetParent всегда null — видимость только по размеру
+  const r = rail && rail.getBoundingClientRect();
+  const topAfterLift = q.top - Math.max(0, q.bottom - limit);
+  if (r && r.height > 0 && r.right > q.left && topAfterLift < r.bottom) {
+    const railLimit = r.top - 12;
+    if (railLimit < limit && q.height <= railLimit - 8) limit = railLimit;
+  }
+  if (q.bottom <= limit) return;
+  const need = row.bottom - limit;
+  const dy = Math.max(Math.min(q.bottom - limit, q.top - 8), need);
+  if (dy <= 0) return;
+  // Сразу, без плавной прокрутки: её обрывает первое же касание, а в фоновой
+  // вкладке она не идёт вовсе — задание оставалось бы под клавиатурой. Резкого
+  // скачка нет: renderCurrentTask только что так же сразу поднял страницу к 0
+  window.scrollBy(0, dy);
 }
 setupFloatingKeypad();
 
