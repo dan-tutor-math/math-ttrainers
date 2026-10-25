@@ -1325,7 +1325,20 @@ function taSplit(src){
   return out.map(x => x.trim()).filter(x => x !== '');
 }
 function taParseNums(src){
-  const items = taSplit(src).map(taEval);
+  // №108: так корни пишут в тетради — «x = 4 ± √7» и «x₁ = …»: подпись
+  // переменной снимаем, а «±» раскрываем в два корня. Иначе верный по сути
+  // ответ уходил в «запишите иначе», и ученик не понимал, что не так
+  const items = [];
+  taSplit(src).forEach(raw => {
+    const it = taStrip(raw).replace(/^[a-zа-я][0-9₀-₉]*=/i, '');
+    const k = it.indexOf('±');
+    if (k >= 0 && it.indexOf('±', k + 1) < 0) items.push(it.replace('±', '+'), it.replace('±', '-'));
+    else items.push(it);
+  });
+  return taEvalNums(items);
+}
+function taEvalNums(list){
+  const items = list.map(taEval);
   return items.some(isNaN) ? null : items;
 }
 // корни сравниваем как множество: у x² + 6x + 9 = 0 «−3» и «−3; −3» — одно и то же

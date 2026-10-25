@@ -7182,6 +7182,9 @@ function buildTaskOverlay(obj){
         taskLiveOut(id, false);
       });
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); taskCheck(id); } });
+      // №108: своя клавиатура с √ / ± ; — системной цифровой этих знаков
+      // нет, а «да/нет» набирают словами, ему она не нужна
+      if (window.BoardAnswerPad && f.type !== 'yesno') BoardAnswerPad.attach(inp, { onCheck: () => taskCheck(id) });
       root.appendChild(inp);
       rec.inputs.push(inp);
     });
@@ -7642,7 +7645,11 @@ function syncTaskOverlays(){
     if (seen.has(id)) return;
     // поле с фокусом не выдёргиваем посреди набора (кадр мог отсечь его на
     // долю секунды при прокрутке) — оно уберётся, когда фокус уйдёт
-    if (rec.root.contains(document.activeElement) && boardActive && taskObjById(id)) return;
+    // №108: но и висеть на старом месте экрана ему нельзя — раньше так и
+    // было (поле с фокусом «прилипало» к экрану, пока доску листали), а
+    // теперь за полем ездит ещё и клавиатура ответа. Прячем; вернётся в
+    // кадр — синхронизация выше снимет visibility сама
+    if (rec.root.contains(document.activeElement) && boardActive && taskObjById(id)){ rec.root.style.visibility = 'hidden'; return; }
     rec.root.remove();
     taskEls.delete(id);
   });
