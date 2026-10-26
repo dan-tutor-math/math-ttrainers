@@ -5,9 +5,9 @@
 Проверяет:
   1. Широкий экран (компьютер, отдельное окно): тренажёр во всю ширину, без
      масштаба; узкий (телефон) — кадр 420, вписанный масштабом.
-  2. Снимок с широкого вида — той же ширины и того же вида, что с
-     телефонного (кадр на время снимка сужается до 420 под плашкой и потом
-     возвращается).
+  2. Снимок с широкого вида — таким, как виден: кадр не сужается, а
+     растянутая или суженная ручками рабочая зона тренажёра (ОГЭ №8) меняет
+     ширину снимка, как во встроенной панели. На телефоне — кадр 420.
   3. Плотность снимка — как у доски, а не по экрану: на экране с
      плотностью 3 без доски берётся 2 (natW / css.w = 2); доска присылает
      своё число в pong (state().scale).
@@ -66,16 +66,16 @@ def local_server():
 
 SNAP_JS = """async () => {
   const f = document.getElementById('bpIframe'); const out = [];
-  await __boardPanel.withSnapLayout(() => ttSnapTrainerTasks(f.contentWindow, 'oge6', 'oge6.html', { widthFor: () => null, scale: __boardPanel.snapScale(),
+  await ttSnapTrainerTasks(f.contentWindow, __boardPanel.openId, f.contentWindow.location.pathname.split('/').pop(), { widthFor: () => null, scale: __boardPanel.snapScale(),
     onShot: async (it) => { const im = new Image(); im.src = it.dataUrl; await im.decode();
-      out.push({ css: it.shot.css, natW: im.naturalWidth, vw: it.gen && it.gen.vw, text: f.contentDocument.querySelector('#questionPanel').innerText.slice(0, 80) }); } }));
+      out.push({ css: it.shot.css, natW: im.naturalWidth, vw: it.gen && it.gen.vw, text: f.contentDocument.querySelector('#questionPanel').innerText.slice(0, 80) }); } });
   return out[0]; }"""
 FRAME_JS = """() => { const f = document.getElementById('bpIframe'), st = document.getElementById('bpStage');
   return { fw: parseFloat(f.style.width), sw: st.clientWidth, tr: f.style.transform, desktop: document.body.classList.contains('bp-desktop'),
-           inner: f.contentWindow.innerWidth, cover: document.getElementById('bpSnapCover').classList.contains('show') }; }"""
+           inner: f.contentWindow.innerWidth }; }"""
 
 
-def panel(browser, w, h, dpr, mobile):
+def panel(browser, w, h, dpr, mobile, tid="oge6"):
     ctx = browser.new_context(viewport={"width": w, "height": h}, device_scale_factor=dpr, is_mobile=mobile, has_touch=mobile)
     ctx.route("https://**/*", lambda r: r.abort())
     ctx.add_init_script("localStorage.setItem('bdPanel:link', JSON.stringify({ key: 'k'.repeat(43), devId: 'd', name: 't', local: true }));")
@@ -83,7 +83,7 @@ def panel(browser, w, h, dpr, mobile):
     p.on("pageerror", lambda e: ERRORS.append(str(e)))
     p.goto(f"{BASE}/boards-panel.html")
     p.wait_for_function("() => window.__boardPanel")
-    p.evaluate("() => __boardPanel.openTrainer('oge6', 'oge6.html', 'oge6')")
+    p.evaluate(f"() => __boardPanel.openTrainer({json.dumps(tid)}, {json.dumps(tid + '.html')}, {json.dumps(tid)})")
     p.wait_for_function("""() => { try { const f = document.getElementById('bpIframe');
         return f.contentDocument.readyState === 'complete' && typeof f.contentWindow.tsGetState === 'function'; } catch (e) { return false; } }""", timeout=20000)
     p.evaluate(f"() => document.getElementById('bpIframe').contentWindow.eval({json.dumps(SEED)})")
@@ -99,16 +99,30 @@ def run():
         fd = d.evaluate(FRAME_JS)
         check("1. компьютер: тренажёр во всю ширину, без масштаба", fd["desktop"] and abs(fd["fw"] - fd["sw"]) < 1 and fd["tr"] == "none" and fd["inner"] > 1000, str(fd))
         sd = d.evaluate(SNAP_JS)
-        fd2 = d.evaluate(FRAME_JS)
-        check("2. после снимка кадр снова во всю ширину, плашка убрана", fd2["desktop"] and abs(fd2["fw"] - fd2["sw"]) < 1 and not fd2["cover"], str(fd2))
-        check("2. снимок сделан в кадре 420 (как во встроенной панели)", sd["vw"] == 420, str(sd))
+        check("2. компьютер: снимок — в кадре той ширины, что на экране", sd["vw"] == fd["inner"], f"{sd['vw']} / {fd['inner']}")
+        check("2. компьютер: карточка шире телефонной (вёрстка как видна)", sd["css"]["w"] > 450, str(sd["css"]))
+
+        # ширина рабочей зоны ручкой тренажёра (ОГЭ №8) — меняет снимок
+        ctx_8, e8 = panel(browser, 1280, 860, 1, False, "oge8")
+        a8 = e8.evaluate(SNAP_JS)
+        hr = e8.evaluate("""() => { const f = document.getElementById('bpIframe'), fr = f.getBoundingClientRect();
+            const h = f.contentDocument.getElementById('workResizeRight').getBoundingClientRect();
+            return { x: fr.left + h.left + h.width / 2, y: fr.top + h.top + Math.min(h.height / 2, 60) }; }""")
+        e8.mouse.move(hr["x"], hr["y"])
+        e8.mouse.down()
+        e8.mouse.move(hr["x"] - 150, hr["y"], steps=8)
+        e8.mouse.up()
+        e8.wait_for_timeout(300)
+        b8 = e8.evaluate(SNAP_JS)
+        check("2. сузили рабочую зону ручкой тренажёра — снимок уже", b8["css"]["w"] < a8["css"]["w"] - 150, f"{a8['css']['w']} → {b8['css']['w']}")
+        check("2. и то же задание", a8["text"] == b8["text"], f"{a8['text']!r} / {b8['text']!r}")
+        ctx_8.close()
 
         ctx_m, m = panel(browser, 390, 820, 3, True)
         fm = m.evaluate(FRAME_JS)
         check("1. телефон: кадр 420, вписан масштабом", not fm["desktop"] and fm["fw"] == 420 and "scale" in fm["tr"] and fm["inner"] == 420, str(fm))
         sm = m.evaluate(SNAP_JS)
-        check("2. тот же пример в обоих видах", sd["text"] == sm["text"], f"{sd['text']!r} / {sm['text']!r}")
-        check("2. снимок той же ширины с компьютера и с телефона", abs(sd["css"]["w"] - sm["css"]["w"]) < 0.5 and abs(sd["css"]["h"] - sm["css"]["h"]) < 0.5, f"{sd['css']} / {sm['css']}")
+        check("2. телефон: снимок в кадре 420", sm["vw"] == 420 and sm["css"]["w"] < 420, str(sm))
         check("3. плотность снимка 2 на экране с плотностью 3 (доски нет)", m.evaluate("() => __boardPanel.snapScale()") == 2 and abs(sm["natW"] / sm["css"]["w"] - 2) < 0.02, f"{sm['natW']} / {sm['css']['w']}")
         check("3. с плотностью компьютера — тоже 2", abs(sd["natW"] / sd["css"]["w"] - 2) < 0.02, f"{sd['natW']} / {sd['css']['w']}")
 

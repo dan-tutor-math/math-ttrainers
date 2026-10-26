@@ -6,7 +6,7 @@
      крупнее. На доску это не влияет — снимок делается в кадре постоянной
      ширины (PANEL_FRAME_W ниже), а размер на доске выбирает доска. На
      широком экране (компьютер, отдельное окно) тренажёр показан во всю
-     ширину, а на время снимка кадр сужается до той же постоянной ширины -->
+     ширину и снимается таким, как виден, — с растянутой рабочей зоной -->
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Тренажёры → доска</title>
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
@@ -66,11 +66,9 @@ body.bp-in-frame .bp-frame-wrap{display:flex;}
 .bp-stage{flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
 /* узкий экран (телефон): кадр постоянной ширины (PANEL_FRAME_W, как
    встроенная панель на доске по умолчанию) и только масштабируется на
-   экран; широкий — кадр во всю ширину, тренажёр в своей «компьютерной»
-   вёрстке. Снимок в обоих случаях — в кадре PANEL_FRAME_W (withSnapLayout) */
+   экран — щипок и ширина телефона снимок не меняют; широкий — кадр во всю
+   ширину, тренажёр в своей «компьютерной» вёрстке, и снимок — как виден */
 .bp-iframe{position:absolute;left:0;top:0;border:none;background:var(--card);transform-origin:0 0;}
-.bp-snap-cover{position:absolute;inset:0;z-index:2;display:none;align-items:center;justify-content:center;background:var(--bg);color:var(--muted-2);font-size:14px;}
-.bp-snap-cover.show{display:flex;}
 .bp-actions{flex:none;display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--glass-border);background:var(--card);justify-content:center;flex-wrap:wrap;}
 .bp-actions .bp-btn,.bp-actions .bp-btn2{flex:1 1 0;min-width:0;max-width:220px;white-space:nowrap;}
 /* три кнопки в ряд на телефоне — только с короткими подписями */
@@ -107,7 +105,7 @@ body.bp-in-frame .bp-frame-wrap{display:flex;}
 </div>
 
 <div class="bp-frame-wrap" id="bpFrameWrap">
-  <div class="bp-stage" id="bpStage"><iframe class="bp-iframe" id="bpIframe"></iframe><div class="bp-snap-cover" id="bpSnapCover">Снимаем задание…</div></div>
+  <div class="bp-stage" id="bpStage"><iframe class="bp-iframe" id="bpIframe"></iframe></div>
   <div class="bp-actions">
     <button class="bp-btn" id="bpAddBtn">📥 Добавить<span class="bp-long"> на доску</span></button>
     <button class="bp-btn2" id="bpManualBtn" title="Добавить вручную — место и размер выбрать на доске">✥ <span class="bp-long">Добавить </span>вручную</button>
@@ -238,11 +236,9 @@ body.bp-in-frame .bp-frame-wrap{display:flex;}
   // с какой ширины экрана тренажёр показывается «по-компьютерному» — во всю
   // ширину; у́же — телефонная вёрстка кадра PANEL_FRAME_W, вписанная масштабом
   const DESKTOP_MIN_W = 700;
-  let snapping = false;
   function fitFrame(){
     const w = stage.clientWidth, h = stage.clientHeight;
     if (!w || !h) return;
-    if (snapping) return;   // на время снимка кадр держит ширину снимка
     const desktop = w >= DESKTOP_MIN_W;
     document.body.classList.toggle('bp-desktop', desktop);
     if (desktop){
@@ -277,29 +273,6 @@ body.bp-in-frame .bp-frame-wrap{display:flex;}
     if (ttFrameIsHome(loc) || !syncFrame()){ closeTrainer(); return; }
     ttHookTrainerFrameDoc(doc, { onHome: closeTrainer, onTheory: addTheory, kpLift: 12 });
   });
-
-  /* Снимок всегда в кадре PANEL_FRAME_W — как во встроенной панели, какой бы
-     вид ни был на экране: иначе задание с компьютера в «широкой» вёрстке
-     ложилось бы на доску другой ширины и другим видом, чем с телефона или
-     со встроенной панели. На компьютере кадр на это время сужается под
-     плашкой «Снимаем задание…» и потом возвращается */
-  async function withSnapLayout(fn){
-    const wide = stage.clientWidth >= DESKTOP_MIN_W;
-    if (!wide) return fn();
-    snapping = true;
-    $('bpSnapCover').classList.add('show');
-    Object.assign(iframe.style, { width: PANEL_FRAME_W + 'px', height: stage.clientHeight + 'px', transform: 'none', left: '0px' });
-    // тренажёр перестраивается под новую ширину (медиазапросы, формулы) —
-    // два кадра отрисовки и короткая пауза на догрузку
-    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-    await new Promise(r => setTimeout(r, 150));
-    try { return await fn(); }
-    finally {
-      snapping = false;
-      $('bpSnapCover').classList.remove('show');
-      fitFrame();
-    }
-  }
 
   /* ── отправка на доску ── */
   function setBusy(v){
@@ -345,14 +318,14 @@ body.bp-in-frame .bp-frame-wrap{display:flex;}
     // продолжает ту стопку, что начнёт первое
     let ref = client.state().board.ref;
     const sends = [];
-    const res = await withSnapLayout(() => ttSnapTrainerTasks(win, openId, openHref, {
+    const res = await ttSnapTrainerTasks(win, openId, openHref, {
       widthFor: (gen) => ttWidthLike(ref && ref.node, ref && ref.cw, gen),
       scale: snapScale(),
       onShot: async (it) => {
         ref = { node: (it.gen && it.gen.node) || null, cw: it.cw };
         sends.push(client.send('add-task', payloadOf(it)));
       },
-    }));
+    });
     setBusy(false);
     if (res.none){ toast('Не нашли текущее задание — попробуйте сгенерировать заново'); return; }
     if (!sends.length){ toast('Не получилось снять задание'); return; }
@@ -364,7 +337,7 @@ body.bp-in-frame .bp-frame-wrap{display:flex;}
     try { doc = iframe.contentDocument; } catch (e) {}
     setBusy(true); btn.disabled = true;
     try {
-      const shot = await withSnapLayout(() => ttSnapTheory(doc, snapScale()));
+      const shot = await ttSnapTheory(doc, snapScale());
       if (!shot){ toast('У этого задания нет теории'); return; }
       reportSends([client.send('add-task', { img: shot.dataUrl, card: shot.card, css: shot.css })], 1);
     } catch (e) {
@@ -384,14 +357,14 @@ body.bp-in-frame .bp-frame-wrap{display:flex;}
     setBusy(true);
     let ref = client.state().board.ref;
     const sends = [];
-    const res = await withSnapLayout(() => ttSnapTrainerTasks(win, openId, openHref, {
+    const res = await ttSnapTrainerTasks(win, openId, openHref, {
       widthFor: (gen) => ttWidthLike(ref && ref.node, ref && ref.cw, gen),
       scale: snapScale(),
       onShot: async (it) => {
         ref = { node: (it.gen && it.gen.node) || null, cw: it.cw };
         sends.push(client.send('add-manual', payloadOf(it)));
       },
-    }));
+    });
     setBusy(false);
     if (res.none){ toast('Не нашли текущее задание — попробуйте сгенерировать заново'); return; }
     if (!sends.length){ toast('Не получилось снять задание'); return; }
@@ -414,7 +387,7 @@ body.bp-in-frame .bp-frame-wrap{display:flex;}
     const s = client.state();
     if (s.waiting){ e.preventDefault(); e.returnValue = ''; }
   });
-  window.__boardPanel = { client, openTrainer, addToBoard, syncFrame, snapScale, withSnapLayout, get openId(){ return openId; } };
+  window.__boardPanel = { client, openTrainer, addToBoard, syncFrame, snapScale, get openId(){ return openId; } };
 })();
 </script>
 </body>

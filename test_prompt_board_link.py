@@ -226,7 +226,9 @@ def run():
         check("4. та же стопка", a["stack"]["id"] == b["stack"]["id"], f"{a['stack']} / {b['stack']}")
         ka, kb = a["w"] / a["css"]["w"], b["w"] / b["css"]["w"]
         check("4. тот же масштаб стопки", abs(ka - kb) < 1e-6, f"{ka} / {kb}")
-        check("4. та же ширина узла (кадр 420)", abs(a["css"]["w"] - b["css"]["w"]) < 2, f"{a['css']['w']} / {b['css']['w']}")
+        # панель здесь во всю ширину окна — снимок таким, как виден в её кадре
+        pvw = panel.evaluate("() => document.getElementById('bpIframe').contentWindow.innerWidth")
+        check("4. снимок в кадре той ширины, что на экране панели", b["gen"].get("vw") == pvw, f"{b['gen'].get('vw')} / {pvw}")
         check("4. gen.node и ответ задания", b["gen"].get("node") == a["gen"].get("node") and b["task"].get("kind") == a["task"].get("kind"), f"{b['gen'].get('node')} {b['task'].get('kind')}")
         panel.wait_for_function("() => document.getElementById('bpToast').textContent.includes('Добавлено на доску')", timeout=8000)
         check("4. панель — «Добавлено на доску»", True)
