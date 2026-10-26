@@ -104,9 +104,9 @@ input,textarea{-webkit-user-select:text; -moz-user-select:text; user-select:text
 .bl-folders{display:flex;flex-direction:column;gap:1px;margin-top:2px;}
 .bl-folder-item{padding-left:30px;}
 .bl-main{flex:1 1 auto;padding:22px 26px 60px;min-width:0;}
-.bl-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px;}
+.bl-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
 /* №113: переключатель «доски / все / презентации» и метка «Бета» */
-.bl-kind{display:inline-flex;gap:2px;padding:3px;margin-bottom:14px;border-radius:12px;background:var(--hover-1);max-width:100%;flex-wrap:wrap;}
+.bl-kind{display:inline-flex;gap:2px;padding:3px;margin-bottom:18px;border-radius:12px;background:var(--hover-1);max-width:100%;flex-wrap:wrap;}
 .bl-kind-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:none;border-radius:9px;background:none;cursor:pointer;font-family:var(--font-ui);font-weight:600;font-size:13.5px;color:var(--muted-2);}
 .bl-kind-btn:hover{color:var(--pencil);}
 .bl-kind-btn.active{background:var(--paper);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.14);}
@@ -1231,13 +1231,8 @@ function resolveBasketTexInHtml(html){
     <div class="bl-nav" id="blNav"></div>
   </div>
   <div class="bl-main">
-    <!-- №113: доски и презентации — разные виды списка. По умолчанию только
-         доски; презентации в бете, поэтому у них подпись «Бета» -->
-    <div class="bl-kind" id="blKindSwitch" role="tablist" aria-label="Что показывать">
-      <button type="button" class="bl-kind-btn active" data-kind="boards" role="tab" aria-selected="true">Основные доски</button>
-      <button type="button" class="bl-kind-btn" data-kind="all" role="tab" aria-selected="false">Все доски и презентации</button>
-      <button type="button" class="bl-kind-btn" data-kind="decks" role="tab" aria-selected="false">Презентации <span class="bl-beta">Бета</span></button>
-    </div>
+    <!-- «К тренажёрам» и название раздела — самым верхним рядом: это выход со
+         страницы и ответ на «где я», переключатель видов списка идёт под ними -->
     <div class="bl-head">
       <a class="bl-btn bl-to-index" id="blToIndex" href="index.html" title="К тренажёрам">
         <svg viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1298,6 +1293,13 @@ function resolveBasketTexInHtml(html){
           </div>
         </div>
       </div>
+    </div>
+    <!-- №113: доски и презентации — разные виды списка. По умолчанию только
+         доски; презентации в бете, поэтому у них подпись «Бета» -->
+    <div class="bl-kind" id="blKindSwitch" role="tablist" aria-label="Что показывать">
+      <button type="button" class="bl-kind-btn active" data-kind="boards" role="tab" aria-selected="true">Основные доски</button>
+      <button type="button" class="bl-kind-btn" data-kind="all" role="tab" aria-selected="false">Все доски и презентации</button>
+      <button type="button" class="bl-kind-btn" data-kind="decks" role="tab" aria-selected="false">Презентации <span class="bl-beta">Бета</span></button>
     </div>
     <div class="bl-cloud-warn" id="blCloudWarn" role="alert" hidden>
       <div class="bl-cloud-warn-body">
