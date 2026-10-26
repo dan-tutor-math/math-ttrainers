@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<!-- Щипок (pinch-zoom) не запрещаем: на телефоне задание удобно рассмотреть
+     крупнее. На доску это не влияет — снимок делается в кадре постоянной
+     ширины (PANEL_FRAME_W ниже), а размер на доске выбирает доска -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Тренажёры → доска</title>
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<link rel="stylesheet" href="onest.css">
+<link rel="stylesheet" href="trainers-list.css">
+<style>
+:root{
+  --font-ui:'Onest',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
+  --font-mono:ui-monospace,-apple-system,'SF Mono',SFMono-Regular,Menlo,Consolas,monospace;
+  --bg:#EEF1F7; --card:#fff; --glass-border:rgba(20,30,60,.12);
+  --hover-1:rgba(0,76,153,.06); --hover-2:rgba(0,76,153,.10);
+  --muted-2:#6E6E73; --ink:#004C99; --pencil:#1D1D1F; --ok:#248A3D; --bad:#C2410C;
+  --shadow:0 10px 34px rgba(20,30,60,.12);
+}
+html[data-theme="dark"]{
+  --bg:#0B0E1A; --card:#1E2540; --glass-border:rgba(255,255,255,.12);
+  --hover-1:rgba(127,160,255,.08); --hover-2:rgba(127,160,255,.14);
+  --muted-2:#9A9AA2; --ink:#2E7DE0; --pencil:#F2F3F5; --ok:#3E8E5B; --bad:#FB923C;
+  --shadow:0 10px 40px rgba(0,0,0,.55);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--pencil);font-family:var(--font-ui);display:flex;flex-direction:column;min-height:100%;}
+button{font-family:inherit;}
+.bp-head{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--glass-border);background:var(--card);}
+.bp-back{width:30px;height:30px;border-radius:50%;border:none;background:none;color:var(--muted-2);cursor:pointer;display:none;align-items:center;justify-content:center;flex:none;}
+.bp-back svg{width:18px;height:18px;}
+body.bp-in-frame .bp-back{display:flex;}
+.bp-title{flex:1;min-width:0;font-weight:700;font-size:15px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bp-status{flex:none;display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted-2);max-width:55%;cursor:pointer;border:none;background:none;text-align:right;}
+.bp-dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--muted-2);opacity:.6;}
+.bp-dot.on{background:var(--ok);opacity:1;}
+.bp-dot.off{background:var(--bad);opacity:1;}
+.bp-status-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bp-pending{flex:none;padding:6px 12px;font-size:12.5px;background:var(--hover-2);color:var(--pencil);display:none;}
+.bp-pending.show{display:block;}
+/* сопряжение — пока устройство не подключено, это первый экран */
+.bp-pair{display:none;flex-direction:column;gap:12px;padding:20px 16px;max-width:420px;width:100%;margin:0 auto;}
+body.bp-pairing .bp-pair{display:flex;}
+body.bp-pairing .bp-list,body.bp-pairing .bp-frame-wrap{display:none!important;}
+.bp-pair h1{font-size:19px;}
+.bp-pair p{font-size:13.5px;color:var(--muted-2);line-height:1.45;}
+.bp-pair label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:700;color:var(--muted-2);}
+.bp-pair input{border:1px solid var(--glass-border);border-radius:11px;background:var(--card);padding:11px 12px;font-size:16px;color:var(--pencil);font-family:var(--font-ui);}
+.bp-pair input.bp-code{font-family:var(--font-mono);font-size:24px;letter-spacing:.1em;text-transform:uppercase;text-align:center;}
+.bp-pair-msg{font-size:13.5px;min-height:1.4em;}
+.bp-pair-msg.bad{color:var(--bad);}
+.bp-btn{border:none;border-radius:12px;padding:12px 18px;font-size:14px;font-weight:700;background:var(--ink);color:#fff;cursor:pointer;}
+.bp-btn:disabled{opacity:.6;cursor:default;}
+.bp-btn2{border:1.5px solid var(--ink);border-radius:12px;padding:10px 14px;font-size:14px;font-weight:700;background:var(--card);color:var(--ink);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
+.bp-btn2:disabled{opacity:.6;cursor:default;}
+.bp-link{border:none;background:none;color:var(--ink);font-size:13px;cursor:pointer;text-decoration:underline;align-self:flex-start;}
+.bp-list{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;gap:8px;padding:10px 12px 12px;max-width:640px;width:100%;margin:0 auto;}
+body.bp-in-frame .bp-list{display:none;}
+.bp-frame-wrap{flex:1 1 auto;min-height:0;display:none;flex-direction:column;}
+body.bp-in-frame .bp-frame-wrap{display:flex;}
+.bp-stage{flex:1 1 auto;min-height:0;position:relative;overflow:hidden;}
+/* кадр — постоянной ширины (PANEL_FRAME_W, как встроенная панель на доске
+   по умолчанию) и только масштабируется на экран: вёрстка задания, а с
+   ней и снимок, не зависят от ширины телефона или окна */
+.bp-iframe{position:absolute;left:0;top:0;border:none;background:var(--card);transform-origin:0 0;}
+.bp-actions{flex:none;display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--glass-border);background:var(--card);justify-content:center;flex-wrap:wrap;}
+.bp-actions .bp-btn,.bp-actions .bp-btn2{flex:1 1 0;min-width:0;max-width:220px;white-space:nowrap;}
+/* три кнопки в ряд на телефоне — только с короткими подписями */
+@media (max-width:560px){ .bp-long{display:none;} .bp-actions{gap:6px;padding-left:8px;padding-right:8px;} .bp-actions .bp-btn,.bp-actions .bp-btn2{padding-left:8px;padding-right:8px;font-size:13.5px;} }
+.bp-toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:5;background:var(--ink);color:#fff;padding:8px 14px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:calc(100vw - 24px);text-align:center;}
+.bp-toast.show{opacity:1;}
+</style>
+</head>
+<body>
+<div class="bp-head">
+  <button class="bp-back" id="bpBack" title="К списку тренажёров">
+    <svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <div class="bp-title" id="bpTitle">Тренажёры</div>
+  <button class="bp-status" id="bpStatus" title="Связь с доской"><span class="bp-dot" id="bpDot"></span><span class="bp-status-text" id="bpStatusText">Не подключено</span></button>
+</div>
+<div class="bp-pending" id="bpPending"></div>
+
+<div class="bp-pair" id="bpPair">
+  <h1>Подключение к доске</h1>
+  <p>На доске откройте «Тренажёры» → значок телефона и введите код, который там показан. На доске появится вопрос — нажмите «Разрешить». Дальше это устройство подключается само.</p>
+  <label>Имя этого устройства<input id="bpName" maxlength="40" autocomplete="off"></label>
+  <label>Код с доски<input id="bpCode" class="bp-code" maxlength="7" placeholder="K7M-4QX" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
+  <button class="bp-btn" id="bpPairBtn">Подключить</button>
+  <div class="bp-pair-msg" id="bpPairMsg"></div>
+  <button class="bp-link" id="bpPairBack" style="display:none">Вернуться к тренажёрам</button>
+</div>
+
+<div class="bp-list" id="bpList">
+  <input type="text" class="bd-trainers-search" id="bpSearch" placeholder="Поиск тренажёра…">
+  <div class="bd-trainers-groups" id="bpGroups"></div>
+  <button class="bp-link" id="bpUnpair" style="display:none">Отключить это устройство от доски</button>
+</div>
+
+<div class="bp-frame-wrap" id="bpFrameWrap">
+  <div class="bp-stage" id="bpStage"><iframe class="bp-iframe" id="bpIframe"></iframe></div>
+  <div class="bp-actions">
+    <button class="bp-btn" id="bpAddBtn">📥 Добавить<span class="bp-long"> на доску</span></button>
+    <button class="bp-btn2" id="bpManualBtn" title="Добавить вручную — место и размер выбрать на доске">✥ <span class="bp-long">Добавить </span>вручную</button>
+    <button class="bp-btn2" id="bpRefreshBtn" title="Обновить пример — то же, что ⟳ в самом тренажёре">⟳ Обновить<span class="bp-long"> пример</span></button>
+  </div>
+</div>
+<div class="bp-toast" id="bpToast"></div>
+
+<!-- те же модули, что у встроенной панели на доске: каталог и снимок
+     (trainer-tasks.js), цикл снятия (trainer-capture.js), протокол
+     сопряжения (board-link.js) -->
+<!-- Supabase — связь с доской на другом устройстве (board-link.js, этап 3);
+     только публичный anon-ключ из supabase-config.js -->
+<script src="supabase-config.js"></script>
+<script src="supabase-js.umd.js"></script>
+<script src="lazy-libs.js" data-preload="html2canvas"></script>
+<script src="trainer-tasks.js"></script>
+<script src="trainer-capture.js"></script>
+<script src="board-link.js"></script>
+<script>
+(function(){
+  'use strict';
+  // ширина кадра — как у встроенной панели по умолчанию (--tp-w в boards.html):
+  // задание в узком кадре свёрстано «по-телефонному», и на доске оно
+  // выглядит так же, как добавленное из встроенной панели
+  const PANEL_FRAME_W = 420;
+  const $ = id => document.getElementById(id);
+  const iframe = $('bpIframe'), stage = $('bpStage');
+  let openId = null, openHref = null, busy = false;
+
+  function toast(msg, ms){
+    const t = $('bpToast');
+    t.textContent = msg; t.classList.add('show');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => t.classList.remove('show'), ms || 2400);
+  }
+
+  /* ── связь с доской ── */
+  function guessName(){
+    const ua = navigator.userAgent || '';
+    if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'iPad';
+    if (/iPhone/.test(ua)) return 'iPhone';
+    if (/Android/.test(ua)) return /Mobile/.test(ua) ? 'Телефон Android' : 'Планшет Android';
+    if (/Mac/.test(ua)) return 'Mac';
+    if (/Windows/.test(ua)) return 'Компьютер Windows';
+    return 'Устройство';
+  }
+  let st = null;
+  function renderStatus(s){
+    st = s;
+    const dot = $('bpDot'), txt = $('bpStatusText');
+    dot.className = 'bp-dot' + (s.paired ? (s.online ? ' on' : ' off') : '');
+    txt.textContent = !s.paired ? (s.revoked ? 'Доска отключила это устройство' : 'Не подключено')
+      : s.online ? 'Подключено к доске' + (s.board.board ? ' «' + s.board.board + '»' : '')
+      : 'Доска не в сети';
+    const parts = [];
+    if (s.waiting && !s.online) parts.push('Ждут отправки: ' + s.waiting + ' — уйдут, как только доска появится в сети. Не закрывайте эту страницу.');
+    if (s.placing) parts.push('Размещаем на доске…');
+    else if (s.queued) parts.push('В очереди на доске: ' + s.queued + ' — доска занята (открыто окно), задания встанут, когда его закроют.');
+    $('bpPending').textContent = parts.join(' ');
+    $('bpPending').classList.toggle('show', parts.length > 0);
+    $('bpUnpair').style.display = s.paired ? '' : 'none';
+    if (!s.paired) document.body.classList.add('bp-pairing');
+  }
+  const client = BoardLink.createClient({ onChange: renderStatus });
+
+  function showPair(fromUser){
+    document.body.classList.add('bp-pairing');
+    $('bpPairBack').style.display = (fromUser && client.state().paired) ? '' : 'none';
+    $('bpName').value = $('bpName').value || client.savedName() || guessName();
+  }
+  function hidePair(){ document.body.classList.remove('bp-pairing'); }
+  $('bpStatus').addEventListener('click', () => { if (!client.state().paired) showPair(true); });
+  $('bpPairBack').addEventListener('click', hidePair);
+  $('bpUnpair').addEventListener('click', () => {
+    if (!confirm('Отключить это устройство от доски? Подключиться снова можно по коду.')) return;
+    client.unpair(); showPair(false);
+  });
+  const PAIR_MSG = {
+    badcode: 'Код из 6 знаков, например K7M-4QX — проверьте его на доске.',
+    denied: 'На доске отказали в подключении или код уже сменили.',
+    busy: 'Доска сейчас отвечает на другой запрос — попробуйте через несколько секунд.',
+    timeout: 'Доска не ответила. Проверьте код и что доска открыта.',
+    nocrypto: 'Браузер не поддерживает защищённое подключение — откройте страницу по https.',
+    error: 'Не получилось подключиться — попробуйте ещё раз.',
+  };
+  $('bpPairBtn').addEventListener('click', async () => {
+    const msg = $('bpPairMsg');
+    msg.className = 'bp-pair-msg'; msg.textContent = 'Ждём «Разрешить» на доске…';
+    $('bpPairBtn').disabled = true;
+    const r = await client.pair($('bpCode').value, $('bpName').value);
+    $('bpPairBtn').disabled = false;
+    if (r === 'ok'){ msg.textContent = ''; $('bpCode').value = ''; hidePair(); toast('Подключено к доске'); return; }
+    msg.className = 'bp-pair-msg bad'; msg.textContent = PAIR_MSG[r] || PAIR_MSG.error;
+  });
+  $('bpCode').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('bpPairBtn').click(); });
+  // ссылка из QR-кода на доске: код уже в адресе — после «#», чтобы не
+  // уходить на сервер. Из адреса его сразу убираем: в истории браузера и при
+  // пересылке ссылки он не нужен
+  (function readHash(){
+    const m = /(?:^|[#&])pair=([A-Za-z0-9-]+)/.exec(location.hash || '');
+    if (m){
+      $('bpCode').value = BoardLink.formatCode(BoardLink.normCode(m[1])) || m[1];
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+      if (!client.state().paired) showPair(false);
+    }
+  })();
+  if (!client.state().paired) showPair(false);
+
+  /* ── список и кадр тренажёра ── */
+  function renderList(){ ttRenderTrainersList($('bpGroups'), $('bpSearch').value, openTrainer); }
+  $('bpSearch').addEventListener('input', renderList);
+  renderList();
+  function openTrainer(id, href, name){
+    openId = id; openHref = href;
+    $('bpTitle').textContent = name;
+    document.body.classList.add('bp-in-frame');
+    iframe.src = href;
+    fitFrame();
+  }
+  function closeTrainer(){
+    openId = null; openHref = null;
+    $('bpTitle').textContent = 'Тренажёры';
+    document.body.classList.remove('bp-in-frame');
+    iframe.src = 'about:blank';
+  }
+  $('bpBack').addEventListener('click', closeTrainer);
+  // кадр постоянной ширины, вписанный в экран масштабом (см. .bp-iframe)
+  function fitFrame(){
+    const w = stage.clientWidth, h = stage.clientHeight;
+    if (!w || !h) return;
+    const k = Math.max(0.5, Math.min(1.6, w / PANEL_FRAME_W));
+    iframe.style.width = PANEL_FRAME_W + 'px';
+    iframe.style.height = Math.ceil(h / k) + 'px';
+    iframe.style.transform = 'scale(' + k + ')';
+    // кадр уже экрана (широкое окно и потолок масштаба) — по центру
+    iframe.style.left = Math.max(0, (w - PANEL_FRAME_W * k) / 2) + 'px';
+  }
+  window.addEventListener('resize', fitFrame);
+  if (window.ResizeObserver) new ResizeObserver(fitFrame).observe(stage);
+  // какой тренажёр открыт — по адресу кадра (стрелки ЕГЭ меняют ?n= без
+  // перезагрузки), как syncTrainersFrame встроенной панели
+  function syncFrame(){
+    if (!openId) return false;
+    let loc = null;
+    try { loc = iframe.contentWindow.location; } catch (e) {}
+    const it = ttPanelItemForLocation(loc);
+    if (!it) return false;
+    if (it.id !== openId){ openId = it.id; openHref = it.href; $('bpTitle').textContent = it.name; }
+    return true;
+  }
+  iframe.addEventListener('load', () => {
+    if (!openId) return;
+    let loc = null, doc = null;
+    try { loc = iframe.contentWindow.location; doc = iframe.contentDocument; } catch (e) {}
+    if (!loc || loc.href === 'about:blank') return;
+    if (ttFrameIsHome(loc) || !syncFrame()){ closeTrainer(); return; }
+    ttHookTrainerFrameDoc(doc, { onHome: closeTrainer, onTheory: addTheory, kpLift: 12 });
+  });
+
+  /* ── отправка на доску ── */
+  function setBusy(v){
+    busy = v;
+    $('bpAddBtn').disabled = v;
+    $('bpManualBtn').disabled = v;
+    // пока снимаем, пример в кадре менять нельзя — снялось бы полузаменённое
+    $('bpRefreshBtn').disabled = v;
+  }
+  function needPair(){
+    if (client.state().paired) return false;
+    showPair(false);
+    toast('Сначала подключитесь к доске');
+    return true;
+  }
+  function payloadOf(it){
+    return { img: it.dataUrl, task: it.task, gen: it.gen, card: it.shot.card, css: it.shot.css, sol: it.shot.sol, cw: it.cw };
+  }
+  function reportSends(sends, n){
+    const s = client.state();
+    if (!s.online) toast(n === 1 ? 'Доска не в сети — задание отправится, как только она появится' : 'Доска не в сети — задания (' + n + ') отправятся, как только она появится', 3200);
+    else toast(n === 1 ? 'Отправлено на доску…' : 'Отправлено на доску: ' + n + '…');
+    Promise.all(sends).then(rs => {
+      const ok = rs.filter(r => r === 'ok').length;
+      if (rs.some(r => r === 'revoked')) toast('Доска отключила это устройство — задание не добавлено', 3500);
+      else if (ok === rs.length) toast(ok === 1 ? 'Добавлено на доску' : 'Добавлено на доску: ' + ok);
+      else toast('Доска не смогла вставить задание', 3500);
+    });
+  }
+  async function addToBoard(){
+    if (busy || !syncFrame() || needPair()) return;
+    let win = null;
+    try { win = iframe.contentWindow; void win.document; } catch (e) { win = null; }
+    if (!win){ toast('Не удалось получить доступ к тренажёру'); return; }
+    setBusy(true);
+    // ширина узла — от последнего задания стопки на доске (присылает доска),
+    // как у встроенной панели (widthForNewTask); следующее задание пакета
+    // продолжает ту стопку, что начнёт первое
+    let ref = client.state().board.ref;
+    const sends = [];
+    const res = await ttSnapTrainerTasks(win, openId, openHref, {
+      widthFor: (gen) => ttWidthLike(ref && ref.node, ref && ref.cw, gen),
+      onShot: async (it) => {
+        ref = { node: (it.gen && it.gen.node) || null, cw: it.cw };
+        sends.push(client.send('add-task', payloadOf(it)));
+      },
+    });
+    setBusy(false);
+    if (res.none){ toast('Не нашли текущее задание — попробуйте сгенерировать заново'); return; }
+    if (!sends.length){ toast('Не получилось снять задание'); return; }
+    reportSends(sends, sends.length);
+  }
+  async function addTheory(btn){
+    if (busy || needPair()) return;
+    let doc = null;
+    try { doc = iframe.contentDocument; } catch (e) {}
+    setBusy(true); btn.disabled = true;
+    try {
+      const shot = await ttSnapTheory(doc);
+      if (!shot){ toast('У этого задания нет теории'); return; }
+      reportSends([client.send('add-task', { img: shot.dataUrl, card: shot.card, css: shot.css })], 1);
+    } catch (e) {
+      console.error('[panel] theory capture failed', e);
+      toast('Не получилось снять теорию');
+    } finally { setBusy(false); btn.disabled = false; }
+  }
+  $('bpAddBtn').addEventListener('click', addToBoard);
+  /* «Добавить вручную»: снимок тот же, но на доске задание появляется
+     призраком — место и размер учитель выбирает там, на холсте. Здесь ждём
+     итога: «Закрепить» или «Отмена» на доске */
+  async function addManual(){
+    if (busy || !syncFrame() || needPair()) return;
+    let win = null;
+    try { win = iframe.contentWindow; void win.document; } catch (e) { win = null; }
+    if (!win){ toast('Не удалось получить доступ к тренажёру'); return; }
+    setBusy(true);
+    let ref = client.state().board.ref;
+    const sends = [];
+    const res = await ttSnapTrainerTasks(win, openId, openHref, {
+      widthFor: (gen) => ttWidthLike(ref && ref.node, ref && ref.cw, gen),
+      onShot: async (it) => {
+        ref = { node: (it.gen && it.gen.node) || null, cw: it.cw };
+        sends.push(client.send('add-manual', payloadOf(it)));
+      },
+    });
+    setBusy(false);
+    if (res.none){ toast('Не нашли текущее задание — попробуйте сгенерировать заново'); return; }
+    if (!sends.length){ toast('Не получилось снять задание'); return; }
+    toast(client.state().online ? 'Размещаем на доске…' : 'Доска не в сети — задание появится на ней, как только она будет в сети', 3200);
+    const rs = await Promise.all(sends);
+    const placed = rs.filter(r => r === 'placed').length;
+    if (rs.some(r => r === 'revoked')) toast('Доска отключила это устройство — задание не добавлено', 3500);
+    else if (placed) toast(placed === rs.length ? 'Закреплено на доске' : 'Закреплено: ' + placed + ', отменено: ' + (rs.length - placed), 3000);
+    else toast('Отменено на доске', 3000);
+  }
+  $('bpManualBtn').addEventListener('click', addManual);
+  $('bpRefreshBtn').addEventListener('click', () => {
+    if (busy) return;
+    let res = 'notask';
+    try { syncFrame(); res = openId ? refreshTrainerIn(iframe.contentWindow, openId) : 'notask'; } catch (e) { console.error(e); }
+    if (res !== 'ok') toast(res === 'single' ? 'У этого номера один прототип — другого примера нет' : 'Сначала откройте задание в тренажёре');
+  });
+  // уходят с неотправленным — предупреждаем: задание держится только здесь
+  window.addEventListener('beforeunload', (e) => {
+    const s = client.state();
+    if (s.waiting){ e.preventDefault(); e.returnValue = ''; }
+  });
+  window.__boardPanel = { client, openTrainer, addToBoard, syncFrame, get openId(){ return openId; } };
+})();
+</script>
+</body>
+</html>

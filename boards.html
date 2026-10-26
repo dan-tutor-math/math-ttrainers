@@ -16,6 +16,8 @@
 <!-- жидкое стекло (общее с главной): режим «обычный»/«максимум» выбирается
      в меню «⋯» на главной и хранится на устройстве — здесь он тот же -->
 <link rel="stylesheet" href="liquid-glass.css">
+<!-- список тренажёров панели — общий со вкладкой-панелью boards-panel.html -->
+<link rel="stylesheet" href="trainers-list.css">
 <script src="liquid-glass.js"></script>
 <!-- меню «⋯» справа сверху — то же, что на главной: тема, эффекты,
      совместный доступ -->
@@ -552,16 +554,7 @@ html[data-theme="dark"] .bd-ref-panel{box-shadow:var(--shadow), inset 0 1px 0 rg
 .bd-trainers-back:hover,.bd-trainers-close:hover{background:var(--hover-1);color:var(--pencil);}
 .bd-trainers-list{flex:1 1 auto;min-height:0;display:none;flex-direction:column;padding:10px 12px 12px;gap:8px;}
 .bd-trainers-panel:not(.bd-trainers-in-frame) .bd-trainers-list{display:flex;}
-.bd-trainers-search{border:1px solid var(--glass-border);border-radius:9px;background:var(--card);padding:7px 10px;font-family:var(--font-ui);font-size:13px;color:var(--pencil);outline:none;flex:none;}
-.bd-trainers-search::placeholder{color:var(--muted-2);}
-.bd-trainers-groups{flex:1 1 auto;overflow-y:auto;display:flex;flex-direction:column;gap:12px;}
-.bd-trainers-group-title{font-family:var(--font-ui);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted-2);padding:0 2px 4px;}
-.bd-trainers-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:none;background:none;padding:7px 8px;border-radius:9px;cursor:pointer;color:var(--pencil);font-family:var(--font-ui);font-size:12.5px;}
-.bd-trainers-item:hover{background:var(--hover-1);}
-.bd-trainers-item-num{flex:none;width:20px;height:20px;border-radius:6px;background:var(--hover-1);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--muted-2);}
-.bd-trainers-item-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.bd-trainers-item-eq{flex:none;font-family:var(--font-mono);font-size:10.5px;color:var(--muted-2);max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.bd-trainers-empty{padding:10px 4px;color:var(--muted-2);font-family:var(--font-ui);font-size:12.5px;}
+/* список тренажёров (поиск, группы, строки) — в trainers-list.css, общий с boards-panel.html */
 .bd-trainers-frame-wrap{flex:1 1 auto;min-height:0;position:relative;display:none;container:bdtp / inline-size;}
 .bd-trainers-panel.bd-trainers-in-frame .bd-trainers-frame-wrap{display:flex;}
 .bd-trainers-iframe{flex:1;width:100%;height:100%;border:none;background:var(--card);}
@@ -581,9 +574,67 @@ html[data-theme="dark"] .bd-ref-panel{box-shadow:var(--shadow), inset 0 1px 0 rg
 @media (prefers-reduced-motion: reduce){ .bd-trainers-refresh.spin .bd-rf-ic{animation:none;} }
 /* узкая панель: подписи короче, чтобы обе кнопки помещались в ряд */
 @container bdtp (max-width: 360px){ .bd-trainers-add .bd-btn-long,.bd-trainers-refresh .bd-btn-long{display:none;} }
+/* «Добавить вручную» — третья в ряду; подпись только в широкой панели, в
+   узкой — значок (полная подпись в title/aria-label): иначе ряд не влез бы
+   в 420 px вместе с полными «Добавить на доску» и «Обновить пример» */
+.bd-trainers-manual{padding:10px 11px;}
+.bd-trainers-manual .bd-mn-ic{width:16px;height:16px;flex:none;}
+.bd-trainers-manual .bd-mn-text{display:none;}
+@container bdtp (min-width: 520px){ .bd-trainers-manual .bd-mn-text{display:inline;} }
+/* призрак ручного размещения (boards-core.js, placeTaskManually) — слой
+   над холстом, не объект доски: в сохранение, облако, сессию и выгрузку не
+   попадает. Над живыми заданиями (#bdTaskLayer), под панелями */
+#bdGhostLayer{position:absolute;inset:0;left:var(--bd-inset,0px);z-index:2;pointer-events:none;overflow:hidden;}
+.bd-ghost{position:absolute;pointer-events:auto;touch-action:none;cursor:move;outline:2px dashed var(--ink);border-radius:6px;}
+.bd-ghost img{display:block;width:100%;height:100%;opacity:.62;pointer-events:none;user-select:none;-webkit-user-drag:none;border-radius:inherit;}
+.bd-ghost.dragging img{opacity:.5;}
+/* ручки крупные: их ловят пером графического планшета и пальцем */
+.bd-ghost-h{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:var(--card);border:2.5px solid var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.25);touch-action:none;}
+.bd-ghost-h[data-c="nw"]{left:0;top:0;cursor:nwse-resize;}
+.bd-ghost-h[data-c="ne"]{left:100%;top:0;cursor:nesw-resize;}
+.bd-ghost-h[data-c="sw"]{left:0;top:100%;cursor:nesw-resize;}
+.bd-ghost-h[data-c="se"]{left:100%;top:100%;cursor:nwse-resize;}
+.bd-ghost-bar{position:absolute;pointer-events:auto;display:flex;align-items:center;gap:8px;white-space:nowrap;background:var(--card);border:1px solid var(--glass-border);border-radius:14px;box-shadow:var(--shadow);padding:7px 8px 7px 12px;font-family:var(--font-ui);}
+.bd-ghost-who{font-size:12.5px;color:var(--muted-2);max-width:220px;overflow:hidden;text-overflow:ellipsis;}
+.bd-ghost-bar button{border:1.5px solid var(--ink);border-radius:10px;padding:7px 13px;font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;background:var(--card);color:var(--ink);}
+.bd-ghost-bar .bd-ghost-pin{background:var(--ink);color:#fff;}
+@media print{ #bdGhostLayer{display:none!important;} }
 .bd-trainers-toast{position:absolute;left:50%;bottom:62px;transform:translateX(-50%);z-index:3;background:var(--ink);color:#fff;padding:6px 12px;border-radius:9px;font-family:var(--font-ui);font-size:12px;opacity:0;pointer-events:none;transition:opacity .2s;}
 .bd-trainers-toast.show{opacity:1;}
 @media print{ .bd-trainers-panel,.bd-trainers-strip{display:none!important;} }
+
+/* ── сопряжение панели тренажёров с доской (board-link.js) ── */
+.bd-modal-link{width:min(560px,94vw);padding-bottom:18px;}
+.bd-link-row{display:flex;gap:8px;flex-wrap:wrap;margin:14px 20px 0;}
+.bd-link-btn{border:1.5px solid var(--ink);border-radius:11px;padding:8px 14px;background:var(--card);color:var(--ink);font-family:var(--font-ui);font-size:13px;font-weight:700;cursor:pointer;}
+.bd-link-btn:hover{background:var(--hover-2);}
+.bd-link-primary{background:var(--ink);color:#fff;}
+.bd-link-primary:hover{background:var(--ink);opacity:.9;}
+.bd-link-title{margin:18px 20px 0;font-family:var(--font-ui);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted-2);}
+.bd-link-pair{display:flex;gap:16px;align-items:flex-start;margin:10px 20px 0;flex-wrap:wrap;}
+.bd-link-qr{flex:none;width:164px;height:164px;border-radius:12px;overflow:hidden;background:#fff;}
+.bd-link-qr svg{display:block;width:100%;height:100%;}
+.bd-link-pair-side{flex:1;min-width:200px;display:flex;flex-direction:column;gap:10px;align-items:flex-start;}
+.bd-link-hint{font-family:var(--font-ui);font-size:12.5px;color:var(--muted-2);line-height:1.4;}
+.bd-link-url{font-family:var(--font-mono);color:var(--pencil);word-break:break-all;}
+.bd-link-code{font-family:var(--font-mono);font-size:30px;font-weight:700;letter-spacing:.08em;color:var(--pencil);}
+.bd-link-devices{margin:8px 20px 0;display:flex;flex-direction:column;gap:6px;}
+.bd-link-dev{display:flex;align-items:center;gap:8px;}
+.bd-link-dev input{flex:1;min-width:0;border:1px solid var(--glass-border);border-radius:9px;background:var(--card);padding:6px 9px;font-family:var(--font-ui);font-size:13px;color:var(--pencil);}
+.bd-link-dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--muted-2);opacity:.5;}
+.bd-link-dot.on{background:#2fa65a;opacity:1;}
+.bd-link-dev .bd-link-btn{padding:5px 10px;font-size:12px;}
+.bd-link-empty{font-family:var(--font-ui);font-size:12.5px;color:var(--muted-2);}
+/* запрос на подключение — поверх всего, в том числе поверх окна с кодом:
+   его и открывают, чтобы подключить телефон */
+.bd-link-ask{position:fixed;top:70px;left:50%;transform:translateX(-50%);z-index:720;display:none;flex-direction:column;background:var(--card);border:1px solid var(--glass-border);border-radius:16px;box-shadow:var(--shadow);padding:14px 0 16px;max-width:calc(100vw - 24px);}
+.bd-link-ask.show{display:flex;}
+.bd-link-ask .bd-link-row{margin:12px 18px 0;}
+.bd-link-ask-text{margin:0 18px;font-family:var(--font-ui);font-size:14.5px;font-weight:700;color:var(--pencil);}
+.bd-link-queue,.bd-link-toast{position:fixed;top:62px;right:16px;z-index:260;display:none;background:var(--ink);color:#fff;padding:7px 12px;border-radius:10px;font-family:var(--font-ui);font-size:12.5px;box-shadow:var(--shadow);}
+.bd-link-toast{top:104px;}
+.bd-link-queue.show,.bd-link-toast.show{display:block;}
+@media print{ .bd-link-ask,.bd-link-queue,.bd-link-toast{display:none!important;} }
 
 /* ── всплывающая панель цвета/толщины/стиля над доком ── */
 .bd-optbar{position:fixed;left:calc(50% + var(--bd-inset,0px) / 2);bottom:66px;transform:translateX(-50%);z-index:250;display:none;align-items:center;gap:calc(10px*var(--dock-scale,1));background:var(--glass-strong);backdrop-filter:blur(26px) saturate(190%);-webkit-backdrop-filter:blur(26px) saturate(190%);border:1px solid var(--glass-border);border-radius:calc(18px*var(--dock-scale,1));padding:calc(9px*var(--dock-scale,1)) calc(12px*var(--dock-scale,1));box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.5);flex-wrap:wrap;max-width:calc(100vw - 20px);}
@@ -1814,6 +1865,10 @@ function resolveBasketTexInHtml(html){
         <svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
       <div class="bd-trainers-title" id="bdTrainersTitle">Тренажёры</div>
+      <!-- сопряжение: панель в отдельной вкладке, окне или на телефоне (board-link.js) -->
+      <button class="bd-trainers-collapse" id="bdTrainersLinkBtn" title="Панель в отдельной вкладке или на телефоне / планшете">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="7" y="3" width="10" height="18" rx="2" stroke="currentColor" stroke-width="2"/><path d="M11 17.5h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
       <button class="bd-trainers-collapse" id="bdTrainersCollapse" title="Свернуть панель — тренажёр и задание в нём останутся, развернуть можно кнопкой у левого края">
         <svg viewBox="0 0 24 24" fill="none"><path d="M13 6l-6 6 6 6M19 6l-6 6 6 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       </button>
@@ -1828,6 +1883,8 @@ function resolveBasketTexInHtml(html){
       <div class="bd-trainers-actions" id="bdTrainersActions">
         <button class="bd-trainers-add" id="bdTrainersAddBtn">📥 Добавить<span class="bd-btn-long"> на доску</span></button>
         <button class="bd-trainers-refresh" id="bdTrainersRefreshBtn" title="Обновить пример — то же, что ⟳ в самом тренажёре"><span class="bd-rf-ic">⟳</span><span>Обновить<span class="bd-btn-long"> пример</span></span></button>
+        <!-- этап 2 «сопряжения»: место и размер задания выбрать на самой доске (призрак) -->
+        <button class="bd-trainers-refresh bd-trainers-manual" id="bdTrainersManualBtn" title="Добавить вручную — место и размер выбрать на доске" aria-label="Добавить вручную"><svg class="bd-mn-ic" viewBox="0 0 24 24" fill="none"><path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="bd-mn-text">Вручную</span></button>
       </div>
       <div class="bd-trainers-toast" id="bdTrainersToast"></div>
     </div>
@@ -1840,6 +1897,43 @@ function resolveBasketTexInHtml(html){
   </button>
 
   <div class="bd-access-note" id="bdAccessNote"></div>
+
+  <!-- Сопряжение панели тренажёров с доской (board-link.js): окно с кодом и
+       QR, запрос на подключение, очередь заданий с панели -->
+  <div class="bd-modal-backdrop" id="linkModalBackdrop">
+    <div class="bd-modal bd-modal-link" id="linkModal">
+      <div class="bd-modal-head">
+        <div class="bd-modal-title">Панель тренажёров отдельно от доски</div>
+        <button class="bd-modal-close" id="linkModalClose">✕</button>
+      </div>
+      <div class="bd-modal-note">Задание снимает панель, а доске приходит готовая картинка — вкладка доски не тормозит на трансляции. Размер и место на доске выбирает доска, как при обычном «Добавить на доску».</div>
+      <div class="bd-link-row">
+        <button class="bd-link-btn" id="linkOpenTab">Открыть в новой вкладке</button>
+        <button class="bd-link-btn" id="linkOpenWin">Открыть в отдельном окне</button>
+      </div>
+      <div class="bd-link-title">Подключить телефон или планшет</div>
+      <div class="bd-link-pair">
+        <div class="bd-link-qr" id="linkQr"></div>
+        <div class="bd-link-pair-side">
+          <div class="bd-link-hint">Наведите камеру на QR-код или откройте <span class="bd-link-url" id="linkUrl"></span> и введите код:</div>
+          <div class="bd-link-code" id="linkCode"></div>
+          <button class="bd-link-btn" id="linkChangeCode">Сменить код</button>
+          <div class="bd-link-hint">Новый код перестаёт пускать по старому; уже подключённые устройства остаются.</div>
+        </div>
+      </div>
+      <div class="bd-link-title">Подключённые устройства</div>
+      <div class="bd-link-devices" id="linkDevices"></div>
+    </div>
+  </div>
+  <div class="bd-link-ask" id="linkAsk" role="alertdialog">
+    <div class="bd-link-ask-text" id="linkAskText"></div>
+    <div class="bd-link-row">
+      <button class="bd-link-btn bd-link-primary" id="linkAskAllow">Разрешить</button>
+      <button class="bd-link-btn" id="linkAskDeny">Отклонить</button>
+    </div>
+  </div>
+  <div class="bd-link-queue" id="linkQueue"></div>
+  <div class="bd-link-toast" id="linkToast"></div>
 
   <!-- Промпт №17: меню «Фигуры» над доком и панель «Элементы фигуры»;
        содержимое собирает board-figures.js -->
@@ -1975,6 +2069,13 @@ function resolveBasketTexInHtml(html){
      «ещё такое же» — общий модуль с конструктором работ (промпт №15
      «работы»); обязательно ДО boards-core.js, который его зовёт -->
 <script src="trainer-tasks.js"></script>
+<!-- снятие задания для доски — общее со вкладкой-панелью boards-panel.html;
+     после trainer-tasks.js (зовёт его), до boards-core.js -->
+<script src="trainer-capture.js"></script>
+<!-- сопряжение с вынесенной панелью тренажёров и QR-код ссылки на неё;
+     до boards-core.js, который заводит сторону доски -->
+<script src="board-link.js"></script>
+<script src="qr-mini.js"></script>
 <!-- №108: клавиатура ответа у живых заданий (√ / ± ;) и строка «читается так»;
      до boards-core.js — тот цепляет её к каждому полю ответа -->
 <script src="board-answer-pad.js"></script>

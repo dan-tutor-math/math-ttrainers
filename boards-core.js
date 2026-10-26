@@ -3382,6 +3382,7 @@ function scheduleRedraw(){
     rememberViewIfMoved();   // «Вставка и вид доски»: любой сдвиг камеры, чем бы он ни был
     syncTextEditorToCam();
     syncTaskOverlays();   // Промпт №66
+    syncPlaceGhost();     // призрак ручного размещения едет вместе с камерой
   });
 }
 // открытое поле редактирования текста «приклеено» к своей мировой точке —
@@ -5490,6 +5491,8 @@ canvas.addEventListener('pointerup', (e) => {
     scheduleRedraw();
   }
   if (dragMode === 'handle' && (dragHandleRole === 'ie' || dragHandleRole === 'iw')) finishTaskWidthDrag(dragObjId);
+  // растянули задание за угол — это и есть выбранный масштаб для следующих
+  if (dragMode === 'handle' && /^(se|sw|ne|nw)$/.test(dragHandleRole || '')) noteTaskScale(taskObjById(dragObjId));
   if (dragMode === 'move' || dragMode === 'handle' || dragMode === 'multimove'){ saveDB(); }
   if (dragMode === 'pan') updateCursor(); // вернуть «раскрытую руку» или курсор текущего инструмента
   if (dragMode === 'marquee'){
@@ -6282,26 +6285,9 @@ const TRAINERS_PANEL_W_KEY = 'bdTrainersPanel:w';
   } catch(e){}
 })();
 
+// разметка списка — общая со вкладкой-панелью (trainer-capture.js)
 function renderTrainersList(filterText){
-  const q = (filterText || '').trim().toLowerCase();
-  const html = TRAINERS_PANEL_GROUPS.map(g => {
-    const items = g.items.filter(it => !q || it.name.toLowerCase().includes(q));
-    if (!items.length) return '';
-    return `
-      <div>
-        <div class="bd-trainers-group-title">${g.title}</div>
-        ${items.map((it, ii) => `
-          <button class="bd-trainers-item" data-id="${it.id}" data-href="${it.href}" data-name="${it.name.replace(/"/g,'&quot;')}">
-            <span class="bd-trainers-item-num">${String(ii+1).padStart(2,'0')}</span>
-            <span class="bd-trainers-item-name">${it.name}</span>
-            <span class="bd-trainers-item-eq">${it.eq}</span>
-          </button>`).join('')}
-      </div>`;
-  }).join('');
-  trainersGroupsEl.innerHTML = html || `<div class="bd-trainers-empty">Ничего не нашлось</div>`;
-  trainersGroupsEl.querySelectorAll('.bd-trainers-item').forEach(btn => {
-    btn.addEventListener('click', () => openTrainerInPanel(btn.dataset.id, btn.dataset.href, btn.dataset.name));
-  });
+  ttRenderTrainersList(trainersGroupsEl, filterText, openTrainerInPanel);
 }
 renderTrainersList('');
 trainersSearchEl.addEventListener('input', () => renderTrainersList(trainersSearchEl.value));
@@ -6344,11 +6330,7 @@ trainersBackBtn.addEventListener('click', closeTrainerFrame);
 function trainersFrameLocation(){
   try { return trainersIframe.contentWindow.location; } catch (e) { return null; }
 }
-function trainersFrameIsHome(loc){
-  if (!loc || !loc.href || loc.href === 'about:blank') return false;
-  const file = (loc.pathname || '').split('/').pop();
-  return file === '' || file === 'index.html';
-}
+const trainersFrameIsHome = ttFrameIsHome;   // общая со вкладкой-панелью (trainer-capture.js)
 // → true, если в кадре тренажёр из каталога (и id/адрес/заголовок теперь его)
 function syncTrainersFrame(){
   if (!trainersOpenId) return false;
@@ -6373,23 +6355,9 @@ trainersIframe.addEventListener('load', () => {
   if (trainersFrameIsHome(loc) || !syncTrainersFrame()){ closeTrainerFrame(); return; }
   let doc = null;
   try { doc = trainersIframe.contentDocument; } catch (e) {}
-  if (!doc || doc.__bdHomeHook) return;
-  doc.__bdHomeHook = true;
-  // стрелку «Ко всем тренажёрам» и любые ссылки на главную перехватываем
-  // ещё до обработчика страницы (фаза перехвата на документе): иначе в
-  // кадре на мгновение мелькнула бы обычная главная
-  doc.addEventListener('click', (e) => {
-    const a = e.target && e.target.closest && e.target.closest('a[href], #homeBtn');
-    if (!a) return;
-    let home = a.id === 'homeBtn';
-    if (!home && a.href){
-      try { home = trainersFrameIsHome(new URL(a.href, doc.baseURI)); } catch (err) {}
-    }
-    if (!home) return;
-    e.preventDefault();
-    e.stopImmediatePropagation();
-    closeTrainerFrame();
-  }, true);
+  // стрелка «Ко всем тренажёрам», подъём клавиатуры над рядом кнопок и
+  // «Добавить теорию на доску» (ОГЭ №1–5) — общие со вкладкой-панелью
+  ttHookTrainerFrameDoc(doc, { onHome: closeTrainerFrame, onTheory: addTheoryToBoard });
 });
 
 /* ── Промпт №68: открыть / свернуть / закрыть ──
@@ -6676,6 +6644,30 @@ function taskGapFor(h){ return Math.max(4, Math.min(24, Math.round(TASK_GAP_K * 
 // задания до этой правки отступа не знают — у них прежний постоянный
 function taskGapOf(o){ return (o && o.gap > 0) ? o.gap : TASK_GAP; }
 function taskScaleOf(o){ return o.w / o.css.w; }
+/* «Последний выбранный масштаб задания» (промпт «сопряжение панели», этап 2):
+   B.taskScale — масштаб, который учитель выбрал сам: закрепил задание после
+   ручного размещения (призрак) или растянул уже вставленное за угол.
+   Ключ лежит в самой доске: масштаб — в единицах доски на CSS-пиксель
+   тренажёра, на другой доске с другой клеткой он значил бы другое.
+   Новая стопка начинается в этом масштабе, а не «под экран». Внутри стопки
+   по-прежнему масштаб последнего задания (taskScaleOf(st.last)) — кроме
+   случая, когда выбор сделан позже, чем легло это последнее (растянули
+   более раннее задание стопки): выбор учителя главнее. */
+function rememberedTaskScale(){
+  const s = B && B.taskScale;
+  return (Number.isFinite(s) && s > 0) ? Math.max(TASK_MIN_S, Math.min(TASK_MAX_S, s)) : null;
+}
+function stackTaskScale(st){
+  const r = rememberedTaskScale();
+  return (r && (B.taskScaleAt || 0) > (st.last.addedAt || 0)) ? r : taskScaleOf(st.last);
+}
+function noteTaskScale(o){
+  if (!B || !o || o.type !== 'image' || !o.css || !(o.css.w > 0)) return;
+  // только задания с тренажёра — у обычной картинки «масштаб задания» нет
+  if (!o.task && !o.gen && !o.stack) return;
+  B.taskScale = taskScaleOf(o);
+  B.taskScaleAt = Date.now();
+}
 // предел размера: шестая часть листа — на листе помещаются 2 столбика по 3
 function taskMaxBox(){
   const sw = sheetWpx(), sh = sheetHpx();
@@ -6715,7 +6707,7 @@ function currentTaskStack(){
 // ширина узла cw переносится только на узел того же вида: ширину условия
 // ЕГЭ на столбик переносить бессмысленно
 function widthLike(ref, gen){
-  return (ref && ref.css && ref.css.cw && gen && gen.node && ref.gen && ref.gen.node === gen.node) ? ref.css.cw : null;
+  return ttWidthLike(ref && ref.gen && ref.gen.node, ref && ref.css && ref.css.cw, gen);
 }
 // ширина для задания из панели — до снимка (снимок делается сразу нужной ширины)
 function widthForNewTask(gen){
@@ -6813,36 +6805,26 @@ function newStackSpot(w, h, g){
   return rectHits(s, obs, g - 0.5) ? f : s;
 }
 
-// снимок задания; sol — разбор «Тренировки» (trainerSolutionHTML): тогда
-// разбор снимается отдельной картинкой, а на карточке внизу — ряд с кнопкой.
-// Разбор не снялся — задание всё равно ложится, просто без кнопки
-async function captureTaskWithSolution(el, info, cw, sol){
-  const opts = { width: cw };
-  if (!sol) return captureTrainerNode(el, info, opts);
-  const shot = await captureTrainerNode(el, info, Object.assign({}, opts, { solRow: true }));
-  try {
-    // разбор — шириной во всю карточку задания: под ней он и раскрывается
-    const solImg = await captureSolutionImage(el, sol, shot.css.w);
-    if (shot.solHot) shot.sol = { v: 1, src: solImg.src, css: solImg.css, card: solImg.card, hot: shot.solHot, open: false };
-    return shot;
-  } catch (e) {
-    console.warn('[доска] не удалось снять разбор задания', e);
-    // ряд с кнопкой без разбора был бы мёртвым — снимаем задание без него
-    return captureTrainerNode(el, info, opts);
-  }
-}
+// снимок задания с разбором (captureTaskWithSolution) — в trainer-capture.js
 
 // вставка одной готовой картинки задания на доску — тот же формат объекта,
 // что и у обычной вставленной картинки (см. imgModalInsert выше).
 // beside — исходное задание для «ещё такое же» и сторона (src, dir); без
 // него задание идёт в стопку (из панели тренажёров).
-// shot — результат captureTrainerNode (card, css); cw — заданная ширина узла
-async function insertTaskImage(dataUrl, task, gen, beside, shot, cw){
+// shot — результат captureTrainerNode (card, css); cw — заданная ширина узла.
+// place = { x, y, w, h } — место и размер выбрал сам учитель (ручное
+// размещение с призраком): задание начинает там новую стопку
+async function insertTaskImage(dataUrl, task, gen, beside, shot, cw, place){
   const card = shot && shot.card;
   const sz = await taskImageSize(dataUrl);
   const css = shot && shot.css;
   let pt, gap, stack = null;
-  if (beside){
+  if (place){
+    sz.w = place.w; sz.h = place.h;
+    pt = { x: place.x, y: place.y };
+    gap = taskGapFor(sz.h);
+    stack = { id: 'st' + uid(), i: 0, x0: pt.x, y0: pt.y, c: 0, b: 0 };
+  } else if (beside){
     const src = beside.src;
     if (css && src.css && src.css.w){ const s = taskScaleOf(src); sz.w = css.w * s; sz.h = css.h * s; }
     gap = taskGapOf(src);
@@ -6852,7 +6834,7 @@ async function insertTaskImage(dataUrl, task, gen, beside, shot, cw){
   } else {
     const st = currentTaskStack();
     if (css){
-      const s = st ? taskScaleOf(st.last) : scaleForNewStack(css);
+      const s = st ? stackTaskScale(st) : (rememberedTaskScale() || scaleForNewStack(css));
       sz.w = css.w * s; sz.h = css.h * s;
     }
     if (st){
@@ -6887,41 +6869,25 @@ async function insertTaskImage(dataUrl, task, gen, beside, shot, cw){
 trainersAddBtn.addEventListener('click', async () => {
   syncTrainersFrame();
   if (!trainersOpenId || !B) return;
-  let doc;
-  try { doc = trainersIframe.contentDocument; } catch(e){ doc = null; }
-  if (!doc){ showTrainersToast('Не удалось получить доступ к тренажёру'); return; }
-  // теорию к заданию (ОГЭ №1–5) кладёт своя кнопка «Добавить теорию на
-  // доску» рядом с «Показать теорию» (addTheoryToBoard) — сюда она больше не
-  // едет довеском к каждому заданию
-  const all = collectTrainerCaptureNodes(doc, trainersOpenId);
-  all.forEach(n => { if (n.el.id === 'theoryContent' && n.restore) n.restore(); });
-  const nodes = all.filter(n => n.el.id !== 'theoryContent');
-  if (!nodes.length){ showTrainersToast('Не нашли текущее задание — попробуйте сгенерировать заново'); return; }
+  let win;
+  try { win = trainersIframe.contentWindow; void win.document; } catch(e){ win = null; }
+  if (!win){ showTrainersToast('Не удалось получить доступ к тренажёру'); return; }
   trainersAddBtn.disabled = true;
   // пока снимаем, пример в кадре менять нельзя — снялось бы полузаменённое
   trainersRefreshBtn.disabled = true;
-  let added = 0;
-  try {
-    const win = trainersIframe.contentWindow;
-    for (const { el, restore } of nodes){
-      try {
-        // ответ читаем до снимка — пока на странице то же задание, что снимаем
-        const info = trainerTaskInfo(win, trainersOpenId, el);
-        const gen = trainerGenInfo(win, trainersOpenId, trainersOpenHref, el);
-        const cw = widthForNewTask(gen);
-        const shot = await captureTaskWithSolution(el, info, cw, trainerSolutionHTML(win, trainersOpenId, el));
-        await insertTaskImage(shot.dataUrl, (info && shot.hot) ? Object.assign({ v: 1 }, info, { hot: shot.hot }) : null, gen, null, shot, cw);
-        added++;
-        scheduleRedraw();   // каждое задание — на глазах, не дожидаясь остальных из пакета
-      } finally {
-        if (restore) restore();
-      }
-    }
-  } catch(err){
-    console.error('[trainers panel] capture failed', err);
-  }
+  // цикл снятия — общий со вкладкой-панелью (trainer-capture.js): задание
+  // оттуда и отсюда должно получаться одинаковым
+  const res = await ttSnapTrainerTasks(win, trainersOpenId, trainersOpenHref, {
+    widthFor: widthForNewTask,
+    onShot: async (it) => {
+      await insertTaskImage(it.dataUrl, it.task, it.gen, null, it.shot, it.cw);
+      scheduleRedraw();   // каждое задание — на глазах, не дожидаясь остальных из пакета
+    },
+  });
   trainersAddBtn.disabled = false;
   trainersRefreshBtn.disabled = false;
+  if (res.none){ showTrainersToast('Не нашли текущее задание — попробуйте сгенерировать заново'); return; }
+  const added = res.added;
   if (added){
     saveDB(); scheduleRedraw();
     showTrainersToast(added === 1 ? 'Добавлено на доску' : `Добавлено на доску: ${added}`);
@@ -6953,58 +6919,24 @@ function refreshTrainerInPanel(){
   try { win = trainersIframe.contentWindow; } catch (e) {}
   return refreshTrainerIn(win, trainersOpenId);
 }
-// В узкой панели тренажёр живёт в «телефонной» вёрстке, и его плавающая
-// клавиатура прижата к низу кадра справа — ровно туда, где ряд «Добавить /
-// Обновить». С двумя кнопками ряд стал шире и закрывал «Ввод» клавиатуры.
-// Поднимаем её в кадре над рядом: margin у fixed-панели с bottom сдвигает её
-// вверх, а на широкой вёрстке (там top) ничего не меняет. Файлы тренажёров
-// не трогаем — стиль кладётся только в кадр панели
-trainersIframe.addEventListener('load', () => {
-  let doc = null;
-  try { doc = trainersIframe.contentDocument; } catch (e) {}
-  if (!doc || !doc.head || doc.getElementById('bdPanelKpLift')) return;
-  const st = doc.createElement('style');
-  st.id = 'bdPanelKpLift';
-  st.textContent = '.keypad-float,.keypad-toggle{margin-bottom:58px !important;}';
-  doc.head.appendChild(st);
-});
-
 /* ── ОГЭ №1–5: «Добавить теорию на доску» ──
    У наборов №1–5 («Шина», тарифы…) под заданием кнопка «Показать теорию»:
    без неё задачу не решить. Раньше теория уезжала на доску довеском к
    КАЖДОМУ заданию — пять заданий набора давали пять одинаковых листов
    теории. Теперь у неё своя кнопка, рядом с «Показать теорию», и задание
-   кладётся без неё. Кнопку кладёт в кадр сама доска (как стиль выше): на
-   странице тренажёра она не нужна, а файл тренажёра не трогаем. Появляется
-   и прячется вместе с блоком теории — его тренажёр показывает только у
-   заданий, где теория есть. */
-trainersIframe.addEventListener('load', () => {
-  let doc = null;
-  try { doc = trainersIframe.contentDocument; } catch (e) {}
-  const toggle = doc && doc.getElementById('theoryToggleBtn');
-  if (!toggle || doc.getElementById('bdTheoryAddBtn')) return;
-  const b = doc.createElement('button');
-  b.type = 'button'; b.id = 'bdTheoryAddBtn';
-  b.className = toggle.className;
-  b.textContent = '📥 Добавить теорию на доску';
-  b.addEventListener('click', () => addTheoryToBoard(b));
-  toggle.insertAdjacentElement('afterend', b);
-});
+   кладётся без неё. Кнопку (и подъём плавающей клавиатуры над рядом кнопок
+   панели) кладёт в кадр сама доска — ttHookTrainerFrameDoc в
+   trainer-capture.js, общий со вкладкой-панелью; файл тренажёра не трогаем. */
 let theoryAdding = false;
 async function addTheoryToBoard(btn){
   if (theoryAdding || !B) return;
   let doc = null;
   try { doc = trainersIframe.contentDocument; } catch (e) {}
-  const el = doc && doc.getElementById('theoryContent');
-  if (!el || !el.textContent.trim()){ showTrainersToast('У этого задания нет теории'); return; }
   theoryAdding = true;
   btn.disabled = true; trainersAddBtn.disabled = true;
-  // свёрнутую теорию на время снимка раскрываем: html2canvas нужна настоящая
-  // вёрстка (так же делал collectTrainerCaptureNodes с unhide)
-  const prev = el.style.display;
-  if (getComputedStyle(el).display === 'none') el.style.display = 'block';
   try {
-    const shot = await captureTrainerNode(el, null, {});
+    const shot = await ttSnapTheory(doc);
+    if (!shot){ showTrainersToast('У этого задания нет теории'); return; }
     await insertTaskImage(shot.dataUrl, null, null, null, shot, null);
     saveDB(); scheduleRedraw();
     showTrainersToast('Теория добавлена на доску');
@@ -7012,7 +6944,6 @@ async function addTheoryToBoard(btn){
     console.error('[trainers panel] theory capture failed', err);
     showTrainersToast('Не получилось добавить теорию');
   } finally {
-    el.style.display = prev;
     btn.disabled = false; trainersAddBtn.disabled = false;
     theoryAdding = false;
   }
@@ -7031,6 +6962,387 @@ trainersRefreshBtn.addEventListener('click', () => {
   trainersRefreshBtn.classList.remove('spin');
   void trainersRefreshBtn.offsetWidth;
   trainersRefreshBtn.classList.add('spin');
+});
+
+/* ═══════════════════════════════════════════════════════════════════════
+   СОПРЯЖЕНИЕ ПАНЕЛИ ТРЕНАЖЁРОВ С ДОСКОЙ (board-link.js, boards-panel.html)
+   Панель можно вынести в отдельную вкладку, окно или на телефон/планшет:
+   снимок задания делает она, а сюда приходит готовая картинка с теми же
+   метаданными, что у встроенной панели, и ложится тем же insertTaskImage —
+   стопка, масштаб, «ещё такое же», общая доска (session-share) работают
+   с ней так же, как с заданием из встроенной панели.
+   Здесь только окна доски; протокол, ключи устройств и очередь — в
+   board-link.js. У просмотра доски учеником (?s=) приёма нет: это не
+   доска учителя. */
+const linkModalEl = document.getElementById('linkModalBackdrop');
+const linkAskEl = document.getElementById('linkAsk');
+const linkQueueEl = document.getElementById('linkQueue');
+const linkToastEl = document.getElementById('linkToast');
+const LINK_ASK_TIMEOUT_MS = 110000;   // чуть меньше, чем панель ждёт ответа
+let linkAskResolve = null;
+function boardLinkPanelUrl(code){
+  const u = new URL('boards-panel.html', location.href);
+  u.search = '';
+  // код — в «#», а не в ?: часть после # не уходит на сервер и в его логи
+  u.hash = code ? 'pair=' + code : '';
+  return u.toString();
+}
+// доска занята — задание с панели ждёт в очереди, а не ложится поверх
+// открытого окна или чужого действия
+function boardLinkBusy(){
+  if (!B || !boardActive || boardAccess === 'view') return true;
+  if (document.querySelector('.bd-modal-backdrop.open')) return true;
+  if (linkAskEl.classList.contains('show')) return true;
+  if (placeGhost) return true;   // идёт ручное размещение — следующее ждёт
+  return false;
+}
+// присланное устройством проверяем по форме: ключ знает только своё
+// устройство, но кривое сообщение не должно ронять доску
+function boardLinkPayload(p){
+  if (!p || typeof p.img !== 'string' || !/^data:image\/(png|webp|jpeg);base64,/.test(p.img)) return null;
+  const obj = v => (v && typeof v === 'object' && !Array.isArray(v)) ? v : null;
+  const css = obj(p.css);
+  if (css && !(css.w > 0 && css.h > 0)) return null;
+  return { img: p.img, task: obj(p.task), gen: obj(p.gen),
+    cw: (typeof p.cw === 'number' && p.cw > 0) ? p.cw : null,
+    shot: { card: obj(p.card), css, sol: obj(p.sol) } };
+}
+async function boardLinkInsert(p, dev){
+  const it = boardLinkPayload(p);
+  if (!it) throw new Error('задание пришло в неверном виде');
+  await insertTaskImage(it.img, it.task, it.gen, null, it.shot, it.cw);
+  saveDB(); scheduleRedraw();
+  showLinkToast('Задание с «' + dev.name + '» на доске');
+  if (boardLink) boardLink.stateChanged();
+}
+// ширина узла для снимка на панели — та же, что взяла бы встроенная панель
+// (widthForNewTask): вид и ширина последнего задания видимой стопки
+function boardLinkState(){
+  let ref = null;
+  if (B && boardActive){
+    try {
+      const st = currentTaskStack();
+      if (st && st.last) ref = { node: (st.last.gen && st.last.gen.node) || null, cw: (st.last.css && st.last.css.cw) || null };
+    } catch (e) {}
+  }
+  return { ref, board: B ? (B.name || '') : '' };
+}
+function boardLinkAsk(dev){
+  return new Promise(resolve => {
+    document.getElementById('linkAskText').textContent = 'Подключить «' + dev.name + '»?';
+    linkAskEl.classList.add('show');
+    // ушли от доски и не ответили — отказ: висящее окошко держало бы все
+    // остальные запросы и задания
+    const t = setTimeout(() => finish(false), LINK_ASK_TIMEOUT_MS);
+    function finish(ok){
+      clearTimeout(t);
+      linkAskResolve = null;
+      linkAskEl.classList.remove('show');
+      resolve(ok);
+    }
+    linkAskResolve = finish;
+  });
+}
+document.getElementById('linkAskAllow').addEventListener('click', () => { if (linkAskResolve) linkAskResolve(true); });
+document.getElementById('linkAskDeny').addEventListener('click', () => { if (linkAskResolve) linkAskResolve(false); });
+function showLinkToast(msg){
+  linkToastEl.textContent = msg;
+  linkToastEl.classList.add('show');
+  clearTimeout(showLinkToast._t);
+  showLinkToast._t = setTimeout(() => linkToastEl.classList.remove('show'), 2400);
+}
+let linkQrCode = null;
+function renderBoardLink(){
+  if (!boardLink) return;
+  const n = boardLink.queueLength();
+  linkQueueEl.textContent = n ? 'Задания с панели: ещё ' + n + ' в очереди' : '';
+  linkQueueEl.classList.toggle('show', n > 0);
+  if (!linkModalEl.classList.contains('open')) return;
+  const code = boardLink.code;
+  document.getElementById('linkCode').textContent = BoardLink.formatCode(code);
+  document.getElementById('linkUrl').textContent = boardLinkPanelUrl('').replace(/^https?:\/\//, '');
+  if (linkQrCode !== code){
+    linkQrCode = code;
+    try { document.getElementById('linkQr').innerHTML = MathhQR.svg(boardLinkPanelUrl(code)); } catch (e) { console.error(e); }
+  }
+  const list = document.getElementById('linkDevices');
+  const devs = boardLink.devices();
+  // поле имени, в котором сейчас печатают, не пересобираем — иначе курсор слетит
+  if (list.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;
+  list.innerHTML = '';
+  if (!devs.length){
+    const e = document.createElement('div');
+    e.className = 'bd-link-empty';
+    e.textContent = 'Пока ни одного';
+    list.appendChild(e);
+  }
+  devs.forEach(d => {
+    const row = document.createElement('div');
+    row.className = 'bd-link-dev';
+    row.dataset.id = d.id;
+    const dot = document.createElement('span');
+    dot.className = 'bd-link-dot' + (d.online ? ' on' : '');
+    dot.title = d.online ? 'в сети' : 'не в сети';
+    const inp = document.createElement('input');
+    inp.value = d.name;
+    inp.maxLength = 40;
+    inp.title = 'Имя устройства — можно поменять';
+    inp.addEventListener('change', () => boardLink.rename(d.id, inp.value));
+    const off = document.createElement('button');
+    off.className = 'bd-link-btn';
+    off.textContent = 'Отключить';
+    off.addEventListener('click', () => boardLink.disconnect(d.id));
+    row.append(dot, inp, off);
+    list.appendChild(row);
+  });
+}
+const boardLink = (window.BoardLink && !window.__boardViewer) ? BoardLink.createHost({
+  isBusy: boardLinkBusy,
+  insert: boardLinkInsert,
+  placeManual: (p, dev) => {
+    const it = boardLinkPayload(p);
+    if (!it) return Promise.reject(new Error('задание пришло в неверном виде'));
+    return placeTaskManually(it, '«' + dev.name + '»');
+  },
+  state: boardLinkState,
+  ask: boardLinkAsk,
+  onChange: renderBoardLink,
+}) : null;
+function openLinkModal(){
+  linkModalEl.classList.add('open');
+  if (boardLink) boardLink.setPairingVisible(true);   // телефон подключают, глядя на это окно
+  renderBoardLink();
+  clearInterval(openLinkModal._t);
+  // точки «в сети» живут по времени, а не по событиям
+  openLinkModal._t = setInterval(() => { if (linkModalEl.classList.contains('open')) renderBoardLink(); else clearInterval(openLinkModal._t); }, 2000);
+}
+function closeLinkModal(){
+  linkModalEl.classList.remove('open');
+  if (boardLink) boardLink.setPairingVisible(false);
+  if (boardLink) boardLink.pump();
+}
+const linkBtnEl = document.getElementById('bdTrainersLinkBtn');
+if (!boardLink) linkBtnEl.style.display = 'none';
+linkBtnEl.addEventListener('click', openLinkModal);
+document.getElementById('linkModalClose').addEventListener('click', closeLinkModal);
+linkModalEl.addEventListener('click', (e) => { if (e.target === linkModalEl) closeLinkModal(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && linkModalEl.classList.contains('open')) closeLinkModal(); });
+document.getElementById('linkChangeCode').addEventListener('click', () => { if (boardLink) boardLink.changeCode(); });
+// своя вкладка или окно этого же браузера подключается без кода (ключ —
+// через общий localStorage). Окно открываем сразу по нажатию, до всего
+// остального: после паузы браузер счёл бы его всплывающим и не открыл
+function openPanelElsewhere(asWindow){
+  if (!boardLink) return;
+  boardLink.linkLocalPanel();
+  const url = boardLinkPanelUrl('');
+  if (asWindow) window.open(url, 'bdTrainersPanelWin', 'popup=yes,width=560,height=900');
+  else window.open(url, '_blank');
+  closeLinkModal();
+}
+document.getElementById('linkOpenTab').addEventListener('click', () => openPanelElsewhere(false));
+document.getElementById('linkOpenWin').addEventListener('click', () => openPanelElsewhere(true));
+
+/* ═══════════════════════════════════════════════════════════════════════
+   РУЧНОЕ РАЗМЕЩЕНИЕ ЗАДАНИЯ С ПРИЗРАКОМ (промпт «сопряжение панели», этап 2)
+   «Добавить вручную» во встроенной панели или на вынесенной: на доске
+   появляется само задание — его картинка, полупрозрачная, с пунктиром.
+   Масштаб учитель выбирает, глядя на настоящую вёрстку задания (чтобы
+   половина примера не уехала на новую строку или лист), а не на рамку.
+   Призрак двигают и растягивают за углы с сохранением пропорций — мышью,
+   пальцем или пером; «Закрепить» превращает его в обычное задание
+   (insertTaskImage с выбранным местом и размером, новая стопка оттуда),
+   выбранный масштаб запоминается (noteTaskScale) для следующих заданий.
+
+   Почему призрак — элемент поверх холста, а не объект доски: его не должно
+   быть нигде, кроме экрана того, кто размещает. Объект в B.objects попал бы
+   в сохранение, отмену, облако, совместную сессию к ученикам и выгрузку в
+   PDF/картинку (они рисуют из B.objects). Отдельный слой не попадает
+   никуда сам собой, без исключений в каждом из этих мест. */
+let placeGhost = null;   // { board, it, x, y, w, h, ratio, minW, maxW, el, img, resolve }
+const PLACE_GHOST_MIN = 40;   // меньше призрак не сжать — за углы будет не ухватить
+function placeGhostLayer(){
+  let l = document.getElementById('bdGhostLayer');
+  if (l) return l;
+  l = document.createElement('div');
+  l.id = 'bdGhostLayer';
+  canvas.insertAdjacentElement('afterend', l);
+  // колесо над призраком — всё равно масштаб и прокрутка доски
+  l.addEventListener('wheel', (e) => { e.preventDefault(); canvas.dispatchEvent(new WheelEvent('wheel', e)); }, { passive: false });
+  return l;
+}
+// стартовый размер призрака — тот, с которым задание легло бы само:
+// выбранный учителем масштаб, иначе масштаб стопки, иначе «под экран»
+async function placeGhostStartSize(it){
+  const css = it.shot && it.shot.css;
+  if (css && css.w > 0){
+    const st = currentTaskStack();
+    const s = rememberedTaskScale() || (st ? stackTaskScale(st) : scaleForNewStack(css));
+    return { w: css.w * s, h: css.h * s };
+  }
+  const sz = await taskImageSize(it.img);
+  return { w: sz.w, h: sz.h };
+}
+// → Promise<'placed' | 'cancelled'>; who — откуда задание (подпись на призраке)
+async function placeTaskManually(it, who){
+  if (placeGhost) throw new Error('уже идёт размещение');
+  if (!B || !boardActive) return 'cancelled';
+  const sz = await placeGhostStartSize(it);
+  const v = visibleBoardRect();
+  const css = it.shot && it.shot.css;
+  const g = {
+    board: B, it,
+    w: sz.w, h: sz.h, ratio: sz.w / sz.h,
+    x: v.x + (v.w - sz.w) / 2, y: v.y + Math.max(0, (v.h - sz.h) / 2),
+    // те же пределы, что у растягивания задания за угол (applyHandle)
+    minW: Math.max(PLACE_GHOST_MIN / cam.zoom, css && css.w ? TASK_MIN_S * css.w : 0),
+    maxW: css && css.w ? TASK_MAX_S * css.w : Infinity,
+  };
+  const el = document.createElement('div');
+  el.className = 'bd-ghost';
+  el.innerHTML = `<img alt="" draggable="false">
+    <span class="bd-ghost-h" data-c="nw"></span><span class="bd-ghost-h" data-c="ne"></span>
+    <span class="bd-ghost-h" data-c="sw"></span><span class="bd-ghost-h" data-c="se"></span>`;
+  // кнопки — отдельной плашкой рядом с призраком, а не внутри него: так их
+  // можно удержать в пределах экрана, куда бы призрак ни утащили
+  const bar = document.createElement('div');
+  bar.className = 'bd-ghost-bar';
+  bar.innerHTML = `<span class="bd-ghost-who"></span>
+    <button type="button" class="bd-ghost-pin">Закрепить</button>
+    <button type="button" class="bd-ghost-cancel">Отмена</button>`;
+  g.el = el; g.bar = bar;
+  g.img = el.querySelector('img');
+  g.img.src = it.img;
+  bar.querySelector('.bd-ghost-who').textContent = who ? 'Задание с ' + who : 'Задание';
+  const layer = placeGhostLayer();
+  layer.append(el, bar);
+  wirePlaceGhost(g);
+  placeGhost = g;
+  syncPlaceGhost();
+  return new Promise(resolve => { g.resolve = resolve; });
+}
+function syncPlaceGhost(){
+  const g = placeGhost;
+  if (!g) return;
+  // доску сменили или закрыли посреди размещения — задание не теряем
+  // молча: размещение отменяется, панель узнает об этом
+  if (B !== g.board || !boardActive){ endPlaceGhost('cancelled'); return; }
+  const z = cam.zoom;
+  const L = (g.x - cam.x) * z, T = (g.y - cam.y) * z, W = g.w * z, H = g.h * z;
+  Object.assign(g.el.style, { left: L + 'px', top: T + 'px', width: W + 'px', height: H + 'px' });
+  // плашка — под призраком по центру; не помещается снизу — над ним; и в
+  // любом случае внутри видимой части доски
+  const lw = canvas.clientWidth || cssW, lh = canvas.clientHeight || cssH;
+  const bw = g.bar.offsetWidth, bh = g.bar.offsetHeight, M = 8;
+  let bx = L + W / 2 - bw / 2, by = T + H + 10;
+  if (by + bh > lh - 76) by = T - bh - 10;   // снизу — док инструментов
+  bx = Math.max(M, Math.min(lw - bw - M, bx));
+  by = Math.max(62, Math.min(lh - bh - 76, by));
+  g.bar.style.left = bx + 'px'; g.bar.style.top = by + 'px';
+}
+function endPlaceGhost(result){
+  const g = placeGhost;
+  if (!g) return;
+  placeGhost = null;
+  g.el.remove(); g.bar.remove();
+  scheduleRedraw();
+  g.resolve(result);
+  if (boardLink) boardLink.pump();   // очередь с панелей ждала этого
+}
+async function pinPlaceGhost(){
+  const g = placeGhost;
+  if (!g || g.pinning) return;
+  if (B !== g.board){ endPlaceGhost('cancelled'); return; }
+  g.pinning = true;
+  const it = g.it;
+  try {
+    const obj = await insertTaskImage(it.img, it.task, it.gen, null, it.shot, it.cw, { x: g.x, y: g.y, w: g.w, h: g.h });
+    noteTaskScale(obj);
+    saveDB();
+    endPlaceGhost('placed');
+  } catch (e) {
+    console.error('[доска] не удалось закрепить задание', e);
+    g.pinning = false;
+    showLinkToast('Не получилось закрепить задание');
+  }
+}
+function wirePlaceGhost(g){
+  const el = g.el;
+  // точка указателя в единицах доски (холст начинается правее панели)
+  const worldAt = (e) => { const r = canvas.getBoundingClientRect(); return screenToWorld(e.clientX - r.left, e.clientY - r.top); };
+  let drag = null;
+  el.addEventListener('pointerdown', (e) => {
+    e.preventDefault(); e.stopPropagation();
+    const h = e.target.closest('.bd-ghost-h');
+    const p = worldAt(e);
+    if (h){
+      // противоположный угол стоит на месте — «якорь», как у картинки на доске
+      const c = h.dataset.c;
+      drag = { c, ax: c.includes('w') ? g.x + g.w : g.x, ay: c.includes('n') ? g.y + g.h : g.y };
+    } else {
+      drag = { c: null, dx: p.x - g.x, dy: p.y - g.y };
+    }
+    try { el.setPointerCapture(e.pointerId); } catch (err) {}
+    el.classList.add('dragging');
+  });
+  el.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    e.preventDefault();
+    const p = worldAt(e);
+    if (!drag.c){ g.x = p.x - drag.dx; g.y = p.y - drag.dy; }
+    else {
+      const sx = drag.c.includes('e') ? 1 : -1, sy = drag.c.includes('s') ? 1 : -1;
+      // ширина — по большей из двух проекций: пером по диагонали тянут
+      // неровно, и угол должен идти за ним, куда бы тот ни отклонился
+      let w = Math.max((p.x - drag.ax) * sx, (p.y - drag.ay) * sy * g.ratio);
+      w = Math.max(g.minW, Math.min(g.maxW, w));
+      g.w = w; g.h = w / g.ratio;
+      g.x = sx > 0 ? drag.ax : drag.ax - g.w;
+      g.y = sy > 0 ? drag.ay : drag.ay - g.h;
+    }
+    syncPlaceGhost();
+  });
+  const end = () => { drag = null; el.classList.remove('dragging'); };
+  el.addEventListener('pointerup', end);
+  el.addEventListener('pointercancel', end);
+  g.bar.querySelector('.bd-ghost-pin').addEventListener('click', pinPlaceGhost);
+  g.bar.querySelector('.bd-ghost-cancel').addEventListener('click', () => endPlaceGhost('cancelled'));
+}
+document.addEventListener('keydown', (e) => {
+  if (!placeGhost) return;
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  if (e.key === 'Escape'){ e.preventDefault(); e.stopPropagation(); endPlaceGhost('cancelled'); }
+  else if (e.key === 'Enter'){ e.preventDefault(); e.stopPropagation(); pinPlaceGhost(); }
+}, true);
+
+// «Добавить вручную» во встроенной панели: снимок тот же, что у «Добавить
+// на доску»; панель на время размещения сворачивается, чтобы не закрывать
+// доску, и возвращается, когда задание закреплено или отменено
+const trainersManualBtn = document.getElementById('bdTrainersManualBtn');
+trainersManualBtn.addEventListener('click', async () => {
+  syncTrainersFrame();
+  if (!trainersOpenId || !B) return;
+  if (placeGhost){ showTrainersToast('Сначала закрепите или отмените задание на доске'); return; }
+  let win;
+  try { win = trainersIframe.contentWindow; void win.document; } catch(e){ win = null; }
+  if (!win){ showTrainersToast('Не удалось получить доступ к тренажёру'); return; }
+  const wasOpen = trainersPanelIsOpen();
+  trainersAddBtn.disabled = trainersRefreshBtn.disabled = trainersManualBtn.disabled = true;
+  let placed = 0, cancelled = 0;
+  const res = await ttSnapTrainerTasks(win, trainersOpenId, trainersOpenHref, {
+    widthFor: widthForNewTask,
+    onShot: async (it) => {
+      if (trainersPanelIsOpen()) setTrainersPanel('collapsed');
+      const r = await placeTaskManually({ img: it.dataUrl, task: it.task, gen: it.gen, shot: it.shot, cw: it.cw }, 'тренажёра');
+      if (r === 'placed') placed++; else cancelled++;
+    },
+  });
+  trainersAddBtn.disabled = trainersRefreshBtn.disabled = trainersManualBtn.disabled = false;
+  if (wasOpen) setTrainersPanel('open');
+  if (res.none){ showTrainersToast('Не нашли текущее задание — попробуйте сгенерировать заново'); return; }
+  if (placed) showTrainersToast(placed === 1 ? 'Задание закреплено на доске' : `Закреплено на доске: ${placed}`);
+  else if (cancelled) showTrainersToast('Отменено — на доску ничего не добавлено');
+  else showTrainersToast('Не получилось добавить задание');
 });
 
 let genChain = Promise.resolve();   // по одному: кадр у тренажёра один

@@ -1,0 +1,15 @@
+/* Список тренажёров в панели: поиск, группы, строки.
+   Общий у встроенной панели на доске (boards.html, #bdTrainersPanel) и у
+   вкладки-панели (boards-panel.html), чтобы список выглядел одинаково и
+   правился в одном месте. Переменные цвета (--card, --pencil, --muted-2,
+   --hover-1, --glass-border, --font-ui, --font-mono) задаёт сама страница. */
+.bd-trainers-search{border:1px solid var(--glass-border);border-radius:9px;background:var(--card);padding:7px 10px;font-family:var(--font-ui);font-size:13px;color:var(--pencil);outline:none;flex:none;}
+.bd-trainers-search::placeholder{color:var(--muted-2);}
+.bd-trainers-groups{flex:1 1 auto;overflow-y:auto;display:flex;flex-direction:column;gap:12px;}
+.bd-trainers-group-title{font-family:var(--font-ui);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted-2);padding:0 2px 4px;}
+.bd-trainers-item{display:flex;align-items:center;gap:8px;width:100%;text-align:left;border:none;background:none;padding:7px 8px;border-radius:9px;cursor:pointer;color:var(--pencil);font-family:var(--font-ui);font-size:12.5px;}
+.bd-trainers-item:hover{background:var(--hover-1);}
+.bd-trainers-item-num{flex:none;width:20px;height:20px;border-radius:6px;background:var(--hover-1);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--muted-2);}
+.bd-trainers-item-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bd-trainers-item-eq{flex:none;font-family:var(--font-mono);font-size:10.5px;color:var(--muted-2);max-width:88px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bd-trainers-empty{padding:10px 4px;color:var(--muted-2);font-family:var(--font-ui);font-size:12.5px;}
