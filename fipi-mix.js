@@ -34,6 +34,9 @@
   const KEY_FILTER = 'fipiMix:filter';
   const KEY_DONE = 'fipiMix:done:';
   const mem = Object.create(null);   // запасной путь без localStorage (приватный режим)
+  // Какое задание ФИПИ вида показано последним (ключ «страница:вид»). Живёт только
+  // в памяти страницы, не в localStorage: «пропустил ⟳» — дело одного подхода.
+  const shownFipi = Object.create(null);
   function read(key, def) {
     try { const raw = localStorage.getItem(key); if (raw) return JSON.parse(raw); } catch (e) {}
     return key in mem ? JSON.parse(mem[key]) : def;
@@ -65,6 +68,17 @@
     if (f.fipi && list.length) {
       const r = rec(page, mode);
       const avail = list.filter(x => r.done.indexOf(x.fipi) < 0);
+      // Тупик с единственным заданием: у вида, где ФИПИ один (многоэтажная дробь
+      // в №6) или остался один нерешённый, ⟳ отдавал бы его снова и снова, пока
+      // не решат, — «примеры не обновляются». Если это же задание уже на экране,
+      // а наши «на основе ФИПИ» разрешены, ⟳ даёт новое задание генератора, без
+      // плашки: ФИПИ ещё не решены, плашку «все решены» показывать рано. Само
+      // задание ФИПИ не теряется — вернётся, как только ученик выйдет в список.
+      if (avail.length === 1 && f.own && shownFipi[page + ':' + mode] === avail[0].fipi) {
+        const t = ownGen();
+        t.basedOnFipi = true;
+        return t;
+      }
       if (avail.length) return withFipi(pick(avail));
       if (!f.own) {
         // «только ФИПИ» и всё решено: второй круг — пустого экрана не бывает
@@ -85,6 +99,9 @@
   function withFipi(item) { const t = item.make(); t.fipi = item.fipi; return t; }
   function commit(page, mode, task, list) {
     if (!task) return;
+    // запоминаем только задание ФИПИ: пока идут наши, оно остаётся «показанным»,
+    // и ⟳ не вернёт его по кругу (см. next)
+    if (task.fipi) shownFipi[page + ':' + mode] = task.fipi;
     if (task.fipiCycle) saveRec(page, mode, { done: [], shown: false });
     else if (task.fipiNotice) { const r = rec(page, mode); r.shown = true; saveRec(page, mode, r); }
   }
@@ -95,6 +112,10 @@
   }
   function countLabel(page, mode, list) {
     if (!list || !list.length) return '';
+    // карточку рисуют, когда ученик на экране выбора типов, то есть вышел из вида:
+    // пропуск ⟳ забываем, и при новом заходе задание ФИПИ снова идёт первым.
+    // Нарочно здесь, а не в страницах: так правило одинаково для всех номеров
+    delete shownFipi[page + ':' + mode];
     const f = filter(), n = list.length;
     if (!f.fipi) return 'на основе ФИПИ';
     const d = rec(page, mode).done.filter(id => list.some(x => x.fipi === id)).length;
