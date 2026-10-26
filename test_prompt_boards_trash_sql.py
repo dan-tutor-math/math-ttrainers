@@ -228,6 +228,29 @@ def main():
         n = pg.ok(f"select public.boards_delete_now(array['{B_OTHER_OLD}'])", 'authenticated', OTHER)
         check(n == '1', 'владелец чужой старой стирает её сам')
 
+        print('F. стирание по индексу, а не полным проходом')
+        # На настоящей базе boards_delete_now упирался в statement timeout
+        # (57014): строки искались через board_id::text, индекс не работал,
+        # каждая доска — полный проход по board_objects. Проверяем счётчиком
+        # полных проходов и тайм-аутом, как у Supabase для вошедших
+        pg.ok(f"""
+          insert into public.boards (id, owner, title)
+            select ('f0000000-0000-4000-8000-' || lpad(g::text, 12, '0'))::uuid, '{ME}', 'груз ' || g
+              from generate_series(1, 100) g;
+          insert into public.board_objects (board_id, obj_id, data)
+            select ('f0000000-0000-4000-8000-' || lpad(b::text, 12, '0'))::uuid, 'o' || o, '{{"t":"pen"}}'::jsonb
+              from generate_series(1, 100) b, generate_series(1, 1000) o;
+          analyze public.board_objects; analyze public.board_objects_deleted; analyze public.boards;""")
+        seq = lambda: int(pg.ok("select seq_scan from pg_stat_user_tables where relname = 'board_objects'"))
+        before = seq()
+        ids = ','.join(f"'f0000000-0000-4000-8000-{i:012d}'" for i in range(1, 11))
+        code, n, err = pg.run(f"set statement_timeout = '3s';\nselect public.boards_delete_now(array[{ids}])",
+                              'authenticated', ME)
+        check(code == 0 and n.endswith('10'), f'10 досок со 100 тыс. объектов в базе стёрты одним вызовом ({n or err})')
+        check(seq() == before, f'ни одного полного прохода по board_objects ({seq() - before})')
+        check(pg.ok("select count(*) from public.board_objects where board_id::text like 'f0000000%'") == '90000',
+              'объекты остальных досок целы')
+
         print('E. права')
         err = pg.fails("select public.board_purge_internal('x')", 'authenticated', ME)
         check(err is not None and 'permission denied' in err, 'служебную функцию не позвать вошедшему')

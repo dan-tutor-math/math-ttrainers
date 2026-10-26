@@ -3109,13 +3109,27 @@
     return window.getDB().boards.some(x => x !== b && x.cloudBoardId === b.cloudBoardId
       && !x.trashedAt && !(except && except.has(x.id)));
   }
-  async function cloudRpc(name, args) {
+  async function cloudRpc(name, args, quiet) {
     if (!window.SB || !window.CURRENT_USER) return { error: 'нет входа' };
     let r;
     try { r = await window.SB.rpc(name, args); } catch (e) { r = { error: e }; }
-    if (r && r.error) cloudTrashFailed(name, r.error);
-    else cloudTrashOk(name);
-    return r || { error: 'пустой ответ' };
+    r = r || { error: 'пустой ответ' };
+    if (!quiet) { if (r.error) cloudTrashFailed(name, r.error); else cloudTrashOk(name); }
+    return r;
+  }
+  // Стирание насовсем — по одной доске за вызов: весь вызов функции — один
+  // запрос под statement timeout, и пачка досок (вход досылает все следы
+  // разом, «С сервера» — сколько отметили) упиралась в него целиком (57014).
+  // Так прошедшие подтверждаются, а не прошедшие повторятся при следующем входе
+  async function cloudDeleteNow(ids) {
+    let firstErr = null;
+    for (const id of ids) {
+      const r = await cloudRpc('boards_delete_now', { p_boards: [id] }, true);
+      if (r.error) { if (!firstErr) firstErr = r.error; if (r.error === 'нет входа') break; }
+      else cloudConfirmGone([id]);
+    }
+    if (firstErr && firstErr !== 'нет входа') cloudTrashFailed('boards_delete_now', firstErr);
+    else if (!firstErr) cloudTrashOk('boards_delete_now');
   }
   function cloudMarkDone(list, flag) {
     list.forEach(b => { if (b[flag]) { b[flag] = false; window.touchBoard(b); } });
@@ -3149,8 +3163,7 @@
       // доску заново, а вход повторит стирание на сервере
       window.noteDeleted('cloud', b.cloudBoardId, { pending: true });
     });
-    if (ids.length) cloudRpc('boards_delete_now', { p_boards: ids })
-      .then(r => { if (!r.error) cloudConfirmGone(ids); });
+    if (ids.length) cloudDeleteNow(ids);
   };
   // При каждом входе: дослать то, что не дошло, и стереть мою просроченную
   // корзину на сервере (вдруг браузер, где доску удалили, больше не открывали)
@@ -3174,10 +3187,7 @@
     }
     // досылаем только неподтверждённые (у следов до этой правки поля нет)
     const gone = [...new Set((db.deleted || []).filter(d => d.kind === 'cloud' && d.pending !== false).map(d => d.id))];
-    if (gone.length) {
-      const r = await cloudRpc('boards_delete_now', { p_boards: gone });
-      if (!r.error) cloudConfirmGone(gone);
-    }
+    if (gone.length) await cloudDeleteNow(gone);
     await cloudRpc('boards_purge_trash', {});
   };
   // движок досок зовёт это, когда список загружен из хранилища (вход к этому

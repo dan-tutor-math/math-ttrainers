@@ -70,6 +70,8 @@ FAKE_SB_JS = """
   window.SB = {
     rpc: (name, args) => {
       window.__rpcLog.push([name, JSON.parse(JSON.stringify(args || {}))]);
+      if ((window.__rpcFailIds || []).some(id => ((args || {}).p_boards || []).includes(id)))
+        return Promise.resolve({ data: null, error: { code: '57014', message: 'canceling statement due to statement timeout' } });
       if (window.__rpcFail.includes(name))
         return Promise.resolve({ data: null, error: { code: 'PGRST202', message: 'Could not find the function public.' + name + ' in the schema cache' } });
       return ok(1);
@@ -321,6 +323,23 @@ def run():
         check("C: след подтверждён", (trace("cb_M") or {}).get("pending") is False)
         check("C: доска не вернулась", cards_of("cb_M") == [])
         check("C: плашка ушла", not page.is_visible("#blCloudWarn"))
+
+        # стирание — по одной доске за вызов: тайм-аут одной (57014) не валит
+        # остальные, прошедшие подтверждаются
+        page.evaluate("""() => { window.noteDeleted('cloud', 'cb_x', { pending: true });
+                                  window.noteDeleted('cloud', 'cb_y', { pending: true });
+                                  window.__rpcFailIds = ['cb_x']; }""")
+        clear_rpc()
+        console_errors.clear()
+        page.evaluate("() => window.cloudTrashReconcile()")
+        page.wait_for_timeout(400)
+        dels = [a["p_boards"] for n, a in rpc() if n == "boards_delete_now"]
+        check("C: boards_delete_now — по одной доске за вызов", sorted(dels) == [["cb_x"], ["cb_y"]])
+        check("C: прошедшая подтверждена, упавшая ждёт повтора",
+              (trace("cb_y") or {}).get("pending") is False and (trace("cb_x") or {}).get("pending") is True)
+        check("C: тайм-аут виден в плашке и консоли",
+              page.is_visible("#blCloudWarn") and "57014" in page.inner_text("#blCloudWarn")
+              and any("57014" in t for t in console_errors))
 
         check("ошибок JavaScript нет", not errors)
         if errors:

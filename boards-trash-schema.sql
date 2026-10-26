@@ -22,10 +22,34 @@
 --
 -- Сравнение id везде через ::text: тип boards.id в репозитории не записан
 -- (схему заводили руками в Supabase), а text ↔ uuid без приведения дают
--- ошибку «operator does not exist». Таблицы маленькие, индекс тут не нужен.
+-- ошибку «operator does not exist». Так — только в маленьких boards и
+-- board_access; объекты стираются по индексу (board_rows_delete).
 -- ============================================================
 
 alter table public.boards add column if not exists trashed_at timestamptz;
+
+-- Удалить строки одной доски из таблицы tbl по столбцу col. Значение
+-- приводится к типу СТОЛБЦА ($1::uuid), а не столбец к тексту: раньше было
+-- «col::text = $1», индекс по board_id так не работает, и каждая доска
+-- стиралась полным проходом по board_objects (дважды). На настоящей базе
+-- это упёрлось в statement timeout (57014) — «Удалить навсегда» не проходило
+-- и доски возвращались на других устройствах («„воскрешение досок“»).
+create or replace function public.board_rows_delete(p_tbl regclass, p_col name, p_board text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare v_type text;
+begin
+  select format_type(a.atttypid, a.atttypmod) into v_type
+    from pg_attribute a
+   where a.attrelid = p_tbl and a.attname = p_col and not a.attisdropped;
+  if v_type is null then return; end if;
+  execute format('delete from %s where %I = $1::%s', p_tbl, p_col, v_type) using p_board;
+end $$;
+
+revoke all on function public.board_rows_delete(regclass, name, text) from public, anon, authenticated;
 
 -- Полное удаление одной доски. Без проверки прав — её зовут только функции
 -- ниже, которые сами проверили, что доска моя. Наружу не выдаётся.
@@ -43,26 +67,27 @@ begin
   -- доски упрётся в ключ без каскада. Перечень берём из самой базы, а не
   -- пишем руками: так не пропустим таблицу, о которой в коде не знаем
   for r in
-    select c.conrelid::regclass as tbl, a.attname as col
+    select distinct c.conrelid::regclass as tbl, a.attname as col
     from pg_constraint c
     join pg_attribute a on a.attrelid = c.conrelid and a.attnum = c.conkey[1]
     where c.contype = 'f' and c.confrelid = 'public.boards'::regclass
   loop
-    execute format('delete from %s where %I::text = $1', r.tbl, r.col) using p_board;
+    perform public.board_rows_delete(r.tbl, r.col, p_board);
   end loop;
-  -- и те же таблицы, если в них board_id без внешнего ключа
+  -- и те же таблицы, если в них board_id без внешнего ключа (по индексу
+  -- это мгновенно, даже если ключ есть и строки уже стёрты выше)
   if to_regclass('public.board_objects') is not null then
-    delete from public.board_objects where board_id::text = p_board;
+    perform public.board_rows_delete('public.board_objects', 'board_id', p_board);
   end if;
   if to_regclass('public.board_access') is not null then
-    delete from public.board_access where board_id::text = p_board;
+    perform public.board_rows_delete('public.board_access', 'board_id', p_board);
   end if;
   -- журнал удалённых объектов (HANDOFF, раздел 7; в базе может не быть) —
   -- удаление объектов выше как раз наполнило бы его копией всей доски
   if to_regclass('public.board_objects_deleted') is not null then
-    execute 'delete from public.board_objects_deleted where board_id::text = $1' using p_board;
+    perform public.board_rows_delete('public.board_objects_deleted', 'board_id', p_board);
   end if;
-  delete from public.boards where id::text = p_board;
+  perform public.board_rows_delete('public.boards', 'id', p_board);
 end $$;
 
 revoke all on function public.board_purge_internal(text) from public, anon, authenticated;
