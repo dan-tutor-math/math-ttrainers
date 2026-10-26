@@ -92,6 +92,14 @@ body.editing .corner-btn{position:absolute;}
 .add-pos{display:flex;gap:2px;padding:3px;border-radius:12px;background:var(--glass);border:1px solid var(--glass-border);flex:0 0 auto;}
 .add-pos button{font-family:var(--font-ui);font-weight:700;font-size:13px;color:var(--muted-3);background:none;border:none;border-radius:9px;padding:0 9px;cursor:pointer;}
 .add-pos button.active{background:var(--ink);color:#fff;}
+.add-count{display:flex;align-items:center;padding:3px;border-radius:12px;background:var(--glass);border:1px solid var(--glass-border);flex:0 0 auto;}
+.add-count button{font-family:var(--font-ui);font-weight:700;font-size:16px;line-height:1;color:var(--muted-3);background:none;border:none;border-radius:9px;width:26px;align-self:stretch;cursor:pointer;}
+.add-count button:hover:not(:disabled){color:var(--ink);}
+.add-count button:disabled{opacity:.4;cursor:default;}
+.add-count input{width:34px;text-align:center;font-family:var(--font-ui);font-weight:700;font-size:14px;color:var(--ink);background:none;border:none;padding:0;-moz-appearance:textfield;appearance:textfield;}
+.add-count input::-webkit-outer-spin-button,.add-count input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0;}
+.frame-cover{flex-direction:column;gap:12px;}
+.frame-cover .btn{flex:none;}
 #wkTries .own{flex:0 0 74px;width:74px;font-family:var(--font-ui);font-weight:600;font-size:13.5px;text-align:center;color:var(--pencil);
   background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 6px;}
 #wkTries .own.active{border-color:var(--ink);box-shadow:0 0 0 2px var(--hl-10);}
@@ -195,11 +203,17 @@ table.res td.nm small{display:block;color:var(--muted-2);font-size:12px;}
         <div class="cat-list" id="catList"></div>
         <div class="frame-wrap" id="frameWrap" hidden>
           <iframe id="trFrame" title="Тренажёр"></iframe>
-          <div class="frame-cover" id="frameCover" hidden>Снимаю задание…</div>
+          <div class="frame-cover" id="frameCover" hidden>
+            <span id="frameCoverText">Снимаю задание…</span>
+            <button class="btn quiet small" id="batchStop" type="button" hidden>Остановить</button>
+          </div>
         </div>
         <div class="frame-actions" id="frameActions" hidden>
           <div class="add-pos" id="addPos" title="Куда ставить новое задание в списке работы">
             <button data-p="end" title="Новое задание — в конец списка">↓</button><button data-p="start" title="Новое задание — в начало списка">↑</button>
+          </div>
+          <div class="add-count" id="addCountBox" title="Сколько разных заданий этого типа добавить за раз: тренажёр сам подберёт новые, с теми же настройками">
+            <button type="button" id="cntMinus" aria-label="Меньше">−</button><input id="addCount" type="number" min="1" max="30" step="1" value="1" inputmode="numeric" aria-label="Сколько заданий добавить"><button type="button" id="cntPlus" aria-label="Больше">+</button>
           </div>
           <button class="btn" id="addBtn">＋ Добавить в работу</button>
           <button class="btn quiet" id="refreshBtn2" title="Другой пример того же типа — как ⟳ в тренажёре">⟳ Обновить пример</button>
@@ -307,9 +321,9 @@ function applyTheme(t, persist){
 applyTheme(curTheme(), false);
 themeBtn.addEventListener('click', () => { applyTheme(curTheme() === 'dark' ? 'light' : 'dark', true); if (!$('scrEdit').hidden) renderTasks(); });
 
-function toast(msg){
+function toast(msg, ms){
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
-  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), 2800);
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms || 2800);
 }
 function show(id){
   ['scrLoading', 'scrAuth', 'scrList', 'scrEdit', 'scrResults'].forEach(s => { $(s).hidden = s !== id; });
@@ -838,6 +852,71 @@ $('addPos').addEventListener('click', e => {
   try { localStorage.setItem('works:addPos', addPos); } catch (err) {}
 });
 renderAddPos();
+
+/* ── «Добавить N заданий» ──
+   Учитель выбирает в кадре тип (прототип, уровень, галочки вроде
+   «отрицательные степени» или «большие числа»), ставит число и жмёт
+   «Добавить». Сначала снимается то, что уже на экране, дальше — «⟳»
+   самого тренажёра (refreshTrainerIn), по одному на каждое следующее.
+   Именно видимый кадр, а не невидимый кадр по рецепту gen: ограничения
+   живут в состоянии страницы, и свой генератор их уже учитывает — второй
+   путь пришлось бы учить им заново. К тому же у ЕГЭ «новое» — следующий
+   прототип, и с видимым кадром следующая пачка продолжит с того места,
+   где кончилась предыдущая, а не повторит первые.
+   Повторы: тренажёр сам не повторяется (no-repeat.js), но у типов с
+   десятком сочетаний или у ЕГЭ с тремя прототипами задания кончаются.
+   Поэтому каждое новое сверяется с уже снятыми и с заданиями этого
+   тренажёра в работе; подряд BATCH_TRIES совпадений — «других нет», пачка
+   на этом заканчивается честным «добавлено K из N». */
+const COUNT_MAX = 30;       // больше за раз не нужно, а ждать пришлось бы минуту и дольше
+const BATCH_TRIES = 8;      // подряд совпадений, после которых считаем, что новых заданий нет
+const BATCH_WAIT = 250;     // мс: страница дорисовывает задание после «⟳»
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function clampCount(v){ const n = Math.round(Number(v)); return n >= 1 ? Math.min(n, COUNT_MAX) : 1; }
+let addCount = 1;
+try { addCount = clampCount(localStorage.getItem('works:addCount')); } catch (e) {}
+function renderAddCount(){
+  $('addCount').value = addCount;
+  $('cntMinus').disabled = addCount <= 1;
+  $('cntPlus').disabled = addCount >= COUNT_MAX;
+  $('addBtn').textContent = addCount > 1 ? '＋ Добавить ' + addCount + ' в работу' : '＋ Добавить в работу';
+}
+function setAddCount(v){
+  addCount = clampCount(v);
+  try { localStorage.setItem('works:addCount', String(addCount)); } catch (e) {}
+  renderAddCount();
+}
+$('cntMinus').addEventListener('click', () => setAddCount(addCount - 1));
+$('cntPlus').addEventListener('click', () => setAddCount(addCount + 1));
+// пока набирают («1» → «10»), поле не трогаем; нормализуем, когда ушли из него
+$('addCount').addEventListener('input', () => {
+  const n = Math.round(Number($('addCount').value));
+  if (n >= 1){ addCount = Math.min(n, COUNT_MAX); $('cntMinus').disabled = addCount <= 1; $('cntPlus').disabled = addCount >= COUNT_MAX;
+    $('addBtn').textContent = addCount > 1 ? '＋ Добавить ' + addCount + ' в работу' : '＋ Добавить в работу'; }
+});
+$('addCount').addEventListener('change', () => setAddCount($('addCount').value));
+$('addCount').addEventListener('keydown', e => { if (e.key === 'Enter'){ setAddCount($('addCount').value); addFromFrame(); } });
+renderAddCount();
+let batchStopped = false;
+$('batchStop').addEventListener('click', () => { batchStopped = true; $('batchStop').disabled = true; });
+// ключ порядка полей не зависит: из базы (jsonb) объекты приходят с другим порядком ключей
+function canon(x){
+  if (Array.isArray(x)) return '[' + x.map(canon).join(',') + ']';
+  if (x && typeof x === 'object') return '{' + Object.keys(x).sort().map(k => JSON.stringify(k) + ':' + canon(x[k])).join(',') + '}';
+  return JSON.stringify(x === undefined ? null : x);
+}
+const nodeText = el => String(el.textContent || '').replace(/\s+/g, ' ').trim();
+// два ключа: по снимку моста (есть у большинства тренажёров и хранится в работе) и по тексту условия
+// (только у заданий этой сессии: в базу он не пишется). Совпал любой — задание то же
+function taskKeys(task, exact, text){
+  const t = canon(task);
+  return { a: exact ? t + '|' + canon(exact) : null, b: text ? t + '|' + text : null };
+}
+class SeenTasks {
+  constructor(blocks){ this.a = new Set(); this.b = new Set(); blocks.forEach(b => this.add(taskKeys(b.task, b.exact, b._sig))); }
+  has(k){ return !!((k.a && this.a.has(k.a)) || (k.b && this.b.has(k.b))); }
+  add(k){ if (k.a) this.a.add(k.a); if (k.b) this.b.add(k.b); }
+}
 async function addFromFrame(){
   if (adding || !openTid) return;
   if (!syncFrameTrainer()){ toast('В кадре не тренажёр — выберите тренажёр в каталоге'); return; }
@@ -850,10 +929,18 @@ async function addFromFrame(){
   const nodes = all.filter(n => n !== thNode);
   if (!nodes.length){ all.forEach(n => { if (n.restore) n.restore(); }); toast('Откройте задание в тренажёре — на экране выбора его ещё нет'); return; }
   adding = true;
-  $('addBtn').disabled = true; $('refreshBtn2').disabled = true;
+  $('addBtn').disabled = true; $('refreshBtn2').disabled = true; $('addCount').disabled = true;
+  $('cntMinus').disabled = true; $('cntPlus').disabled = true;
+  const want = addCount;
+  const coverText = n => { $('frameCoverText').textContent = want > 1 ? 'Снимаю задание ' + n + ' из ' + want + '…' : 'Снимаю задание…'; };
+  coverText(1);
+  batchStopped = false; $('batchStop').disabled = false; $('batchStop').hidden = want <= 1;
   $('frameCover').hidden = false;
-  let added = 0, noAnswer = 0;
+  let added = 0, noAnswer = 0, stopReason = null, onScreenDup = false;
   const fresh = [];
+  // уже лежащее в работе (в т.ч. предыдущей пачкой: кадр остановился на её последнем задании)
+  // второй раз не добавляем — иначе каждая следующая пачка начиналась бы с повтора
+  const seen = new SeenTasks(want > 1 ? E.variants[0].blocks.filter(b => b.tid === openTid) : []);
   let theory = null;
   try {
     // теория — одна на все задания этого снимка (пакет «+» в №1–5 — по той же теории)
@@ -867,14 +954,53 @@ async function addFromFrame(){
         // ответ — до снимка, пока на странице то же задание
         const info = trainerTaskInfo(win, openTid, el);
         if (!info){ noAnswer++; continue; }
+        if (want > 1){
+          const k = taskKeys(Object.assign({}, info), exactSnap(win, el), nodeText(el));
+          if (seen.has(k)){ onScreenDup = true; continue; }
+          seen.add(k);
+        }
         const parts = await shootBlock(win, openTid, openHref, el, info);
         // новое задание — всегда в образец (вариант 1); остальные варианты
         // получат своё «такое же» сами (syncVariant)
         const block = Object.assign({ id: 't' + ttUid(), type: 'task', mode: 'exam', name: trainerName(openTid) }, parts);
+        block._sig = nodeText(el);
         if (theory) block.theory = JSON.parse(JSON.stringify(theory));
         fresh.push(block);
         added++;
       } finally { if (restore) restore(); }
+    }
+    // остальные из N — «⟳» тренажёра; снимается только основное задание, карточки «+» уже сняты
+    if ((fresh.length || onScreenDup) && want > fresh.length){
+      let dup = 0;
+      while (fresh.length < want){
+        if (batchStopped){ stopReason = 'stop'; break; }
+        coverText(fresh.length + 1);
+        const res = refreshTrainerIn(win, openTid);
+        if (res !== 'ok'){ stopReason = res === 'single' ? 'single' : 'notask'; break; }
+        await sleep(BATCH_WAIT);
+        const nodes2 = collectTrainerCaptureNodes(doc, openTid);
+        const main = nodes2.find(n => n.el.id !== 'theoryContent' && !(n.el.closest && n.el.closest('.added-task-card')));
+        nodes2.forEach(n => { if (n !== main && n.restore) n.restore(); });
+        if (!main){ stopReason = 'notask'; break; }
+        try {
+          const info = trainerTaskInfo(win, openTid, main.el);
+          if (!info){ stopReason = 'noanswer'; break; }
+          const text = nodeText(main.el);
+          const keys = taskKeys(Object.assign({}, info), exactSnap(win, main.el), text);
+          if (seen.has(keys)){
+            if (++dup >= BATCH_TRIES){ stopReason = 'exhausted'; break; }
+            continue;
+          }
+          dup = 0;
+          const parts = await shootBlock(win, openTid, openHref, main.el, info);
+          const block = Object.assign({ id: 't' + ttUid(), type: 'task', mode: 'exam', name: trainerName(openTid) }, parts);
+          block._sig = text;
+          if (theory) block.theory = JSON.parse(JSON.stringify(theory));
+          fresh.push(block);
+          seen.add(keys);
+          added++;
+        } finally { if (main.restore) main.restore(); }
+      }
     }
   } catch (err) {
     console.error('[работы] снимок задания не получился', err);
@@ -884,16 +1010,22 @@ async function addFromFrame(){
       if (addPos === 'start') E.variants[0].blocks.unshift(...fresh);
       else E.variants[0].blocks.push(...fresh);
     }
-    $('frameCover').hidden = true;
-    $('addBtn').disabled = false; $('refreshBtn2').disabled = false;
+    $('frameCover').hidden = true; $('batchStop').hidden = true;
+    $('addBtn').disabled = false; $('refreshBtn2').disabled = false; $('addCount').disabled = false;
+    renderAddCount();
     adding = false;
   }
   if (added){
     markDirty(); renderVariants(); renderTasks();
-    toast(added === 1 ? 'Задание добавлено' + (E.variants.length > 1 ? ' во все варианты' : '') : 'Добавлено заданий: ' + added);
+    const why = { exhausted: 'других заданий этого типа с такими настройками больше нет', single: 'у этого номера один прототип',
+      stop: 'остановлено', noanswer: 'у следующего задания нет ответа для проверки', notask: 'тренажёр перестал показывать задание' }[stopReason];
+    if (why && added < want) toast('Добавлено ' + added + ' из ' + want + ': ' + why, 6000);
+    else toast(added === 1 ? 'Задание добавлено' + (E.variants.length > 1 ? ' во все варианты' : '') : 'Добавлено заданий: ' + added);
     const list = $('wkTasks'); const edge = addPos === 'start' ? list.firstElementChild : list.lastElementChild;
     if (edge && E.cur === 0) edge.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     fresh.forEach(b => uploadBlock(b).catch(() => {}));
+  } else if (stopReason === 'exhausted' || stopReason === 'single'){
+    toast('Новых заданий этого типа с такими настройками больше нет — все уже в работе', 6000);
   } else {
     toast(noAnswer ? 'У этого задания нет ответа для проверки (теория, доказательство) — в работу его не добавить' : 'Не получилось снять задание — попробуйте ещё раз');
   }
@@ -1112,7 +1244,7 @@ $('rsClose').addEventListener('click', async () => {
   catch (e) { toast(e.message); }
 });
 
-window.__works = { E, addFromFrame, openTrainer, save, route, gens };   // для тестов и отладки из консоли
+window.__works = { E, addFromFrame, openTrainer, save, route, gens, canon };   // для тестов и отладки из консоли
 boot();
 })();
 </script>
