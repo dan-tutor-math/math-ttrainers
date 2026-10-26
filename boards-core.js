@@ -525,9 +525,9 @@ function clearSaveFailedWarning(){
    из копии другой). */
 const DELETED_KEEP_MS = 90 * 24 * 3600 * 1000;   // сколько помним об удалении
 
-function noteDeleted(kind, id){
+function noteDeleted(kind, id, extra){
   DB.deleted = DB.deleted || [];
-  DB.deleted.push({ kind, id, at: nowTs() });
+  DB.deleted.push(Object.assign({ kind, id, at: nowTs() }, extra || {}));
 }
 // Одна запись на доску/папку. mergeDbs складывает список с диска и из памяти
 // через concat, а после записи оба списка одинаковые — без схлопывания
@@ -542,7 +542,12 @@ function pruneDeleted(list){
   const src = list || [];
   for (let i = 0; i < src.length; i++) {
     const d = src[i];
-    if (!d || !d.id || !((d.at || 0) > edge)) continue;
+    if (!d || !d.id) continue;
+    // След облачной доски, стирание которой сервер ещё НЕ подтвердил
+    // (pending, у старых следов поля нет — тоже не подтверждено), живёт без
+    // срока: пока строка доски на сервере, без следа импорт заведёт её
+    // заново. Подтверждённый (boards-cloud.js, cloudConfirmGone) — обычные 90 дней
+    if (!((d.at || 0) > edge) && !(d.kind === 'cloud' && d.pending !== false)) continue;
     const key = (d.kind || '') + '|' + d.id;
     const was = byKey.get(key);
     if (!was || (d.at || 0) > (was.at || 0)) byKey.set(key, d);
@@ -1468,7 +1473,21 @@ function deckIcon(){
 }
 // разделы списка, которые не папки: доску в них не «кладут», новая доска из
 // них создаётся в корне
-function isSpecialNav(v){ return v === '__recent' || v === '__trash'; }
+function isSpecialNav(v){ return v === '__recent' || v === '__trash' || v === '__fromServer'; }
+
+/* Раздел «С сервера»: мои облачные доски, которые ни разу не открывались в
+   этом браузере. Сюда попадают доски, удалённые ДО появления корзины: тогда
+   удаление было только в браузере, строка оставалась на сервере, и в
+   чистом браузере или на другом устройстве импорт заводит её как обычную.
+   Отличить такую от нужной доски, созданной на другом устройстве, браузер
+   не может — поэтому ничего сам не стирает, а показывает их отдельно:
+   владелец сам отмечает лишние и жмёт «Удалить навсегда» (с подтверждением;
+   на сервер — тот же boards_delete_now, что и из корзины). Открытая хоть
+   раз доска из раздела уходит (lastOpenedAt) */
+function isFromServerUnopened(b){
+  return !!(b && b.cloudBoardId && b.cloudRole === 'owner' && !b.lastOpenedAt && !b.trashedAt && !b.cloudPendingId);
+}
+function fromServerView(){ return curFolderId === '__fromServer' && !searchQuery; }
 
 /* ═══ №113: доски и презентации — два разных раздела ═══
    Презентации ещё в бете, поэтому по умолчанию список показывает ТОЛЬКО
@@ -1487,6 +1506,7 @@ function kindMatch(b){
 // был включён, иначе они остались бы без папки и без корзины
 function kindBoards(){ return liveBoards().filter(kindMatch); }
 function kindTrashed(){ return DB.boards.filter(b => isTrashed(b) && kindMatch(b)); }
+function kindFromServer(){ return kindBoards().filter(isFromServerUnopened); }
 const LIST_KIND_TITLES = { boards: 'Основные доски', all: 'Все доски и презентации', decks: 'Презентации' };
 function setListKind(k){
   if (!LIST_KIND_TITLES[k] || k === listKind) return;
@@ -1581,6 +1601,9 @@ function renderNav(){
   });
   html += '</div>';
   html += `<button class="bl-nav-item bl-nav-trash${curFolderId==='__trash'?' active':''}" data-nav="__trash" title="Удалённые доски — 5 дней их можно восстановить">${trashIcon()}Корзина<span class="cnt">${trashCount}</span></button>`;
+  const fromServerCount = kindFromServer().length;
+  if (fromServerCount || curFolderId === '__fromServer')
+    html += `<button class="bl-nav-item bl-nav-fromserver${curFolderId==='__fromServer'?' active':''}" data-nav="__fromServer" title="Ваши облачные доски, которые ни разу не открывались в этом браузере. Среди них могут быть удалённые до появления корзины">${cloudNavIcon()}С сервера<span class="cnt">${fromServerCount}</span></button>`;
   document.getElementById('blNav').innerHTML = html;
   document.querySelectorAll('.bl-nav-item').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1611,6 +1634,9 @@ function currentBoardsAndFolders(){
   if (inTrashView()){
     // свежеудалённые сверху: их чаще всего и хотят вернуть
     return { folders: [], boards: kindTrashed().sort((a, b) => (b.trashedAt || 0) - (a.trashedAt || 0)) };
+  }
+  if (fromServerView()){
+    return { folders: [], boards: kindFromServer() };
   }
   if (curFolderId === '__recent'){
     return { folders: [], boards: live.filter(b => b.lastOpenedAt) };
@@ -1703,7 +1729,7 @@ function resolveDropTarget(x, y){
   const nav = el.closest('.bl-nav-item');
   if (nav && blDragState.kind === 'board'){
     const v = nav.dataset.nav;
-    if (v === '__recent') return null;
+    if (v === '__recent' || v === '__fromServer') return null;
     if (v === '__trash') return { type: 'trash', el: nav };
     return { type: 'into', folderId: v === '__root' ? null : v, el: nav };
   }
@@ -1920,6 +1946,7 @@ function renderList(){
   let titleHtml = '';
   if (searchQuery) titleHtml = `${allIcon()} Результаты поиска «${escHtml(searchQuery)}»`;
   else if (inTrashView()) titleHtml = `${trashIcon()} Корзина <span class="bl-title-note">доски удаляются насовсем через 5 дней</span>`;
+  else if (fromServerView()) titleHtml = `${cloudNavIcon()} С сервера <span class="bl-title-note">ваши облачные доски, ни разу не открытые в этом браузере. Если среди них удалённые раньше — отметьте их и «Удалить навсегда»</span>`;
   else if (curFolderId === '__recent') titleHtml = `${clockIcon()} Недавние`;
   else if (curFolderId === null) titleHtml = listKind === 'decks'
     ? `${deckIcon()} Презентации <span class="bl-beta">Бета</span>`
@@ -1938,6 +1965,8 @@ function renderList(){
     grid.insertAdjacentHTML('beforebegin', '');
     grid.innerHTML = inTrashView()
       ? `<div class="bl-empty" style="grid-column:1/-1">Корзина пуста. Удалённые доски лежат здесь 5 дней — пока они тут, их можно восстановить.</div>`
+      : fromServerView()
+      ? `<div class="bl-empty" style="grid-column:1/-1">Таких досок больше нет.</div>`
       : (listKind === 'decks' && !DB.boards.some(boardIsDeck))
         ? `<div class="bl-empty" style="grid-column:1/-1">Презентаций пока нет — создайте первую кнопкой выше. Раздел в бете: что-то может работать не так.</div>`
         : `<div class="bl-empty" style="grid-column:1/-1">Здесь пока пусто — создайте первую доску или папку кнопками выше.</div>`;
@@ -1971,7 +2000,7 @@ function renderList(){
         <div class="bl-card-icon">${boardIsDeck(b) ? deckIcon() : boardIcon()}</div>
         <div class="bl-card-body">
           <div class="bl-card-name">${escHtml(b.name)}</div>
-          <div class="bl-card-meta">${isTrashed(b) ? trashLeftText(b) : `${boardIsDeck(b) ? 'Презентация · бета · с' : 'С'}оздана ${fmtDate(b.createdAt)}`}</div>
+          <div class="bl-card-meta">${isTrashed(b) ? trashLeftText(b) : `${boardIsDeck(b) ? 'Презентация · бета · с' : 'С'}оздана ${fmtDate(b.createdAt)}`}${isFromServerUnopened(b) ? '<span class="bl-from-server"> · с сервера, здесь не открывалась</span>' : ''}</div>
         </div>
       </div>`;
   });
@@ -2028,6 +2057,9 @@ const TRASH_KEEP_MS = 5 * 24 * 3600 * 1000;
 function isTrashed(b){ return !!(b && b.trashedAt); }
 function liveBoards(){ return DB.boards.filter(b => !b.trashedAt); }
 function inTrashView(){ return curFolderId === '__trash' && !searchQuery; }
+function cloudNavIcon(){
+  return '<svg viewBox="0 0 24 24" fill="none"><path d="M7 18h10.5a4 4 0 0 0 .6-7.95A6 6 0 0 0 6.6 9.2 4.5 4.5 0 0 0 7 18z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></svg>';
+}
 function trashIcon(){
   return '<svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M9 7V4.5h6V7M6.5 7l1 13h9l1-13" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 }
@@ -2254,6 +2286,8 @@ function blRenderSelBar(){
     const el = document.getElementById(id);
     if (el){ el.hidden = !trash; el.disabled = !nb; }
   });
+  // «С сервера»: удалить старые доски можно сразу насовсем, минуя корзину
+  if (fromServerView()) document.getElementById('blSelPurge').hidden = false;
   // в папку и во вкладки — только доски: папку в папку не кладём, а
   // «открыть папку во вкладке» смысла не имеет
   document.getElementById('blSelMove').disabled = !nb;
@@ -2327,7 +2361,8 @@ function blRestoreSelected(){
 function blPurgeSelected(){
   const ids = blSelectedIds('b:');
   if (!ids.length) return;
-  if (!confirm(`Удалить навсегда ${blCountText(ids.length, 0)}? Восстановить ${ids.length === 1 ? 'её' : 'их'} будет нельзя.`)) return;
+  const where = fromServerView() ? ' — и в этом браузере, и на сервере' : '';
+  if (!confirm(`Удалить навсегда ${blCountText(ids.length, 0)}${where}? Восстановить ${ids.length === 1 ? 'её' : 'их'} будет нельзя.`)) return;
   purgeBoards(ids);
   blSel.clear(); blSelAnchor = null;
   saveDB(); renderList();
@@ -10218,6 +10253,13 @@ async function importNotesOutbox(){
   if (n) saveDB();
   return n;
 }
+// Список досок дочитан из хранилища. Облачный модуль ждёт этого перед
+// импортом (cloudImportSharedBoards): вход и запрос к серверу бывают
+// быстрее IndexedDB, и тогда импорт видел пустой стартовый DB — без
+// карточек и следов удаления — и заводил удалённые доски заново
+// новыми карточками, а слияние при записи добавляло их к настоящему списку
+let resolveBoardsBootReady;
+window.boardsBootReady = new Promise(r => { resolveBoardsBootReady = r; });
 window.boardsAppBoot = function(){
   if (window.__boardsBooted) return;
   window.__boardsBooted = true;
@@ -10234,6 +10276,7 @@ window.boardsAppBoot = function(){
     purgeExpiredTrash(true);
     if (/^#decks\b/.test(location.hash)) listKind = 'decks';   // №96
     renderList();
+    resolveBoardsBootReady();
     if (window.onBoardsBooted) { try { window.onBoardsBooted(); } catch (e) { console.warn(e); } }
     // Промпт №49: если открытие ИМЕННО этой доски роняет вкладку (браузер
     // сам её перезагружает после краша), в адресе остаётся #board=<id> — и

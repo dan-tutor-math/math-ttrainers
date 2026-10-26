@@ -139,7 +139,9 @@ def run():
         # ── 1. ⌘ и Ctrl ──
         check("панели выбора сначала нет", not bar_visible())
         page.click(card("b1"), modifiers=["Meta"])
-        page.click(card("b2"), modifiers=["Control"])
+        # Ctrl — синтетическим щелчком: на macOS Chromium превращает
+        # Ctrl+щелчок мышью в правый щелчок (контекстное меню), click не приходит
+        page.eval_on_selector(card("b2"), "el => el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }))")
         check("⌘/Ctrl+щелчок отметили две доски", sel() == ["b:b1", "b:b2"])
         check("доска при этом не открылась", not board_open())
         check("панель выбора видна", bar_visible())

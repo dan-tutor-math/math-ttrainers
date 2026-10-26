@@ -2924,18 +2924,35 @@
     // «Корзина досок»: trashed_at появляется после boards-trash-schema.sql.
     // Пока файл не запущен, такой запрос — ошибка; тогда спрашиваем по-старому
     let { data: boardsRows, error } = await window.SB.from('boards').select('id, title, owner, created_at, trashed_at');
-    if (error) ({ data: boardsRows, error } = await window.SB.from('boards').select('id, title, owner, created_at'));
+    if (error) {
+      // без trashed_at удалённое на другом устройстве не узнать — об этом
+      // надо сказать, а не тихо работать по-старому
+      cloudTrashFailed('select trashed_at', error);
+      ({ data: boardsRows, error } = await window.SB.from('boards').select('id, title, owner, created_at'));
+    } else cloudTrashOk('select trashed_at');
     if (error || !boardsRows) return;
+    // Список из хранилища должен быть уже загружен (boardsBootReady в
+    // boards-core.js): иначе ни карточек, ни следов удаления ещё не видно,
+    // и всё с сервера завелось бы заново — так удалённые и воскресали
+    if (window.boardsBootReady) await window.boardsBootReady;
     const db = window.getDB();
     if (!db) return;
+    const now = window.nowTs();
     // облачные доски, стёртые здесь насовсем: пока сервер их не стёр (нет
     // связи, не запущен SQL), строка в базе ещё есть — заново не заводим
-    const goneCloud = new Set((db.deleted || []).filter(d => d.kind === 'cloud').map(d => d.id));
+    const goneTraces = (db.deleted || []).filter(d => d.kind === 'cloud');
+    const goneCloud = new Set(goneTraces.map(d => d.id));
     const rowIds = new Set(boardsRows.map(r => r.id));
-    const now = window.nowTs();
+    let changed = false;
+    // Строка «стёртой» доски всё ещё приходит с сервера (стирание не прошло
+    // или сервер его не делает) — след продлеваем, иначе через 90 дней
+    // (pruneDeleted) доска вернулась бы
+    goneTraces.forEach(d => {
+      if (rowIds.has(d.id) && now - (d.at || 0) > CLOUD_TRACE_REFRESH_MS) { d.at = now; changed = true; }
+    });
+    if (cloudDropStubs(db, goneCloud)) changed = true;
     const { data: accessRows } = await window.SB.from('board_access').select('board_id, role').eq('user_id', window.CURRENT_USER.id);
     const roleByBoard = new Map((accessRows || []).map(r => [r.board_id, r.role]));
-    let changed = false;
     boardsRows.forEach(row => {
       if (goneCloud.has(row.id)) return;
       const born = Date.parse(row.created_at || '') || 0;
@@ -2986,6 +3003,94 @@
     if (changed) { window.saveDB(); if (window.renderList) window.renderList(); }
   };
 
+  const CLOUD_TRACE_REFRESH_MS = 30 * 24 * 3600 * 1000;
+  /* Лишние карточки облачных досок. «Заглушка» — живая карточка, которую ни
+     разу не открывали в этом браузере (своего содержимого у неё нет, всё на
+     сервере). Такие плодили гонка импорта с загрузкой списка и две вкладки,
+     импортировавшие одновременно. Убираем заглушку, если:
+     - доску здесь стёрли насовсем (след «cloud») — это воскресшая;
+     - у той же доски есть другая карточка: открытая или положенная в
+       корзину — там решение человека, заглушка его отменяла;
+     - заглушек несколько и других нет — оставляем одну (с меньшим id, чтобы
+       все вкладки выбрали одну и ту же).
+     Убираем только из браузера (deleteListItems), сервер не трогаем */
+  function cloudDropStubs(db, goneCloud) {
+    const cur = window.getCurrentBoard && window.getCurrentBoard();
+    const isStub = b => !b.trashedAt && !b.lastOpenedAt && !b.cloudPendingId && b !== cur
+      && !(Array.isArray(b.objects) && b.objects.length);
+    const groups = new Map();
+    db.boards.forEach(b => {
+      if (!b.cloudBoardId) return;
+      if (!groups.has(b.cloudBoardId)) groups.set(b.cloudBoardId, []);
+      groups.get(b.cloudBoardId).push(b);
+    });
+    const drop = [];
+    groups.forEach((list, cloudId) => {
+      const stubs = list.filter(isStub);
+      if (!stubs.length) return;
+      if (goneCloud.has(cloudId)) { stubs.forEach(b => drop.push(b.id)); return; }
+      if (list.length < 2) return;
+      if (stubs.length < list.length) { stubs.forEach(b => drop.push(b.id)); return; }
+      stubs.sort((a, b) => (a.id < b.id ? -1 : 1)).slice(1).forEach(b => drop.push(b.id));
+    });
+    if (!drop.length) return false;
+    console.info('[корзина] убраны лишние карточки облачных досок:', drop);
+    window.deleteListItems(drop, []);
+    return true;
+  }
+
+  /* Сбой сервера корзины виден: запись в консоль с текстом ошибки и плашка
+     над списком досок (#blCloudWarn). Раньше cloudRpc глотал ошибку молча,
+     и при незапущенном boards-trash-schema.sql доска удалялась только в
+     этом браузере, а на другом устройстве возвращалась */
+  const trashFailures = new Map();   // что не прошло → текст ошибки
+  function rpcErrorText(error) {
+    if (!error) return '';
+    if (typeof error === 'string') return error;
+    return [error.code, error.message || String(error)].filter(Boolean).join(' ');
+  }
+  function noTrashSql(error) {
+    const t = rpcErrorText(error);
+    return /PGRST202|42883|42703|Could not find the function|trashed_at/i.test(t);
+  }
+  function cloudTrashFailed(name, error) {
+    const text = rpcErrorText(error);
+    console.error('[корзина] ' + name + ' не прошёл: ' + text, error);
+    trashFailures.set(name, error);
+    renderTrashWarn();
+  }
+  function cloudTrashOk(name) {
+    if (trashFailures.delete(name)) renderTrashWarn();
+  }
+  function renderTrashWarn() {
+    const el = document.getElementById('blCloudWarn');
+    if (!el) return;
+    if (!trashFailures.size) { el.hidden = true; return; }
+    const errs = [...trashFailures.values()];
+    const sql = errs.some(noTrashSql);
+    const msg = sql
+      ? 'На сервере не настроена корзина досок (не запущен boards-trash-schema.sql в Supabase). Удаление досок дошло только до этого браузера — на других устройствах они вернутся. Сайт повторит при следующем входе.'
+      : 'Сервер не принял удаление или восстановление досок — на других устройствах они могут вернуться. Сайт повторит при следующем входе.';
+    el.querySelector('.bl-cloud-warn-text').textContent = msg;
+    el.querySelector('.bl-cloud-warn-detail').textContent =
+      [...trashFailures.entries()].map(([n, e]) => n + ': ' + rpcErrorText(e)).join(' · ');
+    el.hidden = false;
+  }
+  // стирание дошло — след «cloud» больше не нужен навсегда (pruneDeleted
+  // заберёт его через 90 дней). Время сдвигаем вперёд: при слиянии вкладок
+  // побеждает более свежий след, и неподтверждённая копия соседней вкладки
+  // не перебьёт подтверждение
+  function cloudConfirmGone(ids) {
+    const db = window.getDB();
+    const set = new Set(ids);
+    let changed = false;
+    (db.deleted || []).forEach(d => {
+      if (d.kind !== 'cloud' || !set.has(d.id) || d.pending === false) return;
+      d.pending = false; d.at = Math.max(window.nowTs(), (d.at || 0) + 1); changed = true;
+    });
+    if (changed) window.saveDB();
+  }
+
   /* ═══ Корзина досок: что делать на сервере (boards-trash-schema.sql) ═══
      Движок (boards-core.js, блок «Корзина досок») сам решает, что лежит в
      корзине, и зовёт эти хуки. Здесь — только сервер:
@@ -3006,7 +3111,11 @@
   }
   async function cloudRpc(name, args) {
     if (!window.SB || !window.CURRENT_USER) return { error: 'нет входа' };
-    try { return await window.SB.rpc(name, args); } catch (e) { return { error: e }; }
+    let r;
+    try { r = await window.SB.rpc(name, args); } catch (e) { r = { error: e }; }
+    if (r && r.error) cloudTrashFailed(name, r.error);
+    else cloudTrashOk(name);
+    return r || { error: 'пустой ответ' };
   }
   function cloudMarkDone(list, flag) {
     list.forEach(b => { if (b[flag]) { b[flag] = false; window.touchBoard(b); } });
@@ -3038,15 +3147,21 @@
       ids.push(b.cloudBoardId);
       // след «стёрта насовсем»: пока он есть (90 дней), импорт не заведёт
       // доску заново, а вход повторит стирание на сервере
-      window.noteDeleted('cloud', b.cloudBoardId);
+      window.noteDeleted('cloud', b.cloudBoardId, { pending: true });
     });
-    if (ids.length) cloudRpc('boards_delete_now', { p_boards: ids });
+    if (ids.length) cloudRpc('boards_delete_now', { p_boards: ids })
+      .then(r => { if (!r.error) cloudConfirmGone(ids); });
   };
   // При каждом входе: дослать то, что не дошло, и стереть мою просроченную
   // корзину на сервере (вдруг браузер, где доску удалили, больше не открывали)
   window.cloudTrashReconcile = async function () {
     const db = window.getDB && window.getDB();
     if (!db || !window.CURRENT_USER) return;
+    // прошлые сбои вызовов забываем: что ещё не дошло, повторяется ниже, и
+    // его новый сбой снова поднимет плашку. Иначе плашка висела бы из-за
+    // вызова, повторять который уже нечего (доску с тех пор стёрли)
+    ['boards_trash', 'boards_restore', 'boards_delete_now', 'boards_purge_trash'].forEach(n => trashFailures.delete(n));
+    renderTrashWarn();
     const tr = db.boards.filter(b => b.cloudTrashPending && b.trashedAt);
     if (tr.length) {
       const r = await cloudRpc('boards_trash', { p_boards: tr.map(b => b.cloudBoardId) });
@@ -3057,8 +3172,12 @@
       const r = await cloudRpc('boards_restore', { p_boards: rs.map(b => b.cloudBoardId) });
       if (!r.error) cloudMarkDone(rs, 'cloudRestorePending');
     }
-    const gone = [...new Set((db.deleted || []).filter(d => d.kind === 'cloud').map(d => d.id))];
-    if (gone.length) await cloudRpc('boards_delete_now', { p_boards: gone });
+    // досылаем только неподтверждённые (у следов до этой правки поля нет)
+    const gone = [...new Set((db.deleted || []).filter(d => d.kind === 'cloud' && d.pending !== false).map(d => d.id))];
+    if (gone.length) {
+      const r = await cloudRpc('boards_delete_now', { p_boards: gone });
+      if (!r.error) cloudConfirmGone(gone);
+    }
     await cloudRpc('boards_purge_trash', {});
   };
   // движок досок зовёт это, когда список загружен из хранилища (вход к этому
