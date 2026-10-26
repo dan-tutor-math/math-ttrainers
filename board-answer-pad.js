@@ -57,7 +57,9 @@
     #bdAnsPad.slim button{height:36px;font-size:17px;}
     #bdAnsPad button:active{background:var(--hover-2,rgba(0,0,0,.12));}
     #bdAnsPad button.sp{color:#2e7de0;font-weight:600;}
-    #bdAnsPad button.mi{color:var(--teacher,#ff3b30);font-weight:700;}
+    /* класс НЕ «mi»: в liquid-glass.css «.mi» — общий класс значков (width:1em),
+       и кнопка «−» сжималась до узкой полоски вместо своей ячейки сетки */
+    #bdAnsPad button.neg{color:var(--teacher,#ff3b30);font-weight:700;}
     #bdAnsPad button.aux{font-size:14px;color:var(--muted-6,#86868b);}
     #bdAnsPad button.go{background:#2e7de0;color:#fff;font-size:16px;font-weight:600;}
     @media (max-width:420px){#bdAnsPad.full .bap-grid{grid-template-columns:repeat(5,minmax(44px,1fr));}}
@@ -70,7 +72,7 @@
     ['7'], ['8'], ['9'], ['√', 'sp'], ['back', 'aux', '⌫'],
     ['4'], ['5'], ['6'], ['/', 'sp'], ['±', 'sp'],
     ['1'], ['2'], ['3'], ['+', 'sp'], [';', 'sp'],
-    ['-', 'mi', '−'], ['0'], [','], ['(', 'sp'], [')', 'sp'],
+    ['-', 'neg', '−'], ['0'], [','], ['(', 'sp'], [')', 'sp'],
     ['kbd', 'aux', '⌨'], ['check', 'go', 'Проверить', 3], ['close', 'aux', '✕']
   ];
   const SLIM = [
