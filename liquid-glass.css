@@ -240,6 +240,29 @@ html[data-theme="dark"][data-fx="full"] .lg::before,html[data-theme="dark"][data
   -webkit-backdrop-filter:blur(3px) saturate(185%);
   backdrop-filter:var(--lg-refract) saturate(185%) brightness(1.03);
 }
+/* Safari (и любой браузер на iPhone) не умеет SVG-фильтр в backdrop-filter,
+   и в «максимуме» стекло оставалось тем же матовым, что в обычном режиме.
+   Здесь Liquid Glass изображаем тем, что WebKit рисует быстро: меньше
+   заливки и размытия, сильнее насыщенность — фон под стеклом виден и
+   ярче, а край стекла выделяют светлый ободок и внутреннее свечение.
+   Внешняя тень тут не мешает (карты искажения нет), поэтому у панелей
+   страницы её оставляем; слою .lg-glass она не нужна — тень на капсуле */
+[data-fx="full"].lg-norefract .lg-r{
+  background-color:color-mix(in srgb, var(--glass-strong) 45%, transparent);
+  -webkit-backdrop-filter:blur(12px) saturate(220%) brightness(1.06);
+  backdrop-filter:blur(12px) saturate(220%) brightness(1.06);
+  box-shadow:inset 0 1px 0 var(--glass-border), inset 0 -1px 0 var(--glass-inset),
+    inset 0 0 0 1px var(--glass-border), inset 0 0 22px var(--glass-inset), var(--shadow);
+}
+[data-fx="full"].lg-norefract .lg-r.lg-glass{
+  box-shadow:inset 0 1px 0 var(--glass-border), inset 0 -1px 0 var(--glass-inset),
+    inset 0 0 0 1px var(--glass-border), inset 0 0 16px var(--glass-inset);
+}
+html[data-theme="dark"][data-fx="full"].lg-norefract .lg-r{
+  -webkit-backdrop-filter:blur(12px) saturate(180%) brightness(1.1);
+  backdrop-filter:blur(12px) saturate(180%) brightness(1.1);
+}
+
 /* пока рисуют на холсте, преломление выключается: оно пересчитывается на
    каждом кадре и может тормозить рисование на слабых устройствах */
 html.lg-paused .lg-r.lg-r-ready{backdrop-filter:blur(20px) saturate(180%)}

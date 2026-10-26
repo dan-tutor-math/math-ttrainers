@@ -331,6 +331,18 @@
   // tsApplyState() тренажёра об этом узнает ──
   // тема учителя — последняя, что пришла от него (см. followerThemeTick)
   let leaderTheme = null;
+  // Тему сменили в другой вкладке или страница вернулась кнопкой «Назад»
+  // из кэша браузера (на телефоне так почти всегда) — скрипт в <head> тогда
+  // не выполняется заново, и страница оставалась в старой теме. Ученик
+  // держит тему учителя (followerThemeTick), его не трогаем
+  function syncLocalTheme() {
+    if (IN_STAGE || (!isLeaderFlag && code)) return;
+    let t = null;
+    try { t = localStorage.getItem('theme'); } catch (e) {}
+    if (t === 'dark' || t === 'light') applyRemoteTheme(t);
+  }
+  window.addEventListener('pageshow', e => { if (e.persisted) syncLocalTheme(); });
+  window.addEventListener('storage', e => { if (e.key === 'theme') syncLocalTheme(); });
   function applyRemoteTheme(theme) {
     if (!theme) return;
     try {
@@ -777,7 +789,12 @@
       autosaveHistory = state.__autosaveHistory;
       if (autosaveChangeCb) { try { autosaveChangeCb(autosaveHistory); } catch (e) {} }
     }
-    if (state.__theme) applyRemoteTheme(state.__theme);
+    // тему из снимка берёт только ученик. У учителя (главного) выбор на этом
+    // устройстве важнее: при переходе на тренажёр activate() применяет
+    // снимок из базы, сохранённый ещё до смены темы на главной, — и тёмная
+    // тема молча возвращалась в светлую. По той же причине тема ученика из
+    // его рассылки не должна перекрашивать экран учителя
+    if (state.__theme && !isLeaderFlag) applyRemoteTheme(state.__theme);
     // снимок с размером сцены кладёт только учитель — его тема и есть «правильная»
     if (state.__theme && state.__stage) leaderTheme = state.__theme;
     // Промпт №11 нового списка: размер окна учителя — до проверки «чей снимок»: он нужен

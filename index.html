@@ -141,6 +141,10 @@ body > #resetProgressBtn, body > #themeToggle{display:none}
   .lg-side .lg-tip{left:50%;top:calc(100% + 10px);transform:translate(-50%,-6px);}
   .lg-side :hover > .lg-tip,.lg-side :focus-visible > .lg-tip{transform:translate(-50%,0);}
   h1{font-size:clamp(22px,7vw,30px);}
+  /* вкладки липнут ниже строки с капсулами, а не под ними: при прокрутке
+     «Экзамены / Классы / Основа» уезжали под «Подборку · Доски» и
+     просвечивали сквозь стекло. 16px отступ капсулы + 46px её высота + зазор */
+  .wrap .nav-bar{top:70px;}
 }
 .nav-bar{position:sticky;top:10px;z-index:100;margin-bottom:16px;}
 /* предмет — уровнем выше вкладок «Экзамены / Классы / Основа»: у каждого
@@ -434,7 +438,10 @@ body .ts-share-pop{top:16px;right:calc(16px + var(--lg-menu-w, 48px) + 12px);max
 
   // в «максимуме» преломляют и большие панели страницы; список тем
   // пересоздаётся при смене вкладки — поэтому слежение, а не разовый поиск
-  MathhGlass.autoRefract('.subj-bar, .nav-tabs, .nav-subtabs, .topic, .feedback');
+  // Капсула предметов не преломляет: на Android Chrome карта искажения
+  // захватывала тень выбранного предмета, и под ним висел тёмный обод.
+  // Она обычное размытое стекло, как в обычном режиме
+  MathhGlass.autoRefract('.nav-tabs, .nav-subtabs, .topic, .feedback');
   MathhGlass.pressable('.subj-btn, .nav-tab, .nav-subtab');
   // названия у кнопок левой капсулы — при наведении, справа от кнопки
   MathhGlass.tips('.lg-side > a, .lg-side > button', 'right');

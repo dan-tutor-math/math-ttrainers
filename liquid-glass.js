@@ -49,7 +49,10 @@
   // остаёмся без преломления
   var canRefract = !!(navigator.userAgentData && navigator.userAgentData.brands &&
     navigator.userAgentData.brands.some(function (b) { return /Chromium/i.test(b.brand); }));
-  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+  // без преломления (iPhone, Firefox) «максимум» рисует стекло по-другому —
+  // прозрачнее и с ярким ободком (liquid-glass.css, .lg-norefract)
+  if (!canRefract) root.classList.add('lg-norefract');
+  var reduceMotion =window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
 
   function set(m) {
     m = m === 'full' ? 'full' : 'lite';
