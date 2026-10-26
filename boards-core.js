@@ -1038,6 +1038,10 @@ function rebuildStatus(text){
   const lbl = btn && btn.querySelector('span');
   if (lbl) lbl.textContent = text || 'Пересобрать хранилище';
   if (btn) btn.disabled = !!text;
+  // пункт живёт в меню «Ещё», а оно закрывается сразу после выбора — ход
+  // пересборки (и «закройте другие вкладки») показываем на самой кнопке меню
+  const more = document.getElementById('blMoreLabel');
+  if (more) more.textContent = text || 'Ещё';
 }
 function rebuildStage(v){ try { if (v) localStorage.setItem(REBUILD_KEY, v); else localStorage.removeItem(REBUILD_KEY); } catch (e) {} }
 // архив по одной доске: строки досок складываются в Blob кусками, целиком
@@ -2630,7 +2634,8 @@ document.getElementById('blImportFile').addEventListener('change', (e) => {
 });
 const sortLabels = { my: 'Мой порядок', work: 'По дате работы', new: 'Сначала новые', old: 'Сначала старые', az: 'По названию (А—Я)' };
 document.getElementById('blSortBtn').addEventListener('click', (e) => {
-  e.stopPropagation();
+  e.stopPropagation();   // поэтому соседнее меню «Ещё» закрываем сами
+  setMoreMenu(false);
   document.getElementById('blSortPop').classList.toggle('open');
 });
 document.getElementById('blSortPop').addEventListener('click', (e) => {
@@ -2644,6 +2649,28 @@ document.getElementById('blSortPop').addEventListener('click', (e) => {
 });
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.bl-sort')) document.getElementById('blSortPop').classList.remove('open');
+});
+// меню «Ещё»: выбор пункта закрывает его — сам пункт обрабатывается своим
+// обработчиком выше (по id), меню нужно только открыть и закрыть
+function setMoreMenu(open){
+  const pop = document.getElementById('blMorePop');
+  if (!pop) return;
+  pop.classList.toggle('open', open);
+  document.getElementById('blMoreBtn').setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+document.getElementById('blMoreBtn')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  document.getElementById('blSortPop').classList.remove('open');
+  setMoreMenu(!document.getElementById('blMorePop').classList.contains('open'));
+});
+document.getElementById('blMorePop')?.addEventListener('click', (e) => {
+  if (e.target.closest('.bl-more-item')) setMoreMenu(false);
+});
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.bl-more')) setMoreMenu(false);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') setMoreMenu(false);
 });
 
 /* ═══════════════════════════════════════════════════════════════════════

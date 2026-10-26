@@ -125,6 +125,7 @@ def main():
 
         # пересборка: файл-страховка, потом перезагрузка страницы
         with page.expect_download(timeout=20000) as dl:
+            page.click("#blMoreBtn")   # пересборка — пункт меню «Ещё»
             page.click("#blRebuild")
         path = dl.value.path()
         arch = json.load(open(path, encoding="utf-8"))

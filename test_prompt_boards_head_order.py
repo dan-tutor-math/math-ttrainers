@@ -1,7 +1,8 @@
 """
 Шапка списка досок: самым верхним рядом — «К тренажёрам» и название
 раздела, под ними — переключатель «Основные доски / Все доски и
-презентации / Презентации».
+презентации / Презентации», под ним — ряд кнопок («Создать доску», …,
+«Ещё»), прижатый к левому краю.
 
 Проверяем порядок в разметке и на экране (переключатель ниже шапки и не
 наезжает на неё), а также что переключатель по-прежнему работает.
@@ -32,12 +33,19 @@ def main():
             backTop: back.getBoundingClientRect().top,
             headBottom: head.getBoundingClientRect().bottom,
             kindTop: kind.getBoundingClientRect().top,
+            kindBottom: kind.getBoundingClientRect().bottom,
+            kindLeft: kind.getBoundingClientRect().left,
+            actsAfterKind: !!(kind.compareDocumentPosition(document.querySelector('.bl-head-actions')) & Node.DOCUMENT_POSITION_FOLLOWING),
+            actsTop: document.querySelector('.bl-head-actions').getBoundingClientRect().top,
+            createLeft: document.getElementById('blCreateBoard').getBoundingClientRect().left,
           };
         }""")
         assert r["firstIsHead"], r
         assert r["kindAfterHead"], r
         assert r["backTop"] < r["kindTop"], r
         assert r["kindTop"] >= r["headBottom"], f"переключатель наезжает на шапку: {r}"
+        assert r["actsAfterKind"] and r["actsTop"] >= r["kindBottom"], f"ряд кнопок не под переключателем: {r}"
+        assert abs(r["createLeft"] - r["kindLeft"]) <= 4, f"ряд кнопок не прижат влево: {r}"
         print("ok порядок:", r)
         page.click('#blKindSwitch [data-kind="decks"]')
         assert page.get_attribute('#blKindSwitch [data-kind="decks"]', "aria-selected") == "true"

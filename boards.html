@@ -106,14 +106,14 @@ input,textarea{-webkit-user-select:text; -moz-user-select:text; user-select:text
 .bl-main{flex:1 1 auto;padding:22px 26px 60px;min-width:0;}
 .bl-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
 /* №113: переключатель «доски / все / презентации» и метка «Бета» */
-.bl-kind{display:inline-flex;gap:2px;padding:3px;margin-bottom:18px;border-radius:12px;background:var(--hover-1);max-width:100%;flex-wrap:wrap;}
+.bl-kind{display:inline-flex;gap:2px;padding:3px;margin-bottom:12px;border-radius:12px;background:var(--hover-1);max-width:100%;flex-wrap:wrap;}
 .bl-kind-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:none;border-radius:9px;background:none;cursor:pointer;font-family:var(--font-ui);font-weight:600;font-size:13.5px;color:var(--muted-2);}
 .bl-kind-btn:hover{color:var(--pencil);}
 .bl-kind-btn.active{background:var(--paper);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.14);}
 .bl-beta{display:inline-block;padding:1px 6px;border-radius:6px;background:var(--hl-14);color:var(--ink);font-family:var(--font-ui);font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;line-height:1.5;}
 .bl-title{font-family:var(--font-ui);font-weight:700;font-size:20px;color:var(--pencil);display:flex;align-items:center;gap:8px;}
 .bl-title svg{width:18px;height:18px;color:var(--muted-2);}
-.bl-head-actions{display:flex;gap:8px;margin-left:auto;margin-right:52px;flex-wrap:wrap;}
+.bl-head-actions{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
 /* ── меню «⋯» (mathh-menu.js): в правом верхнем углу досок только оно ──
    Раньше там стояли отдельные кнопки темы и совместного доступа высотой
    40 px с отступом 16 px сверху — нижним краем они на 3 px вылезали за
@@ -163,6 +163,14 @@ html[data-theme="dark"] .bl-card-menu:hover{background:rgba(255,255,255,.18);}
 .bl-sort-pop button{display:block;width:100%;text-align:left;background:none;border:none;padding:8px 10px;border-radius:8px;font-size:13.5px;color:var(--pencil);cursor:pointer;}
 .bl-sort-pop button:hover{background:var(--hover-1);}
 .bl-sort-pop button.active{color:var(--ink);font-weight:700;}
+/* меню «Ещё» — того же вида, что и меню сортировки рядом */
+.bl-more{position:relative;}
+.bl-more-pop{position:absolute;top:calc(100% + 6px);right:0;z-index:300;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);border-radius:12px;box-shadow:var(--shadow);padding:5px;min-width:230px;display:none;flex-direction:column;}
+.bl-more-pop.open{display:flex;}
+.bl-more-item{display:flex;align-items:center;gap:9px;width:100%;text-align:left;background:none;border:none;padding:8px 10px;border-radius:8px;font-family:var(--font-ui);font-weight:600;font-size:13.5px;color:var(--pencil);cursor:pointer;white-space:nowrap;}
+.bl-more-item:hover{background:var(--hover-1);}
+.bl-more-item:disabled{opacity:.5;cursor:default;}
+.bl-more-item svg{width:15px;height:15px;flex:none;color:var(--muted-2);}
 /* ── множественный выбор досок (⌘/Ctrl+щелчок, кнопка «Выбрать») ──
    Кружок-галочка в левом верхнем углу появляется только в режиме выбора:
    в обычном списке он был бы лишним шумом на каждой карточке */
@@ -1239,60 +1247,6 @@ function resolveBasketTexInHtml(html){
         К тренажёрам
       </a>
       <div class="bl-title" id="blTitle"></div>
-      <div class="bl-head-actions">
-        <button class="bl-btn primary" id="blCreateBoard">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-          Создать доску
-        </button>
-        <button class="bl-btn" id="blCreateDeck" title="Доска из слайдов, как в PowerPoint">
-          <svg viewBox="0 0 24 24" fill="none"><rect x="2.5" y="4" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="8.5" y="10" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.8"/></svg>
-          Создать презентацию <span class="bl-beta">Бета</span>
-        </button>
-        <button class="bl-btn" id="blCreateFolder">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="1.8"/></svg>
-          Создать папку
-        </button>
-        <!-- доски хранятся только локально в этом браузере (см. boards-core.js,
-             STORAGE_KEY) — эта кнопка даёт способ вручную вернуть доску,
-             сохранённую файлом через «Экспортировать в файл» в меню доски
-             (⋯), например с другого устройства или как резервную копию -->
-        <button class="bl-btn" id="blExportAll" title="Сохранить все доски и папки в один файл — чтобы перенести на другое устройство или держать резервную копию">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M12 4v12M12 16l-4-4M12 16l4-4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 18v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-          Выгрузить все доски
-        </button>
-        <button class="bl-btn" id="blSnapshots" title="Автоматические резервные копии — вернуть доску, которая пропала">
-          <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><path d="M3 12a9 9 0 1 0 3-6.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="3,4 3,9 8,9" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
-          Копии
-        </button>
-        <button class="bl-btn" id="blRebuild" title="Если доски сильно тормозят или вкладка падает: скачать файл со всеми досками и записать хранилище браузера заново (HANDOFF, раздел 6)">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 0 1-14.3 4.9M4 12a8 8 0 0 1 14.3-4.9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="18.5,3 18.5,7.3 14.2,7.3" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><polyline points="5.5,21 5.5,16.7 9.8,16.7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span>Пересобрать хранилище</span>
-        </button>
-        <button class="bl-btn" id="blImportBoard">
-          <svg viewBox="0 0 24 24" fill="none"><path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
-          Загрузить из файла
-        </button>
-        <input type="file" id="blImportFile" accept=".json,application/json" style="display:none">
-        <!-- множественный выбор без клавиатуры (планшет); с клавиатурой то же
-             самое — ⌘/Ctrl+щелчок по карточкам -->
-        <button class="bl-btn" id="blSelectBtn" title="Выбрать несколько досок — то же, что ⌘/Ctrl+щелчок по карточкам">
-          <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="17" height="17" rx="4" stroke="currentColor" stroke-width="1.8"/><path d="M8 12.2l2.7 2.7L16.2 9.3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          <span>Выбрать</span>
-        </button>
-        <div class="bl-sort">
-          <button class="bl-btn" id="blSortBtn">
-            <svg viewBox="0 0 24 24" fill="none"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l3-3M17 20l-3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span id="blSortLabel">Сначала новые</span>
-          </button>
-          <div class="bl-sort-pop" id="blSortPop">
-            <button data-sort="my">Мой порядок</button>
-            <button data-sort="work">По дате работы</button>
-            <button data-sort="new">Сначала новые</button>
-            <button data-sort="old">Сначала старые</button>
-            <button data-sort="az">По названию (А—Я)</button>
-          </div>
-        </div>
-      </div>
     </div>
     <!-- №113: доски и презентации — разные виды списка. По умолчанию только
          доски; презентации в бете, поэтому у них подпись «Бета» -->
@@ -1300,6 +1254,75 @@ function resolveBasketTexInHtml(html){
       <button type="button" class="bl-kind-btn active" data-kind="boards" role="tab" aria-selected="true">Основные доски</button>
       <button type="button" class="bl-kind-btn" data-kind="all" role="tab" aria-selected="false">Все доски и презентации</button>
       <button type="button" class="bl-kind-btn" data-kind="decks" role="tab" aria-selected="false">Презентации <span class="bl-beta">Бета</span></button>
+    </div>
+    <!-- ряд действий — под переключателем видов и по левому краю: сверху вниз
+         «где я» → «что показать» → «что сделать». Справа его не держим: там
+         в углу кнопка меню приложения (⋯) -->
+    <div class="bl-head-actions">
+      <button class="bl-btn primary" id="blCreateBoard">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+        Создать доску
+      </button>
+      <button class="bl-btn" id="blCreateDeck" title="Доска из слайдов, как в PowerPoint">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="2.5" y="4" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="8.5" y="10" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.8"/></svg>
+        Создать презентацию <span class="bl-beta">Бета</span>
+      </button>
+      <button class="bl-btn" id="blCreateFolder">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="1.8"/></svg>
+        Создать папку
+      </button>
+      <!-- множественный выбор без клавиатуры (планшет); с клавиатурой то же
+           самое — ⌘/Ctrl+щелчок по карточкам -->
+      <button class="bl-btn" id="blSelectBtn" title="Выбрать несколько досок — то же, что ⌘/Ctrl+щелчок по карточкам">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="17" height="17" rx="4" stroke="currentColor" stroke-width="1.8"/><path d="M8 12.2l2.7 2.7L16.2 9.3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Выбрать</span>
+      </button>
+      <div class="bl-sort">
+        <button class="bl-btn" id="blSortBtn">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M7 4v16M7 4l-3 3M7 4l3 3M17 20V4M17 20l3-3M17 20l-3-3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          <span id="blSortLabel">Сначала новые</span>
+        </button>
+        <div class="bl-sort-pop" id="blSortPop">
+          <button data-sort="my">Мой порядок</button>
+          <button data-sort="work">По дате работы</button>
+          <button data-sort="new">Сначала новые</button>
+          <button data-sort="old">Сначала старые</button>
+          <button data-sort="az">По названию (А—Я)</button>
+        </div>
+      </div>
+      <!-- редкие действия с хранилищем собраны в одно меню «Ещё», чтобы не
+           занимать ряд. Не «⋯»: такая кнопка уже есть в правом углу (меню
+           приложения), а стрелка вниз читается так же, как соседняя
+           сортировка. У пунктов прежние id — обработчики в boards-core.js
+           те же -->
+      <div class="bl-more">
+        <button class="bl-btn" id="blMoreBtn" aria-haspopup="menu" aria-expanded="false" title="Выгрузка, загрузка и резервные копии досок">
+          <span id="blMoreLabel">Ещё</span>
+          <svg viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="bl-more-pop" id="blMorePop" role="menu">
+          <!-- доски хранятся только локально в этом браузере (см. boards-core.js,
+               STORAGE_KEY) — выгрузка и загрузка файлом дают способ перенести
+               их на другое устройство или держать резервную копию -->
+          <button class="bl-more-item" role="menuitem" id="blExportAll" title="Сохранить все доски и папки в один файл — чтобы перенести на другое устройство или держать резервную копию">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 4v12M12 16l-4-4M12 16l4-4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 18v1a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-1" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+            Выгрузить все доски
+          </button>
+          <button class="bl-more-item" role="menuitem" id="blImportBoard" title="Вернуть доски из файла, сохранённого «Выгрузить все доски» или «Экспортировать в файл» в меню доски">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>
+            Загрузить из файла
+          </button>
+          <button class="bl-more-item" role="menuitem" id="blSnapshots" title="Автоматические резервные копии — вернуть доску, которая пропала">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M3 12a9 9 0 1 0 3-6.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><polyline points="3,4 3,9 8,9" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 8v4l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+            Копии
+          </button>
+          <button class="bl-more-item" role="menuitem" id="blRebuild" title="Если доски сильно тормозят или вкладка падает: скачать файл со всеми досками и записать хранилище браузера заново (HANDOFF, раздел 6)">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M20 12a8 8 0 0 1-14.3 4.9M4 12a8 8 0 0 1 14.3-4.9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><polyline points="18.5,3 18.5,7.3 14.2,7.3" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><polyline points="5.5,21 5.5,16.7 9.8,16.7" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span>Пересобрать хранилище</span>
+          </button>
+        </div>
+        <input type="file" id="blImportFile" accept=".json,application/json" style="display:none">
+      </div>
     </div>
     <div class="bl-cloud-warn" id="blCloudWarn" role="alert" hidden>
       <div class="bl-cloud-warn-body">
