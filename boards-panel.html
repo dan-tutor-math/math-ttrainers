@@ -69,6 +69,14 @@ body.bp-in-frame .bp-frame-wrap{display:flex;}
    экран — щипок и ширина телефона снимок не меняют; широкий — кадр во всю
    ширину, тренажёр в своей «компьютерной» вёрстке, и снимок — как виден */
 .bp-iframe{position:absolute;left:0;top:0;border:none;background:var(--card);transform-origin:0 0;}
+/* широкий экран: ширина кадра — ручкой у его правого края, как край
+   встроенной панели на доске (там так и сужают / расширяют задание) */
+.bp-frame-resize{position:absolute;top:0;bottom:0;width:12px;margin-left:-6px;z-index:3;cursor:ew-resize;touch-action:none;display:none;}
+.bp-frame-resize::after{content:"";position:absolute;left:4px;top:50%;width:4px;height:44px;margin-top:-22px;border-radius:2px;background:var(--muted-2);opacity:.45;}
+.bp-frame-resize:hover::after,.bp-frame-resize.dragging::after{background:var(--ink);opacity:1;}
+body.bp-desktop .bp-frame-resize{display:block;}
+/* пока тянут, кадр не перехватывает указатель — иначе край «залипал» бы над тренажёром */
+.bp-stage.resizing .bp-iframe{pointer-events:none;}
 .bp-actions{flex:none;display:flex;gap:8px;padding:10px 12px calc(10px + env(safe-area-inset-bottom));border-top:1px solid var(--glass-border);background:var(--card);justify-content:center;flex-wrap:wrap;}
 .bp-actions .bp-btn,.bp-actions .bp-btn2{flex:1 1 0;min-width:0;max-width:220px;white-space:nowrap;}
 /* три кнопки в ряд на телефоне — только с короткими подписями */
@@ -105,7 +113,7 @@ body.bp-in-frame .bp-frame-wrap{display:flex;}
 </div>
 
 <div class="bp-frame-wrap" id="bpFrameWrap">
-  <div class="bp-stage" id="bpStage"><iframe class="bp-iframe" id="bpIframe"></iframe></div>
+  <div class="bp-stage" id="bpStage"><iframe class="bp-iframe" id="bpIframe"></iframe><div class="bp-frame-resize" id="bpFrameResize" title="Потяните — ширина тренажёра и задания. Двойной щелчок — во всю ширину"></div></div>
   <div class="bp-actions">
     <button class="bp-btn" id="bpAddBtn">📥 Добавить<span class="bp-long"> на доску</span></button>
     <button class="bp-btn2" id="bpManualBtn" title="Добавить вручную — место и размер выбрать на доске">✥ <span class="bp-long">Добавить </span>вручную</button>
@@ -236,13 +244,21 @@ body.bp-in-frame .bp-frame-wrap{display:flex;}
   // с какой ширины экрана тренажёр показывается «по-компьютерному» — во всю
   // ширину; у́же — телефонная вёрстка кадра PANEL_FRAME_W, вписанная масштабом
   const DESKTOP_MIN_W = 700;
+  // ширина кадра на широком экране — предпочтение этого устройства (как
+  // ширина встроенной панели на доске), null — во всю ширину окна
+  const FRAME_W_KEY = 'bdPanel:frameW';
+  const FRAME_MIN_W = 300;
+  let frameW = null;
+  try { frameW = parseFloat(localStorage.getItem(FRAME_W_KEY)) || null; } catch (e) {}
   function fitFrame(){
     const w = stage.clientWidth, h = stage.clientHeight;
     if (!w || !h) return;
     const desktop = w >= DESKTOP_MIN_W;
     document.body.classList.toggle('bp-desktop', desktop);
     if (desktop){
-      Object.assign(iframe.style, { width: w + 'px', height: h + 'px', transform: 'none', left: '0px' });
+      const fw = frameW ? Math.max(FRAME_MIN_W, Math.min(w, frameW)) : w;
+      Object.assign(iframe.style, { width: fw + 'px', height: h + 'px', transform: 'none', left: '0px' });
+      $('bpFrameResize').style.left = Math.min(fw, w - 6) + 'px';
       return;
     }
     const k = Math.max(0.5, Math.min(1.6, w / PANEL_FRAME_W));
@@ -254,6 +270,37 @@ body.bp-in-frame .bp-frame-wrap{display:flex;}
   }
   window.addEventListener('resize', fitFrame);
   if (window.ResizeObserver) new ResizeObserver(fitFrame).observe(stage);
+  (function setupFrameResize(){
+    const h = $('bpFrameResize');
+    let start = null;   // { x, w }
+    h.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      h.setPointerCapture(e.pointerId);
+      start = { x: e.clientX, w: iframe.getBoundingClientRect().width };
+      h.classList.add('dragging'); stage.classList.add('resizing');
+    });
+    h.addEventListener('pointermove', (e) => {
+      if (!start) return;
+      frameW = Math.max(FRAME_MIN_W, Math.min(stage.clientWidth, start.w + e.clientX - start.x));
+      fitFrame();
+    });
+    const end = () => {
+      if (!start) return;
+      start = null;
+      h.classList.remove('dragging'); stage.classList.remove('resizing');
+      // дотянули до края окна — «во всю ширину»: тогда кадр и дальше следует за окном
+      if (frameW >= stage.clientWidth - 2) frameW = null;
+      try { frameW ? localStorage.setItem(FRAME_W_KEY, String(Math.round(frameW))) : localStorage.removeItem(FRAME_W_KEY); } catch (e) {}
+      fitFrame();
+    };
+    h.addEventListener('pointerup', end);
+    h.addEventListener('pointercancel', end);
+    h.addEventListener('dblclick', () => {
+      frameW = null;
+      try { localStorage.removeItem(FRAME_W_KEY); } catch (e) {}
+      fitFrame();
+    });
+  })();
   // какой тренажёр открыт — по адресу кадра (стрелки ЕГЭ меняют ?n= без
   // перезагрузки), как syncTrainersFrame встроенной панели
   function syncFrame(){

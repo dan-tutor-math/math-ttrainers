@@ -8,6 +8,9 @@
   2. Снимок с широкого вида — таким, как виден: кадр не сужается, а
      растянутая или суженная ручками рабочая зона тренажёра (ОГЭ №8) меняет
      ширину снимка, как во встроенной панели. На телефоне — кадр 420.
+  2в. Ручка ширины кадра (как край встроенной панели): сузили — тренажёр
+     и снимок уже (ОГЭ №6, где своих ручек нет); ширина помнится после
+     перезагрузки; двойной щелчок — снова во всю ширину.
   3. Плотность снимка — как у доски, а не по экрану: на экране с
      плотностью 3 без доски берётся 2 (natW / css.w = 2); доска присылает
      своё число в pong (state().scale).
@@ -101,6 +104,35 @@ def run():
         sd = d.evaluate(SNAP_JS)
         check("2. компьютер: снимок — в кадре той ширины, что на экране", sd["vw"] == fd["inner"], f"{sd['vw']} / {fd['inner']}")
         check("2. компьютер: карточка шире телефонной (вёрстка как видна)", sd["css"]["w"] > 450, str(sd["css"]))
+
+        # 2в. ручка ширины кадра
+        hr = d.evaluate("() => { const r = document.getElementById('bpFrameResize').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2, vis: r.width > 0 }; }")
+        check("2в. у кадра есть ручка ширины", hr["vis"], str(hr))
+        d.mouse.move(hr["x"], hr["y"])
+        d.mouse.down()
+        d.mouse.move(hr["x"] - 700, hr["y"], steps=10)
+        d.mouse.up()
+        d.wait_for_timeout(400)
+        fn = d.evaluate(FRAME_JS)
+        qn = d.evaluate("() => document.getElementById('bpIframe').contentDocument.querySelector('#questionPanel').getBoundingClientRect().width")
+        check("2в. кадр сузился", abs(fn["fw"] - (fd["fw"] - 700)) < 3 and fn["inner"] == round(fn["fw"]), str(fn))
+        check("2в. задание в тренажёре сузилось", qn < sd["css"]["w"] - 150, f"{sd['css']['w']} → {qn}")
+        sn = d.evaluate(SNAP_JS)
+        check("2в. снимок уже", sn["css"]["w"] < sd["css"]["w"] - 150 and sn["vw"] == fn["inner"], f"{sd['css']['w']} → {sn['css']['w']}")
+        d.reload()
+        d.wait_for_function("() => window.__boardPanel")
+        d.evaluate("() => __boardPanel.openTrainer('oge6', 'oge6.html', 'oge6')")
+        d.wait_for_timeout(1500)
+        fr = d.evaluate(FRAME_JS)
+        check("2в. ширина кадра помнится после перезагрузки", abs(fr["fw"] - fn["fw"]) < 2, f"{fn['fw']} / {fr['fw']}")
+        rh = d.evaluate("() => { const r = document.getElementById('bpFrameResize').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }")
+        d.mouse.dblclick(rh["x"], rh["y"])
+        d.wait_for_timeout(300)
+        ff = d.evaluate(FRAME_JS)
+        check("2в. двойной щелчок — снова во всю ширину", abs(ff["fw"] - ff["sw"]) < 1, str(ff))
+        # после перезагрузки в тренажёре снова экран выбора типа — выбираем, как в panel()
+        d.evaluate(f"() => document.getElementById('bpIframe').contentWindow.eval({json.dumps(PICK)})")
+        d.wait_for_timeout(1000)
 
         # ширина рабочей зоны ручкой тренажёра (ОГЭ №8) — меняет снимок
         ctx_8, e8 = panel(browser, 1280, 860, 1, False, "oge8")
