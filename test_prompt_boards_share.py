@@ -95,8 +95,11 @@ def run_main(browser):
     teacher.click("#lgMenuToggle")
     teacher.wait_for_timeout(400)
     order = teacher.evaluate("""() => [...document.querySelectorAll('#lgMenuItems .lg-item')].map(r => r.querySelector('.lg-label').textContent)""")
-    check("A: в меню — совместный доступ, тема, эффекты", len(order) == 3 and order[0] == "Совместный доступ"
-          and "тема" in order[1] and order[2].startswith("Эффекты"), str(order))
+    # «Проверка связи» добавляет net-check.js (№94) последним пунктом
+    check("A: в меню — совместный доступ, тема, эффекты, проверка связи",
+          len(order) == 4 and order[0] == "Совместный доступ"
+          and "тема" in order[1] and order[2].startswith("Эффекты")
+          and order[3] == "Проверка связи", str(order))
     before = teacher.evaluate("() => document.documentElement.getAttribute('data-theme') || 'light'")
     teacher.click("#themeToggle")
     after = teacher.evaluate("() => document.documentElement.getAttribute('data-theme')")
