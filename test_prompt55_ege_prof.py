@@ -418,6 +418,8 @@ def test_basket(browser):
 
     page.goto(f"{BASE}/index.html")
     page.wait_for_timeout(800)
+    page.click('#lgMenuToggle')  # «Подборка» — в меню «⋯»
+    page.wait_for_timeout(250)
     page.click('#basketToggle')
     page.wait_for_timeout(400)
     src = page.eval_on_selector('.basket-item-src', 'e => e.textContent')

@@ -104,6 +104,22 @@ def main():
         has_cls = page.evaluate("MathhGlass.canRefract || document.documentElement.classList.contains('lg-norefract')")
         check("lg-norefract ставится там, где нет преломления", has_cls)
 
+        # 3а. «Подборка» — последней в меню «⋯», в левой капсуле её нет;
+        # «Доски» — значок школьной доски (линией, не табличная сетка)
+        lay = page.evaluate("""() => ({
+          last: [...document.querySelectorAll('.lg-menu .lg-label')].map(e => e.textContent).pop(),
+          inMenu: !!document.querySelector('.lg-menu #basketToggle'),
+          side: [...document.querySelectorAll('.lg-side > a, .lg-side > button')].map(e => e.className.split(' ')[0]),
+          board: !!document.querySelector('#mi-boards rect') })""")
+        check("«Подборка» последней в меню «⋯»", lay["inMenu"] and lay["last"] == "Подборка заданий", str(lay))
+        check("в левой капсуле доски, работы и панель", lay["side"] == ["boards-toggle", "works-toggle", "panel-toggle"], str(lay["side"]))
+        check("значок «Доски» — школьная доска", lay["board"])
+        page.evaluate("window.scrollTo(0, 0)")
+        page.click("#lgMenuToggle"); page.wait_for_timeout(300)
+        page.click("#basketToggle"); page.wait_for_timeout(300)
+        opened = page.evaluate("[basketOpen, document.querySelector('.lg-menu').classList.contains('is-open')]")
+        check("«Подборка» из меню открывается, меню закрывается", opened == [True, False], str(opened))
+
         # 4. тема из другой вкладки
         trainer = ctx.new_page()
         trainer.on("pageerror", lambda e: errors.append(str(e)))

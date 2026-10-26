@@ -191,12 +191,12 @@ def main():
         check(pg.eval_on_selector_all(".subj-btn.active", "els => els.map(e => e.dataset.id)") == ["math"], "и активна «Математика»")
 
         print("7. «Подборка» и предмет")
-        pg.click("#basketToggle")
+        pg.click("#lgMenuToggle"); pg.wait_for_timeout(250); pg.click("#basketToggle")  # «Подборка» — в меню «⋯»
         pg.wait_for_timeout(150)
         check("Пока пусто" in pg.inner_text("#topics"), "«Подборка» открылась")
         subj(pg, "math")
         check(pg.query_selector("#topics .topic-item") is not None and not pg.evaluate("basketOpen"), "клик по текущему предмету закрывает «Подборку»")
-        pg.click("#basketToggle")
+        pg.click("#lgMenuToggle"); pg.wait_for_timeout(250); pg.click("#basketToggle")  # «Подборка» — в меню «⋯»
         subj(pg, "rus")
         # у русского запомнена подвкладка ЕГЭ (шаг 4) — вместо списка там «готовим»
         check(not pg.evaluate("basketOpen") and "Пока пусто" not in pg.inner_text("#topics")

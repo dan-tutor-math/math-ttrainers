@@ -118,7 +118,7 @@ def run():
         page.click("#lgMenuToggle"); page.wait_for_timeout(400)
         check(page.evaluate("document.querySelector('.lg-menu').classList.contains('is-open')")
               and page.get_attribute("#lgMenuToggle", "aria-expanded") == "true", "«⋯» открывает меню")
-        check(labels(page) == ["Совместный доступ", "Тёмная тема", "Эффекты: обычные", "Сбросить прогресс"],
+        check(labels(page) == ["Совместный доступ", "Тёмная тема", "Эффекты: обычные", "Сбросить прогресс", "Подборка заданий"],
               f"пункты меню и подписи: {labels(page)}")
         h = page.evaluate("document.querySelector('.lg-menu-glass').getBoundingClientRect().height")
         check(h > 200, f"стекло меню вытянулось под список ({h:.0f}px)")
@@ -136,11 +136,11 @@ def run():
         page.mouse.move(640, 500)
         top = "[...document.querySelectorAll('.lg-side .lg-tip')].map(e=>[e.textContent, +getComputedStyle(e).opacity])"
         tips0 = page.evaluate(top)
-        check([t[0] for t in tips0] == ["Подборка", "Доски", "Работы"] and all(t[1] == 0 for t in tips0),
+        check([t[0] for t in tips0] == ["Доски", "Работы", "Панель для доски"] and all(t[1] == 0 for t in tips0),
               f"у левой капсулы есть названия, спрятанные до наведения ({tips0})")
         page.hover(".works-toggle"); page.wait_for_timeout(400)
         tips1 = page.evaluate(top)
-        check(tips1[2][1] == 1 and tips1[0][1] == 0 and tips1[1][1] == 0, f"название появляется у кнопки под курсором ({tips1})")
+        check(tips1[1][1] == 1 and tips1[0][1] == 0 and tips1[2][1] == 0, f"название появляется у кнопки под курсором ({tips1})")
         tr = page.evaluate("document.querySelector('.works-toggle .lg-tip').getBoundingClientRect().left")
         sr = page.evaluate("document.querySelector('.lg-side').getBoundingClientRect().right")
         check(tr > sr, "название — справа от капсулы, не на ней")
@@ -239,9 +239,9 @@ def run():
         # кнопка, мимо которой курсор просто едет, не дёргается: цель
         # считается от покойных положений, а не от уже выросших соседей
         page.mouse.move(r[0], r[1] + 3); page.wait_for_timeout(500)
-        a1 = page.evaluate("parseFloat(document.querySelector('.basket-toggle').style.getPropertyValue('--lg-mag'))")
+        a1 = page.evaluate("parseFloat(document.querySelector('.works-toggle').style.getPropertyValue('--lg-mag'))")
         page.mouse.move(r[0], r[1] + 4); page.wait_for_timeout(500)
-        a2 = page.evaluate("parseFloat(document.querySelector('.basket-toggle').style.getPropertyValue('--lg-mag'))")
+        a2 = page.evaluate("parseFloat(document.querySelector('.works-toggle').style.getPropertyValue('--lg-mag'))")
         check(abs(a2 - a1) < 0.02, f"сдвиг курсора на пиксель почти не меняет соседа ({a1} → {a2})")
         page.mouse.move(640, 500); page.wait_for_timeout(900)
 

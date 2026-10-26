@@ -131,7 +131,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
    (mathh-menu.js): раньше это были три отдельные квадратные кнопки в ряд, и
    каждая новая настройка добавила бы ещё одну. Пока скрипт не перенёс кнопки
    в меню, они лежат в разметке прямо в <body> — прячем, чтобы не мигали */
-body > #resetProgressBtn, body > #themeToggle{display:none}
+body > #resetProgressBtn, body > #themeToggle, body > #basketToggle{display:none}
 /* на телефоне кнопки углов (капсула «Подборка · Доски · Работы» слева и
    «⋯» справа) сходятся к середине и налезали на заголовок: на узком экране
    отдаём им отдельную строку сверху, а левую капсулу кладём горизонтально */
@@ -232,11 +232,11 @@ html[data-theme="dark"] .subj-btn.active{background:rgba(255,255,255,.14);color:
 footer{text-align:center;font-family:var(--font-ui);font-weight:500;color:var(--muted-1);font-size:13px;margin-top:28px;}
 
 
-/* «Подборка», «Доски» и «Работы» — платформенные инструменты, отдельные от
-   предметной навигации. Раньше это были три квадратные кнопки столбиком,
-   теперь одна стеклянная капсула .lg-side (liquid-glass.css) — так же
-   собраны кнопки в iOS 26. Раскладку и стекло задаёт капсула, здесь только
-   то, что своё у каждой кнопки */
+/* «Доски», «Работы» и панель для доски — платформенные инструменты, отдельные
+   от предметной навигации: одна стеклянная капсула .lg-side (liquid-glass.css),
+   как панели iOS 26. «Подборка» раньше стояла здесь первой, но ей пользуются
+   редко — теперь она последняя в меню «⋯», а капсула на телефоне короче.
+   Здесь только то, что своё у каждой кнопки */
 .basket-toggle.active{background:var(--ink);color:#fff;}
 .basket-toggle .badge{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;border-radius:9px;background:var(--teacher);color:#fff;font-family:var(--font-ui);font-size:10.5px;font-weight:700;display:none;align-items:center;justify-content:center;line-height:1;box-shadow:0 0 0 2px var(--bg,#fff);}
 /* панель совместного доступа открывается слева от капсулы меню, а не под
@@ -349,12 +349,12 @@ body .ts-share-pop{top:16px;right:calc(16px + var(--lg-menu-w, 48px) + 12px);max
 })();
 </script>
 <button class="lg-btn" id="themeToggle" type="button" title="Светлая/тёмная тема" aria-label="Тёмная тема"></button>
-<nav class="lg-side lg-capsule lg-mag" aria-label="Подборка, доски и работы">
+<button class="basket-toggle lg-btn" id="basketToggle" type="button" title="Подборка заданий" aria-label="Подборка заданий">
+  <svg class="mi" viewBox="0 0 56 56" aria-hidden="true"><use href="#mi-basket"/></svg>
+  <span class="badge" id="basketBadge">0</span>
+</button>
+<nav class="lg-side lg-capsule lg-mag" aria-label="Доски, работы и панель для доски">
   <span class="lg-glass lg lg-r" aria-hidden="true"></span>
-  <button class="basket-toggle lg-btn" id="basketToggle" type="button" title="Подборка" aria-label="Подборка">
-    <svg class="mi" viewBox="0 0 56 56" aria-hidden="true"><use href="#mi-folder"/></svg>
-    <span class="badge" id="basketBadge">0</span>
-  </button>
   <a class="boards-toggle lg-btn" href="boards.html" title="Доски" aria-label="Доски">
     <svg class="mi" viewBox="0 0 56 56" aria-hidden="true"><use href="#mi-boards"/></svg>
   </a>
@@ -432,6 +432,9 @@ body .ts-share-pop{top:16px;right:calc(16px + var(--lg-menu-w, 48px) + 12px);max
   var resetBtn = document.getElementById('resetProgressBtn');
   resetBtn.innerHTML = MathhIcons.html('reset');
   menu.adopt(resetBtn, { label: 'Сбросить прогресс' });
+  // подборка — последней: ей пользуются реже всего. Меню закрывается по
+  // нажатию — под ним как раз открывается список подборки
+  menu.adopt(document.getElementById('basketToggle'), { label: 'Подборка заданий' });
 
   // совместный доступ — первым в списке: им пользуются чаще остальных
   menu.adoptShare({ before: theme.row });
