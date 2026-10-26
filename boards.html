@@ -71,6 +71,9 @@ body{
     radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
     radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
     var(--bg);
+  /* html и body высотой 100% — без no-repeat свечение повторяется плиткой
+     на каждый экран, и при прокрутке вниз появляется резкая синяя полоса */
+  background-repeat:no-repeat;
   font-family:var(--font-ui); color:var(--pencil); min-height:100vh;
   /* это интерфейс инструмента, а не текст для чтения — весь UI (кнопки,
      подписи, проценты зума и т.п.) не должен случайно выделяться курсором
