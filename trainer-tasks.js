@@ -1348,6 +1348,31 @@ function taSameNumSets(a, b){
   const x = uniq(a), y = uniq(b);
   return x.length === y.length && x.every((v, k) => taSameNum(v, y[k]));
 }
+// разрезание по символу только вне скобок: «;» внутри (1; 5) — не разделитель
+function taSplitTop(s, ch){
+  const out = []; let depth = 0, cur = '';
+  for (const c of s) {
+    if ('([{'.indexOf(c) >= 0) depth++;
+    if (')]}'.indexOf(c) >= 0) depth--;
+    if (depth === 0 && c === ch) { out.push(cur); cur = ''; } else cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+// пересечение двух списков промежутков (оба уже склеены и упорядочены)
+function taIntersectSets(a, b){
+  const out = [];
+  for (const p of a) for (const q of b) {
+    let lo, loC, hi, hiC;
+    if (taSameNum(p.lo, q.lo)) { lo = p.lo; loC = p.loC && q.loC; }
+    else if (p.lo > q.lo) { lo = p.lo; loC = p.loC; } else { lo = q.lo; loC = q.loC; }
+    if (taSameNum(p.hi, q.hi)) { hi = p.hi; hiC = p.hiC && q.hiC; }
+    else if (p.hi < q.hi) { hi = p.hi; hiC = p.hiC; } else { hi = q.hi; hiC = q.hiC; }
+    if (lo < hi && !taSameNum(lo, hi)) out.push({ lo, loC, hi, hiC });
+    else if (taSameNum(lo, hi) && loC && hiC) out.push({ lo, loC: true, hi, hiC: true });
+  }
+  return out;
+}
 function taParseSet(src){
   let s = taNormMinus(src).toLowerCase();
   s = s.replace(/<=/g, '≤').replace(/>=/g, '≥').replace(/\s+или\s+/g, ';');
@@ -1357,6 +1382,21 @@ function taParseSet(src){
   if (!items.length) return null;
   const out = [];
   for (const raw of items) {
+    // «∩» связывает сильнее «∪»: «(1; 5) ∩ (3; 8) ∪ {10}». «∪» к этому
+    // месту уже стал «;», так что здесь в одном элементе только пересечение.
+    // Копии этой функции в ege_prof.html «∩» не знает — там ответ вводят
+    // системной клавиатурой, а у панели на досках кнопка ∩ есть
+    const inter = taSplitTop(raw, '∩');
+    if (inter.length > 1) {
+      let acc = null;
+      for (const piece of inter) {
+        const v = taParseSet(piece);
+        if (v === null) return null;
+        acc = acc === null ? v : taIntersectSets(acc, v);
+      }
+      acc.forEach(iv => out.push(iv));
+      continue;
+    }
     const item = taStrip(raw);
     if (/^[\(\[].*[\)\]]$/.test(item)) {
       const parts = taSplit(item.slice(1, -1));

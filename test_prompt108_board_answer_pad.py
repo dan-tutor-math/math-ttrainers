@@ -151,7 +151,7 @@ def run():
 
         page.click(sel)
         page.wait_for_timeout(150)
-        check("1. фокус — открылась узкая полоска", pad_keys(page) == ["√", "±", "/", ";", "(", ")", "digits", "close"])
+        check("1. фокус — открылась узкая полоска", pad_keys(page) == ["√", "±", "/", ";", "(", ")", "digits", "close", "∞", "+∞", "-∞", "∪", "∩"])
         geo = page.evaluate(f"""() => {{ const a = document.querySelector('{sel}').getBoundingClientRect(),
             b = document.getElementById('bdAnsPad').getBoundingClientRect();
             return {{ gapBelow: b.top - a.bottom, gapAbove: a.top - b.bottom }}; }}""")
@@ -217,7 +217,7 @@ def run():
         tap(page, "digits")
         page.wait_for_timeout(100)
         keys = pad_keys(page)
-        check("5. «123» раскрыл цифры", "7" in keys and "0" in keys and "check" in keys and len(keys) == 23)
+        check("5. «123» раскрыл цифры", "7" in keys and "0" in keys and "check" in keys and len(keys) == 28)
         check("5. выбор запомнен", page.evaluate("() => localStorage.getItem('bdPadFull')") == "1")
         for k in ["-", "1", "/", "6", ";", "1", "/", "2"]:
             tap(page, k)

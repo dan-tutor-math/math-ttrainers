@@ -60,6 +60,8 @@
     /* класс НЕ «mi»: в liquid-glass.css «.mi» — общий класс значков (width:1em),
        и кнопка «−» сжималась до узкой полоски вместо своей ячейки сетки */
     #bdAnsPad button.neg{color:var(--teacher,#ff3b30);font-weight:700;}
+    #bdAnsPad button.set{font-family:"STIX Two Math","Cambria Math","Latin Modern Math","Times New Roman",serif;
+      font-weight:400;font-size:25px;}
     #bdAnsPad button.aux{font-size:14px;color:var(--muted-6,#86868b);}
     #bdAnsPad button.go{background:#2e7de0;color:#fff;font-size:16px;font-weight:600;}
     @media (max-width:420px){#bdAnsPad.full .bap-grid{grid-template-columns:repeat(5,minmax(44px,1fr));}}
@@ -67,17 +69,21 @@
 
   // Раскладка: слева — привычный цифровой блок (как в keypad.js тренажёров),
   // справа — то, ради чего панель: √, /, ±, ;, скобки. «+» нужен для 4 + √7,
-  // «±» — потому что так пишут в тетради (4 ± √7), и разбор его понимает
+  // «±» — потому что так пишут в тетради (4 ± √7), и разбор его понимает.
+  // Ряд ∞ +∞ −∞ ∪ ∩ — для ответов к неравенствам: (−∞; 3) ∪ (5; +∞).
+  // «−∞» вставляет дефис, как и кнопка «−»: так его читают все разборы ответа
   const FULL = [
     ['7'], ['8'], ['9'], ['√', 'sp'], ['back', 'aux', '⌫'],
     ['4'], ['5'], ['6'], ['/', 'sp'], ['±', 'sp'],
     ['1'], ['2'], ['3'], ['+', 'sp'], [';', 'sp'],
     ['-', 'neg', '−'], ['0'], [','], ['(', 'sp'], [')', 'sp'],
+    ['∞', 'sp'], ['+∞', 'sp'], ['-∞', 'sp', '−∞'], ['∪', 'sp set'], ['∩', 'sp set'],
     ['kbd', 'aux', '⌨'], ['check', 'go', 'Проверить', 3], ['close', 'aux', '✕']
   ];
   const SLIM = [
     ['√', 'sp'], ['±', 'sp'], ['/', 'sp'], [';', 'sp'], ['(', 'sp'], [')', 'sp'],
-    ['digits', 'aux', '123'], ['close', 'aux', '✕']
+    ['digits', 'aux', '123'], ['close', 'aux', '✕'],
+    ['∞', 'sp'], ['+∞', 'sp'], ['-∞', 'sp', '−∞'], ['∪', 'sp set'], ['∩', 'sp set']
   ];
 
   let pad = null, prevBox = null, grid = null, target = null, opts = null, raf = 0, lastPos = '';
@@ -201,12 +207,13 @@
     if (!s) return '';
     let i = 0;
     const peek = () => s[i];
-    const starts = ch => ch === '(' || ch === 'π' || ch === '√' || /[0-9]/.test(ch || '');
+    const starts = ch => ch === '(' || ch === 'π' || ch === '∞' || ch === '√' || /[0-9]/.test(ch || '');
     const unwrap = n => (n.t === 'par' ? n.a : n);
     function prim() {
       const ch = peek();
       if (ch === '(') { i++; const a = expr(); if (peek() !== ')') throw 0; i++; return { t: 'par', a }; }
       if (ch === 'π') { i++; return { t: 'raw', s: '\\pi' }; }
+      if (ch === '∞') { i++; return { t: 'raw', s: '\\infty' }; }
       if (ch === '√') { i++; return { t: 'sqrt', a: pow() }; }
       const m = /^\d+([.,]\d+)?/.exec(s.slice(i));
       if (!m) throw 0;
@@ -216,7 +223,7 @@
     function pow() { const b = prim(); if (peek() === '^') { i++; return { t: 'pow', a: b, b: un() }; } return b; }
     function un() {
       if (peek() === '-') { i++; return { t: 'neg', a: un() }; }
-      if (peek() === '+') { i++; return un(); }
+      if (peek() === '+') { i++; return { t: 'plus', a: un() }; }
       return pow();
     }
     function term() {
@@ -247,6 +254,7 @@
         case 'sqrt': return '\\sqrt{' + tex(unwrap(n.a)) + '}';
         case 'pow': return tex(n.a) + '^{' + tex(unwrap(n.b)) + '}';
         case 'neg': return '-' + tex(n.a);
+        case 'plus': return '+' + tex(n.a);
         case 'mul': return tex(n.a) + (n.dot ? '\\cdot ' : '') + tex(n.b);
         // −1/6 разбор читает как (−1)/6 — значение то же, а пишут минус
         // перед дробью
@@ -259,6 +267,38 @@
     const v = expr();
     if (i !== s.length) throw 0;
     return tex(v);
+  }
+
+  // разрезание по символу только вне скобок: «;» внутри (−∞; 3) — это не
+  // разделитель ответов, а середина промежутка
+  function splitTop(str, chars) {
+    const out = []; let depth = 0, cur = '';
+    for (const c of str) {
+      if ('([{'.indexOf(c) >= 0) depth++;
+      if (')]}'.indexOf(c) >= 0) depth--;
+      if (depth === 0 && chars.indexOf(c) >= 0) { out.push(cur); out.push(c); cur = ''; } else cur += c;
+    }
+    out.push(cur);
+    return out;
+  }
+  // один ответ: промежуток «(−∞; 3]», числа и выражения, а между ними ∪ и ∩.
+  // Скобки у промежутка рисуются теми, что набрал ученик, — полуоткрытый
+  // (1; 5] читается верно
+  function toSetTex(part) {
+    const toks = splitTop(part.replace(/[−–—‐‑]/g, '-'), '∪∩');
+    return toks.map(t => {
+      if (t === '∪') return '\\cup ';
+      if (t === '∩') return '\\cap ';
+      const x = t.replace(/\s/g, '');
+      const m = /^([(\[])(.*)([)\]])$/.exec(x);
+      if (m) {
+        const ends = split(m[2]);
+        if (ends.length === 2) {
+          return '\\left' + m[1] + toTex(ends[0]) + ';\\ ' + toTex(ends[1]) + '\\right' + m[3];
+        }
+      }
+      return toTex(t);
+    }).join('');
   }
 
   // корни через «;» (и через «,», если это не десятичная запятая) — тем же
@@ -277,7 +317,7 @@
     }
     let html;
     try {
-      const parts = split(raw).map(toTex);
+      const parts = split(raw).map(toSetTex);
       html = window.katex.renderToString(parts.join(';\\ \\ '), { throwOnError: true, output: 'html' });
     } catch (e) {
       html = null;
