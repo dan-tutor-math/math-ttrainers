@@ -7025,7 +7025,9 @@ function boardLinkState(){
       if (st && st.last) ref = { node: (st.last.gen && st.last.gen.node) || null, cw: (st.last.css && st.last.css.cw) || null };
     } catch (e) {}
   }
-  return { ref, board: B ? (B.name || '') : '' };
+  // плотность снимка — как у встроенной панели этой доски: задание с
+  // телефона не должно весить больше такого же отсюда
+  return { ref, board: B ? (B.name || '') : '', scale: ttCaptureScale() };
 }
 function boardLinkAsk(dev){
   return new Promise(resolve => {
@@ -7135,7 +7137,9 @@ function openPanelElsewhere(asWindow){
   if (!boardLink) return;
   boardLink.linkLocalPanel();
   const url = boardLinkPanelUrl('');
-  if (asWindow) window.open(url, 'bdTrainersPanelWin', 'popup=yes,width=560,height=900');
+  // окно — компьютерного размера: на широком панель показывает тренажёр
+  // «по-компьютерному» (boards-panel.html, DESKTOP_MIN_W)
+  if (asWindow) window.open(url, 'bdTrainersPanelWin', 'popup=yes,width=1100,height=900');
   else window.open(url, '_blank');
   closeLinkModal();
 }
@@ -7149,7 +7153,10 @@ document.getElementById('linkOpenWin').addEventListener('click', () => openPanel
    Масштаб учитель выбирает, глядя на настоящую вёрстку задания (чтобы
    половина примера не уехала на новую строку или лист), а не на рамку.
    Призрак двигают и растягивают за углы с сохранением пропорций — мышью,
-   пальцем или пером; «Закрепить» превращает его в обычное задание
+   пальцем или пером. За боковые ручки меняется ширина — так же, как у
+   вставленного задания (reflowTaskWidth): не растяжением, а перестройкой
+   под новую ширину, текст переносится, шрифт прежний; пока тянут — черновик.
+   «Закрепить» превращает его в обычное задание
    (insertTaskImage с выбранным местом и размером, новая стопка оттуда),
    выбранный масштаб запоминается (noteTaskScale) для следующих заданий.
 
@@ -7158,7 +7165,7 @@ document.getElementById('linkOpenWin').addEventListener('click', () => openPanel
    в сохранение, отмену, облако, совместную сессию к ученикам и выгрузку в
    PDF/картинку (они рисуют из B.objects). Отдельный слой не попадает
    никуда сам собой, без исключений в каждом из этих мест. */
-let placeGhost = null;   // { board, it, x, y, w, h, ratio, minW, maxW, el, img, resolve }
+let placeGhost = null;   // { board, it, x, y, w, h, ratio, minW, maxW, el, img, resolve, previewW, previewX, reflowing }
 const PLACE_GHOST_MIN = 40;   // меньше призрак не сжать — за углы будет не ухватить
 function placeGhostLayer(){
   let l = document.getElementById('bdGhostLayer');
@@ -7193,15 +7200,18 @@ async function placeTaskManually(it, who){
     board: B, it,
     w: sz.w, h: sz.h, ratio: sz.w / sz.h,
     x: v.x + (v.w - sz.w) / 2, y: v.y + Math.max(0, (v.h - sz.h) / 2),
-    // те же пределы, что у растягивания задания за угол (applyHandle)
-    minW: Math.max(PLACE_GHOST_MIN / cam.zoom, css && css.w ? TASK_MIN_S * css.w : 0),
-    maxW: css && css.w ? TASK_MAX_S * css.w : Infinity,
+    previewW: null, previewX: null, reflowing: null,
   };
+  setPlaceGhostLimits(g);
+  // ширину можно менять, только если есть вёрстка задания (gen.html) —
+  // как у вставленного (taskCanReflow); у теории её нет
+  const canReflow = !!(css && css.w && it.gen && it.gen.html != null);
   const el = document.createElement('div');
   el.className = 'bd-ghost';
-  el.innerHTML = `<img alt="" draggable="false">
+  el.innerHTML = `<div class="bd-ghost-clip"><img alt="" draggable="false"></div>
     <span class="bd-ghost-h" data-c="nw"></span><span class="bd-ghost-h" data-c="ne"></span>
-    <span class="bd-ghost-h" data-c="sw"></span><span class="bd-ghost-h" data-c="se"></span>`;
+    <span class="bd-ghost-h" data-c="sw"></span><span class="bd-ghost-h" data-c="se"></span>` +
+    (canReflow ? `<span class="bd-ghost-s" data-s="w" title="Ширина задания"></span><span class="bd-ghost-s" data-s="e" title="Ширина задания"></span>` : '');
   // кнопки — отдельной плашкой рядом с призраком, а не внутри него: так их
   // можно удержать в пределах экрана, куда бы призрак ни утащили
   const bar = document.createElement('div');
@@ -7220,6 +7230,12 @@ async function placeTaskManually(it, who){
   syncPlaceGhost();
   return new Promise(resolve => { g.resolve = resolve; });
 }
+// пределы угла — те же, что у растягивания задания за угол (applyHandle)
+function setPlaceGhostLimits(g){
+  const css = g.it.shot && g.it.shot.css;
+  g.minW = Math.max(PLACE_GHOST_MIN / cam.zoom, css && css.w ? TASK_MIN_S * css.w : 0);
+  g.maxW = css && css.w ? TASK_MAX_S * css.w : Infinity;
+}
 function syncPlaceGhost(){
   const g = placeGhost;
   if (!g) return;
@@ -7227,8 +7243,13 @@ function syncPlaceGhost(){
   // молча: размещение отменяется, панель узнает об этом
   if (B !== g.board || !boardActive){ endPlaceGhost('cancelled'); return; }
   const z = cam.zoom;
-  const L = (g.x - cam.x) * z, T = (g.y - cam.y) * z, W = g.w * z, H = g.h * z;
+  // черновик ширины: рамка новой ширины, прежний снимок в ней обрезан (тянут
+  // левый край — снимок прижат к правому), как у вставленного задания
+  const gx = g.previewX != null ? g.previewX : g.x, gw = g.previewW != null ? g.previewW : g.w;
+  const L = (gx - cam.x) * z, T = (g.y - cam.y) * z, W = gw * z, H = g.h * z;
   Object.assign(g.el.style, { left: L + 'px', top: T + 'px', width: W + 'px', height: H + 'px' });
+  const rightAnchored = g.previewX != null && g.previewX !== g.x;
+  Object.assign(g.img.style, { width: g.w * z + 'px', height: H + 'px', left: rightAnchored ? 'auto' : '0px', right: rightAnchored ? '0px' : 'auto' });
   // плашка — под призраком по центру; не помещается снизу — над ним; и в
   // любом случае внутри видимой части доски
   const lw = canvas.clientWidth || cssW, lh = canvas.clientHeight || cssH;
@@ -7253,6 +7274,9 @@ async function pinPlaceGhost(){
   if (!g || g.pinning) return;
   if (B !== g.board){ endPlaceGhost('cancelled'); return; }
   g.pinning = true;
+  // ширину ещё перестраивают — закрепляем уже перестроенное
+  if (g.reflowing){ try { await g.reflowing; } catch (e) {} }
+  if (placeGhost !== g) return;
   const it = g.it;
   try {
     const obj = await insertTaskImage(it.img, it.task, it.gen, null, it.shot, it.cw, { x: g.x, y: g.y, w: g.w, h: g.h });
@@ -7272,9 +7296,14 @@ function wirePlaceGhost(g){
   let drag = null;
   el.addEventListener('pointerdown', (e) => {
     e.preventDefault(); e.stopPropagation();
+    if (g.reflowing) return;   // пока перестраивается — не трогаем
     const h = e.target.closest('.bd-ghost-h');
+    const sd = e.target.closest('.bd-ghost-s');
     const p = worldAt(e);
-    if (h){
+    if (sd){
+      // ширина: противоположный край стоит на месте
+      drag = { side: sd.dataset.s, ax: sd.dataset.s === 'e' ? g.x : g.x + g.w };
+    } else if (h){
       // противоположный угол стоит на месте — «якорь», как у картинки на доске
       const c = h.dataset.c;
       drag = { c, ax: c.includes('w') ? g.x + g.w : g.x, ay: c.includes('n') ? g.y + g.h : g.y };
@@ -7288,7 +7317,14 @@ function wirePlaceGhost(g){
     if (!drag) return;
     e.preventDefault();
     const p = worldAt(e);
-    if (!drag.c){ g.x = p.x - drag.dx; g.y = p.y - drag.dy; }
+    if (drag.side){
+      const css = g.it.shot.css, s = g.w / css.w;
+      // те же пределы ширины карточки, что у вставленного задания
+      const lo = TASK_MIN_CW * s, hi = TASK_MAX_CW * s;
+      const w = Math.max(lo, Math.min(hi, drag.side === 'e' ? p.x - drag.ax : drag.ax - p.x));
+      g.previewW = w;
+      g.previewX = drag.side === 'e' ? g.x : drag.ax - w;
+    } else if (!drag.c){ g.x = p.x - drag.dx; g.y = p.y - drag.dy; }
     else {
       const sx = drag.c.includes('e') ? 1 : -1, sy = drag.c.includes('s') ? 1 : -1;
       // ширина — по большей из двух проекций: пером по диагонали тянут
@@ -7301,11 +7337,51 @@ function wirePlaceGhost(g){
     }
     syncPlaceGhost();
   });
-  const end = () => { drag = null; el.classList.remove('dragging'); };
+  const end = () => {
+    const d = drag;
+    drag = null; el.classList.remove('dragging');
+    if (d && d.side) reflowPlaceGhost(g, d.side);
+  };
   el.addEventListener('pointerup', end);
   el.addEventListener('pointercancel', end);
   g.bar.querySelector('.bd-ghost-pin').addEventListener('click', pinPlaceGhost);
   g.bar.querySelector('.bd-ghost-cancel').addEventListener('click', () => endPlaceGhost('cancelled'));
+}
+// отпустили боковую ручку — снять задание заново под новую ширину
+async function reflowPlaceGhost(g, side){
+  const it = g.it, css = it.shot.css;
+  const worldW = g.previewW;
+  if (worldW == null || Math.abs(worldW - g.w) < 1){ g.previewW = g.previewX = null; syncPlaceGhost(); return; }
+  const s = g.w / css.w;
+  const cw = taskCwFor(css, s, worldW);
+  g.el.classList.add('busy');
+  const job = genChain.then(() => shotTaskAtWidth(it.gen, it.task, !!(it.shot && it.shot.sol), cw));
+  genChain = job.catch(() => {});
+  g.reflowing = job;
+  try {
+    const shot = await job;
+    if (placeGhost !== g) return;
+    // живые поля обязаны найтись и на перестроенном — иначе оставляем как было
+    if (it.task && !shot.hot) throw new Error('на перестроенном задании не нашлось поле ответа');
+    const right = g.x + g.w;
+    it.img = shot.dataUrl;
+    it.cw = cw;
+    it.shot = Object.assign({}, it.shot, { css: shot.css, card: (shot.card && shot.card.r > 0) ? shot.card : it.shot.card });
+    if (it.task) it.task = Object.assign({}, it.task, { hot: shot.hot });
+    if (it.shot.sol && shot.solHot) it.shot.sol = Object.assign({}, it.shot.sol, { hot: shot.solHot });
+    g.w = shot.css.w * s; g.h = shot.css.h * s; g.ratio = g.w / g.h;
+    if (side === 'w') g.x = right - g.w;
+    setPlaceGhostLimits(g);
+    await new Promise(r => { g.img.onload = g.img.onerror = r; g.img.src = it.img; });
+  } catch (e) {
+    console.error('[доска] не удалось перестроить призрак под ширину', e);
+    showLinkToast('Не получилось изменить ширину — попробуйте ещё раз');
+  } finally {
+    g.previewW = g.previewX = null;
+    g.reflowing = null;
+    g.el.classList.remove('busy');
+    syncPlaceGhost();
+  }
 }
 document.addEventListener('keydown', (e) => {
   if (!placeGhost) return;
@@ -7404,54 +7480,63 @@ const TASK_MIN_CW = 220, TASK_MAX_CW = 1400;   // ширина карточки,
 const TASK_MIN_S = 0.15, TASK_MAX_S = 3.5;
 const taskWidthPreview = new Map();            // id → { w (доска), side, busy }
 function taskCanReflow(o){ return !!(o && o.type === 'image' && o.css && o.css.w && o.gen && o.gen.html != null); }
+// ширина карточки на доске worldW при масштабе s → ширина узла cw для снимка
+function taskCwFor(css, s, worldW){
+  const cardW = Math.max(TASK_MIN_CW, Math.min(TASK_MAX_CW, worldW / s));
+  return Math.round(cardW - 2 * (css.pad || 0));
+}
+// снять то же задание (gen) заново с шириной узла cw — в невидимом кадре
+// тренажёра. Общий шаг у ширины вставленного задания и у ширины призрака
+// ручного размещения. Зовётся внутри genChain (кадр у тренажёра один)
+async function shotTaskAtWidth(g, task, withSol, cw){
+  const frame = await genFrameFor(g.href, g.vw);
+  const win = frame.contentWindow;
+  await genShowSameInFrame(win, g);
+  const nodes = collectTrainerCaptureNodes(win.document, g.tid);
+  const main = nodes.filter(n => n.el.id !== 'theoryContent' && !(n.el.closest && n.el.closest('.added-task-card')));
+  nodes.forEach(n => { if (n !== main[0] && n.restore) n.restore(); });
+  if (!main.length) throw new Error('в тренажёре не нашлось задания');
+  const { el, restore } = main[0];
+  try {
+    // ряд с кнопкой разбора — заново, под новую ширину; сам разбор прежний
+    return await captureTrainerNode(el, task ? plainCopy(task) : null, { html: g.html, width: cw, solRow: !!withSol });
+  } finally {
+    if (restore) restore();
+  }
+}
 function reflowTaskWidth(id, worldW, side){
   const run = async () => {
     const obj = taskObjById(id);
     if (!taskCanReflow(obj)) throw new Error('нет вёрстки задания');
     const g = obj.gen, boardAtStart = B;
     const s = obj.w / obj.css.w;
-    const cardW = Math.max(TASK_MIN_CW, Math.min(TASK_MAX_CW, worldW / s));
-    const cw = Math.round(cardW - 2 * (obj.css.pad || 0));
-    const frame = await genFrameFor(g.href, g.vw);
-    const win = frame.contentWindow;
-    await genShowSameInFrame(win, g);
-    const nodes = collectTrainerCaptureNodes(win.document, g.tid);
-    const main = nodes.filter(n => n.el.id !== 'theoryContent' && !(n.el.closest && n.el.closest('.added-task-card')));
-    nodes.forEach(n => { if (n !== main[0] && n.restore) n.restore(); });
-    if (!main.length) throw new Error('в тренажёре не нашлось задания');
-    const { el, restore } = main[0];
-    try {
-      const t = obj.task ? plainCopy(obj.task) : null;
-      // ряд с кнопкой разбора — заново, под новую ширину; сам разбор прежний
-      const shot = await captureTrainerNode(el, t, { html: g.html, width: cw, solRow: !!obj.sol });
-      const o = taskObjById(id);
-      if (!o || B !== boardAtStart) throw new Error('доска сменилась');
-      // живые поля обязаны найтись и на перестроенном — иначе лучше оставить как было
-      if (o.task && !shot.hot) throw new Error('на перестроенном задании не нашлось поле ответа');
-      // картинку грузим в кэш доски заранее: иначе на кадр-другой вместо
-      // задания мелькнула бы заглушка «Загрузка…»
-      const im = getImg(shot.dataUrl);
-      if (!(im.complete && im.naturalWidth)) await new Promise(r => { im.addEventListener('load', r, { once: true }); im.addEventListener('error', r, { once: true }); });
-      const size = { w: im.naturalWidth || 300, h: im.naturalHeight || 200 };
-      const nw = shot.css.w * s, nh = shot.css.h * s;
-      const x = side === 'iw' ? o.points[0].x + o.w - nw : o.points[0].x;
-      const oldSrc = o.src;
-      o.src = shot.dataUrl; o.natW = size.w; o.natH = size.h;
-      // прежний снимок в памяти не держим (раскрытая картинка весит много,
-      // раздел 6 HANDOFF); понадобится отмене — загрузится заново
-      if (!B.objects.some(x => x.src === oldSrc)) delete imgCache[oldSrc];
-      o.points[0] = { x, y: o.points[0].y };
-      o.w = nw; o.h = nh;
-      if (shot.card && shot.card.r > 0) o.card = shot.card;
-      o.css = Object.assign({}, shot.css, { cw });
-      if (o.task) o.task.hot = shot.hot;
-      if (o.sol && shot.solHot) o.sol.hot = shot.solHot;
-      touchTaskImage(o);
-      saveDB(); scheduleRedraw(); updateContextMenu();
-      return o;
-    } finally {
-      if (restore) restore();
-    }
+    const cw = taskCwFor(obj.css, s, worldW);
+    const shot = await shotTaskAtWidth(g, obj.task, !!obj.sol, cw);
+    const o = taskObjById(id);
+    if (!o || B !== boardAtStart) throw new Error('доска сменилась');
+    // живые поля обязаны найтись и на перестроенном — иначе лучше оставить как было
+    if (o.task && !shot.hot) throw new Error('на перестроенном задании не нашлось поле ответа');
+    // картинку грузим в кэш доски заранее: иначе на кадр-другой вместо
+    // задания мелькнула бы заглушка «Загрузка…»
+    const im = getImg(shot.dataUrl);
+    if (!(im.complete && im.naturalWidth)) await new Promise(r => { im.addEventListener('load', r, { once: true }); im.addEventListener('error', r, { once: true }); });
+    const size = { w: im.naturalWidth || 300, h: im.naturalHeight || 200 };
+    const nw = shot.css.w * s, nh = shot.css.h * s;
+    const x = side === 'iw' ? o.points[0].x + o.w - nw : o.points[0].x;
+    const oldSrc = o.src;
+    o.src = shot.dataUrl; o.natW = size.w; o.natH = size.h;
+    // прежний снимок в памяти не держим (раскрытая картинка весит много,
+    // раздел 6 HANDOFF); понадобится отмене — загрузится заново
+    if (!B.objects.some(x => x.src === oldSrc)) delete imgCache[oldSrc];
+    o.points[0] = { x, y: o.points[0].y };
+    o.w = nw; o.h = nh;
+    if (shot.card && shot.card.r > 0) o.card = shot.card;
+    o.css = Object.assign({}, shot.css, { cw });
+    if (o.task) o.task.hot = shot.hot;
+    if (o.sol && shot.solHot) o.sol.hot = shot.solHot;
+    touchTaskImage(o);
+    saveDB(); scheduleRedraw(); updateContextMenu();
+    return o;
   };
   const p = genChain.then(run, run);
   genChain = p.catch(() => {});

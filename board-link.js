@@ -455,7 +455,7 @@
     function stateMsg(){
       let st = {};
       try { st = opts.state() || {}; } catch (e) {}
-      return { ref: st.ref || null, board: st.board || '', queue: queue.length + (working ? 1 : 0),
+      return { ref: st.ref || null, board: st.board || '', scale: st.scale || null, queue: queue.length + (working ? 1 : 0),
         pending: queue.map(q => q.m.id).concat(working ? [working.m.id] : []) };
     }
     function onWork(key, ch, m){
@@ -650,7 +650,7 @@
       if (m.t === 'pong'){
         const was = online();
         lastPong = Date.now();
-        board = { ref: m.ref || null, board: m.board || '', queue: m.queue || 0 };
+        board = { ref: m.ref || null, board: m.board || '', scale: m.scale || null, queue: m.queue || 0 };
         (m.pending || []).forEach(id => { const o = outbox.find(x => x.id === id); if (o) o.heardAt = Date.now(); });
         if (!was) flush();
         change();

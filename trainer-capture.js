@@ -38,13 +38,14 @@ function ttWidthLike(refNode, refCw, gen){
 // снимок задания; sol — разбор «Тренировки» (trainerSolutionHTML): тогда
 // разбор снимается отдельной картинкой, а на карточке внизу — ряд с кнопкой.
 // Разбор не снялся — задание всё равно ложится, просто без кнопки
-async function captureTaskWithSolution(el, info, cw, sol){
-  const opts = { width: cw };
+// scale — пикселей на CSS-пиксель (ttCaptureScale); не задан — по своему экрану
+async function captureTaskWithSolution(el, info, cw, sol, scale){
+  const opts = { width: cw, scale };
   if (!sol) return captureTrainerNode(el, info, opts);
   const shot = await captureTrainerNode(el, info, Object.assign({}, opts, { solRow: true }));
   try {
     // разбор — шириной во всю карточку задания: под ней он и раскрывается
-    const solImg = await captureSolutionImage(el, sol, shot.css.w);
+    const solImg = await captureSolutionImage(el, sol, shot.css.w, scale);
     if (shot.solHot) shot.sol = { v: 1, src: solImg.src, css: solImg.css, card: solImg.card, hot: shot.solHot, open: false };
     return shot;
   } catch (e) {
@@ -62,6 +63,7 @@ async function captureTaskWithSolution(el, info, cw, sol){
    на доску по сопряжению); ждём его до следующего снимка — на доске каждое
    задание появляется на глазах, не дожидаясь остальных из пакета.
    item = { dataUrl, task, gen, shot, cw } — ровно то, что берёт insertTaskImage.
+   opts.scale — плотность снимка (вкладка-панель берёт её у доски).
    → { added, none, error } */
 async function ttSnapTrainerTasks(win, tid, href, opts){
   const doc = win && win.document;
@@ -81,7 +83,7 @@ async function ttSnapTrainerTasks(win, tid, href, opts){
         const info = trainerTaskInfo(win, tid, el);
         const gen = trainerGenInfo(win, tid, href, el);
         const cw = opts.widthFor ? opts.widthFor(gen) : null;
-        const shot = await captureTaskWithSolution(el, info, cw, trainerSolutionHTML(win, tid, el));
+        const shot = await captureTaskWithSolution(el, info, cw, trainerSolutionHTML(win, tid, el), opts.scale);
         const task = (info && shot.hot) ? Object.assign({ v: 1 }, info, { hot: shot.hot }) : null;
         await opts.onShot({ dataUrl: shot.dataUrl, task, gen, shot, cw });
         added++;
@@ -99,13 +101,13 @@ async function ttSnapTrainerTasks(win, tid, href, opts){
 // теория ОГЭ №1–5 — отдельной картинкой, без task/gen. Свёрнутую теорию на
 // время снимка раскрываем: html2canvas нужна настоящая вёрстка (так же
 // делал collectTrainerCaptureNodes с unhide). → shot или null (теории нет)
-async function ttSnapTheory(doc){
+async function ttSnapTheory(doc, scale){
   const el = doc && doc.getElementById('theoryContent');
   if (!el || !el.textContent.trim()) return null;
   const prev = el.style.display;
   if (getComputedStyle(el).display === 'none') el.style.display = 'block';
   try {
-    return await captureTrainerNode(el, null, {});
+    return await captureTrainerNode(el, null, { scale });
   } finally {
     el.style.display = prev;
   }

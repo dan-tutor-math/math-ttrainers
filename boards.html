@@ -586,8 +586,17 @@ html[data-theme="dark"] .bd-ref-panel{box-shadow:var(--shadow), inset 0 1px 0 rg
    попадает. Над живыми заданиями (#bdTaskLayer), под панелями */
 #bdGhostLayer{position:absolute;inset:0;left:var(--bd-inset,0px);z-index:2;pointer-events:none;overflow:hidden;}
 .bd-ghost{position:absolute;pointer-events:auto;touch-action:none;cursor:move;outline:2px dashed var(--ink);border-radius:6px;}
-.bd-ghost img{display:block;width:100%;height:100%;opacity:.62;pointer-events:none;user-select:none;-webkit-user-drag:none;border-radius:inherit;}
+.bd-ghost-clip{position:absolute;inset:0;overflow:hidden;border-radius:inherit;pointer-events:none;}
+/* размер снимка задаёт syncPlaceGhost в пикселях: при черновике ширины рамка
+   у́же или шире снимка, и он обрезается, а не сжимается */
+.bd-ghost img{position:absolute;top:0;display:block;max-width:none;opacity:.62;pointer-events:none;user-select:none;-webkit-user-drag:none;}
 .bd-ghost.dragging img{opacity:.5;}
+.bd-ghost.busy{cursor:progress;}
+.bd-ghost.busy img{opacity:.3;}
+/* боковые ручки — ширина задания (перестройка, а не растяжение) */
+.bd-ghost-s{position:absolute;top:50%;width:12px;height:38px;margin:-19px 0 0 -6px;border-radius:6px;background:var(--card);border:2.5px solid var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.25);cursor:ew-resize;touch-action:none;}
+.bd-ghost-s[data-s="w"]{left:0;}
+.bd-ghost-s[data-s="e"]{left:100%;}
 /* ручки крупные: их ловят пером графического планшета и пальцем */
 .bd-ghost-h{position:absolute;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50%;background:var(--card);border:2.5px solid var(--ink);box-shadow:0 1px 4px rgba(0,0,0,.25);touch-action:none;}
 .bd-ghost-h[data-c="nw"]{left:0;top:0;cursor:nwse-resize;}

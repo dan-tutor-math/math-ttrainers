@@ -18,6 +18,8 @@
   4. Следующее «Добавить на доску» — в эту стопку и в этом масштабе; новая
      стопка в другом месте доски — тоже в запомненном масштабе.
   5. «Отмена» (кнопка и Esc) — ничего не вставлено, панель вернулась.
+  2б. Боковая ручка призрака меняет ширину: пока тянут — черновик, отпустили —
+     задание перестроено под ширину (масштаб прежний, текст перенёсся).
   6. Растянули вставленное задание за угол — масштаб запомнен, следующее
      задание стопки берёт его.
   7. С вкладки-панели: «Добавить вручную» → призрак с подписью устройства,
@@ -188,12 +190,34 @@ def run():
         check("2. пока двигали — ни saveDB, ни pushUndo", board.evaluate("() => [__saves, __undos]") == [0, 0], str(board.evaluate("() => [__saves, __undos]")))
         check("2. призрака по-прежнему нет в B.objects", count(board) == 0)
 
+        # 2б. ширина призрака боковой ручкой — перестройка, а не растяжение
+        gb = ghost(board)
+        css0 = board.evaluate("() => placeGhost.it.shot.css")
+        sr = board.evaluate("() => { const r = document.querySelector('.bd-ghost-s[data-s=\"e\"]').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; }")
+        board.mouse.move(sr["x"], sr["y"])
+        board.mouse.down()
+        board.mouse.move(sr["x"] - 120, sr["y"], steps=6)
+        pv = board.evaluate("() => [placeGhost.previewW, placeGhost.w, placeGhost.el.getBoundingClientRect().width]")
+        check("2б. пока тянут — черновик новой ширины", pv[0] is not None and pv[0] < pv[1] - 10 and abs(pv[2] - pv[0] * zoom) < 2, str(pv))
+        board.mouse.up()
+        board.wait_for_function("() => placeGhost && !placeGhost.reflowing && placeGhost.previewW == null", timeout=30000)
+        g5 = ghost(board)
+        css1 = board.evaluate("() => placeGhost.it.shot.css")
+        check("2б. ширина изменилась", g5["w"] < gb["w"] - 60, f"{gb['w']} → {g5['w']}")
+        check("2б. масштаб тот же (шрифт прежний), а не сжатие", abs(g5["w"] / css1["w"] - gb["w"] / css0["w"]) < 1e-6, f"{gb['w']/css0['w']} / {g5['w']/css1['w']}")
+        check("2б. текст перенёсся: задание стало выше или таким же", g5["h"] >= gb["h"] - 0.5, f"{gb['h']} → {g5['h']}")
+        check("2б. новый снимок в призраке", g5["src"] != gb["src"] and g5["src"].startswith("data:image/"))
+        check("2б. левый край на месте", abs(g5["x"] - gb["x"]) < 0.5)
+        check("2б. и всё ещё не в B.objects", count(board) == 0)
+        g4 = g5
+
         # 3. закрепить
         board.click(".bd-ghost-bar .bd-ghost-pin")
         wait_count(board, 1)
         o = board.evaluate(f"() => {IMAGES}[0]")
         check("3. задание там, где был призрак", abs(o["points"][0]["x"] - g4["x"]) < 0.01 and abs(o["points"][0]["y"] - g4["y"]) < 0.01, f"{o['points'][0]} / {g4['x']},{g4['y']}")
         check("3. и такого же размера", abs(o["w"] - g4["w"]) < 0.01 and abs(o["h"] - g4["h"]) < 0.01)
+        check("3. ширина карточки — выбранная на призраке", abs(o["css"]["w"] - css1["w"]) < 0.01 and o["css"].get("cw"), f"{o['css']} / {css1}")
         for k in ("task", "gen", "css", "card", "stack", "gap", "locked", "addedAt"):
             check(f"3. есть поле {k}", k in o, str(sorted(o.keys())))
         check("3. новая стопка с этого места", o["stack"]["i"] == 0 and abs(o["stack"]["x0"] - o["points"][0]["x"]) < 0.01)

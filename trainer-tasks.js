@@ -304,6 +304,77 @@ function wrapIntoCard(content, card, scale, cssW, cssH){
   return { canvas: out, W, H, R: R / scale };
 }
 
+// сколько пикселей картинки на CSS-пиксель задания: не меньше двух — задание
+// на доске часто смотрят крупнее, чем в тренажёре, и с одним пикселем текст
+// сразу мылится. Вкладка-панель берёт число у доски (opts.scale), а не у
+// своего экрана: иначе задание с телефона (плотность 3) весило бы вдвое
+// больше такого же со встроенной панели
+function ttCaptureScale(){ return Math.max(2, Math.min(3, window.devicePixelRatio || 1)); }
+
+/* Холст и вариативный шрифт (промпт «сопряжение панели», после этапа 3).
+   Onest на сайте — вариативный: один файл на все веса (onest.css).
+   html2canvas рисует текст на холсте страницы, где он запущен (доски или
+   вкладки-панели), а Safari на iPhone на холсте вес вариативного шрифта не
+   применяет: полужирный текст задания ложился обычным 400 — тусклым и
+   тонким, в отличие от того же задания со встроенной панели. Формулы KaTeX
+   и моноширинные варианты ответа не страдали: у них обычные файлы по весам.
+   Проверка на месте: рисуем строку весом 400 и 800 и сравниваем, сколько
+   «краски» ушло. Различает — ничего не трогаем (Chrome, Firefox). Не
+   различает — подключаем onest-static.css (Onest отдельными файлами по
+   весам) и отключаем вариативный onest.css на этой странице: тогда и холст
+   берёт нужный вес. Страницы тренажёров в кадре это не затрагивает: вёрстку
+   html2canvas считает по ним, а рисует шрифтами страницы, где запущен. */
+let ttFontFixP = null;
+function ttCanvasInk(c, weight){
+  c.clearRect(0, 0, 240, 60);
+  c.font = weight + ' 36px Onest';
+  c.fillStyle = '#000';
+  c.textBaseline = 'top';
+  c.fillText('ШЖМшжм', 4, 8);
+  const d = c.getImageData(0, 0, 240, 60).data;
+  let ink = 0;
+  for (let i = 3; i < d.length; i += 4) ink += d[i];
+  return ink;
+}
+// Onest на этой странице — из отдельных файлов по весам (onest-static.css)
+async function ttUseStaticOnest(){
+  if (!document.getElementById('ttOnestStatic')){
+    await new Promise((resolve) => {
+      const l = document.createElement('link');
+      l.rel = 'stylesheet'; l.href = 'onest-static.css'; l.id = 'ttOnestStatic';
+      l.onload = l.onerror = resolve;
+      document.head.appendChild(l);
+    });
+  }
+  document.querySelectorAll('link[rel="stylesheet"][href$="onest.css"]').forEach(l => { l.disabled = true; });
+  const sample = 'Аа Aa 0123 ≥−∞';
+  await Promise.all([400, 500, 600, 700].map(w => document.fonts.load(w + ' 16px Onest', sample)));
+}
+function ttCanvasFontFix(){
+  if (ttFontFixP) return ttFontFixP;
+  ttFontFixP = (async () => {
+    try {
+      if (!document.fonts || !document.fonts.load) return 'no-fonts-api';
+      // без загруженного Onest проверка мерила бы запасной шрифт
+      await Promise.all([document.fonts.load('400 36px Onest', 'ШЖМшжм'), document.fonts.load('800 36px Onest', 'ШЖМшжм')]);
+      if (!document.fonts.check('400 36px Onest', 'ШЖМ')) return 'no-onest';
+      const cv = document.createElement('canvas');
+      cv.width = 240; cv.height = 60;
+      const c = cv.getContext('2d', { willReadFrequently: true });
+      const thin = ttCanvasInk(c, 400), bold = ttCanvasInk(c, 800);
+      // у Onest 800 «краски» заметно больше, чем у 400 (в Chrome — в полтора
+      // раза); почти поровну — холст вес не применяет
+      if (!thin || bold > thin * 1.15) return 'ok';
+      await ttUseStaticOnest();
+      return 'static';
+    } catch (e) {
+      console.warn('[снимок] проверка шрифта холста не удалась', e);
+      return 'error';
+    }
+  })();
+  return ttFontFixP;
+}
+
 // opts.answer — где строка ответа, если её дорисовывать: 'below' (под
 // снимком) или 'right'; без него — как просит узел (data-bd-answer у
 // столбиков), иначе под снимком.
@@ -317,14 +388,13 @@ async function captureTrainerNode(el, task, opts){
     try { await window.MathhLibs.load('html2canvas'); } catch (e) {}
   }
   if (typeof html2canvas !== 'function') throw new Error('html2canvas not loaded');
+  await ttCanvasFontFix();
   opts = opts || {};
   const doc = el.ownerDocument;
   const answerSide = opts.answer || el.getAttribute('data-bd-answer');
   const pageBg = trainerPageBg(doc);
   const card = trainerCardStyle(el, pageBg);
-  // не меньше двух пикселей на CSS-пиксель: задание на доске часто смотрят
-  // крупнее, чем в тренажёре, и с одним пикселем текст сразу мылится
-  const scale = Math.max(2, Math.min(3, window.devicePixelRatio || 1));
+  const scale = opts.scale > 0 ? opts.scale : ttCaptureScale();
   let hot = null;
   const mark = 'c' + ttUid();
   el.setAttribute('data-bd-cap', mark);
@@ -520,7 +590,7 @@ function trainerSolutionHTML(win, trainerId, el, force){
 
 // снять разбор картинкой-карточкой той же ширины, что задание (el — узел
 // задания в кадре: его документ, стили, тема)
-async function captureSolutionImage(el, sol, width){
+async function captureSolutionImage(el, sol, width, scale){
   const doc = el.ownerDocument;
   const w = Math.round(width || el.getBoundingClientRect().width || 600);
   const host = doc.createElement('div');
@@ -542,7 +612,7 @@ async function captureSolutionImage(el, sol, width){
   doc.body.appendChild(host);
   try {
     flattenModernColors(panel);
-    const shot = await captureTrainerNode(panel, null, {});
+    const shot = await captureTrainerNode(panel, null, { scale });
     return { src: shot.dataUrl, css: { w: shot.css.w, h: shot.css.h }, card: shot.card };
   } finally {
     host.remove();
