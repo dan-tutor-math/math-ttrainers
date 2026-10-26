@@ -15,11 +15,6 @@
      — с мышью — узкая полоска только того, чего нет на клавиатуре
        (√ ± / ; ( ) ), цифры набирают руками; «123» раскрывает цифры
        для тех, у кого мышь без клавиатуры (интерактивная доска).
-   Над кнопками — строка «как прочитал проверяющий»: набранное рисуется
-   KaTeX'ом с той же расстановкой действий, что у taEval (trainer-tasks.js).
-   Это главное: «√2+3» разбор читает как √2 + 3, а не √5 — и ученик видит
-   это до «Проверить», а не после красного поля. Дроби — вертикально.
-
    Панель одна на страницу и висит в body с position:fixed: слой заданий
    (#bdTaskLayer) обрезает всё, что выходит за задание, и не ловит мышь.
    Ввод — через Keypad-подобные insert/erase с событием input: по нему
@@ -44,11 +39,6 @@
       box-shadow:0 10px 32px rgba(0,0,0,.18);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
       font-family:var(--font-ui,system-ui);user-select:none;-webkit-user-select:none;touch-action:manipulation;}
     #bdAnsPad.open{display:block;}
-    #bdAnsPad .bap-prev{min-height:0;display:none;align-items:center;gap:8px;padding:4px 6px 8px;
-      color:var(--ink,#1d1d1f);font-size:17px;overflow-x:auto;white-space:nowrap;}
-    #bdAnsPad .bap-prev.on{display:flex;}
-    #bdAnsPad .bap-prev small{font-size:11.5px;color:var(--muted-6,#86868b);flex:none;}
-    #bdAnsPad .bap-prev .bap-raw{color:var(--muted-6,#86868b);font-size:14px;}
     #bdAnsPad .bap-grid{display:grid;gap:6px;}
     #bdAnsPad.full .bap-grid{grid-template-columns:repeat(5,52px);}
     #bdAnsPad.slim .bap-grid{grid-template-columns:repeat(8,40px);}
@@ -86,7 +76,7 @@
     ['∞', 'sp'], ['+∞', 'sp'], ['-∞', 'sp', '−∞'], ['∪', 'sp set'], ['∩', 'sp set']
   ];
 
-  let pad = null, prevBox = null, grid = null, target = null, opts = null, raf = 0, lastPos = '';
+  let pad = null, grid = null, target = null, opts = null, raf = 0, lastPos = '';
 
   function ensure() {
     if (pad) return pad;
@@ -98,11 +88,8 @@
     pad.id = 'bdAnsPad';
     pad.setAttribute('role', 'group');
     pad.setAttribute('aria-label', 'Клавиатура ответа');
-    prevBox = document.createElement('div');
-    prevBox.className = 'bap-prev';
     grid = document.createElement('div');
     grid.className = 'bap-grid';
-    pad.appendChild(prevBox);
     pad.appendChild(grid);
     // фокус должен остаться в поле: курсор нужен, чтобы вставлять в его
     // место, а потеря фокуса закрыла бы панель. pointerdown не должен и
@@ -157,7 +144,6 @@
     try { inp.focus({ preventScroll: true }); } catch (e) { inp.focus(); }
     try { inp.setSelectionRange(at, at); } catch (e) {}
     inp.dispatchEvent(new Event('input', { bubbles: true }));
-    preview();
   }
   function insert(inp, text) {
     const [a, b] = caret(inp);
@@ -193,144 +179,6 @@
     if (k === 'back') { erase(inp); return; }
     // «; » с пробелом — так читается и совпадает с записью в разборе
     insert(inp, k === ';' ? '; ' : k);
-  }
-
-  /* ── строка «как прочитал проверяющий» ──
-     Разбор повторяет грамматику taEval: сумма → произведение (явное «*»,
-     «/» и неявное «2√7») → унарный минус → степень → √ берёт следующий
-     множитель целиком (√2+3 — это √2 + 3, √(2+3) — корень из суммы).
-     Деление левоассоциативно: 2√7/2 = (2√7)/2, как и у проверки */
-  function toTex(src) {
-    let s = String(src).replace(/[\s  ]/g, '').replace(/[−–—‐‑]/g, '-').toLowerCase();
-    s = s.replace(/sqrt|корень/g, '√').replace(/pi|пи/g, 'π').replace(/[·×*]/g, '*').replace(/[:÷]/g, '/');
-    s = s.replace(/^[a-zа-я][0-9₀-₉]*=/, '');
-    if (!s) return '';
-    let i = 0;
-    const peek = () => s[i];
-    const starts = ch => ch === '(' || ch === 'π' || ch === '∞' || ch === '√' || /[0-9]/.test(ch || '');
-    const unwrap = n => (n.t === 'par' ? n.a : n);
-    function prim() {
-      const ch = peek();
-      if (ch === '(') { i++; const a = expr(); if (peek() !== ')') throw 0; i++; return { t: 'par', a }; }
-      if (ch === 'π') { i++; return { t: 'raw', s: '\\pi' }; }
-      if (ch === '∞') { i++; return { t: 'raw', s: '\\infty' }; }
-      if (ch === '√') { i++; return { t: 'sqrt', a: pow() }; }
-      const m = /^\d+([.,]\d+)?/.exec(s.slice(i));
-      if (!m) throw 0;
-      i += m[0].length;
-      return { t: 'raw', s: m[0].replace(/[.,]/, '{,}') };
-    }
-    function pow() { const b = prim(); if (peek() === '^') { i++; return { t: 'pow', a: b, b: un() }; } return b; }
-    function un() {
-      if (peek() === '-') { i++; return { t: 'neg', a: un() }; }
-      if (peek() === '+') { i++; return { t: 'plus', a: un() }; }
-      return pow();
-    }
-    function term() {
-      let v = un();
-      for (;;) {
-        const ch = peek();
-        if (ch === '*') { i++; v = { t: 'mul', a: v, b: un(), dot: true }; }
-        else if (ch === '/') { i++; v = { t: 'div', a: v, b: un() }; }
-        else if (starts(ch)) v = { t: 'mul', a: v, b: pow() };
-        else break;
-      }
-      return v;
-    }
-    function expr() {
-      let v = term();
-      for (;;) {
-        const ch = peek();
-        if (ch === '+' || ch === '-' || ch === '±') { i++; v = { t: 'add', op: ch, a: v, b: term() }; }
-        else break;
-      }
-      return v;
-    }
-    const OP = { '+': '+', '-': '-', '±': '\\pm' };
-    function tex(n) {
-      switch (n.t) {
-        case 'raw': return n.s;
-        case 'par': return '\\left(' + tex(n.a) + '\\right)';
-        case 'sqrt': return '\\sqrt{' + tex(unwrap(n.a)) + '}';
-        case 'pow': return tex(n.a) + '^{' + tex(unwrap(n.b)) + '}';
-        case 'neg': return '-' + tex(n.a);
-        case 'plus': return '+' + tex(n.a);
-        case 'mul': return tex(n.a) + (n.dot ? '\\cdot ' : '') + tex(n.b);
-        // −1/6 разбор читает как (−1)/6 — значение то же, а пишут минус
-        // перед дробью
-        case 'div': return n.a.t === 'neg' ? '-' + tex({ t: 'div', a: n.a.a, b: n.b })
-          : '\\dfrac{' + tex(unwrap(n.a)) + '}{' + tex(unwrap(n.b)) + '}';
-        case 'add': return tex(n.a) + OP[n.op] + tex(n.b);
-      }
-      return '';
-    }
-    const v = expr();
-    if (i !== s.length) throw 0;
-    return tex(v);
-  }
-
-  // разрезание по символу только вне скобок: «;» внутри (−∞; 3) — это не
-  // разделитель ответов, а середина промежутка
-  function splitTop(str, chars) {
-    const out = []; let depth = 0, cur = '';
-    for (const c of str) {
-      if ('([{'.indexOf(c) >= 0) depth++;
-      if (')]}'.indexOf(c) >= 0) depth--;
-      if (depth === 0 && chars.indexOf(c) >= 0) { out.push(cur); out.push(c); cur = ''; } else cur += c;
-    }
-    out.push(cur);
-    return out;
-  }
-  // один ответ: промежуток «(−∞; 3]», числа и выражения, а между ними ∪ и ∩.
-  // Скобки у промежутка рисуются теми, что набрал ученик, — полуоткрытый
-  // (1; 5] читается верно
-  function toSetTex(part) {
-    const toks = splitTop(part.replace(/[−–—‐‑]/g, '-'), '∪∩');
-    return toks.map(t => {
-      if (t === '∪') return '\\cup ';
-      if (t === '∩') return '\\cap ';
-      const x = t.replace(/\s/g, '');
-      const m = /^([(\[])(.*)([)\]])$/.exec(x);
-      if (m) {
-        const ends = split(m[2]);
-        if (ends.length === 2) {
-          return '\\left' + m[1] + toTex(ends[0]) + ';\\ ' + toTex(ends[1]) + '\\right' + m[3];
-        }
-      }
-      return toTex(t);
-    }).join('');
-  }
-
-  // корни через «;» (и через «,», если это не десятичная запятая) — тем же
-  // разрезанием, что у проверки, иначе «2,5» показалось бы двумя корнями
-  function split(src) {
-    if (typeof window.taSplit === 'function') return window.taSplit(src);
-    return String(src).split(';').map(x => x.trim()).filter(Boolean);
-  }
-
-  function preview() {
-    if (!pad || !target) return;
-    const raw = (target.value || '').trim();
-    // пока в записи только цифры, читать нечего — строка не нужна
-    if (!raw || /^[-−]?\d+([.,]\d+)?$/.test(raw) || !window.katex) {
-      prevBox.classList.remove('on'); prevBox.innerHTML = ''; return;
-    }
-    let html;
-    try {
-      const parts = split(raw).map(toSetTex);
-      html = window.katex.renderToString(parts.join(';\\ \\ '), { throwOnError: true, output: 'html' });
-    } catch (e) {
-      html = null;
-    }
-    prevBox.innerHTML = '';
-    const lab = document.createElement('small');
-    lab.textContent = html ? 'Читается так:' : 'Пока не разобрать:';
-    prevBox.appendChild(lab);
-    const out = document.createElement('span');
-    if (html) out.innerHTML = html;
-    else { out.className = 'bap-raw'; out.textContent = raw; }
-    prevBox.appendChild(out);
-    prevBox.classList.add('on');
   }
 
   /* ── место на экране: под полем, а если не влезает — над ним ── */
@@ -373,7 +221,6 @@
     target = inp; opts = o || {};
     layout();
     pad.classList.add('open');
-    preview();
     lastPos = '';
     place(true);
     if (!raf) raf = requestAnimationFrame(loop);
@@ -401,12 +248,11 @@
     inp.addEventListener('click', () => {
       if (document.activeElement === inp && target !== inp && !inp.readOnly && !inp.disabled) show(inp, o);
     });
-    inp.addEventListener('input', () => { if (target === inp) preview(); });
     inp.addEventListener('blur', () => {
       // ⌨ на миг снимает фокус, чтобы поднять системную, — не закрываемся
       setTimeout(() => { if (target === inp && document.activeElement !== inp) hide(); }, 120);
     });
   }
 
-  window.BoardAnswerPad = { attach, hide, toTex, isOpen: () => !!(pad && pad.classList.contains('open')) };
+  window.BoardAnswerPad = { attach, hide, isOpen: () => !!(pad && pad.classList.contains('open')) };
 })();

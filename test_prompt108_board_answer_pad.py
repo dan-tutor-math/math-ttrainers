@@ -7,8 +7,6 @@
      клавиатура не трогается (inputmode как был).
   2. Полоска пишет в место курсора и шлёт событие input (черновик задания
      обновляется — по нему поле уходит собеседнику).
-  3. Строка «Читается так»: 4−√7 → KaTeX с \\sqrt, дроби — вертикальные
-     (\\dfrac), √2+3 — корень только из 2, √(2+3) — из суммы.
   4. «4±√7» засчитан как два корня, «x = 4 ± √7» тоже; дроби «-1/6; 1/2»
      засчитаны, набранные кнопками.
   5. «123» раскрывает цифры (и запоминается), ✕ закрывает, потеря фокуса
@@ -171,17 +169,6 @@ def run():
               page.evaluate(f"() => document.activeElement === document.querySelector('{sel}')"))
         check("2. черновик задания обновлён (событие input дошло)",
               page.evaluate(f"() => taskDrafts.get({json.dumps(oid)}).vals.ans") == "4-√7; 4+√7")
-        prev = page.evaluate("() => document.querySelector('#bdAnsPad .bap-prev').classList.contains('on') && document.querySelectorAll('#bdAnsPad .bap-prev .katex .sqrt').length")
-        check("3. строка «Читается так» с двумя корнями", prev == 2)
-
-        tex = page.evaluate("() => ['√2+3', '√(2+3)', '-1/6; 1/2', '(8+2√7)/2', 'x=4±√7', '2,5'].map(s => s.split(';').map(x => BoardAnswerPad.toTex(x.trim())).join(' ; '))")
-        check("3. √2+3 — корень только из 2", tex[0] == "\\sqrt{2}+3")
-        check("3. √(2+3) — корень из суммы", tex[1] == "\\sqrt{2+3}")
-        check("3. дроби вертикальные", tex[2] == "-\\dfrac{1}{6} ; \\dfrac{1}{2}")
-        check("3. скобки числителя снимаются", tex[3] == "\\dfrac{8+2\\sqrt{7}}{2}")
-        check("3. «x =» снят, ± показан", tex[4] == "4\\pm\\sqrt{7}")
-        check("3. десятичная запятая", tex[5] == "2{,}5")
-
         page.fill(sel, "")
         page.click(sel)
         page.keyboard.type("4")
@@ -222,8 +209,7 @@ def run():
         for k in ["-", "1", "/", "6", ";", "1", "/", "2"]:
             tap(page, k)
         check("4. дроби набраны кнопками", page.input_value(sel2) == "-1/6; 1/2")
-        fr = page.evaluate("() => document.querySelectorAll('#bdAnsPad .bap-prev .katex .mfrac').length")
-        check("3. в строке две вертикальные дроби", fr == 2)
+        check("3. над кнопками нет строки «Читается так»", not page.evaluate("() => !!document.querySelector('#bdAnsPad .bap-prev')"))
         tap(page, "check")
         page.wait_for_timeout(250)
         check("4. «Проверить» в панели — дроби засчитаны", st(page, oid2).get("res") == "ok")

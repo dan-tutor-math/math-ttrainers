@@ -8,8 +8,7 @@
   2. Узкая полоска (с мышью, без цифр): те же пять кнопок вторым рядом.
   3. Каждая кнопка вставляет своё: ∞, +∞, -∞ (дефис — как кнопка «−», так
      его читают все разборы), ∪, ∩; подпись у третьей — «−∞».
-  4. Строка «Читается так» понимает промежутки и ∪ / ∩, не пишет
-     «Пока не разобрать».
+  4. Над кнопками нет строки «Читается так» (её убрали: мешала быстрому вводу).
   5. Проверка ответа (taCheckField, тип set): ∞ и ∪ засчитываются, а ∩ —
      пересечение двух промежутков считается, как на бумаге.
 
@@ -29,9 +28,8 @@ from playwright.sync_api import sync_playwright
 PORT = 8994
 HERE = os.path.dirname(os.path.abspath(__file__))
 HARNESS = """<!doctype html><meta charset="utf-8">
-<link rel="stylesheet" href="liquid-glass.css"><link rel="stylesheet" href="katex-0.18.5.css">
+<link rel="stylesheet" href="liquid-glass.css">
 <body style="margin:0;padding:200px 40px"><input id="a" style="width:260px;height:40px">
-<script src="katex-0.18.5.js"></script>
 <script src="trainer-tasks.js"></script>
 <script src="board-answer-pad.js"></script>
 <script>
@@ -128,24 +126,12 @@ with local_server(), sync_playwright() as p:
     tap(page, "∪")
     check("2. в узкой полоске кнопки пишут в поле", page.input_value("#a") == "(-∞; 3)∪")
 
-    # 4. строка «Читается так»
-    def prev(text):
-        page.fill("#a", text)
-        page.dispatch_event("#a", "input")
-        page.wait_for_timeout(120)
-        return page.evaluate("""() => { const b = document.querySelector('#bdAnsPad .bap-prev');
-            return { on: b.classList.contains('on'), txt: b.textContent, katex: b.querySelectorAll('.katex').length }; }""")
-    for src in ["(-∞;3)∪(5;+∞)", "(1;5]∩(3;8)", "[-2;3)", "(-∞;+∞)"]:
-        r = prev(src)
-        check(f"4. «{src}» читается без «Пока не разобрать»", r["on"] and r["katex"] == 1 and "Пока не разобрать" not in r["txt"])
-    r = prev("(-∞;3)∪(5;+∞)")
-    check("4. в строке есть ∞ и ∪", "∞" in r["txt"] and "∪" in r["txt"])
-    r = prev("(1;5]∩(3;8)")
-    check("4. в строке есть ∩ и скобка ]", "∩" in r["txt"] and "]" in r["txt"])
-    r = prev("(2;+∞)")
-    check("4. +∞ в строке остаётся с плюсом", "+" in r["txt"] and "∞" in r["txt"])
-    r = prev("4-√7; 4+√7")
-    check("4. старое не сломалось: два корня читаются", r["katex"] == 1 and "Пока не разобрать" not in r["txt"])
+    # 4. строки «Читается так» нет, как бы ни выглядел ответ
+    page.fill("#a", "(-∞;3)∪(5;+∞)")
+    page.dispatch_event("#a", "input")
+    page.wait_for_timeout(120)
+    check("4. над кнопками нет строки «Читается так»",
+          page.evaluate("() => !document.querySelector('#bdAnsPad .bap-prev') && !/Читается/.test(document.getElementById('bdAnsPad').textContent)"))
 
     # 5. проверка ответа
     def chk(value, answer):
