@@ -358,6 +358,14 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .home-btn:active{transform:scale(.92)}
 /* «Тренировка»: кнопка разбора — как в ОГЭ №7 */
 .sol-btn-row{display:flex;margin:-4px 0 14px;}
+/* растягиваемая рабочая зона — как у ОГЭ №8: задание (условие и варианты)
+   тянется за любой край и шире страницы (820). Нужна прежде всего, чтобы
+   выбрать ширину задания перед снимком на доску — длинное неравенство и
+   варианты в строку не переносились */
+.work-zone{position:relative;left:50%;transform:translateX(-50%);max-width:calc(100vw - 24px);width:var(--work-w, 100%);}
+.work-resize-handle{position:absolute;top:0;bottom:0;width:10px;cursor:ew-resize;touch-action:none;z-index:5;}
+.work-resize-handle.left{left:0;}
+.work-resize-handle.right{right:0;}
 .soft-btn{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--ink);background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:11px;padding:9px 14px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:transform .12s, border-color .12s;}
 .soft-btn:hover{border-color:var(--ink)}
 .soft-btn:active{transform:scale(.96)}
@@ -528,6 +536,9 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
     <div class="panel coming-soon" id="comingSoonPanel" style="display:none"></div>
 
+    <div class="work-zone" id="workZone">
+    <div class="work-resize-handle left" id="workResizeLeft" title="Потяните — расширить рабочую зону"></div>
+    <div class="work-resize-handle right" id="workResizeRight" title="Потяните — расширить рабочую зону"></div>
     <div class="panel" id="questionPanel" style="display:none">
       <div class="prompt" id="questionPromptText"></div>
       <div class="mcq-title">Варианты ответа:</div>
@@ -544,6 +555,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
     <div class="panel" id="mainPanel" style="display:none">
       <div class="explain" id="explainBox" style="display:none"></div>
       <button class="next-btn" id="nextBtn" style="display:none">Следующий пример →</button>
+    </div>
     </div>
 
     <div class="calc-tools" id="calcTools">
@@ -1708,6 +1720,62 @@ renderPicker();
    синхронизируется то же, что и в ОГЭ №8: экран (выбор типа или задание),
    выбранный тип, режим и само текущее задание. Штрихи доски подмешиваются
    сюда же — общим снимком заведует session-share.js. */
+/* ═══ растягиваемая рабочая зона — как у ОГЭ №8 (setupWorkZoneResize там):
+   тянется за любой край симметрично, ширина помнится. Клавиатуры у №13 нет
+   (ответ — выбор варианта), поэтому предел — только окно. В карточке «+»
+   (тот же файл в кадре, IS_CARD) ручки не нужны: ширину карточки задаёт
+   основная страница ── */
+const WORK_W_KEY = 'oge13:workZoneW';
+const workZoneEl = document.getElementById('workZone');
+function clampWorkW(w){
+  const min = 380, max = Math.max(min, window.innerWidth - 24);
+  return Math.min(max, Math.max(min, w));
+}
+// после растягивания стекло карточек иногда остаётся недорисованным
+// «призраком» — короткая смена прозрачности заставляет браузер перерисовать
+function forceRepaintWorkArea(){
+  const prev = workZoneEl.style.opacity;
+  workZoneEl.style.opacity = '0.999999';
+  requestAnimationFrame(() => { workZoneEl.style.opacity = prev; });
+}
+(function setupWorkZone(){
+  if (IS_CARD){
+    document.getElementById('workResizeLeft').style.display = 'none';
+    document.getElementById('workResizeRight').style.display = 'none';
+    return;
+  }
+  try {
+    const w = parseFloat(localStorage.getItem(WORK_W_KEY));
+    if (w) workZoneEl.style.setProperty('--work-w', clampWorkW(w) + 'px');
+  } catch (e) {}
+  function setup(handleEl, side){
+    let start = null; // {x, w}
+    handleEl.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      handleEl.setPointerCapture(e.pointerId);
+      start = { x: e.clientX, w: workZoneEl.getBoundingClientRect().width };
+    });
+    handleEl.addEventListener('pointermove', (e) => {
+      if (!start) return;
+      const dx = (side === 'right') ? (e.clientX - start.x) : (start.x - e.clientX);
+      // зона по центру — край уходит на dx, ширина меняется на 2·dx
+      workZoneEl.style.setProperty('--work-w', clampWorkW(start.w + dx * 2) + 'px');
+    });
+    function end(){
+      if (!start) return;
+      start = null;
+      try { localStorage.setItem(WORK_W_KEY, String(parseFloat(getComputedStyle(workZoneEl).width))); } catch (e) {}
+      setTimeout(forceRepaintWorkArea, 30);
+      // ширина — часть общего снимка сессии (tsGetState); отправляем сразу
+      if (window.TrainerSession) window.TrainerSession.push();
+    }
+    handleEl.addEventListener('pointerup', end);
+    handleEl.addEventListener('pointercancel', end);
+  }
+  setup(document.getElementById('workResizeLeft'), 'left');
+  setup(document.getElementById('workResizeRight'), 'right');
+})();
+
 function tsGetState(){
   const base = {
     // «на экране выбора» определяем по самому списку типов, а не по одной
@@ -1721,6 +1789,7 @@ function tsGetState(){
     hadWrongPick: typeof hadWrongPick !== 'undefined' ? !!hadWrongPick : false,
     // раскрытый в «Тренировке» разбор — общий, как в ОГЭ №7
     solShown: !!solShown,
+    workW: parseFloat(getComputedStyle(workZoneEl).width) || null,
   };
   if (window.__boardGetState) Object.assign(base, window.__boardGetState());
   if (window.__cardsGetState) Object.assign(base, window.__cardsGetState()); // Промпт №33 — добавленные примеры
@@ -1731,6 +1800,17 @@ function tsApplyState(state){
   // доска — независимо от того, на каком экране сейчас участник
   if (window.__boardApplyState) window.__boardApplyState(state);
   if (window.__cardsApplyState) window.__cardsApplyState(state); // Промпт №33
+  // ширина рабочей зоны — независимо от экрана и задания, как в ОГЭ №8;
+  // применяем, только если реально отличается (иначе каждый push() дёргал бы CSS)
+  if (state.workW && !IS_CARD){
+    const curW = parseFloat(getComputedStyle(workZoneEl).width);
+    if (Math.abs(curW - state.workW) > 1){
+      const w = clampWorkW(state.workW);
+      workZoneEl.style.setProperty('--work-w', w + 'px');
+      try { localStorage.setItem(WORK_W_KEY, String(w)); } catch (e) {}
+      setTimeout(forceRepaintWorkArea, 30);
+    }
+  }
   if (typeof state.picker === 'undefined') return; // снимок без задания (пустая сессия)
 
   if (state.picker) {
