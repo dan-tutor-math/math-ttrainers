@@ -917,6 +917,7 @@ html[data-theme="dark"] .bd-optbar{box-shadow:var(--shadow), inset 0 1px 0 rgba(
    что и «Создать доску»/«Создать папку», чтобы не занимать отдельное
    плавающее место и не перекрывать контент на узких экранах телефона */
 .bl-to-index{text-decoration:none;flex:none;}
+#blPanelLink{text-decoration:none;}
 
 /* ═══ Промпт №17: меню «Фигуры» и панель «Элементы фигуры» ═══ */
 .bd-fig-menu{position:fixed;z-index:262;display:none;flex-direction:column;gap:10px;width:min(452px,calc(100vw - 16px));max-height:calc(100vh - 16px);overflow:auto;background:var(--glass-strong);backdrop-filter:blur(26px) saturate(190%);-webkit-backdrop-filter:blur(26px) saturate(190%);border:1px solid var(--glass-border);border-radius:18px;box-shadow:var(--shadow);padding:12px;}
@@ -1341,6 +1342,12 @@ function resolveBasketTexInHtml(html){
           <button data-sort="az">По названию (А—Я)</button>
         </div>
       </div>
+      <!-- сопряжение: открыть ЭТО устройство как панель тренажёров для доски
+           (boards-panel.html) — с телефона в один шаг, без поиска адреса -->
+      <a class="bl-btn" id="blPanelLink" href="boards-panel.html" title="Это устройство — панель тренажёров: подбирать задания здесь и отправлять на доску. Подключение по коду с доски">
+        <svg viewBox="0 0 24 24" fill="none"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5" stroke="currentColor" stroke-width="1.8"/><path d="M10.5 18h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Панель для доски
+      </a>
       <!-- редкие действия с хранилищем собраны в одно меню «Ещё», чтобы не
            занимать ряд. Не «⋯»: такая кнопка уже есть в правом углу (меню
            приложения), а стрелка вниз читается так же, как соседняя
