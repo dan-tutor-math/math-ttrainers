@@ -121,11 +121,11 @@ def run_single(browser):
     page.wait_for_timeout(200)
 
     print("3. Раздел «Презентации»")
-    item = page.query_selector(".bl-nav-item[data-nav='__decks']")
-    check("3: пункт «Презентации» есть", item is not None)
-    cnt = page.inner_text(".bl-nav-item[data-nav='__decks'] .cnt").strip() if item else ""
-    check("3: счётчик 1", cnt == "1", cnt)
-    page.click(".bl-nav-item[data-nav='__decks']")
+    # №113: «Презентации» — вкладка переключателя над заголовком, а не пункт слева
+    item = page.query_selector("#blKindSwitch [data-kind='decks']")
+    check("3: вкладка «Презентации» есть", item is not None)
+    check("3: в виде «Основные доски» презентации не видны", len(nav_cards(page)) == 0 or all("Урок слайдами" not in c for c in nav_cards(page)))
+    page.click("#blKindSwitch [data-kind='decks']")
     page.wait_for_timeout(200)
     cards = nav_cards(page)
     check("3: видна только презентация (она в папке)", len(cards) == 1 and "Урок слайдами" in cards[0], str(cards))
@@ -134,11 +134,13 @@ def run_single(browser):
     check("3: модуль не загружен от просмотра списка", not page.evaluate(DECK_LOADED))
     page.reload()
     boot(page)
-    check("3: после перезагрузки с #decks — раздел «Презентации»",
-          page.evaluate("() => document.querySelector('.bl-nav-item.active')?.dataset.nav") == "__decks")
-    page.click(".bl-nav-item[data-nav='__root']")
+    check("3: после перезагрузки с #decks — вид «Презентации»",
+          page.evaluate("() => document.querySelector('#blKindSwitch .active')?.dataset.kind") == "decks")
+    page.click("#blKindSwitch [data-kind='boards']")
     page.wait_for_timeout(150)
-    check("3: «Все доски» снимают #decks", page.evaluate("() => location.hash") == "")
+    check("3: «Основные доски» снимают #decks", page.evaluate("() => location.hash") == "")
+    page.click("#blKindSwitch [data-kind='decks']")   # дальше — работа с презентациями
+    page.wait_for_timeout(150)
 
     print("4. «Создать презентацию»")
     n0 = page.evaluate("() => getDB().boards.length")
@@ -152,7 +154,7 @@ def run_single(browser):
     page.wait_for_timeout(200)
 
     print("5. Перезагрузка прямо в презентацию")
-    page.evaluate("() => { curFolderId = '__decks'; renderList(); }")
+    page.evaluate("() => { setListKind('decks'); }")
     page.evaluate("() => openBoard('bDeck')")
     page.wait_for_function("() => boardActive && getCurrentBoard().id === 'bDeck'")
     page.evaluate("() => deckGo(1)")

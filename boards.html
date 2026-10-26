@@ -102,6 +102,12 @@ input,textarea{-webkit-user-select:text; -moz-user-select:text; user-select:text
 .bl-folder-item{padding-left:30px;}
 .bl-main{flex:1 1 auto;padding:22px 26px 60px;min-width:0;}
 .bl-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:18px;}
+/* №113: переключатель «доски / все / презентации» и метка «Бета» */
+.bl-kind{display:inline-flex;gap:2px;padding:3px;margin-bottom:14px;border-radius:12px;background:var(--hover-1);max-width:100%;flex-wrap:wrap;}
+.bl-kind-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:none;border-radius:9px;background:none;cursor:pointer;font-family:var(--font-ui);font-weight:600;font-size:13.5px;color:var(--muted-2);}
+.bl-kind-btn:hover{color:var(--pencil);}
+.bl-kind-btn.active{background:var(--paper);color:var(--ink);box-shadow:0 1px 3px rgba(0,0,0,.14);}
+.bl-beta{display:inline-block;padding:1px 6px;border-radius:6px;background:var(--hl-14);color:var(--ink);font-family:var(--font-ui);font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;line-height:1.5;}
 .bl-title{font-family:var(--font-ui);font-weight:700;font-size:20px;color:var(--pencil);display:flex;align-items:center;gap:8px;}
 .bl-title svg{width:18px;height:18px;color:var(--muted-2);}
 .bl-head-actions{display:flex;gap:8px;margin-left:auto;margin-right:52px;flex-wrap:wrap;}
@@ -1214,6 +1220,13 @@ function resolveBasketTexInHtml(html){
     <div class="bl-nav" id="blNav"></div>
   </div>
   <div class="bl-main">
+    <!-- №113: доски и презентации — разные виды списка. По умолчанию только
+         доски; презентации в бете, поэтому у них подпись «Бета» -->
+    <div class="bl-kind" id="blKindSwitch" role="tablist" aria-label="Что показывать">
+      <button type="button" class="bl-kind-btn active" data-kind="boards" role="tab" aria-selected="true">Основные доски</button>
+      <button type="button" class="bl-kind-btn" data-kind="all" role="tab" aria-selected="false">Все доски и презентации</button>
+      <button type="button" class="bl-kind-btn" data-kind="decks" role="tab" aria-selected="false">Презентации <span class="bl-beta">Бета</span></button>
+    </div>
     <div class="bl-head">
       <a class="bl-btn bl-to-index" id="blToIndex" href="index.html" title="К тренажёрам">
         <svg viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -1227,7 +1240,7 @@ function resolveBasketTexInHtml(html){
         </button>
         <button class="bl-btn" id="blCreateDeck" title="Доска из слайдов, как в PowerPoint">
           <svg viewBox="0 0 24 24" fill="none"><rect x="2.5" y="4" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.8"/><rect x="8.5" y="10" width="13" height="9" rx="1.5" stroke="currentColor" stroke-width="1.8"/></svg>
-          Создать презентацию
+          Создать презентацию <span class="bl-beta">Бета</span>
         </button>
         <button class="bl-btn" id="blCreateFolder">
           <svg viewBox="0 0 24 24" fill="none"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke="currentColor" stroke-width="1.8"/></svg>

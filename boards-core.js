@@ -1468,7 +1468,32 @@ function deckIcon(){
 }
 // разделы списка, которые не папки: доску в них не «кладут», новая доска из
 // них создаётся в корне
-function isSpecialNav(v){ return v === '__recent' || v === '__trash' || v === '__decks'; }
+function isSpecialNav(v){ return v === '__recent' || v === '__trash'; }
+
+/* ═══ №113: доски и презентации — два разных раздела ═══
+   Презентации ещё в бете, поэтому по умолчанию список показывает ТОЛЬКО
+   доски: ни в «Недавних», ни в папках, ни в поиске, ни в корзине презентаций
+   не видно. Увидеть их можно, явно переключив вид: «Презентации» (только
+   они) или «Все доски и презентации» (вперемешку). Вид не запоминается между
+   заходами нарочно: пока раздел в бете, каждый заход начинается с обычных
+   досок, а на презентации ведёт адрес boards.html#decks. */
+let listKind = 'boards';   // 'boards' | 'all' | 'decks'
+function kindMatch(b){
+  if (listKind === 'all') return true;
+  return listKind === 'decks' ? boardIsDeck(b) : !boardIsDeck(b);
+}
+// живые доски выбранного вида. Сама liveBoards() вида не знает: удаление
+// папки обязано унести в корзину и презентации внутри неё, какой бы вид ни
+// был включён, иначе они остались бы без папки и без корзины
+function kindBoards(){ return liveBoards().filter(kindMatch); }
+function kindTrashed(){ return DB.boards.filter(b => isTrashed(b) && kindMatch(b)); }
+const LIST_KIND_TITLES = { boards: 'Основные доски', all: 'Все доски и презентации', decks: 'Презентации' };
+function setListKind(k){
+  if (!LIST_KIND_TITLES[k] || k === listKind) return;
+  listKind = k;
+  renderList();   // выделение из чужого вида подрежет blSyncSelection в конце renderList
+  syncListHash();
+}
 function curRealFolderId(){ return (curFolderId && !isSpecialNav(curFolderId)) ? curFolderId : null; }
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -1542,13 +1567,12 @@ function fmtDate(ts){
 }
 
 function renderNav(){
-  const live = liveBoards();
+  const live = kindBoards();
   const recentCount = live.filter(b => b.lastOpenedAt).length;
-  const trashCount = DB.boards.length - live.length;
+  const trashCount = kindTrashed().length;
   let html = `
     <button class="bl-nav-item${curFolderId==='__recent'?' active':''}" data-nav="__recent">${clockIcon()}Недавние<span class="cnt">${recentCount}</span></button>
     <button class="bl-nav-item${curFolderId===null?' active':''}" data-nav="__root">${allIcon()}Все доски<span class="cnt">${live.length}</span></button>
-    <button class="bl-nav-item${curFolderId==='__decks'?' active':''}" data-nav="__decks" title="Все презентации из всех папок">${deckIcon()}Презентации<span class="cnt">${live.filter(boardIsDeck).length}</span></button>
     <div class="bl-folders">
   `;
   DB.folders.forEach(f => {
@@ -1576,7 +1600,7 @@ function escHtml(s){ return String(s || '').replace(/&/g,'&amp;').replace(/</g,'
 function currentBoardsAndFolders(){
   // доски из корзины видны только в самой корзине — ни в поиске, ни в
   // «Недавних», ни в папках, из которых их удалили
-  const live = liveBoards();
+  const live = kindBoards();
   if (searchQuery){
     const q = searchQuery.toLowerCase();
     return {
@@ -1586,14 +1610,15 @@ function currentBoardsAndFolders(){
   }
   if (inTrashView()){
     // свежеудалённые сверху: их чаще всего и хотят вернуть
-    return { folders: [], boards: DB.boards.filter(isTrashed).sort((a, b) => (b.trashedAt || 0) - (a.trashedAt || 0)) };
+    return { folders: [], boards: kindTrashed().sort((a, b) => (b.trashedAt || 0) - (a.trashedAt || 0)) };
   }
   if (curFolderId === '__recent'){
     return { folders: [], boards: live.filter(b => b.lastOpenedAt) };
   }
-  // №96: «Презентации» — все презентации, в какой бы папке они ни лежали
-  if (curFolderId === '__decks'){
-    return { folders: [], boards: live.filter(boardIsDeck) };
+  // №96: в виде «Презентации» корень — все презентации сразу, в какой бы
+  // папке они ни лежали (так было у раздела «Презентации» до №113)
+  if (curFolderId === null && listKind === 'decks'){
+    return { folders: [], boards: live };
   }
   if (curFolderId === null){
     return { folders: DB.folders, boards: live.filter(b => !b.folderId) };
@@ -1678,7 +1703,7 @@ function resolveDropTarget(x, y){
   const nav = el.closest('.bl-nav-item');
   if (nav && blDragState.kind === 'board'){
     const v = nav.dataset.nav;
-    if (v === '__recent' || v === '__decks') return null;
+    if (v === '__recent') return null;
     if (v === '__trash') return { type: 'trash', el: nav };
     return { type: 'into', folderId: v === '__root' ? null : v, el: nav };
   }
@@ -1872,7 +1897,22 @@ function initCardDnd(grid){
   });
 }
 
+// переключатель вида над заголовком. Обе кнопки создания видны в любом виде:
+// созданное откроется само, а при выходе backToList переключит список на тот
+// вид, где оно лежит, — так новое не «теряется» в виде, который его не показывает
+function renderKindSwitch(){
+  document.querySelectorAll('#blKindSwitch [data-kind]').forEach(btn => {
+    const on = btn.dataset.kind === listKind;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+}
+document.querySelectorAll('#blKindSwitch [data-kind]').forEach(btn => {
+  btn.addEventListener('click', () => setListKind(btn.dataset.kind));
+});
+
 function renderList(){
+  renderKindSwitch();
   renderNav();
   const { folders, boards } = currentBoardsAndFolders();
   const sortedBoards = inTrashView() ? boards : sortBoards(boards);
@@ -1881,8 +1921,9 @@ function renderList(){
   if (searchQuery) titleHtml = `${allIcon()} Результаты поиска «${escHtml(searchQuery)}»`;
   else if (inTrashView()) titleHtml = `${trashIcon()} Корзина <span class="bl-title-note">доски удаляются насовсем через 5 дней</span>`;
   else if (curFolderId === '__recent') titleHtml = `${clockIcon()} Недавние`;
-  else if (curFolderId === '__decks') titleHtml = `${deckIcon()} Презентации`;
-  else if (curFolderId === null) titleHtml = `${allIcon()} Все доски`;
+  else if (curFolderId === null) titleHtml = listKind === 'decks'
+    ? `${deckIcon()} Презентации <span class="bl-beta">Бета</span>`
+    : `${allIcon()} ${listKind === 'all' ? 'Все доски и презентации' : 'Все доски'}`;
   else {
     const f = DB.folders.find(x => x.id === curFolderId);
     titleHtml = `${folderIcon()} ${escHtml(f ? f.name : '')}`;
@@ -1897,14 +1938,19 @@ function renderList(){
     grid.insertAdjacentHTML('beforebegin', '');
     grid.innerHTML = inTrashView()
       ? `<div class="bl-empty" style="grid-column:1/-1">Корзина пуста. Удалённые доски лежат здесь 5 дней — пока они тут, их можно восстановить.</div>`
-      : `<div class="bl-empty" style="grid-column:1/-1">Здесь пока пусто — создайте первую доску или папку кнопками выше.</div>`;
+      : (listKind === 'decks' && !DB.boards.some(boardIsDeck))
+        ? `<div class="bl-empty" style="grid-column:1/-1">Презентаций пока нет — создайте первую кнопкой выше. Раздел в бете: что-то может работать не так.</div>`
+        : `<div class="bl-empty" style="grid-column:1/-1">Здесь пока пусто — создайте первую доску или папку кнопками выше.</div>`;
     blSyncSelection();
     return;
   }
 
   let html = '';
   folders.forEach(f => {
-    const n = liveBoards().filter(b => b.folderId === f.id).length;
+    const n = kindBoards().filter(b => b.folderId === f.id).length;
+    const nWord = listKind === 'decks' ? blPlural(n, 'презентация', 'презентации', 'презентаций')
+      : listKind === 'all' ? blPlural(n, 'элемент', 'элемента', 'элементов')
+      : blPlural(n, 'доска', 'доски', 'досок');
     html += `
       <div class="bl-card folder" data-folder="${f.id}">
         <span class="bl-check" aria-hidden="true"></span>
@@ -1912,7 +1958,7 @@ function renderList(){
         <div class="bl-card-icon">${folderIcon()}</div>
         <div class="bl-card-body">
           <div class="bl-card-name">${escHtml(f.name)}</div>
-          <div class="bl-card-meta">${n} ${n===1?'доска':'досок'}</div>
+          <div class="bl-card-meta">${n} ${nWord}</div>
         </div>
       </div>`;
   });
@@ -1922,10 +1968,10 @@ function renderList(){
         <span class="bl-check" aria-hidden="true"></span>
         ${b.pairMissing ? `<span class="bl-pair-dot" title="При последнем переносе пары для этой доски не нашлось — возможно, её удалили на другом устройстве или она создана только здесь"></span>` : ''}
         <button class="bl-card-menu" data-menu="board:${b.id}">⋯</button>
-        <div class="bl-card-icon">${b.kind === 'deck' && typeof deckIcon === 'function' ? deckIcon() : boardIcon()}</div>
+        <div class="bl-card-icon">${boardIsDeck(b) ? deckIcon() : boardIcon()}</div>
         <div class="bl-card-body">
           <div class="bl-card-name">${escHtml(b.name)}</div>
-          <div class="bl-card-meta">${isTrashed(b) ? trashLeftText(b) : `${b.kind === 'deck' ? 'Презентация · с' : 'С'}оздана ${fmtDate(b.createdAt)}`}</div>
+          <div class="bl-card-meta">${isTrashed(b) ? trashLeftText(b) : `${boardIsDeck(b) ? 'Презентация · бета · с' : 'С'}оздана ${fmtDate(b.createdAt)}`}</div>
         </div>
       </div>`;
   });
@@ -2523,7 +2569,7 @@ document.getElementById('blCreateDeck')?.addEventListener('click', () => {
 // разделов не копило шаги «Назад» в браузере
 function syncListHash(){
   if (boardActive) return;
-  const want = curFolderId === '__decks' ? '#decks' : '';
+  const want = listKind === 'decks' ? '#decks' : '';
   if ((location.hash || '') === want) return;
   try { history.replaceState(null, '', location.pathname + location.search + want); } catch (e) {}
 }
@@ -3164,7 +3210,12 @@ function backToList(){
   viewReady = false;
   screenBoard.style.display = 'none';
   screenList.style.display = 'flex';
-  location.hash = curFolderId === '__decks' ? 'decks' : '';
+  // вышли из презентации, а список стоит на «Основных досках» — она там была бы
+  // невидима, и человек решил бы, что она пропала
+  // (и наоборот: доска, созданная в виде «Презентации», — в «Основных досках»)
+  if (B && boardIsDeck(B) && listKind === 'boards') listKind = 'decks';
+  else if (B && !boardIsDeck(B) && listKind === 'decks') listKind = 'boards';
+  location.hash = listKind === 'decks' ? 'decks' : '';
   // Промпт №39: записываем сразу, но НЕ через saveDB() — он отмечает доску как
   // изменённую, а просто «зашёл и вышел» правкой не является: иначе при
   // переносе досок между компьютерами каждая открытая доска выглядела бы
@@ -10181,7 +10232,7 @@ window.boardsAppBoot = function(){
     }
     loadClipboard();
     purgeExpiredTrash(true);
-    if (/^#decks\b/.test(location.hash)) curFolderId = '__decks';   // №96
+    if (/^#decks\b/.test(location.hash)) listKind = 'decks';   // №96
     renderList();
     if (window.onBoardsBooted) { try { window.onBoardsBooted(); } catch (e) { console.warn(e); } }
     // Промпт №49: если открытие ИМЕННО этой доски роняет вкладку (браузер
