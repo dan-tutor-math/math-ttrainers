@@ -253,6 +253,23 @@ def main():
                 check(len(heads) == 4 and all(heads), f"{w}px {theme}: подзаголовки в экране")
                 ctx.close()
 
+        print("7б. фон вверху не зависит от длины списка")
+        # пятна фона раньше считались от высоты body: на длинном списке верх
+        # темнел. Пустой кусок фона слева сверху должен совпадать попиксельно
+        for theme in ("light", "dark"):
+            for w, h in ((1140, 1100), (390, 844)):
+                ctx = new_ctx(w=w, h=h, theme=theme)
+                pg = new_page(ctx)
+                go(pg)
+                clip = {"x": 0, "y": 0, "width": min(140, w // 4), "height": 60}
+                oge = pg.screenshot(clip=clip)
+                pg.click('.nav-tab[data-id="grades"]')
+                pg.wait_for_timeout(200)
+                tall = pg.evaluate("document.body.offsetHeight")
+                g14 = pg.screenshot(clip=clip)
+                check(tall > 5000 and oge == g14, f"{theme} {w}px: угол фона на «1–4 классах» ({tall}px) как на «ОГЭ»")
+                ctx.close()
+
         print("8. ошибки JavaScript")
         check(not errors, f"ошибок нет: {errors}")
         b.close()

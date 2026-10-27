@@ -118,7 +118,14 @@ body{
     linear-gradient(var(--grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid) 1px, transparent 1px),
     var(--bg);
-  background-size:auto,auto,24px 24px,24px 24px,auto;
+  /* цветные пятна — в коробке постоянной высоты, а не во всю страницу:
+     «circle at 6% -8%» считает центр и радиус от высоты body, и на длинном
+     списке («1–4 классы», 6000+ px) пятно раздувалось и уезжало вверх — верх
+     страницы темнел. 1460px — высота страницы на «Экзамены → ОГЭ», под её
+     оттенок и подогнано; ниже коробки пятна уже прозрачные, повтор не нужен.
+     Не background-attachment:fixed — на iPhone он молча становится scroll */
+  background-size:100% 1460px,100% 1460px,24px 24px,24px 24px,auto;
+  background-repeat:no-repeat,no-repeat,repeat,repeat,repeat;
   font-family:var(--font-ui);
   color:var(--pencil);
   min-height:100vh;
