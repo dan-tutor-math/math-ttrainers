@@ -375,6 +375,63 @@ function ttCanvasFontFix(){
   return ttFontFixP;
 }
 
+/* Шрифты кадра — странице, которая снимает. html2canvas рисует текст на
+   холсте страницы, где запущен (доски или вкладки-панели), а не кадра
+   тренажёра: шрифт, которого на этой странице нет, холст заменяет
+   запасным. На доске стили формул KaTeX подключены, а на вкладке-панели
+   их не было — и формулы с телефона ложились на доску запасным шрифтом:
+   «x» опущен, дробь срезана, промежутки неровные (ОГЭ ч. 2 №20). Поэтому
+   перед снимком: описания шрифтов (@font-face) кадра, которых здесь нет, —
+   сюда, и загрузить ровно те начертания, что есть в задании (холст сам
+   шрифт не грузит, он берёт только уже загруженное). Onest не трогаем —
+   его эта страница держит сама (ttCanvasFontFix) */
+const ttFontRulesSeen = new Set();
+async function ttSyncFrameFonts(el){
+  const doc = el.ownerDocument;
+  if (!doc || doc === document || !document.fonts) return;
+  try {
+    const have = new Set();
+    document.fonts.forEach(f => have.add(String(f.family).replace(/['"]/g, '').trim().toLowerCase()));
+    let css = '';
+    Array.from(doc.styleSheets).forEach(sh => {
+      let rules = null;
+      try { rules = sh.cssRules; } catch (e) { return; }
+      const base = sh.href || doc.baseURI;
+      Array.from(rules || []).forEach(r => {
+        if (r.type !== 5) return;   // CSSRule.FONT_FACE_RULE
+        const fam = String(r.style.getPropertyValue('font-family')).replace(/['"]/g, '').trim().toLowerCase();
+        if (!fam || fam === 'onest' || have.has(fam)) return;
+        // относительный адрес файла шрифта — от стиля кадра, не этой страницы
+        const t = r.cssText.replace(/url\((['"]?)([^'")]+)\1\)/g, (m, q, u) =>
+          /^(data:|blob:|https?:)/.test(u) ? m : 'url("' + new URL(u, base).href + '")');
+        if (ttFontRulesSeen.has(t)) return;
+        ttFontRulesSeen.add(t);
+        css += t + '\n';
+      });
+    });
+    if (css){
+      const st = document.createElement('style');
+      st.className = 'tt-frame-fonts';
+      st.textContent = css;
+      document.head.appendChild(st);
+    }
+    // начертания, которые есть в задании, — загрузить до снимка
+    const want = new Map();
+    const win = doc.defaultView;
+    const nodes = [el].concat(Array.from(el.querySelectorAll('*')).slice(0, 3000));
+    nodes.forEach(e => {
+      const cs = win.getComputedStyle(e);
+      const key = cs.fontStyle + ' ' + cs.fontWeight + ' 16px ' + cs.fontFamily;
+      if (!want.has(key)) want.set(key, '');
+      const tx = (e.textContent || '').trim();
+      if (tx && want.get(key).length < 60) want.set(key, (want.get(key) + tx).slice(0, 60));
+    });
+    await Promise.all(Array.from(want).map(([font, text]) => document.fonts.load(font, text || 'a').catch(() => {})));
+  } catch (e) {
+    console.warn('[снимок] не удалось подготовить шрифты кадра', e);
+  }
+}
+
 // opts.answer — где строка ответа, если её дорисовывать: 'below' (под
 // снимком) или 'right'; без него — как просит узел (data-bd-answer у
 // столбиков), иначе под снимком.
@@ -389,6 +446,7 @@ async function captureTrainerNode(el, task, opts){
   }
   if (typeof html2canvas !== 'function') throw new Error('html2canvas not loaded');
   await ttCanvasFontFix();
+  await ttSyncFrameFonts(el);
   opts = opts || {};
   const doc = el.ownerDocument;
   const answerSide = opts.answer || el.getAttribute('data-bd-answer');
