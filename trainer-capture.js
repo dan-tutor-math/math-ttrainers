@@ -16,7 +16,8 @@
    - captureTaskWithSolution — снимок задания вместе с разбором;
    - ttSnapTrainerTasks — снять все задания, открытые в кадре (пакет «+1..+10»);
    - ttSnapTheory — снять теорию ОГЭ №1–5 отдельной картинкой;
-   - ttWidthLike — какую ширину узла брать (продолжение стопки на доске);
+   - ttWidthLike / ttCwForCard — какой ширины карточку снимать (продолжение
+     стопки на доске) и какая для этого нужна ширина узла;
    - ttRenderTrainersList — список тренажёров (TRAINERS_PANEL_GROUPS);
    - ttHookTrainerFrameDoc — что панель подкладывает в кадр тренажёра.
 
@@ -28,11 +29,29 @@
    без доски не смогла бы им пользоваться.
    ========================================================== */
 
-// ширина узла cw переносится только на узел того же вида: ширину условия
-// ЕГЭ на столбик переносить бессмысленно. refNode/refCw — вид и ширина
-// последнего задания стопки на доске (во вкладке-панели их присылает доска)
-function ttWidthLike(refNode, refCw, gen){
-  return (refCw && gen && gen.node && refNode && refNode === gen.node) ? refCw : null;
+/* Ширина нового задания стопки — ширина КАРТОЧКИ (css.w) последнего
+   задания того же тренажёра (того же номера). Раньше переносилась ширина
+   узла и только на узел того же вида — и в пакете ОГЭ №8 карточка «+»
+   (другой узел) ложилась на доску своей «телефонной» шириной; то же после
+   смены типа, если последней на доске была карточка «+». Переносить надо
+   именно карточку: основное задание — само карточка (#questionPanel), а
+   вокруг узла карточки «+» снимок дорисовывает поля, и одна ширина узла
+   давала разные карточки. На другой тренажёр не переносим: ширину условия
+   ЕГЭ на столбик переносить бессмысленно.
+   refTid/refW — тренажёр и ширина карточки последнего задания стопки (во
+   вкладке-панели их присылает доска). → ширина карточки или null */
+function ttWidthLike(refTid, refW, gen){
+  return (refW && gen && gen.tid && refTid && refTid === gen.tid) ? refW : null;
+}
+// ширина карточки cardW → ширина узла для снимка (opts.width у
+// captureTrainerNode): за вычетом полей, которые дорисуются вокруг узла.
+// Столбики — нет: их ширина зависит от числа цифр
+function ttCwForCard(el, cardW){
+  if (!cardW || !el || el.hasAttribute('data-bd-answer')) return null;
+  let pad = 0;
+  try { pad = trainerCardStyle(el, trainerPageBg(el.ownerDocument)).pad || 0; } catch (e) {}
+  const cw = Math.round(cardW - 2 * pad);
+  return cw > 0 ? cw : null;
 }
 
 // снимок задания; sol — разбор «Тренировки» (trainerSolutionHTML): тогда
@@ -56,7 +75,7 @@ async function captureTaskWithSolution(el, info, cw, sol, scale){
 }
 
 /* Снять все задания, открытые сейчас в кадре тренажёра tid.
-   opts.widthFor(gen) → cw — ширина узла; зовётся ПЕРЕД каждым снимком, а не
+   opts.widthFor(gen) → ширина карточки (или null); зовётся ПЕРЕД каждым снимком, а не
    один раз на пакет: первое задание пакета само начинает стопку на доске, и
    второе должно взять уже её ширину.
    opts.onShot(item) — что делать со снимком (вставить на доску, отправить
@@ -82,7 +101,8 @@ async function ttSnapTrainerTasks(win, tid, href, opts){
         // ответ читаем до снимка — пока на странице то же задание, что снимаем
         const info = trainerTaskInfo(win, tid, el);
         const gen = trainerGenInfo(win, tid, href, el);
-        const cw = opts.widthFor ? opts.widthFor(gen) : null;
+        // widthFor отдаёт ширину карточки — узлу нужна своя, без полей
+        const cw = ttCwForCard(el, opts.widthFor ? opts.widthFor(gen) : null);
         const shot = await captureTaskWithSolution(el, info, cw, trainerSolutionHTML(win, tid, el), opts.scale);
         const task = (info && shot.hot) ? Object.assign({ v: 1 }, info, { hot: shot.hot }) : null;
         await opts.onShot({ dataUrl: shot.dataUrl, task, gen, shot, cw });

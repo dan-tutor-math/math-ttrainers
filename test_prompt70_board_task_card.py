@@ -298,8 +298,10 @@ def run():
         s7, cw7 = a7["w"] / a7["css"]["w"], a7["css"].get("cw")
 
         # ── 8. новое задание — в масштабе и ширине последнего ─────────
+        # ширина карточки переносится в пределах тренажёра (ttWidthLike,
+        # промпт «сопряжение панели») — поэтому снова ОГЭ №6, как у «a»
         T68.open_panel(page)
-        T68.open_trainer(page, "oge7", "oge7.html", "document.querySelectorAll('.mode-card:not(.soon)')[1].click()")
+        T68.open_trainer(page, "oge6", "oge6.html", "document.querySelectorAll('.mode-card:not(.soon)')[1].click()")
         T68.add_to_board(page)
         b1 = T68.obj(page)
         check("8. из панели — тот же масштаб, что у последнего", abs(b1["w"] / b1["css"]["w"] - s7) < 1e-6)
@@ -309,6 +311,14 @@ def run():
         focus(b1, 0.6)
         b2 = T68.more(page, b1, "right")
         check("8. «ещё такое же» — тот же масштаб и ширина", abs(b2["w"] / b2["css"]["w"] - s7) < 1e-6 and b2["css"].get("cw") == cw7)
+        # другой тренажёр — масштаб стопки тот же, а ширину ОГЭ №6 не перенимает
+        T68.open_panel(page)
+        T68.open_trainer(page, "oge7", "oge7.html", "document.querySelectorAll('.mode-card:not(.soon)')[1].click()")
+        T68.add_to_board(page)
+        b3 = T68.obj(page)
+        check("8. другой тренажёр (ОГЭ №7) — тот же масштаб, своя ширина", abs(b3["w"] / b3["css"]["w"] - s7) < 1e-6 and not b3["css"].get("cw") and abs(b3["css"]["w"] - a7["css"]["w"]) > 50)
+        page.evaluate("() => setTrainersPanel('closed')")
+        page.wait_for_timeout(200)
         check("6. нет ошибок JavaScript (размер)", not errors)
 
         if errors:

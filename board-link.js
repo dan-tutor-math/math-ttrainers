@@ -346,7 +346,7 @@
                             ждёт в очереди, а не затирает текущее состояние
        insert(p, dev)     → Promise: вставить задание add-task
        placeManual(p, dev)→ Promise<'placed'|'cancelled'> (этап 2)
-       state()            → { ref: {node, cw}|null, board: имя доски }
+       state()            → { ref: {tid, w — ширина карточки}|null, board: имя доски, scale }
        ask(dev)           → Promise<boolean> — окошко «Разрешить / Отклонить»
        onChange()         — перерисовать окна доски (код, устройства, очередь)
      Несколько вкладок доски на одном компьютере: принимает задания только

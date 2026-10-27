@@ -6704,12 +6704,12 @@ function currentTaskStack(){
   if (!members.some(o => bbVisible(objectBBox(o), v))) return null;
   return { id: last.stack.id, last, members, x0: last.stack.x0, y0: last.stack.y0 };
 }
-// ширина узла cw переносится только на узел того же вида: ширину условия
-// ЕГЭ на столбик переносить бессмысленно
+// ширина карточки переносится на задание того же тренажёра (ttWidthLike в
+// trainer-capture.js — там же почему карточки, а не узла). → ширина карточки
 function widthLike(ref, gen){
-  return ttWidthLike(ref && ref.gen && ref.gen.node, ref && ref.css && ref.css.cw, gen);
+  return ttWidthLike(ref && ref.gen && ref.gen.tid, ref && ref.css && ref.css.w, gen);
 }
-// ширина для задания из панели — до снимка (снимок делается сразу нужной ширины)
+// ширина карточки для задания из панели — до снимка (снимок делается сразу нужной ширины)
 function widthForNewTask(gen){
   const st = currentTaskStack();
   return st ? widthLike(st.last, gen) : null;
@@ -7022,7 +7022,7 @@ function boardLinkState(){
   if (B && boardActive){
     try {
       const st = currentTaskStack();
-      if (st && st.last) ref = { node: (st.last.gen && st.last.gen.node) || null, cw: (st.last.css && st.last.css.cw) || null };
+      if (st && st.last) ref = { tid: (st.last.gen && st.last.gen.tid) || null, w: (st.last.css && st.last.css.w) || null };
     } catch (e) {}
   }
   // плотность снимка — как у встроенной панели этой доски: задание с
@@ -7442,7 +7442,7 @@ function makeSimilarTask(srcId, dir){
       if (g.vw) gen.vw = g.vw;
       // Промпт №13 «раскладка заданий»: ширина и масштаб — исходного задания, а не
       // последнего добавленного на доску (insertTaskImage, beside)
-      const cw = widthLike(src, gen);
+      const cw = ttCwForCard(el, widthLike(src, gen));
       // у исходного был разбор — будет и у нового (режим в невидимом кадре
       // может быть любым, поэтому force)
       const sol = src.sol ? trainerSolutionHTML(win, g.tid, el, true) : null;

@@ -203,13 +203,14 @@ def run():
         rb, r2 = T68.rect(get(page, big)), T68.rect(m2)
         check("7. «+» вниз — вплотную под исходным с его отступом",
               abs(r2[0] - rb[0]) < EPS and r2[1] >= rb[1] + rb[3] + big["gap"] - EPS)
-        # ширину узла тоже от исходного
+        # ширину тоже от исходного: с промпта «сопряжение панели» переносится
+        # ширина карточки (css.w), а ширина узла считается из неё (ttCwForCard)
         page.evaluate(f"""() => {{ const o = getCurrentBoard().objects.find(x => x.id === {json.dumps(ts[2]['id'])});
-            o.css.cw = 300; }}""")
+            o.css.cw = 300 - 2 * (o.css.pad || 0); o.css.w = 300; }}""")
         src3 = get(page, ts[2])
         look(page, 1, src3["points"][0]["x"] + src3["w"] / 2, src3["points"][0]["y"] + src3["h"] / 2)
         m3 = T68.more(page, src3, "left")
-        check("7. «+» — ширина узла исходного", m3["css"].get("cw") == 300, m3["css"])
+        check("7. «+» — ширина карточки исходного", abs(m3["css"]["w"] - 300) < 2 and m3["css"].get("cw") == 300 - 2 * (m3["css"].get("pad") or 0), m3["css"])
         T68.open_panel(page)
 
         # ── 6. ушли в другое место — новая стопка под текущий экран ─────

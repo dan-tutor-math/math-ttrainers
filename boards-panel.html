@@ -360,16 +360,16 @@ body.bp-desktop .bp-frame-resize{display:block;}
     try { win = iframe.contentWindow; void win.document; } catch (e) { win = null; }
     if (!win){ toast('Не удалось получить доступ к тренажёру'); return; }
     setBusy(true);
-    // ширина узла — от последнего задания стопки на доске (присылает доска),
+    // ширина карточки — от последнего задания стопки на доске (присылает доска),
     // как у встроенной панели (widthForNewTask); следующее задание пакета
     // продолжает ту стопку, что начнёт первое
     let ref = client.state().board.ref;
     const sends = [];
     const res = await ttSnapTrainerTasks(win, openId, openHref, {
-      widthFor: (gen) => ttWidthLike(ref && ref.node, ref && ref.cw, gen),
+      widthFor: (gen) => ttWidthLike(ref && ref.tid, ref && ref.w, gen),
       scale: snapScale(),
       onShot: async (it) => {
-        ref = { node: (it.gen && it.gen.node) || null, cw: it.cw };
+        ref = { tid: (it.gen && it.gen.tid) || null, w: it.shot.css.w };
         sends.push(client.send('add-task', payloadOf(it)));
       },
     });
@@ -405,10 +405,10 @@ body.bp-desktop .bp-frame-resize{display:block;}
     let ref = client.state().board.ref;
     const sends = [];
     const res = await ttSnapTrainerTasks(win, openId, openHref, {
-      widthFor: (gen) => ttWidthLike(ref && ref.node, ref && ref.cw, gen),
+      widthFor: (gen) => ttWidthLike(ref && ref.tid, ref && ref.w, gen),
       scale: snapScale(),
       onShot: async (it) => {
-        ref = { node: (it.gen && it.gen.node) || null, cw: it.cw };
+        ref = { tid: (it.gen && it.gen.tid) || null, w: it.shot.css.w };
         sends.push(client.send('add-manual', payloadOf(it)));
       },
     });
