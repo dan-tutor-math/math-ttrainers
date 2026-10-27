@@ -4,7 +4,7 @@
 
 Проверяет:
   1. подвкладки «Классов» — «1–4 классы», 5, 6, 7, 8, 9, 10, 11; у 5–11
-     прежние названия и прежние тренажёры (ссылки по порядку);
+     прежние названия и прежние живые тренажёры (темы — test_prompt_grades_5_11.py);
   2. в «1–4 классах» четыре подзаголовка (1–4 класс), в каждом пять блоков,
      в первом блоке 1 класса темы ровно в заданном порядке, всего 88 тем;
   3. заглушки — не ссылки, подписаны «скоро», приглушены, не ловят нажатие:
@@ -144,12 +144,14 @@ def main():
         check([s[0] for s in subs] == ["g1_4", "g5", "g6", "g7", "g8", "g9", "g10", "g11"], f"порядок подвкладок: {[s[0] for s in subs]}")
         check(subs[0][1].replace(" ", " ") == "1–4 классы · 1", f"первая — «1–4 классы · 1»: {subs[0][1]!r}")
         check(pg.locator('.nav-subtab[data-id="g1"]').count() == 0, "отдельной «1 класс» больше нет")
+        # с правки «5–11 класс» там тоже заглушки программы — содержимое
+        # сверяет test_prompt_grades_5_11.py; здесь — что живые на месте
         for sid, (title, hrefs) in OTHER_GRADES.items():
             open_sub(pg, sid)
             label = pg.inner_text(f'.nav-subtab[data-id="{sid}"]')
             items = pg.evaluate(ITEMS)
-            check(label.startswith(title) and [i["href"] for i in items] == hrefs and not any(i["soon"] for i in items),
-                  f"{title}: без изменений ({[i['href'] for i in items]})")
+            live = sorted(i["href"] for i in items if not i["soon"])
+            check(label.startswith(title) and live == sorted(hrefs), f"{title}: живые тренажёры на месте ({live})")
             check(pg.locator("#topics .grade-head").count() == 0, f"{title}: подзаголовков классов нет")
 
         print("2. «1–4 классы»: четыре класса, блоки, темы")
