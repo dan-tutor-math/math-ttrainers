@@ -198,6 +198,21 @@ def test_picker_and_task(browser, F):
     page.click('#nextProtoBtn')
     page.wait_for_timeout(150)
 
+    # рядом с ◀ ▶ заданий — переход между типами (группами), как в №1–19
+    check("задание: рядом кнопки «Предыдущий/Следующий тип»",
+          page.is_visible('#prevTypeBtn') and page.is_visible('#nextTypeBtn')
+          and page.inner_text('#nextTypeBtn') == 'Следующий тип ▶' and page.inner_text('#prevTypeBtn') == '◀ Предыдущий тип')
+    gi = [x["id"] for x in t20["groups"]].index("sys_add")
+    nxt = next(x for x in t20["groups"][gi + 1:] if any(p["group"] == x["id"] for p in t20["protos"]))
+    page.click('#nextTypeBtn')
+    page.wait_for_timeout(200)
+    check("Следующий тип ▶: открывает следующую группу с первого задания",
+          page.evaluate("curProto.group") == nxt["id"] and page.inner_text('#taskTitle').startswith(nxt["title"] + ' · задание 1 из'),
+          page.inner_text('#taskTitle'))
+    page.click('#prevTypeBtn')
+    page.wait_for_timeout(200)
+    check("◀ Предыдущий тип: возвращает в группу", page.evaluate("curProto.fipi") == items[0]["fipi"])
+
     # проверка: запись без скобок — просьба, неверно — ошибка, верно — засчитано
     page.fill('#answerArea input.answer-input', '1; 4')
     page.click('#answerArea .check-btn')

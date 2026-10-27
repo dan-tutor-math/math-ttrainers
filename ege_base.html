@@ -626,6 +626,8 @@ html[data-medals="on"] .board-view-toolbar{bottom:64px;}
     <div class="task-head">
       <div class="type-nav">
         <button class="back-btn" id="backBtn">← все прототипы</button>
+        <button class="type-nav-btn" id="prevTypeBtn" title="Предыдущий тип" style="display:none">◀ Предыдущий тип</button>
+        <button class="type-nav-btn" id="nextTypeBtn" title="Следующий тип" style="display:none">Следующий тип ▶</button>
         <button class="type-nav-btn" id="prevProtoBtn" title="Предыдущий прототип">◀ Предыдущий прототип</button>
         <button class="type-nav-btn" id="nextProtoBtn" title="Следующий прототип">Следующий прототип ▶</button>
       </div>
@@ -752,6 +754,7 @@ html[data-medals="on"] .board-view-toolbar{bottom:64px;}
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="mode-card-keys.js"></script>
 <script src="keypad.js"></script>
 <script src="exam-nav.js"></script>
 <script src="lazy-libs.js" data-preload="html2canvas jspdf"></script>
@@ -1129,7 +1132,7 @@ let totalSolved = 0, totalErrors = 0, streak = 0;
 let curProto = null, lastFocusedInput = null;
 
 const els = {};
-['pickerArea','pickerTitle','protoList','taskArea','backBtn','prevProtoBtn','nextProtoBtn',
+['pickerArea','pickerTitle','protoList','taskArea','backBtn','prevTypeBtn','nextTypeBtn','prevProtoBtn','nextProtoBtn',
  'taskTitle','pageTitle','pageSub','questionPanel','questionText','answerArea','card1BtnRow',
  'basketInlineBtn','workZone','workResizeLeft','workResizeRight','tasksColumns','card1Wrapper',
  'addRail','addRailToggle','addRailBody','addRailSep',
@@ -1681,6 +1684,11 @@ function render(){
   els.nextProtoBtn.textContent = inGroup ? 'Следующее задание ▶' : 'Следующий прототип ▶';
   els.prevProtoBtn.title = inGroup ? 'Предыдущее задание этого вида' : 'Предыдущий прототип';
   els.nextProtoBtn.title = inGroup ? 'Следующее задание этого вида' : 'Следующий прототип';
+  // в номере с группами ◀ ▶ выше ходят внутри вида, поэтому переход между
+  // видами — отдельной парой рядом (как «Предыдущий/Следующий тип» в №1–19)
+  const manyTypes = typeUnits().length > 1;
+  els.prevTypeBtn.style.display = manyTypes ? 'inline-flex' : 'none';
+  els.nextTypeBtn.style.display = manyTypes ? 'inline-flex' : 'none';
 
   els.tabLearn.classList.toggle('active', S.mode === 'learn');
   els.tabPractice.classList.toggle('active', S.mode === 'practice');
@@ -1738,6 +1746,23 @@ window.__examNav = {
   pid: () => (S.screen === 'task' && curProto) ? S.pid : null,
   open: (n, pid) => { if (task(n)) ensureFipi(n, () => openTask(n, pid && protoById(n, pid) ? pid : null)); },
 };
+/* «Типы» номера с группами — в порядке экрана выбора: сначала задания без
+   группы (демоверсия) по одному, потом группы. У номеров без групп (ЕГЭ)
+   типов нет: там прототип и есть тип, хватает ◀ ▶ прототипов */
+function typeUnits(){
+  if (!groupsOf(S.n).length) return [];
+  const list = protos(S.n);
+  return list.filter(p => !p.group).map(p => [p])
+    .concat(groupsOf(S.n).map(g => list.filter(p => p.group === g.id)).filter(a => a.length));
+}
+// соседний тип по кругу; группу открываем, как карточка на экране выбора, —
+// с первого нерешённого задания
+function typeNeighbour(delta){
+  const units = typeUnits();
+  const i = units.findIndex(u => u.some(p => p.id === S.pid));
+  const u = units[(i + delta + units.length) % units.length];
+  return (u.find(p => !isSolved(p.id)) || u[0]).id;
+}
 // сосед по списку прототипов этого номера, по кругу
 function protoNeighbour(delta){
   const list = sibs(S.pid);
@@ -1858,6 +1883,8 @@ els.nextBtn.onclick = guard('switchTask', () => {
   else showPicker();
 });
 els.backBtn.onclick = guard('switchTask', showPicker);
+els.prevTypeBtn.onclick = guard('switchTask', () => openTask(S.n, typeNeighbour(-1)));
+els.nextTypeBtn.onclick = guard('switchTask', () => openTask(S.n, typeNeighbour(1)));
 els.prevProtoBtn.onclick = guard('switchTask', () => openTask(S.n, protoNeighbour(-1).id));
 els.nextProtoBtn.onclick = guard('switchTask', () => openTask(S.n, protoNeighbour(1).id));
 // 📥 в шапке — как в ОГЭ №8: всё, что сейчас на экране (основное задание и
