@@ -310,8 +310,12 @@ def handle_db(route, request):
         route.fulfill(status=204, headers=CORS)
 
 
-def new_context(browser, **kw):
+def new_context(browser, live=False, **kw):
     ctx = browser.new_context(**kw)
+    # тесты этапов 1–3 проверяют задание-картинку; живое задание (кадр
+    # тренажёра) — в test_prompt_work_live.py, ему live=True
+    if not live:
+        ctx.add_init_script("try { localStorage.setItem('work:noLive', '1'); } catch (e) {}")
     ctx.route("https://**/*", lambda r: r.abort())
     ctx.route("https://fakesb.test/db", handle_db)
     ctx.route("**/supabase-js.umd.js", lambda r: r.fulfill(status=200, content_type="application/javascript", body=FAKE_SB_JS))

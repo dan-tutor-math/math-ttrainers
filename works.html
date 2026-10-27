@@ -765,6 +765,20 @@ function exactSnap(win, el){
   if (Array.isArray(s.cards)) s.cards = [];
   return JSON.stringify(s).length <= 60000 ? s : null;
 }
+/* Живое задание (вместо картинки у ученика — сам тренажёр в кадре с тем же
+   заданием, как на «Решу ЕГЭ»). Только там, где узел задания — условие с
+   полями ответа, а не пошаговый лист решения (столбики, линейные и
+   квадратные, НОД/НОК: их лист живёт шагами, а не одним ответом), и только
+   со снимком exact — без него в кадре открылось бы «такое же», а не то же.
+   Задания, добавленные до этой правки, поля live не имеют и остаются
+   картинками. Картинка снимается и у живых: это превью в конструкторе и
+   запасной путь у ученика (кадр не загрузился или задание в нём разошлось). */
+const LIVE_NODES = ['questionPanel', 'egeQuestion', 'pctQuestion', 'logQuestion', 'trigQuestion'];
+function liveOf(el, exact){
+  if (!exact || !el || !el.id || LIVE_NODES.indexOf(el.id) < 0) return null;
+  if (el.closest && el.closest('.added-task-card')) return null;
+  return { v: 1, sel: '#' + el.id };
+}
 const CAP_W = 440;
 const raf2 = w => new Promise(r => w.requestAnimationFrame(() => w.requestAnimationFrame(() => setTimeout(r, 60))));
 async function setFrameTheme(win, t){
@@ -829,6 +843,7 @@ async function shootBlock(win, tid, href, el, info){
   const L = shots.light;
   return {
     tid, href, gen, exact,
+    live: liveOf(el, exact),
     task: Object.assign({}, info),
     hot: L.hot ? { w: L.hot.w, h: L.hot.h, fields: L.hot.fields, opts: L.hot.opts, check: L.hot.check, checkText: L.hot.checkText || null, style: { font: (L.hot.style || {}).font || null } } : null,
     css: L.css,

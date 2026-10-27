@@ -88,6 +88,11 @@
 .tc-wrap{position:relative;}
 .tc-box{position:absolute;left:0;top:0;transform-origin:0 0;}
 .tc-box img{display:block;width:100%;height:100%;user-select:none;-webkit-user-drag:none;}
+/* живое задание: тренажёр в кадре, масштаб — тем же transform, что у картинки.
+   Пока грузится — невидим и сжат (не раздвигает страницу), видна картинка */
+.live-box iframe{display:block;width:100%;height:100%;border:0;background:transparent;color-scheme:normal;}
+.live-box.loading{visibility:hidden;pointer-events:none;transform:scale(.05)!important;}
+.vseg.zoom button{min-width:38px;}
 .tc-resize{position:absolute;right:-9px;bottom:-9px;width:22px;height:22px;border-radius:7px;background:var(--glass-strong);border:1px solid var(--glass-border);
   box-shadow:0 1px 5px rgba(0,0,0,.2);cursor:nwse-resize;z-index:4;touch-action:none;display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-size:11px;}
 .tc-resize::before{content:'⤡';}
@@ -197,6 +202,10 @@
           <button data-v="one" title="Задания по одному">По одному</button>
           <button data-v="list" title="Все задания списком">Списком</button>
         </div>
+        <div class="vseg zoom" id="wZoom" title="Масштаб задания">
+          <button id="wZoomOut" aria-label="Мельче">A−</button>
+          <button id="wZoomIn" aria-label="Крупнее">A+</button>
+        </div>
         <button class="notes-toggle" id="wNotes" title="Заметки: писать поверх задания и на поле под ним">✏️ Заметки</button>
       </div>
     </div>
@@ -240,7 +249,19 @@ function applyTheme(t, persist){
   if (persist) { try { localStorage.setItem('theme', t); } catch (e) {} }
 }
 applyTheme(curTheme(), false);
-themeBtn.addEventListener('click', () => { applyTheme(curTheme() === 'dark' ? 'light' : 'dark', true); if (S.blocks && !$('scrTask').hidden) renderTasks(); });
+// живые кадры не перезагружаем — им достаточно сменить тему; картинки и
+// теория — снимки в нужной теме
+themeBtn.addEventListener('click', () => {
+  applyTheme(curTheme() === 'dark' ? 'light' : 'dark', true);
+  if (!S.blocks || $('scrTask').hidden) return;
+  VIEWS.forEach(v => {
+    if (v.theory){ const im = imgOf(v.b.theory); const ti = v.theory.box.querySelector('img'); if (im && ti) ti.src = im.url; }
+    if (liveReady(v)) setLiveTheme(v);
+    else if (!(v.live && v.live.state === 'loading')){ renderCard(v); applyState(v); }
+    v.barEl.querySelectorAll('.pen').forEach(b => { const p = PENS[Number(b.dataset.k)]; b.querySelector('.dot').style.background = curTheme() === 'dark' ? p.d : p.c; });
+  });
+  fitAll();
+});
 
 function toast(msg){
   const t = $('toast'); t.textContent = msg; t.classList.add('show');
@@ -262,7 +283,7 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&am
    notes — заметки ученика по id задания (тоже только в браузере). */
 const S = {
   work: null, settings: {}, blocks: null, att: null, answers: {}, drafts: {}, notes: {}, cur: 0, finished: false,
-  activeMs: 0, taskMs: 0, tick: null, view: 'one', fill: 1, notesOn: false,
+  activeMs: 0, taskMs: 0, tick: null, view: 'one', fill: 1, lzoom: 1, notesOn: false,
 };
 const feedbackEnd = () => S.settings.feedback === 'end';
 const maxTries = () => {
@@ -280,7 +301,7 @@ function isFinal(a){ return !!a && !feedbackEnd() && (a.status === 'ok' || a.sta
 
 const LS = {
   idx: () => 'work:idx:' + code, drafts: () => 'work:drafts:' + code, queue: () => 'work:queue:' + code,
-  view: () => 'work:view:' + code, notes: () => 'work:notes:' + code, fill: 'work:fill', notesOn: 'work:notesOn',
+  view: () => 'work:view:' + code, notes: () => 'work:notes:' + code, fill: 'work:fill', lzoom: 'work:lzoom', notesOn: 'work:notesOn',
 };
 function lsGet(k, d){ try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }
 function lsSet(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
@@ -392,6 +413,7 @@ async function boot(){
   S.work = opened.work;
   S.settings = (opened.work && opened.work.settings) || {};
   S.fill = clampFill(Number(lsGet(LS.fill, 1)) || 1);
+  S.lzoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Number(lsGet(LS.lzoom, 1)) || 1));
   S.notesOn = !!lsGet(LS.notesOn, false);
   S.notes = lsGet(LS.notes(), {}) || {};
   initView();
@@ -489,7 +511,7 @@ function showTask(){
 function renderTasks(){
   const blocks = taskBlocks();
   if (!blocks.length){ fail('В работе пока нет заданий', 'Напиши учителю.'); return; }
-  VIEWS.forEach(v => closeTrainer(v));
+  VIEWS.forEach(v => { closeTrainer(v); liveUnwatch(v); });
   const host = $('wHost');
   host.innerHTML = '';
   host.className = S.view === 'list' ? 'list' : 'one';
@@ -498,7 +520,7 @@ function renderTasks(){
   $('wView').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.v === S.view));
   VIEWS = (S.view === 'list' ? blocks.map((b, i) => i) : [S.cur]).map(i => buildView(blocks[i], i));
   VIEWS.forEach(v => { host.appendChild(v.root); });
-  VIEWS.forEach(v => { fitView(v); applyState(v); });
+  VIEWS.forEach(v => { fitView(v); applyState(v); liveWatch(v); });
   renderNums();
 }
 function viewOf(i){ return VIEWS.find(v => v.i === i) || null; }
@@ -680,8 +702,19 @@ function renderCard(v){
       box.appendChild(cb);
       v.check = cb; v.checkText = cb.textContent;
     }
-  } else {
-    // запасной путь: ответ под картинкой обычной формой
+  } else buildBelow(v);
+  const rz = el('div', 'tc-resize');
+  rz.title = 'Потяните, чтобы сузить или растянуть задание; двойной щелчок — во всю ширину';
+  wireResize(rz, v);
+  wrap.appendChild(box);
+  wrap.appendChild(rz);
+  v.box = box; v.W = W; v.H = H;
+}
+// запасной путь: ответ под заданием обычной формой (мест под поля на
+// картинке нет, или у живого задания поля в тренажёре не нашлись)
+function buildBelow(v){
+  const t = v.b.task || {}, below = v.below;
+  {
     v.belowMode = true;
     below.hidden = false;
     if (t.kind === 'fields'){
@@ -708,12 +741,6 @@ function renderCard(v){
       row.appendChild(lbl); row.appendChild(opts); below.appendChild(row);
     }
   }
-  const rz = el('div', 'tc-resize');
-  rz.title = 'Потяните, чтобы сузить или растянуть задание; двойной щелчок — во всю ширину';
-  wireResize(rz, v);
-  wrap.appendChild(box);
-  wrap.appendChild(rz);
-  v.box = box; v.W = W; v.H = H;
 }
 
 // масштаб: доля колонки, заданная уголком (S.fill, по умолчанию вся колонка).
@@ -729,7 +756,17 @@ const SCRATCH_H = 240;   // поле для записей под карточк
 function fitView(v){
   if (!v.box || !v.root.isConnected) return;
   const avail = availOf(v);
-  const k = kFor(avail, v.W);
+  let k = kFor(avail, v.W);
+  if (liveReady(v)){
+    // живое: ширина кадра (вёрстка тренажёра) = LIVE_W / масштаб, и кадр
+    // растягивается до той же доли колонки, что и картинка. «+» делает текст
+    // крупнее, и задание переносится по строкам, а не уезжает вбок
+    const wl = Math.max(LIVE_MIN, Math.round(LIVE_W / S.lzoom));
+    v.W = wl;
+    v.box.style.width = wl + 'px';
+    v.box.style.height = v.H + 'px';
+    k = Math.max(0.25, avail * S.fill / wl);
+  }
   v.k = k;
   v.box.style.transform = 'scale(' + k + ')';
   v.wrap.style.width = Math.round(v.W * k) + 'px';
@@ -766,6 +803,260 @@ function wireResize(rz, v){
   rz.addEventListener('pointercancel', end);
   rz.addEventListener('dblclick', () => { S.fill = 1; lsSet(LS.fill, 1); fitAll(); });
 }
+
+/* ── живое задание ──
+   Задание с пометкой live (добавлено после этой правки, works.html → liveOf)
+   у ученика — сам тренажёр в кадре с ТЕМ ЖЕ заданием (снимок exact, как в
+   «Подсказках и решении»), а не картинка: формулы, чертёж, поля — настоящие,
+   текст чёткий при любом масштабе. От страницы тренажёра в кадре видно
+   только задание (liveIsolate), остальное спрятано стилем, сам тренажёр
+   работает как обычно.
+   Проверяет по-прежнему эта страница, а не тренажёр: только так попытки,
+   «Экзамен», «результат в конце» и запись в базу одинаковы с картинками.
+   Поэтому поля, варианты и «Проверить» тренажёра перехватываются в кадре до
+   его собственных обработчиков (фаза захвата на окне кадра) и работают как
+   поля этой страницы. Не нашлись поля — ответ формой под заданием, а поля
+   тренажёра спрятаны.
+   Пока кадр грузится, видна картинка того же задания. Кадр не загрузился или
+   в нём другое задание (тренажёр с тех пор поменяли, снимок неполный) —
+   картинка остаётся: ученик не должен получить «не то» задание, ответ к
+   которому сохранён в работе.
+   Телефон: кадр — целая страница тренажёра (10–17 МБ), поэтому кадры живут
+   только у заданий у экрана (LIVE_MARGIN) и не больше LIVE_MAX сразу;
+   ушедшее далеко задание снова становится картинкой, набранное — в черновике. */
+const LIVE_W = 440;        // ширина кадра при масштабе 1 — как у снимка (CAP_W в works.html)
+const LIVE_MIN = 300;      // уже тренажёры не рассчитаны
+const LIVE_MAX = 4;
+const LIVE_MARGIN = '700px 0px';
+const ZOOM_MIN = 0.6, ZOOM_MAX = LIVE_W / LIVE_MIN;
+// work:noLive = '1' — показывать и новые задания картинками: тесты пути
+// картинок (этапы 1–3) и запасной выход, если живой кадр где-то подведёт
+const NO_LIVE = (() => { try { return localStorage.getItem('work:noLive') === '1'; } catch (e) { return false; } })();
+const liveWanted = b => !NO_LIVE && !!(b && b.live && b.live.sel && b.exact && b.href && b.task && b.tid && 'IntersectionObserver' in window);
+const liveReady = v => !!(v && v.live && v.live.state === 'ready');
+const wait = ms => new Promise(r => setTimeout(r, ms));
+// сравнение ответа без порядка ключей: из базы (jsonb) объект приходит с другим порядком
+function canonJ(x){
+  if (Array.isArray(x)) return '[' + x.map(canonJ).join(',') + ']';
+  if (x && typeof x === 'object') return '{' + Object.keys(x).sort().map(k => JSON.stringify(k) + ':' + canonJ(x[k])).join(',') + '}';
+  return JSON.stringify(x === undefined ? null : x);
+}
+const liveIO = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
+  entries.forEach(en => {
+    const v = VIEWS.find(x => x.root === en.target);
+    if (!v || !v.live) return;
+    v.live.inView = en.isIntersecting;
+    if (en.isIntersecting) liveLoad(v);
+    else if (v.live.state !== 'idle' && v.live.state !== 'failed') liveDrop(v);
+  });
+}, { rootMargin: LIVE_MARGIN }) : null;
+function liveWatch(v){
+  if (!liveWanted(v.b) || !liveIO) return;
+  v.live = { state: 'idle', inView: false };
+  liveIO.observe(v.root);
+}
+function liveUnwatch(v){
+  if (!v.live) return;
+  if (liveIO) liveIO.unobserve(v.root);
+  if (v.live.fr) v.live.fr.src = 'about:blank';
+  v.live = null;
+}
+function liveLoad(v){
+  if (!v.live || v.live.state !== 'idle' || !v.root.isConnected) return;
+  // лишние кадры — у заданий, ушедших с экрана
+  const busy = VIEWS.filter(x => x !== v && x.live && (x.live.state === 'loading' || x.live.state === 'ready'));
+  if (busy.length >= LIVE_MAX) busy.filter(x => !x.live.inView).slice(0, busy.length - LIVE_MAX + 1).forEach(liveDrop);
+  const fr = el('iframe', 'live-frame');
+  fr.title = 'Задание ' + (v.i + 1);
+  fr.setAttribute('scrolling', 'no');
+  const lbox = el('div', 'tc-box live-box loading');
+  lbox.style.width = LIVE_W + 'px'; lbox.style.height = v.H + 'px';
+  lbox.appendChild(fr);
+  v.wrap.appendChild(lbox);
+  const my = Object.assign(v.live, { state: 'loading', fr, lbox });
+  fr.addEventListener('load', () => liveBoot(v, my), { once: true });
+  fr.src = v.b.href;
+}
+// назад к картинке; набранное уже в черновике, его покажут поля картинки
+function liveDrop(v){
+  if (!v.live) return;
+  const was = v.live.state;
+  if (v.live.fr) v.live.fr.src = 'about:blank';
+  v.live = { state: was === 'failed' ? 'failed' : 'idle', inView: v.live.inView };
+  if (v.root.isConnected){ renderCard(v); fitView(v); applyState(v); }
+}
+async function liveBoot(v, my){
+  const b = v.b;
+  try {
+    const w = my.fr.contentWindow;
+    const t0 = Date.now();
+    while (!(w.document && w.document.readyState === 'complete' && typeof w.tsApplyState === 'function')){
+      if (Date.now() - t0 > 15000) throw new Error('тренажёр не загрузился');
+      await wait(100);
+      if (v.live !== my) return;
+    }
+    w.document.documentElement.setAttribute('data-theme', curTheme());
+    // как в «Подсказках»: страница сначала достраивает свой первый экран
+    await wait(300);
+    if (v.live !== my) return;
+    w.tsApplyState(JSON.parse(JSON.stringify(b.exact)));
+    await wait(350);
+    if (v.live !== my) return;
+    const node = w.document.querySelector(b.live.sel);
+    if (!node || node.offsetParent === null) throw new Error('нет узла задания');
+    const info = trainerTaskInfo(w, b.tid, node);
+    if (!info || canonJ(info) !== canonJ(b.task)) throw new Error('в тренажёре другое задание');
+    const keep = liveIsolate(w, node);
+    my.state = 'ready';
+    my.win = w; my.keep = keep;
+    // картинка больше не нужна; поля и форма — заново, уже в кадре
+    if (v.box && v.box !== my.lbox) v.box.remove();
+    v.box = my.lbox;
+    my.lbox.classList.remove('loading');
+    v.below.innerHTML = ''; v.below.hidden = true;
+    v.inputs = []; v.opts = []; v.check = null; v.belowMode = false;
+    liveMap(v, w, keep);
+    liveMeasure(v, my);
+    fitView(v); applyState(v);
+  } catch (e) {
+    if (v.live !== my) return;
+    console.warn('[работа] живое задание не открылось — остаётся картинка', e);
+    my.lbox.remove();
+    if (my.fr) my.fr.src = 'about:blank';
+    v.live = { state: 'failed', inView: my.inView };
+  }
+}
+/* В кадре видно только задание: его панель (.panel вокруг узла) и в ней
+   сам узел и поля ответа (#answerArea у ЕГЭ, «Процентов», логарифмов —
+   рядом с узлом, а не внутри). Всё остальное — display:none стилем, без
+   удаления узлов: тренажёр продолжает работать как ни в чём не бывало. */
+const LIVE_CSS = `
+html,body{min-height:0!important;height:auto!important;overflow:hidden!important;background:transparent!important;}
+body::before,body::after{display:none!important;}
+body{margin:0!important;padding:0!important;}
+body > :not([data-wl-up]):not([data-wl-root]),
+[data-wl-up] > :not([data-wl-up]):not([data-wl-root]),
+[data-wl-root]:not([data-wl-keep]) > :not([data-wl-in]):not([data-wl-keep]),
+[data-wl-in] > :not([data-wl-in]):not([data-wl-keep]),
+#keypadFloat, [data-wl-root] :is(.explain, .added-explain, .next-btn, .answer-msg, .card-btn-row, .sol-btn-row, .level-up, #basketInlineBtn)
+  {display:none!important;}
+[data-wl-up]{margin:0!important;padding:0!important;border:0!important;box-shadow:none!important;transform:none!important;
+  max-width:none!important;width:auto!important;min-width:0!important;min-height:0!important;height:auto!important;display:block!important;position:static!important;}
+[data-wl-root]{margin:0!important;max-width:none!important;width:auto!important;display:block!important;}
+.wl-below [data-wl-root] :is(.input-answer-row, .p2-field, .sym-bar, .check-btn){display:none!important;}
+.wl-c.picked{outline:3px solid #2e7de0!important;outline-offset:1px;}
+.wl-c.good{outline:3px solid #248a3d!important;outline-offset:1px;}
+.wl-c.bad{outline:3px solid #ff3b30!important;outline-offset:1px;}
+input.wl-c.good{outline:none!important;border-color:#248a3d!important;color:#248a3d!important;}
+input.wl-c.bad{outline:none!important;border-color:#ff3b30!important;color:#ff3b30!important;}
+input.wl-c.done{border-color:#2e7de0!important;}
+input.wl-c:disabled{opacity:1;-webkit-text-fill-color:currentColor;}
+`;
+function liveIsolate(w, node){
+  const doc = w.document;
+  const root = node.classList.contains('panel') ? node : (node.closest('.panel') || node);
+  const keep = [node];
+  const aa = doc.getElementById('answerArea');
+  if (aa && aa !== node && root.contains(aa) && !node.contains(aa)) keep.push(aa);
+  keep.forEach(k => {
+    k.setAttribute('data-wl-keep', '');
+    for (let e = k.parentElement; e && e !== root && e !== doc.body; e = e.parentElement) e.setAttribute('data-wl-in', '');
+  });
+  root.setAttribute('data-wl-root', '');
+  for (let e = root.parentElement; e && e !== doc.documentElement; e = e.parentElement) e.setAttribute('data-wl-up', '');
+  const st = doc.createElement('style');
+  st.id = 'wlLiveStyle'; st.textContent = LIVE_CSS;
+  doc.head.appendChild(st);
+  return { root, els: keep };
+}
+// поля, варианты и кнопка тренажёра — те же признаки, что у мест полей на
+// снимке (prepareTaskClone в trainer-tasks.js)
+function liveMap(v, w, keep){
+  const t = v.b.task || {};
+  const vis = e => { const r = e.getBoundingClientRect(); return r.width > 1 && r.height > 1; };
+  const all = sel => keep.els.flatMap(k => [...k.querySelectorAll(sel)]).filter(vis);
+  let inputs = null, opts = null;
+  if (t.kind === 'fields'){
+    const ins = all('input.answer-input');
+    const byFid = (t.fields || []).map(f => ins.find(i => i.dataset.fid === String(f.id)) || null);
+    if (byFid.length && byFid.every(Boolean)) inputs = byFid;
+    else if ((t.fields || []).length === 1 && ins.length === 1) inputs = [ins[0]];
+  } else if (t.kind === 'choice'){
+    const o = all('.mcq-btn'); if (o.length === t.n) opts = o;
+  } else if (t.kind === 'multi'){
+    const o = all('.stmt'); if (o.length === t.n && all('.check-btn').length) opts = o;
+  }
+  const chk = t.kind === 'choice' ? null : (all('.check-btn')[0] || null);
+  if (!inputs && !opts){
+    w.document.documentElement.classList.add('wl-below');
+    buildBelow(v);
+  } else {
+    (inputs || []).forEach((inp, k) => {
+      const fid = String(t.fields[k].id);
+      if (!inp.dataset.fid) inp.dataset.fid = fid;
+      inp.classList.add('wl-c');
+      wireInput(v, inp, fid);
+      v.inputs.push(inp);
+    });
+    (opts || []).forEach(o => { o.classList.add('wl-c'); v.opts.push(o); });
+    if (chk){ v.check = chk; v.checkText = (chk.textContent || '').trim() || 'Проверить'; }
+  }
+  const stop = e => { e.preventDefault(); e.stopImmediatePropagation(); };
+  const hit = (list, e) => list.findIndex(x => x === e.target || (x.contains && x.contains(e.target)));
+  // захват на окне кадра — раньше обработчиков самого тренажёра: он не
+  // должен ни проверить ответ сам, ни показать разбор
+  w.addEventListener('click', e => {
+    if (v.check && hit([v.check], e) === 0){ stop(e); check(v); return; }
+    const k = hit(v.opts, e);
+    if (k >= 0){ stop(e); pick(v, k); }
+  }, true);
+  w.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && v.inputs.indexOf(e.target) >= 0){ stop(e); check(v); }
+  }, true);
+  // символы ЕГЭ (π, √ …) тренажёр вставляет в поле сам, без события input
+  w.addEventListener('click', () => setTimeout(() => liveSyncDraft(v), 0));
+  w.addEventListener('pointerdown', () => { if (S.view === 'list') setCur(v.i); }, true);
+  // кадр по высоте содержимого и прокручиваться не должен, а тренажёр сам
+  // крутит страницу к заданию (scrollIntoView) — тогда верх задания уезжал
+  w.addEventListener('scroll', () => { if (w.scrollY || w.scrollX) w.scrollTo(0, 0); });
+  w.scrollTo(0, 0);
+}
+function liveSyncDraft(v){
+  if (!liveReady(v) || v.belowMode) return;
+  const d = draft(v.b.id);
+  let changed = false;
+  v.inputs.forEach(inp => { if (!inp.disabled && (d.vals[inp.dataset.fid] || '') !== inp.value){ d.vals[inp.dataset.fid] = inp.value; changed = true; } });
+  if (changed) lsSet(LS.drafts(), S.drafts);
+}
+// высота кадра — по содержимому: картинки и KaTeX дорисовываются позже
+function liveMeasure(v, my){
+  const w = my.win, root = my.keep.root;
+  const upd = () => {
+    if (v.live !== my) return;
+    if (w.scrollY) w.scrollTo(0, 0);
+    const h = Math.ceil(root.getBoundingClientRect().bottom) + 2;
+    if (h > 20 && Math.abs(h - v.H) > 1){ v.H = h; fitView(v); }
+  };
+  upd();
+  try { new w.ResizeObserver(upd).observe(root); } catch (e) {}
+  setTimeout(upd, 600);
+}
+function setLiveTheme(v){
+  if (!liveReady(v)) return;
+  try { v.live.win.document.documentElement.setAttribute('data-theme', curTheme()); } catch (e) {}
+}
+// масштаб «− / +»: у живых — крупность текста (кадр перестраивается), у
+// картинок — доля колонки (картинку крупнее не сделать, только шире)
+function zoomStep(dir){
+  if (VIEWS.some(liveReady)){
+    S.lzoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(S.lzoom * (dir > 0 ? 1.15 : 1 / 1.15) * 100) / 100));
+    lsSet(LS.lzoom, S.lzoom);
+  }
+  if (VIEWS.some(v => !liveReady(v))){ S.fill = clampFill(S.fill + dir * 0.1); lsSet(LS.fill, S.fill); }
+  fitAll();
+}
+$('wZoomOut').addEventListener('click', () => zoomStep(-1));
+$('wZoomIn').addEventListener('click', () => zoomStep(1));
 
 /* ── заметки ──
    Писать поверх задания и на поле под ним, как доска поверх тренажёра.
@@ -1003,6 +1294,7 @@ function check(v){
   if (S.view === 'list') setCur(v.i);
   const prev = ans(b.id);
   if (isFinal(prev)) return;
+  liveSyncDraft(v);
   const r = evaluate(b);
   if (r.err){ setMsg(v, r.err, 'info'); return; }
   bankTaskTime();
