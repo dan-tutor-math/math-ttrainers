@@ -64,7 +64,24 @@
   const SS_DONE = 'bdLink:done';
   const LS_PANEL = 'bdPanel:link';
   const LS_PANEL_NAME = 'bdPanel:name';
+  // все доски, к которым подключали эту панель: у каждой доски свой код и
+  // свой ключ устройства, а учитель ведёт нескольких учеников — между их
+  // досками панель переключается без кода
+  const LS_PANEL_LINKS = 'bdPanel:links';
+  const PANEL_LINKS_MAX = 30;
 
+  function panelLinks(){
+    const l = lsGet(LS_PANEL_LINKS, []);
+    return Array.isArray(l) ? l.filter(x => x && typeof x.key === 'string') : [];
+  }
+  function rememberPanelLink(link){
+    const list = panelLinks().filter(x => x.key !== link.key && !(link.boardId && x.boardId === link.boardId));
+    list.unshift(link);
+    lsSet(LS_PANEL_LINKS, list.slice(0, PANEL_LINKS_MAX));
+  }
+  function forgetPanelLink(key){
+    lsSet(LS_PANEL_LINKS, panelLinks().filter(x => x.key !== key));
+  }
   function lsGet(k, def){ try { const v = localStorage.getItem(k); return v == null ? def : JSON.parse(v); } catch (e) { return def; } }
   function lsSet(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 
@@ -349,22 +366,31 @@
        state()            → { ref: {tid, w — ширина карточки}|null, board: имя доски, scale }
        ask(dev)           → Promise<boolean> — окошко «Разрешить / Отклонить»
        onChange()         — перерисовать окна доски (код, устройства, очередь)
-     Несколько вкладок доски на одном компьютере: принимает задания только
-     одна (Web Locks), иначе задание легло бы дважды. Остальные вкладки
-     показывают тот же код и список (они в localStorage) и подхватят приём,
-     когда первая закроется. */
+     opts.state() даёт ещё board — имя доски (его видит панель).
+
+     Код и подключённые устройства — У КАЖДОЙ ДОСКИ СВОИ (setBoard(id) из
+     boards-core.js, когда в вкладке открывают доску). Сначала они были одни
+     на компьютер, и задания шли в первую открытую вкладку доски, а не на ту
+     доску, с которой занимаются: учитель открывал доску другого ученика, а
+     задания с телефона уезжали к прежнему, туда же всплывал и запрос на
+     подключение. Теперь телефон подключают к доске, и он шлёт именно на неё.
+     Хранится в localStorage этого компьютера под id доски, не в самой доске:
+     ключи устройств не должны уезжать в облако и в совместную сессию.
+     Одна и та же доска открыта в двух вкладках — принимает одна (Web Locks
+     на id доски), иначе задание легло бы дважды; вторая подхватит приём,
+     когда первая закроется или перейдёт на другую доску. */
   function createHost(opts){
-    let code = lsGet(LS_CODE, null);
-    if (!normCode(code)){ code = newCode(); lsSet(LS_CODE, code); }
-    let devices = lsGet(LS_DEVICES, []);
-    if (!Array.isArray(devices)) devices = [];
-    let revoked = lsGet(LS_REVOKED, []);
-    if (!Array.isArray(revoked)) revoked = [];
+    let boardId = null;          // доска, открытая в этой вкладке
+    let code = null, devices = [], revoked = [];
+    const kCode = () => LS_CODE + ':' + boardId;
+    const kDevices = () => LS_DEVICES + ':' + boardId;
+    const kRevoked = () => LS_REVOKED + ':' + boardId;
     let done = [];
     try { done = JSON.parse(sessionStorage.getItem(SS_DONE) || '[]'); } catch (e) { done = []; }
     const doneMap = new Map(done.map(d => [d.id, d.r]));
 
-    let active = false;          // эта вкладка принимает задания
+    let active = false;          // эта вкладка принимает задания своей доски
+    let lockRelease = null;      // отпустить замок доски (Web Locks)
     let pairChan = null, pairCode = null, pairRemote = false;
     // канал кода через Supabase — только пока на доске открыто окно с кодом
     // и PAIR_REMOTE_KEEP_MS после: подключают телефон, глядя на это окно, а
@@ -379,7 +405,33 @@
     let pumpTimer = null;
 
     const change = () => { try { opts.onChange && opts.onChange(); } catch (e) { console.error(e); } };
-    const saveDevices = () => lsSet(LS_DEVICES, devices);
+    const saveDevices = () => { if (boardId) lsSet(kDevices(), devices); };
+    const boardName = () => { try { return (opts.state() || {}).board || ''; } catch (e) { return ''; } };
+
+    // этап 1 хранил код и устройства одни на компьютер — они переходят к
+    // первой доске, которую откроют: уже подключённый телефон не придётся
+    // подключать заново хотя бы к ней
+    function migrateGlobal(){
+      const old = lsGet(LS_DEVICES, null);
+      if (!Array.isArray(old)) return;
+      if (!Array.isArray(lsGet(kDevices(), null))){
+        lsSet(kDevices(), old);
+        const c = lsGet(LS_CODE, null);
+        if (normCode(c)) lsSet(kCode(), c);
+        const r = lsGet(LS_REVOKED, null);
+        if (Array.isArray(r)) lsSet(kRevoked(), r);
+      }
+      try { [LS_DEVICES, LS_CODE, LS_REVOKED].forEach(k => localStorage.removeItem(k)); } catch (e) {}
+    }
+    function loadBoard(){
+      migrateGlobal();
+      code = lsGet(kCode(), null);
+      if (!normCode(code)){ code = newCode(); lsSet(kCode(), code); }
+      devices = lsGet(kDevices(), []);
+      if (!Array.isArray(devices)) devices = [];
+      revoked = lsGet(kRevoked(), []);
+      if (!Array.isArray(revoked)) revoked = [];
+    }
 
     function rememberDone(id, r){
       doneMap.set(id, r);
@@ -444,7 +496,7 @@
         devices.push(d); saveDevices();
         seenAt.set(d.id, Date.now());
         syncChannels();
-        ch.post({ t: 'approve', to: m.from, nonce: m.nonce, pub: kp.pub, devId: d.id, name: d.name });
+        ch.post({ t: 'approve', to: m.from, nonce: m.nonce, pub: kp.pub, devId: d.id, name: d.name, boardId, board: boardName() });
         change();
       } catch (e) {
         console.error('[board-link] pairing failed', e);
@@ -504,7 +556,8 @@
       if (busy){ pumpTimer = setTimeout(pump, 600); return; }
       working = queue.shift();
       change();
-      const { m, dev, ch } = working;
+      const job = working;
+      const { m, dev, ch } = job;
       let r = 'fail';
       try {
         if (m.t === 'add-manual' && opts.placeManual) r = (await opts.placeManual(m.p, dev)) === 'placed' ? 'placed' : 'cancelled';
@@ -515,6 +568,9 @@
       }
       rememberDone(m.id, r);
       reply(ch, m, r);
+      // приём успели закрыть, пока размещали (ушли с доски) — ответили и
+      // закрываем канал этого устройства
+      if (job.closeAfter) setTimeout(job.closeAfter, 1500);
       working = null;
       change();
       // соседи по очереди узнают, что продвинулись
@@ -524,9 +580,10 @@
     }
 
     function onStorage(e){
-      if (e.key === LS_CODE){ const c = lsGet(LS_CODE, null); if (normCode(c)) code = c; }
-      else if (e.key === LS_DEVICES){ const d = lsGet(LS_DEVICES, []); devices = Array.isArray(d) ? d : []; }
-      else if (e.key === LS_REVOKED){ const r = lsGet(LS_REVOKED, []); revoked = Array.isArray(r) ? r : []; }
+      if (!boardId) return;
+      if (e.key === kCode()){ const c = lsGet(kCode(), null); if (normCode(c)) code = c; }
+      else if (e.key === kDevices()){ const d = lsGet(kDevices(), []); devices = Array.isArray(d) ? d : []; }
+      else if (e.key === kRevoked()){ const r = lsGet(kRevoked(), []); revoked = Array.isArray(r) ? r : []; }
       else return;
       syncChannels(); change();
     }
@@ -535,27 +592,62 @@
     function activate(){
       // каналы — когда страница догрузилась: supabase-js подключается ниже
       if (document.readyState === 'loading'){ document.addEventListener('DOMContentLoaded', activate, { once: true }); return; }
+      if (!boardId) return;
       active = true; syncChannels(); change();
-      // брошенные файлы крупных заданий в Storage — только если есть кому
-      // их оставлять (подключено удалённое устройство)
-      const sweep = () => { if (devices.some(d => !d.local)) sweepBlobs(); };
-      setTimeout(sweep, 15000);
-      setInterval(sweep, 30 * 60 * 1000);
     }
-    if (navigator.locks && navigator.locks.request){
-      // замок держится, пока жива вкладка: обещание никогда не выполняется
-      navigator.locks.request('bdlink-host', () => new Promise(() => activate())).catch(() => activate());
-    } else activate();
+    // приём закрывается: вкладка ушла с доски или открыла другую. Канал
+    // устройства, чьё задание сейчас размещают призраком, закрываем после
+    // ответа — иначе панель так и ждала бы «Закреплено / Отменено»
+    function deactivate(){
+      active = false;
+      if (pairChan){ pairChan.close(); pairChan = null; pairCode = null; }
+      const keep = working ? working.key : null;
+      chans.forEach((rec, key) => { if (key !== keep) rec.ch.close(); });
+      if (keep && chans.get(keep)){ const ch = chans.get(keep).ch; working.closeAfter = () => ch.close(); }
+      chans.clear();
+      // что не успели вставить, панели пришлют снова (RESEND_MS) — уже туда,
+      // где эта доска откроется
+      queue.length = 0;
+      seenAt.clear();
+      if (lockRelease){ lockRelease(); lockRelease = null; }
+    }
+    function setBoard(id){
+      id = id || null;
+      if (id === boardId) return;
+      deactivate();
+      boardId = id;
+      if (!id){ code = null; devices = []; revoked = []; change(); return; }
+      loadBoard();
+      change();
+      if (navigator.locks && navigator.locks.request){
+        const mine = id;
+        // замок держится, пока вкладка на этой доске; доску сменили, пока
+        // ждали замка, — сразу отпускаем
+        navigator.locks.request('bdlink-board-' + mine, () => new Promise((release) => {
+          if (boardId !== mine){ release(); return; }
+          lockRelease = release;
+          activate();
+        })).catch(() => { if (boardId === mine) activate(); });
+      } else activate();
+    }
+    // брошенные файлы крупных заданий в Storage — только если есть кому их
+    // оставлять (к этой доске подключено удалённое устройство)
+    const sweep = () => { if (active && devices.some(d => !d.local)) sweepBlobs(); };
+    setTimeout(sweep, 15000);
+    setInterval(sweep, 30 * 60 * 1000);
 
     return {
       get code(){ return code; },
       get active(){ return active; },
+      get boardId(){ return boardId; },
+      setBoard,
       get asking(){ return asking; },
       devices: () => devices.map(d => ({ id: d.id, name: d.name, addedAt: d.addedAt, online: Date.now() - (seenAt.get(d.id) || 0) < ONLINE_TTL_MS })),
       queueLength: () => queue.length,
       working: () => working ? { t: working.m.t, dev: working.dev.name } : null,
       changeCode(){
-        code = newCode(); lsSet(LS_CODE, code);
+        if (!boardId) return null;
+        code = newCode(); lsSet(kCode(), code);
         syncChannels(); change();
         return code;
       },
@@ -573,7 +665,7 @@
         devices.splice(i, 1); saveDevices();
         revoked.push(d.key);
         while (revoked.length > REVOKED_MAX) revoked.shift();
-        lsSet(LS_REVOKED, revoked);
+        lsSet(kRevoked(), revoked);
         // недоставленное от него больше не ждём
         for (let k = queue.length - 1; k >= 0; k--) if (queue[k].dev.id === id) queue.splice(k, 1);
         syncChannels(); change();
@@ -582,12 +674,15 @@
       // у вкладок общий, поэтому код не нужен — ключ кладём панели прямо
       // туда. Окошко «Разрешить» тут лишнее: открыл её сам учитель с доски
       linkLocalPanel(){
+        if (!boardId) return;
         let d = devices.find(x => x.local);
         if (!d){
           d = { id: newId(), name: 'Вкладка этого браузера', key: b64url(randBytes(32)), addedAt: Date.now(), local: true };
           devices.push(d); saveDevices();
         }
-        lsSet(LS_PANEL, { key: d.key, devId: d.id, name: d.name, at: Date.now(), local: true });
+        const link = { key: d.key, devId: d.id, name: d.name, at: Date.now(), local: true, boardId, board: boardName() };
+        lsSet(LS_PANEL, link);
+        rememberPanelLink(link);
         syncChannels(); change();
       },
       pump,
@@ -627,6 +722,8 @@
     const me = newId();
     let link = lsGet(LS_PANEL, null);
     if (!link || typeof link.key !== 'string') link = null;
+    // ключ с этапа 1 (до списка досок) — в список, чтобы не потерялся
+    if (link && !panelLinks().some(x => x.key === link.key)) rememberPanelLink(link);
     let chan = null;
     let lastPong = 0, board = { ref: null, board: '', queue: 0 };
     let revokedFlag = false;
@@ -634,14 +731,18 @@
     let timer = null;
 
     const online = () => !!link && Date.now() - lastPong < ONLINE_TTL_MS;
+    const mine = (o) => !!link && o.key === link.key;
     const snapshot = () => ({
       paired: !!link, online: online(), revoked: revokedFlag, board,
       deviceName: link ? link.name : '',
+      boardName: link ? (link.board || '') : '',
       // не дошло до доски (ещё не слали или ответа нет): доска не в сети —
       // это и есть «ждут отправки»
-      waiting: outbox.filter(o => o.state === 'wait' || o.state === 'sent').length,
-      queued: outbox.filter(o => o.state === 'queued' || o.state === 'placing').length,
-      placing: outbox.some(o => o.state === 'placing'),
+      waiting: outbox.filter(o => mine(o) && (o.state === 'wait' || o.state === 'sent')).length,
+      // неотправленное на другие доски этой панели (переключились, не дождавшись)
+      waitingElsewhere: outbox.filter(o => !mine(o)).length,
+      queued: outbox.filter(o => mine(o) && (o.state === 'queued' || o.state === 'placing')).length,
+      placing: outbox.some(o => mine(o) && o.state === 'placing'),
     });
     const change = () => { try { opts.onChange && opts.onChange(snapshot()); } catch (e) { console.error(e); } };
 
@@ -651,6 +752,11 @@
         const was = online();
         lastPong = Date.now();
         board = { ref: m.ref || null, board: m.board || '', scale: m.scale || null, queue: m.queue || 0 };
+        // доску переименовали — в списке досок панели тоже
+        if (link && m.board && link.board !== m.board){
+          link.board = m.board;
+          lsSet(LS_PANEL, link); rememberPanelLink(link);
+        }
         (m.pending || []).forEach(id => { const o = outbox.find(x => x.id === id); if (o) o.heardAt = Date.now(); });
         if (!was) flush();
         change();
@@ -685,6 +791,9 @@
       if (!chan || !online()) return;
       const now = Date.now();
       outbox.forEach(o => {
+        // задание снято для своей доски — на другую оно не уходит, даже
+        // если панель уже переключили (ждёт, пока на неё вернутся)
+        if (o.key !== link.key) return;
         if (o.sentAt && now - Math.max(o.sentAt, o.heardAt || 0) < RESEND_MS) return;
         o.sentAt = now;
         if (o.state === 'wait') o.state = 'sent';
@@ -702,11 +811,13 @@
       // стираем только свой
       const stored = lsGet(LS_PANEL, null);
       if (link && stored && stored.key === link.key){ try { localStorage.removeItem(LS_PANEL); } catch (e) {} }
+      const gone = link ? link.key : null;
+      if (link) forgetPanelLink(link.key);
       link = null;
       if (chan){ chan.close(); chan = null; }
       lastPong = 0;
       // доска нас больше не примет — недоставленное честно отменяем
-      outbox.splice(0).forEach(o => o.resolve('revoked'));
+      if (gone){ for (let i = outbox.length - 1; i >= 0; i--) if (outbox[i].key === gone){ outbox[i].resolve('revoked'); outbox.splice(i, 1); } }
       change();
     }
     function start(){
@@ -747,8 +858,9 @@
             if (m.t !== 'approve' || typeof m.pub !== 'string') return;
             try {
               const key = await deriveSecret(kp.priv, m.pub);
-              link = { key, devId: m.devId, name: m.name || nm, at: Date.now() };
+              link = { key, devId: m.devId, name: m.name || nm, at: Date.now(), boardId: m.boardId || null, board: m.board || '' };
               lsSet(LS_PANEL, link);
+              rememberPanelLink(link);
               revokedFlag = false;
               openWork(); tick();
               end('ok');
@@ -761,13 +873,26 @@
       // → Promise, итог: 'ok' | 'fail' | 'placed' | 'cancelled' | 'revoked'
       send(t, p){
         return new Promise((resolve) => {
-          const o = { id: newId(), t, p, sentAt: 0, heardAt: 0, state: 'wait', resolve };
+          const o = { id: newId(), t, p, key: link ? link.key : null, sentAt: 0, heardAt: 0, state: 'wait', resolve };
           outbox.push(o);
           flush();
           change();
         });
       },
       unpair: forget,
+      // доски, к которым подключали панель, — для выбора без кода
+      links: () => panelLinks().map(x => ({ key: x.key, board: x.board || '', boardId: x.boardId || null, local: !!x.local, active: !!link && x.key === link.key })),
+      // переключиться на другую доску из списка (без кода)
+      use(key){
+        const x = panelLinks().find(l => l.key === key);
+        if (!x) return false;
+        link = x; revokedFlag = false; lastPong = 0;
+        board = { ref: null, board: x.board || '', queue: 0 };
+        lsSet(LS_PANEL, link);
+        rememberPanelLink(link);
+        openWork(); tick();
+        return true;
+      },
       savedName: () => { try { return localStorage.getItem(LS_PANEL_NAME) || ''; } catch (e) { return ''; } },
     };
   }

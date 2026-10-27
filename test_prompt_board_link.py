@@ -255,7 +255,7 @@ def run():
         board.close()
 
         # 6. доска не в сети — задание ждёт; доска вернулась — легло без окошка
-        check("6. доска закрыта — «Доска не в сети»", wait_status(panel, "Доска не в сети", 12000), status(panel))
+        check("6. доска закрыта — «Доска не в сети»", wait_status(panel, "не в сети", 12000), status(panel))
         panel.evaluate("() => document.getElementById('bpRefreshBtn').click()")
         panel.wait_for_timeout(400)
         panel.click("#bpAddBtn")

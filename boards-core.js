@@ -3200,6 +3200,7 @@ function openBoardReady(b, id){
   // теперь (окно могли сузить, а старые версии пускали док за край экрана)
   clampDockOffset(); layoutOptbar();
   boardActive = true;
+  linkFollowBoard();   // код и устройства панели тренажёров — этой доски
   document.title = b.name + ' — Доски';
   document.getElementById('bdName').value = b.name;
   location.hash = 'board=' + id;
@@ -3269,6 +3270,7 @@ function backToList(){
   rememberView(true);
   clearTimeout(viewSaveTimer); viewSaveTimer = null;
   boardActive = false;
+  linkFollowBoard();
   viewReady = false;
   screenBoard.style.display = 'none';
   screenList.style.display = 'flex';
@@ -7061,6 +7063,7 @@ function renderBoardLink(){
   linkQueueEl.classList.toggle('show', n > 0);
   if (!linkModalEl.classList.contains('open')) return;
   const code = boardLink.code;
+  document.getElementById('linkModalTitle').textContent = 'Панель тренажёров для доски «' + ((B && B.name) || 'Без названия') + '»';
   document.getElementById('linkCode').textContent = BoardLink.formatCode(code);
   document.getElementById('linkUrl').textContent = boardLinkPanelUrl('').replace(/^https?:\/\//, '');
   if (linkQrCode !== code){
@@ -7098,6 +7101,13 @@ function renderBoardLink(){
     list.appendChild(row);
   });
 }
+// у каждой доски свой код и свои устройства (board-link.js, setBoard): приём
+// следует за доской, открытой в этой вкладке. Зовётся из openBoardReady и
+// при выходе в список; boardLink объявлен ниже — до его объявления (ранний
+// вызов при загрузке) обращение бросило бы ReferenceError, поэтому try
+function linkFollowBoard(){
+  try { if (boardLink) boardLink.setBoard(B && boardActive ? B.id : null); } catch (e) {}
+}
 const boardLink = (window.BoardLink && !window.__boardViewer) ? BoardLink.createHost({
   isBusy: boardLinkBusy,
   insert: boardLinkInsert,
@@ -7110,6 +7120,7 @@ const boardLink = (window.BoardLink && !window.__boardViewer) ? BoardLink.create
   ask: boardLinkAsk,
   onChange: renderBoardLink,
 }) : null;
+linkFollowBoard();
 function openLinkModal(){
   linkModalEl.classList.add('open');
   if (boardLink) boardLink.setPairingVisible(true);   // телефон подключают, глядя на это окно

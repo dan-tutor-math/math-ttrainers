@@ -53,6 +53,11 @@ body.bp-pairing .bp-list,body.bp-pairing .bp-frame-wrap{display:none!important;}
 .bp-pair input{border:1px solid var(--glass-border);border-radius:11px;background:var(--card);padding:11px 12px;font-size:16px;color:var(--pencil);font-family:var(--font-ui);}
 .bp-pair input.bp-code{font-family:var(--font-mono);font-size:24px;letter-spacing:.1em;text-transform:uppercase;text-align:center;}
 .bp-pair-msg{font-size:13.5px;min-height:1.4em;}
+.bp-boards{display:flex;flex-direction:column;gap:10px;margin-bottom:10px;}
+.bp-boards-list{display:flex;flex-direction:column;gap:6px;}
+.bp-board{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:1px solid var(--glass-border);border-radius:12px;background:var(--card);padding:11px 12px;font-size:15px;font-weight:600;color:var(--pencil);cursor:pointer;}
+.bp-board.on{border-color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink);}
+.bp-board small{margin-left:auto;font-size:12px;font-weight:500;color:var(--muted-2);}
 .bp-pair-msg.bad{color:var(--bad);}
 .bp-btn{border:none;border-radius:12px;padding:12px 18px;font-size:14px;font-weight:700;background:var(--ink);color:#fff;cursor:pointer;}
 .bp-btn:disabled{opacity:.6;cursor:default;}
@@ -96,8 +101,14 @@ body.bp-desktop .bp-frame-resize{display:block;}
 <div class="bp-pending" id="bpPending"></div>
 
 <div class="bp-pair" id="bpPair">
-  <h1>Подключение к доске</h1>
-  <p>На доске откройте «Тренажёры» → значок телефона и введите код, который там показан. На доске появится вопрос — нажмите «Разрешить». Дальше это устройство подключается само.</p>
+  <!-- доски, к которым эту панель уже подключали: у каждой доски свой код,
+       и между досками учеников переключаются одной кнопкой, без кода -->
+  <div class="bp-boards" id="bpBoardsWrap" style="display:none">
+    <h1>Куда отправлять задания</h1>
+    <div class="bp-boards-list" id="bpBoards"></div>
+  </div>
+  <h1 id="bpPairTitle">Подключение к доске</h1>
+  <p>На доске откройте «Тренажёры» → значок телефона и введите код, который там показан. У каждой доски свой код. На доске появится вопрос — нажмите «Разрешить». Дальше эта доска есть в списке, и подключаться к ней снова не нужно.</p>
   <label>Имя этого устройства<input id="bpName" maxlength="40" autocomplete="off"></label>
   <label>Код с доски<input id="bpCode" class="bp-code" maxlength="7" placeholder="K7M-4QX" autocomplete="off" autocapitalize="characters" spellcheck="false"></label>
   <button class="bp-btn" id="bpPairBtn">Подключить</button>
@@ -108,6 +119,7 @@ body.bp-desktop .bp-frame-resize{display:block;}
 <div class="bp-list" id="bpList">
   <input type="text" class="bd-trainers-search" id="bpSearch" placeholder="Поиск тренажёра…">
   <div class="bd-trainers-groups" id="bpGroups"></div>
+  <button class="bp-link" id="bpSwitch" style="display:none">Другая доска…</button>
   <button class="bp-link" id="bpUnpair" style="display:none">Отключить это устройство от доски</button>
   <a class="bp-link" href="index.html">← На главную</a>
 </div>
@@ -166,30 +178,60 @@ body.bp-desktop .bp-frame-resize{display:block;}
     st = s;
     const dot = $('bpDot'), txt = $('bpStatusText');
     dot.className = 'bp-dot' + (s.paired ? (s.online ? ' on' : ' off') : '');
+    const bn = s.board.board || s.boardName;
     txt.textContent = !s.paired ? (s.revoked ? 'Доска отключила это устройство' : 'Не подключено')
-      : s.online ? 'Подключено к доске' + (s.board.board ? ' «' + s.board.board + '»' : '')
-      : 'Доска не в сети';
+      : s.online ? 'Подключено к доске' + (bn ? ' «' + bn + '»' : '')
+      : (bn ? 'Доска «' + bn + '» не в сети' : 'Доска не в сети');
     const parts = [];
     if (s.waiting && !s.online) parts.push('Ждут отправки: ' + s.waiting + ' — уйдут, как только доска появится в сети. Не закрывайте эту страницу.');
+    if (s.waitingElsewhere) parts.push('Ещё ' + s.waitingElsewhere + ' ждут отправки на другую доску — уйдут, когда переключитесь на неё.');
     if (s.placing) parts.push('Размещаем на доске…');
     else if (s.queued) parts.push('В очереди на доске: ' + s.queued + ' — доска занята (открыто окно), задания встанут, когда его закроют.');
     $('bpPending').textContent = parts.join(' ');
     $('bpPending').classList.toggle('show', parts.length > 0);
     $('bpUnpair').style.display = s.paired ? '' : 'none';
+    $('bpSwitch').style.display = s.paired ? '' : 'none';
+    $('bpSwitch').textContent = (s.boardName ? 'Доска «' + s.boardName + '»' : 'Доска') + ' — сменить…';
     if (!s.paired) document.body.classList.add('bp-pairing');
   }
   const client = BoardLink.createClient({ onChange: renderStatus });
 
+  function renderBoards(){
+    const links = client.links();
+    $('bpBoardsWrap').style.display = links.length ? '' : 'none';
+    $('bpPairTitle').textContent = links.length ? 'Подключить ещё доску' : 'Подключение к доске';
+    const box = $('bpBoards');
+    box.innerHTML = '';
+    links.forEach(l => {
+      const b = document.createElement('button');
+      b.className = 'bp-board' + (l.active ? ' on' : '');
+      b.textContent = l.board ? '«' + l.board + '»' : 'Доска без названия';
+      const note = document.createElement('small');
+      note.textContent = l.active ? 'сейчас' : (l.local ? 'этот браузер' : '');
+      b.appendChild(note);
+      b.addEventListener('click', () => {
+        client.use(l.key);
+        hidePair();
+        toast('Задания — на доску ' + (l.board ? '«' + l.board + '»' : 'без названия'));
+      });
+      box.appendChild(b);
+    });
+  }
   function showPair(fromUser){
     document.body.classList.add('bp-pairing');
+    renderBoards();
     $('bpPairBack').style.display = (fromUser && client.state().paired) ? '' : 'none';
     $('bpName').value = $('bpName').value || client.savedName() || guessName();
   }
   function hidePair(){ document.body.classList.remove('bp-pairing'); }
-  $('bpStatus').addEventListener('click', () => { if (!client.state().paired) showPair(true); });
+  // строка связи в шапке — и выбор доски: у каждой доски свой код, и
+  // переключаются между досками учеников отсюда
+  $('bpStatus').addEventListener('click', () => showPair(true));
   $('bpPairBack').addEventListener('click', hidePair);
+  $('bpSwitch').addEventListener('click', () => showPair(true));
   $('bpUnpair').addEventListener('click', () => {
-    if (!confirm('Отключить это устройство от доски? Подключиться снова можно по коду.')) return;
+    const bn = client.state().boardName;
+    if (!confirm('Отключить эту панель от доски' + (bn ? ' «' + bn + '»' : '') + '? Подключиться снова можно по её коду.')) return;
     client.unpair(); showPair(false);
   });
   const PAIR_MSG = {
@@ -218,7 +260,9 @@ body.bp-desktop .bp-frame-resize{display:block;}
     if (m){
       $('bpCode').value = BoardLink.formatCode(BoardLink.normCode(m[1])) || m[1];
       try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
-      if (!client.state().paired) showPair(false);
+      // QR другой доски, а панель уже подключена к какой-то — всё равно экран
+      // подключения: у каждой доски свой код, это новая доска
+      showPair(true);
     }
   })();
   if (!client.state().paired) showPair(false);

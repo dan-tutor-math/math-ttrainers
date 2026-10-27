@@ -378,7 +378,7 @@ def run():
         board.wait_for_timeout(900)
         n3 = count(board)
         board.close()
-        check("5. доска закрыта — «Доска не в сети»", wait_text(phone, "#bpStatusText", "Доска не в сети", 15000), phone.inner_text("#bpStatusText"))
+        check("5. доска закрыта — «Доска не в сети»", wait_text(phone, "#bpStatusText", "не в сети", 15000), phone.inner_text("#bpStatusText"))
         phone.evaluate("() => document.getElementById('bpRefreshBtn').click()")
         phone.wait_for_timeout(500)
         phone.click("#bpAddBtn")

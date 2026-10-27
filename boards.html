@@ -1919,10 +1919,10 @@ function resolveBasketTexInHtml(html){
   <div class="bd-modal-backdrop" id="linkModalBackdrop">
     <div class="bd-modal bd-modal-link" id="linkModal">
       <div class="bd-modal-head">
-        <div class="bd-modal-title">Панель тренажёров отдельно от доски</div>
+        <div class="bd-modal-title" id="linkModalTitle">Панель тренажёров отдельно от доски</div>
         <button class="bd-modal-close" id="linkModalClose">✕</button>
       </div>
-      <div class="bd-modal-note">Задание снимает панель, а доске приходит готовая картинка — вкладка доски не тормозит на трансляции. Размер и место на доске выбирает доска, как при обычном «Добавить на доску».</div>
+      <div class="bd-modal-note">Задание снимает панель, а доске приходит готовая картинка — вкладка доски не тормозит на трансляции. Размер и место на доске выбирает доска, как при обычном «Добавить на доску». У каждой доски свой код: подключённое устройство шлёт задания на эту доску, даже если открыта другая.</div>
       <div class="bd-link-row">
         <button class="bd-link-btn" id="linkOpenTab">Открыть в новой вкладке</button>
         <button class="bd-link-btn" id="linkOpenWin">Открыть в отдельном окне</button>
@@ -1937,7 +1937,7 @@ function resolveBasketTexInHtml(html){
           <div class="bd-link-hint">Новый код перестаёт пускать по старому; уже подключённые устройства остаются.</div>
         </div>
       </div>
-      <div class="bd-link-title">Подключённые устройства</div>
+      <div class="bd-link-title">Устройства, подключённые к этой доске</div>
       <div class="bd-link-devices" id="linkDevices"></div>
     </div>
   </div>
