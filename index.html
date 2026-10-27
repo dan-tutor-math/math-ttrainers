@@ -214,6 +214,22 @@ html[data-theme="dark"] .subj-btn.active{background:rgba(255,255,255,.14);color:
 .item-num{font-family:var(--font-mono);font-size:13px;color:var(--muted-1);min-width:22px;}
 .item-name{font-size:17px}
 .topic-item.soon{opacity:.5;cursor:default;pointer-events:none;}
+/* «1–4 классы»: подзаголовок класса стоит между карточками блоков. Цвета —
+   только переменные темы (--pencil, --muted-*), поэтому тёмная тема и цвет
+   предмета подхватываются сами, отдельных правил под них нет */
+.grade-section{display:flex;flex-direction:column;gap:12px;}
+.grade-section + .grade-section{margin-top:18px;}
+.grade-head{margin:6px 6px 0;font-family:var(--font-ui);font-weight:800;font-size:22px;line-height:1.2;color:var(--pencil);}
+/* названия тем начальной школы длинные (до двух строк на телефоне): даём
+   имени сжиматься и переноситься, а «скоро» остаётся справа одной строкой */
+.grade-section .item-name{min-width:0;overflow-wrap:anywhere;line-height:1.3;}
+.grade-section .topic-item.soon .item-soon{flex:0 0 auto;}
+@media (max-width:620px){
+  .grade-head{font-size:19px;}
+  .grade-section .item-name{font-size:15px;}
+  .grade-section .topic-item{gap:10px;padding:10px 8px;}
+  .grade-section .section-title{padding-left:16px;padding-right:16px;}
+}
 .item-soon{margin-left:auto;font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-1);white-space:nowrap;}
 .group{margin:2px 4px 6px;border-radius:14px;background:var(--hover-1);overflow:hidden;}
 .group-header{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;background:none;border:none;cursor:pointer;text-align:left;font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--pencil);}
@@ -609,9 +625,167 @@ Object.keys(RUS_OGE_TITLES).forEach(k => {
 });
 const rusIds = (from, to) => { const a = []; for (let n = from; n <= to; n++) a.push('rus' + n); return a; };
 
+/* ───────── программа по классам (заглушки тем) ─────────
+   Вся программа лежит здесь, отдельно от NAV, а страница только рисует её:
+   добавить или переименовать тему — одна строка в одном месте. Ключ — id
+   подвкладки «Классов» (g1_4), значение — список классов (sections), внутри
+   класса — большие блоки (groups), внутри блока — темы (items).
+   Тема — строка с названием: это заглушка «скоро», она не кликается и не
+   считается тренажёром. Живой тренажёр — объект { id: '<ключ TRAINERS>' }:
+   так заглушка заменяется ссылкой, не трогая остальной список. Строкой
+   именно заглушка (а не id, как в NAV), потому что заглушек здесь сотня, а
+   живых — единицы; и опечатка в id не превратится молча в «скоро» — объект
+   с неизвестным id просто не нарисуется, это заметно сразу.
+   Чтобы так же разложить 5–11 класс, достаточно положить сюда g5_9 (или g5)
+   и сослаться на него из подвкладки через sections — код рендера общий.
+   Заглушки живут только тут: «Основа», панель досок (TRAINERS_PANEL_GROUPS
+   в trainer-tasks.js) и счётчики вкладок берут лишь тренажёры с href. */
+const CURRICULUM = {
+  g1_4: [
+    { id: 'c1', title: '1 класс', groups: [
+      { title: 'Числа и величины', items: [
+        'Числа от 1 до 20: счёт, чтение, запись',
+        'Сравнение чисел: больше, меньше, равно',
+        { id: 'sostav' },
+        'Порядок чисел, соседние числа',
+        'Длина: сантиметр, дециметр',
+      ]},
+      { title: 'Арифметические действия', items: [
+        'Сложение и вычитание в пределах 10',
+        'Сложение и вычитание в пределах 20 без перехода через десяток',
+        'Сложение и вычитание в пределах 20 с переходом через десяток',
+        'Связь сложения и вычитания, компоненты действий',
+        'Равенства и неравенства, пропущенные числа',
+      ]},
+      { title: 'Текстовые задачи', items: [
+        'Задачи в одно действие на сложение и вычитание',
+        'Задачи на увеличение и уменьшение на несколько единиц',
+        'Составление задачи по картинке и по краткой записи',
+      ]},
+      { title: 'Геометрические фигуры', items: [
+        'Точка, линия, отрезок, измерение отрезка',
+        'Треугольник, четырёхугольник, круг, многоугольник',
+        'Пространственные отношения: слева, справа, выше, ниже, между',
+      ]},
+      { title: 'Математическая информация', items: [
+        'Закономерности и продолжение рядов',
+        'Простые таблицы и схемы',
+        'Логические задачи на сравнение и классификацию',
+      ]},
+    ]},
+    { id: 'c2', title: '2 класс', groups: [
+      { title: 'Числа и величины', items: [
+        'Числа до 100: разряды, десятки и единицы',
+        'Сравнение и упорядочивание чисел',
+        'Метр, миллиметр, перевод единиц длины',
+        'Рубль и копейка',
+        'Время: час, минута, чтение часов',
+        'Масса (килограмм) и ёмкость (литр)',
+      ]},
+      { title: 'Арифметические действия', items: [
+        'Сложение и вычитание в пределах 100 устно',
+        'Сложение и вычитание в столбик',
+        'Умножение как сложение одинаковых слагаемых',
+        'Таблица умножения на 2, 3, 4, 5, затем полная',
+        'Деление как действие, обратное умножению, таблица деления',
+        'Порядок действий, скобки',
+        'Уравнения: неизвестное слагаемое, уменьшаемое, вычитаемое',
+      ]},
+      { title: 'Текстовые задачи', items: [
+        'Задачи в 2 действия',
+        'Задачи на увеличение и уменьшение в несколько раз',
+        'Задачи на кратное сравнение',
+        'Задачи на время и стоимость',
+      ]},
+      { title: 'Геометрические фигуры', items: [
+        'Ломаная и её длина',
+        'Угол, прямой угол',
+        'Прямоугольник и квадрат, их свойства',
+        'Периметр прямоугольника',
+      ]},
+      { title: 'Математическая информация', items: [
+        'Чтение и составление таблиц',
+        'Столбчатые диаграммы',
+        'Истинные и ложные утверждения, логические связки «и», «или», «не»',
+      ]},
+    ]},
+    { id: 'c3', title: '3 класс', groups: [
+      { title: 'Числа и величины', items: [
+        'Числа до 1000: разряды, сравнение',
+        'Единицы длины, массы, времени и их перевод (километр, тонна, центнер, грамм, секунда, сутки)',
+        'Доли: половина, треть, четверть, сравнение долей',
+      ]},
+      { title: 'Арифметические действия', items: [
+        'Сложение и вычитание в пределах 1000 письменно',
+        'Внетабличное умножение и деление',
+        'Умножение и деление на однозначное число письменно',
+        'Деление с остатком',
+        'Свойства действий и удобные вычисления',
+        'Порядок действий в выражениях со скобками',
+        'Уравнения на умножение и деление',
+      ]},
+      { title: 'Текстовые задачи', items: [
+        'Задачи на цену, количество, стоимость',
+        'Задачи на движение: скорость, время, расстояние (первое знакомство)',
+        'Задачи на нахождение доли числа',
+        'Задачи в 3 действия',
+      ]},
+      { title: 'Геометрические фигуры', items: [
+        'Площадь, квадратный сантиметр',
+        'Площадь прямоугольника и квадрата',
+        'Периметр и площадь вместе',
+        'Окружность и круг: центр, радиус, диаметр',
+      ]},
+      { title: 'Математическая информация', items: [
+        'Столбчатые и круговые диаграммы',
+        'Таблицы с несколькими условиями',
+        'Задачи на логику и перебор вариантов',
+      ]},
+    ]},
+    { id: 'c4', title: '4 класс', groups: [
+      { title: 'Числа и величины', items: [
+        'Многозначные числа, классы и разряды',
+        'Сравнение и округление многозначных чисел',
+        'Единицы времени: век, год, месяц',
+        'Единицы площади: дм², м², км², гектар',
+        'Единицы скорости, перевод величин',
+      ]},
+      { title: 'Арифметические действия', items: [
+        'Сложение и вычитание многозначных чисел',
+        'Умножение на однозначное, двузначное, трёхзначное число',
+        'Деление на однозначное, двузначное, трёхзначное число',
+        'Свойства действий, порядок действий',
+        'Уравнения посложнее',
+        'Дроби: доли и дроби, сравнение, сложение и вычитание дробей с одинаковыми знаменателями',
+      ]},
+      { title: 'Текстовые задачи', items: [
+        'Задачи на движение: навстречу, вдогонку, в противоположные стороны',
+        'Задачи на части и на нахождение неизвестного по двум разностям',
+        'Задачи на приведение к единице',
+        'Задачи на работу и на совместные действия',
+        'Задачи с дробями и долями',
+      ]},
+      { title: 'Геометрические фигуры', items: [
+        'Периметр и площадь многоугольников',
+        'Прямоугольный параллелепипед и куб: грани, рёбра, вершины',
+        'Объём (знакомство)',
+        'Построение фигур на клетчатой бумаге',
+      ]},
+      { title: 'Математическая информация', items: [
+        'Диаграммы разных видов',
+        'Анализ таблиц и графиков',
+        'Комбинаторика: перебор вариантов',
+        'Логические задачи и олимпиадные темы',
+      ]},
+    ]},
+  ],
+};
+
 /* ───────── дерево разделов ─────────
    у вкладки либо есть subtabs (тогда открываются они), либо сразу groups (плоская вкладка).
-   soon:true — вкладка пока без тренажёров ("скоро"). items — id-шники из TRAINERS. */
+   soon:true — вкладка пока без тренажёров ("скоро"). items — id-шники из TRAINERS.
+   sections вместо groups — подвкладка, разбитая по классам с подзаголовками
+   (данные — в CURRICULUM выше, там же заглушки тем). */
 const NAV = [
   { id: 'exams', title: 'Экзамены', subtabs: [
     { id: 'oge',      title: 'ОГЭ',           groups: [
@@ -630,9 +804,10 @@ const NAV = [
     { id: 'vpr',      title: 'ВПР / МЦКО',    groups: [], soon: true },
   ]},
   { id: 'grades', title: 'Классы', subtabs: [
-    { id: 'g1', title: '1 класс', groups: [
-      { title: 'Состав числа', items: ['sostav'] },
-    ]},
+    // начальная школа — одной подвкладкой: четыре отдельные «1…4 класс» почти
+    // пустыми растянули бы ряд подвкладок на телефоне в три строки. Прежний
+    // id g1 переезжает сюда через SUBTAB_MOVED (сохранённая вкладка)
+    { id: 'g1_4', title: '1–4 классы', sections: CURRICULUM.g1_4 },
     { id: 'g5', title: '5 класс', groups: [
       { title: 'Действия с числами', items: ['add_col','sub_col','mul_col','div_col'] },
       { title: 'Действия с дробями', items: ['frac_mul','frac_div'] },
@@ -752,14 +927,24 @@ let curTabId = null, curSubtabId = null;
 // «Подборка» — платформенная функция, не часть предметной навигации,
 // поэтому у неё свой флаг, а не место среди вкладок NAV (см. .basket-toggle)
 let basketOpen = false;
+// подвкладки, которые переименовали или слили: у кого в ogeNav:state осталась
+// старая, открывается та, куда её содержимое переехало, а не первая попавшаяся
+// (сейчас «1 класс» → «1–4 классы»; так же потом сольются 5–9 классы)
+const SUBTAB_MOVED = { g1: 'g1_4' };
 function restoreNavState(){
   curTabId = null; curSubtabId = null;
   const nav = curNav();
+  let moved = false;
   try {
     const saved = JSON.parse(localStorage.getItem(navStateKey()) || 'null');
-    if (saved && nav.some(t => t.id === saved.tabId)) { curTabId = saved.tabId; curSubtabId = saved.subtabId || null; }
+    if (saved && nav.some(t => t.id === saved.tabId)) {
+      curTabId = saved.tabId; curSubtabId = saved.subtabId || null;
+      if (SUBTAB_MOVED[curSubtabId]) { curSubtabId = SUBTAB_MOVED[curSubtabId]; moved = true; }
+    }
   } catch(e){}
   if (!curTabId) curTabId = nav[0].id;
+  // перезаписываем сразу, чтобы старый id не жил в хранилище до первого клика
+  if (moved) saveNavState();
 }
 restoreNavState();
 function saveNavState(){
@@ -794,7 +979,7 @@ function itemHTML(it, ii, base){
   const num = String((base || 0) + ii + 1).padStart(2,'0');
   if(!it.href){
     return `
-      <div class="topic-item soon">
+      <div class="topic-item soon" aria-disabled="true">
         <span class="item-num">${num}</span>
         <span class="item-name">${it.name}</span>
         <span class="item-soon">скоро</span>
@@ -812,6 +997,21 @@ function itemHTML(it, ii, base){
 function groupsCount(groups){
   return (groups||[]).reduce((sum,g)=>sum + g.items.filter(id=>TRAINERS[id] && TRAINERS[id].href).length, 0);
 }
+/* тема программы (CURRICULUM) → то же, что запись TRAINERS: у заглушки нет
+   href, и itemHTML рисует её «скоро» тем же путём, что и неготовые номера
+   русского. Неизвестный id → null: выпадает из списка, а не становится
+   заглушкой с чужим названием */
+function curriculumItem(x){
+  if (typeof x === 'string') return { name: x, href: null };
+  return (x && TRAINERS[x.id]) || null;
+}
+// в счётчик « · N» идут только живые тренажёры: сотня заглушек иначе
+// раздула бы цифру у «Классов», а там считают именно готовое
+function sectionsCount(sections){
+  return (sections||[]).reduce((sum,s)=>sum + (s.groups||[]).reduce((n,g)=>
+    n + g.items.filter(x => typeof x !== 'string' && TRAINERS[x.id] && TRAINERS[x.id].href).length, 0), 0);
+}
+function defCount(def){ return def.sections ? sectionsCount(def.sections) : groupsCount(def.groups); }
 
 function getCurTab(){ const nav = curNav(); return nav.find(t => t.id === curTabId) || nav[0]; }
 function getCurSubtab(){
@@ -838,7 +1038,7 @@ function updateBasketToggle(){
 function renderNav(){
   const mainEl = document.getElementById('mainTabs');
   mainEl.innerHTML = curNav().map(t => {
-    const n = t.subtabs ? t.subtabs.reduce((s,st)=>s+groupsCount(st.groups),0) : groupsCount(t.groups);
+    const n = t.subtabs ? t.subtabs.reduce((s,st)=>s+defCount(st),0) : defCount(t);
     // «· 0» у предмета, который ещё готовим, читается как ошибка — нуль не пишем
     return `<button class="nav-tab${(!basketOpen && t.id===curTabId)?' active':''}" data-id="${t.id}">${t.title}${n ? `<span class="tcount"> · ${n}</span>` : ''}</button>`;
   }).join('');
@@ -861,7 +1061,7 @@ function renderNav(){
     if (!tab.subtabs.some(s=>s.id===curSubtabId)) curSubtabId = tab.subtabs[0].id;
     subEl.style.display = 'flex';
     subEl.innerHTML = tab.subtabs.map(s => {
-      const n = groupsCount(s.groups);
+      const n = defCount(s);
       return `<button class="nav-subtab${s.id===curSubtabId?' active':''}" data-id="${s.id}">${s.title}${s.soon?'':` <span class="tcount"> · ${n}</span>`}</button>`;
     }).join('');
     subEl.querySelectorAll('.nav-subtab').forEach(btn=>{
@@ -883,6 +1083,7 @@ function renderContent(){
   const el = document.getElementById('topics');
   if (basketOpen) { renderBasketView(); return; }
   const def = getActiveDef();
+  if (def && !def.soon && def.sections) { renderSections(el, def.sections); return; }
   if (!def || def.soon || !(def.groups||[]).length) {
     const text = (def && def.soonText) || 'Здесь пока нет тренажёров — они появятся в числе первых, когда будут готовы.';
     el.innerHTML = `<div class="topic"><div class="coming-soon-tab">🚧 ${text}</div></div>`;
@@ -902,6 +1103,29 @@ function renderContent(){
       </div>
     `;
   }).join('');
+}
+
+/* подвкладка по классам: подзаголовок класса — отдельной строкой между
+   карточками, а не ещё одним уровнем внутри карточки, иначе на телефоне
+   три вложенных рамки съедают ширину под длинные названия тем. Блоки класса —
+   обычные карточки .topic, как группы в остальных вкладках */
+function renderSections(el, sections){
+  el.innerHTML = sections.map(s => `
+    <section class="grade-section" data-grade="${s.id}">
+      <h2 class="grade-head">${s.title}</h2>
+      ${(s.groups||[]).map(g => {
+        const items = g.items.map(curriculumItem).filter(Boolean);
+        return `
+          <div class="topic">
+            <div class="section-title">${g.title}</div>
+            <div class="topic-list">
+              ${items.map((it, ii) => itemHTML(it, ii, 0)).join('')}
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </section>
+  `).join('');
 }
 
 /* ───────── подборка ─────────
