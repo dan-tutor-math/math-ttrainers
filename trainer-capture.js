@@ -200,6 +200,18 @@ function ttHookTrainerFrameDoc(doc, opts){
     st.textContent = '.keypad-float,.keypad-toggle{margin-bottom:' + (opts.kpLift || 58) + 'px !important;}';
     doc.head.appendChild(st);
   }
+  // Браузеры iPhone сами укрупняют мелкий текст в узких блоках (text
+  // autosizing), а кадр тренажёра на телефоне уже экрана и вписан масштабом.
+  // На экране это незаметно, а снимок html2canvas собирается из двух
+  // размеров: строки расставлены по укрупнённому тексту, буквы нарисованы по
+  // размеру из стилей — буквы «поехали», строка «Источник…» обрезалась
+  // справа. Запрещаем укрупнение — вёрстка и снимок совпадают с экраном
+  if (!doc.getElementById('bdNoTextInflate')){
+    const st = doc.createElement('style');
+    st.id = 'bdNoTextInflate';
+    st.textContent = 'html{-webkit-text-size-adjust:100% !important;text-size-adjust:100% !important;}';
+    doc.head.appendChild(st);
+  }
   // ОГЭ №1–5: у теории своя кнопка рядом с «Показать теорию» — раньше она
   // уезжала довеском к каждому заданию набора. Появляется и прячется вместе
   // с блоком теории: его тренажёр показывает только у заданий, где она есть

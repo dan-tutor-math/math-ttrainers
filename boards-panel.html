@@ -29,6 +29,9 @@ html[data-theme="dark"]{
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
+/* без автоукрупнения текста браузерами iPhone — как и в кадре тренажёра
+   (bdNoTextInflate в trainer-capture.js): размеры как в стилях */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 body{background:var(--bg);color:var(--pencil);font-family:var(--font-ui);display:flex;flex-direction:column;min-height:100%;}
 button{font-family:inherit;}
 .bp-head{flex:none;display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--glass-border);background:var(--card);}

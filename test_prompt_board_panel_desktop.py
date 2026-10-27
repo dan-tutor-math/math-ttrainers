@@ -154,6 +154,10 @@ def run():
         fm = m.evaluate(FRAME_JS)
         check("1. телефон: кадр 420, вписан масштабом", not fm["desktop"] and fm["fw"] == 420 and "scale" in fm["tr"] and fm["inner"] == 420, str(fm))
         sm = m.evaluate(SNAP_JS)
+        # браузеры iPhone сами укрупняют мелкий текст в узком кадре — снимок
+        # тогда расходится с экраном; в кадре тренажёра это запрещено
+        tsa = m.evaluate("() => { const d = document.getElementById('bpIframe').contentDocument; const cs = getComputedStyle(d.documentElement); return { st: !!d.getElementById('bdNoTextInflate'), v: cs.webkitTextSizeAdjust || cs.textSizeAdjust }; }")
+        check("2. телефон: в кадре тренажёра запрещено автоукрупнение текста", tsa["st"] and tsa["v"] == "100%", str(tsa))
         check("2. телефон: снимок в кадре 420", sm["vw"] == 420 and sm["css"]["w"] < 420, str(sm))
         check("3. плотность снимка 2 на экране с плотностью 3 (доски нет)", m.evaluate("() => __boardPanel.snapScale()") == 2 and abs(sm["natW"] / sm["css"]["w"] - 2) < 0.02, f"{sm['natW']} / {sm['css']['w']}")
         check("3. с плотностью компьютера — тоже 2", abs(sd["natW"] / sd["css"]["w"] - 2) < 0.02, f"{sd['natW']} / {sd['css']['w']}")

@@ -409,6 +409,11 @@ async function captureTrainerNode(el, task, opts){
     scale,
     useCORS: true,
     onclone: (cloneDoc) => {
+      // копия страницы для снимка — без автоукрупнения текста браузерами
+      // iPhone (см. bdNoTextInflate в trainer-capture.js): иначе строки
+      // расставлены по одному размеру, а буквы нарисованы другим
+      cloneDoc.documentElement.style.setProperty('-webkit-text-size-adjust', '100%', 'important');
+      cloneDoc.documentElement.style.setProperty('text-size-adjust', '100%', 'important');
       const c = cloneDoc.querySelector('[data-bd-cap="' + mark + '"]');
       if (!c) return;
       // сам узел клона не подменяем — html2canvas рисует именно его, по
