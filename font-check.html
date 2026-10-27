@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Проверка шрифта холста</title>
+<!-- Служебная страница (промпт «сопряжение панели»): на iPhone задание,
+     снятое вкладкой-панелью, ложилось на доску тоньше, с «поехавшими»
+     буквами и обрезанной справа строкой. Снимок рисует текст на холсте
+     (html2canvas → canvas), а расстановку слов берёт из обычной вёрстки.
+     Здесь одна и та же строка — обычным текстом и на холсте, по весам:
+     видно, каким шрифтом холст рисует на этом устройстве. Ни на что на
+     сайте не влияет, ссылок на неё нет. -->
+<link rel="stylesheet" href="onest.css">
+<style>
+body{margin:0;padding:14px;font-family:'Onest',-apple-system,sans-serif;background:#fff;color:#1d1d1f;}
+h1{font-size:17px;margin:0 0 6px;}
+.ua{font-size:11px;color:#6e6e73;word-break:break-all;margin-bottom:10px;}
+.row{border-top:1px solid #ddd;padding:8px 0;}
+.lbl{font-size:11px;color:#6e6e73;margin-bottom:4px;}
+.dom{font-size:22px;white-space:nowrap;}
+canvas{display:block;}
+table{border-collapse:collapse;font-size:12px;margin-top:8px;}
+td,th{border:1px solid #ddd;padding:3px 6px;text-align:right;}
+td:first-child,th:first-child{text-align:left;}
+.bad{background:#ffe1d6;}
+.ok{background:#dcf5e3;}
+button{font:inherit;font-size:14px;padding:8px 12px;margin:8px 8px 0 0;border-radius:10px;border:1.5px solid #004C99;background:#fff;color:#004C99;}
+</style>
+</head>
+<body>
+<h1>Шрифт холста на этом устройстве</h1>
+<div class="ua" id="ua"></div>
+<div id="out"></div>
+<table id="tbl"></table>
+<button id="staticBtn">Включить Onest по весам (onest-static.css)</button>
+<script>
+(function(){
+  const TEXTS = ['Решите неравенство', 'Источник: открытый банк заданий ФИПИ', 'Solve 123 ≥ x'];
+  const WEIGHTS = [400, 500, 600, 700];
+  const PX = 22;
+  document.getElementById('ua').textContent = navigator.userAgent + ' · dpr ' + devicePixelRatio;
+  // ширина строки в обычной вёрстке
+  function domWidth(text, w, family){
+    const s = document.createElement('span');
+    s.className = 'dom';
+    s.style.fontWeight = w; s.style.fontFamily = family; s.textContent = text;
+    s.style.position = 'absolute'; s.style.visibility = 'hidden';
+    document.body.appendChild(s);
+    const r = s.getBoundingClientRect().width;
+    s.remove();
+    return r;
+  }
+  function canvasWidth(text, w, family){
+    const c = document.createElement('canvas').getContext('2d');
+    c.font = w + ' ' + PX + 'px ' + family;
+    return c.measureText(text).width;
+  }
+  async function run(note){
+    const out = document.getElementById('out'), tbl = document.getElementById('tbl');
+    out.innerHTML = ''; tbl.innerHTML = '<tr><th>' + (note || 'onest.css') + '</th><th>вёрстка</th><th>холст Onest</th><th>холст запасной</th><th>вывод</th></tr>';
+    await Promise.all(WEIGHTS.map(w => document.fonts.load(w + ' ' + PX + 'px Onest', TEXTS.join(' '))));
+    await document.fonts.ready;
+    const FAM = "Onest, -apple-system, sans-serif";
+    TEXTS.forEach(t => WEIGHTS.forEach(w => {
+      const d = domWidth(t, w, FAM), co = canvasWidth(t, w, FAM), cf = canvasWidth(t, w, '-apple-system, sans-serif');
+      // холст рисует Onest — его ширина совпадает с вёрсткой; рисует запасной
+      // — совпадает с «запасным», а не с вёрсткой
+      const same = Math.abs(co - d) / d < 0.01;
+      const verdict = same ? 'Onest' : (Math.abs(co - cf) / cf < 0.01 ? 'ЗАПАСНОЙ шрифт' : 'другой шрифт');
+      tbl.insertAdjacentHTML('beforeend', '<tr class="' + (same ? 'ok' : 'bad') + '"><td>' + w + ' «' + t.slice(0, 14) + '…»</td><td>' + d.toFixed(1) + '</td><td>' + co.toFixed(1) + '</td><td>' + cf.toFixed(1) + '</td><td>' + verdict + '</td></tr>');
+    }));
+    // глазами: строка обычным текстом и под ней — та же на холсте
+    [400, 600].forEach(w => {
+      const t = TEXTS[1];
+      const row = document.createElement('div'); row.className = 'row';
+      row.innerHTML = '<div class="lbl">вес ' + w + ': сверху обычный текст, снизу холст</div>';
+      const dom = document.createElement('div'); dom.className = 'dom'; dom.style.fontWeight = w; dom.textContent = t;
+      const cv = document.createElement('canvas');
+      const W = Math.ceil(domWidth(t, w, FAM)) + 40, H = 34, k = devicePixelRatio || 1;
+      cv.width = W * k; cv.height = H * k; cv.style.width = W + 'px'; cv.style.height = H + 'px';
+      const c = cv.getContext('2d'); c.scale(k, k);
+      c.font = w + ' ' + PX + 'px ' + FAM; c.textBaseline = 'top'; c.fillStyle = '#1d1d1f';
+      c.fillText(t, 0, 4);
+      row.append(dom, cv);
+      out.appendChild(row);
+    });
+  }
+  run();
+  document.getElementById('staticBtn').addEventListener('click', async () => {
+    const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'onest-static.css';
+    await new Promise(r => { l.onload = l.onerror = r; document.head.appendChild(l); });
+    document.querySelectorAll('link[href$="onest.css"]').forEach(x => { x.disabled = true; });
+    run('onest-static.css');
+  });
+})();
+</script>
+</body>
+</html>
