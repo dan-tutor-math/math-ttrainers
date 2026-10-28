@@ -51,7 +51,10 @@ VPORT = 9243
 BASE = f"http://127.0.0.1:{PORT}"
 VBASE = f"http://127.0.0.1:{VPORT}"
 HERE = os.path.dirname(os.path.abspath(__file__))
-SLUG = "oge1-5-tire-razbor"
+# slug видео шин и есть ли у него ссылка — из настоящего video-links.js в main():
+# сейчас там тестовый ролик, потом будет разбор, тест от этого не зависит
+SLUG = None
+REAL_HAS_URL = False
 
 results = []
 
@@ -158,12 +161,24 @@ def make_fixture(tmp):
     return out_root, f"{SLUG}/{vers[0]}"
 
 
+def tire_video(src):
+    """Запись videos, к которой сейчас привязан блок шин, — (начало, конец, текст)."""
+    slug = re.search(r"video_slug: '([^']+)', page: 'oge1_5', block_key: 'tire'", src).group(1)
+    i = src.index(f"{{ slug: '{slug}'")
+    j = src.index("] },", i) + len("] },")
+    return i, j, src[i:j]
+
+
 def patched_links(rel):
+    """video-links.js, где у видео шин ссылка на локальный фикстур (какой бы ролик ни был привязан)."""
     src = open(os.path.join(HERE, "video-links.js"), encoding="utf-8").read()
-    src = src.replace("hls_url: '',", f"hls_url: '{VBASE}/{rel}/master.m3u8',", 1)
-    src = src.replace("poster_url: '',", f"poster_url: '{VBASE}/{rel}/poster.jpg',", 1)
-    src = src.replace("duration: 0,", "duration: 20,", 1)
-    src = src.replace("chapters: [] },", "chapters: [{ t: 0, title: 'Задание 1 — ширина' }, { t: 6, title: 'Задание 2 — боковина' }, { t: 12, title: 'Задание 3 — диаметр' }] },", 1)
+    i, j, entry = tire_video(src)
+    entry = re.sub(r"hls_url: '[^']*'", f"hls_url: '{VBASE}/{rel}/master.m3u8'", entry)
+    entry = re.sub(r"poster_url: '[^']*'", f"poster_url: '{VBASE}/{rel}/poster.jpg'", entry)
+    entry = re.sub(r"title: '[^']*'", "title: 'Шины: разбор заданий 1–5'", entry, count=1)
+    entry = re.sub(r"duration: \d+", "duration: 20", entry)
+    entry = re.sub(r"chapters: \[.*\] \},$", "chapters: [{ t: 0, title: 'Задание 1 — ширина' }, { t: 6, title: 'Задание 2 — боковина' }, { t: 12, title: 'Задание 3 — диаметр' }] },", entry, flags=re.S)
+    src = src[:i] + entry + src[j:]
     assert VBASE in src
     return src
 
@@ -194,6 +209,11 @@ def wait_time(page, cond, timeout=8):
 
 
 def main():
+    global SLUG, REAL_HAS_URL
+    real = open(os.path.join(HERE, "video-links.js"), encoding="utf-8").read()
+    entry = tire_video(real)[2]
+    SLUG = re.search(r"slug: '([^']+)'", entry).group(1)
+    REAL_HAS_URL = not re.search(r"hls_url: ''", entry)
     tmp = tempfile.mkdtemp(prefix="video1_")
     try:
         root, rel = make_fixture(tmp)
@@ -202,12 +222,13 @@ def main():
             browser = p.chromium.launch(channel="chrome")
             errors = []
 
-            # 3. настоящий конфиг: ссылки нет — кнопки нет
+            # 3. настоящий конфиг: кнопка у шин есть ровно тогда, когда у их видео есть ссылка
             ctx = browser.new_context()
             page = ctx.new_page()
             page.on("pageerror", lambda e: errors.append(str(e)))
             open_mode(page, "tire_set1")
-            check("настоящий video-links.js: у шин кнопки нет, пока видео не загружено", not btn_visible(page))
+            check("настоящий video-links.js: кнопка у шин — только если у видео есть ссылка",
+                  btn_visible(page) == REAL_HAS_URL)
             ctx.close()
 
             # 4–6. с фикстуром

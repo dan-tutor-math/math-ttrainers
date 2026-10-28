@@ -35,8 +35,15 @@ window.VIDEO_LINKS = {
       hls_url: '',
       poster_url: '',
       chapters: [] },
+    // Тестовый ролик (цветные полосы ffmpeg testsrc) — проверить плеер и
+    // хранилище на сайте до настоящей записи. Когда разбор шин будет
+    // загружен, ссылку шин вернуть на oge1-5-tire-razbor, эту запись удалить.
+    { slug: 'test-video', title: 'Тестовый ролик (проверка плеера)', kind: 'razbor', duration: 30,
+      hls_url: 'https://mathh-video.s3.cloud.ru/test-video/20261028-154920/master.m3u8',
+      poster_url: 'https://mathh-video.s3.cloud.ru/test-video/20261028-154920/poster.jpg',
+      chapters: [{ t: 0, title: 'Начало' }, { t: 10, title: 'Середина' }, { t: 20, title: 'Конец' }] },
   ],
   links: [
-    { video_slug: 'oge1-5-tire-razbor', page: 'oge1_5', block_key: 'tire', task_key: null },
+    { video_slug: 'test-video', page: 'oge1_5', block_key: 'tire', task_key: null },
   ],
 };
