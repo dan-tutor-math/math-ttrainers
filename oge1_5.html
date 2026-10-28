@@ -208,6 +208,10 @@ h1{max-height:64px}
 .example-history-panel{max-height:220px}
 .submode-tabs{max-height:56px}
 .taskset-nav{max-height:52px}
+/* «Смотреть разбор» сворачивается вместе с подсказками: в режиме «свернуть»
+   место нужно под запись на доске, а видео — та же подсказка */
+.video-row{max-height:64px;overflow:hidden;margin:0 0 12px;transition:max-height .32s ease, opacity .22s ease, margin .32s ease;}
+.video-row[hidden]{display:none;}
 /* Промпт №63: на телефоне три части навигации «◀ Предыдущее — Задание N из 5 —
    Следующее ▶» переносятся на две-три строки, а 52px вмещали одну — кнопку
    «Следующее задание» обрезало (overflow:hidden выше), нажать её было нельзя */
@@ -219,7 +223,8 @@ html[data-focus="on"] .stats,
 html[data-focus="on"] .example-history-toggle,
 html[data-focus="on"] .example-history-panel,
 html[data-focus="on"] .submode-tabs,
-html[data-focus="on"] .taskset-nav{
+html[data-focus="on"] .taskset-nav,
+html[data-focus="on"] .video-row{
   max-height:0;
   min-height:0;
   padding:0;
@@ -418,6 +423,15 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
 .explain{font-family:var(--font-ui);font-size:15px;color:var(--muted-4);line-height:1.55;}
 .explain b{color:var(--ink)}
+/* решение столбиком и вертикальные дроби — как в №6 и №9 (там KaTeX нет, дробь — две строки) */
+.explain .sol{margin:6px 0 8px;}
+.explain .sol-line{margin:3px 0;}
+.vf{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.15;margin:0 2px;font-size:.92em;}
+.vf>span:first-child{border-bottom:1px solid currentColor;padding:0 3px;}
+.vf>span:last-child{padding:0 3px;}
+.tire-ctx{font-size:14px;color:var(--muted-3);margin:0 0 6px;}
+.source-note{font-family:var(--font-ui);font-weight:500;font-size:12.5px;color:var(--muted-3);margin:12px 0 0;}
+.mode-card .msub{font-family:var(--font-ui);font-weight:500;font-size:13px;color:var(--muted-2);white-space:nowrap;}
 .next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:14px;box-shadow:0 6px 18px var(--ok-shadow);transition:transform .15s;}
 .next-btn:active{transform:scale(.98)}
 
@@ -635,6 +649,10 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       <button class="taskset-nav-btn" id="nextTaskBtn">Следующее задание ▶</button>
     </div>
 
+    <div class="video-row" id="videoRow" hidden>
+      <button type="button" class="video-open-btn" id="videoBtn">Смотреть разбор</button>
+    </div>
+
     <div class="panel theory-block" id="theoryBlock" style="display:none">
       <div class="theory-block-head">
         <button class="theory-toggle" id="theoryToggleBtn">📖 Показать теорию</button>
@@ -656,6 +674,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
         <button class="check-btn" id="checkAnswerBtn">Проверить</button>
       </div>
       <button class="change-answer-btn" id="changeAnswerBtn" style="display:none">✎ Изменить ответ</button>
+      <!-- подпись источника — внутри #questionPanel: едет в «Подборку» и на доску, как в №6 и №9 -->
+      <div class="source-note" id="sourceNote" style="display:none"></div>
     </div>
 
     <div class="calc-tools" id="calcTools">
@@ -720,9 +740,13 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="mode-card-keys.js"></script>
 <script src="keypad.js"></script>
 <script src="exam-nav.js"></script>
+<script src="oge1_5-fipi-bank.js"></script>
 <script src="trainer-multi.js"></script>
+<script src="video-links.js"></script>
+<script src="video-player.js"></script>
 <script>
 /* ═══════════════ утилиты ═══════════════ */
 const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -803,7 +827,12 @@ const FACTORY_TIRE_POOL = [
   {width:205,profile:55,rim:17}, {width:215,profile:55,rim:17}, {width:215,profile:60,rim:16},
 ];
 function pickFactoryTire(){ return pick(FACTORY_TIRE_POOL); }
-function ensureFactoryTire(){ if (!curFactoryTire) curFactoryTire = pickFactoryTire(); return curFactoryTire; }
+/* Сохранённая шина важнее случайной: кадр карточки «+» и невидимый кадр
+   доски («ещё такое же») — отдельные страницы, им тему не открывали, и
+   раньше они брали случайную шину — ответ заданий 3–5 считался не от той,
+   что в теории. Теперь кадр получает шину снимком (tsApplyState), а без
+   снимка — ту же, что сохранена у этой вкладки */
+function ensureFactoryTire(){ if (!curFactoryTire) curFactoryTire = loadFactoryTire() || pickFactoryTire(); return curFactoryTire; }
 
 // ── заводская шина переживает перезагрузку страницы (раньше выбиралась заново
 // при КАЖДОМ входе в «Шина 1», из-за чего теория показывала одну шину, а
@@ -915,93 +944,129 @@ function tireCellsTableHTML(ds, widthHead){
   return `<table class="data-table"><thead><tr>${head1}</tr><tr>${head2}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
+/* ═══════════════ «Шины»: условие и решение по числам задания ═══════════════
+   Одними и теми же функциями строятся задания «Шины 1» (генератор) и задания
+   открытого банка ФИПИ (oge1_5-fipi-bank.js): запись и шаги решения у них
+   одинаковые по построению. Решение — столбиком, по строке на шаг, дроби
+   вертикально (числитель над знаменателем), как в №6 и №9.
+   Диаметры считаются в СОТЫХ долях миллиметра целыми числами: у шин все
+   величины — не больше двух знаков после запятой, и так проценты в задании
+   5 округляются до десятых точно, без погрешности плавающей точки (иначе
+   1,25 % могло округлиться не в ту сторону). */
+function tireD100(t){ return 2*t.width*t.profile + t.rim*2540; }
+function tireH100(t){ return t.width*t.profile; }
+function tireMark(t){ return `${t.width}/${t.profile} R${t.rim}`; }
+function vfrac(n, d){ return `<span class="vf"><span>${n}</span><span>${d}</span></span>`; }
+function solHTML(lines){ return `<div class="sol">${lines.map(l => `<div class="sol-line">${l}</div>`).join('')}</div>`; }
+/* у заданий 3–5 ответ зависит от заводской шины. На странице она в теории,
+   но задание уходит и туда, где теории нет: карточки «+», «ещё такое же» на
+   доске, «Случайно», «Подборка». Поэтому заводская шина — строкой в самом
+   условии, и задание всегда решается по тому, что в нём написано */
+function tireCtxHTML(ft){ return `<div class="tire-ctx">С завода автомобиль выходит с шинами ${tireMark(ft)}.</div>`; }
+function tireDiamLines(t, i){
+  const s = i ? `<sub>${i}</sub>` : '';
+  return [
+    `Шина ${tireMark(t)}: высота боковины H${s} = ${t.width} · ${vfrac(t.profile, 100)} = ${fmtNum(tireH100(t)/100)} мм`,
+    `диаметр диска d${s} = ${t.rim} · 25,4 = ${fmtNum(t.rim*25.4)} мм`,
+    `диаметр колеса D${s} = d${s} + 2H${s} = ${fmtNum(t.rim*25.4)} + 2 · ${fmtNum(tireH100(t)/100)} = ${fmtNum(tireD100(t)/100)} мм`,
+  ];
+}
+function build_tire_width(ds, rim, wantMax, widthHead){
+  const allowed = ds.widths.filter(w => ds.cells[`${w},${rim}`]).sort((a,b) => a-b);
+  const marks = allowed.flatMap(w => ds.cells[`${w},${rim}`].map(p => `${w}/${p}`));
+  const correct = wantMax ? allowed[allowed.length-1] : allowed[0];
+  const word = wantMax ? 'наибольшей' : 'наименьшей';
+  return {
+    type: 'input', unit: 'мм', correctValue: correct,
+    prompt: `Завод допускает установку шин с другими маркировками. В таблице показаны разрешённые размеры шин.` +
+      tireCellsTableHTML(ds, widthHead || 'Ширина шины (мм)') +
+      `<br>Шины какой ${word} ширины можно устанавливать на автомобиль, если диаметр диска равен ${rim} дюймам? Ответ дайте в миллиметрах.`,
+    explain: solHTML([
+      `В столбце «${rim}» (диаметр диска ${rim} дюймов) разрешены шины ${marks.join(', ')}.`,
+      `Их ширины: ${allowed.join(', ')} мм.`,
+      `${wantMax ? 'Наибольшая' : 'Наименьшая'} из них — ${correct} мм.`,
+    ]) + `<b>Ответ: ${correct} мм.</b>`
+  };
+}
+function build_tire_side(t){
+  const h = tireH100(t)/100;
+  return {
+    type: 'input', unit: 'мм', correctValue: h,
+    prompt: `Сколько миллиметров составляет высота боковины шины, имеющей маркировку ${tireMark(t)}?`,
+    explain: solHTML([
+      `В маркировке ${tireMark(t)} ширина шины B = ${t.width} мм, высота боковины — ${t.profile} % от ширины.`,
+      `H = ${t.width} · ${vfrac(t.profile, 100)} = ${t.width} · ${fmtNum(t.profile/100)} = ${fmtNum(h)} мм`,
+    ]) + `<b>Ответ: ${fmtNum(h)} мм.</b>`
+  };
+}
+function build_tire_diam(ft){
+  const d = tireD100(ft)/100;
+  return {
+    type: 'input', unit: 'мм', correctValue: d, factoryTire: ft,
+    prompt: tireCtxHTML(ft) + `Найдите диаметр колеса автомобиля, выходящего с завода. Ответ дайте в миллиметрах.`,
+    explain: solHTML([
+      `Диаметр колеса — это диск и две боковины шины, сверху и снизу диска.`,
+      ...tireDiamLines(ft, 0),
+    ]) + `<b>Ответ: ${fmtNum(d)} мм.</b>`
+  };
+}
+function build_tire_ddiam(ft, nt){
+  const d1 = tireD100(ft), d2 = tireD100(nt), inc = d2 > d1;
+  const diff = Math.abs(d2 - d1)/100;
+  return {
+    type: 'input', unit: 'мм', correctValue: diff, factoryTire: ft,
+    prompt: tireCtxHTML(ft) + `На сколько миллиметров ${inc ? 'увеличится' : 'уменьшится'} диаметр колеса, если заменить колёса, установленные на заводе, колёсами с шинами ${tireMark(nt)}?`,
+    explain: solHTML([
+      ...tireDiamLines(ft, 1),
+      ...tireDiamLines(nt, 2),
+      inc ? `D<sub>2</sub> − D<sub>1</sub> = ${fmtNum(d2/100)} − ${fmtNum(d1/100)} = ${fmtNum(diff)} мм`
+          : `D<sub>1</sub> − D<sub>2</sub> = ${fmtNum(d1/100)} − ${fmtNum(d2/100)} = ${fmtNum(diff)} мм`,
+    ]) + `<b>Ответ: ${fmtNum(diff)} мм.</b>`
+  };
+}
+function build_tire_run(ft, nt){
+  const d1 = tireD100(ft), d2 = tireD100(nt), inc = d2 > d1, dd = Math.abs(d2 - d1);
+  // десятые доли процента, округление половины вверх — целыми числами
+  const p10 = Math.floor((2*dd*1000 + d1) / (2*d1));
+  const pct = p10/10;
+  // приближённое значение — отброшенными знаками после третьего («1,249…»):
+  // округлённое до сотых «1,25» сбивало бы с толку перед округлением до десятых
+  const r3 = Math.floor(dd*100000/d1);
+  const raw = String(r3/1000).replace('.', ',') + ((dd*100000) % d1 ? '…' : '');
+  return {
+    type: 'input', unit: '%', correctValue: pct, factoryTire: ft,
+    prompt: tireCtxHTML(ft) + `На сколько процентов ${inc ? 'увеличится' : 'уменьшится'} пробег автомобиля при одном обороте колеса, если заменить колёса, установленные на заводе, колёсами с шинами ${tireMark(nt)}? Результат округлите до десятых.`,
+    explain: solHTML([
+      `За один оборот колесо проезжает длину своей окружности π · D — она пропорциональна диаметру, поэтому пробег меняется на столько же процентов, что и диаметр.`,
+      ...tireDiamLines(ft, 1),
+      ...tireDiamLines(nt, 2),
+      `${vfrac(inc ? 'D<sub>2</sub> − D<sub>1</sub>' : 'D<sub>1</sub> − D<sub>2</sub>', 'D<sub>1</sub>')} · 100 % = ${vfrac(fmtNum(dd/100), fmtNum(d1/100))} · 100 % ≈ ${raw} %`,
+      `округляем до десятых: ${fmtNum(pct)} %`,
+    ]) + `<b>Ответ: ${fmtNum(pct)} %.</b>`
+  };
+}
+
 function gen_tire_task1() {
   const ds = pick(TIRE_DATASETS);
   // берём диаметры диска, для которых допустимо хотя бы 2 разные ширины —
   // иначе "наименьшая"/"наибольшая" были бы одним и тем же числом
   const eligibleRims = ds.rims.filter(r => ds.widths.filter(w => ds.cells[`${w},${r}`]).length >= 2);
-  const rim = pick(eligibleRims);
-  const allowedWidths = ds.widths.filter(w => ds.cells[`${w},${rim}`]).sort((a,b) => a-b);
-  const wantMax = Math.random() < 0.5;
-  const correct = wantMax ? allowedWidths[allowedWidths.length-1] : allowedWidths[0];
-
-  return {
-    type: 'input',
-    unit: 'мм',
-    correctValue: correct,
-    prompt: `Шины какой ${wantMax ? 'наибольшей' : 'наименьшей'} ширины можно устанавливать на автомобиль, если диаметр диска равен ${rim} дюймам?` +
-      tireCellsTableHTML(ds) +
-      `<br>Ответ дайте в миллиметрах.`,
-    explain: `В таблице находим столбец, соответствующий диаметру диска ${rim} дюймов. В этом столбце указаны допустимые ширины шин: ${allowedWidths.join(', ')} мм — это все маркировки, которые завод разрешает устанавливать при таком диаметре диска.<br>Нужно выбрать ${wantMax ? 'наибольшую' : 'наименьшую'} из них. Сравнивая числа ${allowedWidths.join(', ')}, видим, что ${wantMax ? 'наибольшее' : 'наименьшее'} значение — ${correct} мм.<br><b>Ответ: ${correct} мм.</b>`
-  };
+  return build_tire_width(ds, pick(eligibleRims), Math.random() < 0.5);
 }
-
 function gen_tire_task2() {
-  const width = pick([175,185,195,205,215,225,235]);
-  const profile = pick([45,50,55,60,65,70,75]);
-  const rim = pick([13,14,15,16,17,18]);
-  const correct = clean2(width * profile / 100);
-  return {
-    type: 'input',
-    unit: 'мм',
-    correctValue: correct,
-    prompt: `Сколько миллиметров составляет высота боковины шины, имеющей маркировку ${width}/${profile} R${rim}?`,
-    explain: `Маркировка шины ${width}/${profile}R${rim} означает: ширина шины B = ${width} мм, а профиль (отношение высоты боковины к ширине) равен ${profile}%.<br>Высота боковины вычисляется по формуле H = B · профиль/100. Подставляем значения: H = ${width} · ${profile}/100 = ${width} · ${fmtNum(profile/100)} = ${fmtNum(correct)} мм.<br><b>Ответ: ${fmtNum(correct)} мм.</b>`
-  };
+  return build_tire_side({ width: pick([175,185,195,205,215,225,235]),
+    profile: pick([45,50,55,60,65,70,75]), rim: pick([13,14,15,16,17,18]) });
 }
-
-function gen_tire_task3() {
-  const ft = ensureFactoryTire();
-  const H = clean2(ft.width * ft.profile / 100);
-  const rimMM = clean2(ft.rim * 25.4);
-  const correct = clean2(rimMM + 2 * H);
-  return {
-    type: 'input',
-    unit: 'мм',
-    correctValue: correct,
-    prompt: `Найдите диаметр колеса автомобиля, выходящего с завода. Ответ дайте в миллиметрах.`,
-    explain: `Заводская маркировка шины — ${ft.width}/${ft.profile}R${ft.rim}. Значит, ширина шины B = ${ft.width} мм, профиль H/B = ${ft.profile}%, диаметр диска d = ${ft.rim} дюймов.<br>Сначала найдём высоту боковины шины: H = B · профиль/100 = ${ft.width} · ${ft.profile}/100 = ${fmtNum(H)} мм.<br>Переведём диаметр диска в миллиметры (в одном дюйме 25,4 мм): d = ${ft.rim} · 25,4 = ${fmtNum(rimMM)} мм.<br>Общий диаметр колеса D складывается из диаметра диска и удвоенной высоты боковины (боковина есть и сверху, и снизу диска): D = d + 2H = ${fmtNum(rimMM)} + 2 · ${fmtNum(H)} = ${fmtNum(rimMM)} + ${fmtNum(2*H)} = ${fmtNum(correct)} мм.<br><b>Ответ: ${fmtNum(correct)} мм.</b>`
-  };
-}
-
+function gen_tire_task3() { return build_tire_diam(ensureFactoryTire()); }
 function gen_tire_task4() {
   const ft = ensureFactoryTire();
-  const H1 = clean2(ft.width * ft.profile / 100);
-  const rim1MM = clean2(ft.rim * 25.4);
-  const D1 = clean2(rim1MM + 2 * H1);
-  const newTire = pickUpgradeTire(ft);
-  const H2 = clean2(newTire.width * newTire.profile / 100);
-  const rim2MM = clean2(newTire.rim * 25.4);
-  const D2 = clean2(rim2MM + 2 * H2);
-  const correct = clean2(D2 - D1);
-  return {
-    type: 'input',
-    unit: 'мм',
-    correctValue: correct,
-    prompt: `На сколько миллиметров увеличится диаметр колеса, если заменить колёса, установленные на заводе, колёсами с шинами ${newTire.width}/${newTire.profile} R${newTire.rim}?`,
-    explain: `Заводская шина — ${ft.width}/${ft.profile}R${ft.rim}. Высота боковины: H₁ = ${ft.width} · ${ft.profile}/100 = ${fmtNum(H1)} мм. Диаметр диска в мм: ${ft.rim} · 25,4 = ${fmtNum(rim1MM)} мм. Диаметр колеса: D₁ = ${fmtNum(rim1MM)} + 2 · ${fmtNum(H1)} = ${fmtNum(D1)} мм.<br>Новая шина — ${newTire.width}/${newTire.profile}R${newTire.rim}. Высота боковины: H₂ = ${newTire.width} · ${newTire.profile}/100 = ${fmtNum(H2)} мм. Диаметр диска в мм: ${newTire.rim} · 25,4 = ${fmtNum(rim2MM)} мм. Диаметр колеса: D₂ = ${fmtNum(rim2MM)} + 2 · ${fmtNum(H2)} = ${fmtNum(D2)} мм.<br>Увеличение диаметра: D₂ − D₁ = ${fmtNum(D2)} − ${fmtNum(D1)} = ${fmtNum(correct)} мм.<br><b>Ответ: ${fmtNum(correct)} мм.</b>`
-  };
+  return build_tire_ddiam(ft, pickUpgradeTire(ft));
 }
-
 function gen_tire_task5() {
   const ft = ensureFactoryTire();
-  const H1 = clean2(ft.width * ft.profile / 100);
-  const rim1MM = clean2(ft.rim * 25.4);
-  const D1 = clean2(rim1MM + 2 * H1);
   // на реальном экзамене примерно в половине случаев ответ маленький (≤2%, порой
   // даже доли процента) — подмешиваем такие «близкие по диаметру» замены шин
-  const newTire = (Math.random() < 0.5 ? pickCloseTire(ft) : null) || pickUpgradeTire(ft);
-  const H2 = clean2(newTire.width * newTire.profile / 100);
-  const rim2MM = clean2(newTire.rim * 25.4);
-  const D2 = clean2(rim2MM + 2 * H2);
-  const correct = Number(((D2 - D1) / D1 * 100).toFixed(1));
-  return {
-    type: 'input',
-    unit: '%',
-    correctValue: correct,
-    prompt: `На сколько процентов увеличится пробег автомобиля при одном обороте колеса, если заменить колёса, установленные на заводе, колёсами с шинами ${newTire.width}/${newTire.profile} R${newTire.rim}? Результат округлите до десятых.`,
-    explain: `За один оборот колесо проезжает расстояние, равное длине его окружности, а она пропорциональна диаметру колеса — поэтому вместо длины окружности можно сравнивать сами диаметры.<br>Заводская шина ${ft.width}/${ft.profile}R${ft.rim}: диаметр D₁ = ${ft.rim} · 25,4 + 2 · (${ft.width} · ${ft.profile}/100) = ${fmtNum(rim1MM)} + ${fmtNum(2*H1)} = ${fmtNum(D1)} мм.<br>Новая шина ${newTire.width}/${newTire.profile}R${newTire.rim}: диаметр D₂ = ${newTire.rim} · 25,4 + 2 · (${newTire.width} · ${newTire.profile}/100) = ${fmtNum(rim2MM)} + ${fmtNum(2*H2)} = ${fmtNum(D2)} мм.<br>Пробег за один оборот увеличится на столько же процентов, на сколько увеличился диаметр: (D₂ − D₁)/D₁ × 100% = (${fmtNum(D2)} − ${fmtNum(D1)})/${fmtNum(D1)} × 100% = ${fmtNum((D2-D1)/D1*100)}%.<br>Округляем до десятых, как требует условие.<br><b>Ответ: ${correct}%.</b>`
-  };
+  return build_tire_run(ft, (Math.random() < 0.5 ? pickCloseTire(ft) : null) || pickUpgradeTire(ft));
 }
 
 const TIRE1_TASKS = [
@@ -1122,17 +1187,130 @@ function gen_tariff2() {
 
 /* ═══════════════ реестр тем ═══════════════ */
 const GROUPS = [
-  { title: '🚗 Шины', modes: [
+  // key — ключ блока для привязки видео (video-links.js, block_key): заголовок
+  // с эмодзи для этого не годится, его меняют ради вида
+  { title: '🚗 Шины', key: 'tire', modes: [
     { id: 'tire_demo2027', title: 'Шина 0 · Демоверсия ОГЭ 2027', kind: 'taskset', demo: true,
       tasks: TIRE_DEMO_TASKS, theory: buildDemoTireTheoryHTML },
-    { id: 'tire_set1', title: 'Шина 1', kind: 'taskset', tasks: TIRE1_TASKS },
+    { id: 'tire_set1', title: 'Шина 1', kind: 'taskset', tasks: TIRE1_TASKS,
+      // теория по заводской шине, которая сейчас у страницы: у присоединившегося
+      // к сессии она приходит снимком (factoryTire), у кадра карточки — тоже
+      theory: () => buildTireTheoryHTML(ensureFactoryTire()) },
   ]},
   { title: '📱 Тарифы', modes: [
     { id: 'tariff1', title: 'Стоимость связи по тарифу', gen: gen_tariff1 },
     { id: 'tariff2', title: 'Сравнение двух тарифов', gen: gen_tariff2 },
   ]},
 ];
-const SOON_THEMES = ['🏡 Участок', '🏠 Квартира', '🔥 Печь для бани', '📄 Листы бумаги', '🗺️ План местности'];
+/* ═══════════════ задания из открытого банка ФИПИ ═══════════════
+   №1–5 банка ФИПИ — oge1_5-fipi-bank.js, собран скриптами
+   fipi-pilot/tools/n15_*.py. Общий текст сюжета в банке — отдельный блок, за
+   ним задания; у сюжета несколько текстов (вариантов), у каждого свои числа.
+   Пока в банке сюжет «Шины»: 20 текстов, все считаются по числам, без
+   рисунков. Текст у всех 20 одинаковый, кроме заводской шины, — поэтому
+   теория наша (с нашими рисунками), а из банка — заводская шина, таблица и
+   числа заданий; условие и решение строят те же build_tire_*, что «Шину 1».
+   Группа «Шины · ФИПИ»: открыт один текст, задания 1–5 по порядку. ⟳ и
+   «Следующий пример» — следующий текст без повторов (теория меняется
+   вместе с ним), «+» — то же задание из другого текста. Ученику — только
+   задания с ответом, принятым сайтом ФИПИ (checked); ?all=1 — все. */
+const FIPI15 = window.OGE1_5_FIPI || null;
+const FIPI15_ALL = new URLSearchParams(location.search).get('all') === '1';
+const TIRE_KINDS = ['width', 'side', 'diam', 'ddiam', 'run'];
+const TIRE_FIPI_KEY = 'ogeProg:oge1_5:tireFipi';
+// тексты, у которых есть хотя бы одно задание, видное этому пользователю
+const TIRE_FIPI = FIPI15 ? FIPI15.plots.tire.map(v => Object.assign({}, v, {
+  tasks: FIPI15.tasks.filter(t => t.plot === 'tire' && t.v === v.v && (t.checked || FIPI15_ALL)) })).filter(v => v.tasks.length) : [];
+let curTireFipiVar = null;
+function tireFipiState(){
+  try { return JSON.parse(localStorage.getItem(TIRE_FIPI_KEY)) || {}; } catch (e) { return {}; }
+}
+function saveTireFipiState(st){ try { localStorage.setItem(TIRE_FIPI_KEY, JSON.stringify(st)); } catch (e) {} }
+function tireFipiVar(){
+  if (curTireFipiVar === null || !TIRE_FIPI.some(v => v.v === curTireFipiVar)) {
+    const st = tireFipiState();
+    curTireFipiVar = TIRE_FIPI.some(v => v.v === st.v) ? st.v : pick(TIRE_FIPI).v;
+  }
+  return TIRE_FIPI.find(v => v.v === curTireFipiVar);
+}
+// следующий текст — среди ещё не открытых, без повторов, пока не пройдены все
+function nextTireFipiVar(){
+  const st = tireFipiState();
+  const seen = new Set([...(st.seen || []), curTireFipiVar]);
+  let rest = TIRE_FIPI.filter(v => !seen.has(v.v));
+  if (!rest.length) { seen.clear(); rest = TIRE_FIPI.filter(v => v.v !== curTireFipiVar); }
+  curTireFipiVar = (rest.length ? pick(rest) : TIRE_FIPI[0]).v;
+  seen.add(curTireFipiVar);
+  saveTireFipiState({ v: curTireFipiVar, seen: [...seen] });
+}
+const tireOf = a => ({ width: a[0], profile: a[1], rim: a[2] });
+function tireFipiTaskOf(v, t){
+  const ft = tireOf(v.factory);
+  const x = t.kind === 'width' ? build_tire_width(v.table, t.args[0], !!t.args[1])
+    : t.kind === 'side' ? build_tire_side(tireOf(t.args))
+    : t.kind === 'diam' ? build_tire_diam(ft)
+    : t.kind === 'ddiam' ? build_tire_ddiam(ft, tireOf(t.args)) : build_tire_run(ft, tireOf(t.args));
+  // поля — только когда они есть: undefined пропадает в снимке сессии
+  return Object.assign(x, { fipi: t.fipi, tireVar: v.v }, t.checked ? {} : { unchecked: true });
+}
+const IS_CARD_FRAME = new URLSearchParams(location.search).get('card') === '1';
+function gen_tire_fipi(kind){
+  const has = TIRE_FIPI.filter(v => v.tasks.some(t => t.kind === kind));
+  // на странице — задание открытого текста (его теория над заданием); в кадре
+  // карточки «+», «ещё такое же» и в «Случайно» — из любого текста: NoRepeat
+  // с avoid сам не даст повторить основное и соседние карточки
+  let v = (IS_CARD_FRAME || curMode === 'random') ? pick(has) : tireFipiVar();
+  if (!v.tasks.some(t => t.kind === kind)) v = pick(has);   // в одном тексте ФИПИ нет задания 4
+  return tireFipiTaskOf(v, v.tasks.find(t => t.kind === kind));
+}
+if (TIRE_FIPI.length) {
+  const n = TIRE_FIPI.length;
+  GROUPS[0].modes.push({ id: 'tire_fipi', title: 'Шины · задания ФИПИ', kind: 'taskset', fipi: true,
+    sub: `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'текст' : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? 'текста' : 'текстов'} ФИПИ`,
+    tasks: TIRE_KINDS.map((k, i) => ({ id: 'tirefipi_t' + (i + 1), title: 'Задание ' + (i + 1),
+      gen: () => gen_tire_fipi(k) })),
+    theory: () => buildTireTheoryHTML(tireOf(tireFipiVar().factory)) });
+}
+function fipiNoteText(task){
+  if (!task || !task.fipi) return '';
+  return 'Источник: открытый банк заданий ФИПИ, задание ' + task.fipi + (task.unchecked ? ' (ответ ещё не сверен с сайтом ФИПИ)' : '');
+}
+/* Листы бумаги и печь для бани из банка ФИПИ (n15_more.py). У каждого
+   сюжета ОДИН текст, а на каждый номер 1–5 — несколько заданий ФИПИ (у листов
+   по 4, у бани по 2) со своей формулировкой, поэтому условие хранится в банке
+   как есть (prompt — с таблицами ФИПИ), решение — строками (sol), а не
+   строится страницей, как у шин. Задание номера — случайное из его заданий
+   ФИПИ; NoRepeat (avoid) не повторяет только что решённое. У бани задание 5
+   (радиус арки печи) — по рисунку, ждёт картинок ФИПИ: его в теме нет.
+   Наших заданий «на основе ФИПИ» здесь нет — пока только ФИПИ. */
+const PLOT_FIPI = [
+  { plot: 'paper', group: '📄 Листы бумаги', title: 'Листы бумаги · задания ФИПИ' },
+  { plot: 'bath', group: '🔥 Печь для бани', title: 'Печь для бани · задания ФИПИ' },
+];
+function plotFipiTask(plot, n){
+  const t = pick(FIPI15.tasks.filter(x => x.plot === plot && x.n === n && (x.checked || FIPI15_ALL)));
+  const ans = fmtNum(t.ans);
+  const last = t.sol[t.sol.length - 1] || '';
+  return Object.assign({
+    type: 'input', correctValue: t.ans, prompt: t.prompt,
+    explain: solHTML(t.sol) + (/Ответ/.test(last) ? '' : `<b>Ответ: ${ans}.</b>`),
+    fipi: t.fipi,
+  }, t.checked ? {} : { unchecked: true });
+}
+const PLOT_FIPI_ON = [];
+PLOT_FIPI.forEach(p => {
+  if (!FIPI15 || !FIPI15.plots[p.plot]) return;
+  const vis = FIPI15.tasks.filter(t => t.plot === p.plot && (t.checked || FIPI15_ALL));
+  const nums = [1, 2, 3, 4, 5].filter(n => vis.some(t => t.n === n));
+  if (!nums.length) return;
+  PLOT_FIPI_ON.push(p.group);
+  GROUPS.push({ title: p.group, modes: [{ id: p.plot + '_fipi', title: p.title, kind: 'taskset', fipi: true,
+    sub: `${vis.length} заданий ФИПИ`,
+    tasks: nums.map(n => ({ id: p.plot + 'fipi_t' + n, title: 'Задание ' + n, gen: () => plotFipiTask(p.plot, n) })),
+    theory: () => `<div class="fipi-plot-text">${FIPI15.plots[p.plot].theory}</div>` }] });
+});
+// темы «скоро» — без тех, что уже пришли из банка ФИПИ (ответы сверены или ?all=1)
+const SOON_THEMES = ['🏡 Участок', '🏠 Квартира', '🔥 Печь для бани', '📄 Листы бумаги', '🗺️ План местности'].filter(t => PLOT_FIPI_ON.indexOf(t) < 0);
 const ALL_MODES = GROUPS.flatMap(g => g.modes.flatMap(m => m.kind === 'taskset' ? m.tasks.filter(t => t.gen) : [m]));
 // «Случайно» — только из генераторов: задания демоверсии всегда одни и те же
 const RANDOM_MODES = ALL_MODES.filter(m => !m.demo);
@@ -1360,7 +1538,7 @@ function renderPicker() {
     <div class="modes">
       ${g.modes.map(m => {
         const badges = pickerBadgeFor(m);
-        return `<div class="mode-card${m.demo ? ' demo' : ''}" data-id="${m.id}"><div class="mtitle">${m.title}</div>${badges ? `<div class="mode-medals">${badges}</div>` : ''}</div>`;
+        return `<div class="mode-card${m.demo ? ' demo' : ''}" data-id="${m.id}"><div class="mtitle">${m.title}</div>${m.sub ? `<div class="msub">${m.sub}</div>` : ''}${badges ? `<div class="mode-medals">${badges}</div>` : ''}</div>`;
       }).join('')}
     </div>
   `).join('');
@@ -1413,7 +1591,8 @@ function enterTaskset(tasksetMode) {
     }
     curTasksetTheory = buildTireTheoryHTML(curFactoryTire);
   } else if (tasksetMode.theory) {
-    // у тем с постоянной теорией (Шина 0 из демоверсии) она строится сразу
+    // у тем с постоянной теорией (Шина 0 из демоверсии) она строится сразу;
+    // у «Шин · ФИПИ» — по открытому тексту
     curTasksetTheory = tasksetMode.theory();
   }
   setCurMode(tasksetMode.tasks[0].id);
@@ -1424,6 +1603,7 @@ function enterTaskset(tasksetMode) {
    для тех случаев, когда автоматика (см. enterTaskset) не подходит: например,
    учитель хочет начать тему с нуля, не дожидаясь, пока ученик решит все 5 */
 function rerollFactoryTire() {
+  if (curTasksetRef && curTasksetRef.id === 'tire_fipi') { switchTireFipiVar(true); return; }
   if (!curTasksetRef || curTasksetRef.id !== 'tire_set1') return;
   if (!confirm('Выбрать новую заводскую шину и начать «Шину 1» заново?\nПрогресс по всем 5 заданиям этой темы будет сброшен.')) return;
   curFactoryTire = pickFactoryTire();
@@ -1435,6 +1615,32 @@ function rerollFactoryTire() {
   openTask();
 }
 els.newTireBtn.onclick = rerollFactoryTire;
+/* «Шины · ФИПИ»: другой текст. Задания прежнего текста стираются из памяти
+   тем — иначе возврат к «Заданию 2» показал бы задание старого текста под
+   новой теорией. toFirst — с кнопки «Другой текст»: с задания 1; с ⟳ —
+   то же задание нового текста */
+function switchTireFipiVar(toFirst){
+  nextTireFipiVar();
+  curTasksetRef.tasks.forEach(t => clearProg(t.id));
+  curTasksetTheory = curTasksetRef.theory();
+  if (toFirst) setCurMode(curTasksetRef.tasks[0].id);
+  curSubMode = curSubMode || 'exam';
+  openTask();
+}
+// ⟳ в «Шинах · ФИПИ» — то же задание следующего текста; «Следующий пример»
+// после ответа — следующее задание этого текста, после пятого — новый текст
+// с задания 1: так задания идут 1–5 по порядку, как на экзамене. В
+// остальных темах — как было
+function nextExample(){
+  if (curTasksetRef && curTasksetRef.id === 'tire_fipi') switchTireFipiVar(false);
+  else newTask();
+}
+function nextAfterAnswer(){
+  if (!(curTasksetRef && curTasksetRef.id === 'tire_fipi')) { newTask(); return; }
+  const i = curTasksetRef.tasks.findIndex(t => t.id === curMode);
+  if (i >= 0 && i < curTasksetRef.tasks.length - 1) navigateTaskset(1);
+  else switchTireFipiVar(true);
+}
 
 els.theoryBasketAddBtn.onclick = () => {
   if (!window.Basket) return;
@@ -1473,9 +1679,9 @@ function openTask() {
   els.taskArea.style.display = 'block';
   window.scrollTo(0, 0);
   // у присоединившегося к сессии тема не выбиралась кликом — он получает
-  // только id задания. Для темы с постоянной теорией (Шина 0) восстанавливаем
-  // её по этому id: теория и навигация «Задание N из 5» — как у ведущего.
-  // «Шину 1» так не трогаем: её заводская шина у каждого своя
+  // только id задания. Восстанавливаем тему по этому id: теория и навигация
+  // «Задание N из 5» — как у ведущего. Заводская шина «Шины 1» и текст «Шин ·
+  // ФИПИ» приходят в снимке (factoryTire, tireFipiVar) раньше, чем сюда
   if (!curTasksetRef) {
     const ts = GROUPS.flatMap(g => g.modes).find(x => x.kind === 'taskset' && x.theory && x.tasks.some(t => t.id === curMode));
     if (ts) { curTasksetRef = ts; curTasksetTheory = ts.theory(); }
@@ -1502,7 +1708,9 @@ function openTask() {
     els.theoryContent.innerHTML = curTasksetTheory;
     els.theoryContent.style.display = 'none';
     els.theoryToggleBtn.textContent = '📖 Показать теорию';
-    els.newTireBtn.style.display = (curTasksetRef && curTasksetRef.id === 'tire_set1') ? 'inline-flex' : 'none';
+    const tireBtn = curTasksetRef && (curTasksetRef.id === 'tire_set1' || curTasksetRef.id === 'tire_fipi');
+    els.newTireBtn.style.display = tireBtn ? 'inline-flex' : 'none';
+    els.newTireBtn.textContent = curTasksetRef && curTasksetRef.id === 'tire_fipi' ? '🔄 Другой текст ФИПИ' : '🔄 Новая шина';
     els.theoryBasketAddBtn.style.display = 'inline-flex';
   } else {
     els.theoryBlock.style.display = 'none';
@@ -1512,7 +1720,21 @@ function openTask() {
 
   updateTasksetNav();
   updateTypeNav();
+  syncVideoBtn();
   switchSubMode(curSubMode, true);
+}
+/* «Смотреть разбор» — только если к блоку текущего задания привязано видео
+   (video-links.js). В кадре карточки «+» кнопки нет: карточка — копия
+   задания рядом с основным, второй плеер там не нужен. «Случайно» — не
+   блок, видео к нему не привязать. */
+function syncVideoBtn() {
+  const row = document.getElementById('videoRow');
+  if (!row || !window.VideoPlayer) return;
+  const g = curMode && curMode !== 'random' && !IS_CARD_FRAME
+    ? findGroupOf(curTasksetRef ? curTasksetRef.id : curMode) : null;
+  const v = g && g.key ? VideoPlayer.findFor({ page: 'oge1_5', block: g.key, task: curMode }) : null;
+  VideoPlayer.syncButton(document.getElementById('videoBtn'), v);
+  row.hidden = !v;
 }
 els.theoryToggleBtn.onclick = () => {
   const isOpen = els.theoryContent.style.display !== 'none';
@@ -1527,7 +1749,7 @@ els.backBtn.onclick = () => {
   syncKeypadVisibility();
   renderPicker();
 };
-els.refreshBtn.onclick = () => { if (curSubMode === 'exam' || curSubMode === 'practice') newTask(); };
+els.refreshBtn.onclick = () => { if (curSubMode === 'exam' || curSubMode === 'practice') nextExample(); };
 
 els.basketAddBtn = document.getElementById('basketAddBtn');
 els.basketAddBtn.onclick = () => {
@@ -1621,6 +1843,10 @@ function renderCurrentTask(){
   els.questionPanel.style.display = 'block';
   els.questionPromptText.innerHTML = curTask.prompt;
   els.changeAnswerBtn.style.display = 'none';
+  // подпись — по полю задания: так она приходит и со снимком сессии
+  const note = document.getElementById('sourceNote'), noteText = fipiNoteText(curTask);
+  note.textContent = noteText;
+  note.style.display = noteText ? 'block' : 'none';
 
   if (curTask.type === 'input') {
     els.mcqTitle.style.display = 'none';
@@ -1908,7 +2134,7 @@ function finishTask(isFreshSolve) {
   els.mainPanel.classList.add('reveal');
   els.showSolutionBtn.style.display = 'none';
 }
-els.nextBtn.onclick = newTask;
+els.nextBtn.onclick = nextAfterAnswer;
 
 /* «Тренировка»: показать решение и ответ сразу, без прохождения интерактивной
    проверки — не засчитывается в статистику решено/ошибок. Кнопка работает как
@@ -2166,6 +2392,12 @@ function tsGetState(){
     taskAnswered: typeof taskAnswered !== 'undefined' ? !!taskAnswered : false,
     hadWrongPick: typeof hadWrongPick !== 'undefined' ? !!hadWrongPick : false,
   };
+  // заводская шина «Шины 1» и открытый текст «Шин · ФИПИ» — в снимок: по
+  // ним кадр карточки «+», «ещё такое же» на доске и собеседник считают
+  // задания 3–5 и строят теорию. Раньше шины в снимке не было, и кадр брал
+  // случайную — ответ считался не от той шины, что в теории
+  if (curFactoryTire) base.factoryTire = curFactoryTire;
+  if (curTireFipiVar !== null) base.tireFipiVar = curTireFipiVar;
   if (window.__boardGetState) Object.assign(base, window.__boardGetState());
   if (window.__cardsGetState) Object.assign(base, window.__cardsGetState()); // Промпт №33 — добавленные примеры
   return base;
@@ -2176,6 +2408,19 @@ function tsApplyState(state){
   if (window.__boardApplyState) window.__boardApplyState(state);
   if (window.__cardsApplyState) window.__cardsApplyState(state); // Промпт №33
   if (typeof state.picker === 'undefined') return; // снимок без задания (пустая сессия)
+  // шина и текст — до openTask(): по ним строится теория темы. Шина
+  // собеседника в localStorage не пишется — это его занятие, а не своя тема
+  let tireChanged = false;
+  if (state.factoryTire && JSON.stringify(state.factoryTire) !== JSON.stringify(curFactoryTire)) {
+    curFactoryTire = state.factoryTire; tireChanged = true;
+  }
+  if (typeof state.tireFipiVar === 'number' && state.tireFipiVar !== curTireFipiVar) {
+    curTireFipiVar = state.tireFipiVar; tireChanged = true;
+  }
+  if (tireChanged && curTasksetRef && curTasksetRef.theory && els.picker.style.display === 'none') {
+    curTasksetTheory = curTasksetRef.theory();
+    els.theoryContent.innerHTML = curTasksetTheory;
+  }
 
   if (state.picker) {
     if (els.picker.style.display === 'none') {
