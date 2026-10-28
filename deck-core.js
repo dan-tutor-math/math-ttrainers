@@ -181,13 +181,23 @@ function deckArea(){
   const W = window.innerWidth, H = window.innerHeight, gap = 14;
   // №105: в показе интерфейса нет — слайд на всю вкладку с узким полем
   if (document.documentElement.classList.contains('deck-show')){
-    const m = 8, x0 = Math.max(m, m - boardInset);
-    return { x: x0, y: m, w: Math.max(80, Math.min(cssW, W - boardInset) - x0 - m), h: Math.max(60, Math.min(cssH, H) - 2 * m) };
+    // инструменты доски в показе видны — слайд не уходит под их панель
+    const m = 8, si = { l: m, t: m, r: m, b: m };
+    if (document.documentElement.classList.contains('deck-show-tools')) deckAreaInsets(['bdDock'], si, W, H, gap);
+    const x0 = Math.max(m, si.l - boardInset);
+    return { x: x0, y: si.t, w: Math.max(80, Math.min(cssW, W - boardInset) - x0 - si.r), h: Math.max(60, Math.min(cssH, H) - si.t - si.b) };
   }
   const ins = { l: 16, t: 16, r: 16, b: 16 };
   const top = document.querySelector('.bd-topbar');
   if (top) ins.t = Math.max(ins.t, top.getBoundingClientRect().bottom + gap);
-  ['bdRail', 'bdDock', 'deckNav', 'deckStrip', 'deckScrub'].forEach(id => {
+  deckAreaInsets(['bdRail', 'bdDock', 'deckNav', 'deckStrip', 'deckScrub'], ins, W, H, gap);
+  const x0 = Math.max(16, ins.l - boardInset), x1 = Math.min(cssW - 16, W - ins.r - boardInset);
+  const y0 = ins.t, y1 = Math.min(cssH, H) - ins.b;
+  return { x: x0, y: y0, w: Math.max(80, x1 - x0), h: Math.max(60, y1 - y0) };
+}
+// отступы ins от краёв окна под панели ids (край панели — по её форме и месту)
+function deckAreaInsets(ids, ins, W, H, gap){
+  ids.forEach(id => {
     const el = document.getElementById(id);
     if (!el || el.hidden) return;
     const r = el.getBoundingClientRect();
@@ -199,9 +209,6 @@ function deckArea(){
     else if (e === 't') ins.t = Math.max(ins.t, r.bottom + gap);
     else ins.b = Math.max(ins.b, H - r.top + gap);
   });
-  const x0 = Math.max(16, ins.l - boardInset), x1 = Math.min(cssW - 16, W - ins.r - boardInset);
-  const y0 = ins.t, y1 = Math.min(cssH, H) - ins.b;
-  return { x: x0, y: y0, w: Math.max(80, x1 - x0), h: Math.max(60, y1 - y0) };
 }
 // «вписан» оставляет по краям, куда листают, место под выглядывающих соседей
 function deckFitZoom(s){

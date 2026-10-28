@@ -1211,7 +1211,21 @@ function dtbSlideMenu(btn){
 let dtbShow = null;        // { mode, flow, tool, color, width, opacity } — что вернуть после показа
 let dtbShowTool = 'nav';   // nav | pen | marker | eraser | laser
 let dtbShowIdle = 0;
+let dtbShowInner = false;  // инструмент меняет сам показ (dtbShowSetTool), а не щелчок по панели доски
 function dtbShowOn(){ return !!dtbShow; }
+// Инструменты доски в показе: вся панель (dock) с цветами и толщиной видна,
+// как в обычном режиме, — рисовать можно чем угодно, не только пером и
+// маркером. «Скрыть» на панели убирает её, «Инструменты» в полосе — возвращает.
+// Выбор помним (localStorage boardsDeckShowTools). Только у того, кто ведёт
+// показ: ученику признак показа приходит отдельно (deckViewerView), ему не надо
+function dtbShowToolsPref(){ try { return localStorage.getItem('boardsDeckShowTools') !== '0'; } catch (e) { return true; } }
+function dtbShowSetToolsVisible(on, save){
+  if (save){ try { localStorage.setItem('boardsDeckShowTools', on ? '1' : '0'); } catch (e) {} }
+  document.documentElement.classList.toggle('deck-show-tools', !!(on && dtbShow));
+  document.querySelector('#dtbShowBar [data-sh="tools"]')?.setAttribute('aria-pressed', on ? 'true' : 'false');
+  // слайд вписывается заново: панель забирает край вкладки или отдаёт его
+  if (dtbShow) requestAnimationFrame(() => { deckGo(deckCurIndex(), 0); });
+}
 function dtbVisibleIdx(){ return deckSlides().map((s, i) => s.hide ? -1 : i).filter(i => i >= 0); }
 // ближайший нескрытый слайд от i в сторону dir (0 — сам i или следующий)
 function dtbShowFind(i, dir){
@@ -1234,6 +1248,7 @@ function dtbShowStart(fromStart){
   if (deckIsTeacher()) deckSetMode('lesson');
   if (deckFlow() === 'scroll') deckSetFlow('v', true);
   dtbShowBuildBar();
+  dtbShowSetToolsVisible(dtbShowToolsPref(), false);
   dtbShowSetTool('nav');
   try { document.activeElement && document.activeElement.blur && document.activeElement.blur(); } catch (e) {}
   // панели спрятаны — места стало больше; вписываем, когда раскладка обновится
@@ -1244,7 +1259,7 @@ function dtbShowStop(){
   if (!dtbShow) return;
   const st = dtbShow;
   dtbShow = null;
-  document.documentElement.classList.remove('deck-show', 'dtb-show-idle');
+  document.documentElement.classList.remove('deck-show', 'dtb-show-idle', 'deck-show-tools');
   document.getElementById('dtbLaser')?.remove();
   // инструмент и перо — как были до показа
   curColorTok = st.color; curWidth = st.width; curOpacity = st.opacity;
@@ -1283,7 +1298,8 @@ function dtbShowBuildBar(){
     '<span class="dtb-show-no" id="dtbShowNo">1 / 1</span>' +
     '<button type="button" data-sh="next" title="Следующий (→, пробел)">' + ic('<path d="M9 5l7 7-7 7" stroke-linejoin="round"/>') + '</button><i class="dtb-show-sep"></i>' +
     DTB_SHOW_TOOLS.map(t => '<button type="button" data-tool-show="' + t.id + '" title="' + t.label + '" aria-pressed="false">' + ic(t.icon) + '</button>').join('') +
-    '<i class="dtb-show-sep"></i><button type="button" data-sh="clear" class="txt" title="Стереть пометки на этом слайде">Очистить</button>' +
+    '<i class="dtb-show-sep"></i><button type="button" data-sh="tools" class="txt" title="Показать или скрыть инструменты доски" aria-pressed="false">Инструменты</button>' +
+    '<button type="button" data-sh="clear" class="txt" title="Стереть пометки на этом слайде">Очистить</button>' +
     '<button type="button" data-sh="exit" class="txt" title="Выйти из показа (Esc)">Выйти</button>';
   (document.getElementById('screenBoard') || document.body).appendChild(bar);
   bar.addEventListener('click', (e) => {
@@ -1293,16 +1309,40 @@ function dtbShowBuildBar(){
     const a = b.dataset.sh;
     if (a === 'prev') dtbShowStep(-1);
     else if (a === 'next') dtbShowStep(1);
+    else if (a === 'tools') dtbShowSetToolsVisible(!document.documentElement.classList.contains('deck-show-tools'), true);
     else if (a === 'clear') deckClearNotes(false);
     else if (a === 'exit') dtbShowStop();
   });
   // кнопки полосы не начинают штрих и не листают
   bar.addEventListener('pointerdown', (e) => e.stopPropagation());
+  // «Скрыть» — на самой панели инструментов, видна только в показе (CSS)
+  const tools = document.getElementById('bdDockTools');
+  if (tools && !document.getElementById('dtbDockHide')){
+    const h = document.createElement('button');
+    h.type = 'button'; h.id = 'dtbDockHide'; h.className = 'dtb-dock-hide';
+    h.title = 'Скрыть инструменты (вернуть — «Инструменты» внизу)';
+    h.textContent = 'Скрыть';
+    h.addEventListener('click', () => dtbShowSetToolsVisible(false, true));
+    tools.appendChild(h);
+    // инструмент выбрали на панели доски (щелчком или цифрой) — указатель
+    // показа больше не листает по щелчку, иначе линию или текст не провести
+    tools.addEventListener('click', (e) => {
+      const b = e.target.closest('.bd-tool[data-tool]');
+      if (!dtbShow || dtbShowInner || !b) return;
+      const t = b.dataset.tool;
+      dtbShowMark(t === 'hand' ? 'nav' : t === 'eraser' ? 'eraser' : 'board');
+      if (t !== 'hand') document.getElementById('dtbLaser')?.remove();
+    });
+  }
 }
-function dtbShowSetTool(t){
+// отметить инструмент в полосе показа (board — любой инструмент панели доски)
+function dtbShowMark(t){
   dtbShowTool = t;
   document.querySelectorAll('#dtbShowBar [data-tool-show]').forEach(b => b.setAttribute('aria-pressed', b.dataset.toolShow === t ? 'true' : 'false'));
   document.documentElement.dataset.showTool = t;
+}
+function dtbShowSetTool(t){
+  dtbShowMark(t);
   const st = dtbShow;
   if (!st) return;
   // перо и маркер — свои цвет и толщина на время показа, как в PowerPoint
@@ -1310,7 +1350,8 @@ function dtbShowSetTool(t){
   else if (t === 'marker'){ curColorTok = '#FFD400'; curWidth = 16; curOpacity = true; }
   else { curColorTok = st.color; curWidth = st.width; curOpacity = st.opacity; }
   const boardTool = t === 'pen' || t === 'marker' ? 'pen' : t === 'eraser' ? 'eraser' : 'hand';
-  document.querySelector('.bd-tool[data-tool="' + boardTool + '"]')?.click();
+  dtbShowInner = true;
+  try { document.querySelector('.bd-tool[data-tool="' + boardTool + '"]')?.click(); } finally { dtbShowInner = false; }
   if (t !== 'laser') document.getElementById('dtbLaser')?.remove();
 }
 function dtbShowSync(){
@@ -1336,6 +1377,9 @@ function dtbShowInit(){
       if (e.key === 'F5' || (e.key === 'Enter' && e.metaKey)){ e.preventDefault(); e.stopImmediatePropagation(); dtbShowStart(e.key === 'F5' ? !e.shiftKey : e.shiftKey); }
       return;
     }
+    // текст или формула набираются инструментом доски — пробел, Enter и
+    // Backspace достаются полю, а не листают (Esc — тоже полю: закрыть его)
+    if (typing) return;
     let dir = 0;
     if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter', 'n', 'N'].includes(e.key)) dir = 1;
     else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace', 'p', 'P'].includes(e.key)) dir = -1;
@@ -1552,7 +1596,17 @@ function dtbInjectStyle(){
     '.deck-thumb-hid svg{width:16px;height:16px;display:block}',
     // №105: режим показа — интерфейс доски спрятан, фон тёмный (и у ученика)
     'html.deck-show,html.deck-show body,html.deck-show #screenBoard{background:#121418!important}',
-    'html.deck-show #screenBoard > :not(#boardCv):not(#bdTaskLayer):not(#deckToast):not(#bdEraserRing):not(#dtbShowBar){display:none!important}',
+    'html.deck-show:not(.deck-show-tools) #screenBoard > :not(#boardCv):not(#bdTaskLayer):not(#deckToast):not(#bdEraserRing):not(#dtbShowBar){display:none!important}',
+    // инструменты в показе: панель доски и всё, что она открывает (цвета и
+    // толщина, паттерны, фигуры, формула, вставка картинки, меню объекта)
+    'html.deck-show.deck-show-tools #screenBoard > :not(#boardCv):not(#bdTaskLayer):not(#deckToast):not(#bdEraserRing):not(#dtbShowBar):not(#bdDock):not(#bdOptbar):not(#bdPatterns):not(#bdFormulaEditor):not(#bdImgSrcPop):not(#bdFigMenu):not(#bdFigPanel):not(#bdCtxMenu):not(#bdDropOverlay){display:none!important}',
+    '.dtb-dock-hide{display:none}',
+    'html.deck-show-tools .dtb-dock-hide{display:inline-flex;align-items:center;justify-content:center;flex:none;position:relative;z-index:1;height:34px;padding:0 10px;margin-left:4px;border:none;border-radius:10px;background:rgba(127,127,127,.16);color:inherit;font:600 12px var(--font-ui);cursor:pointer}',
+    'html.deck-show-tools .dtb-dock-hide:hover{background:rgba(127,127,127,.28)}',
+    '.bd-dock.pos-left .dtb-dock-hide,.bd-dock.pos-right .dtb-dock-hide{margin:4px 0 0;padding:0 4px;font-size:11px}',
+    // снизу — панель инструментов; полоса показа уходит наверх, чтобы не наложиться
+    'html.deck-show.deck-show-tools .dtb-show-bar{top:12px;bottom:auto}',
+    'html.deck-show.deck-show-tools.dtb-show-idle .dtb-show-bar{transform:translate(-50%,-12px)}',
     'html.deck-show body > .lg-menu,html.deck-show body > .lg-ftip,html.deck-show #authUserPill,html.deck-show .ts-share-pop,html.deck-show #bdSharePop,html.deck-show .dtb-pop,html.deck-show #dtbMoreMenu{display:none!important}',
     'html.deck-show[data-show-tool="nav"] #boardCv{cursor:default!important}',
     'html.deck-show[data-show-tool="laser"] #boardCv,html.deck-show.dtb-show-idle #boardCv{cursor:none!important}',

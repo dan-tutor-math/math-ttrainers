@@ -56,6 +56,8 @@ def main():
         page = browser.new_page(viewport={"width": 1400, "height": 900})
         page.on("pageerror", lambda e: errors.append(str(e)))
         page.goto(T.BASE + "/boards.html")
+        # здесь — показ без инструментов доски (они — test_prompt_deck_show_tools.py)
+        page.evaluate("() => localStorage.setItem('boardsDeckShowTools', '0')")
         page.evaluate(T.BOOT_JS)
         page.click("#blCreateDeck")
         page.wait_for_function("() => B && B.kind === 'deck' && boardActive && typeof dtbShowStart === 'function'")
