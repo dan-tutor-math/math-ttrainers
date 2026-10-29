@@ -28,22 +28,13 @@
    ═══════════════════════════════════════════════════════════════════════ */
 window.VIDEO_LINKS = {
   videos: [
-    // Разбор шин ОГЭ №1–5. hls_url пустой, пока ролик не записан и не
-    // загружен: кнопка «Смотреть разбор» появится, когда сюда встанет ссылка
-    // из вывода скрипта нарезки.
-    { slug: 'oge1-5-tire-razbor', title: 'Шины: разбор заданий 1–5', kind: 'razbor', duration: 0,
-      hls_url: '',
-      poster_url: '',
-      chapters: [] },
-    // Тестовый ролик (цветные полосы ffmpeg testsrc) — проверить плеер и
-    // хранилище на сайте до настоящей записи. Когда разбор шин будет
-    // загружен, ссылку шин вернуть на oge1-5-tire-razbor, эту запись удалить.
-    { slug: 'test-video', title: 'Тестовый ролик (проверка плеера)', kind: 'razbor', duration: 30,
-      hls_url: 'https://mathh-video.s3.cloud.ru/test-video/20261028-154920/master.m3u8',
-      poster_url: 'https://mathh-video.s3.cloud.ru/test-video/20261028-154920/poster.jpg',
-      chapters: [{ t: 0, title: 'Начало' }, { t: 10, title: 'Середина' }, { t: 20, title: 'Конец' }] },
+    // Разбор шин ОГЭ №1–5 (монтаж v7, 30.10.2026): теория, задания 1–5, итог формул
+    { slug: 'oge1-5-tire-razbor', title: 'Шины: разбор заданий 1–5', kind: 'razbor', duration: 1309,
+      hls_url: 'https://mathh-video.s3.cloud.ru/oge1-5-tire-razbor/20261030-003540/master.m3u8',
+      poster_url: 'https://mathh-video.s3.cloud.ru/oge1-5-tire-razbor/20261030-003540/poster.jpg',
+      chapters: [{ t: 0, title: 'Вступление' }, { t: 10, title: 'Теория: маркировка шины' }, { t: 190, title: 'Задание 1 — ширина шины' }, { t: 268, title: 'Задание 2 — высота боковины' }, { t: 456, title: 'Задание 3 — диаметр колеса' }, { t: 663, title: 'Задание 4 — на сколько уменьшится диаметр' }, { t: 828, title: 'Задание 5 — на сколько процентов увеличится пробег' }, { t: 1259, title: 'Все формулы шин' }] },
   ],
   links: [
-    { video_slug: 'test-video', page: 'oge1_5', block_key: 'tire', task_key: null },
+    { video_slug: 'oge1-5-tire-razbor', page: 'oge1_5', block_key: 'tire', task_key: null },
   ],
 };
