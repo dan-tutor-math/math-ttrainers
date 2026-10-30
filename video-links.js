@@ -37,7 +37,7 @@ window.VIDEO_LINKS = {
     { slug: 'oge8-stepeni-korni-razbor', title: 'ОГЭ №8: степени и корни', kind: 'razbor', duration: 4108,
       hls_url: 'https://mathh-video.s3.cloud.ru/oge8-stepeni-korni-razbor/20261030-005518/master.m3u8',
       poster_url: 'https://mathh-video.s3.cloud.ru/oge8-stepeni-korni-razbor/20261030-005518/poster.jpg',
-      chapters: [] },
+      chapters: [{ t: 0, title: 'Свойства степеней' }, { t: 172, title: 'Степень произведения и степень дроби' }, { t: 284, title: 'Свойства корней' }, { t: 383, title: 'Умножение степеней с одинаковым основанием' }, { t: 511, title: 'Деление степеней' }, { t: 626, title: 'Возведение степени в степень' }, { t: 971, title: 'Степени с переменными' }, { t: 1202, title: 'Степени с числами: приводим к одному основанию' }, { t: 1449, title: 'Отрицательные степени и дроби' }, { t: 1707, title: 'Степени разных чисел' }, { t: 2091, title: 'Корни из степеней чисел' }, { t: 2275, title: 'Число с корнем в квадрате' }, { t: 2491, title: 'Произведение корней' }, { t: 2816, title: 'Произведение и деление корней' }, { t: 2934, title: 'Сложение корней: выносим множитель' }, { t: 3113, title: 'Формулы сокращённого умножения с корнями' }, { t: 3525, title: 'Корни из выражений с переменной' }, { t: 3838, title: 'Квадрат суммы под корнем' }] },
   ],
   links: [
     { video_slug: 'oge1-5-tire-razbor', page: 'oge1_5', block_key: 'tire', task_key: null },
