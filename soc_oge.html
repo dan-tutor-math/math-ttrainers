@@ -283,8 +283,8 @@ const EXAM_ATTEMPTS = 3;
 function attemptsFor(t){ return t.k === 'one' ? 1 : EXAM_ATTEMPTS; }
 
 // Номера с кратким ответом по КИМ ОГЭ 2027 (20 заданий; банк ФИПИ в формате 2026,
-// перевод номеров — fipi-pilot/tools/classify_soc.py). Развёрнутые №1, 7, 8, 12 и №17–20
-// сайт ФИПИ не проверяет — у них будет своя страница с самопроверкой.
+// перевод номеров — fipi-pilot/tools/classify_soc.py). Развёрнутые №1, 7, 8, 12, 18–20
+// сайт ФИПИ не проверяет — они в soc_oge_long.html с самопроверкой по критериям.
 // Названия совпадают с SOC_OGE_TITLES в index.html.
 const NUMS = [
   {n:2,  title:'Пропуск в таблице'},
@@ -630,11 +630,14 @@ function goPicker(){
 }
 $('backBtn').addEventListener('click', goPicker);
 $('prevBtn').addEventListener('click', () => openTask(S.idx - 1));
-// соседний номер — по кругу и только среди номеров, где есть задания для ученика
+// соседний номер — по всем номерам ОГЭ-2027 по кругу, как в бланке: развёрнутые
+// (№1, 7, 8, 12, 18–20) живут в soc_oge_long.html, туда и переходим; №17 банком не представлен
+const ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20];
 function stepNumber(d){
-  const ns = NUMS.map(m => m.n).filter(n => (POOL[n] || []).length);
-  const i = ns.indexOf(S.n);
-  openNumber(ns[(i + d + ns.length) % ns.length]);
+  const i = ORDER.indexOf(S.n);
+  const n = ORDER[(i + d + ORDER.length) % ORDER.length];
+  if ((POOL[n] || []).length) openNumber(n);
+  else location.href = 'soc_oge_long.html?n=' + n;
 }
 $('prevTypeBtn').addEventListener('click', () => stepNumber(-1));
 $('nextTypeBtn').addEventListener('click', () => stepNumber(1));

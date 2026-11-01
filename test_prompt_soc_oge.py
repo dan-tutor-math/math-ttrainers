@@ -15,10 +15,10 @@
   4. №3: порядок внутри колонки — только подтверждённый ФИПИ, пока нет флага any;
      с флагом — любой; №2 — без регистра и «ё/е»;
   5. навигация: ◀ ▶ заданий по кругу, пара «Предыдущий / Следующий номер» (правило
-     «кнопки типов»), адрес ?n=…&t=… открывает то же задание, «← все задания» — на
+     «кнопки типов») по всем номерам ОГЭ-2027, развёрнутые — на soc_oge_long.html, адрес ?n=…&t=… открывает то же задание, «← все задания» — на
      index.html?subject=soc;
   6. главная: у обществознания 20 номеров ОГЭ 2027, №2 ведёт на soc_oge.html?n=2,
-     развёрнутые (№1, 7, 8, 12, 17–20) — «скоро»;
+     развёрнутые (№1, 7, 8, 12, 18–20) — на soc_oge_long.html, «скоро» только №17;
   7. тёмная тема и ширина телефона: без ошибок JS, без горизонтальной прокрутки,
      в №14 шапки колонок переезжают внутрь колонок; белый текст на залитых
      кнопках — контраст не ниже 4,5:1 в обеих темах.
@@ -249,10 +249,12 @@ def main():
         pg.click("#nextTypeBtn")
         check(pg.evaluate("window.__socOge.S.n") == 10 and "n=10" in pg.url, "«Следующий номер ▶» — с №9 на №10")
         pg.click("#prevTypeBtn"); pg.click("#prevTypeBtn")
-        check(pg.evaluate("window.__socOge.S.n") == 6, "«◀ Предыдущий номер» пропускает развёрнутые №7, 8")
-        pg.goto(BASE + "/soc_oge.html?n=2")
-        pg.click("#prevTypeBtn")
-        check(pg.evaluate("window.__socOge.S.n") == 16, "по кругу: с №2 назад — на №16")
+        pg.wait_for_url(lambda u: "soc_oge_long.html" in u, timeout=5000)
+        check("soc_oge_long.html?n=8" in pg.url, "«◀ Предыдущий номер» с №9 — на развёрнутый №8 (своя страница)")
+        pg.goto(BASE + "/soc_oge.html?n=16")
+        pg.click("#nextTypeBtn")
+        pg.wait_for_url(lambda u: "soc_oge_long.html" in u, timeout=5000)
+        check("n=18" in pg.url, "с №16 вперёд — на №18 (№17 банком не представлен)")
         pg.click("#backBtn")
         pg.wait_for_url(lambda u: "/index.html" in u, timeout=5000)
         check("/index.html" in pg.url, "«← все задания» — на главную")
@@ -269,8 +271,10 @@ def main():
         check(pg.locator('a.topic-item[href="soc_oge.html?n=2"]').count() == 1, "№2 ведёт на soc_oge.html?n=2")
         live = pg.eval_on_selector_all("a.topic-item[href^='soc_oge.html']", "els => els.length")
         check(live == 12, f"ссылок на номера с кратким ответом: {live}")
+        long_ = pg.eval_on_selector_all("a.topic-item[href^='soc_oge_long.html']", "els => els.map(e => e.getAttribute('href'))")
+        check(sorted(int(h.split('=')[1]) for h in long_) == [1, 7, 8, 12, 18, 19, 20], f"развёрнутые ведут на soc_oge_long.html: {long_}")
         soon = pg.eval_on_selector_all(".topic-item.soon .item-name", "els => els.map(e => e.textContent)")
-        check(sorted(int(re.match(r"№(\d+)", s).group(1)) for s in soon) == [1, 7, 8, 12, 17, 18, 19, 20], f"развёрнутые — «скоро»: {soon}")
+        check(sorted(int(re.match(r"№(\d+)", s).group(1)) for s in soon) == [17], f"«скоро» — только №17: {soon}")
         pg.context.close()
 
         print("7. тёмная тема, телефон, контраст")
