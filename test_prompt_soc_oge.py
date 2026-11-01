@@ -1,26 +1,26 @@
 """
-Тренажёр «ОГЭ. Обществознание» (soc_oge.html) — часть 1 с кратким ответом
-(№2–4, 7–11, 13–20) из открытого банка ФИПИ.
+Тренажёр «ОГЭ. Обществознание» (soc_oge.html) — задания с кратким ответом по КИМ 2027
+(№2–6, 9–11, 13–16) из открытого банка ФИПИ.
 
 Проверяет:
-  1. данные soc-oge-fipi.js целы: номера только части 1, у выбора — четыре варианта
-     и ключ 1–4, у №15 — цифры не больше числа пунктов справа, у №19 — четыре
-     цифры 1–4, у №20 — непустая строка; в вариантах нет обрывков разметки ФИПИ;
+  1. данные soc-oge-fipi.js целы: только номера КИМ 2027 с кратким ответом, у выбора —
+     четыре варианта и ключ 1–4, у №14 — цифры не больше числа пунктов справа, у №3 —
+     четыре цифры 1–4, у №2 — непустая строка; в вариантах нет обрывков разметки ФИПИ;
   2. ученик видит только задания с ответом, принятым сайтом ФИПИ; ?all=1 —
      предпросмотр, адрес без номера уводит на главную к обществознанию;
   3. все четыре вида ответа: верный засчитывается и запоминается, неверный —
-     красным; в «Экзамене» у выбора одна попытка, у №15, 19, 20 — три;
+     красным; в «Экзамене» у выбора одна попытка, у №2, 3, 14 — три;
      «Тренировка»: попыток сколько угодно, «Показать ответ» показывает и прячет,
      подсмотренное не идёт в «верно»;
-  4. №19: порядок внутри колонки — только подтверждённый ФИПИ, пока нет флага any;
-     с флагом — любой; №20 — без регистра и «ё/е»;
+  4. №3: порядок внутри колонки — только подтверждённый ФИПИ, пока нет флага any;
+     с флагом — любой; №2 — без регистра и «ё/е»;
   5. навигация: ◀ ▶ заданий по кругу, пара «Предыдущий / Следующий номер» (правило
      «кнопки типов»), адрес ?n=…&t=… открывает то же задание, «← все задания» — на
      index.html?subject=soc;
-  6. главная: у обществознания номера ОГЭ, №2 ведёт на soc_oge.html?n=2,
-     развёрнутые (№1, 5, 6, 12, 21–24) — «скоро»;
+  6. главная: у обществознания 20 номеров ОГЭ 2027, №2 ведёт на soc_oge.html?n=2,
+     развёрнутые (№1, 7, 8, 12, 17–20) — «скоро»;
   7. тёмная тема и ширина телефона: без ошибок JS, без горизонтальной прокрутки,
-     в №15 шапки колонок переезжают внутрь колонок; белый текст на залитых
+     в №14 шапки колонок переезжают внутрь колонок; белый текст на залитых
      кнопках — контраст не ниже 4,5:1 в обеих темах.
 
 Совместного режима у страницы нет — проверять на сайте руками нечего.
@@ -41,7 +41,7 @@ from playwright.sync_api import sync_playwright
 PORT = 8993
 BASE = f"http://127.0.0.1:{PORT}"
 HERE = os.path.dirname(os.path.abspath(__file__))
-PART1 = [2, 3, 4, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20]
+PART1 = [2, 3, 4, 5, 6, 9, 10, 11, 13, 14, 15, 16]
 
 
 @contextlib.contextmanager
@@ -99,9 +99,10 @@ def test_data(D):
         else:
             bad.append((t["id"], "вид"))
     check(not bad, f"ключи нужной формы (ошибок: {len(bad)} {bad[:5]})")
-    check(sorted({t["n"] for t in T}) == PART1, "в файле все номера части 1 с кратким ответом")
-    check({t["k"] for t in T if t["n"] == 15} == {"match"} and {t["k"] for t in T if t["n"] == 19} == {"pair"}
-          and {t["k"] for t in T if t["n"] == 20} == {"text"}, "№15 — соответствие, №19 — сравнение, №20 — строка")
+    check(sorted({t["n"] for t in T}) == PART1, "в файле все номера КИМ 2027 с кратким ответом")
+    check({t["k"] for t in T if t["n"] == 14} == {"match"} and {t["k"] for t in T if t["n"] == 3} == {"pair"}
+          and {t["k"] for t in T if t["n"] == 2} == {"text"}, "№14 — соответствие, №3 — сравнение, №2 — строка")
+    check({t["n"] for t in T if t.get("h")} == {4, 5}, "эвристикой подобраны только №4/№5")
     check(sum(t["ok"] for t in T) == len([t for t in T if t["a"]]), "ключ есть только у подтверждённых ФИПИ")
 
 
@@ -161,7 +162,7 @@ def main():
         okall = pg.evaluate("Object.values(window.__socOge.POOL).every(l => l.every(t => t.ok))")
         check(okall, "в задания ученика не попало ни одного несверенного ответа")
         pg.goto(BASE + "/soc_oge.html?all=1")
-        check(pg.eval_on_selector_all(".mode-card[data-n]:not([disabled])", "els => els.length") == 16, "?all=1 — открыты все 16 номеров")
+        check(pg.eval_on_selector_all(".mode-card[data-n]:not([disabled])", "els => els.length") == 12, "?all=1 — открыты все 12 номеров")
         th = next(t for t in D["tasks"] if t.get("h"))
         pg.goto(BASE + f"/soc_oge.html?all=1&n={th['n']}&t={th['id']}")
         check("номер подобран автоматически" in pg.inner_text(".source-note"), "в предпросмотре эвристическая раскладка помечена")
@@ -169,7 +170,7 @@ def main():
         check("автоматически" not in pg.inner_text(".source-note"), "у ученика этой пометки нет")
 
         print("3. виды ответа, «Экзамен» и «Тренировка»")
-        for n in (3, 15, 19, 20):
+        for n in (5, 14, 3, 2):
             t = first(D, n)
             att = 1 if t["k"] == "one" else 3
             pg = new_page()
@@ -212,33 +213,33 @@ def main():
             check(res.get(t3["id"]) == "shown", f"№{n}: подсмотренный ответ не засчитан как «верно»")
             pg.context.close()
 
-        print("4. №19 и №20: какие написания засчитываются")
+        print("4. №3 и №2: какие написания засчитываются")
         pg = new_page()
-        pg.goto(BASE + "/soc_oge.html?n=19")
+        pg.goto(BASE + "/soc_oge.html?n=3")
         r = pg.evaluate("""() => { const c = window.__socOge.checkAnswer; return [
             c({k:'pair', a:'1324'}, '1324'), c({k:'pair', a:'1324'}, '3142'),
             c({k:'pair', a:'1324', any:1}, '3142'), c({k:'pair', a:'1324', any:1}, '2413'),
             c({k:'text', a:'верховенство'}, '  Верховенство. '), c({k:'text', a:'объединение'}, 'обьединение'),
             c({k:'text', a:'учёба'}, 'учеба'), c({k:'text', a:'долг'}, '') ]; }""")
-        check(r[:2] == [True, False], "№19 без флага: только порядок, принятый ФИПИ")
-        check(r[2:4] == [True, False], "№19 с флагом any: любой порядок внутри колонок, но не перепутанные колонки")
-        check(r[4] and not r[5] and r[6] and not r[7], "№20: без регистра, пробелов и «ё/е»; пустое и опечатка — неверно")
-        t = first(D, 19)
-        pg.goto(BASE + f"/soc_oge.html?n=19&t={t['id']}")
+        check(r[:2] == [True, False], "№3 без флага: только порядок, принятый ФИПИ")
+        check(r[2:4] == [True, False], "№3 с флагом any: любой порядок внутри колонок, но не перепутанные колонки")
+        check(r[4] and not r[5] and r[6] and not r[7], "№2: без регистра, пробелов и «ё/е»; пустое и опечатка — неверно")
+        t = first(D, 3)
+        pg.goto(BASE + f"/soc_oge.html?n=3&t={t['id']}")
         pg.click("#tabPractice")
         pg.click("#showBtn")
         check(f"(в бланк: {t['a']})" in pg.inner_text(".answer-box") and "сходства:" in pg.inner_text(".answer-box"),
-              "№19: ответ показан по колонкам и строкой для бланка")
-        t15 = first(D, 15)
-        pg.goto(BASE + f"/soc_oge.html?n=15&t={t15['id']}")
+              "№3: ответ показан по колонкам и строкой для бланка")
+        t15 = first(D, 14)
+        pg.goto(BASE + f"/soc_oge.html?n=14&t={t15['id']}")
         opts = pg.eval_on_selector('#match select[data-i="0"]', "s => s.options.length - 1")
-        check(opts == t15["m"], f"№15: в списке столько цифр, сколько пунктов справа ({opts})")
+        check(opts == t15["m"], f"№14: в списке столько цифр, сколько пунктов справа ({opts})")
         pg.context.close()
 
         print("5. навигация")
         pg = new_page()
-        L = [t for t in D["tasks"] if t["n"] == 7 and t["ok"]]
-        pg.goto(BASE + f"/soc_oge.html?n=7&t={L[-1]['id']}")
+        L = [t for t in D["tasks"] if t["n"] == 9 and t["ok"]]
+        pg.goto(BASE + f"/soc_oge.html?n=9&t={L[-1]['id']}")
         check(pg.evaluate("window.__socOge.S.idx") == len(L) - 1, "адрес ?n=…&t=… открывает то же задание")
         pg.click("#nextBtnTop")
         check(pg.evaluate("window.__socOge.S.idx") == 0, "▶ с последнего задания — на первое")
@@ -246,12 +247,12 @@ def main():
         check(pg.evaluate("window.__socOge.S.idx") == len(L) - 1, "◀ с первого — на последнее")
         check(pg.is_visible("#prevTypeBtn") and pg.is_visible("#nextTypeBtn"), "пара «Предыдущий / Следующий номер» на экране задания")
         pg.click("#nextTypeBtn")
-        check(pg.evaluate("window.__socOge.S.n") == 8 and "n=8" in pg.url, "«Следующий номер ▶» — с №7 на №8")
+        check(pg.evaluate("window.__socOge.S.n") == 10 and "n=10" in pg.url, "«Следующий номер ▶» — с №9 на №10")
         pg.click("#prevTypeBtn"); pg.click("#prevTypeBtn")
-        check(pg.evaluate("window.__socOge.S.n") == 4, "«◀ Предыдущий номер» пропускает развёрнутые №5, 6")
+        check(pg.evaluate("window.__socOge.S.n") == 6, "«◀ Предыдущий номер» пропускает развёрнутые №7, 8")
         pg.goto(BASE + "/soc_oge.html?n=2")
         pg.click("#prevTypeBtn")
-        check(pg.evaluate("window.__socOge.S.n") == 20, "по кругу: с №2 назад — на №20")
+        check(pg.evaluate("window.__socOge.S.n") == 16, "по кругу: с №2 назад — на №16")
         pg.click("#backBtn")
         pg.wait_for_url(lambda u: "/index.html" in u, timeout=5000)
         check("/index.html" in pg.url, "«← все задания» — на главную")
@@ -262,26 +263,27 @@ def main():
         pg.goto(BASE + "/index.html?subject=soc")
         pg.wait_for_timeout(400)
         txt = pg.inner_text("#topics")
-        check("№2. Человек, общество, культура: понятия" in txt and "№20. Пропуск в таблице" in txt, "номера обществознания на главной")
+        check("№2. Пропуск в таблице" in txt and "№16. Государство и право: суждения" in txt and "№20. Текст: примеры" in txt, "номера ОГЭ 2027 на главной")
+        check("№21" not in txt, "номеров больше 20 нет")
         check("готовим" not in txt.split("ЕГЭ")[0] if "ЕГЭ" in txt else "Обществознание готовим" not in txt, "вместо «готовим» — список номеров")
         check(pg.locator('a.topic-item[href="soc_oge.html?n=2"]').count() == 1, "№2 ведёт на soc_oge.html?n=2")
         live = pg.eval_on_selector_all("a.topic-item[href^='soc_oge.html']", "els => els.length")
-        check(live == 16, f"ссылок на номера части 1: {live}")
+        check(live == 12, f"ссылок на номера с кратким ответом: {live}")
         soon = pg.eval_on_selector_all(".topic-item.soon .item-name", "els => els.map(e => e.textContent)")
-        check(sorted(int(re.match(r"№(\d+)", s).group(1)) for s in soon) == [1, 5, 6, 12, 21, 22, 23, 24], f"развёрнутые — «скоро»: {soon}")
+        check(sorted(int(re.match(r"№(\d+)", s).group(1)) for s in soon) == [1, 7, 8, 12, 17, 18, 19, 20], f"развёрнутые — «скоро»: {soon}")
         pg.context.close()
 
         print("7. тёмная тема, телефон, контраст")
         for theme in ("light", "dark"):
             pg = new_page(375, 812, theme)
-            for n in (15, 19, 20, 17):
+            for n in (14, 3, 2, 15):
                 pg.goto(BASE + f"/soc_oge.html?n={n}")
                 pg.wait_for_timeout(250)
                 sw = pg.evaluate("document.documentElement.scrollWidth")
                 check(sw <= 375, f"{theme}, телефон, №{n}: без горизонтальной прокрутки ({sw})")
-            pg.goto(BASE + f"/soc_oge.html?n=15&t={first(D, 15)['id']}")
+            pg.goto(BASE + f"/soc_oge.html?n=14&t={first(D, 14)['id']}")
             heads = pg.eval_on_selector_all(".q .col-head", "els => els.filter(e => e.offsetParent).map(e => e.textContent.trim())")
-            check(len(heads) == 2 and all(heads), f"{theme}: №15 на телефоне — шапки внутри колонок {heads}")
+            check(len(heads) == 2 and all(heads), f"{theme}: №14 на телефоне — шапки внутри колонок {heads}")
             ratios = pg.evaluate("""() => {
               const lum = c => { const m = c.match(/\\d+(\\.\\d+)?/g).slice(0, 3).map(x => +x / 255)
                 .map(x => x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4); return .2126*m[0] + .7152*m[1] + .0722*m[2]; };

@@ -146,11 +146,11 @@ h1{font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,5vw,34px);text-ali
 .q p{margin:0 0 6px}
 .q table{border-collapse:collapse;width:100%;margin:6px 0}
 .q td{padding:3px 6px;vertical-align:top}
-/* №20 — таблица с пропуском: у ФИПИ рамка зашита атрибутом border=1, который чистка
+/* №2 — таблица с пропуском: у ФИПИ рамка зашита атрибутом border=1, который чистка
    убирает; без рамки «Заполните пропуск в таблице» превращается в два столбика слов */
 .q table.grid td{border:1px solid var(--muted-1);padding:6px 8px}
 .q .col-head{display:none;margin:10px 0 4px}
-/* №15 у ФИПИ свёрстан таблицей в две колонки (факты | сферы) с шапкой отдельной
+/* №14 (соответствие) у ФИПИ свёрстан таблицей в две колонки (факты | сферы) с шапкой отдельной
    строкой. На телефоне колонки встают друг под другом, а копия шапки (stackHeads)
    переезжает внутрь каждой колонки — так же, как №4 у русского */
 @media (max-width:620px){
@@ -182,7 +182,7 @@ h1{font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,5vw,34px);text-ali
 .match select:focus{outline:none;border-color:var(--ink)}
 .match select.wrong{border-color:var(--teacher);background:var(--bad-tint)}
 .match select.correct{border-color:var(--ok);background:var(--ok-tint)}
-/* №19: две колонки бланка — «сходства» и «различия», по две клетки в каждой */
+/* №3: две колонки бланка — «сходства» и «различия», по две клетки в каждой */
 .pair{display:flex;gap:18px;flex-wrap:wrap}
 .pair .col{display:flex;flex-direction:column;gap:6px}
 .pair .col-title{font-weight:600;font-size:14px;color:var(--muted-3)}
@@ -282,30 +282,27 @@ h1{font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,5vw,34px);text-ali
 const EXAM_ATTEMPTS = 3;
 function attemptsFor(t){ return t.k === 'one' ? 1 : EXAM_ATTEMPTS; }
 
-// Номера части 1 с кратким ответом (КИМ ОГЭ 2026). Развёрнутые №1, 5, 6, 12 и №21–24
+// Номера с кратким ответом по КИМ ОГЭ 2027 (20 заданий; банк ФИПИ в формате 2026,
+// перевод номеров — fipi-pilot/tools/classify_soc.py). Развёрнутые №1, 7, 8, 12 и №17–20
 // сайт ФИПИ не проверяет — у них будет своя страница с самопроверкой.
 // Названия совпадают с SOC_OGE_TITLES в index.html.
 const NUMS = [
-  {n:2,  title:'Человек, общество, культура: понятия'},
-  {n:3,  title:'Человек, общество, культура: ситуация'},
-  {n:4,  title:'Человек, общество, культура: суждения'},
-  {n:7,  title:'Экономика: понятия'},
-  {n:8,  title:'Экономика: ситуация'},
-  {n:9,  title:'Экономика: суждения'},
-  {n:10, title:'Социальная сфера'},
-  {n:11, title:'Социальная сфера: суждения'},
-  {n:13, title:'Политика'},
-  {n:14, title:'Политика: суждения'},
-  {n:15, title:'Соответствие'},
-  {n:16, title:'Гражданин и государство'},
-  {n:17, title:'Право'},
-  {n:18, title:'Государство и право: суждения'},
-  {n:19, title:'Сходства и различия'},
-  {n:20, title:'Пропуск в таблице'},
+  {n:2,  title:'Пропуск в таблице'},
+  {n:3,  title:'Сходства и различия'},
+  {n:4,  title:'Человек, общество, культура: понятия'},
+  {n:5,  title:'Человек, общество, культура: ситуация'},
+  {n:6,  title:'Человек, общество, культура: суждения'},
+  {n:9,  title:'Экономика'},
+  {n:10, title:'Экономика: суждения'},
+  {n:11, title:'Политика'},
+  {n:13, title:'Конституция и органы власти'},
+  {n:14, title:'Соответствие'},
+  {n:15, title:'Право'},
+  {n:16, title:'Государство и право: суждения'},
 ];
 // подсказка о форме ответа — как в бланке ОГЭ
 const HINTS = {
-  20: 'Слово или словосочетание, пропущенное в таблице',
+  2: 'Слово или словосочетание, пропущенное в таблице',
 };
 
 const DATA = window.SOC_OGE_FIPI || {tasks:[]};
@@ -340,7 +337,7 @@ const L = ['А', 'Б', 'В', 'Г', 'Д', 'Е'];
 function normText(s){
   return String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[\s.,;:!?«»"'()–—-]+/g, '');
 }
-// №19: цифры внутри колонки переставлять можно, только если это подтвердил сам сайт
+// №3: цифры внутри колонки переставлять можно, только если это подтвердил сам сайт
 // ФИПИ (флаг any от fipi_soc_order.py); без флага — ровно тот порядок, что принял сайт
 function pairKey(s){ s = String(s); return s.slice(0, 2).split('').sort().join('') + '|' + s.slice(2).split('').sort().join(''); }
 
@@ -460,13 +457,13 @@ function renderTask(animate){
   html += '<div id="answerBox"></div>';
   if (mode === 'practice') html += '<div class="sol-row" id="solRow"><button class="soft-btn" id="showBtn">Показать ответ</button></div>';
   html += '<button class="next-btn" id="nextBtn" style="display:none">Следующее задание →</button>';
-  // в предпросмотре видно, что номер №2/3 или №7/8 выбран эвристикой — ученику это ни к чему
+  // в предпросмотре видно, что номер №4/5 выбран эвристикой — ученику это ни к чему
   html += `<div class="source-note">Источник: открытый банк заданий ФИПИ, задание ${t.id}` +
     (t.ok ? '' : '<span class="unchecked-tag">ответ ещё не сверен с ФИПИ</span>') +
     (SHOW_ALL && t.h ? '<span class="unchecked-tag">номер подобран автоматически</span>' : '') + '</div>';
   P.innerHTML = html;
   const q = P.querySelector('.q');
-  // таблица с пропуском (№20) — единственная, где у ФИПИ видимая рамка
+  // таблица с пропуском (№2) — единственная, где у ФИПИ видимая рамка
   if (t.k === 'text') q.querySelectorAll('table').forEach(tb => tb.classList.add('grid'));
   stackHeads(q);
   if (animate) { P.classList.remove('reveal'); void P.offsetWidth; P.classList.add('reveal'); }
@@ -490,7 +487,7 @@ function renderTask(animate){
   if ($('showBtn')) $('showBtn').addEventListener('click', toggleReveal);
 }
 
-// Строка-шапка над двумя колонками (№15: «ФАКТЫ | СФЕРЫ») на телефоне оторвалась бы
+// Строка-шапка над двумя колонками (№14: «ФАКТЫ | СФЕРЫ») на телефоне оторвалась бы
 // от своих колонок — кладём её копию внутрь каждой колонки (как в rus_oge.html)
 function stackHeads(q){
   if (!q) return;
@@ -586,7 +583,7 @@ function finish(kind){
       if (b.dataset.v === t.a) { b.classList.remove('wrong'); b.classList.add('correct'); }
     });
   } else if (t.k === 'match' || t.k === 'pair') {
-    // по клеткам подсвечиваем только у соответствия: в №19 с любым порядком внутри
+    // по клеткам подсвечиваем только у соответствия: в №3 с любым порядком внутри
     // колонки «не та клетка» не значит «не та цифра»
     P.querySelectorAll('#match select').forEach(s => {
       s.disabled = true;
