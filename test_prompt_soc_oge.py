@@ -102,7 +102,11 @@ def test_data(D):
     check(sorted({t["n"] for t in T}) == PART1, "в файле все номера КИМ 2027 с кратким ответом")
     check({t["k"] for t in T if t["n"] == 14} == {"match"} and {t["k"] for t in T if t["n"] == 3} == {"pair"}
           and {t["k"] for t in T if t["n"] == 2} == {"text"}, "№14 — соответствие, №3 — сравнение, №2 — строка")
-    check({t["n"] for t in T if t.get("h")} == {4, 5}, "эвристикой подобраны только №4/№5")
+    # после ручной сверки (fipi-pilot/full_oge_soc/fix27.json) пометка эвристики может
+    # исчезнуть совсем; если она есть — только у №4/№5, других эвристик в части 1 нет
+    check({t["n"] for t in T if t.get("h")} <= {4, 5}, "эвристикой подобраны только №4/№5 (или ничего)")
+    check(next((t["n"] for t in T if t["id"] == "2CA4E2"), None) == 5 and next((t["n"] for t in T if t["id"] == "2FC2F8"), None) == 4,
+          "ручные поправки раскладки применены (2CA4E2 → №5, 2FC2F8 → №4)")
     check(sum(t["ok"] for t in T) == len([t for t in T if t["a"]]), "ключ есть только у подтверждённых ФИПИ")
 
 
@@ -163,11 +167,12 @@ def main():
         check(okall, "в задания ученика не попало ни одного несверенного ответа")
         pg.goto(BASE + "/soc_oge.html?all=1")
         check(pg.eval_on_selector_all(".mode-card[data-n]:not([disabled])", "els => els.length") == 12, "?all=1 — открыты все 12 номеров")
-        th = next(t for t in D["tasks"] if t.get("h"))
-        pg.goto(BASE + f"/soc_oge.html?all=1&n={th['n']}&t={th['id']}")
-        check("номер подобран автоматически" in pg.inner_text(".source-note"), "в предпросмотре эвристическая раскладка помечена")
-        pg.goto(BASE + f"/soc_oge.html?n={th['n']}&t={th['id']}")
-        check("автоматически" not in pg.inner_text(".source-note"), "у ученика этой пометки нет")
+        th = next((t for t in D["tasks"] if t.get("h")), None)
+        if th:  # после полной ручной сверки помеченных заданий может не остаться
+            pg.goto(BASE + f"/soc_oge.html?all=1&n={th['n']}&t={th['id']}")
+            check("номер подобран автоматически" in pg.inner_text(".source-note"), "в предпросмотре эвристическая раскладка помечена")
+            pg.goto(BASE + f"/soc_oge.html?n={th['n']}&t={th['id']}")
+            check("автоматически" not in pg.inner_text(".source-note"), "у ученика этой пометки нет")
 
         print("3. виды ответа, «Экзамен» и «Тренировка»")
         for n in (5, 14, 3, 2):
