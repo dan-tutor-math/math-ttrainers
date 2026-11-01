@@ -12,8 +12,8 @@
   3. «Проверить себя»: список требований из условия, критерии номера с максимумом
      ФИПИ 2027, пометка у фото старого образца; выбор балла сохраняется, считается
      в «баллов из возможных», появляется «Следующее задание»; оценённое задание
-     открывается сразу с самопроверкой;
-  4. навигация: ◀ ▶ заданий по кругу, «Следующий номер» с №18 — №19 к тому же
+     открывается сразу с самопроверкой; образец ответа (пока у №1) свёрнут и раскрывается;
+  4. навигация: ◀ ▶ заданий по кругу; №17 — одно задание демоверсии; «Следующий номер» с №18 — №19 к тому же
      тексту, с №8 — на краткий №9 (soc_oge.html), с №20 по кругу — на №1;
      «← все задания» и адрес без номера — на главную;
   5. телефон и тёмная тема: без ошибок JS и горизонтальной прокрутки, картинка не
@@ -37,8 +37,8 @@ from playwright.sync_api import sync_playwright
 PORT = 8996
 BASE = f"http://127.0.0.1:{PORT}"
 HERE = os.path.dirname(os.path.abspath(__file__))
-LONG = [1, 7, 8, 12, 18, 19, 20]
-MAX = {1: 2, 7: 2, 8: 2, 12: 4, 18: 2, 19: 2, 20: 3}
+LONG = [1, 7, 8, 12, 17, 18, 19, 20]
+MAX = {1: 2, 7: 2, 8: 2, 12: 4, 17: 2, 18: 2, 19: 2, 20: 3, 21: 2}
 
 
 @contextlib.contextmanager
@@ -80,7 +80,8 @@ def check(cond, msg):
 def test_data(D):
     print("1. данные")
     T = D["tasks"]
-    check(sorted({t["n"] for t in T}) == LONG, f"номера — только развёрнутые КИМ 2027: {sorted({t['n'] for t in T})}")
+    check(sorted({t["n"] for t in T}) == LONG + [21], f"номера — развёрнутые КИМ 2027 и 21 (бывший №24): {sorted({t['n'] for t in T})}")
+    check(all(t.get("t") in D["texts"] for t in T if t["n"] == 21), "у дополнительных заданий (бывший №24) есть текст")
     check(all(t["r"] for t in T), "у каждого задания есть список требований")
     descr = [t["id"] for t in T for r in t["r"] if not (re.sub(r"\s*\([^()]*\)\s*$", "", r).endswith("?") or re.search(r"(?i)\b(выпишите|объясните|приведите|сформулируйте|выскажите|укажите|назовите|составьте|раскройте|поясните|проиллюстрируйте|дайте|подтвердите|покажите|используя|озаглавьте|предположите|опишите|определите|"
                      r"конкретизируйте|докажите|аргументируйте|обоснуйте|выделите|найдите|сравните|охарактеризуйте)", r))]
@@ -91,9 +92,16 @@ def test_data(D):
     srcs = [m for t in T for m in re.findall(r'src="([^"]+)"', t["q"])]
     missing = [s for s in srcs if not os.path.exists(os.path.join(HERE, s))]
     check(srcs and not missing, f"файлы картинок на месте: {len(srcs)}, нет {missing[:3]}")
+    d17 = [t for t in T if t["n"] == 17]
+    check(len(d17) == 1 and d17[0].get("src") == "demo", "№17 — одно задание из демоверсии 2027, своих нет")
     junk = [t["id"] for t in T if "бланке ответов" in t["q"] or "ShowPicture" in t["q"] or "<script" in t["q"]]
     check(not junk, f"в условиях нет строки про бланк и скриптов ФИПИ ({junk[:3]})")
     check(any(t.get("o26") for t in T if t["n"] == 7), "фото старого образца помечены")
+    # номер, к которому образцы уже написаны, должен быть покрыт целиком: пропуск
+    # значил бы, что образец потерялся при сборке (не тот id, опечатка в файле)
+    started = sorted({t["n"] for t in T if t.get("s")})
+    holes = [t["id"] for t in T if t["n"] in started and not t.get("s")]
+    check(1 in started and not holes, f"образцы у номеров {started} — у всех заданий (без образца: {holes[:5]})")
 
 
 def first(D, n, pred=lambda t: True):
@@ -147,7 +155,19 @@ def main():
         check(sc.get(t7["id"]) == 1, "оценка запомнена")
         pg.reload()
         check(pg.is_visible(".check-panel") and "active" in pg.get_attribute('.score-btn[data-b="1"]', "class"), "оценённое задание открывается с самопроверкой")
-        for n in LONG:
+        t1 = first(D, 1, lambda t: t.get("s"))
+        pg.goto(BASE + f"/soc_oge_long.html?n=1&t={t1['id']}")
+        pg.click("#checkBtn")
+        check(pg.locator(".sample").count() == 1 and not pg.is_visible(".sample-text"), "образец есть и свёрнут")
+        pg.click(".sample summary")
+        check(t1["s"].split("\n")[0] in pg.inner_text(".sample-text"), "образец раскрывается")
+        tn = next((t for t in D["tasks"] if not t.get("s")), None)
+        if tn:  # когда образцы будут у всех заданий, проверять станет нечего
+            pg.goto(BASE + f"/soc_oge_long.html?n={tn['n']}&t={tn['id']}")
+            if pg.is_visible("#checkBtn"):
+                pg.click("#checkBtn")
+            check(pg.locator(".sample").count() == 0, "без образца — без блока «Образец»")
+        for n in LONG + [21]:
             pg.goto(BASE + f"/soc_oge_long.html?n={n}")
             if pg.is_visible("#checkBtn"):  # у №7 откроется уже оценённое задание — без кнопки
                 pg.click("#checkBtn")
@@ -163,9 +183,20 @@ def main():
         pg.click("#nextTypeBtn")
         cur = pg.evaluate("window.__socOgeLong.S.list[window.__socOgeLong.S.idx]")
         check(cur["n"] == 19 and cur["t"] == tx, "«Следующий номер» с №18 — №19 к тому же тексту")
+        pg.goto(BASE + f"/soc_oge_long.html?n=19&t={cur['id']}")
+        pg.click("#extraBtn")
+        ex = pg.evaluate("window.__socOgeLong.S.list[window.__socOgeLong.S.idx]")
+        check(ex["n"] == 21 and ex["t"] == tx, "из №19 — дополнительное задание к тому же тексту")
+        check("в ОГЭ-2027 такого нет" in pg.inner_text(".old-note"), "у дополнительного задания пометка «вне ОГЭ-2027»")
+        check("№21" not in pg.inner_text("#pageSub"), "у дополнительного задания нет несуществующего «№21»")
+        pg.click("#prevTypeBtn")
+        back = pg.evaluate("window.__socOgeLong.S.list[window.__socOgeLong.S.idx]")
+        check(back["n"] == 20 and back["t"] == tx, "из дополнительного назад — №20 того же текста")
         pg.goto(BASE + "/soc_oge_long.html?n=20")
         pg.click("#nextTypeBtn")
         check(pg.evaluate("window.__socOgeLong.S.n") == 1, "с №20 вперёд по кругу — на №1")
+        pg.goto(BASE + "/soc_oge_long.html?n=17")
+        check("демонстрационный вариант ОГЭ-2027" in pg.inner_text(".source-note"), "№17: источник — демоверсия")
         pg.goto(BASE + "/soc_oge_long.html?n=8")
         pg.click("#nextTypeBtn")
         pg.wait_for_url(lambda u: "soc_oge.html" in u, timeout=5000)

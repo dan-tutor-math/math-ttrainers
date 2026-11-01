@@ -552,13 +552,21 @@ function runCheck(){
   if (mode === 'exam' && S.tries >= attemptsFor(t)) {
     finish('bad');
     fb.className = 'feedback bad';
-    fb.textContent = attemptsFor(t) === 1 ? 'Неверно.' : 'Попытки закончились.';
+    fb.textContent = (attemptsFor(t) === 1 ? 'Неверно.' : 'Попытки закончились.') + halfNote(t, v);
     return;
   }
   fb.className = 'feedback bad';
-  fb.textContent = mode === 'exam'
+  fb.textContent = (mode === 'exam'
     ? `Неверно. Осталось попыток: ${attemptsFor(t) - S.tries}`
-    : 'Неверно. Попробуй ещё раз или посмотри ответ';
+    : 'Неверно. Попробуй ещё раз или посмотри ответ') + halfNote(t, v);
+}
+
+// №14: по критериям ФИПИ одна неверная позиция — 1 балл из 2. Говорим об этом, не называя
+// позицию: иначе подсказка выдала бы, где ошибка, ещё до конца попыток
+function halfNote(t, v){
+  if (t.k !== 'match' || v.length !== t.a.length) return '';
+  const diff = v.split('').filter((c, i) => c !== t.a[i]).length;
+  return diff === 1 ? ' Ошибка в одной букве — на ОГЭ это 1 балл из 2.' : '';
 }
 
 // красным — только то, что выбрал ученик, а не всё неверное: подсветка по клеткам
@@ -631,8 +639,8 @@ function goPicker(){
 $('backBtn').addEventListener('click', goPicker);
 $('prevBtn').addEventListener('click', () => openTask(S.idx - 1));
 // соседний номер — по всем номерам ОГЭ-2027 по кругу, как в бланке: развёрнутые
-// (№1, 7, 8, 12, 18–20) живут в soc_oge_long.html, туда и переходим; №17 банком не представлен
-const ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20];
+// (№1, 7, 8, 12, 17–20) живут в soc_oge_long.html, туда и переходим
+const ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 function stepNumber(d){
   const i = ORDER.indexOf(S.n);
   const n = ORDER[(i + d + ORDER.length) % ORDER.length];

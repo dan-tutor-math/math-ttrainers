@@ -246,6 +246,11 @@ h1{font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,5vw,34px);text-ali
 .score-btn{font-family:var(--font-ui);font-weight:700;font-size:16px;min-width:48px;height:44px;border-radius:12px;border:1.5px solid transparent;background:var(--hl-10);color:var(--ink);cursor:pointer}
 .score-btn:hover{border-color:var(--ink)}
 .score-btn.active{background:linear-gradient(135deg,var(--btn-1),var(--btn-2));color:#fff;border-color:var(--btn-2)}
+.sample summary{cursor:pointer;font-size:14px;font-weight:700;color:var(--ink);list-style:none}
+.sample summary::-webkit-details-marker{display:none}
+.sample summary::after{content:' · показать';font-weight:500;color:var(--muted-2)}
+.sample[open] summary::after{content:' · скрыть'}
+.sample-text{margin-top:8px;font-size:15px;line-height:1.55}
 .score-saved{font-size:14px;font-weight:600;color:var(--ok);margin-top:8px}
 </style>
 </head>
@@ -321,6 +326,11 @@ const NUMS = [
     [1, 'Только один любой элемент'],
     [0, 'Общие рассуждения. ИЛИ Ответ неправильный']],
     note:'Предположение — распространённое предложение с объяснением, а не одно слово. Если просят объяснить сходство и различие, предположение засчитывается только вместе со своим выводом.'},
+  {n:17, title:'Объяснение явления', max:2, levels:[
+    [2, 'Правильно приведены оба объяснения'],
+    [1, 'Правильно приведено только одно объяснение'],
+    [0, 'Общие рассуждения, не соответствующие требованию задания. ИЛИ Ответ неправильный']],
+    note:'В банке ФИПИ заданий №17 пока нет — здесь задание из демоверсии ОГЭ-2027.'},
   {n:18, title:'Текст: план', max:2, levels:[
     [2, 'Выделены основные смысловые фрагменты, каждый пункт плана отражает основную идею фрагмента (число пунктов может быть разным)'],
     [1, 'Верно выделено больше половины фрагментов. ИЛИ Фрагменты выделены, но не все пункты отражают их основную идею'],
@@ -337,12 +347,20 @@ const NUMS = [
     [1, 'Пояснён только один пример. ИЛИ Приведены только примеры, без пояснений'],
     [0, 'Приведён один пример без пояснения. ИЛИ Общие рассуждения']],
     note:'Пример — конкретный факт, деятель, событие или ситуация, а не повтор мысли из текста.'},
+  // бывший №24 ОГЭ-2026 (мнение и аргументы к тексту): в КИМ 2027 его нет, но задания
+  // полезны для №17 и №7 — даём их «дополнительно к тексту», вне круга номеров экзамена.
+  // Критериев ФИПИ 2027 для него нет, поэтому шкала ориентировочная и это сказано прямо.
+  {n:21, title:'Дополнительно к тексту', max:2, extra:true, levels:[
+    [2, 'Выполнены все требования задания: по каждому — суть, а не общие слова'],
+    [1, 'Выполнена только часть требований'],
+    [0, 'Общие рассуждения, не соответствующие требованию задания. ИЛИ Ответ неправильный']],
+    note:'Задание прежнего формата (№24 ОГЭ-2026), в ОГЭ-2027 его нет. Шкала ориентировочная, не ФИПИ.'},
 ];
 const COMMON = 'Допускаются иные формулировки ответа, не искажающие его смысла. Критерии — по демоверсии ОГЭ-2027 (ФИПИ).';
 
 // Порядок всех номеров ОГЭ-2027, чтобы «Следующий номер» шёл через обе страницы
-// предмета: краткие ответы живут в soc_oge.html. №17 банком не представлен.
-const ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 19, 20];
+// предмета: краткие ответы живут в soc_oge.html
+const ORDER = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 const SHORT_PAGE = 'soc_oge.html';
 const HOME = 'index.html?subject=soc';
 
@@ -395,7 +413,8 @@ function curTask(){ return S.list[S.idx]; }
 
 function renderTask(animate){
   const t = curTask(), m = meta(S.n);
-  $('pageSub').textContent = `№${S.n}. ${m.title} · развёрнутый ответ`;
+  // у дополнительного блока номера ОГЭ нет — «№21» ученика бы запутал
+  $('pageSub').textContent = m.extra ? `${m.title} · вне ОГЭ-2027` : `№${S.n}. ${m.title} · развёрнутый ответ`;
   $('taskTitle').textContent = `задание ${S.idx + 1} из ${S.list.length}`;
   renderStats();
   const P = $('questionPanel');
@@ -403,6 +422,7 @@ function renderTask(animate){
   if (t.t && DATA.texts[t.t]) {
     html += `<details class="text-box" open><summary>Текст к заданиям 18–20</summary><div class="text-body">${DATA.texts[t.t]}</div></details>`;
   }
+  if (m.extra) html += '<div class="old-note" style="margin-bottom:14px">Дополнительное задание к тексту: в ОГЭ-2027 такого нет, но оно тренирует аргументацию — она нужна в №7 и №17.</div>';
   html += `<div class="q">${t.q}</div>`;
   html += `<label class="answer-label" for="draft">Твой ответ (черновик сохраняется сам):</label>
     <textarea class="draft" id="draft" spellcheck="true" placeholder="Запиши ответ так, как в бланке №2"></textarea>
@@ -410,7 +430,10 @@ function renderTask(animate){
   html += '<button class="check-btn" id="checkBtn">Проверить себя</button>';
   html += '<div id="checkArea"></div>';
   html += '<button class="next-btn" id="nextBtn" style="display:none">Следующее задание →</button>';
-  html += `<div class="source-note">Источник: открытый банк заданий ФИПИ, задание ${t.id}</div>`;
+  // к тексту №18–20 есть ещё бывший №24 — даём к нему переход, не смешивая с номерами экзамена
+  const extra = t.t && S.n >= 18 && S.n <= 20 && (POOL[21] || []).some(x => x.t === t.t);
+  if (extra) html += '<div class="sol-row"><button class="soft-btn" id="extraBtn">Дополнительное задание к этому тексту →</button></div>';
+  html += `<div class="source-note">${t.src === 'demo' ? 'Источник: демонстрационный вариант ОГЭ-2027 (ФИПИ)' : 'Источник: открытый банк заданий ФИПИ, задание ' + t.id}</div>`;
   P.innerHTML = html;
   if (animate) { P.classList.remove('reveal'); void P.offsetWidth; P.classList.add('reveal'); }
   const d = $('draft');
@@ -418,6 +441,7 @@ function renderTask(animate){
   d.addEventListener('input', () => LS.set('socOgeLong:draft:' + t.id, d.value));
   $('checkBtn').addEventListener('click', showCheck);
   $('nextBtn').addEventListener('click', () => openTask(S.idx + 1));
+  if ($('extraBtn')) $('extraBtn').addEventListener('click', () => openNumber(21, null, t.t));
   // уже оценённое задание открываем сразу с самопроверкой: видно, что и как оценено
   if (scores[t.id] != null) showCheck();
 }
@@ -436,6 +460,13 @@ function showCheck(){
     m.levels.map(([b, txt]) => `<div class="level"><b>${b}</b><span>${escapeHTML(txt)}</span></div>`).join('') + '</div>' +
     (m.note ? `<p class="crit-note" style="margin-top:10px">${escapeHTML(m.note)}</p>` : '') +
     `<p class="crit-note" style="margin-top:8px">${COMMON}</p></div>`;
+  // образец свёрнут: сначала ученик сверяет свой ответ с требованиями и критериями сам,
+  // иначе он оценивал бы не свой ответ, а сходство с образцом
+  if (t.s) {
+    html += `<details class="check-block sample"><summary>Образец ответа на ${m.max} ${plural(m.max, 'балл', 'балла', 'баллов')}</summary>` +
+      `<div class="sample-text">${escapeHTML(t.s).replace(/\n/g, '<br>')}</div>` +
+      '<p class="crit-note" style="margin-top:8px">Образец — один из верных вариантов: засчитываются и другие формулировки, не искажающие смысла.</p></details>';
+  }
   html += '<div class="check-block"><h3>Оцени свой ответ по критериям</h3><div class="scores" id="scores">' +
     Array.from({length: m.max + 1}, (_, b) => `<button class="score-btn${scores[t.id] === b ? ' active' : ''}" data-b="${b}">${b}</button>`).join('') +
     '</div><div class="score-saved" id="scoreSaved"></div></div></div>';
@@ -471,6 +502,8 @@ function renderStats(){
 
 // соседний номер — по всем номерам ОГЭ-2027 по кругу; краткие — на своей странице
 function stepNumber(d){
+  // дополнительный блок вне круга: назад — к №20 того же текста, вперёд — к началу
+  if (S.n === 21) { d < 0 ? openNumber(20, null, curTask().t) : openNumber(1); return; }
   const i = ORDER.indexOf(S.n);
   const n = ORDER[(i + d + ORDER.length) % ORDER.length];
   const t = curTask();
