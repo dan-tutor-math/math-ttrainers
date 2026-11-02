@@ -1915,10 +1915,8 @@
      "id": "q31",
      "label": "31",
      "type": "word",
-     "value": "friendliness",
-     "alts": [
-      "friendship"
-     ]
+     "value": "friendship",
+     "alts": []
     },
     {
      "id": "q32",
@@ -1942,9 +1940,9 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>29 — unusual<br>30 — illness<br>31 — friendliness (или friendship)<br>32 — manager<br>33 — careless<br>34 — useful",
+   "answerTex": "<br>29 — unusual<br>30 — illness<br>31 — friendship<br>32 — manager<br>33 — careless<br>34 — useful",
    "steps": [
-    "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">29</span> Last year, I became a volunteer in a charity shop. It was an <b>unusual</b> job for me – I had never been involved with charities.</p><p><span class=\"eng-num\">30</span> Our shop raised money to provide medical care for anyone suffering from any <b>illness</b>. The job was not easy but I enjoyed it very much.</p><p><span class=\"eng-num\">31</span> All my colleagues were very helpful. Their <b>friendliness</b> and support meant a lot to me.</p><p><span class=\"eng-num\">32</span> Andrew, my boss and <b>manager</b>, was a smart and well-organized person.</p><p><span class=\"eng-num\">33</span> He kept saying that we had no right to be indifferent or <b>careless</b> because people’s lives depended on us.</p><p><span class=\"eng-num\">34</span> Working in the charity shop, I have met some very interesting people and have learnt a lot of practical skills. Volunteering has equipped me with experience which I’m sure will be <b>useful</b> for my future.</p></div>"
+    "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">29</span> Last year, I became a volunteer in a charity shop. It was an <b>unusual</b> job for me – I had never been involved with charities.</p><p><span class=\"eng-num\">30</span> Our shop raised money to provide medical care for anyone suffering from any <b>illness</b>. The job was not easy but I enjoyed it very much.</p><p><span class=\"eng-num\">31</span> All my colleagues were very helpful. Their <b>friendship</b> and support meant a lot to me.</p><p><span class=\"eng-num\">32</span> Andrew, my boss and <b>manager</b>, was a smart and well-organized person.</p><p><span class=\"eng-num\">33</span> He kept saying that we had no right to be indifferent or <b>careless</b> because people’s lives depended on us.</p><p><span class=\"eng-num\">34</span> Working in the charity shop, I have met some very interesting people and have learnt a lot of practical skills. Volunteering has equipped me with experience which I’m sure will be <b>useful</b> for my future.</p></div>"
    ],
    "group": "all"
   },
@@ -1986,7 +1984,7 @@
      "id": "q33",
      "label": "33",
      "type": "word",
-     "value": "unusually",
+     "value": "usually",
      "alts": []
     },
     {
@@ -1997,9 +1995,9 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>29 — famous<br>30 — writer<br>31 — exciting<br>32 — impressive<br>33 — unusually<br>34 — comfortable",
+   "answerTex": "<br>29 — famous<br>30 — writer<br>31 — exciting<br>32 — impressive<br>33 — usually<br>34 — comfortable",
    "steps": [
-    "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">29</span> Siem Reap is a small town in Cambodia, a country in southeast Asia. It is built around a <b>famous</b> cathedral.</p><p><span class=\"eng-num\">30</span> The town is charming with some fine examples of French colonial architecture. A legend says that a French <b>writer</b> once called the town “a pearl of Cambodia”.</p><p><span class=\"eng-num\">31</span> Nowadays, this town is quite popular with tourists. They often use it as a starting point for their <b>exciting</b> travellings.</p><p><span class=\"eng-num\">32</span> The town is really remarkable. There you will find some <b>impressive</b> stone monuments and statues, ancient buildings and picturesque ruins.</p><p><span class=\"eng-num\">33</span> Note that it’s <b>unusually</b> hot there in the summer.</p><p><span class=\"eng-num\">34</span> Please ensure that you take <b>comfortable</b> walking shoes, light clothing and plenty of water to drink.</p></div>"
+    "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">29</span> Siem Reap is a small town in Cambodia, a country in southeast Asia. It is built around a <b>famous</b> cathedral.</p><p><span class=\"eng-num\">30</span> The town is charming with some fine examples of French colonial architecture. A legend says that a French <b>writer</b> once called the town “a pearl of Cambodia”.</p><p><span class=\"eng-num\">31</span> Nowadays, this town is quite popular with tourists. They often use it as a starting point for their <b>exciting</b> travellings.</p><p><span class=\"eng-num\">32</span> The town is really remarkable. There you will find some <b>impressive</b> stone monuments and statues, ancient buildings and picturesque ruins.</p><p><span class=\"eng-num\">33</span> Note that it’s <b>usually</b> hot there in the summer.</p><p><span class=\"eng-num\">34</span> Please ensure that you take <b>comfortable</b> walking shoes, light clothing and plenty of water to drink.</p></div>"
    ],
    "group": "all"
   },
@@ -2263,7 +2261,7 @@
      "id": "q33",
      "label": "33",
      "type": "word",
-     "value": "do not like",
+     "value": "dislike",
      "alts": []
     },
     {
@@ -2274,9 +2272,9 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>29 — stressful<br>30 — gardener<br>31 — entertainment<br>32 — quickly<br>33 — do not like<br>34 — nervous",
+   "answerTex": "<br>29 — stressful<br>30 — gardener<br>31 — entertainment<br>32 — quickly<br>33 — dislike<br>34 — nervous",
    "steps": [
-    "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">29</span> I’ve worked in an office for many years. It’s a very <b>stressful</b> job and recently I’ve taken up a new hobby – gardening.</p><p><span class=\"eng-num\">30</span> My grandmother was a very good <b>gardener</b>.</p><p><span class=\"eng-num\">31</span> She never did gardening as a job but for pleasure and <b>entertainment</b>.</p><p><span class=\"eng-num\">32</span> She had the so-called green fingers – the flowers and fruit trees she planted grew very <b>quickly</b>. I wish I were as skillful as she was.</p><p><span class=\"eng-num\">33</span> It’s a pity my family does not share my interest. My children <b>do not like</b> working outdoors. They prefer using the computer indoors.</p><p><span class=\"eng-num\">34</span> I don’t argue with them. Arguing and quarrelling makes me feel <b>nervous</b> and unhappy but cannot change the situation. I hope one day they will join me in the garden.</p></div>"
+    "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">29</span> I’ve worked in an office for many years. It’s a very <b>stressful</b> job and recently I’ve taken up a new hobby – gardening.</p><p><span class=\"eng-num\">30</span> My grandmother was a very good <b>gardener</b>.</p><p><span class=\"eng-num\">31</span> She never did gardening as a job but for pleasure and <b>entertainment</b>.</p><p><span class=\"eng-num\">32</span> She had the so-called green fingers – the flowers and fruit trees she planted grew very <b>quickly</b>. I wish I were as skillful as she was.</p><p><span class=\"eng-num\">33</span> It’s a pity my family does not share my interest. My children <b>dislike</b> working outdoors. They prefer using the computer indoors.</p><p><span class=\"eng-num\">34</span> I don’t argue with them. Arguing and quarrelling makes me feel <b>nervous</b> and unhappy but cannot change the situation. I hope one day they will join me in the garden.</p></div>"
    ],
    "group": "all"
   },
@@ -3200,7 +3198,7 @@
      "id": "q33",
      "label": "33",
      "type": "word",
-     "value": "do not like",
+     "value": "dislike",
      "alts": []
     },
     {
@@ -3211,9 +3209,9 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>29 — national<br>30 — government<br>31 — actually<br>32 — traditional<br>33 — do not like<br>34 — difference",
+   "answerTex": "<br>29 — national<br>30 — government<br>31 — actually<br>32 — traditional<br>33 — dislike<br>34 — difference",
    "steps": [
-    "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">29</span> If someone asks what your nationality is, how do you answer? For British people <b>national</b> identity is a complex issue.</p><p><span class=\"eng-num\">30</span> Take me for example. I carry a passport issued by the British <b>government</b>. I was born in England, but my Mum is Scottish and my Granny is from Northern Ireland. So what am I?</p><p><span class=\"eng-num\">31</span> <b>actually</b>, I am all of them: English, Irish, Scottish and British.</p><p><span class=\"eng-num\">32</span> Each of the ‘nations’ has a lot in common but they also have their own unique culture and <b>traditional</b> lifestyle.</p><p><span class=\"eng-num\">33</span> They <b>do not like</b> it when people call them English.</p><p><span class=\"eng-num\">34</span> And perhaps the most important <b>difference</b> of all – each nation has its own football team!</p></div>"
+    "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">29</span> If someone asks what your nationality is, how do you answer? For British people <b>national</b> identity is a complex issue.</p><p><span class=\"eng-num\">30</span> Take me for example. I carry a passport issued by the British <b>government</b>. I was born in England, but my Mum is Scottish and my Granny is from Northern Ireland. So what am I?</p><p><span class=\"eng-num\">31</span> <b>actually</b>, I am all of them: English, Irish, Scottish and British.</p><p><span class=\"eng-num\">32</span> Each of the ‘nations’ has a lot in common but they also have their own unique culture and <b>traditional</b> lifestyle.</p><p><span class=\"eng-num\">33</span> They <b>dislike</b> it when people call them English.</p><p><span class=\"eng-num\">34</span> And perhaps the most important <b>difference</b> of all – each nation has its own football team!</p></div>"
    ],
    "group": "all"
   },

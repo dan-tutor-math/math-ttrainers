@@ -689,7 +689,7 @@
      "id": "q14",
      "label": "14",
      "type": "plain",
-     "value": "2"
+     "value": "3"
     },
     {
      "id": "q15",
@@ -722,9 +722,9 @@
      "value": "1"
     }
    ],
-   "answerTex": "<br>13 — 2 (False)<br>14 — 2 (False)<br>15 — 1 (True)<br>16 — 1 (True)<br>17 — 3 (Not stated)<br>18 — 2 (False)<br>19 — 1 (True)",
+   "answerTex": "<br>13 — 2 (False)<br>14 — 3 (Not stated)<br>15 — 1 (True)<br>16 — 1 (True)<br>17 — 3 (Not stated)<br>18 — 2 (False)<br>19 — 1 (True)",
    "steps": [
-    "Ключ к утверждениям:<div class=\"eng-text\"><p><span class=\"eng-num\">13</span> In general British people prefer coffee to tea. — <b>False</b></p><p><span class=\"eng-num\">14</span> In the 17th century a Chinese Emperor sent tea to the British royal family as a present. — <b>False</b></p><p><span class=\"eng-num\">15</span> Tea became popular in Great Britain due to the royal marriage. — <b>True</b></p><p><span class=\"eng-num\">16</span> The ‘afternoon tea’ tradition was started by a woman. — <b>True</b></p><p><span class=\"eng-num\">17</span> In the first tea shops the British could also buy some medicines. — <b>Not stated</b></p><p><span class=\"eng-num\">18</span> During World War II the British government prohibited drinking tea. — <b>False</b></p><p><span class=\"eng-num\">19</span> There are many phrases with ‘tea’ in the English language. — <b>True</b></p></div>"
+    "Ключ к утверждениям:<div class=\"eng-text\"><p><span class=\"eng-num\">13</span> In general British people prefer coffee to tea. — <b>False</b></p><p><span class=\"eng-num\">14</span> In the 17th century a Chinese Emperor sent tea to the British royal family as a present. — <b>Not stated</b></p><p><span class=\"eng-num\">15</span> Tea became popular in Great Britain due to the royal marriage. — <b>True</b></p><p><span class=\"eng-num\">16</span> The ‘afternoon tea’ tradition was started by a woman. — <b>True</b></p><p><span class=\"eng-num\">17</span> In the first tea shops the British could also buy some medicines. — <b>Not stated</b></p><p><span class=\"eng-num\">18</span> During World War II the British government prohibited drinking tea. — <b>False</b></p><p><span class=\"eng-num\">19</span> There are many phrases with ‘tea’ in the English language. — <b>True</b></p></div>"
    ],
    "group": "all"
   },
@@ -872,7 +872,7 @@
      "id": "q17",
      "label": "17",
      "type": "plain",
-     "value": "2"
+     "value": "1"
     },
     {
      "id": "q18",
@@ -887,9 +887,9 @@
      "value": "1"
     }
    ],
-   "answerTex": "<br>13 — 3 (Not stated)<br>14 — 2 (False)<br>15 — 1 (True)<br>16 — 3 (Not stated)<br>17 — 2 (False)<br>18 — 2 (False)<br>19 — 1 (True)",
+   "answerTex": "<br>13 — 3 (Not stated)<br>14 — 2 (False)<br>15 — 1 (True)<br>16 — 3 (Not stated)<br>17 — 1 (True)<br>18 — 2 (False)<br>19 — 1 (True)",
    "steps": [
-    "Ключ к утверждениям:<div class=\"eng-text\"><p><span class=\"eng-num\">13</span> The narrator writes mainly about school life in the blog. — <b>Not stated</b></p><p><span class=\"eng-num\">14</span> The narrator has found convincing evidence that today’s teenagers read less than their grandparents did. — <b>False</b></p><p><span class=\"eng-num\">15</span> The narrator’s favourite genre is fantasy and adventure books. — <b>True</b></p><p><span class=\"eng-num\">16</span> The narrator’s sister is younger than him. — <b>Not stated</b></p><p><span class=\"eng-num\">17</span> The narrator’s sister is fond of books about romance and relationships. — <b>False</b></p><p><span class=\"eng-num\">18</span> The narrator reads books in Italian and French. — <b>False</b></p><p><span class=\"eng-num\">19</span> According to the narrator, nowadays science fiction is less popular than detective stories. — <b>True</b></p></div>"
+    "Ключ к утверждениям:<div class=\"eng-text\"><p><span class=\"eng-num\">13</span> The narrator writes mainly about school life in the blog. — <b>Not stated</b></p><p><span class=\"eng-num\">14</span> The narrator has found convincing evidence that today’s teenagers read less than their grandparents did. — <b>False</b></p><p><span class=\"eng-num\">15</span> The narrator’s favourite genre is fantasy and adventure books. — <b>True</b></p><p><span class=\"eng-num\">16</span> The narrator’s sister is younger than him. — <b>Not stated</b></p><p><span class=\"eng-num\">17</span> The narrator’s sister is fond of books about romance and relationships. — <b>True</b></p><p><span class=\"eng-num\">18</span> The narrator reads books in Italian and French. — <b>False</b></p><p><span class=\"eng-num\">19</span> According to the narrator, nowadays science fiction is less popular than detective stories. — <b>True</b></p></div>"
    ],
    "group": "all"
   },

@@ -121,9 +121,7 @@
      "label": "23",
      "type": "word",
      "value": "have lost",
-     "alts": [
-      "have already lost"
-     ]
+     "alts": []
     },
     {
      "id": "q24",
@@ -161,7 +159,7 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>20 — came<br>21 — was surfing<br>22 — were employed<br>23 — have lost (или have already lost)<br>24 — most patient<br>25 — me<br>26 — did not like<br>27 — fourth<br>28 — women",
+   "answerTex": "<br>20 — came<br>21 — was surfing<br>22 — were employed<br>23 — have lost<br>24 — most patient<br>25 — me<br>26 — did not like<br>27 — fourth<br>28 — women",
    "steps": [
     "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> It was late at night but the light was on in Ted’s room. When I <b>came</b> in, he didn’t even turn to me.</p><p><span class=\"eng-num\">21</span> I looked at his monitor and realized that he <b>was surfing</b> the Internet for job vacancies.</p><p><span class=\"eng-num\">22</span> “Why do you need a job?” I asked. “You <b>were employed</b> by Mr. Green only a week ago as far as I remember.”</p><p><span class=\"eng-num\">23</span> “Yes, I was. I got a job of a waiter in his restaurant. But I <b>have lost</b> that job already. They said I was rude to a client.”</p><p><span class=\"eng-num\">24</span> “Were you?” I was surprised since Ted was the <b>most patient</b> and tolerant person I’d ever met.</p><p><span class=\"eng-num\">25</span> “Yes, it was probably rude of <b>me</b> to tell those ladies that I wouldn’t bring them anything else. Just imagine – they had changed their order three times!</p><p><span class=\"eng-num\">26</span> Each time they tried a dish, they <b>did not like</b> it.</p><p><span class=\"eng-num\">27</span> When they said that for the <b>fourth</b> time, I lost control.</p><p><span class=\"eng-num\">28</span> One of the <b>women</b> called for the manager and complained.” Ted nervously turned back to his computer. “I didn’t like that job anyway.”</p></div>"
    ],
@@ -261,9 +259,7 @@
      "label": "21",
      "type": "word",
      "value": "would live",
-     "alts": [
-      "would be living"
-     ]
+     "alts": []
     },
     {
      "id": "q22",
@@ -284,9 +280,7 @@
      "label": "24",
      "type": "word",
      "value": "were passing",
-     "alts": [
-      "passed"
-     ]
+     "alts": []
     },
     {
      "id": "q25",
@@ -317,7 +311,7 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>20 — months<br>21 — would live (или would be living)<br>22 — more convenient<br>23 — first<br>24 — were passing (или passed)<br>25 — did not manage<br>26 — them<br>27 — are<br>28 — were built",
+   "answerTex": "<br>20 — months<br>21 — would live<br>22 — more convenient<br>23 — first<br>24 — were passing<br>25 — did not manage<br>26 — them<br>27 — are<br>28 — were built",
    "steps": [
     "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> I was happy to take part in the exchange programme and to go to college in Britain. An opportunity to spend two <b>months</b> in London sounded fantastic.</p><p><span class=\"eng-num\">21</span> Our teacher told us that we <b>would live</b> in a student hostel.</p><p><span class=\"eng-num\">22</span> It was going to be <b>more convenient</b> than staying with a host family as the hostel was very close to the college.</p><p><span class=\"eng-num\">23</span> When we arrived in London, the <b>first</b> thing we had was a bus excursion round the British capital.</p><p><span class=\"eng-num\">24</span> Unfortunately, when we <b>were passing</b> Westminster Abbey, it started to rain hard.</p><p><span class=\"eng-num\">25</span> We had to go down to the lower level of our double-decker and we <b>did not manage</b> to enjoy the wonderful sights.</p><p><span class=\"eng-num\">26</span> Anyway, London is very impressive. People from all over the world live there. Some of <b>them</b> come as tourists, others choose this place to study or to work in.</p><p><span class=\"eng-num\">27</span> It is a dynamic multicultural city, though there <b>are</b> so many historical buildings in it.</p><p><span class=\"eng-num\">28</span> Amazingly, many of the houses <b>were built</b> centuries ago!</p></div>"
    ],
@@ -465,15 +459,13 @@
      "id": "q28",
      "label": "28",
      "type": "word",
-     "value": "had said",
-     "alts": [
-      "said"
-     ]
+     "value": "said",
+     "alts": []
     }
    ],
-   "answerTex": "<br>20 — was<br>21 — rang<br>22 — could not<br>23 — was found<br>24 — were repairing<br>25 — will come<br>26 — more original<br>27 — my<br>28 — had said (или said)",
+   "answerTex": "<br>20 — was<br>21 — rang<br>22 — could not<br>23 — was found<br>24 — were repairing<br>25 — will come<br>26 — more original<br>27 — my<br>28 — said",
    "steps": [
-    "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> Annie was waiting for her guests. Her birthday was on 25th December and she felt this was both lucky and unlucky. It <b>was</b> great to have her birthday on a special day like Christmas. But, on the other hand, very few of Annie’s friends came to her party. Most of them had family plans for that day.</p><p><span class=\"eng-num\">21</span> The doorbell <b>rang</b> and her classmate, Brian, appeared. He had a plastic bag in his hand.</p><p><span class=\"eng-num\">22</span> “Happy birthday, Annie!” Brain said and got an old oil lamp out of his bag. Annie <b>could not</b> hide her surprise: “What’s this? And where did you buy it?”</p><p><span class=\"eng-num\">23</span> “A magic lamp. And I didn’t buy it. It <b>was found</b> in the attic of an old country house a year ago.</p><p><span class=\"eng-num\">24</span> My friend found it when they <b>were repairing</b> the house.</p><p><span class=\"eng-num\">25</span> He says if you light the lamp and make a wish, the wish <b>will come</b> true. It works particularly well with reasonable wishes that are not too big for the lamp. Its magic is not very strong.”</p><p><span class=\"eng-num\">26</span> Annie laughed aloud. “I’ve never got a present <b>more original</b> than this. Ok, let’s test your lamp.”</p><p><span class=\"eng-num\">27</span> Annie lit it and said: “I wish the whole class would come to <b>my</b> party today”.</p><p><span class=\"eng-num\">28</span> As soon as she <b>had said</b> it, the doorbell rang impatiently.</p></div>"
+    "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> Annie was waiting for her guests. Her birthday was on 25th December and she felt this was both lucky and unlucky. It <b>was</b> great to have her birthday on a special day like Christmas. But, on the other hand, very few of Annie’s friends came to her party. Most of them had family plans for that day.</p><p><span class=\"eng-num\">21</span> The doorbell <b>rang</b> and her classmate, Brian, appeared. He had a plastic bag in his hand.</p><p><span class=\"eng-num\">22</span> “Happy birthday, Annie!” Brain said and got an old oil lamp out of his bag. Annie <b>could not</b> hide her surprise: “What’s this? And where did you buy it?”</p><p><span class=\"eng-num\">23</span> “A magic lamp. And I didn’t buy it. It <b>was found</b> in the attic of an old country house a year ago.</p><p><span class=\"eng-num\">24</span> My friend found it when they <b>were repairing</b> the house.</p><p><span class=\"eng-num\">25</span> He says if you light the lamp and make a wish, the wish <b>will come</b> true. It works particularly well with reasonable wishes that are not too big for the lamp. Its magic is not very strong.”</p><p><span class=\"eng-num\">26</span> Annie laughed aloud. “I’ve never got a present <b>more original</b> than this. Ok, let’s test your lamp.”</p><p><span class=\"eng-num\">27</span> Annie lit it and said: “I wish the whole class would come to <b>my</b> party today”.</p><p><span class=\"eng-num\">28</span> As soon as she <b>said</b> it, the doorbell rang impatiently.</p></div>"
    ],
    "group": "all"
   },
@@ -762,9 +754,7 @@
      "label": "26",
      "type": "word",
      "value": "have found",
-     "alts": [
-      "have already found"
-     ]
+     "alts": []
     },
     {
      "id": "q27",
@@ -781,7 +771,7 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>20 — children<br>21 — did not differ<br>22 — could<br>23 — better<br>24 — her<br>25 — first<br>26 — have found (или have already found)<br>27 — will come<br>28 — liked",
+   "answerTex": "<br>20 — children<br>21 — did not differ<br>22 — could<br>23 — better<br>24 — her<br>25 — first<br>26 — have found<br>27 — will come<br>28 — liked",
    "steps": [
     "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> Mr. and Mrs. Wormwood were our neighbours. They had two <b>children</b>.</p><p><span class=\"eng-num\">21</span> Their son Michael <b>did not differ</b> from the other children very much, but their daughter Matilda was a brilliant child.</p><p><span class=\"eng-num\">22</span> By the time she was five, Matilda was able to read very well. She studied every magazine and newspaper that she <b>could</b> find around the house.</p><p><span class=\"eng-num\">23</span> Actually, she could read <b>better</b> than most school pupils.</p><p><span class=\"eng-num\">24</span> One afternoon when the parents were out of the house, Matilda put on <b>her</b> dress and shoes and went to the library.</p><p><span class=\"eng-num\">25</span> The librarian was surprised to see such a small child. “Are you here for the <b>first</b> time? Would you like me to find a nice book with lots of pictures for you?” she asked.</p><p><span class=\"eng-num\">26</span> “No, thank you, I <b>have found</b> what I need,” answered Matilda showing a thick book of fairy tales.</p><p><span class=\"eng-num\">27</span> Then she added, “I <b>will come</b> for a new book as soon as I finish this one”.</p><p><span class=\"eng-num\">28</span> The librarian was really shocked when she saw Matilda only two days later. “I wish all children <b>liked</b> reading so much,” the librarian said. From that day on Matilda went to the library every afternoon.</p></div>"
    ],
@@ -805,9 +795,7 @@
      "label": "21",
      "type": "word",
      "value": "was organized",
-     "alts": [
-      "was organised"
-     ]
+     "alts": []
     },
     {
      "id": "q22",
@@ -859,7 +847,7 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>20 — took<br>21 — was organized (или was organised)<br>22 — most wonderful<br>23 — were<br>24 — children<br>25 — has completed<br>26 — him<br>27 — understood<br>28 — will kill",
+   "answerTex": "<br>20 — took<br>21 — was organized<br>22 — most wonderful<br>23 — were<br>24 — children<br>25 — has completed<br>26 — him<br>27 — understood<br>28 — will kill",
    "steps": [
     "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> Mike Fay is a famous biologist. He is well-known for his 2,000-mile walk across Africa. It <b>took</b> him 455 days.</p><p><span class=\"eng-num\">21</span> His expedition started in 2001. It <b>was organized</b> to draw attention to the African forests. During his expedition Mike Fay made several films about the beauty of the forests.</p><p><span class=\"eng-num\">22</span> He said they were the<b>most wonderful</b> natural sights he had ever seen.</p><p><span class=\"eng-num\">23</span> His films<b>were</b> a success. Thanks to them the governments of several African countries agreed to create 13 national parks.</p><p><span class=\"eng-num\">24</span> Mike commented that 26,000 square kilometres of the forest were saved for the future and for our <b>children</b>.</p><p><span class=\"eng-num\">25</span> At the moment Mike works for the National Geographic. Recently he <b>has completed</b> several projects for the magazine. His job involves lots of travelling, which is sometimes not very safe.</p><p><span class=\"eng-num\">26</span> Not long ago, Mike came face to face with an elephant which attacked<b>him</b>. Mike was injured but luckily not seriously.</p><p><span class=\"eng-num\">27</span> But danger could never stop Mike. “I wish everyone <b>understood</b> that life is a very delicate thing.</p><p><span class=\"eng-num\">28</span> If we go on in the same irresponsible way, we <b>will kill</b> all life on the planet, and ourselves too”.</p></div>"
    ],
@@ -966,9 +954,7 @@
      "label": "22",
      "type": "word",
      "value": "is",
-     "alts": [
-      "was"
-     ]
+     "alts": []
     },
     {
      "id": "q23",
@@ -1013,7 +999,7 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>20 — me<br>21 — ran<br>22 — is (или was)<br>23 — have left<br>24 — older<br>25 — would explain<br>26 — was written<br>27 — stories<br>28 — will have",
+   "answerTex": "<br>20 — me<br>21 — ran<br>22 — is<br>23 — have left<br>24 — older<br>25 — would explain<br>26 — was written<br>27 — stories<br>28 — will have",
    "steps": [
     "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> It started as a normal Monday morning. My alarm clock woke <b>me</b> up early in the morning.</p><p><span class=\"eng-num\">21</span> I had breakfast, brushed my teeth and <b>ran</b> outside to catch the bus.</p><p><span class=\"eng-num\">22</span> At school I noticed that something was different. I came up to my friend Laura and asked her: “What’s going on? Why <b>is</b> everyone so excited?”</p><p><span class=\"eng-num\">23</span> “Don’t you know?” she said. “All the teachers <b>have left</b> for a conference. Only the headteacher and a few of the school staff are here.</p><p><span class=\"eng-num\">24</span> The senior students will be teaching us today. They are only two or three years <b>older</b> than us. How can they possibly teach us?”</p><p><span class=\"eng-num\">25</span> However, she was wrong. Our substitute teacher, a student two grades above, was very serious. He said that he <b>would explain</b> some French poetry to us.</p><p><span class=\"eng-num\">26</span> It was an unusual, but interesting French class. The poem <b>was written</b> on the board, our new teacher read it and then we discussed the poet’s message, choice of words and other poetical things.</p><p><span class=\"eng-num\">27</span> Probably because the teacher was almost the same age as us, we felt relaxed and spoke freely. He also told us several amusing <b>stories</b> about the poet and his time. When the class was almost over, our substitute teacher invited us to attend the next session of the school literary society.</p><p><span class=\"eng-num\">28</span> “I’m the Chairman of the society,” he added, “If you come, we <b>will have</b> a special welcome party for new members.”</p></div>"
    ],
@@ -1072,9 +1058,7 @@
      "label": "26",
      "type": "word",
      "value": "is improving",
-     "alts": [
-      "has improved"
-     ]
+     "alts": []
     },
     {
      "id": "q27",
@@ -1091,7 +1075,7 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>20 — worst<br>21 — rained<br>22 — was<br>23 — did not listen<br>24 — had<br>25 — was held<br>26 — is improving (или has improved)<br>27 — will have<br>28 — feet",
+   "answerTex": "<br>20 — worst<br>21 — rained<br>22 — was<br>23 — did not listen<br>24 — had<br>25 — was held<br>26 — is improving<br>27 — will have<br>28 — feet",
    "steps": [
     "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> It was the middle of November and Tina felt down and depressed. Late autumn was the <b>worst</b> season of the year.</p><p><span class=\"eng-num\">21</span> It often <b>rained</b>, and Tina had to spend most of her time indoors. Because of this, she really welcomed the changes in her school routine. The school administration introduced a new class - a dance class.</p><p><span class=\"eng-num\">22</span> But not everyone was happy! The boys said that it <b>was</b> a waste of time.</p><p><span class=\"eng-num\">23</span> They often missed the class and, when they attended, they <b>did not listen</b> to the teacher’s instructions but tried to make fun of everything.</p><p><span class=\"eng-num\">24</span> “I wish we <b>had</b> a class for girls only,” Tina thought.</p><p><span class=\"eng-num\">25</span> The Junior Dance Competition <b>was held</b> in their town every year. It was a spectacular show.</p><p><span class=\"eng-num\">26</span> “Your dancing <b>is improving</b> every day,” the teacher said one day.</p><p><span class=\"eng-num\">27</span> “If you go on like this, you <b>will have</b> a chance to take part in the Dance Competition next month.”</p><p><span class=\"eng-num\">28</span> Tina imagined herself wearing a beautiful dress and elegant shoes on her <b>feet</b>. She decided it was something she’d like to try.</p></div>"
    ],
@@ -1546,12 +1530,10 @@
      "label": "28",
      "type": "word",
      "value": "wanted",
-     "alts": [
-      "would want"
-     ]
+     "alts": []
     }
    ],
-   "answerTex": "<br>20 — will like<br>21 — smaller<br>22 — were kept<br>23 — foxes<br>24 — their<br>25 — were<br>26 — do not understand<br>27 — made<br>28 — wanted (или would want)",
+   "answerTex": "<br>20 — will like<br>21 — smaller<br>22 — were kept<br>23 — foxes<br>24 — their<br>25 — were<br>26 — do not understand<br>27 — made<br>28 — wanted",
    "steps": [
     "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> Tim liked going to the zoo. One day his mother said: “We’re going to a different place today, Tim. It’s an animal shelter. I’m sure you <b>will like</b> it.”</p><p><span class=\"eng-num\">21</span> The place was much <b>smaller</b> than a zoo, but clean and well kept. There were volunteers in special uniforms. One of them showed Tim and his mum round the shelter.</p><p><span class=\"eng-num\">22</span> Lots of animals <b>were kept</b> there.</p><p><span class=\"eng-num\">23</span> Cats and dogs made up most of the population, but there were also horses, monkeys, <b>foxes</b> and other animals.</p><p><span class=\"eng-num\">24</span> Each of the animals had its own story written on a sign next to its cage or enclosure. All the stories were sad – the animals had either been abandoned by <b>their</b> owners or saved by the animal police from cruel treatment.</p><p><span class=\"eng-num\">25</span> “If people <b>were</b> more responsible for their pets, we wouldn’t have so much work here,” the volunteer remarked.</p><p><span class=\"eng-num\">26</span> “But unfortunately some people <b>do not understand</b> that animals are not toys.”</p><p><span class=\"eng-num\">27</span> Tim’s mother thanked the volunteer and <b>made</b> a donation. Shelters always needed money to pay for the animals’ food and medical care.</p><p><span class=\"eng-num\">28</span> On the way home Tim told his mother that he <b>wanted</b> to go to the shelter again, not only to watch but also to help the volunteers.</p></div>"
    ],
@@ -2066,9 +2048,7 @@
      "label": "26",
      "type": "word",
      "value": "is making",
-     "alts": [
-      "has made"
-     ]
+     "alts": []
     },
     {
      "id": "q27",
@@ -2085,7 +2065,7 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>20 — leaves<br>21 — were<br>22 — best<br>23 — her<br>24 — bought<br>25 — did not hear<br>26 — is making (или has made)<br>27 — was decorated<br>28 — liked",
+   "answerTex": "<br>20 — leaves<br>21 — were<br>22 — best<br>23 — her<br>24 — bought<br>25 — did not hear<br>26 — is making<br>27 — was decorated<br>28 — liked",
    "steps": [
     "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> Veronica loved autumn. It was her favourite season. There were many good things about it. She loved the smells, the changing <b>leaves</b>, and the cool breezes.</p><p><span class=\"eng-num\">21</span> There <b>were</b> also apple pies, apple doughnuts and pumpkin pies.</p><p><span class=\"eng-num\">22</span> For Veronica, pumpkin pies were the <b>best</b>, especially when her mother cooked them.</p><p><span class=\"eng-num\">23</span> Veronica had never tried to make a pie herself, but she knew how, as she had seen how <b>her</b> mother made it many times.</p><p><span class=\"eng-num\">24</span> One day, on her way from school, Veronica <b>bought</b> a pumpkin and decided to cook it. She tried to do everything the same way her mother usually did.</p><p><span class=\"eng-num\">25</span> Veronica was in the kitchen and <b>did not hear</b> the door bell. Her mother had to use her key to enter the house.</p><p><span class=\"eng-num\">26</span> “Who <b>is making</b> a pie?” her mother asked. “I can smell it. How soon is it going to be ready? I’m very hungry.”</p><p><span class=\"eng-num\">27</span> When the pie was ready, Veronica put it on the table. The pie looked nice: it <b>was decorated</b> with nuts and coloured sugar.</p><p><span class=\"eng-num\">28</span> Veronica’s mother had a large piece. She smiled and said that she <b>liked</b> it very much.</p></div>"
    ],
@@ -2178,9 +2158,7 @@
      "label": "20",
      "type": "word",
      "value": "have not heard",
-     "alts": [
-      "have never heard"
-     ]
+     "alts": []
     },
     {
      "id": "q21",
@@ -2239,7 +2217,7 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>20 — have not heard (или have never heard)<br>21 — knew<br>22 — centuries<br>23 — left<br>24 — was spoken<br>25 — twentieth<br>26 — is offered<br>27 — most difficult<br>28 — will survive",
+   "answerTex": "<br>20 — have not heard<br>21 — knew<br>22 — centuries<br>23 — left<br>24 — was spoken<br>25 — twentieth<br>26 — is offered<br>27 — most difficult<br>28 — will survive",
    "steps": [
     "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> English, Welsh, Scottish…all these languages sound familiar. But I’m sure you <b>have not heard</b> of Cornish.</p><p><span class=\"eng-num\">21</span> I wish I <b>knew</b> it, like my Granny does.</p><p><span class=\"eng-num\">22</span> Cornish is a Celtic language, used in Cornwall, a county in south-west England. <b>centuries</b> ago, when the Anglo-Saxons invaded Britain, many Celts moved to the mountain areas.</p><p><span class=\"eng-num\">23</span> Some Celts even <b>left</b> the country completely and settled in France.</p><p><span class=\"eng-num\">24</span> Speakers of Cornish stayed in the south-west. There the language <b>was spoken</b> until the late 1700s. But the number of speakers got smaller and the language almost disappeared.</p><p><span class=\"eng-num\">25</span> At the beginning of the <b>twentieth</b> century, academics became interested in Cornish and started to study the ancient texts. From those old documents they managed to restore the language!</p><p><span class=\"eng-num\">26</span> Nowadays, if you visit Cornwall, you will hear a lot of it. The language <b>is offered</b> as an option in many universities, and students themselves choose to learn it.</p><p><span class=\"eng-num\">27</span> Like I did. I think it’s the <b>most difficult</b> language I have ever learnt, but it’s interesting and it sounds very nice.</p><p><span class=\"eng-num\">28</span> I believe the Cornish language <b>will survive</b>.</p></div>"
    ],
@@ -3355,9 +3333,7 @@
      "label": "25",
      "type": "word",
      "value": "saw",
-     "alts": [
-      "could see"
-     ]
+     "alts": []
     },
     {
      "id": "q26",
@@ -3381,7 +3357,7 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>20 — hears<br>21 — are kept<br>22 — him<br>23 — potatoes<br>24 — woke<br>25 — saw (или could see)<br>26 — second<br>27 — had<br>28 — has stolen",
+   "answerTex": "<br>20 — hears<br>21 — are kept<br>22 — him<br>23 — potatoes<br>24 — woke<br>25 — saw<br>26 — second<br>27 — had<br>28 — has stolen",
    "steps": [
     "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> Most people love jokes. A good joke can break the ice and make the conversation enjoyable. My friend’s hobby is collecting jokes. When he <b>hears</b> a good joke, he writes it down on a special card.</p><p><span class=\"eng-num\">21</span> The cards <b>are kept</b> in a box in his room.</p><p><span class=\"eng-num\">22</span> When I visit <b>him</b>, I never miss a chance to read a joke from his collection. Yesterday’s joke was about famous detectives. Here it is.</p><p><span class=\"eng-num\">23</span> One day Sherlock Holmes and Dr Watson went camping. They put up a tent, made a fire and had a good dinner of meat and <b>potatoes</b>.</p><p><span class=\"eng-num\">24</span> That night, Holmes <b>woke</b> up and asked: “Watson, look up and tell me what you see.”</p><p><span class=\"eng-num\">25</span> Watson said that he <b>saw</b> millions of stars. “And what does it tell you?” Holmes went on his interrogation.</p><p><span class=\"eng-num\">26</span> “Well, if we apply our deductive method, we’ll come to several conclusions. Astronomically, there are billions of planets. My<b>second</b> conclusion is astrological – I observe Saturn in Leo.</p><p><span class=\"eng-num\">27</span> And, meteorologically, it’ll be a beautiful day tomorrow. I wish we<b>had</b> this kind of weather more often in this country. And what does the sky tell you, Holmes?”</p><p><span class=\"eng-num\">28</span> Holmes was silent for a moment and then said, “Someone <b>has stolen</b> our tent!”</p></div>"
    ],
@@ -3720,9 +3696,7 @@
      "label": "22",
      "type": "word",
      "value": "did not get",
-     "alts": [
-      "never got"
-     ]
+     "alts": []
     },
     {
      "id": "q23",
@@ -3757,9 +3731,7 @@
      "label": "27",
      "type": "word",
      "value": "played",
-     "alts": [
-      "had to play"
-     ]
+     "alts": []
     },
     {
      "id": "q28",
@@ -3769,7 +3741,7 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>20 — best<br>21 — were<br>22 — did not get (или never got)<br>23 — second<br>24 — was made<br>25 — saved<br>26 — takes<br>27 — played (или had to play)<br>28 — had",
+   "answerTex": "<br>20 — best<br>21 — were<br>22 — did not get<br>23 — second<br>24 — was made<br>25 — saved<br>26 — takes<br>27 — played<br>28 — had",
    "steps": [
     "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> Most adults miss their childhood. Your school years are the <b>best</b> years of your life, they say.</p><p><span class=\"eng-num\">21</span> Just recently, while I was on my way to work, I started thinking back to my own school years. They probably were not trouble-free but there <b>were</b> many reasons for us to feel happy at school.</p><p><span class=\"eng-num\">22</span> One of them was spending every single day with friends. We <b>did not get</b> tired of being together.</p><p><span class=\"eng-num\">23</span> The <b>second</b> one was uniform. Yes, in my opinion, the school uniform had more advantages than disadvantages.</p><p><span class=\"eng-num\">24</span> It was dark green, unfashionable but comfortable. It <b>was made</b> of natural materials.</p><p><span class=\"eng-num\">25</span> Besides, the uniform <b>saved</b> a lot of time in the mornings.</p><p><span class=\"eng-num\">26</span> Now it <b>takes</b> me hours to decide what to wear.</p><p><span class=\"eng-num\">27</span> Another thing is that I don’t really like sport. But at school we <b>played</b> football, netball, hockey and so on. Sport was compulsory. Now I realise that this was a good thing!</p><p><span class=\"eng-num\">28</span> And of course there were… holidays! Christmas, Easter, half-term, and the jackpot – the summer holidays. I wish I <b>had</b> as much free time now.</p></div>"
    ],
@@ -4659,9 +4631,7 @@
      "label": "25",
      "type": "word",
      "value": "had helped",
-     "alts": [
-      "helped"
-     ]
+     "alts": []
     },
     {
      "id": "q26",
@@ -4685,7 +4655,7 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>20 — chose<br>21 — did not know<br>22 — could<br>23 — was built<br>24 — first<br>25 — had helped (или helped)<br>26 — coldest<br>27 — their<br>28 — makes",
+   "answerTex": "<br>20 — chose<br>21 — did not know<br>22 — could<br>23 — was built<br>24 — first<br>25 — had helped<br>26 — coldest<br>27 — their<br>28 — makes",
    "steps": [
     "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> After school, I decided to go to university. I <b>chose</b> St Andrews University in Scotland.</p><p><span class=\"eng-num\">21</span> At that time I <b>did not know</b> much about the University but when I arrived there, I liked it at once.</p><p><span class=\"eng-num\">22</span> Now I'm in my last year and I wish I <b>could</b> stay here forever!</p><p><span class=\"eng-num\">23</span> St Andrews University is a truly special place. It <b>was built</b> 600 years ago and it is one of the oldest universities in the English-speaking world.</p><p><span class=\"eng-num\">24</span> It has many traditions – for example, the ‘May Dip’. It is held on the <b>first</b> of May every year.</p><p><span class=\"eng-num\">25</span> All the students run into the North Sea at sunrise to celebrate the coming of spring and for good luck! One of my classmates said that the tradition <b>had helped</b> him to pass his exams last summer.</p><p><span class=\"eng-num\">26</span> For me the ‘May Dip’ was the <b>coldest</b> experience of my life!</p><p><span class=\"eng-num\">27</span> Because the weather is famously cold, St Andrews students designed <b>their</b> own uniform which consists of a warm jacket, jeans and boat shoes.</p><p><span class=\"eng-num\">28</span> The uniform <b>makes</b> us all look the same, but it is the only way to keep warm!</p></div>"
    ],
@@ -4744,9 +4714,7 @@
      "label": "26",
      "type": "word",
      "value": "do not drink",
-     "alts": [
-      "never drink"
-     ]
+     "alts": []
     },
     {
      "id": "q27",
@@ -4763,7 +4731,7 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>20 — largest<br>21 — was called<br>22 — men<br>23 — had bought<br>24 — was<br>25 — heard<br>26 — do not drink (или never drink)<br>27 — could<br>28 — him",
+   "answerTex": "<br>20 — largest<br>21 — was called<br>22 — men<br>23 — had bought<br>24 — was<br>25 — heard<br>26 — do not drink<br>27 — could<br>28 — him",
    "steps": [
     "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> Martin and Jane were shopping. They were in the <b>largest</b> shopping centre in their city.</p><p><span class=\"eng-num\">21</span> In fact, it was their favourite place because it was nice and not very expensive. The centre <b>was called</b> Dress for Less.</p><p><span class=\"eng-num\">22</span> Unlike most <b>men</b>, Martin liked shopping.</p><p><span class=\"eng-num\">23</span> Today he felt really happy because he <b>had bought</b> a shirt and a pair of jeans. Jane was still in the changing room so Martin had time for a cup of coffee in the lobby.</p><p><span class=\"eng-num\">24</span> It was the first time Martin had had a good look at the building itself. The shopping centre building <b>was</b> impressive. The engineers had used advanced technologies to make it light, warm and spacious.</p><p><span class=\"eng-num\">25</span> “Hi!” Martin <b>heard</b> Jane’s voice.</p><p><span class=\"eng-num\">26</span> “What are you having? Coffee? No, I <b>do not drink</b> coffee. Never. It’s not good for your health. ” “Look, Jane, do you know the name of the architect of this building?” Martin interrupted her.</p><p><span class=\"eng-num\">27</span> Jane looked puzzled. “I wish we <b>could</b> change our life a bit,” went on Martin. “We probably spend too much time on things like shopping and miss more important things. When was the last time we visited a museum?”</p><p><span class=\"eng-num\">28</span> Jane quietly sat down on the chair beside <b>him</b>.</p></div>"
    ],
@@ -4787,9 +4755,7 @@
      "label": "21",
      "type": "word",
      "value": "was driving",
-     "alts": [
-      "drove"
-     ]
+     "alts": []
     },
     {
      "id": "q22",
@@ -4841,7 +4807,7 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>20 — her<br>21 — was driving (или drove)<br>22 — did not want<br>23 — is<br>24 — could<br>25 — busiest<br>26 — will call<br>27 — took<br>28 — were offered",
+   "answerTex": "<br>20 — her<br>21 — was driving<br>22 — did not want<br>23 — is<br>24 — could<br>25 — busiest<br>26 — will call<br>27 — took<br>28 — were offered",
    "steps": [
     "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> School was finally over and I was about to enjoy my holidays. I was going to stay with my Aunt Helen, who lived in California. I thought that visiting <b>her</b> would be great fun, but I felt nervous and scared.</p><p><span class=\"eng-num\">21</span> When my mum <b>was driving</b> me to the airport, she noticed that something was wrong with me.</p><p><span class=\"eng-num\">22</span> “Are you all right?’ she asked. “You’re afraid of flying, aren’t you?” “Yes, I <b>did not want</b> to tell you. I’m a bit scared. Sorry.”</p><p><span class=\"eng-num\">23</span> “There <b>is</b> nothing to be sorry about! It’s natural to feel nervous before your first flight.</p><p><span class=\"eng-num\">24</span> I wish I <b>could</b> go with you, but you know that I can’t.”</p><p><span class=\"eng-num\">25</span> It was true. My mum was the <b>busiest</b> woman in the world.</p><p><span class=\"eng-num\">26</span> “I’m fine, Mum. Don’t worry.” I tried to sound calm. “I <b>will call</b> you as soon as we land.”</p><p><span class=\"eng-num\">27</span> The plane <b>took</b> off smoothly. The pilot informed the passengers about the details of the flight.</p><p><span class=\"eng-num\">28</span> Then we <b>were offered</b> refreshing drinks. I had some orange juice and closed my eyes.</p></div>"
    ],
@@ -5521,9 +5487,7 @@
      "label": "27",
      "type": "word",
      "value": "could",
-     "alts": [
-      "would"
-     ]
+     "alts": []
     },
     {
      "id": "q28",
@@ -5533,7 +5497,7 @@
      "alts": []
     }
    ],
-   "answerTex": "<br>20 — boxes<br>21 — were<br>22 — gave<br>23 — will see<br>24 — was reading<br>25 — was written<br>26 — him<br>27 — could (или would)<br>28 — first",
+   "answerTex": "<br>20 — boxes<br>21 — were<br>22 — gave<br>23 — will see<br>24 — was reading<br>25 — was written<br>26 — him<br>27 — could<br>28 — first",
    "steps": [
     "Текст с ответами:<div class=\"eng-text\"><p><span class=\"eng-num\">20</span> I remember my uncle Thomas very well. My mum says I can’t because I was a little girl, only three at the time. But my memories of him are still very vivid. Uncle Thomas was a sailor. When he returned from his last trip, he brought several large <b>boxes</b> with him.</p><p><span class=\"eng-num\">21</span> Inside there <b>were</b> bits of wood, metal, and painted cloth.</p><p><span class=\"eng-num\">22</span> “What is it for?” I asked my uncle. He <b>gave</b> me a broad smile and said: “Have your breakfast first and then come to the backyard.</p><p><span class=\"eng-num\">23</span> You <b>will see</b> everything with your own eyes.”</p><p><span class=\"eng-num\">24</span> When I came to the backyard, Uncle Thomas <b>was reading</b> an instruction manual.</p><p><span class=\"eng-num\">25</span> It took all his attention because the manual <b>was written</b> in Spanish, a language my uncle didn’t know very well.</p><p><span class=\"eng-num\">26</span> All in all, it took <b>him</b> a couple of weeks to assemble the object from the parts.</p><p><span class=\"eng-num\">27</span> To all my questions he said that it was a machine that <b>could</b> fly like a bird. I was probably the only one in the family who took his words seriously.</p><p><span class=\"eng-num\">28</span> They could never believe that soon we were going to see one of the <b>first</b> airplane flights in the country.</p></div>"
    ],
