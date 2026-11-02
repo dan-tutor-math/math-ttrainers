@@ -302,6 +302,7 @@ table.res td.nm small{display:block;color:var(--muted-2);font-size:12px;}
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="lazy-libs.js" data-preload="html2canvas"></script>
+<script src="subjects-catalog.js"></script>
 <script src="trainer-tasks.js"></script>
 <script src="works-cloud.js"></script>
 <script>
@@ -676,15 +677,13 @@ function cleanBlock(b){
 /* ── каталог и тренажёр в кадре ── */
 let openTid = null, openHref = null;
 function renderCatalog(q){
-  q = (q || '').trim().toLowerCase();
-  const html = TRAINERS_PANEL_GROUPS.map(g => {
-    const items = g.items.filter(it => !q || it.name.toLowerCase().includes(q));
-    if (!items.length) return '';
-    return '<div><div class="cat-group-title">' + esc(g.title) + '</div>' + items.map((it, i) =>
+  // разделы и переключатель предмета — общие с панелью досок (trainer-tasks.js)
+  const html = ttPanelView(q).map(g =>
+    '<div><div class="cat-group-title">' + esc(g.title) + '</div>' + g.items.map((it, i) =>
       '<button class="cat-item" data-id="' + esc(it.id) + '" data-href="' + esc(it.href) + '" data-name="' + esc(it.name) + '">'
-      + '<span class="n">' + String(i + 1).padStart(2, '0') + '</span><span class="nm">' + esc(it.name) + '</span><span class="eq">' + esc(it.eq) + '</span></button>').join('') + '</div>';
-  }).join('');
-  $('catList').innerHTML = html || '<div class="empty">Ничего не нашлось</div>';
+      + '<span class="n">' + String(i + 1).padStart(2, '0') + '</span><span class="nm">' + esc(it.name) + '</span><span class="eq">' + esc(it.eq) + '</span></button>').join('') + '</div>').join('');
+  $('catList').innerHTML = ttSubjectTabsHtml() + (html || '<div class="empty">Ничего не нашлось</div>');
+  ttBindSubjectTabs($('catList'), () => renderCatalog($('catSearch').value));
 }
 $('catSearch').addEventListener('input', () => renderCatalog($('catSearch').value));
 $('catList').addEventListener('click', e => {

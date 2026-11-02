@@ -109,90 +109,97 @@ for (let n = 20; n <= 25; n++) {
   TRAINER_CAPTURE['oge' + n] = [ { sel:'#egeQuestion' }, { selAll:'.added-task-card .added-card-question' } ];
 }
 
-// список тренажёров для панели — те же названия/файлы, что и в реестре
-// TRAINERS на главной странице (index.html), сгруппированы так же просто,
-// как раздел «Основа» там: отдельно все номера ОГЭ, отдельно всё остальное —
-// без повторов одного тренажёра в нескольких разделах (это на главной
-// странице оправдано навигацией по классам, а тут только мешало бы искать)
-const TRAINERS_PANEL_GROUPS = [
-  { title: 'ОГЭ', items: [
-    { id:'oge1_5',   name:'№1–5. Практические задачи',    href:'oge1_5.html',            eq:'шины, тарифы…' },
-    { id:'oge6',     name:'№6. Числа и вычисления',       href:'oge6.html',              eq:'1/10 + 29/20' },
-    { id:'oge7',     name:'№7. Сравнение и оценка чисел', href:'oge7.html',              eq:'5 < √27 < 6' },
-    { id:'oge8',     name:'№8. Выражения и формулы',      href:'oge8.html',              eq:'a²−b²' },
-    { id:'oge9',     name:'№9. Уравнения и неравенства',  href:'oge9.html',              eq:'3x²−7x+2=0' },
-    { id:'oge10',    name:'№10. Теория вероятности',      href:'oge10.html',             eq:'P(A)=5⁄20' },
-    { id:'oge11',    name:'№11. Графики функций',         href:'oge11.html',             eq:'y=kx+b' },
-    { id:'oge12',    name:'№12. Вычисления по формулам',  href:'oge12.html',             eq:'v=v₀+at' },
-    { id:'oge13',    name:'№13. Неравенства',             href:'oge13.html',             eq:'x²−9≤0' },
-    { id:'oge14',    name:'№14. Прогрессии',              href:'oge14.html',             eq:'aₙ=a₁+(n−1)d' },
-    { id:'oge15_18', name:'№15–18. Геометрия',            href:'oge15_18.html',          eq:'S, P, Пифагор' },
-    { id:'oge19',    name:'№19. Верные утверждения',      href:'oge19.html',             eq:'верно/неверно' },
-  ]},
-  { title: 'Основа', items: [
-    { id:'add_col',   name:'Сложение в столбик',      href:'addition.html',          eq:'999+1' },
-    { id:'sub_col',   name:'Вычитание в столбик',     href:'subtraction.html',       eq:'700−458' },
-    { id:'mul_col',   name:'Умножение в столбик',     href:'multiplication.html',    eq:'347×26' },
-    { id:'div_col',   name:'Деление в столбик',       href:'division.html',          eq:'4826:7' },
-    { id:'linear',    name:'Линейные уравнения',      href:'linear.html',            eq:'3(2x−5)+x' },
-    { id:'quadratic', name:'Квадратные уравнения',    href:'quadratic.html',         eq:'2x²−7x+3=0' },
-    { id:'frac_mul',  name:'Умножение дробей',        href:'fraction_multiply.html', eq:'4⁄9×3⁄8' },
-    { id:'frac_div',  name:'Деление дробей',          href:'fraction_divide.html',   eq:'2⁄3÷4⁄5' },
-    // Промпт №54: тренажёр степеней появился на главной позже этой панели,
-    // сюда его добавить забыли
-    { id:'powers',    name:'Действия со степенями',   href:'powers.html',            eq:'a⁵·a³=a⁸' },
-    { id:'gcd',       name:'Наибольший общий делитель (НОД)', href:'gcd.html',    eq:'НОД(84, 60)' },
-    { id:'lcm',       name:'Наименьшее общее кратное (НОК)',  href:'lcm.html',    eq:'НОК(12, 18)' },
-    { id:'percent',   name:'Проценты',                href:'percent.html',           eq:'15% от 80' },
-    { id:'logarithms', name:'Свойства логарифмов',    href:'logarithms.html',        eq:'log₂8 = 3' },
-    { id:'trig_equations', name:'Тригонометрические уравнения', href:'trig_equations.html', eq:'sin x = ½' },
-  ]},
-];
-// ЕГЭ профиль вставляем вторым разделом (после ОГЭ) — те же названия, что в
-// реестре на главной; все двадцать номеров ведут в один файл с номером в адресе
-const EGE_PROF_PANEL = [
-  'Планиметрия', 'Векторы', 'Стереометрия', 'Начала теории вероятностей',
-  'Вероятности сложных событий', 'Случайная величина', 'Простейшие уравнения',
-  'Вычисления и преобразования', 'Производная и графики',
-  'Задачи с прикладным содержанием', 'Текстовые задачи', 'Графики функций',
-  'Кредиты и вклады', 'Уравнения', 'Стереометрическая задача', 'Неравенства',
-  'Прикладная задача', 'Планиметрическая задача', 'Задача с параметром',
-  'Числа и их свойства',
-];
-TRAINERS_PANEL_GROUPS.splice(1, 0, { title: 'ЕГЭ профиль', items: EGE_PROF_PANEL.map((title, i) => ({
-  id: 'ege' + (i + 1),
-  name: '№' + (i + 1) + '. ' + title,
-  href: 'ege_prof.html?n=' + (i + 1),
-  eq: i < 13 ? 'краткий ответ' : 'с решением',
-})) });
-// ЕГЭ база — третьим разделом, сразу за профилем; названия те же, что на главной
-const EGE_BASE_PANEL = [
-  'Простейшие текстовые задачи', 'Величины и их значения', 'Графики, диаграммы и таблицы',
-  'Вычисления по формулам', 'Начала теории вероятностей', 'Выбор оптимального варианта',
-  'Анализ графиков и диаграмм', 'Анализ утверждений', 'Площади на клетчатом плане',
-  'Прикладная планиметрия', 'Прикладная стереометрия', 'Планиметрия', 'Стереометрия',
-  'Вычисления', 'Проценты и доли', 'Значения выражений', 'Простейшие уравнения',
-  'Числа на прямой и неравенства', 'Цифровая запись числа', 'Текстовые задачи',
-  'Задачи на смекалку',
-];
-TRAINERS_PANEL_GROUPS.splice(2, 0, { title: 'ЕГЭ база', items: EGE_BASE_PANEL.map((title, i) => ({
-  id: 'egeb' + (i + 1),
-  name: '№' + (i + 1) + '. ' + title,
-  href: 'ege_base.html?n=' + (i + 1),
-  eq: 'краткий ответ',
-})) });
+/* Каталог тренажёров для панелей — из subjects-catalog.js (общий с главной).
+   TRAINERS_PANEL_GROUPS — все разделы всех предметов подряд, у раздела есть
+   subject: поиск id и адреса кадра (ttPanelItemForLocation, «Работы») идёт
+   по всем предметам сразу, а список на экране показывает один предмет —
+   выбранный в переключателе (ttPanelView). Без каталога на странице панель
+   пуста, но остальной модуль (снимки, проверка ответа) работает */
+const TT_CATALOG = window.MathhCatalog || null;
+if (!TT_CATALOG) console.error('trainer-tasks.js: не подключён subjects-catalog.js — список тренажёров пуст');
+const TRAINERS_PANEL_GROUPS = TT_CATALOG ? TT_CATALOG.panelGroups() : [];
+// прежние имена списков — их читает boards-core.js (подписи «Подборки»)
+const EGE_PROF_PANEL = TT_CATALOG ? TT_CATALOG.titles.egeProf : [];
+const EGE_BASE_PANEL = TT_CATALOG ? TT_CATALOG.titles.egeBase : [];
+const OGE_PART2_PANEL = TT_CATALOG ? TT_CATALOG.titles.ogePart2 : {};
 
-// ОГЭ, часть 2 (Промпт №61) — в тот же раздел «ОГЭ», следом за №19; названия
-// те же, что в реестре на главной, все шесть номеров ведут в oge_part2.html
-const OGE_PART2_PANEL = {
-  20: 'Уравнения и неравенства', 21: 'Текстовая задача', 22: 'Графики функций',
-  23: 'Геометрическая задача на вычисление', 24: 'Геометрическая задача на доказательство',
-  25: 'Геометрическая задача повышенной сложности',
-};
-Object.keys(OGE_PART2_PANEL).forEach(n => {
-  TRAINERS_PANEL_GROUPS[0].items.push({ id: 'oge' + n, name: '№' + n + '. ' + OGE_PART2_PANEL[n],
-    href: 'oge_part2.html?n=' + n, eq: n === '24' ? 'доказательство' : 'с решением' });
+/* Страницы-копии ege_prof.html (ЕГЭ, ОГЭ ч. 2, обществознание, английский)
+   снимаются одинаково — условие #egeQuestion и карточки «+»; русский
+   (скелет rus_oge.html) — вся панель задания без кнопок и отзыва: поле ответа
+   и варианты остаются, на доске по ним пишут ручкой. Явная запись в
+   TRAINER_CAPTURE выше важнее каталога */
+const TT_RUS_STRIP = '.check-btn, #feedback, #answerBox, #solRow, .sol-row, #nextBtn, .next-btn';
+if (TT_CATALOG) Object.keys(TT_CATALOG.trainers).forEach(id => {
+  if (TRAINER_CAPTURE[id]) return;
+  const cap = TT_CATALOG.trainers[id].cap;
+  if (cap === 'ege') TRAINER_CAPTURE[id] = [ { sel:'#egeQuestion' }, { selAll:'.added-task-card .added-card-question' } ];
+  else if (cap === 'rus') TRAINER_CAPTURE[id] = [ { sel:'#questionPanel', strip: TT_RUS_STRIP } ];
 });
+
+/* ── переключатель предмета в панели ──
+   Выбор помнится отдельно от главной (ttPanel:subject): на доске учитель
+   ведёт урок одного предмета, а главную мог оставить на другом. Пока выбора
+   не было — берём предмет главной (ogeNav:subject), это обычно тот же урок */
+const TT_SUBJECT_KEY = 'ttPanel:subject';
+function ttPanelSubjects(){
+  if (!TT_CATALOG) return [];
+  // предмет без единого раздела в панели не показываем — нечего выбирать
+  return TT_CATALOG.subjects.filter(s => TRAINERS_PANEL_GROUPS.some(g => g.subject === s.id));
+}
+function ttPanelSubject(){
+  const subs = ttPanelSubjects();
+  let id = null;
+  try { id = localStorage.getItem(TT_SUBJECT_KEY) || localStorage.getItem('ogeNav:subject'); } catch (e) {}
+  return subs.some(s => s.id === id) ? id : (subs[0] ? subs[0].id : 'math');
+}
+function ttSetPanelSubject(id){
+  try { localStorage.setItem(TT_SUBJECT_KEY, id); } catch (e) {}
+}
+/* что показать в списке: без поиска — разделы выбранного предмета; с
+   поиском — по всем предметам (учитель не обязан помнить, где что лежит),
+   и тогда к заголовку раздела приписан предмет: «ОГЭ» без него не различить */
+function ttPanelView(filterText){
+  const q = (filterText || '').trim().toLowerCase();
+  const cur = ttPanelSubject();
+  const title = id => { const s = TT_CATALOG && TT_CATALOG.subjects.find(x => x.id === id); return s ? s.title : ''; };
+  return TRAINERS_PANEL_GROUPS
+    .filter(g => q || g.subject === cur)
+    .map(g => ({ subject: g.subject, title: q ? title(g.subject) + ' · ' + g.title : g.title,
+      items: g.items.filter(it => !q || it.name.toLowerCase().includes(q)) }))
+    .filter(g => g.items.length);
+}
+// ряд кнопок предметов; цвет — акцент предмета, как на главной
+function ttSubjectTabsHtml(){
+  const subs = ttPanelSubjects();
+  if (subs.length < 2) return '';
+  ttEnsureSubjectCss();
+  const cur = ttPanelSubject();
+  const e = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  return '<div class="tt-subj-row" role="group" aria-label="Предмет">' + subs.map(s =>
+    '<button type="button" class="tt-subj' + (s.id === cur ? ' on' : '') + '" data-subj="' + e(s.id) +
+    '" aria-pressed="' + (s.id === cur) + '" style="--tt-s:' + e(s.color) + '">' + e(s.title) + '</button>').join('') + '</div>';
+}
+// щелчок по предмету: запомнить и перерисовать список тем же кодом
+function ttBindSubjectTabs(container, rerender){
+  container.querySelectorAll('.tt-subj').forEach(b => b.addEventListener('click', () => {
+    ttSetPanelSubject(b.dataset.subj);
+    rerender();
+  }));
+}
+// стили кнопок предметов — здесь, а не в trainers-list.css: «Работы» этот
+// файл не подключают, а переключатель у всех трёх списков должен быть одним
+function ttEnsureSubjectCss(){
+  if (document.getElementById('ttSubjCss')) return;
+  const st = document.createElement('style');
+  st.id = 'ttSubjCss';
+  st.textContent = '.tt-subj-row{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}'
+    + '.tt-subj{appearance:none;border:1px solid rgba(128,128,128,.35);background:transparent;color:inherit;'
+    + 'border-radius:999px;padding:6px 12px;font:inherit;font-size:13px;line-height:1.2;cursor:pointer}'
+    + '.tt-subj:hover{border-color:var(--tt-s)}'
+    + '.tt-subj.on{background:var(--tt-s);border-color:var(--tt-s);color:#fff}'
+    + '.tt-subj:focus-visible{outline:2px solid var(--tt-s);outline-offset:2px}';
+  document.head.appendChild(st);
+}
 
 
 // снимок одного DOM-узла тренажёра в PNG (data:) — вёрстка внутри iframe
@@ -491,6 +498,8 @@ async function captureTrainerNode(el, task, opts){
       }
       cleanCloneForCard(c, card);
       hideDeadSolutionButtons(c);
+      const strip = c.getAttribute('data-bd-strip');
+      if (strip) { try { c.querySelectorAll(strip).forEach(e => e.style.setProperty('display', 'none', 'important')); } catch (e) {} }
       // столбик с ответом под записью — место для решения не нужно
       if (answerSide !== 'right') c.querySelectorAll('.bd-col-blank').forEach(e => e.remove());
       if (task) hot = prepareTaskClone(c, task);
@@ -760,6 +769,11 @@ function collectTrainerCaptureNodes(doc, trainerId){
     }
     const el = doc.querySelector(entry.sel);
     if (!el) return;
+    // strip — что спрятать на снимке (кнопки, отзыв): прячем в копии
+    // страницы, которую снимает html2canvas, а живую страницу не трогаем —
+    // ученик в совместной сессии ничего не заметит. Селектор едет на самом
+    // узле: captureTrainerNode получает только узел, не запись карты
+    if (entry.strip) el.setAttribute('data-bd-strip', entry.strip);
     let restore = null;
     if (entry.unhide && getComputedStyle(el).display === 'none'){
       const prevDisplay = el.style.display;
@@ -1016,7 +1030,7 @@ function trainerTaskInfo(win, trainerId, el){
   try {
     const card = el.closest ? el.closest('.added-task-card[data-idx]') : null;
     const cardIdx = card ? Number(card.dataset.idx) : -1;
-    if (/^(ege|egeb)\d+$/.test(trainerId) || /^oge2[0-5]$/.test(trainerId)) return egeTaskInfo(win, cardIdx);
+    if (isEgeLikeTrainer(trainerId)) return egeTaskInfo(win, cardIdx);
     // Промпт №71: тренажёр, у которого верный ответ лежит прямо в объекте
     // задания («Проценты»), отдаёт его сам готовым — доске не нужно знать
     // его модель задания. Новым тренажёрам достаточно завести этот хук
@@ -1062,7 +1076,13 @@ function trainerTaskInfo(win, trainerId, el){
    Побочный эффект тот же, что у карточек «+1»: кадр пишет прогресс типа в
    localStorage тренажёра (последнее задание, последний уровень).
    ═══════════════════════════════════════════════════════════════════════ */
-function isEgeLikeTrainer(tid){ return /^(ege|egeb)\d+$/.test(tid) || /^oge2[0-5]$/.test(tid); }
+// страница-копия ege_prof.html: ЕГЭ, ОГЭ ч. 2, обществознание, английский —
+// у них одна модель задания (S.n, S.pid, fieldsOf). Список — в каталоге (cap)
+function isEgeLikeTrainer(tid){
+  if (/^(ege|egeb)\d+$/.test(tid) || /^oge2[0-5]$/.test(tid)) return true;
+  const t = TT_CATALOG && TT_CATALOG.trainers[tid];
+  return !!(t && t.cap === 'ege');
+}
 // снимок моста сессии без доски, калькулятора и служебных полей: только то,
 // что задаёт тип и уровень задания
 function stripTrainerSnap(st){

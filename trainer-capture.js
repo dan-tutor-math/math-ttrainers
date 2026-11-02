@@ -133,24 +133,23 @@ async function ttSnapTheory(doc, scale){
   }
 }
 
-// список тренажёров панели с поиском; onPick(id, href, name)
+// список тренажёров панели с поиском; onPick(id, href, name). Над списком —
+// переключатель предмета (ttSubjectTabsHtml в trainer-tasks.js); при поиске
+// ищем по всем предметам
 function ttRenderTrainersList(container, filterText, onPick){
-  const q = (filterText || '').trim().toLowerCase();
-  const html = TRAINERS_PANEL_GROUPS.map(g => {
-    const items = g.items.filter(it => !q || it.name.toLowerCase().includes(q));
-    if (!items.length) return '';
-    return `
+  const groups = ttPanelView(filterText);
+  const html = groups.map(g => `
       <div>
         <div class="bd-trainers-group-title">${g.title}</div>
-        ${items.map((it, ii) => `
+        ${g.items.map((it, ii) => `
           <button class="bd-trainers-item" data-id="${it.id}" data-href="${it.href}" data-name="${it.name.replace(/"/g,'&quot;')}">
             <span class="bd-trainers-item-num">${String(ii+1).padStart(2,'0')}</span>
             <span class="bd-trainers-item-name">${it.name}</span>
             <span class="bd-trainers-item-eq">${it.eq}</span>
           </button>`).join('')}
-      </div>`;
-  }).join('');
-  container.innerHTML = html || `<div class="bd-trainers-empty">Ничего не нашлось</div>`;
+      </div>`).join('');
+  container.innerHTML = ttSubjectTabsHtml() + (html || `<div class="bd-trainers-empty">Ничего не нашлось</div>`);
+  ttBindSubjectTabs(container, () => ttRenderTrainersList(container, filterText, onPick));
   container.querySelectorAll('.bd-trainers-item').forEach(btn => {
     btn.addEventListener('click', () => onPick(btn.dataset.id, btn.dataset.href, btn.dataset.name));
   });

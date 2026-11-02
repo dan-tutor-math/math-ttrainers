@@ -10848,6 +10848,12 @@ const TRAINER_NAMES = {
 EGE_PROF_PANEL.forEach((title, i) => { TRAINER_NAMES['ege' + (i + 1)] = 'ЕГЭ профиль №' + (i + 1) + '. ' + title; });
 EGE_BASE_PANEL.forEach((title, i) => { TRAINER_NAMES['egeb' + (i + 1)] = 'ЕГЭ база №' + (i + 1) + '. ' + title; });
 Object.keys(OGE_PART2_PANEL).forEach(n => { TRAINER_NAMES['oge' + n] = '№' + n + '. ' + OGE_PART2_PANEL[n]; });
+// остальные предметы — подпись с предметом и экзаменом из каталога
+// (subjects-catalog.js): «№5» без «Обществознание ОГЭ» в «Подборке» не различить
+if (window.MathhCatalog) Object.keys(MathhCatalog.trainers).forEach(id => {
+  const t = MathhCatalog.trainers[id];
+  if (!TRAINER_NAMES[id] && t.full) TRAINER_NAMES[id] = t.full;
+});
 function escapeHtmlBd(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
 function renderBasketPicker(){
