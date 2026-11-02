@@ -726,6 +726,8 @@
   }
 
   function drawBgGrid(){
+    // EXAM.noBoardGrid (обществознание ОГЭ): заметки поверх заданий — без клетки
+    if (document.documentElement.hasAttribute('data-no-board-grid')) return;
     const topLeft = bgScreenToWorld(0, 0);
     const bottomRight = bgScreenToWorld(window.innerWidth, window.innerHeight);
     const gridColor = (getComputedStyle(document.documentElement).getPropertyValue('--grid') || '#dfe6f3').trim() || '#dfe6f3';

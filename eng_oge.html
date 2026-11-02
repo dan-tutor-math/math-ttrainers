@@ -492,6 +492,57 @@ html[data-theme="dark"][data-subject="eng"]{--ink:#8462C8;--ink-active:#9878D6;-
 /* без цифровой клавиатуры и без «+ ещё задания» (EXAM.noKeypad, noAddRail) */
 html[data-no-keypad] #keypadFloat,html[data-no-keypad] #kpToggle{display:none!important}
 html[data-no-add-rail] #addRail{display:none!important}
+/* ─── обществознание ОГЭ (soc_oge.html) ───
+   Цвет — зелёный обществознания с главной. Светлый акцент тёмной темы даёт с белым
+   текстом меньше 4,5:1, поэтому залитые кнопки в тёмной теме красятся отдельно */
+html[data-subject="soc"]{--ink:#17694F;--ink-active:#10523D;--hl-10:rgba(23,105,79,.10);--hl-35:rgba(23,105,79,.35);--blob-1:rgba(36,137,106,.16)}
+html[data-theme="dark"][data-subject="soc"]{--ink:#2F8F70;--ink-active:#3FA584;--hl-10:rgba(58,158,126,.16);--hl-35:rgba(58,158,126,.5);--blob-1:rgba(58,158,126,.22)}
+html[data-theme="dark"][data-subject="soc"] .submode-tab.active,html[data-theme="dark"][data-subject="soc"] .check-btn,html[data-theme="dark"][data-subject="soc"] .yn-btn.sel,html[data-theme="dark"][data-subject="soc"] .proof-score-btn.active,html[data-theme="dark"][data-subject="soc"] .board-visibility-toggle.active{background:#1E7A5C;border-color:#1E7A5C;}
+html[data-theme="dark"][data-subject="soc"] .next-btn{background:#1F7A36;}
+.soc-text p{margin:0 0 6px;}
+.soc-text table{border-collapse:collapse;width:100%;margin:6px 0;}
+.soc-text td{padding:3px 6px;vertical-align:top;overflow-wrap:anywhere;hyphens:auto;}
+/* «А)», «1)» в таблицах соответствия — узкой ячейкой, в одну строку */
+.soc-text td:has(> b:only-child){width:1%;white-space:nowrap;}
+.soc-text td>p:last-child{margin-bottom:0;}
+/* №2 — таблица с пропуском: рамку ФИПИ чистка убирает, без неё это два столбика слов */
+.soc-text table.grid td{border:1px solid var(--muted-1);padding:6px 8px;}
+.soc-text .col-head{display:none;margin:10px 0 4px;}
+.soc-text img.fig{display:block;max-width:100%;height:auto;margin:10px auto;background:#fff;border-radius:12px;padding:6px;}
+.soc-opts{display:flex;flex-direction:column;gap:6px;margin-top:12px;}
+.soc-opt{display:flex;gap:10px;}
+.soc-opt b{flex:0 0 auto;min-width:20px;color:var(--ink);}
+.soc-note{font-size:13.5px;line-height:1.45;color:var(--pencil);background:var(--hl-10);border-radius:12px;padding:10px 12px;margin-bottom:12px;}
+.soc-text-box{background:var(--card);border:1px solid var(--glass-border);border-radius:16px;margin-bottom:16px;}
+.soc-text-box summary{cursor:pointer;padding:12px 16px;font-weight:600;font-size:14px;color:var(--ink);}
+.soc-text-body{padding:0 16px 14px;max-height:46vh;overflow:auto;font-size:15.5px;line-height:1.6;}
+.soc-req{display:flex;gap:10px;align-items:flex-start;line-height:1.45;padding:6px 0;cursor:pointer;}
+.soc-req input{width:18px;height:18px;margin-top:2px;accent-color:var(--ink);flex:0 0 auto;}
+.soc-sample summary{cursor:pointer;font-weight:700;color:var(--ink);}
+.soc-sample-text{margin-top:8px;}
+.soc-sample-note{font-size:13px;color:var(--muted-3);margin:8px 0 0;}
+/* №14 у ФИПИ — таблица в две колонки: на телефоне они встают друг под другом, а копия
+   шапки (col-head, её кладёт выгрузка) переезжает внутрь каждой */
+@media (max-width:620px){
+  .soc-text tr:has(> td > table){display:flex;flex-direction:column;}
+  .soc-text tr:has(> td > table) > td{display:block;width:auto;}
+  .soc-text tr.col-heads{display:none;}
+  .soc-text .col-head{display:block;}
+  /* колонки поровну: иначе при переносе по буквам первая сжимается до «По-ня-тие» */
+  .soc-text table.grid{table-layout:fixed;}
+}
+/* черновик и самооценка развёрнутого ответа (EXAM.proofDraft, proofScores) */
+.proof-draft-label{display:block;font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--muted-3);margin-bottom:6px;}
+.proof-draft{display:block;box-sizing:border-box;width:100%;min-height:150px;resize:vertical;font-family:var(--font-ui);font-size:16px;line-height:1.5;color:var(--pencil);background:var(--card);border:1.5px solid var(--glass-border);border-radius:14px;padding:12px 14px;margin-bottom:10px;}
+.proof-draft:focus{outline:none;border-color:var(--ink);}
+.proof-score{margin-top:14px;font-family:var(--font-ui);}
+.proof-score-title{font-weight:600;font-size:14px;color:var(--muted-3);margin-bottom:8px;}
+.proof-score-btns{display:flex;gap:8px;flex-wrap:wrap;}
+.proof-score-btn{font-family:var(--font-ui);font-weight:700;font-size:16px;min-width:48px;height:44px;border-radius:12px;border:1.5px solid var(--glass-border);background:var(--card);color:var(--ink);cursor:pointer;}
+.proof-score-btn:hover{border-color:var(--ink);}
+.proof-score-btn.active{background:var(--ink);border-color:var(--ink);color:#fff;}
+.proof-score-saved{font-size:14px;font-weight:600;color:var(--ok);margin-top:8px;}
+#extraTaskBtn{margin-top:12px;}
 </style>
 <link rel="stylesheet" href="katex-0.18.5.css" id="katexCss">
 <script src="katex-0.18.5.js"></script>
@@ -699,6 +750,7 @@ html[data-no-add-rail] #addRail{display:none!important}
               <button class="soft-btn icon-only" id="basketInlineBtn" title="В подборку">📥</button>
               <button class="soft-btn" id="showSolutionBtn" style="display:none">Показать решение и ответ</button>
             </div>
+            <button class="soft-btn" id="extraTaskBtn" style="display:none"></button>
           </div>
 
           <div class="panel" id="mainPanel" style="display:none">
@@ -710,6 +762,7 @@ html[data-no-add-rail] #addRail{display:none!important}
               <summary id="critSummary">Критерии оценивания ФИПИ</summary>
               <table id="critTable"></table>
             </details>
+            <div class="proof-score" id="proofScore" style="display:none"></div>
             <button class="next-btn" id="nextBtn" style="display:none">Следующее задание →</button>
           </div>
         </div>
@@ -914,6 +967,12 @@ if (EXAM.backLabel) document.getElementById('backBtn').textContent = EXAM.backLa
 if (EXAM.subject) document.documentElement.setAttribute('data-subject', EXAM.subject);
 if (EXAM.noKeypad) document.documentElement.setAttribute('data-no-keypad', '');
 if (EXAM.noAddRail) document.documentElement.setAttribute('data-no-add-rail', '');
+/* Обществознание ОГЭ (soc_oge.html):
+   - noBoardGrid — доска на самом тренажёре без клетчатой подложки (trainer-board.js);
+   - proofDraft — у развёрнутого ответа поле-черновик, он сохраняется сам;
+   - proofScores — после сверки с критериями ученик ставит себе балл;
+   - legacyKeys — откуда один раз забрать прогресс прежней страницы предмета */
+if (EXAM.noBoardGrid) document.documentElement.setAttribute('data-no-board-grid', '');
 const FIGS = EXAM.figs || {};
 const NUMS = Object.keys(BANK).map(Number).sort((a, b) => a - b);
 
@@ -1203,7 +1262,7 @@ const els = {};
  'keypadFloat','kpToggle','kpClose','kpDragHandle','keypadButtons',
  'manualNote','showSolutionBtn','mainPanel','solHint','solSteps','nextStepBtn',
  'solAnswer','critBox','critSummary','critTable','nextBtn','tabLearn','tabPractice','tabExam',
- 'basketAddBtn','refreshBtn','stSolved','stErrors','stStreak'].forEach(id => { els[id] = document.getElementById(id); });
+ 'basketAddBtn','refreshBtn','stSolved','stErrors','stStreak','proofScore','extraTaskBtn'].forEach(id => { els[id] = document.getElementById(id); });
 
 /* отметки «решено» живут в общем для всех тренажёров localStorage под
    ключом ogeProg: — их стирает кнопка сброса прогресса на главной */
@@ -1216,6 +1275,29 @@ function markSolved(pid){
   try { localStorage.setItem(PROG_KEY, JSON.stringify(solvedIds)); } catch (e) {}
 }
 const isSolved = pid => solvedIds.indexOf(pid) >= 0;
+/* Черновики и самооценка лежат под ogeProg: — их, как и «решено», стирает сброс
+   прогресса на главной */
+const DRAFT_PREFIX = 'ogeProg:' + EXAM.slug + ':draft:';
+const SCORES_KEY = 'ogeProg:' + EXAM.slug + ':scores';
+let proofScoreMap = {};
+try { proofScoreMap = JSON.parse(localStorage.getItem(SCORES_KEY) || '{}') || {}; } catch (e) {}
+/* Перенос один раз: старые ключи после него удаляются, иначе сброс прогресса вернул бы их назад */
+if (EXAM.legacyKeys) (function(L){
+  try {
+    const results = JSON.parse(localStorage.getItem(L.results) || '{}') || {};
+    Object.keys(results).forEach(id => { if (results[id] === 'ok') markSolved(id); });
+    localStorage.removeItem(L.results);
+    const scores = JSON.parse(localStorage.getItem(L.scores) || '{}') || {};
+    Object.keys(scores).forEach(id => { proofScoreMap[id] = scores[id]; markSolved(id); });
+    if (Object.keys(scores).length) localStorage.setItem(SCORES_KEY, JSON.stringify(proofScoreMap));
+    localStorage.removeItem(L.scores);
+    Object.keys(localStorage).filter(k => k.indexOf(L.draft) === 0).forEach(k => {
+      const v = JSON.parse(localStorage.getItem(k));
+      if (v) localStorage.setItem(DRAFT_PREFIX + k.slice(L.draft.length), v);
+      localStorage.removeItem(k);
+    });
+  } catch (e) {}
+})(EXAM.legacyKeys);
 
 /* ═══════════════ прогресс номера: медали и история решённого ═══════════════
    Единица прогресса здесь — НОМЕР задания, а не прототип: прототип решается
@@ -1509,6 +1591,7 @@ const FIELD_HINTS = {
   seqAny: 'номера подряд, без пробелов и запятых — например, 135',
 };
 function fieldHint(f){
+  if (f.hint) return f.hint;
   if (f.seq) return f.anyOrder ? FIELD_HINTS.seqAny : FIELD_HINTS.seq;
   if (f.type === 'set') {
     // буква в эталоне — это параметр («a < −1»), но не «log» в конце промежутка
@@ -1551,8 +1634,16 @@ function buildAnswerArea(root, p, st, prefix, onChanged){
      Без этой ветки пустой список полей «проходил» проверку, и задание
      считалось решённым по одному нажатию */
   if (p.proof) {
-    root.innerHTML = '<div class="input-answer-row"><button class="check-btn">' + (EXAM.proofLabel || 'Сверить с доказательством') + '</button></div>' +
+    root.innerHTML = (EXAM.proofDraft ? '<label class="proof-draft-label">Твой ответ (черновик сохраняется сам):' +
+        '<textarea class="proof-draft" spellcheck="true" placeholder="Запиши ответ так, как в бланке №2"></textarea></label>' : '') +
+      '<div class="input-answer-row"><button class="check-btn">' + (EXAM.proofLabel || 'Сверить с доказательством') + '</button></div>' +
       '<div class="answer-msg"></div>';
+    const draft = root.querySelector('.proof-draft');
+    if (draft) {
+      try { draft.value = localStorage.getItem(DRAFT_PREFIX + p.id) || ''; } catch (e) {}
+      draft.addEventListener('input', () => { try { localStorage.setItem(DRAFT_PREFIX + p.id, draft.value); } catch (e) {} });
+      if (TS && TS.registerField) TS.registerField('ege:' + prefix + ':' + p.id + ':draft', draft);
+    }
     root.querySelector('.check-btn').onclick = () => {
       if (st.answered) return;
       st.answered = true;
@@ -1566,9 +1657,9 @@ function buildAnswerArea(root, p, st, prefix, onChanged){
     html += '<span class="p2-label">' + f.label + '</span>';
     if (f.type === 'yesno') {
       html += '<span class="yn-group" data-fid="' + f.id + '">' +
-        '<button class="yn-btn" data-val="да">да</button><button class="yn-btn" data-val="нет">нет</button></span>';
+        (f.choices || ['да', 'нет']).map(c => '<button class="yn-btn" data-val="' + c + '">' + c + '</button>').join('') + '</span>';
     } else {
-      const wide = (f.type === 'set' || f.type === 'nums' || f.type === 'pairs') ? ' wide' : f.type === 'word' ? ' word' : '';
+      const wide = (f.type === 'set' || f.type === 'nums' || f.type === 'pairs' || f.type === 'term') ? ' wide' : f.type === 'word' ? ' word' : '';
       html += '<input type="text" class="answer-input' + wide + '" data-fid="' + f.id + '" ' +
         (f.type === 'plain' ? 'inputmode="decimal" ' : '') +
         (f.type === 'word' && EXAM.lang ? 'lang="' + EXAM.lang + '" ' : '') +
@@ -1658,7 +1749,31 @@ function renderSolution(){
     els.critSummary.textContent = 'Критерии оценивания ФИПИ (максимум ' + task(S.n).points + ' б.)';
     els.critTable.innerHTML = p.criteria.map(row =>
       '<tr><td class="pts">' + row[0] + '</td><td>' + rich(row[1]) + '</td></tr>').join('');
+    // балл ставят по критериям: прятать их в свёрнутый блок незачем
+    if (EXAM.proofScores) els.critBox.open = true;
   }
+}
+/* Самооценка развёрнутого ответа: сайт его не проверяет, поэтому «решено / ошибок» не
+   меняются, а балл запоминается по заданию и суммируется по номеру */
+function renderProofScore(allShown){
+  const p = curProto;
+  const on = !!(EXAM.proofScores && p.proof && allShown);
+  els.proofScore.style.display = on ? 'block' : 'none';
+  if (!on) return;
+  const max = task(S.n).points, mine = proofScoreMap[p.id];
+  const done = protos(S.n).filter(x => proofScoreMap[x.id] != null);
+  els.proofScore.innerHTML = '<div class="proof-score-title">Оцени свой ответ по критериям</div><div class="proof-score-btns">' +
+    Array.from({ length: max + 1 }, (_, b) => '<button class="proof-score-btn' + (mine === b ? ' active' : '') + '" data-b="' + b + '">' + b + '</button>').join('') + '</div>' +
+    (mine != null ? '<div class="proof-score-saved">Оценка сохранена: ' + mine + ' из ' + max + '. Всего по номеру: ' +
+      done.reduce((sum, x) => sum + proofScoreMap[x.id], 0) + ' из ' + done.length * max + '</div>' : '');
+  els.proofScore.querySelectorAll('.proof-score-btn').forEach(btn => {
+    btn.onclick = () => {
+      proofScoreMap[p.id] = +btn.dataset.b;
+      try { localStorage.setItem(SCORES_KEY, JSON.stringify(proofScoreMap)); } catch (e) {}
+      markSolved(p.id);
+      render();
+    };
+  });
 }
 /* Какое задание сейчас нарисовано в #taskArea. Условие, поле ответа и разбор
    рисует только openTask, а при запуске страница стоит на первом прототипе
@@ -1685,6 +1800,8 @@ function openTask(n, pid){
   S.marks = {}; S.yn = {};
   S.sol = false;
   S.step = S.mode === 'learn' ? 1 : 0;
+  // уже оценённое задание открываем сразу с самопроверкой: видно, что и как оценено
+  if (EXAM.proofScores && p.proof && proofScoreMap[p.id] != null) S.answered = true;
   lastFocusedInput = null;
 
   const t = task(n);
@@ -1721,6 +1838,8 @@ function syncUrl(){
   try {
     const u = new URL(location.href);
     u.searchParams.set('n', String(S.n));
+    // ?t= — разовая ссылка на задание (см. запуск), дальше адрес показывает только номер
+    u.searchParams.delete('t'); u.searchParams.delete('text');
     history.replaceState(null, '', u.toString());
   } catch (e) {}
 }
@@ -1788,6 +1907,10 @@ function render(){
   const allShown = shown >= total && total > 0;
   els.solAnswer.style.display = (allShown && !curProto.proof) ? 'block' : 'none';
   els.critBox.style.display = (allShown && curProto.criteria) ? 'block' : 'none';
+  renderProofScore(allShown);
+  // соседний блок к тому же тексту (обществознание: №18–20 и «Дополнительно к тексту»)
+  els.extraTaskBtn.style.display = curProto.extra ? 'inline-flex' : 'none';
+  if (curProto.extra) els.extraTaskBtn.textContent = curProto.extra.label;
   // «Следующий прототип» относится к одному заданию на экране: когда рядом
   // стоят добавленные карточки, кнопка только сбивает с толку
   els.nextBtn.style.display = (S.answered && !hasCards) ? 'block' : 'none';
@@ -1810,7 +1933,16 @@ function render(){
 window.__examNav = {
   n: () => S.n,
   pid: () => (S.screen === 'task' && curProto) ? S.pid : null,
-  open: (n, pid) => { if (task(n)) ensureFipi(n, () => openTask(n, pid && protoById(n, pid) ? pid : null)); },
+  open: (n, pid) => {
+    if (!task(n)) return;
+    // задание к тексту (обществознание №18–20): соседний номер — к тому же тексту,
+    // а не последнее открытое там: ученик идёт по тексту подряд
+    const text = curProto && curProto.t;
+    ensureFipi(n, () => {
+      const same = text && protos(n).find(x => x.t === text);
+      openTask(n, same ? same.id : (pid && protoById(n, pid) ? pid : null));
+    });
+  },
 };
 /* «Типы» номера с группами — в порядке экрана выбора: сначала задания без
    группы (демоверсия) по одному, потом группы. У номеров без групп (ЕГЭ)
@@ -1850,6 +1982,11 @@ function wordKey(s){
     .replace(/[\s.,!?;:]+/g, '');
 }
 function sameWords(a, b){ return wordKey(a) === wordKey(b); }
+/* Слово или словосочетание по-русски (обществознание №2): без регистра, «ё» = «е»,
+   пробелы, кавычки и тире на ответ не влияют */
+function termKey(s){ return String(s).toLowerCase().replace(/ё/g, 'е').replace(/[\s.,;:!?«»"'()–—-]+/g, ''); }
+// №3 обществознания: две цифры сходства и две различия — порядок важен только между колонками
+function colsKey(s){ s = String(s); return s.slice(0, 2).split('').sort().join('') + '|' + s.slice(2).split('').sort().join(''); }
 function checkField(f, value, st){
   // → true/false, либо null, если запись не разобрали (это не ошибка ученика,
   // а просьба записать иначе: на бланке ЕГЭ формат ответа тоже оговорён)
@@ -1862,13 +1999,16 @@ function checkField(f, value, st){
   // верными считаются эталон и все ответы «<или>» из ключа ФИПИ (alts)
   const accepted = [f.value].concat(f.alts || []);
   if (f.type === 'word') return accepted.some(a => sameWords(a, raw));
+  if (f.type === 'term') return accepted.some(a => termKey(a) === termKey(raw));
   if (f.type === 'plain' && f.seq) {
     // последовательность цифр (соответствия, выбор утверждений): на бланке
     // её пишут подряд. Пробелы между цифрами ничего не путают — убираем;
     // а «1, 2» — не неверный ответ, а другая запись: просим переписать
     const d = stripSpaces(raw);
     if (!/^\d+$/.test(d)) return null;
-    const key = x => f.anyOrder ? String(x).split('').sort().join('') : String(x);
+    // exactLen: не столько цифр, сколько клеток на бланке, — просьба переписать, а не ошибка
+    if (f.exactLen && d.length !== String(f.value).length) return null;
+    const key = x => f.anyOrder ? String(x).split('').sort().join('') : f.anyCols ? colsKey(x) : String(x);
     return accepted.some(a => key(a) === key(d));
   }
   if (f.type === 'plain') {
@@ -1912,13 +2052,22 @@ function runCheck(p, st, root){
   if (unparsed) {
     const seqBad = list.some(f => f.seq && results[f.id] === null);
     if (msgEl) msgEl.textContent = seqBad
-      ? 'Запишите номера подряд — без запятых и других знаков, как на бланке'
+      ? (list.some(f => f.exactLen) ? 'Запишите все цифры подряд, по одной на клетку бланка: ' + String(list[0].value).length + ' — без запятых и других знаков'
+        : 'Запишите номера подряд — без запятых и других знаков, как на бланке')
       : partOf(S.n) === 1 ? EXAM.part1Format : 'Заполни все поля так, как подсказано под ними';
     return;
   }
   if (msgEl) msgEl.textContent = '';
   const allOk = list.every(f => results[f.id] === true);
   list.forEach(f => { st.marks[f.id] = results[f.id] ? 'good' : 'bad'; });
+  /* №14 обществознания: одна неверная позиция — 1 балл из 2 (критерий ФИПИ). Позицию
+     не называем: подсказка выдала бы, где ошибка, ещё до конца попыток */
+  const half = list.find(f => f.halfNote);
+  if (half && msgEl && !allOk) {
+    const inp = root.querySelector('input.answer-input[data-fid="' + half.id + '"]');
+    const v = stripSpaces(inp ? inp.value : ''), key = String(half.value);
+    if (v.split('').filter((c, i) => c !== key[i]).length === 1) msgEl.textContent = 'Ошибка в одной букве — на ОГЭ это 1 балл из 2.';
+  }
 
   if (allOk) {
     st.answered = true; st.correct = true;
@@ -1926,9 +2075,10 @@ function runCheck(p, st, root){
     markSolved(p.id);
     addHistory(p, st, true);
     awardMedals();
-  } else if (st.hadWrong) {
+  } else if (st.hadWrong || (S.mode === 'exam' && list.some(f => f.oneTry))) {
     // вторая неудачная попытка — как в ОГЭ №8: подставляем верный ответ
-    // и открываем разбор
+    // и открываем разбор. oneTry — выбор одного из четырёх в «Экзамене»: с двумя
+    // попытками ответ находится перебором, поэтому попытка одна
     st.answered = true; st.correct = false;
     list.forEach(f => { if (!results[f.id]) st.marks[f.id] = 'fixed'; });
     totalErrors++; streak = 0;
@@ -1963,6 +2113,10 @@ els.nextBtn.onclick = guard('switchTask', () => {
   else showPicker();
 });
 els.backBtn.onclick = guard('switchTask', showPicker);
+els.extraTaskBtn.onclick = guard('switchTask', () => {
+  const x = curProto.extra;
+  if (x) ensureFipi(x.n, () => openTask(x.n, x.pid));
+});
 els.prevTypeBtn.onclick = guard('switchTask', () => openTask(S.n, typeNeighbour(-1)));
 els.nextTypeBtn.onclick = guard('switchTask', () => openTask(S.n, typeNeighbour(1)));
 els.prevProtoBtn.onclick = guard('switchTask', () => openTask(S.n, protoNeighbour(-1).id));
@@ -2377,6 +2531,12 @@ curProg = loadProgFor(S.n); progLoadedFor = S.n;
 renderKeypadKeys();
 renderAnswerArea(); renderSolution(); showPicker();
 syncUrl();
+/* ?n=9&t=ID — открыть это задание сразу, минуя список (старые адреса обществознания;
+   ?text=T001 — задание номера к этому тексту) */
+if (URL_N && (URL_PARAMS.get('t') || URL_PARAMS.get('text'))) ensureFipi(URL_N, () => {
+  const want = protos(URL_N).find(x => x.id === URL_PARAMS.get('t')) || protos(URL_N).find(x => x.t && x.t === URL_PARAMS.get('text'));
+  if (want) openTask(URL_N, want.id);
+});
 
 /* ═══ общий снимок для совместной сессии, доски и карточек ═══
    Схема та же, что в остальных тренажёрах после Промпта №54: состояние

@@ -1,29 +1,28 @@
 """
-Тренажёр «ОГЭ. Обществознание» (soc_oge.html) — задания с кратким ответом по КИМ 2027
-(№2–6, 9–11, 13–16) из открытого банка ФИПИ.
+Тренажёр «ОГЭ обществознание» (soc_oge.html, краткий ответ) — номера КИМ 2027 из открытого банка
+ФИПИ на той же странице, что ЕГЭ профиль / ЕГЭ база / ОГЭ ч. 2 / английский (sync_ege_pages.py).
+Развёрнутые ответы той же страницы — test_prompt_soc_oge_long.py.
 
 Проверяет:
-  1. данные soc-oge-fipi.js целы: только номера КИМ 2027 с кратким ответом, у выбора —
-     четыре варианта и ключ 1–4, у №14 — цифры не больше числа пунктов справа, у №3 —
-     четыре цифры 1–4, у №2 — непустая строка; в вариантах нет обрывков разметки ФИПИ;
-  2. ученик видит только задания с ответом, принятым сайтом ФИПИ; ?all=1 —
-     предпросмотр, адрес без номера уводит на главную к обществознанию;
-  3. все четыре вида ответа: верный засчитывается и запоминается, неверный —
-     красным; в «Экзамене» у выбора одна попытка, у №2, 3, 14 — три;
-     «Тренировка»: попыток сколько угодно, «Показать ответ» показывает и прячет,
-     подсмотренное не идёт в «верно»;
-  4. №14: одна ошибка — подсказка «1 балл из 2»; №3: порядок внутри колонки — только подтверждённый ФИПИ, пока нет флага any;
-     с флагом — любой; №2 — без регистра и «ё/е»;
-  5. навигация: ◀ ▶ заданий по кругу, пара «Предыдущий / Следующий номер» (правило
-     «кнопки типов») по всем номерам ОГЭ-2027, развёрнутые — на soc_oge_long.html, адрес ?n=…&t=… открывает то же задание, «← все задания» — на
-     index.html?subject=soc;
-  6. главная: у обществознания 20 номеров ОГЭ 2027, №2 ведёт на soc_oge.html?n=2,
-     развёрнутые (№1, 7, 8, 12, 17–20) — на soc_oge_long.html, «скоро» нет;
-  7. тёмная тема и ширина телефона: без ошибок JS, без горизонтальной прокрутки,
-     в №14 шапки колонок переезжают внутрь колонок; белый текст на залитых
-     кнопках — контраст не ниже 4,5:1 в обеих темах.
+  1. страница не разошлась с ege_prof.html (кроме блока настроек EXAM);
+  2. данные: каждое задание экспорта (fipi-pilot/full_oge_soc/export_short.json) — на странице, с
+     принятым ФИПИ ключом, флагом any у №3, числом пунктов №14, всеми вариантами; ключ проходит
+     проверку самой страницы; нет «$» (съел бы KaTeX) и обрывков разметки ФИПИ; номера КИМ 2027;
+  3. навигация как в математике: ◀ ▶ над названием по №1–20, «← все задания», «◀ Предыдущий тип /
+     Следующий тип ▶» по видам внутри номера, «◀ Предыдущее / Следующее задание ▶», ⟳ — задание
+     того же вида, 📥 «В подборку», счётчик и «История решённого» самой нижней кнопкой;
+  4. ответы: выбор — одна попытка в «Экзамене» и две в «Тренировке», №2 без регистра и «ё/е», №3
+     с перестановкой внутри колонки (и без неё, если нет флага), №14 — «1 балл из 2» без указания
+     позиции, неполный ответ — просьба дописать, а не ошибка, разбор и ответ после решения;
+  5. как в математике, но без калькулятора, клавиатуры, «+» и клетки на доске; цвет — зелёный
+     обществознания; кнопки доски, полноэкранного режима, совместного доступа и конспекта на месте;
+  6. мост состояния и подборка: снимок переносит номер, задание и результат; id позиции soc<номер>;
+  7. главная и старые адреса: все 20 номеров ведут на soc_oge.html, ?n=…&t=… открывает то задание;
+     прогресс прежней страницы переносится один раз;
+  8. телефон и тёмная тема: без ошибок JS и горизонтальной прокрутки на всех заданиях №2, 3, 14,
+     контраст белого на залитых кнопках не ниже 4,5:1.
 
-Совместного режима у страницы нет — проверять на сайте руками нечего.
+Совместный режим здесь на заглушке (Supabase отрезан): живьём — на сайте руками.
 
 Запуск: ~/.venvs/trainers/bin/python test_prompt_soc_oge.py (сервер поднимается сам).
 """
@@ -31,7 +30,6 @@ import contextlib
 import http.client
 import json
 import os
-import re
 import subprocess
 import sys
 import time
@@ -41,15 +39,22 @@ from playwright.sync_api import sync_playwright
 PORT = 8993
 BASE = f"http://127.0.0.1:{PORT}"
 HERE = os.path.dirname(os.path.abspath(__file__))
-PART1 = [2, 3, 4, 5, 6, 9, 10, 11, 13, 14, 15, 16]
+EXPORT = os.path.join(os.path.dirname(HERE), "fipi-pilot", "full_oge_soc", "export_short.json")
+SHORT = [2, 3, 4, 5, 6, 9, 10, 11, 13, 14, 15, 16]
+COUNTS = {2: 82, 3: 87, 4: 123, 5: 233, 6: 287, 9: 193, 10: 98, 11: 97, 13: 50, 14: 91, 15: 223, 16: 210}
+FAILS = []
+
+
+def check(cond, msg):
+    print(("  ок  " if cond else "  ОШИБКА  ") + msg)
+    if not cond:
+        FAILS.append(msg)
 
 
 @contextlib.contextmanager
 def local_server():
-    proc = subprocess.Popen(
-        [sys.executable, "-m", "http.server", str(PORT)], cwd=HERE,
-        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    )
+    proc = subprocess.Popen([sys.executable, "-m", "http.server", str(PORT)], cwd=HERE,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
         for _ in range(50):
             try:
@@ -66,255 +71,357 @@ def local_server():
         proc.terminate()
 
 
-def load_data():
-    s = open(os.path.join(HERE, "soc-oge-fipi.js"), encoding="utf-8").read()
-    return json.loads(s[s.index("=") + 1:].strip().rstrip(";"))
+def new_page(browser, width=1280, height=900, theme=None):
+    ctx = browser.new_context(viewport={"width": width, "height": height})
+    if theme:
+        ctx.add_init_script(f"localStorage.setItem('theme', '{theme}')")
+    page = ctx.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    # совместная сессия ходит в Supabase — в тесте сеть наружу отрезана
+    page.route("https://**/*", lambda route: route.abort())
+    return ctx, page, errors
 
 
-FAILS = []
+def settle(page):
+    page.wait_for_function("() => !window.__fipiBusy || !window.__fipiBusy()")
+    page.wait_for_timeout(150)
 
 
-def check(cond, msg):
-    print(("  ок  " if cond else "  ОШИБКА  ") + msg)
-    if not cond:
-        FAILS.append(msg)
+def open_n(page, n):
+    page.goto(f"{BASE}/soc_oge.html?n={n}")
+    settle(page)
 
 
-def test_data(D):
-    print("1. данные")
-    T = D["tasks"]
-    check(len(T) > 0, f"заданий в файле: {len(T)}")
-    bad = []
-    for t in T:
-        if t["n"] not in PART1: bad.append((t["id"], "номер"))
-        if t["k"] == "one":
-            if len(t.get("o") or []) != 4 or t["a"] not in "1234" or not t["a"]: bad.append((t["id"], "выбор"))
-            if any(re.search(r"<td|<input|^\s*$", o) for o in t.get("o") or []): bad.append((t["id"], "вариант"))
-        elif t["k"] == "match":
-            if not re.fullmatch(r"\d{5}", t["a"]) or max(map(int, t["a"])) > t.get("m", 0): bad.append((t["id"], "соответствие"))
-        elif t["k"] == "pair":
-            if not re.fullmatch(r"[1-4]{4}", t["a"]) or len(set(t["a"])) != 4: bad.append((t["id"], "сравнение"))
-        elif t["k"] == "text":
-            if not t["a"].strip(): bad.append((t["id"], "строка"))
-        else:
-            bad.append((t["id"], "вид"))
-    check(not bad, f"ключи нужной формы (ошибок: {len(bad)} {bad[:5]})")
-    check(sorted({t["n"] for t in T}) == PART1, "в файле все номера КИМ 2027 с кратким ответом")
-    check({t["k"] for t in T if t["n"] == 14} == {"match"} and {t["k"] for t in T if t["n"] == 3} == {"pair"}
-          and {t["k"] for t in T if t["n"] == 2} == {"text"}, "№14 — соответствие, №3 — сравнение, №2 — строка")
-    # после ручной сверки (fipi-pilot/full_oge_soc/fix27.json) пометка эвристики может
-    # исчезнуть совсем; если она есть — только у №4/№5, других эвристик в части 1 нет
-    check({t["n"] for t in T if t.get("h")} <= {4, 5}, "эвристикой подобраны только №4/№5 (или ничего)")
-    check(next((t["n"] for t in T if t["id"] == "2CA4E2"), None) == 5 and next((t["n"] for t in T if t["id"] == "2FC2F8"), None) == 4,
-          "ручные поправки раскладки применены (2CA4E2 → №5, 2FC2F8 → №4)")
-    check(sum(t["ok"] for t in T) == len([t for t in T if t["a"]]), "ключ есть только у подтверждённых ФИПИ")
+def open_first_task(page, n):
+    open_n(page, n)
+    page.click("#protoList .mode-card")
+    page.wait_for_selector("#taskArea", state="visible")
+    page.wait_for_timeout(150)
 
 
-def first(D, n, ok=True):
-    return next((t for t in D["tasks"] if t["n"] == n and (not ok or t["ok"])), None)
+def check_btn(page):
+    page.click("#answerArea .check-btn")
+    page.wait_for_timeout(150)
 
 
-def answer(page, t, value=None):
-    """Вводит ответ так, как это сделал бы ученик. value=None — верный ответ из ключа."""
-    v = value if value is not None else t["a"]
-    if t["k"] == "one":
-        page.click(f'.opt[data-v="{v}"]')
-    elif t["k"] in ("match", "pair"):
-        for i, d in enumerate(v):
-            page.select_option(f'#match select[data-i="{i}"]', d)
-    else:
-        page.fill("#answerInput", v)
-    page.click("#checkBtn")
+def stats(page):
+    return tuple(int(page.inner_text(s)) for s in ("#stSolved", "#stErrors", "#stStreak"))
 
 
-def wrong_value(t):
-    if t["k"] == "one":
-        return "1" if t["a"] != "1" else "2"
-    if t["k"] == "match":
-        return "".join("1" if d != "1" else "2" for d in t["a"])
-    if t["k"] == "pair":
-        return t["a"][2:] + t["a"][:2]   # сходства и различия перепутаны местами
-    return "заведомо неверно"
+def contrast_white(rgb):
+    def lin(c):
+        c /= 255
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    lum = 0.2126 * lin(rgb[0]) + 0.7152 * lin(rgb[1]) + 0.0722 * lin(rgb[2])
+    return 1.05 / (lum + 0.05)
 
 
-def cur(pg):
-    return pg.evaluate("window.__socOge.POOL[window.__socOge.S.n][window.__socOge.S.idx]")
+def bg_rgb(page, selector):
+    s = page.evaluate(f"getComputedStyle(document.querySelector('{selector}')).backgroundColor")
+    return [float(x) for x in s[s.index("(") + 1:-1].split(",")[:3]]
 
 
 def main():
-    D = load_data()
-    test_data(D)
-    errors = []
+    print("1. страница — копия ege_prof.html")
+    r = subprocess.run([sys.executable, "sync_ege_pages.py", "--check"], cwd=HERE, capture_output=True, text=True)
+    check(r.returncode == 0, "sync_ege_pages.py --check: страницы не разошлись")
+    check("soc_oge.html совпадает" in r.stdout, "soc_oge.html — среди копий")
+
     with local_server(), sync_playwright() as p:
-        b = p.chromium.launch()
+        browser = p.chromium.launch()
+        ctx, page, errors = new_page(browser)
 
-        def new_page(w=1100, h=900, theme="light"):
-            ctx = b.new_context(viewport={"width": w, "height": h})
-            pg = ctx.new_page()
-            pg.on("pageerror", lambda e: errors.append(str(e)))
-            pg.add_init_script(f"try{{localStorage.setItem('theme','{theme}')}}catch(e){{}}")
-            return pg
+        print("2. данные: ничего не потеряно")
+        open_n(page, 2)
+        dump = page.evaluate("""async (nums) => {
+          const out = {};
+          for (const n of nums) {
+            await new Promise(r => ensureFipi(n, r));
+            out[n] = { title: task(n).title, points: task(n).points, protos: protos(n).map(p => {
+              const f = (p.fields || [])[0] || {};
+              const st = { yn: { [f.id]: f.value } };
+              return { id: p.id, fipi: p.fipi, type: f.type, value: f.value, anyCols: !!f.anyCols, hint: f.hint || '',
+                       choices: f.choices || null, oneTry: !!f.oneTry, halfNote: !!f.halfNote, text: p.text,
+                       group: p.group, passes: checkField(f, f.value, st) === true, steps: (p.steps || []).length, answerTex: p.answerTex };
+            }) };
+          }
+          return out;
+        }""", SHORT)
+        export = json.load(open(EXPORT, encoding="utf-8"))["tasks"]
+        by_id = {t["id"]: t for t in export}
+        check(sum(len(dump[str(n)]["protos"]) for n in SHORT) == 1774, "на странице все 1774 задания с кратким ответом")
+        for n in SHORT:
+            check(len(dump[str(n)]["protos"]) == COUNTS[n], f"№{n}: {COUNTS[n]} заданий (номера КИМ 2027)")
+        lost = []
+        for n in SHORT:
+            ps = dump[str(n)]["protos"]
+            ids = {q["id"] for q in ps}
+            lost += [t["id"] for t in export if t["n"] == n and t["id"] not in ids]
+            for q in ps:
+                t = by_id[q["id"]]
+                if t["n"] != n:
+                    lost.append(q["id"] + ": номер")
+                if q["value"] != t["a"] or not t["ok"]:
+                    lost.append(q["id"] + ": ключ")
+                if not q["passes"] or not q["steps"] or not q["answerTex"] or q["fipi"] != q["id"]:
+                    lost.append(q["id"] + ": проверка, разбор или источник")
+                if t["k"] == "one":
+                    if q["choices"] != [str(i + 1) for i in range(len(t["o"]))] or not q["oneTry"]:
+                        lost.append(q["id"] + ": варианты")
+                    if q["text"].count('class="soc-opt"') != len(t["o"]):
+                        lost.append(q["id"] + ": варианты в условии")
+                if t["k"] == "pair" and q["anyCols"] != bool(t.get("any")):
+                    lost.append(q["id"] + ": флаг any")
+                if t["k"] == "match" and (not q["halfNote"] or f"от 1 до {t['m']}" not in q["hint"]):
+                    lost.append(q["id"] + ": №14")
+                if "$" in q["text"] or any(x in q["text"] for x in ("ShowPicture", "MsoNormal", "files_location", "<span lang")):
+                    lost.append(q["id"] + ": разметка в условии")
+        check(not lost, f"ключи, варианты, флаги и подсказки совпадают с экспортом ({lost[:4]})")
+        check(sum(1 for q in dump["3"]["protos"] if q["anyCols"]) == 87, "у всех 87 заданий №3 — флаг any")
+        check(dump["14"]["points"] == 2 and dump["5"]["points"] == 1, "баллы: №14 — 2, остальные краткие — 1")
+        check(all(q["group"] for n in SHORT for q in dump[str(n)]["protos"]), "у каждого задания есть вид")
 
-        print("2. только подтверждённые ФИПИ")
-        pg = new_page()
-        pg.goto(BASE + "/soc_oge.html")
-        pg.wait_for_url(lambda u: "/index.html" in u, timeout=5000)
-        check("/index.html" in pg.url, "soc_oge.html без номера уводит на главную")
-        pg.wait_for_timeout(400)
-        check(pg.evaluate("document.documentElement.getAttribute('data-subject')") == "soc", "главная открыта на обществознании")
-        pg.goto(BASE + "/soc_oge.html?n=2")
-        okall = pg.evaluate("Object.values(window.__socOge.POOL).every(l => l.every(t => t.ok))")
-        check(okall, "в задания ученика не попало ни одного несверенного ответа")
-        pg.goto(BASE + "/soc_oge.html?all=1")
-        check(pg.eval_on_selector_all(".mode-card[data-n]:not([disabled])", "els => els.length") == 12, "?all=1 — открыты все 12 номеров")
-        th = next((t for t in D["tasks"] if t.get("h")), None)
-        if th:  # после полной ручной сверки помеченных заданий может не остаться
-            pg.goto(BASE + f"/soc_oge.html?all=1&n={th['n']}&t={th['id']}")
-            check("номер подобран автоматически" in pg.inner_text(".source-note"), "в предпросмотре эвристическая раскладка помечена")
-            pg.goto(BASE + f"/soc_oge.html?n={th['n']}&t={th['id']}")
-            check("автоматически" not in pg.inner_text(".source-note"), "у ученика этой пометки нет")
+        print("3. навигация как в математике")
+        open_n(page, 5)
+        check(page.inner_text("#pageTitle").strip() == "ОГЭ обществознание · №5", "заголовок «ОГЭ обществознание · №5»")
+        check("1 балл" in page.inner_text("#pageSub"), "подзаголовок с названием номера и баллом")
+        cards = page.locator("#protoList .mode-card")
+        check(cards.count() > 3, f"в списке карточки видов ({cards.count()})")
+        check(page.locator("#protoList .proto-section").count() > 1, "виды разложены по разделам")
+        cards.nth(0).click()
+        page.wait_for_timeout(200)
+        check(page.inner_text("#backBtn").strip() == "← все задания", "кнопка «← все задания»")
+        check(page.is_visible("#prevTypeBtn") and page.is_visible("#nextTypeBtn"), "«◀ Предыдущий тип / Следующий тип ▶»")
+        check(page.inner_text("#prevProtoBtn").strip() == "◀ Предыдущее задание" and page.inner_text("#nextProtoBtn").strip() == "Следующее задание ▶",
+              "«◀ Предыдущее задание / Следующее задание ▶»")
+        g0, p0 = page.evaluate("[curProto.group, S.pid]")
+        page.click("#nextProtoBtn")
+        page.wait_for_timeout(150)
+        check(page.evaluate("curProto.group") == g0 and page.evaluate("S.pid") != p0, "«Следующее задание ▶» — того же вида")
+        page.click("#refreshBtn")
+        page.wait_for_timeout(150)
+        check(page.evaluate("curProto.group") == g0, "⟳ «Обновить задание» — другое задание того же вида")
+        page.click("#nextTypeBtn")
+        page.wait_for_timeout(150)
+        g1 = page.evaluate("curProto.group")
+        check(g1 != g0, "«Следующий тип ▶» — другой вид")
+        page.click("#prevTypeBtn")
+        page.wait_for_timeout(150)
+        check(page.evaluate("curProto.group") == g0, "«◀ Предыдущий тип» — обратно")
+        page.click("#backBtn")
+        page.wait_for_timeout(150)
+        check(page.is_visible("#protoList"), "«← все задания» — к списку видов")
+        check(page.locator("#examPrevBtn").count() == 1 and page.locator("#examNextBtn").count() == 1, "стрелки ◀ ▶ над названием")
+        order = page.evaluate("[...document.querySelectorAll('#examPrevBtn, #pageTitle, #examNextBtn')].map(e => e.id)")
+        check(order == ["examPrevBtn", "pageTitle", "examNextBtn"], "стрелки по бокам названия")
+        open_n(page, 1)
+        check(page.is_disabled("#examPrevBtn"), "на №1 левая стрелка неактивна")
+        page.click("#examNextBtn")
+        page.wait_for_timeout(400)
+        settle(page)
+        check(page.evaluate("S.n") == 2 and "soc_oge.html" in page.url, "▶ с №1 (развёрнутый) — №2 (краткий) на той же странице")
+        page.click("#examPrevBtn")
+        page.wait_for_timeout(400)
+        check(page.evaluate("S.n") == 1, "◀ — обратно на №1")
+        open_n(page, 20)
+        check(page.is_disabled("#examNextBtn"), "на №20 правая стрелка неактивна")
+        open_n(page, 16)
+        page.click("#examNextBtn")
+        page.wait_for_timeout(400)
+        check(page.evaluate("S.n") == 17, "▶ с №16 — №17, задание из демоверсии")
 
-        print("3. виды ответа, «Экзамен» и «Тренировка»")
-        for n in (5, 14, 3, 2):
-            t = first(D, n)
-            att = 1 if t["k"] == "one" else 3
-            pg = new_page()
-            pg.goto(BASE + f"/soc_oge.html?n={n}&t={t['id']}")
-            pg.click("#tabExam")
-            answer(pg, t)
-            check(pg.inner_text("#feedback").strip() == "Верно!", f"№{n} ({t['k']}): верный ответ засчитан")
-            check(pg.is_visible("#nextBtn"), f"№{n}: «Следующее задание» после верного ответа")
-            res = pg.evaluate("JSON.parse(localStorage.getItem('socOge:results')||'{}')")
-            check(res.get(t["id"]) == "ok", f"№{n}: итог запомнен как «верно»")
+        print("4. ответы: выбор, №2, №3, №14")
+        # выбор одного из четырёх
+        open_first_task(page, 9)
+        key = page.evaluate("fieldsOf(curProto)[0].value")
+        wrong = next(c for c in "1234" if c != key)
+        check(page.locator("#answerArea .yn-btn").count() == 4, "выбор — кнопки 1, 2, 3, 4")
+        check("Проверить" == page.inner_text("#answerArea .check-btn").strip(), "кнопка «Проверить»")
+        check_btn(page)
+        check("Заполни" in page.inner_text("#answerArea .answer-msg") and stats(page)[1] == 0, "без выбора — просьба ответить, не ошибка")
+        page.click(f'#answerArea .yn-btn[data-val="{wrong}"]')
+        check_btn(page)
+        check(page.evaluate("S.answered && !S.correct") and stats(page)[1] == 1, "«Экзамен»: одна попытка на выбор, сразу ответ")
+        check(page.is_visible("#solSteps") and "Верный вариант" in page.inner_text("#solSteps"), "открыт верный вариант")
+        check(page.is_visible("#solAnswer") and key in page.inner_text("#solAnswer"), "ответ под разбором")
+        check("(1)" in page.inner_text("#exampleHistoryToggle"), "история решённого — 1")
+        page.click("#nextBtn")
+        page.wait_for_timeout(150)
+        page.click("#tabPractice")
+        key = page.evaluate("fieldsOf(curProto)[0].value")
+        wrong = next(c for c in "1234" if c != key)
+        check(page.is_visible("#showSolutionBtn"), "«Тренировка»: кнопка «Показать решение и ответ»")
+        page.click(f'#answerArea .yn-btn[data-val="{wrong}"]')
+        check_btn(page)
+        check(not page.evaluate("S.answered"), "«Тренировка»: после ошибки можно ещё раз")
+        page.click(f'#answerArea .yn-btn[data-val="{key}"]')
+        check_btn(page)
+        check(page.evaluate("S.answered && S.correct"), "вторая попытка верна — засчитано")
+        # №2: слово
+        open_first_task(page, 2)
+        key = page.evaluate("fieldsOf(curProto)[0].value")
+        page.fill("#answerArea input.answer-input", "  " + key.upper().replace("Е", "Ё", 1) + ". ")
+        check_btn(page)
+        check(page.evaluate("S.correct"), f"№2: регистр, ё/е и точка не мешают («{key}»)")
+        check(page.evaluate("document.querySelector('.soc-text table').classList.contains('grid')"), "№2: у таблицы с пропуском есть рамка")
+        # №3
+        open_first_task(page, 3)
+        key = page.evaluate("fieldsOf(curProto)[0].value")
+        check("сходства" in page.inner_text("#answerArea"), "№3: подсказка про сходства и различия")
+        page.fill("#answerArea input.answer-input", key[1] + key[0] + key[3] + key[2])
+        check_btn(page)
+        check(page.evaluate("S.correct"), "№3: с флагом any перестановка внутри колонок — верно")
+        check("сходства" in page.inner_text("#solAnswer"), "№3: ответ по колонкам")
+        res = page.evaluate("""(key) => {
+          const f = { type: 'plain', seq: true, exactLen: true, value: key };
+          return [checkField(f, key, {}), checkField(f, key[1] + key[0] + key[2] + key[3], {}),
+                  checkField(Object.assign({ anyCols: true }, f), key[2] + key[3] + key[0] + key[1], {})];
+        }""", key)
+        check(res == [True, False, False], "№3: без флага — только принятый порядок; между колонками менять нельзя и с флагом")
+        # №14
+        open_first_task(page, 14)
+        key = page.evaluate("fieldsOf(curProto)[0].value")
+        before = stats(page)
+        page.fill("#answerArea input.answer-input", key[:-1])
+        check_btn(page)
+        check("подряд" in page.inner_text("#answerArea .answer-msg") and stats(page) == before, "№14: неполный ответ — просьба дописать, не ошибка")
+        one_off = ("1" if key[0] != "1" else "2") + key[1:]
+        page.fill("#answerArea input.answer-input", one_off)
+        check_btn(page)
+        msg = page.inner_text("#answerArea .answer-msg")
+        check("1 балл из 2" in msg and "А" not in msg.replace("ОГЭ", ""), "№14: одна неверная буква — «1 балл из 2», без указания где")
+        two_off = ("1" if key[0] != "1" else "2") + ("1" if key[1] != "1" else "2") + key[2:]
+        page.fill("#answerArea input.answer-input", two_off)
+        check_btn(page)
+        check("1 балл" not in page.inner_text("#answerArea .answer-msg"), "№14: две неверные — приписки нет")
+        check(page.evaluate("S.answered && !S.correct"), "№14: вторая неудачная попытка открывает ответ")
+        check("А — " in page.inner_text("#solAnswer"), "№14: ответ по буквам")
+        check(page.is_visible("#critBox") and "максимум 2" in page.inner_text("#critSummary"), "№14: критерии на 2 балла")
+        opened = page.evaluate("""() => {
+          const heads = protos(14).filter(p => /col-heads/.test(p.text));
+          return [heads.length, heads.filter(p => (p.text.match(/class="col-head"/g) || []).length === 2).length];
+        }""")
+        check(opened[0] > 80 and opened[0] == opened[1], f"№14: копии шапки в обеих колонках ({opened})")
 
-            pg.click("#nextBtnTop")
-            t2 = cur(pg)
-            check(("Одна попытка" in pg.inner_text("#modeHint")) == (att == 1), f"№{n}: подсказка режима про {att} попытк.")
-            for k in range(att):
-                answer(pg, t2, wrong_value(t2))
-                if k < att - 1:
-                    check(f"Осталось попыток: {att - 1 - k}" in pg.inner_text("#feedback"), f"№{n}: попытка {k + 1} — осталось {att - 1 - k}")
-            check(pg.is_visible(".answer-box"), f"№{n}: после {att} неверн. попыток ответ открыт")
-            check(pg.is_disabled("#checkBtn"), f"№{n}: задание закрыто")
-            if t2["k"] == "one":
-                check(pg.get_attribute(f'.opt[data-v="{t2["a"]}"]', "class").find("correct") >= 0, "верный вариант подсвечен зелёным")
-                check(pg.locator(".opt.wrong").count() == 1, "выбранный неверный — красным")
-            res = pg.evaluate("JSON.parse(localStorage.getItem('socOge:results')||'{}')")
-            check(res.get(t2["id"]) == "bad", f"№{n}: итог запомнен как «не решено»")
+        print("5. как в математике, без лишнего; цвет обществознания")
+        open_first_task(page, 5)
+        check(not page.is_visible("#calcTools"), "кнопок «Сложить / Вычесть…» нет")
+        check(page.locator("#answerArea .sym-bar").count() == 0, "символов π, √ нет")
+        check(not page.is_visible("#keypadFloat") and not page.is_visible("#kpToggle"), "цифровой клавиатуры нет")
+        check(not page.is_visible("#addRail"), "колонки «+» нет")
+        ink = page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--ink').trim()")
+        check(ink.upper() == "#17694F", f"зелёный обществознания, как на главной ({ink})")
+        grid = page.evaluate("""() => {
+          const c = document.getElementById('boardCanvasBg');
+          const d = c.getContext('2d').getImageData(0, 0, c.width, Math.min(c.height, 200)).data;
+          for (let i = 3; i < d.length; i += 4) if (d[i]) return true;
+          return false;
+        }""")
+        check(not grid, "доска на тренажёре без клетчатой подложки")
+        check(page.is_visible("#basketAddBtn") and page.is_visible("#refreshBtn"), "📥 и ⟳ в шапке задания")
+        check(page.locator("#boardToolbar").count() == 1, "доска на месте")
+        for sel, name in (("#tsShareBtn, .ts-share-btn", "совместный доступ"), ("#focusToggle", "полноэкранный режим"),
+                          ("#lnBtn", "конспект"), ("#boardVisibilityToggle", "кнопка доски")):
+            check(page.locator(sel).count() >= 1, f"{name} на месте")
+        order = page.evaluate("""() => {
+          const y = s => document.querySelector(s).getBoundingClientRect().top;
+          return y('#questionPanel') < y('.stats') && y('.stats') < y('#exampleHistoryToggle');
+        }""")
+        check(order, "счётчик внизу, «История решённого» — самой нижней кнопкой")
+        check([page.inner_text(f"#{t}").strip() for t in ("tabLearn", "tabPractice", "tabExam")] == ["Обучение", "Тренировка", "Экзамен"], "вкладки режимов как в математике")
 
-            pg.click("#nextBtnTop")
-            pg.click("#tabPractice")
-            t3 = cur(pg)
-            for _ in range(4):
-                answer(pg, t3, wrong_value(t3))
-            check(not pg.is_disabled("#checkBtn"), f"№{n}: в «Тренировке» попыток сколько угодно")
-            pg.click("#showBtn")
-            check(pg.is_visible(".answer-box"), f"№{n}: «Показать ответ» показывает ответ")
-            pg.click("#showBtn")
-            check(not pg.is_visible(".answer-box"), f"№{n}: и прячет его")
-            pg.click("#showBtn")
-            answer(pg, t3)
-            res = pg.evaluate("JSON.parse(localStorage.getItem('socOge:results')||'{}')")
-            check(res.get(t3["id"]) == "shown", f"№{n}: подсмотренный ответ не засчитан как «верно»")
-            pg.context.close()
+        print("6. мост состояния и подборка")
+        open_first_task(page, 10)
+        page.click("#nextProtoBtn")
+        page.wait_for_timeout(150)
+        page.click(f'#answerArea .yn-btn[data-val="{page.evaluate("fieldsOf(curProto)[0].value")}"]')
+        check_btn(page)
+        snap = page.evaluate("tsGetState()")
+        ctx2, page2, err2 = new_page(browser)
+        open_n(page2, 1)
+        page2.evaluate("s => tsApplyState(s)", snap)
+        page2.wait_for_timeout(800)
+        check(page2.evaluate("S.n") == 10 and page2.evaluate("S.pid") == snap["egePid"], "снимок переносит номер и задание")
+        check(page2.evaluate("S.answered && S.correct"), "и результат проверки")
+        check(not err2, f"на второй вкладке ошибок нет ({err2[:2]})")
+        ctx2.close()
+        page.click("#basketAddBtn")
+        page.wait_for_timeout(300)
+        items = page.evaluate("window.Basket ? Basket.all() : []")
+        check(any(it.get("trainerId") == "soc10" for it in items), "«В подборку» — задание с id soc10")
 
-        print("4. №3 и №2: какие написания засчитываются")
-        pg = new_page()
-        pg.goto(BASE + "/soc_oge.html?n=3")
-        r = pg.evaluate("""() => { const c = window.__socOge.checkAnswer; return [
-            c({k:'pair', a:'1324'}, '1324'), c({k:'pair', a:'1324'}, '3142'),
-            c({k:'pair', a:'1324', any:1}, '3142'), c({k:'pair', a:'1324', any:1}, '2413'),
-            c({k:'text', a:'верховенство'}, '  Верховенство. '), c({k:'text', a:'объединение'}, 'обьединение'),
-            c({k:'text', a:'учёба'}, 'учеба'), c({k:'text', a:'долг'}, '') ]; }""")
-        check(r[:2] == [True, False], "№3 без флага: только порядок, принятый ФИПИ")
-        check(r[2:4] == [True, False], "№3 с флагом any: любой порядок внутри колонок, но не перепутанные колонки")
-        check(r[4] and not r[5] and r[6] and not r[7], "№2: без регистра, пробелов и «ё/е»; пустое и опечатка — неверно")
-        t = first(D, 3)
-        pg.goto(BASE + f"/soc_oge.html?n=3&t={t['id']}")
-        pg.click("#tabPractice")
-        pg.click("#showBtn")
-        check(f"(в бланк: {t['a']})" in pg.inner_text(".answer-box") and "сходства:" in pg.inner_text(".answer-box"),
-              "№3: ответ показан по колонкам и строкой для бланка")
-        t14 = first(D, 14)
-        pg.goto(BASE + f"/soc_oge.html?n=14&t={t14['id']}")
-        pg.click("#tabPractice")
-        one = ("1" if t14["a"][0] != "1" else "2") + t14["a"][1:]
-        answer(pg, t14, one)
-        check("1 балл из 2" in pg.inner_text("#feedback"), "№14: одна ошибка — подсказка про 1 балл из 2")
-        answer(pg, t14, wrong_value(t14))
-        check("1 балл" not in pg.inner_text("#feedback"), "№14: больше одной ошибки — без подсказки")
-        t15 = first(D, 14)
-        pg.goto(BASE + f"/soc_oge.html?n=14&t={t15['id']}")
-        opts = pg.eval_on_selector('#match select[data-i="0"]', "s => s.options.length - 1")
-        check(opts == t15["m"], f"№14: в списке столько цифр, сколько пунктов справа ({opts})")
-        pg.context.close()
+        print("7. главная и старые адреса")
+        page.goto(f"{BASE}/index.html?subject=soc")
+        page.wait_for_timeout(400)
+        check(page.locator('a.topic-item[href^="soc_oge.html"]').count() == 20, "все 20 номеров ведут на soc_oge.html")
+        check(page.locator('a.topic-item[href^="soc_oge_long"]').count() == 0, "на soc_oge_long.html ссылок нет")
+        for n in range(1, 21):
+            page.goto(f"{BASE}/soc_oge.html?n={n}")
+            settle(page)
+            if page.evaluate("S.n") != n or not page.evaluate("protos(S.n).length"):
+                check(False, f"№{n} не открылся")
+        names = page.evaluate("Object.keys(BANK).length")
+        check(names == 21, "в банке 20 номеров и блок «Дополнительно к тексту»")
+        tid = dump["9"]["protos"][7]["id"]
+        page.goto(f"{BASE}/soc_oge.html?n=9&t={tid}")
+        settle(page)
+        page.wait_for_timeout(200)
+        check(page.evaluate("S.screen") == "task" and page.evaluate("S.pid") == tid, "старый адрес ?n=9&t=… открывает то же задание")
+        check("t=" not in page.url, "дальше адрес показывает только номер")
+        page.goto(f"{BASE}/soc_oge.html?n=9")
+        settle(page)
+        check(page.evaluate("S.screen") == "picker" and page.evaluate("S.n") == 9, "старый адрес ?n=9 — тот же номер")
 
-        print("5. навигация")
-        pg = new_page()
-        L = [t for t in D["tasks"] if t["n"] == 9 and t["ok"]]
-        pg.goto(BASE + f"/soc_oge.html?n=9&t={L[-1]['id']}")
-        check(pg.evaluate("window.__socOge.S.idx") == len(L) - 1, "адрес ?n=…&t=… открывает то же задание")
-        pg.click("#nextBtnTop")
-        check(pg.evaluate("window.__socOge.S.idx") == 0, "▶ с последнего задания — на первое")
-        pg.click("#prevBtn")
-        check(pg.evaluate("window.__socOge.S.idx") == len(L) - 1, "◀ с первого — на последнее")
-        check(pg.is_visible("#prevTypeBtn") and pg.is_visible("#nextTypeBtn"), "пара «Предыдущий / Следующий номер» на экране задания")
-        pg.click("#nextTypeBtn")
-        check(pg.evaluate("window.__socOge.S.n") == 10 and "n=10" in pg.url, "«Следующий номер ▶» — с №9 на №10")
-        pg.click("#prevTypeBtn"); pg.click("#prevTypeBtn")
-        pg.wait_for_url(lambda u: "soc_oge_long.html" in u, timeout=5000)
-        check("soc_oge_long.html?n=8" in pg.url, "«◀ Предыдущий номер» с №9 — на развёрнутый №8 (своя страница)")
-        pg.goto(BASE + "/soc_oge.html?n=16")
-        pg.click("#nextTypeBtn")
-        pg.wait_for_url(lambda u: "soc_oge_long.html" in u, timeout=5000)
-        check("n=17" in pg.url, "с №16 вперёд — на №17 (задание демоверсии)")
-        pg.click("#backBtn")
-        pg.wait_for_url(lambda u: "/index.html" in u, timeout=5000)
-        check("/index.html" in pg.url, "«← все задания» — на главную")
-        pg.context.close()
+        ctx3, page3, err3 = new_page(browser)
+        page3.goto(f"{BASE}/index.html")
+        ok_id = dump["9"]["protos"][3]["id"]
+        page3.evaluate("""(id) => {
+          localStorage.setItem('socOge:results', JSON.stringify({ [id]: 'ok', ZZZ: 'bad' }));
+        }""", ok_id)
+        open_n(page3, 9)
+        res = page3.evaluate("(id) => [isSolved(id), isSolved('ZZZ'), localStorage.getItem('socOge:results')]", ok_id)
+        check(res == [True, False, None], "прогресс старой страницы перенесён один раз: решённое — решено, старый ключ снят")
+        ctx3.close()
+        check(not errors, f"ошибок JS нет ({errors[:2]})")
+        ctx.close()
 
-        print("6. главная")
-        pg = new_page()
-        pg.goto(BASE + "/index.html?subject=soc")
-        pg.wait_for_timeout(400)
-        txt = pg.inner_text("#topics")
-        check("№2. Пропуск в таблице" in txt and "№16. Государство и право: суждения" in txt and "№20. Текст: примеры" in txt, "номера ОГЭ 2027 на главной")
-        check("№21" not in txt, "номеров больше 20 нет")
-        check("готовим" not in txt.split("ЕГЭ")[0] if "ЕГЭ" in txt else "Обществознание готовим" not in txt, "вместо «готовим» — список номеров")
-        check(pg.locator('a.topic-item[href="soc_oge.html?n=2"]').count() == 1, "№2 ведёт на soc_oge.html?n=2")
-        live = pg.eval_on_selector_all("a.topic-item[href^='soc_oge.html']", "els => els.length")
-        check(live == 12, f"ссылок на номера с кратким ответом: {live}")
-        long_ = pg.eval_on_selector_all("a.topic-item[href^='soc_oge_long.html']", "els => els.map(e => e.getAttribute('href'))")
-        check(sorted(int(h.split('=')[1]) for h in long_) == [1, 7, 8, 12, 17, 18, 19, 20], f"развёрнутые ведут на soc_oge_long.html: {long_}")
-        soon = pg.eval_on_selector_all(".topic-item.soon .item-name", "els => els.map(e => e.textContent)")
-        check(not soon, f"«скоро» не осталось: {soon}")
-        pg.context.close()
+        print("8. телефон и тёмная тема")
+        ctx, page, errors = new_page(browser, 360, 800, theme="dark")
+        for n in (2, 3, 5, 14, 16):
+            open_first_task(page, n)
+            sw = page.evaluate("document.documentElement.scrollWidth")
+            check(sw <= 361, f"№{n}: без горизонтальной прокрутки ({sw})")
+        wide = page.evaluate("""async () => {
+          const bad = [];
+          for (const n of [2, 3, 14]) {
+            await new Promise(r => ensureFipi(n, r));
+            for (const p of protos(n)) {
+              openTask(n, p.id);
+              const over = [...document.querySelectorAll('#questionText, #questionText *')].some(e => e.getBoundingClientRect().right > innerWidth + 1);
+              if (document.documentElement.scrollWidth > innerWidth || over) bad.push(p.id);
+            }
+          }
+          return bad;
+        }""")
+        check(not wide, f"все задания №2, 3, 14 помещаются в 360 px ({wide[:4]})")
+        open_first_task(page, 14)
+        check(page.evaluate("getComputedStyle(document.querySelector('.soc-text .col-head')).display") == "block", "№14: шапка у каждой колонки")
+        check(page.evaluate("document.documentElement.dataset.theme") == "dark", "тёмная тема")
+        ink = page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--ink').trim()")
+        check(ink.upper() == "#2F8F70", f"тёмный зелёный, как на главной ({ink})")
+        for sel in ("#tabExam", "#answerArea .check-btn"):
+            c = contrast_white(bg_rgb(page, sel))
+            check(c >= 4.5, f"белый на {sel}: контраст {c:.1f}")
+        page.fill("#answerArea input.answer-input", page.evaluate("fieldsOf(curProto)[0].value"))
+        check_btn(page)
+        c = contrast_white(bg_rgb(page, "#nextBtn"))
+        check(c >= 4.5, f"белый на «Следующее задание»: контраст {c:.1f}")
+        check(not errors, f"ошибок JS нет ({errors[:2]})")
+        ctx.close()
+        browser.close()
 
-        print("7. тёмная тема, телефон, контраст")
-        for theme in ("light", "dark"):
-            pg = new_page(375, 812, theme)
-            for n in (14, 3, 2, 15):
-                pg.goto(BASE + f"/soc_oge.html?n={n}")
-                pg.wait_for_timeout(250)
-                sw = pg.evaluate("document.documentElement.scrollWidth")
-                check(sw <= 375, f"{theme}, телефон, №{n}: без горизонтальной прокрутки ({sw})")
-            pg.goto(BASE + f"/soc_oge.html?n=14&t={first(D, 14)['id']}")
-            heads = pg.eval_on_selector_all(".q .col-head", "els => els.filter(e => e.offsetParent).map(e => e.textContent.trim())")
-            check(len(heads) == 2 and all(heads), f"{theme}: №14 на телефоне — шапки внутри колонок {heads}")
-            ratios = pg.evaluate("""() => {
-              const lum = c => { const m = c.match(/\\d+(\\.\\d+)?/g).slice(0, 3).map(x => +x / 255)
-                .map(x => x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4); return .2126*m[0] + .7152*m[1] + .0722*m[2]; };
-              const css = getComputedStyle(document.documentElement);
-              return ['--btn-1', '--btn-2', '--btn-ok'].map(v => {
-                const d = document.createElement('div'); d.style.color = css.getPropertyValue(v); document.body.appendChild(d);
-                const L = lum(getComputedStyle(d).color); d.remove(); return Math.round(105 / (L + .05)) / 100; });
-            }""")
-            check(all(r >= 4.5 for r in ratios), f"{theme}: белый на кнопках — контраст {ratios}")
-            pg.context.close()
-
-        b.close()
-    check(not errors, f"ошибок JavaScript нет {errors[:3]}")
-    print("\nИТОГ: " + ("всё прошло" if not FAILS else f"ошибок {len(FAILS)}"))
+    print("\nИТОГ:", "всё ок" if not FAILS else f"{len(FAILS)} ошибок")
     sys.exit(1 if FAILS else 0)
 
 
