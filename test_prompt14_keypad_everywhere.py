@@ -57,12 +57,14 @@ PAGES = {
     "oge14": ("cards", [], '-'), "powers": ("cards", [], '-'),
     # Промпт №80: №9 — прототипы, как №6; движков с клавишами x и «;» больше нет
     "oge9": ("cards", [], '-'),
+    # банк ФИПИ №15–18: на экзамене краткий ответ числом — выбор вариантов заменён вводом
+    "oge15_18": ("cards", [], '-'),
     "ege_prof.html?n=7": ("cards", [], '-'), "ege_prof.html?n=15": ("cards", PART2, '-'),
     "ege_base.html?n=7": ("cards", [], '-'), "oge_part2.html?n=20": ("cards", PART2, '-'),
     "percent": ("tile", FR, '-'), "logarithms": ("tiles", ['/'], '−'),
     "trig_equations": ("tile:egeArg", ['/'], '−'),
 }
-CHOICE_ONLY = ["oge11", "oge13", "oge15_18", "oge19"]
+CHOICE_ONLY = ["oge11", "oge13", "oge19"]
 
 CARDS = "#modesGrid .mode-card:not(.soon), #protoList .mode-card, #pickerArea .modes .mode-card"
 VISIBLE_KP = "() => [...document.querySelectorAll('.keypad-float')].find(f => getComputedStyle(f).display !== 'none') || null"

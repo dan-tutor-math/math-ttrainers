@@ -193,10 +193,13 @@ def test_input_pages(browser):
 MCQ_PAGES = [
     ("oge11", "demo2027", "Установите соответствие", 1),
     ("oge13", "demo2027", "Укажите решение системы неравенств", 1),
-    ("oge15_18", "demo15", "биссектриса AK", 1),
-    ("oge15_18", "demo16", "радиуса 7", 3),
-    ("oge15_18", "demo17", "Основания трапеции равны 2 и 9", 2),
-    ("oge15_18", "demo18", "клетки 1×1", 1),
+]
+# №15–18 с банка ФИПИ (октябрь 2026) — ввод числа, как на экзамене, а не варианты
+OGE15_DEMO = [
+    ("demo15", "биссектриса AK", "105"),
+    ("demo16", "радиуса 7", "196"),
+    ("demo17", "Основания трапеции равны 2 и 9", "4,5"),
+    ("demo18", "клетки 1×1", "5"),
 ]
 
 
@@ -221,10 +224,29 @@ def test_mcq_pages(browser):
         page.wait_for_timeout(400)
         check(f"{slug}/{mid}: верный вариант засчитан",
               page.evaluate("taskAnswered") and page.query_selector(f'#mcqOptions .mcq-btn[data-i="{ci}"].correct') is not None)
-        if slug in ("oge11", "oge13", "oge15_18"):
+        if slug in ("oge11", "oge13"):
             svg = page.evaluate("document.querySelectorAll('#questionPanel svg').length")
             check(f"{slug}/{mid}: рисунки на месте", svg >= (3 if slug == "oge11" else 1), str(svg))
         check(f"{slug}/{mid}: без ошибок JS", not errors, str(errors[:1]))
+        ctx.close()
+
+    for mid, frag, ans in OGE15_DEMO:
+        ctx, page, errors = new_page(browser, f"{BASE}/oge15_18.html")
+        check(f"oge15_18/{mid}: в «Случайно» нулевого типа нет", page.evaluate("RANDOM_MODES.every(m => !m.demo)"))
+        open_type(page, mid)
+        prompt = page.inner_text('#questionPromptText')
+        check(f"oge15_18/{mid}: условие из демоверсии", frag in prompt, prompt[:80])
+        page.fill('#answerInput', '999')
+        page.click('#checkAnswerBtn')
+        page.wait_for_timeout(300)
+        check(f"oge15_18/{mid}: неверный ответ — ошибка", page.evaluate("totalErrors") == 1)
+        page.fill('#answerInput', ans)
+        page.click('#checkAnswerBtn')
+        page.wait_for_timeout(400)
+        check(f"oge15_18/{mid}: ответ {ans} засчитан", page.evaluate("taskAnswered"))
+        svg = page.evaluate("document.querySelectorAll('#questionPanel svg').length")
+        check(f"oge15_18/{mid}: рисунок на месте", svg >= 1, str(svg))
+        check(f"oge15_18/{mid}: без ошибок JS", not errors, str(errors[:1]))
         ctx.close()
 
     # №15–18: нулевой тип первым в каждой из четырёх групп
@@ -368,8 +390,11 @@ TIRE_ANS = ["195", "107,25", "549,8", "2,75", "1,4"]
 def test_tires(browser):
     ctx, page, errors = new_page(browser, f"{BASE}/oge1_5.html")
     tires = page.eval_on_selector_all('#modesGrid .modes', 'gs => [...gs[0].querySelectorAll(".mode-card")].map(e => [e.dataset.id, e.innerText])')
-    check("oge1_5: в «Шинах» две темы — Шина 0 (демоверсия) и прежняя Шина 1",
-          [t[0] for t in tires] == ['tire_demo2027', 'tire_set1'] and 'Демоверсия ОГЭ 2027' in tires[0][1]
+    # третьей темой — «Шины · задания ФИПИ»: ученику она видна с тех пор, как
+    # сайт ФИПИ принял ответы (02.11.2026); до сверки её не было
+    check("oge1_5: в «Шинах» Шина 0 (демоверсия), прежняя Шина 1 и задания ФИПИ",
+          [t[0] for t in tires] in (['tire_demo2027', 'tire_set1'], ['tire_demo2027', 'tire_set1', 'tire_fipi'])
+          and 'Демоверсия ОГЭ 2027' in tires[0][1]
           and tires[1][1].startswith('Шина 1'), str(tires))
     check("oge1_5: в «Случайно» заданий демоверсии нет",
           page.evaluate("RANDOM_MODES.every(m => !m.demo) && ALL_MODES.filter(m => m.demo).length === 5"))

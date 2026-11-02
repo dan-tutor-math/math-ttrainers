@@ -237,6 +237,11 @@
   function cardUrl() {
     const u = new URL(location.pathname, location.href);
     u.searchParams.set('card', '1');
+    // ?all=1 — предпросмотр преподавателя со всеми заданиями банка ФИПИ, в том
+    // числе ещё не сверенными. Без него у кадра другой набор типов, и
+    // карточка задания, которого ученику не видно, не находила свой тип
+    const all = new URLSearchParams(location.search).get('all');
+    if (all) u.searchParams.set('all', all);
     return u.toString();
   }
 

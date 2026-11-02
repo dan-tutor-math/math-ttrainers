@@ -202,7 +202,7 @@ def test_phone(browser):
 
 # ─── 3. широкий экран: шапка в одну строку, как была ───
 def test_wide(browser):
-    for slug, card in [("oge6", "p1"), ("oge11", "signs"), ("oge15_18", "tri"), ("oge19", "geom"), ("oge1_5", "tariff1")]:
+    for slug, card in [("oge6", "p1"), ("oge11", "signs"), ("oge15_18", "t_third"), ("oge19", "geom"), ("oge1_5", "tariff1")]:
         ctx, page, errors = new_page(browser, f"{BASE}/{slug}.html")
         page.click(f'.mode-card[data-id="{card}"]')
         page.wait_for_timeout(500)
