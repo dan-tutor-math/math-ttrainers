@@ -460,6 +460,38 @@ html[data-medals="on"] .board-view-toolbar{bottom:64px;}
 .home-btn{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
 .home-btn:hover{border-color:var(--ink)}
 .home-btn:active{transform:scale(.92)}
+/* ─── английский ОГЭ (eng_oge.html, EXAM.lang === 'en') ───
+   Та же страница, что ЕГЭ и ОГЭ ч. 2, но ответы — слова и цифры бланка:
+   калькулятора в столбик нет (его кнопки спрятаны, а не вырезаны — разметка
+   у всех копий страницы одна, см. sync_ege_pages.py), поля ответа номеров
+   20–28 стоят в несколько колонок, а не столбиком на девять строк */
+html[data-no-calc] #calcTools,html[data-no-calc] #calcHistoryPanel,html[data-no-calc] #calcPanel{display:none!important}
+html[data-lang="en"] .answer-area .p2-field{display:inline-flex;margin-right:18px;}
+html[data-lang="en"] .answer-input.word{font-family:var(--font-ui);width:190px;}
+.eng-text p{margin:0 0 10px;}
+.eng-text .eng-note{font-style:italic;color:var(--muted-6);font-size:.92em;}
+.eng-text .eng-num{display:inline-block;min-width:28px;font-weight:700;color:var(--ink);}
+.eng-text .eng-word{font-weight:700;letter-spacing:.03em;color:var(--ink);white-space:nowrap;}
+.eng-text .eng-gap{display:inline-block;min-width:70px;border-bottom:1.5px solid var(--muted-6);margin:0 3px;}
+.eng-text .eng-opts{margin:2px 0 12px 28px;}
+.eng-text .eng-opts div{margin:2px 0;}
+.eng-text .eng-letter{display:inline-block;min-width:26px;font-weight:700;color:var(--ink);}
+.eng-text .eng-title{font-weight:700;text-align:center;margin:4px 0 10px;}
+.eng-text audio{display:block;width:100%;margin:8px 0 12px;}
+.eng-text .eng-table{width:100%;border-collapse:collapse;margin:8px 0;}
+.eng-text .eng-table td{border:1px solid var(--glass-border);padding:6px 10px;vertical-align:top;}
+.refresh-btn{display:none;width:36px;height:36px;border-radius:12px;border:1px solid var(--glass-border);background:var(--glass);color:var(--ink);font-size:17px;cursor:pointer;align-items:center;justify-content:center;transition:transform .12s, border-color .12s;}
+.refresh-btn:hover{border-color:var(--ink)}
+.refresh-btn:active{transform:scale(.92)}
+html[data-refresh-btn] .refresh-btn{display:inline-flex;}
+/* цвет предмета — тот же, что у английского на главной (index.html,
+   html[data-subject="eng"]): по нему ученик и учитель сразу видят, в каком
+   предмете открыт тренажёр. Математика остаётся синей — у неё атрибута нет */
+html[data-subject="eng"]{--ink:#5B3596;--ink-active:#47287A;--hl-10:rgba(91,53,150,.10);--hl-35:rgba(91,53,150,.35);--blob-1:rgba(122,82,184,.16)}
+html[data-theme="dark"][data-subject="eng"]{--ink:#8462C8;--ink-active:#9878D6;--hl-10:rgba(148,116,208,.16);--hl-35:rgba(148,116,208,.5);--blob-1:rgba(148,116,208,.22)}
+/* без цифровой клавиатуры и без «+ ещё задания» (EXAM.noKeypad, noAddRail) */
+html[data-no-keypad] #keypadFloat,html[data-no-keypad] #kpToggle{display:none!important}
+html[data-no-add-rail] #addRail{display:none!important}
 </style>
 <link rel="stylesheet" href="katex-0.18.5.css" id="katexCss">
 <script src="katex-0.18.5.js"></script>
@@ -635,6 +667,7 @@ html[data-medals="on"] .board-view-toolbar{bottom:64px;}
         <div class="task-title" id="taskTitle"></div>
         <span class="medal-badge-row" id="medalBadgeRow"></span>
         <button class="basket-add-btn" id="basketAddBtn" title="В подборку">📥</button>
+        <button class="refresh-btn" id="refreshBtn" title="Обновить задание — другое задание этого вида">⟳</button>
       </div>
     </div>
 
@@ -854,6 +887,26 @@ if (EXAM.fipi && EXAM.fipi.tasks) Object.keys(EXAM.fipi.tasks).forEach(n => {
   if (!(EXAM.fipi.files && EXAM.fipi.files[n])) { mergeFipiNumber(n); fipiState[n] = 'done'; }
 });
 if (EXAM.boardPinned) document.documentElement.setAttribute('data-board-pinned', '');
+/* Английский ОГЭ (eng_oge.html): всё, чем он отличается, — флагами EXAM, а
+   не своей копией логики, чтобы доска, подборка, сессия и карточки «+» у
+   всех экзаменов оставались одной страницей:
+   - noCalc — нет калькулятора в столбик (ответы — слова);
+   - noMathSyms — нет π, √ и знаков промежутков ни под полем, ни на клавиатуре;
+   - refreshBtn — кнопка ⟳ «Обновить задание», как в ОГЭ №1–19;
+   - lang — язык условий (подсказка проверки орфографии и раскладка полей);
+   - backLabel / proofLabel — подписи кнопок «← все задания» и самопроверки */
+if (EXAM.noCalc) document.documentElement.setAttribute('data-no-calc', '');
+if (EXAM.refreshBtn) document.documentElement.setAttribute('data-refresh-btn', '');
+if (EXAM.lang) document.documentElement.setAttribute('data-lang', EXAM.lang);
+if (EXAM.backLabel) document.getElementById('backBtn').textContent = EXAM.backLabel;
+/* - subject — цвет предмета, как на главной (у математики не задан);
+   - noKeypad — без плавающей цифровой клавиатуры: ответы английского — слова
+     и цифры 1–3, их набирают с клавиатуры устройства;
+   - noAddRail — без колонки «+» (несколько заданий рядом): наборы английского
+     длинные, рядом они не помещаются */
+if (EXAM.subject) document.documentElement.setAttribute('data-subject', EXAM.subject);
+if (EXAM.noKeypad) document.documentElement.setAttribute('data-no-keypad', '');
+if (EXAM.noAddRail) document.documentElement.setAttribute('data-no-add-rail', '');
 const FIGS = EXAM.figs || {};
 const NUMS = Object.keys(BANK).map(Number).sort((a, b) => a - b);
 
@@ -1143,7 +1196,7 @@ const els = {};
  'keypadFloat','kpToggle','kpClose','kpDragHandle','keypadButtons',
  'manualNote','showSolutionBtn','mainPanel','solHint','solSteps','nextStepBtn',
  'solAnswer','critBox','critSummary','critTable','nextBtn','tabLearn','tabPractice','tabExam',
- 'basketAddBtn','stSolved','stErrors','stStreak'].forEach(id => { els[id] = document.getElementById(id); });
+ 'basketAddBtn','refreshBtn','stSolved','stErrors','stStreak'].forEach(id => { els[id] = document.getElementById(id); });
 
 /* отметки «решено» живут в общем для всех тренажёров localStorage под
    ключом ogeProg: — их стирает кнопка сброса прогресса на главной */
@@ -1283,6 +1336,9 @@ const TS = window.TrainerSession || null;
 function guard(action, fn){ return TS && TS.guardStudentAction ? TS.guardStudentAction(action, fn) : fn; }
 
 function task(n){ return BANK[n]; }
+// «№7», а у позиций на несколько номеров — своя подпись из банка: «№1–4»,
+// «Устная часть, №2» (английский: один набор на несколько номеров бланка)
+function numLabel(n){ return (task(n) || {}).label || ('№' + n); }
 function protos(n){ return (task(n) || {}).protos || []; }
 function protoById(n, pid){ return protos(n).find(p => p.id === pid) || protos(n)[0] || null; }
 /* Группы заданий (ОГЭ №20 из открытого банка ФИПИ). Там у номера сотни
@@ -1351,7 +1407,7 @@ function renderPicker(){
   const list = protos(S.n);
   // источники всех заданий номера: «демоверсия ОГЭ 2027 и открытый банк заданий ФИПИ»
   const srcs = list.map(p => p.src || '').filter((x, i, all) => x && all.indexOf(x) === i);
-  els.pickerTitle.textContent = (groupsOf(S.n).length ? 'Задания №' : 'Прототипы задания №') + S.n + ' · ' + list.length + ' ' +
+  els.pickerTitle.textContent = (groupsOf(S.n).length ? 'Задания ' : 'Прототипы задания ') + numLabel(S.n) + ' · ' + list.length + ' ' +
     plural(list.length, 'штука', 'штуки', 'штук') +
     // строчной делаем только первую букву: «демоверсия ФИПИ 2027», а не «фипи»
     (srcs.length ? ' · ' + srcs.map(x => x.charAt(0).toLowerCase() + x.slice(1)).join(' и ') : '');
@@ -1368,7 +1424,7 @@ function renderPicker(){
     card.onclick = guard('switchTask', () => openTask(S.n, card.dataset.pid));
   });
   splitPicker();
-  els.pageTitle.textContent = EXAM.title + ' · №' + S.n;
+  els.pageTitle.textContent = EXAM.title + ' · ' + numLabel(S.n);
   els.pageSub.textContent = subtitleOf(t);
 }
 /* Список номера с группами: сначала задания без группы (демоверсия), потом
@@ -1425,7 +1481,7 @@ function renderGroupedPicker(list){
     });
   });
   splitPicker();
-  els.pageTitle.textContent = EXAM.title + ' · №' + S.n;
+  els.pageTitle.textContent = EXAM.title + ' · ' + numLabel(S.n);
   els.pageSub.textContent = subtitleOf(t);
 }
 function showPicker(){
@@ -1459,7 +1515,7 @@ function fieldHint(f){
 function partOf(n){ return (task(n) || {}).part || 1; }
 function subtitleOf(t){
   return t.title + (EXAM.showPart ? ' · часть ' + t.part : '') + ' · ' +
-    t.points + (t.points === 1 ? ' балл' : ' балла');
+    t.points + ' ' + plural(t.points, 'балл', 'балла', 'баллов');
 }
 // «Ответ: 12 (порядок цифр не важен)», «Ответ: 6840 (подходят также: …)» —
 // ученик, записавший другой верный вариант, должен увидеть, что он тоже верен
@@ -1488,7 +1544,7 @@ function buildAnswerArea(root, p, st, prefix, onChanged){
      Без этой ветки пустой список полей «проходил» проверку, и задание
      считалось решённым по одному нажатию */
   if (p.proof) {
-    root.innerHTML = '<div class="input-answer-row"><button class="check-btn">Сверить с доказательством</button></div>' +
+    root.innerHTML = '<div class="input-answer-row"><button class="check-btn">' + (EXAM.proofLabel || 'Сверить с доказательством') + '</button></div>' +
       '<div class="answer-msg"></div>';
     root.querySelector('.check-btn').onclick = () => {
       if (st.answered) return;
@@ -1505,9 +1561,10 @@ function buildAnswerArea(root, p, st, prefix, onChanged){
       html += '<span class="yn-group" data-fid="' + f.id + '">' +
         '<button class="yn-btn" data-val="да">да</button><button class="yn-btn" data-val="нет">нет</button></span>';
     } else {
-      const wide = (f.type === 'set' || f.type === 'nums' || f.type === 'pairs') ? ' wide' : '';
+      const wide = (f.type === 'set' || f.type === 'nums' || f.type === 'pairs') ? ' wide' : f.type === 'word' ? ' word' : '';
       html += '<input type="text" class="answer-input' + wide + '" data-fid="' + f.id + '" ' +
         (f.type === 'plain' ? 'inputmode="decimal" ' : '') +
+        (f.type === 'word' && EXAM.lang ? 'lang="' + EXAM.lang + '" ' : '') +
         'autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">';
       if (f.unit) html += '<span class="p2-unit">' + f.unit + '</span>';
       const hint = fieldHint(f);
@@ -1516,7 +1573,7 @@ function buildAnswerArea(root, p, st, prefix, onChanged){
     html += '</div>';
   });
   // клавиатура телефона не набирает ни π, ни корень — кладём их рядом с полем
-  if (partOf(S.n) === 2 && list.some(f => f.type !== 'yesno')) {
+  if (partOf(S.n) === 2 && !EXAM.noMathSyms && list.some(f => f.type !== 'yesno' && f.type !== 'word')) {
     html += '<div class="sym-bar">' + ['π', '√', '∞', '≤', '≥', '∪', ';', '/', '(', ')']
       .map(c => '<button class="sym-btn" data-ch="' + c + '">' + c + '</button>').join('') + '</div>';
   }
@@ -1624,7 +1681,7 @@ function openTask(n, pid){
   lastFocusedInput = null;
 
   const t = task(n);
-  els.pageTitle.textContent = EXAM.title + ' · №' + n;
+  els.pageTitle.textContent = EXAM.title + ' · ' + numLabel(n);
   els.pageSub.textContent = subtitleOf(t);
   const idx = protos(n).findIndex(x => x.id === p.id);
   // у прототипа может быть своё название (в ОГЭ, часть 2 — «№0. Задание из
@@ -1636,9 +1693,9 @@ function openTask(n, pid){
     const sl = sibs(p.id);
     els.taskTitle.innerHTML = rich(grp.title) + ' · задание ' + (sl.findIndex(x => x.id === p.id) + 1) + ' из ' + sl.length;
   } else {
-    els.taskTitle.textContent = p.title ? p.title : '№' + n + ' · прототип ' + (idx + 1) + ' из ' + protos(n).length;
+    els.taskTitle.textContent = p.title ? p.title : numLabel(n) + ' · прототип ' + (idx + 1) + ' из ' + protos(n).length;
   }
-  document.title = EXAM.title + ' · №' + n + ' — ' + t.title;
+  document.title = EXAM.title + ' · ' + numLabel(n) + ' — ' + t.title;
   els.questionText.innerHTML = rich(p.text) + (p.fig && FIGS[p.fig] ? '<div class="ege-fig">' + FIGS[p.fig] + '</div>' : '') + sourceHTML(p);
   els.manualNote.innerHTML = p.manual ? '⚠️ ' + rich(p.manual) : '';
   els.manualNote.style.display = p.manual ? 'block' : 'none';
@@ -1727,7 +1784,7 @@ function render(){
   // «Следующий прототип» относится к одному заданию на экране: когда рядом
   // стоят добавленные карточки, кнопка только сбивает с толку
   els.nextBtn.style.display = (S.answered && !hasCards) ? 'block' : 'none';
-  els.nextBtn.textContent = sibs(S.pid).length > 1 ? (curProto.group ? 'Следующее задание →' : 'Следующий прототип →') : '← Все прототипы';
+  els.nextBtn.textContent = sibs(S.pid).length > 1 ? (curProto.group ? 'Следующее задание →' : 'Следующий прототип →') : (EXAM.backLabel || '← Все прототипы');
   els.stSolved.textContent = totalSolved;
   els.stErrors.textContent = totalErrors;
   els.stStreak.textContent = streak;
@@ -1773,6 +1830,19 @@ function protoNeighbour(delta){
 }
 
 /* ═══════════════ проверка ответа ═══════════════ */
+/* Слово в ответе (английский ОГЭ, номера 6–11 и 20–34). На бланке ответ
+   пишут без пробелов, а ФИПИ принимает и полную, и краткую форму
+   («didnotmind; didn’tmind»), поэтому сравниваем без пробелов и регистра,
+   с одним апострофом на все его написания и с раскрытыми n’t: «didn’t» =
+   «did not», «can’t» = «cannot», «won’t» = «will not» */
+function wordKey(s){
+  return String(s).toLowerCase()
+    .replace(/[\u2018\u2019\u02BC\u0060\u00B4]/g, "'")
+    .replace(/\bcan't\b/g, 'cannot').replace(/\bwon't\b/g, 'will not').replace(/\bshan't\b/g, 'shall not')
+    .replace(/n't\b/g, ' not')
+    .replace(/[\s.,!?;:]+/g, '');
+}
+function sameWords(a, b){ return wordKey(a) === wordKey(b); }
 function checkField(f, value, st){
   // → true/false, либо null, если запись не разобрали (это не ошибка ученика,
   // а просьба записать иначе: на бланке ЕГЭ формат ответа тоже оговорён)
@@ -1784,6 +1854,7 @@ function checkField(f, value, st){
   if (!raw) return null;
   // верными считаются эталон и все ответы «<или>» из ключа ФИПИ (alts)
   const accepted = [f.value].concat(f.alts || []);
+  if (f.type === 'word') return accepted.some(a => sameWords(a, raw));
   if (f.type === 'plain' && f.seq) {
     // последовательность цифр (соответствия, выбор утверждений): на бланке
     // её пишут подряд. Пробелы между цифрами ничего не путают — убираем;
@@ -1891,6 +1962,13 @@ els.prevProtoBtn.onclick = guard('switchTask', () => openTask(S.n, protoNeighbou
 els.nextProtoBtn.onclick = guard('switchTask', () => openTask(S.n, protoNeighbour(1).id));
 // 📥 в шапке — как в ОГЭ №8: всё, что сейчас на экране (основное задание и
 // добавленные карточки); одну карточку кладёт её личная кнопка
+els.refreshBtn.onclick = guard('switchTask', () => {
+  const list = sibs(S.pid).filter(p => p.id !== S.pid);
+  if (!list.length) return;
+  const fresh = list.filter(p => !isSolved(p.id));
+  const pool = fresh.length ? fresh : list;
+  openTask(S.n, pool[Math.floor(Math.random() * pool.length)].id);
+});
 els.basketAddBtn.onclick = () => {
   if (!window.Basket) return;
   addAllToBasket();
@@ -2197,15 +2275,15 @@ let keypadOpen = true;
 function renderKeypadKeys(){
   // раскладка одна на все тренажёры — keypad.js; во второй части ещё π, √,
   // ∞ и знаки промежутков
-  els.keypadButtons.innerHTML = Keypad.keys(partOf(S.n) === 2 ? ['π','√','∞','≤','≥','∪','(',')',';'] : []);
+  els.keypadButtons.innerHTML = Keypad.keys(partOf(S.n) === 2 && !EXAM.noMathSyms ? ['π','√','∞','≤','≥','∪','(',')',';'] : []);
   Keypad.bind(els.keypadButtons, keypadPress);
 }
 // поле, в которое пишет клавиатура: последнее, где стоял курсор — иначе
 // первое свободное; так одна клавиатура обслуживает и основное задание, и карточки
 function keypadTarget(){
   let inp = lastFocusedInput;
-  if (!inp || !els.workZone.contains(inp) || inp.disabled) {
-    inp = els.workZone.querySelector('input.answer-input:not([disabled])');
+  if (!inp || !els.workZone.contains(inp) || inp.disabled || inp.classList.contains('word')) {
+    inp = els.workZone.querySelector('input.answer-input:not([disabled]):not(.word)');
   }
   return inp;
 }
@@ -2233,7 +2311,7 @@ function keypadPress(ch){
 }
 function syncKeypadVisibility(){
   const free = S.screen === 'task' && els.taskArea.style.display !== 'none' &&
-    !!els.workZone.querySelector('input.answer-input:not([disabled])');
+    !!els.workZone.querySelector('input.answer-input:not([disabled]):not(.word)');
   els.keypadFloat.style.display = (free && keypadOpen) ? 'block' : 'none';
   els.kpToggle.style.display = (free && !keypadOpen) ? 'flex' : 'none';
 }
@@ -2657,7 +2735,7 @@ document.getElementById('homeBtn').addEventListener('click', function (e) {
   e.preventDefault();
   var go = function () {
     if (window.TrainerSession && window.TrainerSession.navigateTo) window.TrainerSession.navigateTo('index');
-    else location.href = 'index.html';
+    else location.href = EXAM.homeUrl || 'index.html';
   };
   if (window.TrainerSession && window.TrainerSession.guardStudentAction) window.TrainerSession.guardStudentAction('navigate', go)();
   else go();

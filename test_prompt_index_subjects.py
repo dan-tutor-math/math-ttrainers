@@ -11,7 +11,7 @@
   4. у каждого предмета своя запомненная вкладка; предмет помнится после
      перезагрузки; математика хранит вкладку под прежним ключом ogeNav:state;
   5. обществознание — номера ОГЭ (soc_oge.html, подробно — test_prompt_soc_oge.py),
-     английский — свой текст «готовим»;
+     английский — наборы ОГЭ (eng_oge.html?n=…, подробно — test_prompt_eng_oge.py);
   6. ?subject=… открывает предмет и пропадает из адреса; мусор → математика;
   7. открытая «Подборка» закрывается выбором предмета;
   8. из списка русского — в тренажёр и кнопкой «←» обратно, на русский;
@@ -180,8 +180,9 @@ def main():
         check(pg.locator('a.topic-item[href="soc_oge.html?n=3"]').count() == 1, "№3 ведёт на soc_oge.html?n=3")
         subj(pg, "eng")
         check(pg.evaluate(INK) == "#5B3596", "английский — фиолетовый")
-        check("Английский готовим" in pg.inner_text("#topics"), "английский — «готовим»")
-        check(pg.inner_text(".nav-tab.active").strip() == "Экзамены", "у пустого раздела нет «· 0»")
+        check("№20–28. Грамматика" in pg.inner_text("#topics"), "английский — наборы ОГЭ вместо «готовим»")
+        check(pg.locator('a.topic-item[href="eng_oge.html?n=20"]').count() == 1, "№20–28 ведёт на eng_oge.html?n=20")
+        check(pg.locator('a.topic-item[href^="eng_oge.html"]').count() == 11, "у английского 11 позиций ОГЭ")
 
         print("6. предмет в адресе")
         go(pg, "/index.html?subject=rus")

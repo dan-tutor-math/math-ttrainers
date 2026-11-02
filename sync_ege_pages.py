@@ -4,7 +4,7 @@
 настройками. Логику правят в ege_prof.html, а остальные файлы
 пересобираются этим скриптом:
 
-    python3 sync_ege_pages.py          — пересобрать ege_base.html и oge_part2.html
+    python3 sync_ege_pages.py          — пересобрать ege_base.html, oge_part2.html и eng_oge.html
     python3 sync_ege_pages.py --check  — только проверить, что страницы
                                          не разошлись (так делают тесты №57 и №61)
 
@@ -27,6 +27,8 @@ END = '/* ═══════════════ конец настро�
 TARGETS = [
     ('ege_base.html', [('ЕГЭ профиль', 'ЕГЭ база'), ('ege-prof-', 'ege-base-')]),
     ('oge_part2.html', [('ЕГЭ профиль', 'ОГЭ, часть 2'), ('ege-prof-', 'oge-part2-')]),
+    # английский ОГЭ: та же страница, отличия — флагами в его блоке EXAM
+    ('eng_oge.html', [('ЕГЭ профиль', 'ОГЭ английский'), ('ege-prof-', 'eng-oge-')]),
 ]
 
 
