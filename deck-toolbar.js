@@ -33,6 +33,7 @@ const DTB_STYLES = [
 
 // значки — контуром одной толщины, как у дока (1,7), красятся currentColor
 const DTB_ICONS = {
+  student: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/>',
   text: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.2"/><path d="M8.5 9h7M12 9v7.2"/>',
   table: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.2"/><path d="M3.5 9.6h17M3.5 14.5h17M9.2 4.5v15M14.8 4.5v15" stroke-width="1.3"/>',
   shapes: '<circle cx="9" cy="9" r="5"/><rect x="11.2" y="11.2" width="9.3" height="9.3" rx="1.6"/>',
@@ -104,7 +105,15 @@ const DECK_CMDS = [
   { id: 'showFirst', group: 'show', icon: 'show', label: 'С начала', title: 'Показ с первого слайда (F5)', ribbonOnly: true,
     run: () => dtbShowStart(true) },
   { id: 'show', group: 'show', icon: 'show', label: 'Показ', short: 'С текущего', title: 'Показ слайдов на всю вкладку (F5 — с начала, Shift+F5 — с текущего)', prio: 3, wide: true,
-    run: () => dtbShowStart(false) }
+    run: () => dtbShowStart(false) },
+  // что видит ученик по ссылке: кадр вместо камеры учителя (deckStudentFrame).
+  // Значок без подписи и первым в «⋯»: настройка редкая и не должна вытеснять из
+  // полосы листание; подпись видна в ленте, в «⋯» и в полосе показа
+  { id: 'student', group: 'show', icon: 'student', label: 'Ученик видит', title: 'Ученик видит: режим показа по ссылке и предпросмотр', prio: 0, popOwn: true,
+    enabled: () => deckIsTeacher(), run: () => {
+      const b = document.getElementById('dtb-student');
+      dtbSvPopToggle(b && !b.classList.contains('dtb-off') ? b : document.getElementById('dtbMoreBtn'));
+    } }
 ];
 // раскладка «одна строка» (вариант Б): порядок групп слева направо
 const DTB_LINE_GROUPS = ['insert', 'format', 'arrange', 'slide', 'mode', 'nav', 'flow', 'lesson', 'show'];
@@ -165,8 +174,8 @@ function dtbBuild(){
       el.setAttribute('aria-label', c.label);
       // подпись: у «широких» видна всегда, у остальных — только в ленте (dtb-lbl-r)
       el.innerHTML = dtbSvg(c.icon) + (c.wide ? '<span class="dtb-lbl">' + (c.short ? '<span class="dtb-lbl-l">' + c.label + '</span><span class="dtb-lbl-r">' + c.short + '</span>' : c.label) + '</span>'
-        : '<span class="dtb-lbl-r">' + (c.short || c.label) + '</span>') + (c.pop ? dtbSvg('caret', 'dtb-caret') : '');
-      if (c.pop){ el.setAttribute('aria-haspopup', 'menu'); el.setAttribute('aria-expanded', 'false'); }
+        : '<span class="dtb-lbl-r">' + (c.short || c.label) + '</span>') + (c.pop || c.popOwn ? dtbSvg('caret', 'dtb-caret') : '');
+      if (c.pop || c.popOwn){ el.setAttribute('aria-haspopup', 'menu'); el.setAttribute('aria-expanded', 'false'); }
       el.addEventListener('click', (e) => dtbRun(c, e));
     }
     if (!el) return;
@@ -1239,7 +1248,7 @@ function dtbShowStart(fromStart){
   const vis = dtbVisibleIdx();
   if (!vis.length){ deckToast('Все слайды скрыты из показа'); return; }
   const start = fromStart ? vis[0] : dtbShowFind(Math.max(0, deckCurIndex()), 0);
-  dtbPopToggle(null); dtbDisarm(); dtbMoreToggle(false);
+  dtbPopToggle(null); dtbDisarm(); dtbMoreToggle(false); dtbSvPopToggle(null, false);
   if (typeof bxCloseEditor === 'function') bxCloseEditor(true);
   if (typeof deckOpenPop === 'function') deckOpenPop(false);
   selectedId = null; multiSelectIds = [];
@@ -1259,6 +1268,7 @@ function dtbShowStop(){
   if (!dtbShow) return;
   const st = dtbShow;
   dtbShow = null;
+  dtbSvPopToggle(null, false);
   document.documentElement.classList.remove('deck-show', 'dtb-show-idle', 'deck-show-tools');
   document.getElementById('dtbLaser')?.remove();
   // инструмент и перо — как были до показа
@@ -1299,6 +1309,7 @@ function dtbShowBuildBar(){
     '<button type="button" data-sh="next" title="Следующий (→, пробел)">' + ic('<path d="M9 5l7 7-7 7" stroke-linejoin="round"/>') + '</button><i class="dtb-show-sep"></i>' +
     DTB_SHOW_TOOLS.map(t => '<button type="button" data-tool-show="' + t.id + '" title="' + t.label + '" aria-pressed="false">' + ic(t.icon) + '</button>').join('') +
     '<i class="dtb-show-sep"></i><button type="button" data-sh="tools" class="txt" title="Показать или скрыть инструменты доски" aria-pressed="false">Инструменты</button>' +
+    '<button type="button" data-sh="student" class="txt" title="Что видит ученик по ссылке и предпросмотр" aria-haspopup="menu">Ученик видит</button>' +
     '<button type="button" data-sh="clear" class="txt" title="Стереть пометки на этом слайде">Очистить</button>' +
     '<button type="button" data-sh="exit" class="txt" title="Выйти из показа (Esc)">Выйти</button>';
   (document.getElementById('screenBoard') || document.body).appendChild(bar);
@@ -1310,6 +1321,7 @@ function dtbShowBuildBar(){
     if (a === 'prev') dtbShowStep(-1);
     else if (a === 'next') dtbShowStep(1);
     else if (a === 'tools') dtbShowSetToolsVisible(!document.documentElement.classList.contains('deck-show-tools'), true);
+    else if (a === 'student') dtbSvPopToggle(b);
     else if (a === 'clear') deckClearNotes(false);
     else if (a === 'exit') dtbShowStop();
   });
@@ -1383,6 +1395,9 @@ function dtbShowInit(){
     let dir = 0;
     if (['ArrowRight', 'ArrowDown', 'PageDown', ' ', 'Enter', 'n', 'N'].includes(e.key)) dir = 1;
     else if (['ArrowLeft', 'ArrowUp', 'PageUp', 'Backspace', 'p', 'P'].includes(e.key)) dir = -1;
+    // открытое меню «Ученик видит» закрывается первым: Esc не должен выкинуть из
+    // показа, а обработчик показа стоит раньше обработчика меню
+    if (e.key === 'Escape' && document.getElementById('dtbSvPop')?.hidden === false){ e.preventDefault(); e.stopImmediatePropagation(); dtbSvPopToggle(null, false); return; }
     if (e.key === 'Escape'){ e.preventDefault(); e.stopImmediatePropagation(); dtbShowStop(); return; }
     if (e.key === 'F5'){ e.preventDefault(); e.stopImmediatePropagation(); return; }
     if (e.key === 'Home' || e.key === 'End'){
@@ -1426,6 +1441,276 @@ function dtbShowInit(){
   window.addEventListener('contextmenu', (e) => { if (dtbShow && e.target.id === 'boardCv') e.preventDefault(); }, true);
   // вкладку сузили или развернули — слайд вписывается заново
   window.addEventListener('resize', () => { if (dtbShow) requestAnimationFrame(() => { deckGo(deckCurIndex(), 0); }); });
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   «Ученик видит»: режим кадра и предпросмотр. Сам кадр считает deck-core.js
+   (deckStudentFrame), шлёт board-stage.js в bd_view; здесь — только выбор и
+   окно предпросмотра.
+   Меню — своё, а не .dtb-pop: те в показе спрятаны CSS-ом, а кнопка нужна и в
+   полосе показа. Предпросмотр — на body по той же причине: в показе дети
+   #screenBoard скрыты, а закрывать окно учитель должен сам
+   ═══════════════════════════════════════════════════════════════════════ */
+const DTB_SV_MODES = [
+  { id: 'slide', label: 'Только слайд', note: 'Слайд во всё окно ученика, за краем спокойный фон' },
+  { id: 'margin', label: 'Слайд с полем', note: 'Вокруг слайда поле, как у вас на экране' },
+  { id: 'mine', label: 'Как у меня', note: 'Ученик идёт за вашей камерой: когда приближаете кусок слайда' }
+];
+const DTB_SV_POS_KEY = 'boardsDeckPreviewPos';
+const DTB_SV_GAP_MS = 200;         // чаще предпросмотр не рисуется: учителю важнее свой слайд
+const DTB_SV_MAX_W = 320, DTB_SV_MAX_H = 220;
+
+function dtbSvBuildPop(){
+  let p = document.getElementById('dtbSvPop');
+  if (p) return p;
+  p = document.createElement('div');
+  p.id = 'dtbSvPop';
+  p.className = 'dtb-sv-pop';
+  p.hidden = true;
+  p.setAttribute('role', 'menu');
+  p.setAttribute('aria-label', 'Ученик видит');
+  p.innerHTML = '<div class="dtb-sv-h">Ученик видит</div>' +
+    DTB_SV_MODES.map(m => '<button type="button" class="dtb-sv-mode" role="menuitemradio" data-sv="' + m.id + '" aria-checked="false"><b>' + m.label + '</b><small>' + m.note + '</small></button>' +
+      (m.id === 'margin' ? '<label class="dtb-sv-range" id="dtbSvRange"><span>Поле</span><input type="range" id="dtbSvMargin" min="' + DECK_SV_MARGIN_MIN + '" max="' + DECK_SV_MARGIN_MAX + '" step="1" aria-label="Размер поля вокруг слайда"><output id="dtbSvMarginVal"></output></label>' : '')).join('') +
+    '<i class="dtb-sv-sep"></i><button type="button" class="dtb-sv-mode" id="dtbSvPreviewBtn" aria-pressed="false"><b>Предпросмотр ученика</b><small>Маленькое окно с тем, что он видит сейчас</small></button>';
+  document.body.appendChild(p);
+  p.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-sv]');
+    if (b){ dtbSvSetMode(b.dataset.sv); return; }
+    if (e.target.closest('#dtbSvPreviewBtn')) dtbSvPreviewToggle();
+  });
+  p.querySelector('#dtbSvMargin').addEventListener('input', (e) => {
+    try { localStorage.setItem(DECK_SV_MARGIN_KEY, e.target.value); } catch (err) {}
+    dtbSvSync();
+    dtbSvChanged();
+  });
+  // щелчок мимо закрывает; по кнопке, которая открыла, — её собственный toggle
+  document.addEventListener('pointerdown', (e) => {
+    if (p.hidden || e.target.closest('#dtbSvPop, #dtb-student, [data-sh="student"], #dtbMoreBtn, #dtbMoreMenu')) return;
+    dtbSvPopToggle(null, false);
+  }, true);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !p.hidden){ e.stopPropagation(); dtbSvPopToggle(null, false); } }, true);
+  return p;
+}
+function dtbSvSync(){
+  const p = document.getElementById('dtbSvPop');
+  if (!p) return;
+  const mode = deckStudentMode(), m = deckStudentMargin();
+  p.querySelectorAll('[data-sv]').forEach(b => b.setAttribute('aria-checked', b.dataset.sv === mode ? 'true' : 'false'));
+  const inp = p.querySelector('#dtbSvMargin');
+  inp.value = m;
+  // ползунок нужен только полю: в остальных режимах он ничего бы не менял
+  inp.disabled = mode !== 'margin';
+  p.querySelector('#dtbSvRange').classList.toggle('off', mode !== 'margin');
+  p.querySelector('#dtbSvMarginVal').textContent = Math.round(m) + ' %';
+  p.querySelector('#dtbSvPreviewBtn').setAttribute('aria-pressed', dtbSvOpen ? 'true' : 'false');
+  document.getElementById('dtb-student')?.setAttribute('title', 'Ученик видит: ' + DTB_SV_MODES.find(x => x.id === mode).label.toLowerCase());
+}
+function dtbSvPopToggle(anchor, force){
+  const p = anchor === null && force === false ? document.getElementById('dtbSvPop') : dtbSvBuildPop();
+  if (!p) return;
+  const open = force === undefined ? p.hidden : !!force;
+  p.hidden = !open;
+  document.getElementById('dtb-student')?.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (!open || !anchor) return;
+  dtbPopToggle(null);
+  dtbSvSync();
+  // в показе кнопка внизу окна — меню открывается над ней
+  const r = anchor.getBoundingClientRect(), h = p.offsetHeight, w = p.offsetWidth;
+  p.style.left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left)) + 'px';
+  p.style.top = (r.bottom + 8 + h > window.innerHeight - 8 ? Math.max(8, r.top - h - 8) : r.bottom + 8) + 'px';
+}
+function dtbSvSetMode(m){
+  try { localStorage.setItem(DECK_SV_MODE_KEY, m); } catch (e) {}
+  dtbSvSync();
+  dtbSvChanged();
+}
+// кадр уезжает ученику вместе с очередной перерисовкой (sendLive в board-stage.js)
+function dtbSvChanged(){
+  dtbSvDirty = true;
+  if (typeof boardActive !== 'undefined' && boardActive) scheduleRedraw();
+}
+
+/* ── окно предпросмотра ── */
+let dtbSvOpen = false, dtbSvTimer = 0, dtbSvDirty = false, dtbSvWho = null, dtbSvAskAt = 0, dtbSvRenders = 0, dtbSvHooked = false;
+function dtbSvBuildPreview(){
+  let w = document.getElementById('dtbSvPreview');
+  if (w) return w;
+  w = document.createElement('div');
+  w.id = 'dtbSvPreview';
+  w.className = 'dtb-sv-preview';
+  w.hidden = true;
+  w.setAttribute('role', 'dialog');
+  w.setAttribute('aria-label', 'Предпросмотр ученика');
+  w.innerHTML = '<div class="dtb-sv-phead" id="dtbSvPHead"><span>Предпросмотр ученика</span>' +
+    '<button type="button" id="dtbSvPClose" title="Закрыть" aria-label="Закрыть предпросмотр"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>' +
+    '<canvas id="dtbSvCanvas"></canvas>' +
+    '<div class="dtb-sv-pfoot"><select id="dtbSvWhoSel" aria-label="Чьё окно показывать" hidden></select><span id="dtbSvNote"></span></div>';
+  document.body.appendChild(w);
+  w.querySelector('#dtbSvPClose').addEventListener('click', () => dtbSvPreviewToggle(false));
+  w.querySelector('#dtbSvWhoSel').addEventListener('change', (e) => { dtbSvWho = e.target.value; dtbSvDirty = true; dtbSvTick(); });
+  // тянем за шапку; кнопка закрытия — своё нажатие
+  const head = w.querySelector('#dtbSvPHead');
+  let drag = null;
+  head.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button')) return;
+    e.preventDefault();
+    const r = w.getBoundingClientRect();
+    drag = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top };
+    try { head.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  head.addEventListener('pointermove', (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    dtbSvPlace(e.clientX - drag.dx, e.clientY - drag.dy);
+  });
+  const end = (e) => {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag = null;
+    const r = w.getBoundingClientRect();
+    try { localStorage.setItem(DTB_SV_POS_KEY, JSON.stringify({ x: Math.round(r.left), y: Math.round(r.top) })); } catch (err) {}
+  };
+  head.addEventListener('pointerup', end);
+  head.addEventListener('pointercancel', end);
+  window.addEventListener('resize', () => { if (dtbSvOpen){ const r = w.getBoundingClientRect(); dtbSvPlace(r.left, r.top); } });
+  return w;
+}
+// окно не должно уехать за край: шапка всегда досягаема
+function dtbSvPlace(x, y){
+  const w = document.getElementById('dtbSvPreview');
+  if (!w) return;
+  w.style.left = Math.max(4, Math.min(window.innerWidth - w.offsetWidth - 4, x)) + 'px';
+  w.style.top = Math.max(4, Math.min(window.innerHeight - w.offsetHeight - 4, y)) + 'px';
+}
+function dtbSvPreviewToggle(force){
+  const open = force === undefined ? !dtbSvOpen : !!force;
+  if (open === dtbSvOpen) return;
+  dtbSvOpen = open;
+  const w = dtbSvBuildPreview();
+  w.hidden = !open;
+  clearInterval(dtbSvTimer);
+  dtbSvTimer = 0;
+  dtbSvSync();
+  if (!open) return;
+  /* Перерисовку подслушиваем один раз и навсегда, но обёртка только ставит
+     флаг. Рисует таймер: пока окно закрыто, таймера нет и лишней работы нет */
+  if (!dtbSvHooked){
+    dtbSvHooked = true;
+    const orig = window.scheduleRedraw;
+    window.scheduleRedraw = function(){ if (dtbSvOpen) dtbSvDirty = true; return orig.apply(this, arguments); };
+  }
+  dtbSvDirty = true;
+  dtbSvTick();
+  let pos = null;
+  try { pos = JSON.parse(localStorage.getItem(DTB_SV_POS_KEY) || 'null'); } catch (e) {}
+  if (pos && typeof pos.x === 'number') dtbSvPlace(pos.x, pos.y);
+  // по умолчанию — в правом нижнем углу: сверху окно закрыло бы полосу панели
+  // и саму кнопку, которой его открыли; правее стоит ползунок листания
+  else dtbSvPlace(window.innerWidth - w.offsetWidth - 72, window.innerHeight - w.offsetHeight - 96);
+  dtbSvTimer = setInterval(dtbSvTick, DTB_SV_GAP_MS);
+}
+// какое окно ученика показываем: выбранное, иначе первое; нет сведений — 16:9
+function dtbSvTarget(){
+  const info = typeof window.bdViewerSizes === 'function' ? window.bdViewerSizes() : { online: 0, list: [] };
+  const cur = info.list.find(x => x.id === dtbSvWho) || info.list[0] || null;
+  return { info, cur };
+}
+function dtbSvSyncFoot(info, cur){
+  const sel = document.getElementById('dtbSvWhoSel'), note = document.getElementById('dtbSvNote');
+  const name = (x) => 'Устройство ' + x.no + (x.dv ? ' · ' + x.dv : '');
+  const sig = info.list.map(x => x.id + name(x)).join('|');
+  if (sel.dataset.sig !== sig){
+    sel.dataset.sig = sig;
+    sel.innerHTML = info.list.map(x => '<option value="' + x.id + '">' + name(x) + '</option>').join('');
+  }
+  sel.hidden = info.list.length < 2;
+  if (cur) sel.value = cur.id;
+  const text = cur ? (info.list.length < 2 ? name(cur) + ' · ' : '') + cur.w + '×' + cur.h
+    : info.online ? 'размер окна ученика неизвестен' : 'ученик не подключён';
+  if (note.textContent !== text) note.textContent = text;
+}
+// камера предпросмотра: те же правила, что у ученика (applyView в board-stage.js)
+function dtbSvCam(cur, cw, ch, W){
+  const fr = deckStudentFrame();
+  if (fr) return deckFrameCam(fr, cw, ch);
+  // на сцене ученик видит окно учителя целиком, уменьшенным; без сцены —
+  // камеру как есть, от левого верхнего угла, в своём масштабе
+  if (cur && !cur.st) return { x: cam.x, y: cam.y, zoom: cam.zoom * cw / W };
+  const ww = window.innerWidth, wh = window.innerHeight;
+  return deckFrameCam({ x: cam.x - boardInset / cam.zoom, y: cam.y, w: ww / cam.zoom, h: wh / cam.zoom }, cw, ch);
+}
+// поля заданий у ученика — живые элементы над холстом. Итог проверки рисует
+// сам render (не главная камера → drawTaskStateForExport), а ещё не
+// проверенные поля и набранное — здесь
+function dtbSvDrawTaskFields(c, s){
+  const r = deckSlideRect(s);
+  B.objects.forEach(o => {
+    const t = o.task;
+    if (!t || !t.hot || t.st || t.kind !== 'fields' || !Array.isArray(t.fields) || !Array.isArray(t.hot.fields)) return;
+    const b = objectBBox(o);
+    if (b.maxX < r.x || b.minX > r.x + r.w || b.maxY < r.y || b.minY > r.y + r.h) return;
+    const p0 = worldToScreen({ x: b.minX, y: b.minY }), p1 = worldToScreen({ x: b.maxX, y: b.maxY });
+    const w = p1.x - p0.x, h = p1.y - p0.y, d = typeof taskDrafts !== 'undefined' ? taskDrafts.get(o.id) : null;
+    t.fields.forEach((f, i) => {
+      const hr = t.hot.fields[i];
+      if (!hr) return;
+      const x = p0.x + hr.x * w, y = p0.y + hr.y * h, fw = hr.w * w, fh = hr.h * h;
+      c.fillStyle = '#FFFFFF'; c.strokeStyle = '#9AA3B2'; c.lineWidth = 1;
+      c.beginPath(); roundRectPath(c, x, y, fw, fh, fh * 0.2); c.fill(); c.stroke();
+      const val = d && d.vals && d.vals[f.id];
+      if (val){
+        c.fillStyle = '#1F2126'; c.font = '600 ' + Math.max(6, fh * 0.46) + 'px ' + UI_FONT_FAMILY;
+        c.textAlign = 'center'; c.textBaseline = 'middle';
+        c.fillText(String(val), x + fw / 2, y + fh / 2, fw * 0.92);
+      }
+    });
+  });
+}
+function dtbSvDraw(cur){
+  const s = deckCur(), cv = document.getElementById('dtbSvCanvas');
+  if (!s || !cv) return;
+  const W = cur ? cur.w : 1600, H = cur ? cur.h : 900;
+  const k = Math.min(DTB_SV_MAX_W / W, DTB_SV_MAX_H / H);
+  const cw = Math.max(40, Math.round(W * k)), ch = Math.max(40, Math.round(H * k));
+  const pd = Math.min(2, window.devicePixelRatio || 1), pw = Math.round(cw * pd), phh = Math.round(ch * pd);
+  // менять размер холста только при смене: это сбрасывает его память
+  const resized = cv.width !== pw || cv.height !== phh;
+  if (resized){ cv.width = pw; cv.height = phh; cv.style.width = cw + 'px'; cv.style.height = ch + 'px'; }
+  const camv = Object.assign(dtbSvCam(cur, cw, ch, W), { minLine: 1 });
+  const ctx = cv.getContext('2d');
+  deckRenderSlideId = s.id;
+  deckPreviewCam = camv;
+  try {
+    render(ctx, cw, ch, camv, false, pd);
+    // живой штрих и пометка, которых ещё нет в объектах, — ученик их уже видит
+    const r = deckSlideRect(s), p0 = worldToScreen({ x: r.x, y: r.y }), p1 = worldToScreen({ x: r.x + r.w, y: r.y + r.h });
+    ctx.save();
+    ctx.setTransform(pd, 0, 0, pd, 0, 0);
+    ctx.beginPath(); ctx.rect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y); ctx.clip();
+    dtbSvDrawTaskFields(ctx, s);
+    if (typeof drawDraftPreview === 'function') drawDraftPreview(ctx, camv);
+    ctx.restore();
+  } catch (e) {}
+  finally { deckRenderSlideId = null; deckPreviewCam = null; activeCam = cam; deckInkSync(); }
+  dtbSvRenders++;
+  // окно поменяло пропорции — шапка не должна уехать за край экрана
+  if (resized){ const r = document.getElementById('dtbSvPreview').getBoundingClientRect(); dtbSvPlace(r.left, r.top); }
+}
+function dtbSvTick(){
+  if (!dtbSvOpen) return;
+  // ушли с презентации — окно закрывается: показывать больше нечего
+  if (!boardActive || !isDeckBoard()){ dtbSvPreviewToggle(false); return; }
+  const { info, cur } = dtbSvTarget();
+  dtbSvSyncFoot(info, cur);
+  // ученик на связи, а размера нет: учитель перезагрузил страницу и забыл его
+  if (info.online > info.list.length && Date.now() - dtbSvAskAt > 2000 && typeof window.bdViewerSizesAsk === 'function'){
+    dtbSvAskAt = Date.now();
+    window.bdViewerSizesAsk();
+  }
+  const sig = cur ? cur.id + ':' + cur.w + 'x' + cur.h : '-';
+  if (sig !== dtbSvTick.sig){ dtbSvTick.sig = sig; dtbSvDirty = true; }
+  if (!dtbSvDirty) return;
+  dtbSvDirty = false;
+  dtbSvDraw(cur);
 }
 
 /* Настройки досок (шестерёнка «Настройки листа»): вид панели презентации.
@@ -1594,6 +1879,31 @@ function dtbInjectStyle(){
     '.deck-thumb.hid .deck-thumb-n{text-decoration:line-through}',
     '.deck-thumb-hid{position:absolute;left:2px;top:22px;width:16px;height:16px;color:var(--muted-2)}',
     '.deck-thumb-hid svg{width:16px;height:16px;display:block}',
+    // «Ученик видит» и предпросмотр: поверх полосы показа (z-index 450)
+    '.dtb-sv-pop{position:fixed;z-index:470;width:286px;max-width:calc(100vw - 16px);padding:8px;border-radius:14px;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);box-shadow:var(--shadow);font-family:var(--font-ui);color:var(--pencil);box-sizing:border-box}',
+    '.dtb-sv-pop[hidden]{display:none}',
+    '.dtb-show-bar [data-sh="student"]{white-space:nowrap;flex:none}',
+    '.dtb-sv-h{font-size:12px;font-weight:600;color:var(--muted-2);padding:2px 8px 6px}',
+    '.dtb-sv-mode{display:block;width:100%;text-align:left;padding:7px 8px;border:none;border-radius:10px;background:none;color:inherit;font:inherit;cursor:pointer}',
+    '.dtb-sv-mode:hover{background:rgba(127,127,127,.14)}',
+    '.dtb-sv-mode[aria-checked="true"],.dtb-sv-mode[aria-pressed="true"]{background:rgba(127,127,127,.22)}',
+    '.dtb-sv-mode b{display:block;font-size:14px;font-weight:600}',
+    '.dtb-sv-mode small{display:block;font-size:12px;line-height:1.3;color:var(--muted-2);margin-top:1px}',
+    '.dtb-sv-range{display:flex;align-items:center;gap:8px;padding:4px 8px 6px;font-size:13px}',
+    '.dtb-sv-range.off{opacity:.4}',
+    '.dtb-sv-range input{flex:1;min-width:0}',
+    '.dtb-sv-range output{width:38px;text-align:right;font-variant-numeric:tabular-nums}',
+    '.dtb-sv-sep{display:block;height:1px;background:var(--glass-border);margin:6px}',
+    '.dtb-sv-preview{position:fixed;z-index:460;border-radius:12px;overflow:hidden;background:var(--glass-strong);border:1px solid var(--glass-border);box-shadow:var(--shadow);font-family:var(--font-ui);color:var(--pencil)}',
+    '.dtb-sv-preview[hidden]{display:none}',
+    '.dtb-sv-phead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 4px 4px 10px;font-size:12px;font-weight:600;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}',
+    '.dtb-sv-phead:active{cursor:grabbing}',
+    '.dtb-sv-phead button{width:26px;height:26px;padding:4px;border:none;border-radius:8px;background:none;color:inherit;cursor:pointer}',
+    '.dtb-sv-phead button:hover{background:rgba(127,127,127,.18)}',
+    '.dtb-sv-preview canvas{display:block;margin:0 auto;background:var(--bg)}',
+    '.dtb-sv-pfoot{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:26px;padding:3px 10px;font-size:12px;color:var(--muted-2)}',
+    '.dtb-sv-pfoot select{min-width:0;max-width:170px;font:inherit;color:var(--pencil);background:none;border:1px solid var(--glass-border);border-radius:6px}',
+    '.dtb-sv-pfoot select[hidden]{display:none}',
     // №105: режим показа — интерфейс доски спрятан, фон тёмный (и у ученика)
     'html.deck-show,html.deck-show body,html.deck-show #screenBoard{background:#121418!important}',
     'html.deck-show:not(.deck-show-tools) #screenBoard > :not(#boardCv):not(#bdTaskLayer):not(#deckToast):not(#bdEraserRing):not(#dtbShowBar){display:none!important}',

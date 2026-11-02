@@ -29,6 +29,7 @@ const DECK_ZMIN = .45;                // дальше 45% от «вписан» 
 const DECK_PEEK_PX = 40;              // сколько видно соседа при «вписан»
 // Промпт №85: render() рисует для миниатюры не текущий слайд, а этот
 let deckRenderSlideId = null;
+let deckPreviewCam = null;            // камера предпросмотра ученика, пока он рисуется
 
 // №96: у ученика (доска учителя, board-stage.js) презентация только
 // рисуется — ни листания, ни ленты, ни меню: всё это проверяет isDeckBoard
@@ -136,7 +137,45 @@ function deckOnOpen(b){
    обрезать объекты по его краю. Какой слайд — учитель присылает вместе с
    видом (ds), как и режим листания (fl): у ученика в localStorage может быть
    свой режим, а слайды должны стоять так же, как у учителя */
-let deckViewerFlow = null, deckViewerSlide = null;
+let deckViewerFlow = null, deckViewerSlide = null, deckViewerFm = null;
+
+/* Кадр для ученика: прямоугольник в координатах доски, который ученик сам
+   вписывает в своё окно. Камера учителя для этого не годится: она посчитана
+   под его окно и его панели (deckArea — между лентой, шапкой и ползунком),
+   и в окне другого размера слайд стоял бы не по центру и не по размеру.
+   Режим и поле — личная настройка учителя (localStorage), как и режим
+   листания: это про то, как он ведёт урок, а не свойство презентации.
+   Камера в презентации всегда в координатах ТЕКУЩЕГО слайда (и в сплошной
+   прокрутке, №86), поэтому рамка слайда подходит для всех режимов листания */
+const DECK_SV_MODE_KEY = 'boardsDeckStudentView', DECK_SV_MARGIN_KEY = 'boardsDeckStudentMargin';
+const DECK_SV_MARGIN_MIN = 2, DECK_SV_MARGIN_MAX = 40, DECK_SV_MARGIN_DEF = 10;
+function deckStudentMode(){
+  try { const m = localStorage.getItem(DECK_SV_MODE_KEY); return m === 'margin' || m === 'mine' ? m : 'slide'; } catch (e) { return 'slide'; }
+}
+function deckStudentMargin(){
+  let v = NaN;
+  try { v = parseFloat(localStorage.getItem(DECK_SV_MARGIN_KEY)); } catch (e) {}
+  return isFinite(v) ? Math.max(DECK_SV_MARGIN_MIN, Math.min(DECK_SV_MARGIN_MAX, v)) : DECK_SV_MARGIN_DEF;
+}
+// поле — доля меньшей стороны слайда: одинаковое по всем краям и у книжного
+// А4, и у широкого слайда; доля от ширины у книжного дала бы огромное поле
+function deckFrameOf(s, mode, marginPct){
+  const r = deckSlideRect(s);
+  if (mode !== 'margin') return r;
+  const m = Math.min(r.w, r.h) * marginPct / 100;
+  return { x: r.x - m, y: r.y - m, w: r.w + 2 * m, h: r.h + 2 * m };
+}
+// null — кадра нет («Как у меня»), ученик идёт за камерой учителя
+function deckStudentFrame(){
+  const mode = deckStudentMode(), s = deckCur();
+  return mode === 'mine' || !s ? null : deckFrameOf(s, mode, deckStudentMargin());
+}
+// камера, вписывающая кадр в окно W×H по центру, с равными полями по краям.
+// ZOOM_MIN здесь не применяем: на телефоне с большим полем он сдвинул бы кадр
+function deckFrameCam(f, W, H){
+  const z = Math.min(W / Math.max(1, f.w), H / Math.max(1, f.h)) || 1;
+  return { x: f.x + f.w / 2 - W / 2 / z, y: f.y + f.h / 2 - H / 2 / z, zoom: z };
+}
 function deckViewerOpen(b){
   window.deckViewerMode = true;
   b.kind = 'deck';
@@ -150,7 +189,7 @@ function deckViewerOpen(b){
   deckCurId = null;
 }
 function deckViewerClose(){
-  window.deckViewerMode = false; deckViewerFlow = null; deckViewerSlide = null; deckCurId = null;
+  window.deckViewerMode = false; deckViewerFlow = null; deckViewerSlide = null; deckViewerFm = null; deckCurId = null;
   document.documentElement.classList.remove('deck-show');
 }
 function deckViewerView(v){
@@ -160,6 +199,7 @@ function deckViewerView(v){
   document.documentElement.classList.toggle('deck-show', !!v.sh);
   deckViewerFlow = v.fl || null;
   deckViewerSlide = v.ds || null;
+  deckViewerFm = v.fm || null;
 }
 function deckViewerSync(){
   const sl = deckSlides();
@@ -274,7 +314,12 @@ function deckDrawBackground(c, camv, w, h, isScreen){
   // полосу листания (их у ученика нет), только бумага слайда
   if (window.deckViewerMode){
     if (isScreen && camv === cam) deckViewerSync();
-    if (isScreen && scroll && camv === cam) deckRenderScrollOthers(c, camv, w, h);
+    // у ученика холст непрозрачный (фон --bg кладёт движок), поэтому тёмный
+    // фон показа (CSS #screenBoard) сквозь него не виден — кладём здесь
+    if (isScreen && camv === cam && document.documentElement.classList.contains('deck-show')){ c.fillStyle = '#121418'; c.fillRect(0, 0, w, h); }
+    // «Только слайд»: соседи из сплошной прокрутки за краем не нужны — ученик
+    // смотрит на один слайд, вокруг только спокойный фон
+    if (isScreen && scroll && camv === cam && deckViewerFm !== 'slide') deckRenderScrollOthers(c, camv, w, h);
     const sv = deckDrawnSlide();
     if (sv) deckDrawPaper(c, sv, camv);
     return;
@@ -284,6 +329,12 @@ function deckDrawBackground(c, camv, w, h, isScreen){
     if (s0){ deckShowSlide(s0); camv = cam; }
   }
   if (isScreen && scroll && camv === cam) deckRenderScrollOthers(c, camv, w, h);
+  // предпросмотр ученика (deck-toolbar.js) рисуется не экранным render, а
+  // показать должен то же, что ветка ученика выше: тёмный фон показа и соседей
+  if (camv === deckPreviewCam){
+    if (document.documentElement.classList.contains('deck-show')){ c.fillStyle = '#121418'; c.fillRect(0, 0, w, h); }
+    if (scroll && deckStudentMode() !== 'slide') deckRenderScrollOthers(c, camv, w, h);
+  }
   const s = deckDrawnSlide();
   if (!s) return;
   deckDrawPaper(c, s, camv);

@@ -2331,7 +2331,23 @@
       });
     }, 1500);
   }
-  onEvent('cursor', (c) => { if (IN_STAGE && !isLeaderFlag) toStageHost(Object.assign({ type: 'cursor' }, c)); });
+  onEvent('cursor', (c) => {
+    if (!IN_STAGE || isLeaderFlag) return;
+    // страница может стоять не так, как у учителя (кадр слайда у ученика,
+    // board-stage.js): она сама переводит точку; null — точке здесь нет места
+    let msg = c;
+    if (!c.h && typeof window.__tsCursorMap === 'function') {
+      let m;
+      try { m = window.__tsCursorMap(c.x, c.y); } catch (err) {}
+      if (m === null) msg = { h: 1 };
+      else if (m) {
+        msg = Object.assign({}, c, { x: Math.round(m.x), y: Math.round(m.y) });
+        // кольцо ластика — в масштабе этой страницы, а не окна учителя
+        if (c.l && c.l.r && m.k) msg.l = Object.assign({}, c.l, { r: c.l.r * m.k });
+      }
+    }
+    toStageHost(Object.assign({ type: 'cursor' }, msg));
+  });
 
   /* ── прокрутка страниц без доски (главная, список номеров) ──
      На тренажёрах прокрутку повторяет доска (board_view). На главной доски
@@ -3628,6 +3644,10 @@
     getAutosaveHistory, setAutosaveHistory, onAutosaveHistoryChange,
     registerHistoryUI, notifyHistoryChanged,
     isStageFrame: () => IN_STAGE, stageFocus,
+    // страница просит сцену отдать ей окно ученика, а не окно учителя (кадр
+    // слайда в презентации, board-stage.js); снимается вместе с документом
+    stageOwnWindow: (on) => toStageHost({ type: 'own', on: !!on }),
+    clientId: () => CLIENT_ID,
     // есть ли кому показывать (board-stage.js шлёт доску, только если есть)
     hasViewers: () => studentsOnline() > 0,
     // Промпт №16: идёт ли занятие «в совместном доступе». Не только «ученик

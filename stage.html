@@ -285,11 +285,15 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;touch-
      active — тот, что на экране. pending — следующая страница, пока она
      грузится и догоняет учителя (см. «смена страницы» ниже) */
   let active = null, pending = null;
-  function frameSize(){
-    return teacher ? teacher : { w: vp.clientWidth, h: vp.clientHeight };
+  /* Обычно кадр размером с окно учителя. Страница может попросить окно ученика
+     ('own': презентация с кадром слайда сама вписывает слайд в окно, и размер
+     учителя ей только мешает). Признак у кадра, а не у сцены: следующая страница
+     грузится рядом и должна верстаться под учителя, пока сама не попросит */
+  function frameSize(f){
+    return teacher && !(f && f._own) ? teacher : { w: vp.clientWidth, h: vp.clientHeight };
   }
   function sizeFrame(f){
-    const sz = frameSize();
+    const sz = frameSize(f);
     f.style.width = sz.w + 'px';
     f.style.height = sz.h + 'px';
     f.style.transform = scale === 1 ? '' : 'scale(' + scale + ')';
@@ -311,8 +315,8 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;touch-
 
   function layout(keepCenter){
     const vw = vp.clientWidth, vh = vp.clientHeight;
-    const sz = frameSize();
-    const fit = teacher ? Math.min(vw / sz.w, vh / sz.h) : 1;
+    const sz = frameSize(active);
+    const fit = teacher && !(active && active._own) ? Math.min(vw / sz.w, vh / sz.h) : 1;
     // центр видимой области в координатах кадра — чтобы при смене масштаба
     // остаться на том же месте, а не отъехать в угол
     let cx = null, cy = null;
@@ -875,6 +879,7 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;touch-
       pending = null;
       active.classList.remove('waiting');
       cur = null; placeCursor();
+      if (!old || !!old._own !== !!active._own) layout(false);
       // старый кадр убираем, когда новый уже проявился. Сначала говорим
       // ему «ты заменён» — уходя, он не прощается с учителем (номер
       // участника у кадров общий, прощание выписало бы и новый кадр).
@@ -1022,6 +1027,8 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;touch-
       // новый документ в кадре: первая загрузка, перезагрузка, переход
       const reloaded = !!(f._doc && f._doc.reloaded);
       f._doc = { blind: !teacher, reloaded: reloaded, ready: false };
+      // новый документ верстается под учителя, пока сам не попросит окно ученика
+      if (f._own) { f._own = false; if (f === active) layout(false); else sizeFrame(f); }
       // адрес сцены повторяет страницу группы: перезагрузка или «открыть
       // ещё раз» вернут ученика туда, где сейчас группа
       const u = targetUrl(d.href);
@@ -1034,6 +1041,11 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;touch-
     } else if (d.type === 'ready') {
       if (f._doc) f._doc.ready = true;
       tryReveal(f);
+    } else if (d.type === 'own') {
+      if (!!f._own === !!d.on) return;
+      f._own = !!d.on;
+      if (f === active) { zoom = 1; layout(false); scheduleFrameDpr(); }
+      else sizeFrame(f);
     } else if (f !== active) {
       return;   // остальное — только от кадра на экране
     } else if (d.type === 'nav') {

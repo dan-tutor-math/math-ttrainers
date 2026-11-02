@@ -397,6 +397,15 @@
         v.fl = deckFlow();
         // №105: режим показа — ученику тоже только слайд (deckViewerView)
         if (typeof dtbShowOn === 'function' && dtbShowOn()) v.sh = 1;
+        /* Кадр — рядом со старыми x, y, zoom, а не вместо: ученик со страницей
+           из кэша кадра не поймёт и пойдёт за камерой, как раньше. Новый
+           ученик в режимах с кадром камеру не смотрит, поэтому приближение и
+           сдвиг учителя до него не доходят */
+        if (typeof deckStudentFrame === 'function') {
+          v.fm = deckStudentMode();
+          const fr = deckStudentFrame();
+          if (fr) v.fr = { x: +fr.x.toFixed(2), y: +fr.y.toFixed(2), w: +fr.w.toFixed(2), h: +fr.h.toFixed(2) };
+        }
       }
       const key = JSON.stringify(v);
       if (!force && key === lastView) return;
@@ -533,7 +542,7 @@
         // досках». Сами доски снимков почти не шлют, и строка могла помнить
         // прежнюю страницу — тогда каждый новый или перезагрузившийся ученик
         // сначала попадал туда и только потом, по сигналу учителя, сюда
-        if (!hadViewers) TS.push();
+        if (!hadViewers) { TS.push(); TS.broadcastEvent('bd_vsize_ask', {}); }
         hadViewers = true;
         if (nowId) sendFull(); else sendClosed();
         return;
@@ -541,6 +550,22 @@
       // правки, прошедшие мимо saveDB (облачная доска: чужие изменения)
       if (nowId) sendDiff();
     }, 500);
+
+    /* Размер окна каждого ученика — только для предпросмотра: пропорции окна
+       в deck-toolbar.js. Кто на связи, решает список устройств сессии (там
+       свой срок жизни), поэтому здесь записи не устаревают */
+    const viewerSizes = new Map();
+    TS.onEvent('bd_vsize', (d) => {
+      if (d && d.id && d.w > 0 && d.h > 0) viewerSizes.set(d.id, { w: d.w, h: d.h, st: !!d.st });
+    });
+    window.bdViewerSizes = () => {
+      const devs = TS.studentDevices ? TS.studentDevices() : [];
+      return {
+        online: devs.length,
+        list: devs.filter(p => viewerSizes.has(p.uid)).map(p => Object.assign({ id: p.uid, no: p.no, dv: p.dv }, viewerSizes.get(p.uid))),
+      };
+    };
+    window.bdViewerSizesAsk = () => TS.broadcastEvent('bd_vsize_ask', {});
 
     // ученик просит доску целиком (только пришёл, переподключился, пропустил правку)
     let helloTimer = null;
@@ -868,15 +893,94 @@
       });
       if (keys.length) TS.broadcastEvent('bd_need', { keys: keys.slice(0, 50) });
     }
+    // кадр применяем, только когда модуль презентаций уже здесь и это всё ещё
+    // презентация: вид от прошлой презентации мог прийти раньше обычной доски
+    function viewFrame() {
+      return view && view.fr && window.deckViewerMode && typeof deckFrameCam === 'function' ? view.fr : null;
+    }
+    /* На сцене кадр страницы — размером с окно учителя, и слайд вписывался бы
+       в его пропорции, а не в окно ученика. Пока идёт кадр слайда, просим
+       сцену отдать странице окно ученика целиком (см. 'own' в stage.html).
+       Старая сцена из кэша сообщение пропустит — слайд всё равно будет по
+       центру, только мельче */
+    let stageOwn = false;
+    function setStageOwn(on) {
+      if (!inStage || on === stageOwn) return;
+      stageOwn = on;
+      if (TS.stageOwnWindow) TS.stageOwnWindow(on);
+    }
+    let viewSig = '';
     function applyView() {
       if (!view || !boardActive) return;
       window.applyBoardInset();
+      const fr = viewFrame();
+      setStageOwn(!!fr);
+      if (fr) {
+        const c = deckFrameCam(fr, cssW, cssH);
+        cam.x = c.x; cam.y = c.y; cam.zoom = c.zoom;
+        // учитель двигает камеру — bd_view идёт часто, а кадр тот же: не
+        // перерисовываем ученику слайд, который у него не изменился
+        const sig = [c.x, c.y, c.zoom, view.ds, view.fl, view.sh, view.fm].join();
+        if (sig === viewSig) return;
+        viewSig = sig;
+        scheduleRedraw();
+        return;
+      }
+      viewSig = '';
       // на сцене — сдвиг на панель (см. выше); ученику в обычном режиме
       // окно своё, там доска просто с той же точки, что у учителя
       const shift = inStage ? (view.inset || 0) / (view.zoom || 1) : 0;
       cam.x = view.x - shift; cam.y = view.y; cam.zoom = view.zoom;
       scheduleRedraw();
     }
+    // Движок уже подогнал холст (его обработчик resize зарегистрирован раньше
+    // этого файла) — осталось вписать кадр заново. На iOS после поворота
+    // размеры обновляются с задержкой, поэтому смотрим ещё раз
+    window.addEventListener('resize', () => { if (viewFrame()) applyView(); sendSizeSoon(); });
+    window.addEventListener('orientationchange', () => setTimeout(() => {
+      if (!boardActive) return;
+      if (Math.max(1, window.innerWidth - boardInset) !== cssW || window.innerHeight !== cssH) resizeCanvas();
+      if (viewFrame()) applyView();
+      sendSizeSoon();
+    }, 250));
+
+    /* Учитель показывает у себя предпросмотр в пропорциях окна ученика. На
+       сцене настоящее окно ученика — это окно сцены: в режиме «Как у меня» кадр
+       страницы размером с окно учителя и о нём не говорит */
+    function realSize() {
+      try { if (inStage) return { w: window.parent.innerWidth, h: window.parent.innerHeight }; } catch (e) {}
+      return { w: window.innerWidth, h: window.innerHeight };
+    }
+    const SIZE_GAP_MS = 300;
+    let sizeTimer = null, sizeAt = 0, sizeSent = '';
+    function sendSize(force) {
+      sizeTimer = null;
+      const s = realSize(), key = s.w + 'x' + s.h;
+      if (!force && key === sizeSent) return;
+      sizeSent = key; sizeAt = Date.now();
+      TS.broadcastEvent('bd_vsize', { id: TS.clientId ? TS.clientId() : '', w: s.w, h: s.h, st: inStage ? 1 : 0 });
+    }
+    function sendSizeSoon(force) {
+      if (sizeTimer) return;
+      sizeTimer = setTimeout(() => sendSize(force), Math.max(0, SIZE_GAP_MS - (Date.now() - sizeAt)));
+    }
+    TS.onEvent('bd_vsize_ask', () => sendSizeSoon(true));
+    // окно сцены меняется без resize в кадре (кадр размером с окно учителя):
+    // слушать родителя нельзя — обработчик пережил бы заменённый кадр
+    if (inStage) setInterval(() => sendSizeSoon(), 1000);
+
+    /* Курсор учителя на сцене приходит в координатах его окна. Пока идёт кадр,
+       слайд у ученика стоит иначе, поэтому переводим через доску; вне кадра
+       (над лентой миниатюр, панелями) стрелке у ученика показывать нечего */
+    window.__tsCursorMap = (x, y) => {
+      const fr = viewFrame();
+      if (!fr) return undefined;
+      const z = view.zoom || 1;
+      const wx = (x - (view.inset || 0)) / z + view.x, wy = y / z + view.y;
+      if (wx < fr.x || wx > fr.x + fr.w || wy < fr.y || wy > fr.y + fr.h) return null;
+      return { x: (wx - cam.x) * cam.zoom, y: (wy - cam.y) * cam.zoom, k: cam.zoom / z };
+    };
+
     function openViewerBoard() {
       B = VB;
       viewerDeckSetup();
@@ -901,13 +1005,14 @@
         if (B !== VB || !VB.objects.some((o) => o && o.type === 'deck')) return;
         deckViewerOpen(VB);
         if (view) deckViewerView(view);
+        applyView();   // кадр применяется, только когда модуль уже загружен
         scheduleRedraw();
       };
       if (typeof deckViewerOpen === 'function') go();
       else if (typeof ensureDeckModule === 'function') ensureDeckModule().then(go, () => {});
     }
     let helloAt = 0;
-    function hello() { helloAt = Date.now(); TS.broadcastEvent('bd_hello', { v: PROTO, gz: CAN_GUNZIP }); }
+    function hello() { helloAt = Date.now(); TS.broadcastEvent('bd_hello', { v: PROTO, gz: CAN_GUNZIP }); sendSizeSoon(true); }
 
     // сколько доски уже пришло — ученик видит, что загрузка идёт, а не висит
     function showProgress() {
@@ -924,6 +1029,7 @@
         complete = false; assembling = null; unpacking = 0; livePen = null; applyShape(null); liveText = null;
         boardActive = false;
         setOn(false);
+        setStageOwn(false);
         showWait('Учитель выбирает доску…');
         releaseReady();
         return;
@@ -1132,6 +1238,7 @@
       playout: () => playout,
       liveShape: () => liveShape, liveText: () => liveText,
       progress: () => (assembling ? { n: assembling.n, count: assembling.count, z: assembling.z } : null),
+      view: () => view, frame: viewFrame,
       ref: () => VB.refPanel,
     };
 
