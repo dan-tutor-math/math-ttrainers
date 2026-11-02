@@ -953,7 +953,11 @@
   let cloudRole = null; // 'owner' | 'editor' | 'admin'
   let cloudChannel = null;
   let cloudApplyingRemote = false;
-  let cloudGestureBefore = null; // JSON-снимок B.objects, снятый в начале ЖЕСТА (см. pushUndo ниже)
+  // «как было» в начале ЖЕСТА (см. pushUndo ниже): JSON-снимок всей доски —
+  // строка, или, если жест сказал, какие объекты он трогает («„скорость
+  // досок“», шаг 4), — { json: Map(id → JSON задетого), idsBefore: Set(id
+  // всех объектов) }: тогда сравниваются только задетые и новые
+  let cloudGestureBefore = null;
   let cloudUndoStack = [];
   let cloudRedoStack = [];
   let cloudFlushTimer = null;
@@ -1611,6 +1615,17 @@
   // догрузку картинок из базы забыли — именно через неё старьё и уходило
   function syncGestureBefore(board, ids) {
     if (cloudGestureBefore === null || !ids || !ids.length) return;
+    if (typeof cloudGestureBefore !== 'string') {
+      // снимок только задетых: пришедшее от других становится их «как было»,
+      // новое от других — «было до жеста», удалённое другими — не наше удаление
+      const p = cloudGestureBefore;
+      ids.forEach(id => {
+        const now = board.objects.find(o => o.id === id);
+        if (p.json.has(id)) { if (now) p.json.set(id, JSON.stringify(now)); else p.json.delete(id); }
+        if (now) p.idsBefore.add(id);
+      });
+      return;
+    }
     const before = JSON.parse(cloudGestureBefore);
     const want = new Set(ids);
     const nowById = new Map();
@@ -1848,13 +1863,38 @@
     }
   }
 
+  // разница жеста по снимку только задетых объектов: раньше на каждый жест
+  // вся доска переводилась в JSON, разбиралась обратно и сравнивалась целиком
+  // — на большой доске сотни миллисекунд на каждый штрих и каждое движение
+  function computeDiffPartial(p, afterArr) {
+    const added = [], updated = [], removed = [];
+    const now = new Map();
+    afterArr.forEach(o => {
+      if (!p.idsBefore.has(o.id)) added.push(o);
+      else if (p.json.has(o.id)) now.set(o.id, o);
+    });
+    p.json.forEach((json, id) => {
+      const cur = now.get(id);
+      if (!cur) removed.push({ id, obj: JSON.parse(json) });
+      else if (JSON.stringify(cur) !== json) updated.push({ id, before: JSON.parse(json), after: cur });
+    });
+    return { added, updated, removed };
+  }
+  function gestureBeforeOf(board, touch) {
+    if (!touch || !Array.isArray(touch.ids)) return JSON.stringify(board.objects);
+    const want = new Set(touch.ids);
+    const json = new Map(), idsBefore = new Set();
+    board.objects.forEach(o => { idsBefore.add(o.id); if (want.has(o.id)) json.set(o.id, JSON.stringify(o)); });
+    return { json, idsBefore };
+  }
+
   function cloudFinalizeGesture() {
     if (!cloudBoardId || cloudGestureBefore === null) return;
     const board = window.getCurrentBoard();
-    const before = JSON.parse(cloudGestureBefore);
+    const snap = cloudGestureBefore;
     cloudGestureBefore = null;
     if (!board) return;
-    const diff = computeDiff(before, board.objects);
+    const diff = typeof snap === 'string' ? computeDiff(JSON.parse(snap), board.objects) : computeDiffPartial(snap, board.objects);
     if (diffIsEmpty(diff)) return;
     stampLocalDiff(diff);
     // в стек отмены — копию: живые объекты доски меняются дальше
@@ -1900,15 +1940,18 @@
   const _origDoUndo = window.doUndo;
   const _origDoRedo = window.doRedo;
 
-  window.pushUndo = function () {
-    _origPushUndo();
-    if (cloudBoardId && !cloudApplyingRemote) {
-      // два pushUndo подряд без завершения предыдущего жеста бывает, когда
-      // ластиком стирают несколько объектов быстро друг за другом — сначала
-      // фиксируем предыдущий, потом начинаем снимок для нового
+  window.pushUndo = function (touch) {
+    // «„скорость досок“», шаг 4: на общей доске своя отмена (разницами, ниже),
+    // и снимок для отмены движка доски там никому не нужен — раньше он всё
+    // равно снимался (полный JSON доски на каждый жест). Своя доска — как была
+    if (!cloudBoardId) { _origPushUndo(touch); return; }
+    if (!cloudApplyingRemote) {
+      // два pushUndo подряд без завершения предыдущего жеста (колесо над
+      // картинкой после паузы и т. п.) — сначала фиксируем предыдущий,
+      // потом начинаем снимок для нового
       if (cloudGestureBefore !== null) cloudFinalizeGesture();
       const board = window.getCurrentBoard();
-      cloudGestureBefore = board ? JSON.stringify(board.objects) : null;
+      cloudGestureBefore = board ? gestureBeforeOf(board, touch) : null;
     }
   };
   window.saveDB = function () {

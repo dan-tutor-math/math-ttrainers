@@ -372,7 +372,10 @@ def run():
         page.evaluate("() => backToList()")
         page.wait_for_timeout(700)
         page.evaluate("() => window.openBoard('bA')")
-        page.wait_for_function("() => window.getCurrentBoard() && Array.isArray(window.getCurrentBoard().objects) && getCurrentBoard().objects.length > 3")
+        # viewReady: доска восстановила свой запомненный вид (в кадре после
+        # открытия). Без этого focus_on иногда успевал раньше, и вид
+        # перекрывал его — задание оказывалось за экраном («„скорость досок“»)
+        page.wait_for_function("() => window.getCurrentBoard() && Array.isArray(window.getCurrentBoard().objects) && getCurrentBoard().objects.length > 3 && viewReady")
         focus_on(page, o["id"])
         page.wait_for_function(f"() => !!document.querySelector('.bd-task[data-id=\"{o['id']}\"] .bd-task-in')", timeout=10000)
         after = page.evaluate(f"""() => {{ const i = document.querySelector('.bd-task[data-id="{o['id']}"] .bd-task-in');

@@ -100,7 +100,11 @@ function idbGet(key){
 function idbPut(key, value){
   return idbRun((db, resolve, reject) => {
     const tx = db.transaction(IDB_STORE, 'readwrite');
+    // «„скорость досок“»: сколько стоила сериализация записи доски — по
+    // ней saveDB решает, ждать ли паузу подлиннее (scheduleIdbSave)
+    const t0 = performance.now();
     tx.objectStore(IDB_STORE).put(value, key);
+    if (typeof key === 'string' && key.indexOf(IDB_BOARD_PREFIX) === 0) idbLastHeavyPutMs = performance.now() - t0;
     tx.oncomplete = () => resolve(true);
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error('запись прервана'));
@@ -875,9 +879,55 @@ function saveDB(){
   if (typeof deckStampLayers === 'function') deckStampLayers();
   stampAuthors();
   touchBoard();
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(idbSaveDB, 300);
+  // шаг 4: жест кончается сохранением — досчитать его запись отмены
+  if (undoOpen) undoRefreshOpen();
+  scheduleIdbSave();
 }
+/* «„скорость досок“», шаг 4: запись в IndexedDB — в паузу.
+   Тяжёлая часть записи — сериализация (structured clone) всей доски в
+   самом put(): на доске из 5000 штрихов это сотни миллисекунд на слабом
+   ноутбуке, и раньше она шла через 300 мс после каждого штриха — посреди
+   письма. Формат записи не трогаем (boarddata:<id> — вся доска одной
+   записью, и пишется только изменившаяся доска, промпт №45), а вот КОГДА
+   писать — меняем: после паузы в правках (300 мс, а если прошлая запись
+   этой доски была тяжёлой — 1,5 с), и не посреди жеста (перо, ластик,
+   перетаскивание), и в простое браузера (requestIdleCallback с таймаутом).
+   Чтобы при долгом непрерывном письме доска всё же писалась, ожидание не
+   дольше SAVE_MAX_WAIT_MS с первой несохранённой правки. При уходе со
+   вкладки (скрыли, закрыли) несохранённое пишется сразу. */
+const SAVE_PAUSE_MS = 300, SAVE_PAUSE_HEAVY_MS = 1500, SAVE_MAX_WAIT_MS = 8000, SAVE_HEAVY_PUT_MS = 40;
+let saveIdle = null, savePendingSince = 0, idbLastHeavyPutMs = 0;
+function cancelPendingSave(){
+  clearTimeout(saveTimer); saveTimer = null;
+  if (saveIdle !== null){ try { (window.cancelIdleCallback || clearTimeout)(saveIdle); } catch (e) {} saveIdle = null; }
+  savePendingSince = 0;
+}
+function scheduleIdbSave(){
+  const now = Date.now();
+  if (!savePendingSince) savePendingSince = now;
+  clearTimeout(saveTimer);
+  if (saveIdle !== null){ try { (window.cancelIdleCallback || clearTimeout)(saveIdle); } catch (e) {} saveIdle = null; }
+  const pause = idbLastHeavyPutMs > SAVE_HEAVY_PUT_MS ? SAVE_PAUSE_HEAVY_MS : SAVE_PAUSE_MS;
+  saveTimer = setTimeout(saveWhenIdle, Math.max(0, Math.min(pause, savePendingSince + SAVE_MAX_WAIT_MS - now)));
+}
+function saveWhenIdle(){
+  saveTimer = null;
+  const overdue = Date.now() - savePendingSince >= SAVE_MAX_WAIT_MS;
+  // посреди жеста не пишем — сериализация отняла бы кадры у самого жеста
+  if (!overdue && (penStroke || eraseGesture || dragMode === 'move' || dragMode === 'handle' || dragMode === 'multimove')){
+    saveTimer = setTimeout(saveWhenIdle, SAVE_PAUSE_MS);
+    return;
+  }
+  const run = () => { saveIdle = null; savePendingSince = 0; idbSaveDB(); };
+  if (window.requestIdleCallback) saveIdle = window.requestIdleCallback(run, { timeout: overdue ? 200 : 1000 });
+  else saveIdle = setTimeout(run, 0);
+}
+function flushPendingSave(){
+  if (!savePendingSince) return;
+  cancelPendingSave();
+  idbSaveDB();
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushPendingSave(); });
 loadDB();
 
 /* ───────── экспорт/импорт отдельной доски файлом ─────────
@@ -1426,8 +1476,11 @@ function themeVar(name){
   return v;
 }
 try {
-  new MutationObserver(() => themeVarCache.clear())
-    .observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  new MutationObserver(() => {
+    themeVarCache.clear();
+    // «„скорость досок“»: кеш нарисован цветами прежней темы
+    if (typeof boardCacheReset === 'function'){ boardCacheReset('тема'); if (boardActive) scheduleRedraw(); }
+  }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 } catch (e) {}
 function resolveColor(tok){
   // Промпт №87: на тёмной подложке слайда перо по умолчанию светлое
@@ -2910,9 +2963,18 @@ function mayTouch(obj){
    прислал собеседник), остаётся чужим — иначе ученик, открыв доску,
    «присвоил» бы себе все записи учителя. */
 function stampAuthors(){
-  if (!boardUserId || !B || !Array.isArray(B.objects)) return;
-  B.objects.forEach(o => { if (!o.by && !knownObjIds.has(o.id)) o.by = boardUserId; });
-  knownObjIds = new Set(B.objects.map(o => o.id));
+  /* «„скорость досок“», шаг 4: раньше каждое сохранение (на каждое движение
+     ластика, на каждый штрих) проходило ВСЕ объекты доски и собирало
+     заново множество их id. Теперь подписываются только объекты, которые
+     появились с прошлого раза: их отдаёт индекс сцены (sceneSync замечает
+     новые объекты сам, по ссылкам — siFresh). Множество «уже было на доске»
+     (knownObjIds) только пополняется: удалённый id в нём никому не мешает */
+  if (!B || !Array.isArray(B.objects)) return;
+  sceneSync();
+  const fresh = si.fresh;
+  si.fresh = [];
+  if (!boardUserId) return;
+  fresh.forEach(o => { if (!o.by && !knownObjIds.has(o.id)) o.by = boardUserId; knownObjIds.add(o.id); });
 }
 
 function clampCam(){
@@ -3081,46 +3143,149 @@ const UNDO_LIMIT = 60;
    короче 60, зато вкладка не падает. */
 const UNDO_BYTES_BUDGET = 40 * 1024 * 1024;
 let undoBytes = 0, redoBytes = 0;
+/* «„скорость досок“», шаг 4: отмена по операциям.
+   Полный снимок доски (JSON всех объектов) на большой доске стоил сотни
+   миллисекунд на каждый штрих — на слабом ноутбуке это заметный рывок в
+   начале каждого штриха, а при бюджете в 40 МБ история отмены вообще
+   сжималась до одного-двух шагов. Теперь частые жесты, про которые точно
+   известно, какие объекты они трогают, пишут в отмену ЗАПИСЬ ПО ОПЕРАЦИЯМ:
+   pushUndo({ ids }) — «жест меняет только эти объекты и, может быть,
+   добавляет новые». Так зовут перо, новая фигура, ластик, перетаскивание
+   и ручки, колесо над картинкой, удаление выделенного. В запись идут
+   копии (JSON) только задетых объектов — «было» и «стало», — и добавленных.
+   Всё остальное (вставка, цвет, правка текста, фигуры, блоки, слайды…)
+   по-прежнему зовёт pushUndo() без подсказки и кладёт полный снимок, как
+   раньше: там редкие разовые действия, и переписывать их незачем.
+   Записи обоих видов лежат в одном стеке и отменяются по порядку; запись
+   по операциям применяется по id, поэтому она верна и после того, как
+   снимок восстановил доску новыми объектами.
+   Запись создаётся сразу в pushUndo (пустая — как раньше снимок, который
+   сделали, а потом ничего не поменяли: число шагов отмены то же), а
+   содержимое досчитывается в saveDB — жест кончается сохранением — и ещё
+   раз перед отменой и следующим pushUndo. Учёт UNDO_BYTES_BUDGET и
+   UNDO_LIMIT — общий: у записи свой вес (bytes), у снимка — его длина.
+   На общей доске этим стеком не пользуются (там своя отмена разницами в
+   boards-cloud.js), и снимок для него там не снимается вовсе. */
+let undoOpen = null;      // { entry, idsBefore, touched: Map(id → { json, index }) } — запись текущего жеста
+function undoEntryBytes(e){ return typeof e === 'string' ? e.length : e.bytes; }
 function trimStackToBudget(stack, bytesRef){
   // bytesRef — объект-обёртка {v: число}, чтобы менять счётчик байт по ссылке
   while (stack.length > 1 && (stack.length > UNDO_LIMIT || bytesRef.v > UNDO_BYTES_BUDGET)) {
-    bytesRef.v -= stack.shift().length;
+    bytesRef.v -= undoEntryBytes(stack.shift());
   }
 }
-function pushUndo(){
+// досчитать открытую запись: что из задетого поменялось или пропало, что добавилось
+function undoRefreshOpen(){
+  const u = undoOpen;
+  if (!u) return;
+  // доску уже покинули и выгрузили (objects нет) — saveDB на списке зовут
+  // переименование, перенос и создание досок; запись остаётся какой была
+  if (!boardActive || !B || !Array.isArray(B.objects)){ undoOpen = null; return; }
+  const ops = [];
+  let bytes = 16;
+  const now = new Map();
+  B.objects.forEach((o, i) => now.set(o.id, i));
+  u.touched.forEach((t, id) => {
+    if (!now.has(id)){ ops.push({ t: 'del', id, json: t.json, index: t.index }); bytes += t.json.length; return; }
+    const after = JSON.stringify(B.objects[now.get(id)]);
+    if (after !== t.json){ ops.push({ t: 'upd', id, before: t.json, after }); bytes += t.json.length + after.length; }
+  });
+  B.objects.forEach((o, i) => {
+    if (u.idsBefore.has(o.id)) return;
+    const json = JSON.stringify(o);
+    ops.push({ t: 'add', id: o.id, json, index: i }); bytes += json.length;
+  });
+  if (undoStack.includes(u.entry)) undoBytes += bytes - u.entry.bytes;
+  u.entry.ops = ops; u.entry.bytes = bytes;
+}
+function undoCloseOpen(){
+  undoRefreshOpen();
+  undoOpen = null;
+}
+function pushUndo(touch){
+  undoCloseOpen();
+  redoStack.length = 0; redoBytes = 0;
+  if (touch && Array.isArray(touch.ids)){
+    const want = new Set(touch.ids);
+    const touched = new Map(), idsBefore = new Set();
+    B.objects.forEach((o, i) => { idsBefore.add(o.id); if (want.has(o.id)) touched.set(o.id, { json: JSON.stringify(o), index: i }); });
+    const entry = { ops: [], bytes: 16 };
+    undoOpen = { entry, touched, idsBefore };
+    undoStack.push(entry);
+    const ref = { v: undoBytes + entry.bytes };
+    trimStackToBudget(undoStack, ref);
+    undoBytes = ref.v;
+    return;
+  }
   const snap = JSON.stringify(B.objects);
   undoStack.push(snap);
   const ref = { v: undoBytes + snap.length };
   trimStackToBudget(undoStack, ref);
   undoBytes = ref.v;
-  redoStack.length = 0; redoBytes = 0;
+}
+// применить запись по операциям вперёд (повтор) или назад (отмена). Сначала
+// убираем, потом правим, потом вставляем по возрастанию места — тогда
+// каждый вставленный объект встаёт ровно туда, где был
+function undoApplyOps(ops, forward){
+  const arr = B.objects.slice();
+  const removeIds = new Set(), upd = new Map(), ins = [];
+  ops.forEach(op => {
+    if (op.t === 'upd') upd.set(op.id, forward ? op.after : op.before);
+    else if ((op.t === 'add') === forward) ins.push(op);   // повтор добавления / отмена удаления
+    else removeIds.add(op.id);                             // отмена добавления / повтор удаления
+  });
+  let out = removeIds.size ? arr.filter(o => !removeIds.has(o.id)) : arr;
+  if (upd.size) out = out.map(o => upd.has(o.id) ? JSON.parse(upd.get(o.id)) : o);
+  ins.sort((a, b) => a.index - b.index).forEach(op => {
+    if (out.some(o => o.id === op.id)) return;
+    out.splice(Math.min(op.index, out.length), 0, JSON.parse(op.json));
+  });
+  B.objects = out;
 }
 function doUndo(){
   if (!mayDraw()) return;                             // Промпт №41
+  undoCloseOpen();
   if (!undoStack.length) return;
-  const redoSnap = JSON.stringify(B.objects);
-  redoStack.push(redoSnap);
-  const rRef = { v: redoBytes + redoSnap.length };
-  trimStackToBudget(redoStack, rRef);
-  redoBytes = rRef.v;
   const popped = undoStack.pop();
-  undoBytes -= popped.length;
-  B.objects = JSON.parse(popped);
+  undoBytes -= undoEntryBytes(popped);
+  if (typeof popped === 'string'){
+    const redoSnap = JSON.stringify(B.objects);
+    redoStack.push(redoSnap);
+    const rRef = { v: redoBytes + redoSnap.length };
+    trimStackToBudget(redoStack, rRef);
+    redoBytes = rRef.v;
+    B.objects = JSON.parse(popped);
+  } else {
+    undoApplyOps(popped.ops, false);
+    redoStack.push(popped);
+    const rRef = { v: redoBytes + popped.bytes };
+    trimStackToBudget(redoStack, rRef);
+    redoBytes = rRef.v;
+  }
   selectedId = null; multiSelectIds = []; clearEditLock();
   updateContextMenu();
   scheduleRedraw(); saveDB();
 }
 function doRedo(){
   if (!mayDraw()) return;                             // Промпт №41
+  undoCloseOpen();
   if (!redoStack.length) return;
-  const undoSnap = JSON.stringify(B.objects);
-  undoStack.push(undoSnap);
-  const uRef = { v: undoBytes + undoSnap.length };
-  trimStackToBudget(undoStack, uRef);
-  undoBytes = uRef.v;
   const popped = redoStack.pop();
-  redoBytes -= popped.length;
-  B.objects = JSON.parse(popped);
+  redoBytes -= undoEntryBytes(popped);
+  if (typeof popped === 'string'){
+    const undoSnap = JSON.stringify(B.objects);
+    undoStack.push(undoSnap);
+    const uRef = { v: undoBytes + undoSnap.length };
+    trimStackToBudget(undoStack, uRef);
+    undoBytes = uRef.v;
+    B.objects = JSON.parse(popped);
+  } else {
+    undoApplyOps(popped.ops, true);
+    undoStack.push(popped);
+    const uRef = { v: undoBytes + popped.bytes };
+    trimStackToBudget(undoStack, uRef);
+    undoBytes = uRef.v;
+  }
   selectedId = null; multiSelectIds = []; clearEditLock();
   updateContextMenu();
   scheduleRedraw(); saveDB();
@@ -3187,7 +3352,7 @@ function openBoardReady(b, id){
   }
   // Промпт №39: открытие доски запоминает время последнего захода, но правкой
   // не является — пишем напрямую, минуя saveDB() с его отметкой «изменено»
-  clearTimeout(saveTimer); saveTimer = null;
+  cancelPendingSave();
   idbSaveDB().catch(() => {});
   // необязательный хук для boards-cloud.js (общая доска с учеником) — сам
   // движок доски ничего не знает про облако, просто сообщает, какая доска
@@ -3206,8 +3371,10 @@ function openBoardReady(b, id){
   location.hash = 'board=' + id;
 
   knownObjIds = new Set((B.objects || []).map(o => o.id));   // Промпт №41
-  undoStack.length = 0; redoStack.length = 0; undoBytes = 0; redoBytes = 0; selectedId = null; multiSelectIds = [];
+  undoStack.length = 0; redoStack.length = 0; undoBytes = 0; redoBytes = 0; undoOpen = null; selectedId = null; multiSelectIds = [];
   draft = null; curvePts = null; circleState = null; polyState = null; penStroke = null;
+  eraseGesture = null;
+  bc.hidden.clear(); boardCacheReset('другая доска');
   armedHandId = null; clearEditLock();
   document.getElementById('bdCtxMenu')?.classList.remove('open');
   document.getElementById('bdImgSrcPop')?.classList.remove('open');
@@ -3284,7 +3451,7 @@ function backToList(){
   // изменённую, а просто «зашёл и вышел» правкой не является: иначе при
   // переносе досок между компьютерами каждая открытая доска выглядела бы
   // спорной. Настоящие правки свою отметку уже поставили в момент правки.
-  clearTimeout(saveTimer); saveTimer = null;
+  cancelPendingSave();
   // Промпт №48: доску, которую покидаем, выгружаем из памяти — но только
   // ПОСЛЕ того, как её собственная запись точно дописана на диск (ждём
   // idbSaveDB здесь, а не идём дальше сразу же), иначе при сбое записи
@@ -3325,6 +3492,7 @@ function resizeCanvas(){
   canvas.style.width = cssW + 'px';
   canvas.style.height = cssH + 'px';
   clampCam();
+  boardCacheReset('размер окна');
   scheduleRedraw();
 }
 window.addEventListener('resize', () => {
@@ -3354,7 +3522,7 @@ function setZoom(z, wx, wy, sx, sy){
   cam.y = wy - sy / z;
   clampCam();
   updateZoomLabel();
-  scheduleRedraw();
+  requestFrame();   // только камера: во время зума кеш растягивается, чётко — после паузы
   rememberView();
 }
 function updateZoomLabel(){
@@ -3374,19 +3542,499 @@ function maybeSnap(p){
    РИСОВАНИЕ
    ═══════════════════════════════════════════════════════════════════════ */
 let redrawScheduled = false;
+// «„скорость досок“», шаг 3: scheduleRedraw по-прежнему значит «доска могла
+// поменяться» — его зовут полсотни мест после любой правки, и каждое из них
+// сбрасывает кеш готовых объектов (ничего не нужно помнить в новых местах:
+// забытый сброс невозможен, в худшем случае кадр рисуется полностью, как
+// раньше). Кадр, в котором объекты точно не менялись — сдвиг камеры, живой
+// штрих пера, ластик до отпускания, рамка и лассо, черновик фигуры, — зовёт
+// requestFrame. Он идёт через тот же window.scheduleRedraw (с флагом), а не
+// мимо: board-stage.js у учителя подслушивает именно его и шлёт ученикам
+// живой штрих и сдвиги
+let redrawFrameOnly = false;
+function requestFrame(){
+  redrawFrameOnly = true;
+  try { scheduleRedraw(); } finally { redrawFrameOnly = false; }
+}
 function scheduleRedraw(){
+  if (!redrawFrameOnly){
+    // кто зовёт перерисовку, мог поменять объекты на месте: индекс сверит
+    // рамки, кеш нарисуется заново
+    sceneMarkDirty();
+    boardCacheReset('scheduleRedraw');
+  }
   if (redrawScheduled) return;
   redrawScheduled = true;
   requestAnimationFrame(() => {
     redrawScheduled = false;
     if (!boardActive) return;
-    render(ctx, cssW, cssH, cam, true);
+    renderScreen();
     rememberViewIfMoved();   // «Вставка и вид доски»: любой сдвиг камеры, чем бы он ни был
     syncTextEditorToCam();
     syncTaskOverlays();   // Промпт №66
     syncPlaceGhost();     // призрак ручного размещения едет вместе с камерой
   });
 }
+
+/* ═══ «„скорость досок“», шаг 2: кеш рамок и пространственный индекс ═══
+   Раньше рамка каждого штриха считалась заново по ВСЕМ его точкам на каждом
+   кадре (отсев по видимой области, промпт №46) и в каждой проверке
+   попадания, а ластик и щелчок перебирали все объекты доски и для каждого —
+   все отрезки. На доске из 5000 штрихов по 50–300 точек это миллион точек
+   на каждое движение.
+
+   Кеш рамок. Рамка хранится в WeakMap по самому объекту — вне данных
+   доски: ни в JSON, ни в базу, ни в облако она не попадает, а объект,
+   который выбросили (стёрли, заменили копией из облака, вернули отменой —
+   doUndo собирает новые объекты из снимка), уносит свою рамку с собой.
+   Пересчёт — только если объект изменился. Признак изменения дешёвый:
+   массив точек тот же, их столько же, первая, средняя и последняя точки те
+   же и стоят там же (плюс опорная точка кривой). Так ловится всё, чем
+   правят штрих: перенос и масштаб меняют все точки, ручки заменяют точку
+   новой (applyHandle: points[i] = pt), дописывание меняет длину, правка из
+   облака и отмена дают новый объект. Объекты из нескольких точек (фигуры,
+   прямые, текст, картинки, круги) кешировать незачем — их рамка и так
+   считается мгновенно, и для них признак не нужен вовсе. Блоки и таблицы
+   (bxBBox, учитывает поворот) — тоже без кеша.
+
+   Индекс — сетка по ячейкам мира (SI_CELL): ячейка → объекты, чья рамка
+   её задевает. По нему работают ластик (оба режима), выделение рамкой,
+   лассо, щелчок по объекту и частичная перерисовка кеша (шаг 3); точная
+   проверка по точкам — только у кандидатов. Индекс сверяется с доской
+   перед каждым запросом (sceneSync): если B.objects — тот же массив с теми
+   же объектами по местам и никто не звал scheduleRedraw (значит, объекты
+   не трогали), сверка — один проход сравнения ссылок. Иначе — точечно:
+   новые объекты добавляются, пропавшие убираются, у остальных по кешу
+   рамок проверяется, не уехали ли они в другие ячейки. Полностью индекс
+   строится заново при открытии другой доски и когда поменялось больше
+   половины объектов (загрузка из облака целиком, отмена большой правки). */
+const BBOX_CACHE_MIN_PTS = 12;
+const bboxCache = new WeakMap();
+function objectBBoxRef(obj){
+  const pts = obj.points;
+  if (!pts || pts.length <= BBOX_CACHE_MIN_PTS || obj.type === 'box' || obj.type === 'table' || obj.type === 'image' || obj.type === 'text') return computeObjectBBox(obj);
+  const n = pts.length, a = pts[0], m = pts[n >> 1], z = pts[n - 1], k = obj.ctrl;
+  const e = bboxCache.get(obj);
+  if (e && e.pts === pts && e.n === n && e.a === a && e.m === m && e.z === z
+      && e.ax === a.x && e.ay === a.y && e.mx === m.x && e.my === m.y && e.zx === z.x && e.zy === z.y
+      && e.k === k && (!k || (e.kx === k.x && e.ky === k.y))) return e.bb;
+  const bb = computeObjectBBox(obj);
+  bboxCache.set(obj, { pts, n, a, m, z, ax: a.x, ay: a.y, mx: m.x, my: m.y, zx: z.x, zy: z.y, k, kx: k && k.x, ky: k && k.y, bb });
+  return bb;
+}
+// копия — снаружи рамку иногда правят (расширяют на отступ и т. п.), а
+// кешированную трогать нельзя
+function objectBBox(obj){
+  const b = objectBBoxRef(obj);
+  return { minX: b.minX, minY: b.minY, maxX: b.maxX, maxY: b.maxY };
+}
+
+const SI_CELL = 1024;            // мировых единиц ≈ пол-листа А4: штрих обычно в одной-двух ячейках
+const si = { board: null, arr: null, list: [], cells: new Map(), ent: new Map(), big: new Set(), order: null, dirty: true, fresh: [] };
+function siRange(bb){
+  // рамка без размера или с NaN (битые данные) — в ячейку 0,0: объект не
+  // должен пропасть из индекса, точная проверка его всё равно отсеет
+  if (!(bb && isFinite(bb.minX) && isFinite(bb.minY) && isFinite(bb.maxX) && isFinite(bb.maxY))) return [0, 0, 0, 0];
+  return [Math.floor(bb.minX / SI_CELL), Math.floor(bb.minY / SI_CELL), Math.floor(bb.maxX / SI_CELL), Math.floor(bb.maxY / SI_CELL)];
+}
+// очень большой объект (служебный список слайдов на -1e7, гигантская
+// картинка) не раскладываем по тысячам ячеек — он лежит в общем списке
+// «больших» и попадает в любой запрос
+const SI_MAX_CELLS = 256;
+function siPut(o, e){
+  const [x0, y0, x1, y1] = e.r;
+  if ((x1 - x0 + 1) * (y1 - y0 + 1) > SI_MAX_CELLS){ e.big = true; si.big.add(o); return; }
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++){
+    const key = x + ',' + y;
+    let cell = si.cells.get(key);
+    if (!cell){ cell = new Set(); si.cells.set(key, cell); }
+    cell.add(o);
+  }
+}
+function siTake(o, e){
+  if (e.big){ si.big.delete(o); return; }
+  const [x0, y0, x1, y1] = e.r;
+  for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++){
+    const key = x + ',' + y, cell = si.cells.get(key);
+    if (cell){ cell.delete(o); if (!cell.size) si.cells.delete(key); }
+  }
+}
+// битый объект (без точек — бывает в старых и обрезанных данных) не должен
+// ронять индекс, а вместе с ним сохранение: у него рамка «нигде» (ячейка 0,0)
+const SI_NOWHERE = { minX: NaN, minY: NaN, maxX: NaN, maxY: NaN };
+function siBBox(o){ try { return objectBBoxRef(o); } catch (e) { return SI_NOWHERE; } }
+function siAdd(o){
+  const bb = siBBox(o);
+  const e = { bb, r: siRange(bb), big: false };
+  si.ent.set(o, e); siPut(o, e);
+  si.fresh.push(o);   // новые объекты — для подписи авторства (stampAuthors)
+}
+function siRefresh(o, e){
+  const bb = siBBox(o);
+  if (bb === e.bb) return;
+  e.bb = bb;
+  const r = siRange(bb);
+  if (r[0] === e.r[0] && r[1] === e.r[1] && r[2] === e.r[2] && r[3] === e.r[3]) return;
+  siTake(o, e); e.r = r; e.big = false; siPut(o, e);
+}
+function siRebuild(arr){
+  si.cells = new Map(); si.ent = new Map(); si.big = new Set();
+  arr.forEach(siAdd);
+}
+// объекты могли поменяться на месте — индекс сверит их рамки при следующем запросе
+function sceneMarkDirty(){ si.dirty = true; }
+function sceneSync(){
+  const arr = (B && Array.isArray(B.objects)) ? B.objects : [];
+  if (si.board !== B){ si.board = B; siRebuild(arr); si.list = arr.slice(); si.arr = arr; si.order = null; si.dirty = false; return; }
+  if (!si.dirty && si.arr === arr && arr.length === si.list.length){
+    let same = true;
+    for (let i = 0; i < arr.length; i++) if (arr[i] !== si.list[i]){ same = false; break; }
+    if (same) return;
+  }
+  const now = new Set(arr);
+  let gone = 0;
+  for (const o of si.list) if (!now.has(o)) gone++;
+  if (gone * 2 > Math.max(8, si.list.length)) siRebuild(arr);
+  else {
+    for (const o of si.list) if (!now.has(o)){ const e = si.ent.get(o); if (e){ siTake(o, e); si.ent.delete(o); } }
+    for (const o of arr){ const e = si.ent.get(o); if (e) siRefresh(o, e); else siAdd(o); }
+  }
+  si.list = arr.slice(); si.arr = arr; si.order = null; si.dirty = false;
+}
+function siOrderOf(){
+  if (!si.order){ si.order = new Map(); si.list.forEach((o, i) => si.order.set(o, i)); }
+  return si.order;
+}
+// объекты, чья рамка пересекает прямоугольник мира, — в порядке слоёв
+function sceneQueryRect(x0, y0, x1, y1){
+  sceneSync();
+  const cx0 = Math.floor(x0 / SI_CELL), cy0 = Math.floor(y0 / SI_CELL), cx1 = Math.floor(x1 / SI_CELL), cy1 = Math.floor(y1 / SI_CELL);
+  const hit = (o) => { const b = si.ent.get(o).bb; return b.maxX >= x0 && b.minX <= x1 && b.maxY >= y0 && b.minY <= y1; };
+  // прямоугольник на всю доску (сильно отдалили) — проще пройти список
+  if (!(isFinite(cx0) && isFinite(cx1) && isFinite(cy0) && isFinite(cy1)) || (cx1 - cx0 + 1) * (cy1 - cy0 + 1) > Math.max(64, si.list.length / 4)){
+    return si.list.filter(o => hit(o) || si.ent.get(o).big);
+  }
+  const found = new Set();
+  for (let y = cy0; y <= cy1; y++) for (let x = cx0; x <= cx1; x++){
+    const cell = si.cells.get(x + ',' + y);
+    if (cell) cell.forEach(o => { if (!found.has(o) && hit(o)) found.add(o); });
+  }
+  si.big.forEach(o => found.add(o));
+  if (!found.size) return [];
+  const ord = siOrderOf();
+  return Array.from(found).sort((a, b) => ord.get(a) - ord.get(b));
+}
+// кандидаты для щелчка в точке с допуском tol (в порядке слоёв: верхний — последний)
+function sceneHitCandidates(pt, tol){
+  const pad = tol + 2 / cam.zoom;
+  return sceneQueryRect(pt.x - pad, pt.y - pad, pt.x + pad, pt.y + pad);
+}
+
+/* ═══ «„скорость досок“», шаг 3: статичный слой (как в Excalidraw) ═══
+   Раньше КАЖДЫЙ кадр — каждое движение пера, ластика, прокрутка, зум —
+   рисовал всю доску заново: фон, сетку и все объекты в кадре. Теперь готовые
+   объекты нарисованы один раз во внеэкранный холст bc.cv (кеш), а кадр —
+   это копия кеша на boardCv плюс живой слой поверх: текущий штрих пера,
+   бледное и куски ластика, перетаскиваемое, выделение и его рамки, рамка
+   и лассо выбора, черновик фигуры (renderOverlay). Курсоры собеседников и
+   живые задания — свои HTML-элементы, как и были. Новых слоёв в странице нет.
+
+   Кеш шире экрана: запас bc.mx/bc.my CSS-пикселей с каждой стороны
+   (около полэкрана). При прокрутке кеш просто сдвигается; заново он
+   рисуется, когда выехали за запас. Сдвиг на нецелое число пикселей
+   копируется со сдвигом до ближайшего пикселя устройства (на глаз не
+   отличить), а через 130 мс тишины кеш рисуется точно (bc.stale).
+   При зуме кеш растягивается как картинка, чётко — через 130 мс без
+   изменений масштаба, а не на каждом событии колеса. Если отдалили так,
+   что кеш уже не закрывает экран, — рисуется сразу.
+
+   Точность. Кеш рисуется той же renderBase, что и полная отрисовка, той же
+   камерой `cam` (на время рисования её x, y сдвинуты на запас), поэтому все
+   «экранные» признаки (activeCam === cam: правка текста, ширина задания)
+   работают как на экране. Запас — целое число CSS-пикселей и пикселей
+   устройства, поэтому сетка (Math.round в CSS-пикселях) ложится туда же.
+   В проверках кадр сверяется с эталонной полной отрисовкой попиксельно
+   (test_prompt_boards_perf3_cache.py).
+
+   Перетаскивание. Пока объект тащат, в кеше лежит всё, что НИЖЕ самого
+   нижнего из перетаскиваемых (bc.liveFrom), а он и всё, что выше, рисуется
+   живым слоем по порядку слоёв — порядок наложения точный. Тащат обычно
+   свежее, над ним мало объектов.
+
+   Новое без полной перерисовки. Готовый штрих пера и новая фигура
+   дорисовываются в кеш поверх (boardCacheCommitted): они верхние, и
+   полная отрисовка нарисовала бы их там же последними. Ластик до
+   отпускания вырезает задетое из кеша частичной перерисовкой его области
+   (bcRepaintWorld: клип по целым пикселям устройства, фон, сетка и объекты
+   из индекса, задевающие эту область), а после отпускания кеш уже
+   совпадает с доской — перерисовывать нечего («Область» дорисовывает
+   только места кусков).
+
+   Сброс — одна функция boardCacheReset(why). Её зовут: scheduleRedraw
+   (любая правка объектов, своя и пришедшая из облака через boardsRedraw),
+   смена доски, смена темы, догрузка картинки, догрузка шрифта, правка
+   текста, изменение размера окна и devicePixelRatio, отмена жеста ластика.
+   Порядок объектов (в том числе lay: 'base' в презентациях — презентации
+   кешем не пользуются вовсе, см. bcUsable) и вообще любая подмена объектов
+   в B.objects ловится ещё и сверкой ссылок на каждом кадре (bcListMatches),
+   а настройки, от которых зависит картинка (тема, размер, редактируемый
+   текст или блок, сетка листа…), — ключом bc.key.
+
+   Память. Кеш — (экран + 2 запаса) × devicePixelRatio², не больше
+   BC_MAX_PIXELS и не больше трёх экранов: на iPad и слабых машинах при
+   большом экране запас просто уменьшается (до нуля — тогда кеш ровно с
+   экран и пользу даёт только письмо и ластик).
+
+   Выгрузка в PDF и картинку, миниатюры, презентации, доска ученика
+   (board-stage.js подменяет render) рисуются как раньше — полной render(). */
+const BC_MAX_PIXELS = 16e6;
+const BC_SETTLE_MS = 130;
+// до какого времени идёт жест зума колесом/щипком (ставит обработчик wheel).
+// Разовая смена масштаба — кнопки, бегунок, ввод процентов, восстановление
+// вида — рисуется сразу чётко: растягивать там нечего, следующего события нет
+let bcZoomGestureUntil = 0;
+const renderOrig = render;
+const bc = { cv: null, ctx: null, Wd: 0, Hd: 0, W: 0, H: 0, mx: 0, my: 0, dpr: 0, cam: null,
+             key: '', list: null, liveFrom: 0, hidden: new Set(), dirty: true, stale: false,
+             settleTimer: null, resets: 0, why: '', full: 0, partial: 0, appended: 0 };
+// единственная точка сброса кеша — см. список мест в комментарии выше
+function boardCacheReset(why){
+  bc.dirty = true; bc.why = why || ''; bc.resets++;
+}
+function bcUsable(){
+  return !window.__noBoardCache && window.render === renderOrig && !window.__boardViewer
+    && !!B && B.kind !== 'deck' && Array.isArray(B.objects) && cssW > 0 && cssH > 0;
+}
+function bcDrop(){
+  bc.cv = null; bc.ctx = null; bc.cam = null; bc.list = null; bc.key = ''; bc.hidden.clear(); bc.dirty = true;
+}
+function bcIntegral(v){ return Math.abs(v - Math.round(v)) < 1e-6; }
+// размер и запас: запас — целое число CSS-пикселей, у которого и пикселей
+// устройства целое число (иначе сетка в кеше легла бы на полпикселя иначе)
+function bcEnsureCanvas(){
+  if (bc.cv && bc.W && bc.dpr === dpr && bc.cssW === cssW && bc.cssH === cssH) return;
+  const screenPx = cssW * cssH * dpr * dpr;
+  const cap = Math.min(BC_MAX_PIXELS, 3 * screenPx);
+  let k = 1;
+  while (k > 0 && (cssW + cssW * k) * (cssH + cssH * k) * dpr * dpr > cap) k -= 0.05;
+  k = Math.max(0, k);
+  const fit = (m) => { m = Math.floor(m); while (m > 0 && !bcIntegral(m * dpr)) m--; return Math.max(0, m); };
+  bc.mx = fit(cssW * k / 2); bc.my = fit(cssH * k / 2);
+  bc.W = cssW + 2 * bc.mx; bc.H = cssH + 2 * bc.my;
+  bc.Wd = Math.ceil(bc.W * dpr); bc.Hd = Math.ceil(bc.H * dpr);
+  if (!bc.cv) bc.cv = document.createElement('canvas');
+  bc.cv.width = bc.Wd; bc.cv.height = bc.Hd;
+  bc.ctx = bc.cv.getContext('2d');
+  bc.dpr = dpr; bc.cssW = cssW; bc.cssH = cssH;
+  bc.dirty = true;
+}
+// снизу вверх: с какого места в B.objects объекты рисует живой слой —
+// пока тащат, это самый нижний из перетаскиваемых
+function bcLiveFrom(){
+  const n = B.objects.length;
+  if (dragMode !== 'move' && dragMode !== 'handle' && dragMode !== 'multimove') return n;
+  const ids = dragMode === 'multimove' ? (dragGroupIds || []) : [dragObjId];
+  let k = n;
+  ids.forEach(id => { const i = B.objects.findIndex(o => o.id === id); if (i >= 0 && i < k) k = i; });
+  return k;
+}
+function bcKey(liveFrom){
+  const editing = (textEditSession && textEditSession.objId) || '';
+  const bx = (typeof bxEditing !== 'undefined' && bxEditing) ? bxEditing.id + ':' + (bxEditing.cell || '') : '';
+  let twp = '';
+  if (taskWidthPreview.size) taskWidthPreview.forEach((v, id) => { twp += id + JSON.stringify(v); });
+  return [B.id, document.documentElement.getAttribute('data-theme') || '', dpr, cssW, cssH, editing, bx, twp,
+    B.gridColor || '', B.cellSize, B.sheetCols, B.sheetRows, B.showPageNumbers ? 1 : 0,
+    liveFrom < B.objects.length ? 'L' + liveFrom : ''].join('|');
+}
+// в кеше ровно те объекты, что сейчас в B.objects (до liveFrom), — по ссылкам
+function bcListMatches(liveFrom){
+  const L = bc.list, A = B.objects;
+  if (!L || L.length !== Math.min(liveFrom, A.length)) return false;
+  for (let i = 0; i < L.length; i++) if (L[i] !== A[i]) return false;
+  return true;
+}
+// нарисовать кеш заново целиком при текущей камере
+function bcRenderFull(liveFrom){
+  bcEnsureCanvas();
+  const z = cam.zoom;
+  const keepX = cam.x, keepY = cam.y;
+  bc.cam = { x: keepX - bc.mx / z, y: keepY - bc.my / z, zoom: z };
+  const list = liveFrom < B.objects.length ? B.objects.slice(0, liveFrom) : B.objects;
+  cam.x = bc.cam.x; cam.y = bc.cam.y;
+  try { renderBase(bc.ctx, bc.W, bc.H, cam, true, dpr, { list, skip: bc.hidden }); }
+  finally { cam.x = keepX; cam.y = keepY; activeCam = cam; }
+  bc.list = B.objects.slice(0, Math.min(liveFrom, B.objects.length));
+  bc.liveFrom = liveFrom;
+  bc.dirty = false; bc.stale = false;
+  bc.full++;
+}
+// как далеко объект может рисовать за своей рамкой: половина толщины и
+// скругление концов, наконечник стрелки и отметка центра (несколько толщин,
+// но не меньше 9 экранных пикселей), подписи координатной прямой (до ~60
+// единиц мира), подложка текста. Запас с избытком: недорисовка — дыра в
+// кеше, а лишняя ширина — лишняя работа ластика на каждом шаге
+function bcObjPad(o){
+  const w = Math.max(1, o.width || 2);
+  return w * 4 + (o.axis ? 70 : 0) + (o.type === 'text' || o.type === 'box' || o.type === 'table' ? 12 : 0) + 12 / bc.cam.zoom;
+}
+// самый большой такой запас среди объектов, которые могут дотянуться до
+// перерисовываемого места: по нему выбираются кандидаты из индекса
+function bcPadWorld(){ return 100 + 12 / bc.cam.zoom; }
+// частичная перерисовка кеша в прямоугольнике мира: клип по целым пикселям
+// устройства — внутри клипа каждый пиксель нарисован заново фоном, сеткой и
+// всеми объектами, которые до него дотягиваются, в порядке слоёв, поэтому
+// он такой же, как при полной отрисовке
+function bcRepaintWorld(x0, y0, x1, y1){
+  if (!bc.cam || bc.dirty) return false;
+  const z = bc.cam.zoom, d = bc.dpr;
+  const px0 = Math.max(0, Math.floor((x0 - bc.cam.x) * z * d) - 1), py0 = Math.max(0, Math.floor((y0 - bc.cam.y) * z * d) - 1);
+  const px1 = Math.min(bc.Wd, Math.ceil((x1 - bc.cam.x) * z * d) + 1), py1 = Math.min(bc.Hd, Math.ceil((y1 - bc.cam.y) * z * d) + 1);
+  if (px1 <= px0 || py1 <= py0) return true;   // вне кеша — нечего перерисовывать
+  const pad = bcPadWorld();
+  const cand = sceneQueryRect(x0 - pad, y0 - pad, x1 + pad, y1 + pad);
+  const list = bc.liveFrom < B.objects.length ? cand.filter(o => B.objects.indexOf(o) < bc.liveFrom) : cand;
+  const c = bc.ctx;
+  c.save();
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.beginPath(); c.rect(px0, py0, px1 - px0, py1 - py0); c.clip();
+  const keepX = cam.x, keepY = cam.y, keepZ = cam.zoom;
+  cam.x = bc.cam.x; cam.y = bc.cam.y; cam.zoom = bc.cam.zoom;
+  // сетка — только по клипу (в мировых единицах, с пикселем запаса)
+  const region = { x0: bc.cam.x + (px0 - 1) / (z * d), y0: bc.cam.y + (py0 - 1) / (z * d), x1: bc.cam.x + (px1 + 1) / (z * d), y1: bc.cam.y + (py1 + 1) / (z * d) };
+  try { renderBase(c, bc.W, bc.H, cam, true, d, { list, skip: bc.hidden, region }); }
+  finally { cam.x = keepX; cam.y = keepY; cam.zoom = keepZ; activeCam = cam; c.restore(); }
+  bc.partial++;
+  return true;
+}
+function bcRepaintAround(objs){
+  if (!objs.length) return true;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  objs.forEach(o => { const b = objectBBoxRef(o), pad = bcObjPad(o); x0 = Math.min(x0, b.minX - pad); y0 = Math.min(y0, b.minY - pad); x1 = Math.max(x1, b.maxX + pad); y1 = Math.max(y1, b.maxY + pad); });
+  if (!(isFinite(x0) && isFinite(y0) && isFinite(x1) && isFinite(y1))) return false;
+  return bcRepaintWorld(x0, y0, x1, y1);
+}
+// ластик задел объекты: вырезать их из кеша (до отпускания доска не меняется)
+function boardCacheHide(objs){
+  objs.forEach(o => bc.hidden.add(o));
+  if (!bc.dirty && !bcRepaintAround(objs)) boardCacheReset('ластик: область вне мира');
+}
+// правка уже применена к доске (готовый штрих, новая фигура, отпущенный
+// ластик) — привести кеш в соответствие без полной перерисовки, если можно.
+// added — объекты, появившиеся в доске этой правкой. Можно, если доска без
+// добавленного — это ровно кеш без вырезанного ластиком
+function boardCacheCommitted(added){
+  if (bc.dirty || !bc.list || !bc.cam || bc.liveFrom < bc.list.length) { boardCacheReset('правка: кеш не готов'); return; }
+  const addSet = new Set(added);
+  const A = B.objects;
+  let i = 0, j = 0;
+  const L = bc.list;
+  while (true){
+    while (i < L.length && bc.hidden.has(L[i])) i++;
+    while (j < A.length && addSet.has(A[j])) j++;
+    if (i >= L.length || j >= A.length) break;
+    if (L[i] !== A[j]){ boardCacheReset('правка: доска разошлась с кешем'); return; }
+    i++; j++;
+  }
+  if (i < L.length || j < A.length){ boardCacheReset('правка: доска разошлась с кешем'); return; }
+  bc.hidden.clear();
+  bc.list = A.slice(); bc.liveFrom = A.length;
+  if (!added.length) return;
+  // добавленное — верхнее: просто дорисовать поверх. Иначе — перерисовать его места
+  const top = added.every(o => A.indexOf(o) >= A.length - added.length);
+  if (!top){ if (!bcRepaintAround(added)) boardCacheReset('правка: вне мира'); return; }
+  const keepX = cam.x, keepY = cam.y, keepZ = cam.zoom;
+  cam.x = bc.cam.x; cam.y = bc.cam.y; cam.zoom = bc.cam.zoom;
+  const c = bc.ctx;
+  try { renderBase(c, bc.W, bc.H, cam, true, bc.dpr, { list: added, skip: null, noBg: true }); }
+  finally { cam.x = keepX; cam.y = keepY; cam.zoom = keepZ; activeCam = cam; }
+  bc.appended++;
+}
+function bcCovers(){
+  const z = cam.zoom, b = bc.cam;
+  return cam.x >= b.x - 1e-9 && cam.y >= b.y - 1e-9
+    && cam.x + cssW / z <= b.x + bc.W / b.zoom + 1e-9 && cam.y + cssH / z <= b.y + bc.H / b.zoom + 1e-9;
+}
+function bcScheduleSettle(){
+  clearTimeout(bc.settleTimer);
+  bc.settleTimer = setTimeout(() => { bc.settleTimer = null; bc.stale = true; requestFrame(); }, BC_SETTLE_MS);
+}
+function renderScreen(){
+  if (!bcUsable()){
+    if (bc.cv) bcDrop();
+    render(ctx, cssW, cssH, cam, true);
+    return;
+  }
+  const n = B.objects.length;
+  const liveFrom = bcLiveFrom();
+  const key = bcKey(liveFrom);
+  bcEnsureCanvas();
+  if (key !== bc.key){ bc.dirty = true; bc.key = key; }
+  if (!bc.dirty && !bcListMatches(liveFrom)) bc.dirty = true;
+  // пока кеш строится заново, вырезанное ластиком в нём тоже не рисуется
+  if (bc.dirty && !eraseGesture) bc.hidden.clear();
+  const z = cam.zoom;
+  let exact = true;
+  if (bc.dirty || bc.stale || !bc.cam) bcRenderFull(liveFrom);
+  else if (z !== bc.cam.zoom){
+    if (performance.now() < bcZoomGestureUntil && bcCovers()) exact = false; else bcRenderFull(liveFrom);
+  } else {
+    const ox = (cam.x - bc.cam.x) * z, oy = (cam.y - bc.cam.y) * z;
+    if (ox < -1e-6 || oy < -1e-6 || ox > 2 * bc.mx + 1e-6 || oy > 2 * bc.my + 1e-6) bcRenderFull(liveFrom);
+    else if (!bcIntegral(ox) || !bcIntegral(oy) || !bcIntegral(ox * dpr) || !bcIntegral(oy * dpr)) exact = false;
+  }
+  // копируем только ту часть кеша, что видна на экране: кеш в несколько раз
+  // больше экрана, и растягивать при зуме его целиком — лишняя работа
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  const cw = canvas.width, ch = canvas.height;
+  if (bc.cam.zoom === z){
+    const sx = Math.round((cam.x - bc.cam.x) * z * dpr), sy = Math.round((cam.y - bc.cam.y) * z * dpr);
+    const w = Math.min(cw, bc.Wd - sx), h = Math.min(ch, bc.Hd - sy);
+    if (w > 0 && h > 0) ctx.drawImage(bc.cv, sx, sy, w, h, 0, 0, w, h);
+  } else {
+    const k = bc.cam.zoom / z;   // пикселей кеша на пиксель экрана
+    const sx = (cam.x - bc.cam.x) * bc.cam.zoom * dpr, sy = (cam.y - bc.cam.y) * bc.cam.zoom * dpr;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(bc.cv, sx, sy, cw * k, ch * k, 0, 0, cw, ch);
+  }
+  ctx.restore();
+  if (!exact) bcScheduleSettle();
+  // живой слой: перетаскиваемое и всё, что над ним, — по порядку слоёв;
+  // бледное и куски ластика — поверх
+  activeCam = cam;
+  ctx.save();
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const pad = 80 / z;
+  const vx0 = cam.x - pad, vy0 = cam.y - pad, vx1 = cam.x + cssW / z + pad, vy1 = cam.y + cssH / z + pad;
+  const vis = (o) => { const b = objectBBoxRef(o); return !(b.maxX < vx0 || b.minX > vx1 || b.maxY < vy0 || b.minY > vy1); };
+  const editingId = (textEditSession && textEditSession.objId) || null;
+  for (let i = liveFrom; i < n; i++){
+    const o = B.objects[i];
+    if (o.id === editingId || bc.hidden.has(o) || !vis(o)) continue;
+    renderObject(ctx, o, cam);
+  }
+  const g = eraseGesture;
+  if (g && g.mode === 'object') g.hit.forEach(o => { if (vis(o)) drawErasedFaded(ctx, o, cam); });
+  if (g && g.mode === 'area') g.work.forEach(w => w.pieces.forEach(p => { if (vis(p)) renderObject(ctx, p, cam); }));
+  ctx.restore();
+  renderOverlay(ctx, cam, dpr);
+}
+// devicePixelRatio меняется и без изменения размера окна (окно перетащили на
+// другой монитор) — тогда кеш нужно пересоздать в новой плотности
+(function watchDpr(){
+  if (!window.matchMedia) return;
+  try {
+    const mq = window.matchMedia('(resolution: ' + (window.devicePixelRatio || 1) + 'dppx)');
+    const on = () => {
+      try { mq.removeEventListener('change', on); } catch (e) {}
+      boardCacheReset('devicePixelRatio');
+      if (boardActive) resizeCanvas();
+      watchDpr();
+    };
+    mq.addEventListener('change', on);
+  } catch (e) {}
+})();
 // открытое поле редактирования текста «приклеено» к своей мировой точке —
 // пересчитываем его экранные координаты и размер шрифта на каждый кадр,
 // пока камера (панорамирование/зум/ресайз окна) двигается
@@ -3449,6 +4097,9 @@ if (document.fonts && document.fonts.addEventListener){
   document.fonts.addEventListener('loadingdone', () => {
     Object.keys(baselineRatioCache).forEach(k => delete baselineRatioCache[k]);
     if (textEditSession) syncTextEditorToCam();
+    // текст в кеше нарисован запасным шрифтом — перерисовать настоящим
+    boardCacheReset('шрифт догрузился');
+    if (boardActive) scheduleRedraw();
   });
 }
 // растягивает textarea точно по содержимому (ширина и высота), без переноса
@@ -3504,7 +4155,10 @@ function applyTextEditorLiveStyle(){
    всё равно полупрозрачные линии на границах листов формата А4. Линии
    считаются только в видимой части экрана — иначе на сетке 200×200
    листов пришлось бы каждый кадр перебирать десятки тысяч линий. */
-function drawSheetsAndGrid(c, camv, w, h){
+// region — прямоугольник мира, которым ограничить линии (частичная
+// перерисовка кеша, шаг 3 «„скорость досок“»): иначе каждый шаг ластика
+// проводил бы все линии сетки по всему кешу, хотя видна лишь его часть
+function drawSheetsAndGrid(c, camv, w, h, region){
   // свой цвет клетки (настройки листа) — если не выбран, берём цвет по теме
   const gridColor = B.gridColor ? resolveColor(B.gridColor) : themeVar('--grid');
   const paperColor = themeVar('--paper');
@@ -3518,8 +4172,14 @@ function drawSheetsAndGrid(c, camv, w, h){
   c.fillRect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y);
   c.restore();
 
-  const worldLeft = Math.max(0, camv.x), worldTop = Math.max(0, camv.y);
-  const worldRight = Math.min(tw, camv.x + w / camv.zoom), worldBottom = Math.min(th, camv.y + h / camv.zoom);
+  let worldLeft = Math.max(0, camv.x), worldTop = Math.max(0, camv.y);
+  let worldRight = Math.min(tw, camv.x + w / camv.zoom), worldBottom = Math.min(th, camv.y + h / camv.zoom);
+  if (region){
+    // с запасом в лист: подписи листов начинаются в углу листа
+    worldLeft = Math.max(worldLeft, Math.floor(region.x0 / sheetWpx()) * sheetWpx());
+    worldTop = Math.max(worldTop, Math.floor(region.y0 / sheetHpx()) * sheetHpx());
+    worldRight = Math.min(worldRight, region.x1); worldBottom = Math.min(worldBottom, region.y1);
+  }
   if (worldLeft >= worldRight || worldTop >= worldBottom) return;
 
   c.save();
@@ -3671,7 +4331,7 @@ function getImg(src){
     // картинки тоже идут через этот кэш, а без этого панель оставалась
     // пустой до первого движения в ней (ученик на демонстрации, у которого
     // картинка приходит позже панели, так её и не видел)
-    im.onload = () => { scheduleRedraw(); rfScheduleRedraw(); };
+    im.onload = () => { boardCacheReset('картинка декодирована'); scheduleRedraw(); rfScheduleRedraw(); };
     setImgSrc(im, src);
     imgCache[src] = im;
   }
@@ -4148,29 +4808,45 @@ function drawDraftPreview(c, camv){
   c.restore();
 }
 
+// Полная отрисовка: так рисуется выгрузка в PNG/PDF, миниатюры, презентации,
+// доска у ученика и эталон в проверках. На экране обычной доски кадр идёт
+// через renderScreen (кеш готовых объектов + живой слой, шаг 3 «„скорость
+// досок“»), но собран из тех же двух половин — renderBase и renderOverlay,
+// поэтому выгрузка и экран рисуют объекты одним и тем же кодом
 function render(c, w, h, camv, isScreen, renderDpr){
   if (renderDpr === undefined) renderDpr = dpr;
+  if (!renderBase(c, w, h, camv, isScreen, renderDpr, null)) return;
+  if (isScreen) renderOverlay(c, camv, renderDpr);
+}
+// фон, лист с сеткой и объекты. opts (только для кеша экрана): list — что
+// рисовать (по умолчанию B.objects), skip — кого пропустить (стёртое
+// ластиком до отпускания); жест ластика тогда рисует не она, а живой слой.
+// false — рисовать нечего (листают презентацию)
+function renderBase(c, w, h, camv, isScreen, renderDpr, opts){
   activeCam = camv;
+  // дорисовка новых объектов поверх готового кеша — без фона и сетки
+  const noBg = !!(opts && opts.noBg);
   c.save();
   c.setTransform(renderDpr,0,0,renderDpr,0,0);
-  c.clearRect(0,0,w,h);
+  if (!noBg) c.clearRect(0,0,w,h);
   // Промпт №85в: у презентации на экране вне слайда холст прозрачный — позади
   // него слой #deckDepth с соседними слайдами (deck-core.js)
   // у ученика (доска учителя, board-stage.js) слоя глубины нет — фон обычный
   const deckScreen = isScreen && B.kind === 'deck' && typeof deckDepthSync === 'function' && !window.deckViewerMode;
-  if (!deckScreen){
+  if (!deckScreen && !noBg){
     const bg = themeVar('--bg');
     c.fillStyle = bg; c.fillRect(0,0,w,h);
   }
   c.restore();
   // пока листают, текущий слайд — картинка в слое, холст его не рисует
-  if (deckScreen && deckSlideHidden()){ deckDepthSync(); deckScrubSync(); deckUpdateNav(); deckStripUpdate(); return; }
+  if (deckScreen && deckSlideHidden()){ deckDepthSync(); deckScrubSync(); deckUpdateNav(); deckStripUpdate(); return false; }
 
   c.save();
   c.setTransform(renderDpr,0,0,renderDpr,0,0);
   const isDeck = B.kind === 'deck' && typeof deckDrawBackground === 'function';
-  if (isDeck) deckDrawBackground(c, camv, w, h, isScreen);
-  else drawSheetsAndGrid(c, camv, w, h);
+  if (noBg){ /* фон и сетка уже в кеше */ }
+  else if (isDeck) deckDrawBackground(c, camv, w, h, isScreen);
+  else drawSheetsAndGrid(c, camv, w, h, opts && opts.region);
   const deckClip = isDeck && deckClipSlide(c, camv);
   // раньше рисовали ВСЕ объекты доски на каждый кадр, даже те, что на других
   // страницах далеко за пределами экрана — при доске из десятков рисунков
@@ -4185,31 +4861,64 @@ function render(c, w, h, camv, isScreen, renderDpr){
   // наложение двух текстов (у ученика так же прячет board-stage.js). Только на
   // экране — в экспорт/миниатюры текст попадает как есть
   const editingId = (isScreen && textEditSession && textEditSession.objId) || null;
-  B.objects.forEach(o => {
+  // жест ластика (шаг 1 «„скорость досок“»): доска ещё не менялась —
+  // задетое «Объектом» рисуем бледным, разрезанное «Областью» — кусками
+  const eg = (isScreen && !opts) ? eraseGesture : null;
+  const skip = opts && opts.skip;
+  // рамка — из кеша (шаг 2): раньше её пересчитывали по всем точкам каждого
+  // штриха на каждом кадре
+  const vis = (o) => { const b = objectBBoxRef(o); return !(b.maxX < visMinX || b.minX > visMaxX || b.maxY < visMinY || b.minY > visMaxY); };
+  ((opts && opts.list) || B.objects).forEach(o => {
     if (editingId && o.id === editingId) return;
-    const b = objectBBox(o);
-    if (b.maxX < visMinX || b.minX > visMaxX || b.maxY < visMinY || b.minY > visMaxY) return;
+    if (skip && skip.has(o)) return;
+    if (eg){
+      if (eg.mode === 'object' && eg.hit.has(o.id)){ if (vis(o)) drawErasedFaded(c, o, camv); return; }
+      const w = eg.mode === 'area' && eg.work.get(o.id);
+      if (w){ w.pieces.forEach(p => { if (vis(p)) renderObject(c, p, camv); }); return; }
+    }
+    if (!vis(o)) return;
     renderObject(c, o, camv);
   });
   if (deckClip) c.restore();
-  if (isScreen) drawDraftPreview(c, camv);
+  c.restore();
+  return true;
+}
+// то, что поверх объектов только на экране: черновик фигуры, рамки
+// выделения, рамка и лассо выбора — и то, что идёт за камерой
+function renderOverlay(c, camv, renderDpr){
+  const editingId = (textEditSession && textEditSession.objId) || null;
+  c.save();
+  c.setTransform(renderDpr,0,0,renderDpr,0,0);
+  drawDraftPreview(c, camv);
   // рамку выделения редактируемого текста тоже прячем: она старого размера
   // и с ручками, а у поля ввода свои рамка и ручки ширины
-  if (isScreen && selectedId && selectedId !== editingId){
+  if (selectedId && selectedId !== editingId){
     const obj = B.objects.find(o=>o.id===selectedId);
     if (obj) drawSelection(c, obj, camv);
   }
-  if (isScreen && multiSelectIds.length){
+  if (multiSelectIds.length){
     multiSelectIds.forEach(id => {
       const obj = B.objects.find(o=>o.id===id);
       if (obj) drawMultiOutline(c, obj, camv);
     });
   }
-  if (isScreen && dragMode === 'marquee' && marqueeStart && marqueeCur) drawMarquee(c, camv);
-  if (isScreen && dragMode === 'lasso' && lassoPts) drawLasso(c);
+  if (dragMode === 'marquee' && marqueeStart && marqueeCur) drawMarquee(c, camv);
+  if (dragMode === 'lasso' && lassoPts) drawLasso(c);
   c.restore();
-  if (isScreen){ updateUnlockBtn(); updateContextMenu(); }
-  if (isScreen && typeof bxEditorSync === 'function') bxEditorSync();   // №97: поле правки блока идёт за камерой
+  updateUnlockBtn(); updateContextMenu();
+  if (typeof bxEditorSync === 'function') bxEditorSync();   // №97: поле правки блока идёт за камерой
+}
+// задетое ластиком «Объект» до отпускания — бледное (как в tldraw): видно,
+// что сотрётся, и видно, что ещё можно передумать (Escape)
+const ERASE_FADE = 0.3;
+function drawErasedFaded(c, o, camv){
+  c.save();
+  c.globalAlpha = ERASE_FADE;
+  // у полупрозрачного объекта renderObject ставит свою прозрачность поверх —
+  // умножаем, чтобы и он бледнел
+  if (o.opacity != null){ const q = Object.assign({}, o, { opacity: o.opacity * ERASE_FADE }); renderObject(c, q, camv); }
+  else renderObject(c, o, camv);
+  c.restore();
 }
 function drawMultiOutline(c, obj, camv){
   const b = objectBBox(obj);
@@ -4392,10 +5101,11 @@ function drawPivotMark(c, s, width, zoom){
 }
 
 function commitObject(obj){
-  pushUndo();
+  pushUndo({ ids: [] });   // только добавляет (шаг 4: запись по операциям)
   B.objects.push(obj);
   bumpColorUsage(obj.color);
-  saveDB(); scheduleRedraw();
+  saveDB();
+  boardCacheCommitted([obj]); sceneMarkDirty(); requestFrame();   // новая фигура — поверх кеша
 }
 function newBase(type){
   const obj = { id: uid(), type, color: curColorTok, width: curWidth, dash: curDash, fill: curFill };
@@ -4481,6 +5191,7 @@ function measureTextObj(obj){
 function openTextEditor(existingObj, worldPt){
   // уже редактируем что-то другое — сначала фиксируем его (как клик мимо)
   if (textEditSession) confirmTextEditor();
+  boardCacheReset('правка текста');   // правимый текст в кеше не рисуется
   const isNew = !existingObj;
   const p = existingObj ? existingObj.points[0] : worldPt;
 
@@ -4670,7 +5381,7 @@ function shapeClick(kind, pt){
     commitObject(obj);
     enterEditLock(obj, kind);
   }
-  scheduleRedraw();
+  requestFrame();   // черновик — живой слой; готовую фигуру commitObject уже дорисовал в кеш
 }
 /* ── «кривая»: произвольное число точек, соединённых одной плавной линией
    (сплайн Катмулла-Рома через все точки — проходит точно через каждую) ── */
@@ -4730,7 +5441,9 @@ canvas.addEventListener('dblclick', (e) => {
   if (tool === 'hand'){
     const pt = eventWorld(e);
     let hit = null;
-    for (let i=B.objects.length-1;i>=0;i--){ if (hitTestObject(B.objects[i], pt, 8/cam.zoom)){ hit=B.objects[i]; break; } }
+    // «„скорость досок“»: точная проверка — только у кандидатов из индекса
+    const HC = sceneHitCandidates(pt, 8/cam.zoom);
+    for (let i=HC.length-1;i>=0;i--){ if (hitTestObject(HC[i], pt, 8/cam.zoom)){ hit=HC[i]; break; } }
     if (hit && hit.type === 'text'){
       armedHandId = null; selectedId = hit.id;
       openTextEditor(hit, null);
@@ -4753,6 +5466,9 @@ canvas.addEventListener('dblclick', (e) => {
 });
 
 function cancelDrafts(){
+  // Escape и смена инструмента посреди маха ластика: ничего не применяем
+  cancelEraseGesture();
+  if (dragMode === 'erase') dragMode = null;
   draft=null; curvePts=null; circleState=null; polyState=null; penStroke=null; shapeDrag=null; armedHandId=null;
   marqueeStart=null; marqueeCur=null; marqueeBase=null; lassoPts=null; lassoBase=null; pendingMoveArmed=false; clearEditLock();
   if (dragMode === 'marquee' || dragMode === 'lasso') dragMode = null;
@@ -4863,8 +5579,24 @@ try {
   const s = parseInt(localStorage.getItem('boardsEraserSize'), 10);
   if (ERASER_SIZES.includes(s)) eraserSize = s;
 } catch (e) {}
-let areaErase = null;     // { last, undoDone } — пока идёт жест «Области» на доске
-let rfAreaErase = null;   // то же для заметок справочной панели
+/* «„скорость досок“», шаг 1: ластик одним жестом (как в tldraw).
+   Раньше ластик менял доску прямо на ходу: «Объект» на КАЖДЫЙ задетый
+   штрих звал pushUndo() (полный JSON всей доски) и saveDB(), а на общей
+   доске каждый стёртый штрих ещё и отдельно сравнивал всю доску и уходил
+   отдельным запросом в базу. На большой доске один такой шаг стоил сотни
+   миллисекунд — на слабом ноутбуке ластик успевал стереть 2 штриха из 20
+   (события мыши слипались, пока шла сериализация).
+   Теперь, пока ластик ведут, данные доски НЕ меняются вовсе: задетые
+   объекты «Объекта» только бледнеют, а для «Области» копятся вырезанные
+   куски, и показываются они поверх (eraseGesture). Всё применяется одной
+   правкой при отпускании (commitEraseGesture): один снимок отмены, одно
+   сохранение, одна разница в облако. pointercancel, Escape и смена
+   инструмента (cancelDrafts) жест просто бросают — бледное возвращается.
+   eraseGesture: { mode: 'object'|'area', last, path,
+     hit: Map(id → объект) — «Объект»: что стереть;
+     work: Map(id → { orig, pieces }) — «Область»: что чем заменить } */
+let eraseGesture = null;
+let rfAreaErase = null;   // «Область» на заметках справочной панели — по-старому, на ходу
 
 // «Область» на одном списке объектов. Возвращает новый массив (или null,
 // если ничего не задето) и id объектов, которые пришлось заменить кусками.
@@ -4896,27 +5628,156 @@ function eraseAreaIn(objs, path, radius, beforeChange){
   }
   return changed ? { objs: out, gone } : null;
 }
-function eraseAreaAlong(a, b){
-  if (!areaErase) return;
+// объекты, которых может коснуться отрезок a→b ластика радиуса r: только по
+// рамкам, точная проверка — у вызывающего
+function eraseCandidates(a, b, r){
+  return sceneQueryRect(Math.min(a.x, b.x) - r, Math.min(a.y, b.y) - r, Math.max(a.x, b.x) + r, Math.max(a.y, b.y) + r);
+}
+// стереть верхний объект под точкой — одной правкой, без жеста (так было
+// до шага 1; осталось для проверок и для кода, которому нужен один объект)
+function eraseAt(pt){
+  const tol = (eraserSize / 2) / cam.zoom;
+  const HC = sceneHitCandidates(pt, tol);
+  for (let i = HC.length - 1; i >= 0; i--){
+    if (HC[i].locked || !hitTestObject(HC[i], pt, tol)) continue;
+    eraseGesture = { mode: 'object', last: pt, path: [pt], hit: new Map([[HC[i].id, HC[i]]]), work: new Map() };
+    return commitEraseGesture();
+  }
+  return false;
+}
+function startEraseGesture(pt){
+  eraseGesture = { mode: eraserMode === 'area' ? 'area' : 'object', last: pt, path: [pt], hit: new Map(), work: new Map() };
+  eraseGestureStep(pt, pt);
+}
+function eraseGestureStep(a, b){
+  const g = eraseGesture;
+  if (!g) return;
+  if (b !== a) g.path.push(b);
+  g.last = b;
+  // шаг вернул: null — ничего нового; массив — объекты, впервые задетые
+  // этим шагом (их нужно вырезать из кеша); пустой массив — поменялись
+  // только уже вырезанные куски «Области» (они на живом слое)
+  const changed = g.mode === 'area' ? eraseAreaStep(g, a, b) : eraseObjectStep(g, a, b);
+  if (changed) eraseGestureChanged(changed);
+}
+// «Объект»: всё, чего коснулся путь ластика. Раньше проверялась одна точка
+// события и стирался один верхний объект за событие — быстрый мах
+// перескакивал штрихи. Теперь отрезок между событиями проверяется точками
+// с шагом в радиус ластика, и задетым считается всё под ним
+function eraseObjectStep(g, a, b){
+  const tol = (eraserSize / 2) / cam.zoom;
+  const len = dist(a, b), n = Math.max(1, Math.ceil(len / Math.max(tol, 1e-6)));
+  const added = [];
+  for (const o of eraseCandidates(a, b, tol)){
+    if (o.locked || g.hit.has(o.id)) continue; // закреплённое изображение ластик не трогает
+    const bb = objectBBoxRef(o);
+    for (let k = 0; k <= n; k++){
+      const p = { x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n };
+      if (p.x < bb.minX - tol || p.x > bb.maxX + tol || p.y < bb.minY - tol || p.y > bb.maxY + tol) continue;
+      if (hitTestObject(o, p, tol)){ g.hit.set(o.id, o); added.push(o); break; }
+    }
+  }
+  return added.length ? added : null;
+}
+// «Область»: куски копятся в g.work, доска не меняется. Уже разрезанный
+// объект дальше режется по своим кускам — так же, как раньше следующий шаг
+// жеста резал куски, лежавшие в доске
+function eraseAreaStep(g, a, b){
   const path = (a.x === b.x && a.y === b.y) ? [a] : [a, b];
-  const res = eraseAreaIn(B.objects, path, (eraserSize / 2) / cam.zoom, () => {
-    // одна запись в отмену на весь жест. Но в общей доске снимок «как было»
-    // закрывается сохранением через 250 мс тишины (boards-cloud.js) — после
-    // паузы открываем новый, иначе стёртое дальше осталось бы только у меня
-    // (тот же приём, что у колеса над картинкой, раздел 8 HANDOFF)
-    const cloudIdle = typeof window.boardsCloudGestureIdle === 'function' && window.boardsCloudGestureIdle();
-    if (!areaErase.undoDone || cloudIdle){ pushUndo(); areaErase.undoDone = true; }
+  const r = (eraserSize / 2) / cam.zoom;
+  const noop = () => {};
+  const touched = [];
+  for (const o of eraseCandidates(a, b, r)){
+    if (g.work.has(o.id)) continue;
+    const res = eraseAreaIn([o], path, r, noop);
+    if (res){ g.work.set(o.id, { orig: o, pieces: res.objs }); touched.push(o); }
+  }
+  const x0 = Math.min(a.x, b.x) - r, y0 = Math.min(a.y, b.y) - r, x1 = Math.max(a.x, b.x) + r, y1 = Math.max(a.y, b.y) + r;
+  let recut = false;
+  g.work.forEach(w => {
+    if (touched.includes(w.orig) || !w.pieces.length) return;
+    if (!w.pieces.some(p => { const bb = objectBBoxRef(p); return bb.maxX >= x0 && bb.minX <= x1 && bb.maxY >= y0 && bb.minY <= y1; })) return;
+    const res = eraseAreaIn(w.pieces, path, r, noop);
+    if (res){ w.pieces = res.objs; recut = true; }
   });
-  if (!res) return;
-  B.objects = res.objs;
-  res.gone.forEach(goneId => {
-    if (selectedId===goneId) selectedId=null;
-    if (armedHandId===goneId) armedHandId=null;
-    if (editLockId===goneId) clearEditLock();
-  });
-  multiSelectIds = multiSelectIds.filter(id => !res.gone.includes(id));
+  return (touched.length || recut) ? touched : null;
+}
+// что-то новое задето — перерисовать. Сами данные доски не тронуты
+function eraseGestureChanged(objs){
+  if (objs.length) boardCacheHide(objs);
+  requestFrame();
+}
+// отпустили — всё стёртое за жест одной правкой.
+// Почему это не нарушает правило из HANDOFF (раздел 8: «Ластик зовёт
+// pushUndo() на каждый стёртый объект… если оптимизировать до одного
+// снимка на жест, стёртое после паузы больше 250 мс у ученика не исчезнет»):
+// то правило держалось на том, что ластик МЕНЯЛ доску по ходу жеста, а
+// облачный модуль закрывает снимок «как было» через 250 мс после saveDB —
+// всё, что стиралось после такой паузы, шло мимо снимка. Теперь до
+// отпускания доска не меняется и saveDB не зовётся, закрывать нечего.
+// Здесь подряд: pushUndo() (облако снимает «как было» — доска ещё целая),
+// правка, saveDB(). Сразу за этим обработчиком срабатывает pointerup на
+// window в boards-cloud.js и вызывает cloudFinalizeGesture — уходит ОДНА
+// разница со всем стёртым. Механизм 250 мс не тронут и для пера,
+// перетаскивания и остального работает как раньше
+function commitEraseGesture(){
+  const g = eraseGesture;
+  eraseGesture = null;
+  if (!g) return false;
+  const byId = new Map(B.objects.map(o => [o.id, o]));
+  const gone = new Set();
+  let out = null;
+  if (g.mode === 'object'){
+    g.hit.forEach((o, id) => { if (byId.has(id)) gone.add(id); });
+    if (gone.size) out = B.objects.filter(o => !gone.has(o.id));
+  } else {
+    const repl = new Map();
+    g.work.forEach((w, id) => {
+      const cur = byId.get(id);
+      if (!cur) return;   // пока вели ластик, собеседник это удалил
+      // пока вели ластик, объект сменился (пришла правка из облака) — режем
+      // новую версию тем же путём, а не возвращаем старую
+      let pieces = w.pieces;
+      if (cur !== w.orig){
+        const res = eraseAreaIn([cur], g.path, (eraserSize / 2) / cam.zoom, () => {});
+        if (!res) return;
+        pieces = res.objs;
+      }
+      repl.set(id, pieces); gone.add(id);
+    });
+    if (repl.size){
+      out = [];
+      B.objects.forEach(o => { const p = repl.get(o.id); if (p) out.push(...p); else out.push(o); });
+    }
+  }
+  if (!out){ bcUnhide(); requestFrame(); return false; }
+  pushUndo({ ids: Array.from(gone) });   // задетые; куски «Области» — добавленные
+  B.objects = out;
+  if (selectedId && gone.has(selectedId)) selectedId = null;
+  if (armedHandId && gone.has(armedHandId)) armedHandId = null;
+  if (editLockId && gone.has(editLockId)) clearEditLock();
+  multiSelectIds = multiSelectIds.filter(id => !gone.has(id));
   updateContextMenu();
-  saveDB(); scheduleRedraw();
+  saveDB();
+  // кеш уже без стёртого (его вырезали по ходу жеста) — остаётся
+  // дорисовать куски «Области» на их места; полной перерисовки нет
+  boardCacheCommitted(B.objects.filter(o => !byId.has(o.id)));
+  sceneMarkDirty();
+  requestFrame();
+  return true;
+}
+// бросить жест: доска и так не менялась, бледное просто перестаёт быть бледным
+function cancelEraseGesture(){
+  if (!eraseGesture) return;
+  eraseGesture = null;
+  bcUnhide();
+  requestFrame();
+}
+// вернуть в кеш вырезанное ластиком — перерисовкой только его мест
+function bcUnhide(){
+  const objs = Array.from(bc.hidden);
+  bc.hidden.clear();
+  if (objs.length && !bcRepaintAround(objs)) boardCacheReset('ластик: жест отменён');
 }
 function rfEraseAreaAlong(a, b){
   if (!rfAreaErase) return;
@@ -5014,25 +5875,6 @@ function syncEraserOptsUI(){
   if (btn){
     btn.dataset.eraserMode = eraserMode;
     btn.title = (eraserMode === 'area' ? 'Ластик: область' : 'Ластик: объект целиком') + ' (4); размер — [ и ]';
-  }
-}
-
-function eraseAt(pt){
-  const tol = (eraserSize / 2) / cam.zoom;
-  for (let i=B.objects.length-1;i>=0;i--){
-    if (B.objects[i].locked) continue; // закреплённое изображение ластик не трогает
-    if (hitTestObject(B.objects[i], pt, tol)){
-      pushUndo();
-      const goneId = B.objects[i].id;
-      if (selectedId===goneId) selectedId=null;
-      multiSelectIds = multiSelectIds.filter(id=>id!==goneId);
-      if (armedHandId===goneId) armedHandId=null;
-      if (editLockId===goneId) clearEditLock();
-      B.objects.splice(i,1);
-      updateContextMenu();
-      saveDB(); scheduleRedraw();
-      return;
-    }
   }
 }
 
@@ -5146,7 +5988,7 @@ function deleteSelected(){
   const sel = getSelectedObjects().filter(mayTouch);   // Промпт №41
   if (!sel.length) return;
   const ids = sel.map(o=>o.id);
-  pushUndo();
+  pushUndo({ ids });
   B.objects = B.objects.filter(o => !ids.includes(o.id));
   if (armedHandId && ids.includes(armedHandId)) armedHandId=null;
   if (editLockId && ids.includes(editLockId)) clearEditLock();
@@ -5187,10 +6029,10 @@ canvas.addEventListener('pointerdown', (e) => {
     pendingMoveArmed = false;
     const sel = getSelectedObjects();
     if (sel.length === 1){
-      pushUndo(); dragMode='move'; dragObjId=sel[0].id; dragStart=pt; dragOrig=clonePts(sel[0]);
+      pushUndo({ ids: [sel[0].id] }); dragMode='move'; dragObjId=sel[0].id; dragStart=pt; dragOrig=clonePts(sel[0]);
       return;
     } else if (sel.length > 1){
-      pushUndo(); dragMode='multimove'; dragGroupIds=sel.map(o=>o.id); dragStart=pt;
+      pushUndo({ ids: sel.map(o=>o.id) }); dragMode='multimove'; dragGroupIds=sel.map(o=>o.id); dragStart=pt;
       dragOrigMap={}; dragGroupIds.forEach(id => { const o=B.objects.find(x=>x.id===id); if (o) dragOrigMap[id]=clonePts(o); });
       return;
     }
@@ -5206,9 +6048,9 @@ canvas.addEventListener('pointerdown', (e) => {
     if (!obj){ clearEditLock(); }
     else {
       const role = hitTestHandles(obj, pt);
-      if (role){ pushUndo(); dragMode='handle'; dragHandleRole=role; dragObjId=obj.id; return; }
+      if (role){ pushUndo({ ids: [obj.id] }); dragMode='handle'; dragHandleRole=role; dragObjId=obj.id; return; }
       if (hitTestObject(obj, pt, 8/cam.zoom)){
-        pushUndo(); dragMode='move'; dragObjId=obj.id; dragStart=pt; dragOrig=clonePts(obj); return;
+        pushUndo({ ids: [obj.id] }); dragMode='move'; dragObjId=obj.id; dragStart=pt; dragOrig=clonePts(obj); return;
       }
       // Промпт №69: у фигур-протяжек (прямоугольник, прямая с центром)
       // клик мимо только что построенной сразу начинает следующую — как у
@@ -5229,7 +6071,7 @@ canvas.addEventListener('pointerdown', (e) => {
         return o && hitTestObject(o, pt, 8/cam.zoom);
       });
       if (hitGroup){
-        pushUndo();
+        pushUndo({ ids: multiSelectIds.slice() });
         dragMode='multimove'; dragGroupIds = multiSelectIds.slice(); dragStart = pt;
         dragOrigMap = {};
         dragGroupIds.forEach(id => { const o=B.objects.find(x=>x.id===id); if (o) dragOrigMap[id]=clonePts(o); });
@@ -5243,9 +6085,9 @@ canvas.addEventListener('pointerdown', (e) => {
       const obj = B.objects.find(o=>o.id===armedHandId);
       if (obj && obj.locked){
         const role = hitTestHandles(obj, pt);
-        if (role){ pushUndo(); dragMode='handle'; dragHandleRole=role; dragObjId=obj.id; return; }
+        if (role){ pushUndo({ ids: [obj.id] }); dragMode='handle'; dragHandleRole=role; dragObjId=obj.id; return; }
         if (hitTestObject(obj, pt, 8/cam.zoom)){
-          pushUndo(); dragMode='move'; dragObjId=obj.id; dragStart=pt; dragOrig=clonePts(obj); return;
+          pushUndo({ ids: [obj.id] }); dragMode='move'; dragObjId=obj.id; dragStart=pt; dragOrig=clonePts(obj); return;
         }
         // клик мимо взведённой картинки — снимаем взвод, обрабатываем клик как обычный ниже
       }
@@ -5259,9 +6101,9 @@ canvas.addEventListener('pointerdown', (e) => {
       const obj = B.objects.find(o=>o.id===selectedId);
       if (obj){
         const role = hitTestHandles(obj, pt);
-        if (role){ pushUndo(); dragMode='handle'; dragHandleRole=role; dragObjId=obj.id; return; }
+        if (role){ pushUndo({ ids: [obj.id] }); dragMode='handle'; dragHandleRole=role; dragObjId=obj.id; return; }
         if (hitTestObject(obj, pt, 8/cam.zoom)){
-          pushUndo(); dragMode='move'; dragObjId=obj.id; dragStart=pt; dragOrig=clonePts(obj); return;
+          pushUndo({ ids: [obj.id] }); dragMode='move'; dragObjId=obj.id; dragStart=pt; dragOrig=clonePts(obj); return;
         }
       }
       // клик мимо объекта редактирования — выходим из режима, обрабатываем клик как обычный ниже
@@ -5270,21 +6112,22 @@ canvas.addEventListener('pointerdown', (e) => {
 
     // любой другой объект под курсором — одиночный клик+протяжка двигает
     // его сразу, без взвода (кроме закреплённых изображений — им взвод нужен)
-    for (let i=B.objects.length-1;i>=0;i--){
-      const obj = B.objects[i];
+    const HC = sceneHitCandidates(pt, 8/cam.zoom);
+    for (let i=HC.length-1;i>=0;i--){
+      const obj = HC[i];
       if (hitTestObject(obj, pt, 8/cam.zoom)){
         if (obj.type === 'image' && obj.locked){
           armedHandId = obj.id; selectedId = obj.id;
           scheduleRedraw();
           return;
         }
-        pushUndo(); dragMode='move'; dragObjId=obj.id; dragStart=pt; dragOrig=clonePts(obj);
+        pushUndo({ ids: [obj.id] }); dragMode='move'; dragObjId=obj.id; dragStart=pt; dragOrig=clonePts(obj);
         return;
       }
     }
 
     // мимо всех объектов — панорамирование, как и раньше
-    scheduleRedraw();
+    scheduleRedraw();   // клик мог снять выделение/взвод — кадр как после правки
     dragMode='pan'; panStart={x:e.clientX,y:e.clientY}; camStart={x:cam.x,y:cam.y}; canvas.style.cursor='grabbing'; return;
   }
 
@@ -5296,8 +6139,9 @@ canvas.addEventListener('pointerdown', (e) => {
     // Проверяется раньше всего остального: иначе щелчок по участнику группы
     // начал бы её перетаскивать, а щелчок мимо — сбросил бы выделение
     if (e.metaKey || e.ctrlKey || e.shiftKey){
-      for (let i=B.objects.length-1;i>=0;i--){
-        if (hitTestObject(B.objects[i], pt, 8/cam.zoom)){ toggleInSelection(B.objects[i]); return; }
+      const HC = sceneHitCandidates(pt, 8/cam.zoom);
+      for (let i=HC.length-1;i>=0;i--){
+        if (hitTestObject(HC[i], pt, 8/cam.zoom)){ toggleInSelection(HC[i]); return; }
       }
       startSelectGesture(pt, currentSelectionIds());
       return;
@@ -5308,7 +6152,7 @@ canvas.addEventListener('pointerdown', (e) => {
       for (const gid of multiSelectIds){
         const gobj = B.objects.find(o=>o.id===gid);
         if (gobj && hitTestObject(gobj, pt, 8/cam.zoom)){
-          pushUndo();
+          pushUndo({ ids: multiSelectIds.slice() });
           dragMode='multimove'; dragGroupIds = multiSelectIds.slice(); dragStart = pt;
           dragOrigMap = {};
           dragGroupIds.forEach(id => { const o=B.objects.find(x=>x.id===id); if (o) dragOrigMap[id]=clonePts(o); });
@@ -5321,17 +6165,18 @@ canvas.addEventListener('pointerdown', (e) => {
       const obj = B.objects.find(o=>o.id===selectedId);
       if (obj){
         const role = hitTestHandles(obj, pt);
-        if (role){ pushUndo(); dragMode='handle'; dragHandleRole=role; dragObjId=obj.id; return; }
+        if (role){ pushUndo({ ids: [obj.id] }); dragMode='handle'; dragHandleRole=role; dragObjId=obj.id; return; }
       }
     }
-    for (let i=B.objects.length-1;i>=0;i--){
-      if (hitTestObject(B.objects[i], pt, 8/cam.zoom)){
-        const obj = B.objects[i];
+    const HC = sceneHitCandidates(pt, 8/cam.zoom);
+    for (let i=HC.length-1;i>=0;i--){
+      if (hitTestObject(HC[i], pt, 8/cam.zoom)){
+        const obj = HC[i];
         if (obj.groupId){
           // объект — часть сохранённой группы: выделяем и двигаем всех её участников разом
           const members = B.objects.filter(o=>o.groupId===obj.groupId).map(o=>o.id);
           selectedId = null; multiSelectIds = members;
-          pushUndo();
+          pushUndo({ ids: members });
           dragMode='multimove'; dragGroupIds = members; dragStart = pt;
           dragOrigMap = {};
           dragGroupIds.forEach(id => { const o=B.objects.find(x=>x.id===id); if (o) dragOrigMap[id]=clonePts(o); });
@@ -5340,7 +6185,7 @@ canvas.addEventListener('pointerdown', (e) => {
           return;
         }
         selectedId = obj.id; multiSelectIds = [];
-        pushUndo();
+        pushUndo({ ids: [obj.id] });
         dragMode='move'; dragObjId=selectedId; dragStart=pt; dragOrig=clonePts(obj);
         updateContextMenu();
         scheduleRedraw();
@@ -5358,15 +6203,16 @@ canvas.addEventListener('pointerdown', (e) => {
   if (tool === 'text'){
     if (textEditSession) return; // поле уже открыто — этот клик его закроет через blur, сам по себе новый текст не начинает
     // Промпт №97: «Текст» по блоку или таблице — правка их текста, а не новая надпись поверх
+    const HC = sceneHitCandidates(pt, 8/cam.zoom);
     if (typeof bxOpenEditor === 'function'){
-      for (let i=B.objects.length-1;i>=0;i--){
-        const o = B.objects[i];
+      for (let i=HC.length-1;i>=0;i--){
+        const o = HC[i];
         if ((o.type === 'box' || o.type === 'table') && hitTestObject(o, pt, 8/cam.zoom)){ selectedId = o.id; bxOpenEditor(o, pt); return; }
       }
     }
     let hitText = null;
-    for (let i=B.objects.length-1;i>=0;i--){
-      if (B.objects[i].type === 'text' && hitTestObject(B.objects[i], pt, 8/cam.zoom)){ hitText = B.objects[i]; break; }
+    for (let i=HC.length-1;i>=0;i--){
+      if (HC[i].type === 'text' && hitTestObject(HC[i], pt, 8/cam.zoom)){ hitText = HC[i]; break; }
     }
     if (hitText){ selectedId = hitText.id; openTextEditor(hitText, null); }
     else openTextEditor(null, maybeSnap(pt));
@@ -5374,15 +6220,14 @@ canvas.addEventListener('pointerdown', (e) => {
   }
 
   if (tool === 'pen'){
-    pushUndo();
+    pushUndo({ ids: [] });   // штрих только добавляется
     penStroke = { id: uid(), type:'pen', color:curColorTok, width:curWidth, dash:curDash, points:[pt] };
     if (curOpacity) penStroke.opacity = SEMI_OPACITY;
     return;
   }
   if (tool === 'eraser'){
     dragMode='erase';
-    if (eraserMode === 'area'){ areaErase = { last: pt, undoDone: false }; eraseAreaAlong(pt, pt); }
-    else eraseAt(pt);
+    startEraseGesture(pt);
     return;
   }
 
@@ -5406,21 +6251,20 @@ canvas.addEventListener('pointermove', (e) => {
     const dx = (e.clientX-panStart.x)/cam.zoom, dy=(e.clientY-panStart.y)/cam.zoom;
     cam.x = camStart.x - dx; cam.y = camStart.y - dy;
     clampCam();
-    scheduleRedraw(); rememberView(); return;
+    requestFrame(); rememberView(); return;
   }
   if (dragMode === 'erase'){
-    // «Область» стирает весь отрезок пути от прошлого события до этого:
-    // ластик ведут быстро, и точками между событиями штрих перескакивался бы
-    if (areaErase){ eraseAreaAlong(areaErase.last, pt); areaErase.last = pt; }
-    else eraseAt(pt);
+    // весь отрезок пути от прошлого события до этого: ластик ведут быстро,
+    // и точками между событиями штрих перескакивался бы
+    if (eraseGesture) eraseGestureStep(eraseGesture.last, pt);
     return;
   }
-  if (dragMode === 'marquee'){ marqueeCur = pt; scheduleRedraw(); return; }
+  if (dragMode === 'marquee'){ marqueeCur = pt; requestFrame(); return; }
   if (dragMode === 'lasso'){
     // точку пути берём не на каждое событие, а через 3 экранных пикселя:
     // путь выходит ровный и лёгкий для проверки попадания
     const last = lassoPts[lassoPts.length - 1];
-    if (dist(last, pt) * cam.zoom >= 3){ lassoPts.push(pt); scheduleRedraw(); }
+    if (dist(last, pt) * cam.zoom >= 3){ lassoPts.push(pt); requestFrame(); }
     return;
   }
   if (dragMode === 'multimove'){
@@ -5433,7 +6277,8 @@ canvas.addEventListener('pointermove', (e) => {
         if (orig.ctrl) obj.ctrl = {x:orig.ctrl.x+dx, y:orig.ctrl.y+dy};
       }
     });
-    scheduleRedraw(); return;
+    // перетаскиваемое рисует живой слой (bcLiveFrom) — кеш под ним цел
+    sceneMarkDirty(); requestFrame(); return;
   }
   if (dragMode === 'move'){
     const dx = pt.x-dragStart.x, dy = pt.y-dragStart.y;
@@ -5441,13 +6286,13 @@ canvas.addEventListener('pointermove', (e) => {
     if (obj){
       obj.points = dragOrig.points.map(p=>({x:p.x+dx,y:p.y+dy}));
       if (dragOrig.ctrl) obj.ctrl = {x:dragOrig.ctrl.x+dx, y:dragOrig.ctrl.y+dy};
-      scheduleRedraw();
+      sceneMarkDirty(); requestFrame();
     }
     return;
   }
   if (dragMode === 'handle'){
     const obj = B.objects.find(o=>o.id===dragObjId);
-    if (obj){ applyHandle(obj, dragHandleRole, pt); scheduleRedraw(); }
+    if (obj){ applyHandle(obj, dragHandleRole, pt); sceneMarkDirty(); requestFrame(); }
     return;
   }
   if (penStroke){
@@ -5456,13 +6301,14 @@ canvas.addEventListener('pointermove', (e) => {
       const r = canvas.getBoundingClientRect();
       penStroke.points.push(screenToWorld(ev.clientX-r.left, ev.clientY-r.top));
     });
-    scheduleRedraw(); return;
+    // живой штрих — на живом слое поверх кеша; доска не менялась
+    requestFrame(); return;
   }
-  if (shapeDrag){ shapeDrag.b = maybeSnap(pt); scheduleRedraw(); return; }
-  if (draft){ draft.preview = maybeSnap(pt); scheduleRedraw(); return; }
-  if (curvePts){ curvePts.preview = maybeSnap(pt); scheduleRedraw(); return; }
-  if (circleState && circleState.r==null){ circleState.previewR = dist(circleState.center, pt); scheduleRedraw(); return; }
-  if (polyState){ polyState.preview = maybeSnap(pt); scheduleRedraw(); return; }
+  if (shapeDrag){ shapeDrag.b = maybeSnap(pt); requestFrame(); return; }
+  if (draft){ draft.preview = maybeSnap(pt); requestFrame(); return; }
+  if (curvePts){ curvePts.preview = maybeSnap(pt); requestFrame(); return; }
+  if (circleState && circleState.r==null){ circleState.previewR = dist(circleState.center, pt); requestFrame(); return; }
+  if (polyState){ polyState.preview = maybeSnap(pt); requestFrame(); return; }
 });
 
 canvas.addEventListener('pointerup', (e) => {
@@ -5479,7 +6325,7 @@ canvas.addEventListener('pointerup', (e) => {
     obj.points = [draft.pts[0], endPt];
     draft = null;
     commitObject(obj);
-    scheduleRedraw();
+    requestFrame();   // прямая уже дорисована в кеш (commitObject), черновик — живой слой
   }
   // Промпт №69: отпустили кнопку — прямоугольник (или прямая с центром)
   // фиксируется с противоположным углом (концом) в точке отпускания; сразу
@@ -5490,7 +6336,7 @@ canvas.addEventListener('pointerup', (e) => {
     const via = tool;
     shapeDrag = null;
     if (obj){ commitObject(obj); enterEditLock(obj, via); updateContextMenu(); }
-    scheduleRedraw();
+    requestFrame();
   }
   if (dragMode === 'handle' && (dragHandleRole === 'ie' || dragHandleRole === 'iw')) finishTaskWidthDrag(dragObjId);
   // растянули задание за угол — это и есть выбранный масштаб для следующих
@@ -5502,11 +6348,9 @@ canvas.addEventListener('pointerup', (e) => {
     const y0=Math.min(marqueeStart.y,marqueeCur.y), y1=Math.max(marqueeStart.y,marqueeCur.y);
     // считаем «зацепленным» любой объект, чей bbox хоть как-то пересекается с
     // рамкой — не обязательно целиком внутри неё
-    const hits = B.objects.filter(o => {
-      if (!mayTouch(o)) return false;               // Промпт №41
-      const b = objectBBox(o);
-      return b.maxX >= x0 && b.minX <= x1 && b.maxY >= y0 && b.minY <= y1;
-    });
+    // «„скорость досок“»: по индексу — он и так отдаёт только тех, чья
+    // рамка пересекает прямоугольник, в порядке слоёв
+    const hits = sceneQueryRect(x0, y0, x1, y1).filter(mayTouch);   // Промпт №41
     setSelectionIds((marqueeBase || []).concat(hits.map(o=>o.id)));
     marqueeStart = null; marqueeCur = null; marqueeBase = null;
     updateContextMenu(); // сразу, не дожидаясь кадра — см. комментарий в cancelDrafts()
@@ -5515,18 +6359,30 @@ canvas.addEventListener('pointerup', (e) => {
   if (dragMode === 'lasso'){
     // короткий росчерк (по сути щелчок мимо) ничего не обводит — как щелчок
     // мимо в режиме рамки: обычный снимает выделение, с ⌘ оставляет прежнее
-    const hits = (lassoPts && lassoPts.length >= 3) ? B.objects.filter(o => mayTouch(o) && lassoCaptures(o, lassoPts)) : [];
+    // кандидаты — из индекса по рамке лассо: объект, захваченный больше чем
+    // наполовину, рамку лассо обязательно пересекает
+    let hits = [];
+    if (lassoPts && lassoPts.length >= 3){
+      let lx0 = Infinity, ly0 = Infinity, lx1 = -Infinity, ly1 = -Infinity;
+      lassoPts.forEach(q => { lx0 = Math.min(lx0, q.x); ly0 = Math.min(ly0, q.y); lx1 = Math.max(lx1, q.x); ly1 = Math.max(ly1, q.y); });
+      hits = sceneQueryRect(lx0, ly0, lx1, ly1).filter(o => mayTouch(o) && lassoCaptures(o, lassoPts));
+    }
     setSelectionIds((lassoBase || []).concat(hits.map(o=>o.id)));
     lassoPts = null; lassoBase = null;
     updateContextMenu();
     scheduleRedraw();
   }
+  // ластик: всё стёртое за жест — одной правкой (до сброса dragMode)
+  if (dragMode === 'erase') commitEraseGesture();
   dragMode = null; dragHandleRole=null; dragObjId=null; dragGroupIds=null; dragOrigMap=null;
-  areaErase = null;
   if (penStroke){
-    if (penStroke.points.length >= 2) B.objects.push(penStroke);
+    const added = [];
+    if (penStroke.points.length >= 2){ B.objects.push(penStroke); added.push(penStroke); }
     if (penStroke.points.length >= 1) bumpColorUsage(penStroke.color);
-    penStroke = null; saveDB(); scheduleRedraw();
+    penStroke = null; saveDB();
+    // «„скорость досок“»: готовый штрих дорисовывается в кеш поверх, без
+    // полной перерисовки (он верхний — полная нарисовала бы его последним)
+    boardCacheCommitted(added); sceneMarkDirty(); requestFrame();
   }
 });
 canvas.addEventListener('pointercancel', () => {
@@ -5534,7 +6390,9 @@ canvas.addEventListener('pointercancel', () => {
   if (dragMode==='pan') updateCursor();
   if (dragMode==='marquee'){ marqueeStart=null; marqueeCur=null; }
   if (dragMode==='lasso'){ lassoPts=null; lassoBase=null; scheduleRedraw(); }
-  dragMode=null; areaErase=null;
+  // прерванный жест ластика ничего не стирает (шаг 1 «„скорость досок“»)
+  cancelEraseGesture();
+  dragMode=null;
   if (penStroke){ penStroke=null; scheduleRedraw(); }
 });
 
@@ -5551,6 +6409,9 @@ canvas.addEventListener('wheel', (e) => {
   const sx = e.clientX-r.left, sy=e.clientY-r.top;
   if (e.ctrlKey || e.metaKey){
     const w = screenToWorld(sx,sy);
+    // идёт жест зума (колесо, щипок тачпада): пока он идёт, кеш доски
+    // растягивается картинкой, чётко — после паузы (renderScreen)
+    bcZoomGestureUntil = performance.now() + 250;
     setZoom(cam.zoom * Math.exp(-e.deltaY*0.0016), w.x, w.y, sx, sy);
     return;
   }
@@ -5563,7 +6424,7 @@ canvas.addEventListener('wheel', (e) => {
       // учителя картинка менялась, у ученика — нет, и его записи у учителя
       // съезжали с рисунка. Снимок закрылся — открываем новый
       const cloudIdle = typeof window.boardsCloudGestureIdle === 'function' && window.boardsCloudGestureIdle();
-      if (!wheelResizeUndoDone || cloudIdle){ pushUndo(); wheelResizeUndoDone = true; }
+      if (!wheelResizeUndoDone || cloudIdle){ pushUndo({ ids: [obj.id] }); wheelResizeUndoDone = true; }
       clearTimeout(wheelResizeTimer);
       wheelResizeTimer = setTimeout(() => { wheelResizeUndoDone = false; }, 500);
       const factor = Math.exp(-e.deltaY*0.0016);
@@ -5577,7 +6438,7 @@ canvas.addEventListener('wheel', (e) => {
   }
   // Промпт №84: в презентации колесо листает слайды, пока слайд вписан в экран
   if (B.kind === 'deck' && typeof deckWheel === 'function' && deckWheel(e)) return;
-  cam.x += e.deltaX/cam.zoom; cam.y += e.deltaY/cam.zoom; clampCam(); scheduleRedraw();
+  cam.x += e.deltaX/cam.zoom; cam.y += e.deltaY/cam.zoom; clampCam(); requestFrame();   // только камера: кеш сдвигается
   // Промпт №54: на тачпаде Mac это основной способ двигать доску, а вид
   // запоминался только при перетаскивании и масштабе — при падении вкладки
   // доска открывалась не там, где закончили (rememberView сам с паузой)
@@ -9355,7 +10216,9 @@ document.getElementById('railExport').addEventListener('click', () => {
 });
 
 /* ── экспорт в PDF («конспект») — только те листы, где есть хоть что-то нарисованное ── */
-function objectBBox(obj){
+// рамка объекта как есть, без кеша. Снаружи зовут objectBBox (копия из
+// кеша) или objectBBoxRef (сам кешированный объект — только читать!)
+function computeObjectBBox(obj){
   // Промпт №97: блок, таблица, повёрнутая картинка — рамка с учётом поворота
   if (typeof bxBBox === 'function'){ const bb = bxBBox(obj); if (bb) return bb; }
   if (obj.type === 'text'){
@@ -10622,7 +11485,7 @@ window.boardsFlyTo = function(wx, wy){
     cam.y = from.y + (to.y - from.y) * e;
     clampCam();
     last = { x: cam.x, y: cam.y };
-    scheduleRedraw();
+    requestFrame();   // только камера
     if (k < 1) camFlyRaf = requestAnimationFrame(step);
     else { camFlyRaf = null; rememberView(); }
   };
@@ -10640,7 +11503,7 @@ window.getCurrentBoard = function(){ return B; };
 window.__applyDrop = function(st, t){ return applyDrop(st, t); };   // для проверок: перенос в папку без мыши
 window.__blSelection = function(){ return [...blSel]; };   // для проверок: что сейчас выделено в списке
 window.__purgeExpiredTrash = function(){ return purgeExpiredTrash(); };   // для проверок: уборка корзины без ожидания часа
-window.boardsRedraw = function(){ scheduleRedraw(); updateContextMenu(); };
+window.boardsRedraw = function(){ boardCacheReset('облако'); scheduleRedraw(); updateContextMenu(); };
 window.boardsClearSelection = function(){ selectedId = null; multiSelectIds = []; clearEditLock(); };
 // Промпт №10 (новый список): записать на диск содержимое общей доски, которое
 // пришло из базы или от собеседника. Это не правка — rev и updatedAt не
