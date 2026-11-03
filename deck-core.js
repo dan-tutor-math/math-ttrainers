@@ -34,6 +34,12 @@ let deckPreviewCam = null;            // камера предпросмотра
 // №96: у ученика (доска учителя, board-stage.js) презентация только
 // рисуется — ни листания, ни ленты, ни меню: всё это проверяет isDeckBoard
 function isDeckBoard(){ return !!(B && B.kind === 'deck') && !window.deckViewerMode; }
+// Можно ли анимировать слайды. Отдельно от isDeckBoard: от него у ученика зависят
+// лента, меню и полоса листания, которых быть не должно, а карточки быть могут
+function deckCanAnimate(){
+  if (window.deckViewerMode) return deckViewerAn > 0 && !!(B && B.kind === 'deck') && !deckReducedMotion();
+  return isDeckBoard();
+}
 function deckObj(){ return (B && Array.isArray(B.objects)) ? B.objects.find(o => o.type === 'deck') : null; }
 function deckSlides(){ const d = deckObj(); return d && Array.isArray(d.slides) ? d.slides : []; }
 function deckCur(){
@@ -112,6 +118,10 @@ function deckOnOpen(b){
   deckSyncStrip();
   deckResetDepth(); deckZf = 1; deckScrubTicks = -1;
   deckOpenPop(false);
+  // плашка другой презентации: у обычной доски кадр слайдов её не обновит
+  deckStraySig = null; deckStrayDismissed = -1;
+  const strays = document.getElementById('deckStrays');
+  if (strays) strays.hidden = true;
   if (b.kind === 'deck') deckLoadPresets();
   // №88: презентация открывается в «Конструкторе»; что было на доске — «видено»
   deckMode = 'edit'; deckResetSeen(); deckSyncModeUI();
@@ -138,6 +148,9 @@ function deckOnOpen(b){
    видом (ds), как и режим листания (fl): у ученика в localStorage может быть
    свой режим, а слайды должны стоять так же, как у учителя */
 let deckViewerFlow = null, deckViewerSlide = null, deckViewerFm = null;
+// №116: что прислал учитель вместе с видом. Учителя без этих полей (страница из
+// кэша) не анимируем: an остаётся 0, ученик смотрит как раньше
+let deckViewerAn = 0, deckViewerFxFull = false, deckViewerMg = 0;
 
 /* Кадр для ученика: прямоугольник в координатах доски, который ученик сам
    вписывает в своё окно. Камера учителя для этого не годится: она посчитана
@@ -147,7 +160,7 @@ let deckViewerFlow = null, deckViewerSlide = null, deckViewerFm = null;
    листания: это про то, как он ведёт урок, а не свойство презентации.
    Камера в презентации всегда в координатах ТЕКУЩЕГО слайда (и в сплошной
    прокрутке, №86), поэтому рамка слайда подходит для всех режимов листания */
-const DECK_SV_MODE_KEY = 'boardsDeckStudentView', DECK_SV_MARGIN_KEY = 'boardsDeckStudentMargin';
+const DECK_SV_MODE_KEY = 'boardsDeckStudentView', DECK_SV_MARGIN_KEY = 'boardsDeckStudentMargin', DECK_SV_ANIM_KEY = 'boardsDeckStudentAnim';
 const DECK_SV_MARGIN_MIN = 2, DECK_SV_MARGIN_MAX = 40, DECK_SV_MARGIN_DEF = 10;
 function deckStudentMode(){
   try { const m = localStorage.getItem(DECK_SV_MODE_KEY); return m === 'margin' || m === 'mine' ? m : 'slide'; } catch (e) { return 'slide'; }
@@ -156,6 +169,10 @@ function deckStudentMargin(){
   let v = NaN;
   try { v = parseFloat(localStorage.getItem(DECK_SV_MARGIN_KEY)); } catch (e) {}
   return isFinite(v) ? Math.max(DECK_SV_MARGIN_MIN, Math.min(DECK_SV_MARGIN_MAX, v)) : DECK_SV_MARGIN_DEF;
+}
+// №116: анимации у ученика — настройка учителя: off, flip (листание), all (и ползунок)
+function deckStudentAnim(){
+  try { const a = localStorage.getItem(DECK_SV_ANIM_KEY); return a === 'off' || a === 'flip' ? a : 'all'; } catch (e) { return 'all'; }
 }
 // поле — доля меньшей стороны слайда: одинаковое по всем краям и у книжного
 // А4, и у широкого слайда; доля от ширины у книжного дала бы огромное поле
@@ -187,8 +204,16 @@ function deckViewerOpen(b){
     if (!s.bg) s.bg = { k: 'grid' };
   });
   deckCurId = null;
+  // доска приехала заново: старые карточки и незавершённая стопка ни к чему
+  deckViewerFastDrop();
+  deckResetDepth();
+  deckViewerDepthRest();
 }
 function deckViewerClose(){
+  deckViewerFastDrop();
+  deckResetDepth();
+  deckViewerDepthRest();
+  deckViewerAn = 0; deckViewerFxFull = false; deckViewerMg = 0;
   window.deckViewerMode = false; deckViewerFlow = null; deckViewerSlide = null; deckViewerFm = null; deckCurId = null;
   document.documentElement.classList.remove('deck-show');
 }
@@ -197,9 +222,122 @@ function deckViewerView(v){
   // №105: учитель в режиме показа — и у ученика только слайд и пометки
   // (тот же CSS html.deck-show, что у учителя: панели доски спрятаны)
   document.documentElement.classList.toggle('deck-show', !!v.sh);
+  deckViewerAn = v.an === 1 || v.an === 2 ? v.an : 0;
+  deckViewerFxFull = v.fx === 1;
+  // учитель выключил анимацию ползунка, пока ученик в стопке
+  if (deckVF && (deckViewerAn < 2 || !deckCanAnimate())) deckViewerFastExit(null);
+  // №116: слайд сменился — та же анимация, что у учителя. Зовётся ДО смены
+  // текущего, поэтому старые слайд, режим и поле ещё на месте; по сети ничего
+  // лишнего не идёт. Пока идёт стопка, слайд ведёт она
+  const next = v.ds || null, prev = deckViewerSlide;
+  const flip = !!(next && prev && next !== prev && boardActive && !deckVF && !deckFx && (v.fl || null) !== 'scroll' && deckCanAnimate() && deckSlides().some(s => s.id === next));
+  let flipped = false;
+  if (flip && v.sh){
+    // в показе слой спрятан: короткое проявление, как у учителя (dtbShowStep)
+    const cv = document.getElementById('boardCv');
+    if (cv){ cv.classList.remove('dtb-show-in'); void cv.offsetWidth; cv.classList.add('dtb-show-in'); }
+  } else if (flip){
+    deckViewerLayerOn();
+    flipped = deckFlipAnim();
+  }
   deckViewerFlow = v.fl || null;
-  deckViewerSlide = v.ds || null;
+  deckViewerSlide = next;
   deckViewerFm = v.fm || null;
+  deckViewerMg = v.mg || 0;
+  // сразу, а не с первым кадром: камера уже может быть в координатах нового слайда
+  if (next && deckSlides().some(s => s.id === next)) deckCurId = next;
+  if (flipped){
+    // в покое карточек у ученика нет: без готовой картинки входящий слайд
+    // первые кадры ехал бы пустым листом
+    const c = deckCards.get(next);
+    if (c){ deckRenderCard(next, c.want); const q = deckCardQueue.indexOf(next); if (q >= 0) deckCardQueue.splice(q, 1); }
+  }
+}
+function deckViewerLayerOn(){
+  const L = deckDepthLayer();
+  if (L && L.hidden) L.hidden = false;
+}
+// анимация кончилась: слой убираем целиком, чтобы соседи не занимали память и не
+// устаревали от новых пометок (в покое их всё равно закрывает непрозрачный холст)
+function deckViewerDepthRest(){
+  const L = deckDepthLayer();
+  if (!L || L.hidden) return;
+  L.hidden = true;
+  L.innerHTML = '';
+  deckCards.clear(); deckCardQueue.length = 0;
+  deckDepthKey = ''; deckDepthCurShown = null;
+}
+// кадр любого слайда по настройкам, которые прислал учитель; null — «Как у меня»
+function deckViewerFrameOf(s){
+  return deckViewerFm === 'slide' || deckViewerFm === 'margin' ? deckFrameOf(s, deckViewerFm, deckViewerMg) : null;
+}
+// где слайд стоит у ученика. deckArea и deckFitZoom здесь не подходят: они про
+// панели учителя, и карточка в конце анимации не совпала бы со слайдом на холсте
+function deckViewerGeom(s){
+  const f = deckViewerFrameOf(s);
+  if (f) return { z: deckFrameCam(f, cssW, cssH).zoom, cx: cssW / 2, cy: cssH / 2 };
+  const r = deckSlideRect(s);
+  return { z: cam.zoom, cx: (r.x + r.w / 2 - cam.x) * cam.zoom, cy: (r.y + r.h / 2 - cam.y) * cam.zoom };
+}
+
+/* №116: быстрое листание у ученика. Позиция приходит сообщениями bd_live (fast),
+   а стопку ведёт тот же код, что у учителя (deckFastEnter/Move/Leave).
+   Учитель шлёт позицию и пока держит ручку неподвижно, поэтому тишина дольше
+   секунды — это обрыв: ученик выходит на последний известный слайд */
+const DECK_VF_TIMEOUT_MS = 1000;
+let deckVF = null, deckVFEnded = 0, deckVFTimer = 0;
+function deckViewerFastDrop(){
+  deckVF = null;
+  clearInterval(deckVFTimer); deckVFTimer = 0;
+}
+function deckViewerFast(m){
+  if (!window.deckViewerMode || !m || !m.n) return;
+  if (m.end){
+    if (deckVF) deckViewerFastExit(m.ds || null);
+    deckVFEnded = m.n;
+    return;
+  }
+  // позиция, которая дошла позже конца, не должна открыть стопку заново
+  if (m.n === deckVFEnded || typeof m.p !== 'number' || !boardActive) return;
+  if (deckViewerAn < 2 || !deckCanAnimate() || deckFlow() === 'scroll' || document.documentElement.classList.contains('deck-show')) return;
+  const sl = deckSlides();
+  if (!sl.length) return;
+  const p = Math.max(0, Math.min(sl.length - 1, m.p));
+  if (!deckVF){
+    deckViewerLayerOn();
+    deckVF = { at: 0, pos: p };
+    deckFastEnter(Math.max(0, deckCurIndex()));
+    scheduleRedraw();
+    deckVFTimer = setInterval(deckViewerFastWatch, 150);
+  }
+  deckVF.at = Date.now();
+  deckVF.pos = p;
+  const s = sl[Math.round(p)];
+  if (s && s.id !== deckCurId){ deckViewerSlide = s.id; deckCurId = s.id; scheduleRedraw(); }
+  deckFastMove(p, !!m.f);
+}
+function deckViewerFastWatch(){
+  if (!deckVF){ deckViewerFastDrop(); return; }
+  const TS = window.TrainerSession, conn = TS && TS.getConnState ? TS.getConnState() : 'online';
+  if (Date.now() - deckVF.at > DECK_VF_TIMEOUT_MS || conn !== 'online') deckViewerFastExit(null);
+}
+function deckViewerFastExit(ds){
+  if (!deckVF) return;
+  // deckViewerSlide — самое свежее из позиции и bd_view: вид мог обогнать позицию,
+  // и округление последней позиции вернуло бы ученика на слайд назад
+  const sl = deckSlides(), last = sl.find(x => x.id === deckViewerSlide) || sl[Math.round(deckVF.pos)];
+  const s = (ds && sl.find(x => x.id === ds)) || last || deckCur();
+  deckViewerFastDrop();
+  if (s){ deckViewerSlide = s.id; deckCurId = s.id; }
+  deckFastLeave();
+  // кадр последнего слайда: bd_view с ним мог и не дойти
+  if (s && typeof window.__bdViewerSetSlide === 'function') window.__bdViewerSetSlide(s.id);
+  scheduleRedraw();
+}
+// сплошная прокрутка: сдвиг камеры при смене слайда, у которого свои координаты
+function deckScrollShift(oldId, newId){
+  const L = deckScrollLayout(), a = L.off.get(oldId), b = L.off.get(newId);
+  return a && b ? { dx: a.x - b.x, dy: a.y - b.y } : null;
 }
 function deckViewerSync(){
   const sl = deckSlides();
@@ -319,7 +457,9 @@ function deckDrawBackground(c, camv, w, h, isScreen){
     if (isScreen && camv === cam && document.documentElement.classList.contains('deck-show')){ c.fillStyle = '#121418'; c.fillRect(0, 0, w, h); }
     // «Только слайд»: соседи из сплошной прокрутки за краем не нужны — ученик
     // смотрит на один слайд, вокруг только спокойный фон
-    if (isScreen && scroll && camv === cam && deckViewerFm !== 'slide') deckRenderScrollOthers(c, camv, w, h);
+    // Пока кадр переезжает, соседи нужны и здесь: иначе старый слайд пропал бы сразу
+    if (isScreen && scroll && camv === cam && (deckViewerFm !== 'slide' || window.deckViewerGlide)) deckRenderScrollOthers(c, camv, w, h);
+    if (isScreen && camv === cam && !deckSlideHidden()) deckViewerDepthRest();
     const sv = deckDrawnSlide();
     if (sv) deckDrawPaper(c, sv, camv);
     return;
@@ -338,7 +478,7 @@ function deckDrawBackground(c, camv, w, h, isScreen){
   const s = deckDrawnSlide();
   if (!s) return;
   deckDrawPaper(c, s, camv);
-  if (isScreen){ deckUpdateNav(); deckStripUpdate(); deckDepthSync(); deckScrubSync(); deckSyncPop(); }
+  if (isScreen){ deckUpdateNav(); deckStripUpdate(); deckDepthSync(); deckScrubSync(); deckSyncPop(); deckStraySync(); }
 }
 // бумага, тень и сетка одного слайда — по текущей activeCam
 function deckDrawPaper(c, s, camv){
@@ -365,6 +505,20 @@ function deckClipSlide(c, camv){
 }
 // для «Скачать PNG»: выгружаем текущий слайд, а не лист А4 полотна
 function deckCurRect(){ const s = deckCur(); return s ? deckSlideRect(s) : null; }
+// №117: рамка, куда кладём задание из тренажёра. Объекты обрезаются по слайду
+// (deckClipSlide), поэтому задание за рамкой не видно: остаются только живые
+// поля над ним. У ученика рамки нет: задания кладёт учитель
+function deckTaskFrame(){ return isDeckBoard() ? deckCurRect() : null; }
+// место внутри слайда: крупное уменьшаем, вылезшее сдвигаем. Даже на полном
+// слайде задание лучше положить внахлёст, чем потерять за краем
+function deckFitTaskRect(r, gap, frame){
+  const f = frame || deckTaskFrame();
+  if (!f) return r;
+  const m = Math.min(gap || 0, f.w / 8, f.h / 8);
+  const k = Math.min(1, (f.w - 2 * m) / r.w, (f.h - 2 * m) / r.h);
+  const w = r.w * k, h = r.h * k;
+  return { x: clamp(r.x, f.x + m, f.x + f.w - m - w), y: clamp(r.y, f.y + m, f.y + f.h - m - h), w, h };
+}
 
 // листание: 'v' лента по одному, 'scroll' сплошная прокрутка (№86), 'h' галерея
 // №105: в режиме показа листание — по одному слайду, даже если учитель
@@ -450,9 +604,13 @@ function deckAnimate(dir){
   if (!cv) return;
   if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const cls = deckFlow() === 'h' ? (dir > 0 ? 'deck-in-h' : 'deck-in-hb') : (dir > 0 ? 'deck-in-v' : 'deck-in-vb');
-  cv.classList.remove('deck-in-v', 'deck-in-vb', 'deck-in-h', 'deck-in-hb');
-  void cv.offsetWidth;
-  cv.classList.add(cls);
+  // №117: поля заданий едут той же анимацией, иначе на 0,26 с отстанут от холста
+  [cv, document.getElementById('bdTaskLayer')].forEach(el => {
+    if (!el) return;
+    el.classList.remove('deck-in-v', 'deck-in-vb', 'deck-in-h', 'deck-in-hb');
+    void el.offsetWidth;
+    el.classList.add(cls);
+  });
 }
 
 function deckNextSlot(d){ return d.slides.reduce((m, s) => Math.max(m, s.slot), -1) + 1; }
@@ -1074,12 +1232,22 @@ let deckFast = false, deckAnimUntil = 0, deckAnimTimer = null;
 // ползунка непрерывно: deckFastPos — дробный номер слайда (2,4 — между
 // вторым и третьим), deckFastFollow — ручка вне «магнита» отметки
 let deckFastPos = null, deckFastFollow = false, deckDepthFollowShown = false;
-function deckMaxFx(){ return document.documentElement.getAttribute('data-fx') === 'full'; }
+// №116: у ученика уровень эффектов — учителя (приходит с видом), а не его собственный
+function deckMaxFx(){ return window.deckViewerMode ? deckViewerFxFull : document.documentElement.getAttribute('data-fx') === 'full'; }
 const deckCards = new Map();          // id слайда → { el, bw, dirty }
 const deckCardQueue = [];
 let deckDepthKey = '', deckDepthCurShown = null;
 
 function deckSlideHidden(){ return deckFast || Date.now() < deckAnimUntil || !!deckFx; }
+// №117: пока слайд едет картинкой, живые поля прячем. Они стоят по камере, а
+// картинку двигает CSS-transform с наклоном и своим масштабом: поверх неё поле
+// оказывалось крупной копией со сдвигом. Слайд — пиксели холста, а не
+// DOM-контейнер, и вложить в него поля нельзя. Поэтому на время полёта они
+// нарисованы в самой картинке (deckCardFace, drawTaskFace) и едут вместе с ней
+function deckLiveLayerSync(){
+  const el = document.getElementById('bdTaskLayer');
+  if (el) el.style.visibility = (B && B.kind === 'deck' && deckSlideHidden()) ? 'hidden' : '';
+}
 
 /* №85е: в «максимуме эффектов» вход в быстрое листание, ход за ручкой и
    выход ведёт JS кадр за кадром: показанные положение стопки (pos) и
@@ -1093,11 +1261,17 @@ function deckFxTarget(){
 }
 function deckFxStart(){
   if (!deckFx) deckFx = { pos: Math.max(0, deckCurIndex()), z: deckZf, t: performance.now() };
+  deckLiveLayerSync();
   if (!deckFxRaf) deckFxRaf = requestAnimationFrame(deckFxTick);
 }
 function deckFxTick(now){
   deckFxRaf = 0;
-  if (!deckFx || !isDeckBoard() || !boardActive){ deckFx = null; return; }
+  if (!deckFx || !deckCanAnimate() || !boardActive){
+    deckFx = null;
+    // у ученика холст на время стопки прозрачный — вернём его
+    if (window.deckViewerMode && boardActive) scheduleRedraw();
+    return;
+  }
   // шаг кадра не больше 100 мс: после свёрнутой вкладки не прыгнуть разом
   const dt = Math.max(1, Math.min(100, now - deckFx.t)); deckFx.t = now;
   const T = deckFxTarget();
@@ -1121,6 +1295,9 @@ function deckDepthParams(z){
 function deckDepthLayer(){ return document.getElementById('deckDepth'); }
 function deckReducedMotion(){ return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); }
 
+// рисуется картинка для слоя: ей нужен ещё и вид поля с «?» и набранным ответом.
+// Миниатюрам и выгрузке не нужен: черновик ответа в PDF не попадает
+let deckCardFace = false;
 // картинка слайда для слоя: ширина по экрану, но не больше DECK_CARD_MAXW
 function deckRenderCard(id, cssWpx){
   const s = deckSlides().find(x => x.id === id), card = deckCards.get(id);
@@ -1130,9 +1307,10 @@ function deckRenderCard(id, cssWpx){
   const bh = Math.max(36, Math.round(bw * r.h / r.w));
   card.el.width = bw; card.el.height = bh; card.bw = bw; card.dirty = false;
   deckRenderSlideId = id;
+  deckCardFace = true;
   try { render(card.el.getContext('2d'), bw, bh, { x: r.x, y: r.y, zoom: bw / r.w, minLine: 1 }, false, 1); }
   catch (e) {}
-  finally { deckRenderSlideId = null; activeCam = cam; deckInkSync(); }
+  finally { deckCardFace = false; deckRenderSlideId = null; activeCam = cam; deckInkSync(); }
   const loading = deckSlotObjects(s).some(o => { if (o.type !== 'image') return false; const im = getImg(o.src); return !(im.complete && im.naturalWidth); });
   if (loading){ card.dirty = true; setTimeout(() => deckQueueCard(id), 900); }
 }
@@ -1144,7 +1322,7 @@ function deckQueueCard(id){
 }
 function deckDrainCards(){
   const id = deckCardQueue.shift();
-  if (id && deckCards.has(id) && isDeckBoard() && boardActive) deckRenderCard(id);
+  if (id && deckCards.has(id) && deckCanAnimate() && boardActive) deckRenderCard(id);
   if (deckCardQueue.length) requestAnimationFrame(deckDrainCards);
 }
 function deckMarkCardsDirty(ids){
@@ -1164,16 +1342,20 @@ function deckResetDepth(){
    если что-то поменялось. Смена текущего слайда, начало/конец листания —
    с анимацией; масштаб и окно — без неё (иначе слой отставал бы от холста) */
 function deckDepthSync(){
+  deckLiveLayerSync();
   const L = deckDepthLayer(), sl = deckSlides(), cur = deckCur();
   if (!L || !cur || L.hidden) return;
   const ci = sl.indexOf(cur), flow = deckFlow() === 'h' ? 'h' : 'v';
   const hidden = deckSlideHidden();
-  const fz = deckFitZoom(cur);
+  const vg = window.deckViewerMode ? deckViewerGeom(cur) : null;
+  const fz = vg ? vg.z : deckFitZoom(cur);
   const zf = deckFast ? Math.min(deckZf, DECK_FAST_Z) : deckZf;
   // где текущий слайд на экране: по камере, а в листании — посередине
   // свободного места в «виртуальном» масштабе
   let Z, cx, cy;
-  if (hidden || deckFitted){
+  if (vg){
+    Z = fz * (deckFx ? deckFx.z : zf); cx = vg.cx; cy = vg.cy;
+  } else if (hidden || deckFitted){
     const a = deckArea();
     Z = fz * (deckFx ? deckFx.z : zf); cx = a.x + a.w / 2; cy = a.y + a.h / 2;
   } else {
@@ -1182,7 +1364,7 @@ function deckDepthSync(){
   }
   // «максимум»: положение и отдаление ведёт deckFxTick, анимация CSS не нужна
   const fxOn = !!deckFx;
-  const p = deckDepthParams(fxOn ? deckFx.z : (deckFitted || hidden ? zf : 1));
+  const p = deckDepthParams(fxOn ? deckFx.z : (vg || deckFitted || hidden ? zf : 1));
   const frac = fxOn || (deckFast && deckFastPos !== null);
   const fpos = fxOn ? Math.max(0, Math.min(sl.length - 1, deckFx.pos)) : frac ? Math.max(0, Math.min(sl.length - 1, deckFastPos)) : ci;
   // пока идёт мягкий вход в обзор (класс slow), за ручкой — с анимацией
@@ -1194,7 +1376,10 @@ function deckDepthSync(){
   const animate = !follow && (cur.id !== deckDepthCurShown || hidden !== (old[1] === 'true') || deckFast !== (old[2] === 'true') || deckDepthFollowShown || frac);
   deckDepthKey = key; deckDepthCurShown = cur.id; deckDepthFollowShown = follow;
 
-  const lo = Math.max(0, Math.floor(fpos) - 3), hi = Math.min(sl.length - 1, Math.ceil(fpos) + 3);
+  // ученику при обычном листании хватит ближайших: карточки он рисует на ходу, а
+  // не держит готовыми, и лишние шесть картинок — это рывок на слабом устройстве
+  const span = vg && !deckFast && !deckFx ? 1 : 3;
+  const lo = Math.max(0, Math.floor(fpos) - span), hi = Math.min(sl.length - 1, Math.ceil(fpos) + span);
   const want = new Set();
   for (let i = lo; i <= hi; i++) want.add(sl[i].id);
   deckCards.forEach((c, id) => { if (!want.has(id)){ c.el.remove(); deckCards.delete(id); } });
@@ -1242,7 +1427,8 @@ function deckDepthSync(){
     el.style.opacity = op;
     // «максимум»: размытие растёт с удалённостью плавно, а не скачком на
     // середине пути (иначе при непрерывной прокрутке слайд «щёлкает»)
-    el.style.filter = deckMaxFx() && a > .02 ? `blur(${(Math.min(a, 1) * 1.4 + Math.max(0, Math.min(a, 2) - 1)).toFixed(2)}px)` : '';
+    // у ученика 'none': его собственный data-fx не должен добавлять размытие сверх учителя
+    el.style.filter = deckMaxFx() && a > .02 ? `blur(${(Math.min(a, 1) * 1.4 + Math.max(0, Math.min(a, 2) - 1)).toFixed(2)}px)` : (vg ? 'none' : '');
     el.style.zIndex = 100 - Math.round(a * 10);
     if (fresh || c.dirty || (c.bw && w * Math.min(2, window.devicePixelRatio || 1) > c.bw * 1.35 && c.bw < DECK_CARD_MAXW)) deckQueueCard(s.id);
   }
@@ -1273,9 +1459,40 @@ function deckFlipAnim(ms){
   ms = ms || DECK_ANIM_MS;
   if (!deckSlideHidden()) deckShowCurCard();
   deckAnimUntil = Math.max(deckAnimUntil, Date.now() + ms);
+  deckLiveLayerSync();
   clearTimeout(deckAnimTimer);
   deckAnimTimer = setTimeout(() => { deckAnimUntil = 0; scheduleRedraw(); }, deckAnimUntil - Date.now() + 20);
   return true;
+}
+
+/* №116: быстрое листание разделено на две части. Здесь — как рисуется стопка: вход,
+   ход и выход. Откуда берётся позиция — отдельно: мышь учителя (ползунок ниже) или
+   сообщение по сети у ученика (deckViewerFast) */
+function deckFastEnter(pos){
+  deckShowCurCard();
+  if (deckMaxFx()){ deckFast = true; deckFastPos = pos; deckFxStart(); }
+  else { deckSlowFor(DECK_MODE_MS); deckFast = true; deckLiveLayerSync(); }
+  // учитель: позицию повезёт ученику board-stage.js
+  if (!window.deckViewerMode && typeof window.__bdFastChanged === 'function') window.__bdFastChanged();
+}
+function deckFastMove(pos, follow){
+  if (!deckFast || !deckMaxFx()) return;
+  deckFastFollow = follow;
+  deckFastPos = pos;
+  if (deckFx) deckFxStart(); else scheduleRedraw();
+}
+function deckFastLeave(){
+  // обзор → свой масштаб, текущий слайд ещё 0,3 с картинкой
+  if (deckFast && deckFx){
+    // «максимум»: стопка плавно доезжает до слайда и приближается обратно
+    deckFastPos = null; deckFastFollow = false; deckFast = false; deckFxStart();
+  } else if (deckFast){ deckFastPos = null; deckFastFollow = false; deckSlowFor(DECK_MODE_MS); deckFlipAnim(DECK_MODE_MS); deckFast = false; }
+}
+// что учитель шлёт ученику: дробный номер слайда и «ручка вне магнита». В обычном
+// уровне эффектов дробной позиции нет — идёт номер текущего слайда
+function deckFastWire(){
+  if (!deckFast) return null;
+  return { p: deckFastPos !== null ? deckFastPos : Math.max(0, deckCurIndex()), f: deckFastFollow ? 1 : 0 };
 }
 
 /* ── ползунок быстрого листания справа (напротив ленты миниатюр) ──
@@ -1325,11 +1542,7 @@ function deckScrubSync(){
     knob.style.top = (snapped ? tickY : y) + 'px';
     // «максимум эффектов»: стопка идёт за ручкой непрерывно, у отметки —
     // примагничивается к слайду
-    if (deckFast && deckMaxFx()){
-      deckFastFollow = !snapped;
-      deckFastPos = snapped || n < 2 ? i : y / r.height * (n - 1);
-      if (deckFx) deckFxStart(); else scheduleRedraw();
-    }
+    deckFastMove(snapped || n < 2 ? i : y / r.height * (n - 1), !snapped);
     const s = deckSlides()[i];
     if (s && s.id !== deckCurId){
       deckShowSlide(s);
@@ -1351,9 +1564,7 @@ function deckScrubSync(){
       sc.classList.add('drag');
       // в сплошной прокрутке соседи и так видны — без обзора
       if (deckCur() && !deckReducedMotion() && !deckIsScroll()){
-        deckShowCurCard();
-        if (deckMaxFx()){ deckFast = true; deckFastPos = Math.max(0, deckCurIndex()); deckFxStart(); }
-        else { deckSlowFor(DECK_MODE_MS); deckFast = true; }
+        deckFastEnter(Math.max(0, deckCurIndex()));
       }
       scheduleRedraw();
     }
@@ -1365,11 +1576,7 @@ function deckScrubSync(){
     deckScrubState = null;
     sc.classList.remove('drag');
     if (st.moved){
-      // обзор → свой масштаб, текущий слайд ещё 0,3 с картинкой
-      if (deckFast && deckFx){
-        // «максимум»: стопка плавно доезжает до слайда и приближается обратно
-        deckFastPos = null; deckFastFollow = false; deckFast = false; deckFxStart();
-      } else if (deckFast){ deckFastPos = null; deckFastFollow = false; deckSlowFor(DECK_MODE_MS); deckFlipAnim(DECK_MODE_MS); deckFast = false; }
+      deckFastLeave();
       rememberView();
       scheduleRedraw();
       return;
@@ -2264,6 +2471,63 @@ function deckMakeBase(id){
   saveDB(); scheduleRedraw();
   deckToast('Слайд закреплён как заготовка');
 }
+/* №117: задания, которые старая раскладка положила за рамку слайда. На слайде
+   их не видно, поэтому сам учитель их не найдёт: плашка появляется только когда
+   такие есть, а двигает их только нажатие — это его данные. Слайд — ближайший к
+   середине задания: промежуток между слайдами больше любого такого промаха.
+   Повёрнутые не трогаем: поворот делают руками, и край там может быть намеренно */
+function deckStrayTasks(){
+  const rects = deckSlides().map(deckSlideRect), out = [];
+  if (!rects.length) return out;
+  B.objects.forEach(o => {
+    if (o.type !== 'image' || o.bgOf || o.rot || !o.points || !o.points[0] || !(o.task || o.gen || o.stack)) return;
+    const x = o.points[0].x, y = o.points[0].y, cx = x + o.w / 2, cy = y + o.h / 2;
+    const dist = r => Math.hypot(Math.max(r.x - cx, 0, cx - r.x - r.w), Math.max(r.y - cy, 0, cy - r.y - r.h));
+    const f = rects.reduce((a, r) => dist(r) < dist(a) ? r : a);
+    if (x < f.x - .5 || y < f.y - .5 || x + o.w > f.x + f.w + .5 || y + o.h > f.y + f.h + .5) out.push({ o, f });
+  });
+  return out;
+}
+function deckReturnStrays(){
+  if (!deckIsTeacher()) return;
+  const list = deckStrayTasks();
+  if (!list.length) return;
+  pushUndo();
+  list.sort((a, b) => (a.o.addedAt || 0) - (b.o.addedAt || 0)).forEach(({ o, f }) => {
+    const g = taskGapOf(o);
+    const q = deckFitTaskRect({ x: o.points[0].x, y: o.points[0].y, w: o.w, h: o.h }, g, f);
+    const area = { x: f.x + g, y: f.y + g, w: f.w - 2 * g, h: f.h - 2 * g };
+    // ближайшее свободное к тому месту, куда задание и хотели положить. Нет такого —
+    // внахлёст: видимое задание лучше потерянного
+    const spot = nearestFreeSpot(area, q.w, q.h, taskObstacles(o.id), q.x + q.w / 2, q.y + q.h / 2, g) || q;
+    o.points[0].x = spot.x; o.points[0].y = spot.y; o.w = q.w; o.h = q.h;
+    // старая стопка привязана к месту за рамкой: новое задание начнёт свою
+    delete o.stack;
+  });
+  deckCards.forEach(c => { c.dirty = true; });
+  deckDepthKey = '';
+  saveDB(); scheduleRedraw();
+  deckToast('Задания возвращены на слайды: ' + list.length);
+}
+let deckStraySig = null, deckStrayCount = 0, deckStrayDismissed = -1;
+// зовётся на каждый кадр, поэтому считаем заново только когда доска изменилась
+function deckStraySync(){
+  const el = document.getElementById('deckStrays');
+  if (!el) return;
+  const sig = B.id + '|' + B.rev + '|' + B.objects.length + '|' + deckSlides().length;
+  if (sig !== deckStraySig){
+    deckStraySig = sig;
+    deckStrayCount = deckIsTeacher() ? deckStrayTasks().length : 0;
+    document.getElementById('deckStraysNo').textContent = deckStrayCount;
+  }
+  const on = deckStrayCount > 0 && deckStrayCount !== deckStrayDismissed;
+  if (el.hidden === on) el.hidden = !on;
+  if (!on) return;
+  // в полосе над слайдом: там выглядывает только сосед, задание не закрываем
+  const a = deckArea();
+  el.style.left = (a.x + a.w / 2 + boardInset) + 'px';
+  el.style.top = (a.y + 3) + 'px';
+}
 // копия урока: вся презентация с пометками — отдельной доской в списке
 function deckSaveLessonCopy(){
   if (!isDeckBoard() || !deckIsTeacher()) return;
@@ -2287,6 +2551,8 @@ document.getElementById('deckModeEdit')?.addEventListener('click', () => deckSet
 document.getElementById('deckModeLesson')?.addEventListener('click', () => deckSetMode('lesson'));
 document.getElementById('deckClearNotes')?.addEventListener('click', () => deckClearNotes(false));
 document.getElementById('deckCopyBtn')?.addEventListener('click', () => deckSaveLessonCopy());
+document.getElementById('deckStraysBtn')?.addEventListener('click', () => deckReturnStrays());
+document.getElementById('deckStraysClose')?.addEventListener('click', () => { deckStrayDismissed = deckStrayCount; deckStraySig = null; scheduleRedraw(); });
 
 
 /* ═══════════════════════════════════════════════════════════════════════

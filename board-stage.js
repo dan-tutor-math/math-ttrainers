@@ -403,6 +403,10 @@
            сдвиг учителя до него не доходят */
         if (typeof deckStudentFrame === 'function') {
           v.fm = deckStudentMode();
+          // №116: уровень анимаций и эффектов; ученик анимирует сам, по смене ds
+          v.an = { off: 0, flip: 1, all: 2 }[deckStudentAnim()];
+          if (deckMaxFx()) v.fx = 1;
+          if (v.fm === 'margin') v.mg = deckStudentMargin();
           const fr = deckStudentFrame();
           if (fr) v.fr = { x: +fr.x.toFixed(2), y: +fr.y.toFixed(2), w: +fr.w.toFixed(2), h: +fr.h.toFixed(2) };
         }
@@ -412,6 +416,33 @@
       lastView = key;
       TS.broadcastEvent('bd_view', v);
     }
+    /* №116: позиция быстрого листания — своим таймером, а не из sendLive: тот
+       будит перерисовка, а в «максимуме» стопку ведёт свой цикл кадров и холст не
+       перерисовывается. Держит ручку неподвижно — шлём ту же позицию реже, иначе
+       ученик решит, что связь оборвалась, и выйдет из стопки */
+    const FAST_MS = 40, FAST_KEEP_MS = 250;
+    let fastTimer = 0, fastN = 0, fastSent = '', fastAt = 0;
+    function fastTick() {
+      const on = boardOpen() && shownId === B.id && viewers() && B.kind === 'deck' && deckStudentAnim() === 'all';
+      const w = on ? deckFastWire() : null;
+      if (!w) {
+        clearInterval(fastTimer); fastTimer = 0;
+        if (fastN) {
+          const cur = boardOpen() && B.kind === 'deck' ? deckCur() : null;
+          TS.broadcastEvent('bd_live', { sync: syncId, fast: { n: fastN, end: 1, ds: cur ? cur.id : null } });
+          fastN = 0;
+          sendView(false);
+        }
+        return;
+      }
+      if (!fastN) { fastN = Date.now(); fastSent = ''; }
+      const key = w.p.toFixed(3) + w.f, now = Date.now();
+      if (key === fastSent && now - fastAt < FAST_KEEP_MS) return;
+      fastSent = key; fastAt = now;
+      TS.broadcastEvent('bd_live', { sync: syncId, fast: { n: fastN, p: +w.p.toFixed(3), f: w.f } });
+    }
+    window.__bdFastChanged = () => { if (!fastTimer) fastTimer = setInterval(fastTick, FAST_MS); };
+
     let liveTimer = null, liveAt = 0;
     let livePenId = null, livePenSent = 0, livePenT0 = 0, livePenLastT = 0;
     const liveDragSig = new Map();
@@ -635,7 +666,7 @@
       /* просмотр: от интерфейса досок остаются холст и живые поля заданий
          (они показывают ответ ученика учителя, но нажать их нельзя) */
       html.bd-viewer #screenList{display:none!important;}
-      html.bd-viewer #screenBoard > *:not(#boardCv):not(#bdTaskLayer):not(#bdViewerWait):not(#bdRefToggle):not(#bdRefPanel){display:none!important;}
+      html.bd-viewer #screenBoard > *:not(#boardCv):not(#deckDepth):not(#bdTaskLayer):not(#bdViewerWait):not(#bdRefToggle):not(#bdRefPanel){display:none!important;}
       html.bd-viewer #screenBoard, html.bd-viewer #screenBoard *{pointer-events:none!important;}
       /* справочные материалы учителя: кнопка в углу ученику видна и
          нажимается (открыть/свернуть у себя), текст в панели можно листать;
@@ -910,16 +941,89 @@
       if (TS.stageOwnWindow) TS.stageOwnWindow(on);
     }
     let viewSig = '';
-    function applyView() {
+    /* №116: плавный переезд кадра — в сплошной прокрутке вместо карточек и при смене
+       режима или поля. Рисует обычный кадр доски, просто с другой камерой. Центр идёт
+       по прямой, а масштаб — по степени: иначе слайд при отдалении уплывал бы вбок */
+    const GLIDE_MS = 350;
+    let glide = null, lastShown = null;
+    function glideStop() {
+      if (!glide) return;
+      cancelAnimationFrame(glide.raf);
+      glide = null;
+      window.deckViewerGlide = false;
+    }
+    function glideTick(now) {
+      if (!glide) return;
+      // метка кадра бывает раньше t0: без нижней границы кадр на миг шёл бы назад
+      const k = Math.max(0, Math.min(1, (now - glide.t0) / GLIDE_MS)), e = 1 - Math.pow(1 - k, 3);
+      const f = glide.from, t = glide.to;
+      if (k >= 1) {
+        cam.x = t.x; cam.y = t.y; cam.zoom = t.zoom;
+        glide = null;
+        window.deckViewerGlide = false;
+        viewSig = '';
+        scheduleRedraw();
+        return;
+      }
+      const z = f.zoom * Math.pow(t.zoom / f.zoom, e);
+      const cx = f.x + cssW / 2 / f.zoom, cy = f.y + cssH / 2 / f.zoom;
+      const tx = t.x + cssW / 2 / t.zoom, ty = t.y + cssH / 2 / t.zoom;
+      cam.zoom = z;
+      cam.x = cx + (tx - cx) * e - cssW / 2 / z;
+      cam.y = cy + (ty - cy) * e - cssH / 2 / z;
+      scheduleRedraw();
+      glide.raf = requestAnimationFrame(glideTick);
+    }
+    function glideStart(to) {
+      glideStop();
+      glide = { from: { x: cam.x, y: cam.y, zoom: cam.zoom }, to: to, t0: performance.now(), raf: 0 };
+      window.deckViewerGlide = true;
+      glide.raf = requestAnimationFrame(glideTick);
+    }
+    // instant — окно ученика изменилось: кадр обязан сразу встать по новому окну
+    function applyView(instant) {
       if (!view || !boardActive) return;
       window.applyBoardInset();
       const fr = viewFrame();
       setStageOwn(!!fr);
+      // презентация от нового учителя: кадр или его камера с плавным переходом
+      if (window.deckViewerMode && view.fm && typeof deckCanAnimate === 'function') {
+        const shift = inStage ? (view.inset || 0) / (view.zoom || 1) : 0;
+        const to = fr ? deckFrameCam(fr, cssW, cssH) : { x: view.x - shift, y: view.y, zoom: view.zoom };
+        const shape = fr ? fr.w + 'x' + fr.h + view.fm : 'mine';
+        const prev = lastShown;
+        lastShown = { ds: view.ds, shape: shape, fl: view.fl };
+        // карточки сами показывают смену слайда — камера под ними встаёт сразу
+        const can = instant !== true && !!prev && deckCanAnimate() && !deckSlideHidden();
+        const sameSlide = !!prev && prev.ds === view.ds;
+        const scrollMove = can && !sameSlide && !!fr && view.fl === 'scroll' && prev.fl === 'scroll';
+        if (can && ((sameSlide && shape !== prev.shape) || scrollMove)) {
+          if (scrollMove) {
+            // камера в координатах текущего слайда: без пересчёта старт был бы мимо
+            const d = deckScrollShift(prev.ds, view.ds);
+            if (d) { cam.x += d.dx; cam.y += d.dy; }
+          }
+          glideStart(to);
+          return;
+        }
+        // «Как у меня»: учитель двигает камеру, пока кадр ещё едет, — цель обновляем
+        if (glide && can && sameSlide) { glide.to = to; return; }
+        glideStop();
+        cam.x = to.x; cam.y = to.y; cam.zoom = to.zoom;
+        if (!fr) { viewSig = ''; scheduleRedraw(); return; }
+        // учитель двигает камеру — bd_view идёт часто, а кадр тот же: не
+        // перерисовываем ученику слайд, который у него не изменился
+        const sig = [to.x, to.y, to.zoom, view.ds, view.fl, view.sh, view.fm, view.an].join();
+        if (sig === viewSig) return;
+        viewSig = sig;
+        scheduleRedraw();
+        return;
+      }
+      glideStop();
+      lastShown = null;
       if (fr) {
         const c = deckFrameCam(fr, cssW, cssH);
         cam.x = c.x; cam.y = c.y; cam.zoom = c.zoom;
-        // учитель двигает камеру — bd_view идёт часто, а кадр тот же: не
-        // перерисовываем ученику слайд, который у него не изменился
         const sig = [c.x, c.y, c.zoom, view.ds, view.fl, view.sh, view.fm].join();
         if (sig === viewSig) return;
         viewSig = sig;
@@ -936,11 +1040,24 @@
     // Движок уже подогнал холст (его обработчик resize зарегистрирован раньше
     // этого файла) — осталось вписать кадр заново. На iOS после поворота
     // размеры обновляются с задержкой, поэтому смотрим ещё раз
-    window.addEventListener('resize', () => { if (viewFrame()) applyView(); sendSizeSoon(); });
+    // glide тоже: при переходе на «Как у меня» сцена меняет размер кадра прямо во
+    // время переезда, и досчитывать его по старому окну нельзя
+    window.addEventListener('resize', () => { if (viewFrame() || glide) applyView(true); sendSizeSoon(); });
+    // №116: стопка кончилась, а bd_view с последним слайдом мог не дойти — кадр
+    // считаем сами, следующий bd_view всё равно его подтвердит
+    window.__bdViewerSetSlide = (id) => {
+      if (!view) return;
+      if (view.ds !== id) {
+        const s = deckSlides().find(x => x.id === id), f = s ? deckViewerFrameOf(s) : null;
+        view = Object.assign({}, view, { ds: id });
+        if (f) view.fr = f;
+      }
+      applyView(true);
+    };
     window.addEventListener('orientationchange', () => setTimeout(() => {
       if (!boardActive) return;
       if (Math.max(1, window.innerWidth - boardInset) !== cssW || window.innerHeight !== cssH) resizeCanvas();
-      if (viewFrame()) applyView();
+      if (viewFrame()) applyView(true);
       sendSizeSoon();
     }, 250));
 
@@ -1140,6 +1257,8 @@
           kickPen();
         }
       }
+      // №116: быстрое листание учителя (старая страница это поле просто не читает)
+      if (l.fast && typeof deckViewerFast === 'function') deckViewerFast(l.fast);
       if ('shape' in l) applyShape(l.shape);
       if ('text' in l) liveText = l.text || null;
       if (Array.isArray(l.objs)) {
@@ -1238,7 +1357,7 @@
       playout: () => playout,
       liveShape: () => liveShape, liveText: () => liveText,
       progress: () => (assembling ? { n: assembling.n, count: assembling.count, z: assembling.z } : null),
-      view: () => view, frame: viewFrame,
+      view: () => view, frame: viewFrame, gliding: () => !!glide,
       ref: () => VB.refPanel,
     };
 

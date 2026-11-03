@@ -1456,6 +1456,11 @@ const DTB_SV_MODES = [
   { id: 'margin', label: 'Слайд с полем', note: 'Вокруг слайда поле, как у вас на экране' },
   { id: 'mine', label: 'Как у меня', note: 'Ученик идёт за вашей камерой: когда приближаете кусок слайда' }
 ];
+const DTB_SV_ANIMS = [
+  { id: 'off', label: 'Выкл', note: 'Слайд у ученика меняется мгновенно' },
+  { id: 'flip', label: 'Листание', note: 'Ученик видит листание, как у вас' },
+  { id: 'all', label: 'Листание и ползунок', note: 'И листание, и стопку слайдов, пока вы держите ползунок' }
+];
 const DTB_SV_POS_KEY = 'boardsDeckPreviewPos';
 const DTB_SV_GAP_MS = 200;         // чаще предпросмотр не рисуется: учителю важнее свой слайд
 const DTB_SV_MAX_W = 320, DTB_SV_MAX_H = 220;
@@ -1472,11 +1477,20 @@ function dtbSvBuildPop(){
   p.innerHTML = '<div class="dtb-sv-h">Ученик видит</div>' +
     DTB_SV_MODES.map(m => '<button type="button" class="dtb-sv-mode" role="menuitemradio" data-sv="' + m.id + '" aria-checked="false"><b>' + m.label + '</b><small>' + m.note + '</small></button>' +
       (m.id === 'margin' ? '<label class="dtb-sv-range" id="dtbSvRange"><span>Поле</span><input type="range" id="dtbSvMargin" min="' + DECK_SV_MARGIN_MIN + '" max="' + DECK_SV_MARGIN_MAX + '" step="1" aria-label="Размер поля вокруг слайда"><output id="dtbSvMarginVal"></output></label>' : '')).join('') +
+    '<div class="dtb-sv-h dtb-sv-an-h" id="dtbSvAnLbl">Анимации у ученика</div><div class="dtb-sv-an" role="radiogroup" aria-labelledby="dtbSvAnLbl">' +
+    DTB_SV_ANIMS.map(a => '<button type="button" role="radio" data-svan="' + a.id + '" aria-checked="false" title="' + a.note + '">' + a.label + '</button>').join('') + '</div>' +
     '<i class="dtb-sv-sep"></i><button type="button" class="dtb-sv-mode" id="dtbSvPreviewBtn" aria-pressed="false"><b>Предпросмотр ученика</b><small>Маленькое окно с тем, что он видит сейчас</small></button>';
   document.body.appendChild(p);
   p.addEventListener('click', (e) => {
     const b = e.target.closest('[data-sv]');
     if (b){ dtbSvSetMode(b.dataset.sv); return; }
+    const an = e.target.closest('[data-svan]');
+    if (an){
+      try { localStorage.setItem(DECK_SV_ANIM_KEY, an.dataset.svan); } catch (err) {}
+      dtbSvSync();
+      dtbSvChanged();
+      return;
+    }
     if (e.target.closest('#dtbSvPreviewBtn')) dtbSvPreviewToggle();
   });
   p.querySelector('#dtbSvMargin').addEventListener('input', (e) => {
@@ -1497,6 +1511,8 @@ function dtbSvSync(){
   if (!p) return;
   const mode = deckStudentMode(), m = deckStudentMargin();
   p.querySelectorAll('[data-sv]').forEach(b => b.setAttribute('aria-checked', b.dataset.sv === mode ? 'true' : 'false'));
+  const anim = deckStudentAnim();
+  p.querySelectorAll('[data-svan]').forEach(b => b.setAttribute('aria-checked', b.dataset.svan === anim ? 'true' : 'false'));
   const inp = p.querySelector('#dtbSvMargin');
   inp.value = m;
   // ползунок нужен только полю: в остальных режимах он ничего бы не менял
@@ -1894,6 +1910,11 @@ function dtbInjectStyle(){
     '.dtb-sv-range input{flex:1;min-width:0}',
     '.dtb-sv-range output{width:38px;text-align:right;font-variant-numeric:tabular-nums}',
     '.dtb-sv-sep{display:block;height:1px;background:var(--glass-border);margin:6px}',
+    '.dtb-sv-an-h{padding-top:8px}',
+    '.dtb-sv-an{display:flex;flex-wrap:wrap;gap:4px;padding:0 8px 4px}',
+    '.dtb-sv-an button{flex:1 1 auto;padding:5px 8px;border:1px solid var(--glass-border);border-radius:8px;background:none;color:inherit;font:inherit;font-size:12px;cursor:pointer;white-space:nowrap}',
+    '.dtb-sv-an button:hover{background:rgba(127,127,127,.14)}',
+    '.dtb-sv-an button[aria-checked="true"]{background:rgba(127,127,127,.26);font-weight:600}',
     '.dtb-sv-preview{position:fixed;z-index:460;border-radius:12px;overflow:hidden;background:var(--glass-strong);border:1px solid var(--glass-border);box-shadow:var(--shadow);font-family:var(--font-ui);color:var(--pencil)}',
     '.dtb-sv-preview[hidden]{display:none}',
     '.dtb-sv-phead{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:4px 4px 4px 10px;font-size:12px;font-weight:600;cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}',
@@ -1906,10 +1927,13 @@ function dtbInjectStyle(){
     '.dtb-sv-pfoot select[hidden]{display:none}',
     // №105: режим показа — интерфейс доски спрятан, фон тёмный (и у ученика)
     'html.deck-show,html.deck-show body,html.deck-show #screenBoard{background:#121418!important}',
-    'html.deck-show:not(.deck-show-tools) #screenBoard > :not(#boardCv):not(#bdTaskLayer):not(#deckToast):not(#bdEraserRing):not(#dtbShowBar){display:none!important}',
+    // №117: окна доски и запрос на подключение не «интерфейс», а вопрос к учителю.
+    // Они лежат в #screenBoard, и список исключений их прятал: телефон ждал ответа,
+    // а на экране ничего не было. Новое окно с классом .bd-modal-backdrop видно само
+    'html.deck-show:not(.deck-show-tools) #screenBoard > :not(#boardCv):not(#bdTaskLayer):not(#deckToast):not(#bdEraserRing):not(#dtbShowBar):not(.bd-modal-backdrop):not(.bd-link-ask):not(.bd-link-queue):not(.bd-link-toast):not(#bdGhostLayer){display:none!important}',
     // инструменты в показе: панель доски и всё, что она открывает (цвета и
     // толщина, паттерны, фигуры, формула, вставка картинки, меню объекта)
-    'html.deck-show.deck-show-tools #screenBoard > :not(#boardCv):not(#bdTaskLayer):not(#deckToast):not(#bdEraserRing):not(#dtbShowBar):not(#bdDock):not(#bdOptbar):not(#bdPatterns):not(#bdFormulaEditor):not(#bdImgSrcPop):not(#bdFigMenu):not(#bdFigPanel):not(#bdCtxMenu):not(#bdDropOverlay){display:none!important}',
+    'html.deck-show.deck-show-tools #screenBoard > :not(#boardCv):not(#bdTaskLayer):not(#deckToast):not(#bdEraserRing):not(#dtbShowBar):not(#bdDock):not(#bdOptbar):not(#bdPatterns):not(#bdFormulaEditor):not(#bdImgSrcPop):not(#bdFigMenu):not(#bdFigPanel):not(#bdCtxMenu):not(#bdDropOverlay):not(.bd-modal-backdrop):not(.bd-link-ask):not(.bd-link-queue):not(.bd-link-toast):not(#bdGhostLayer){display:none!important}',
     '.dtb-dock-hide{display:none}',
     'html.deck-show-tools .dtb-dock-hide{display:inline-flex;align-items:center;justify-content:center;flex:none;position:relative;z-index:1;height:34px;padding:0 10px;margin-left:4px;border:none;border-radius:10px;background:rgba(127,127,127,.16);color:inherit;font:600 12px var(--font-ui);cursor:pointer}',
     'html.deck-show-tools .dtb-dock-hide:hover{background:rgba(127,127,127,.28)}',

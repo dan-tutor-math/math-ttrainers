@@ -4393,7 +4393,11 @@ function renderImageObject(c, obj, camv){
   // Промпт №66: на экране ответ показывают живые элементы поверх картинки,
   // а в выгрузку (PNG/PDF рисуются своей камерой) их не попадает — там
   // рисуем введённое и отметки прямо на холсте
-  if (obj.task && activeCam !== cam) drawTaskStateForExport(c, obj, p0.x, p0.y, w, h);
+  if (obj.task && activeCam !== cam){
+    // №117: у презентации это ещё и картинки слайдов: на них кнопка должна быть с подписью
+    if (B && B.kind === 'deck') drawTaskFace(c, obj, p0.x, p0.y, w, h);
+    drawTaskStateForExport(c, obj, p0.x, p0.y, w, h);
+  }
   c.restore();
 }
 
@@ -4831,8 +4835,9 @@ function renderBase(c, w, h, camv, isScreen, renderDpr, opts){
   if (!noBg) c.clearRect(0,0,w,h);
   // Промпт №85в: у презентации на экране вне слайда холст прозрачный — позади
   // него слой #deckDepth с соседними слайдами (deck-core.js)
-  // у ученика (доска учителя, board-stage.js) слоя глубины нет — фон обычный
-  const deckScreen = isScreen && B.kind === 'deck' && typeof deckDepthSync === 'function' && !window.deckViewerMode;
+  // у ученика (доска учителя, board-stage.js) слой глубины живёт только пока
+  // идёт анимация листания, а в покое фон обычный и соседей не видно
+  const deckScreen = isScreen && B.kind === 'deck' && typeof deckDepthSync === 'function' && (!window.deckViewerMode || deckSlideHidden());
   if (!deckScreen && !noBg){
     const bg = themeVar('--bg');
     c.fillStyle = bg; c.fillRect(0,0,w,h);
@@ -7387,8 +7392,22 @@ function nearestFreeSpot(area, w, h, obs, cx, cy, gap, snap){
   }
   return best;
 }
+// №117: рамка презентации или null. Листы полотна (sheetWpx/sheetHpx) со
+// слайдами не совпадают: раскладка по листам уводила задание за край слайда
+function taskFrame(){ return typeof deckTaskFrame === 'function' ? deckTaskFrame() : null; }
+// где искать место заданию. В презентации — только свободная часть слайда:
+// видимая область доски начинается под верхней полосой, то есть выше слайда,
+// и задание ложилось над ним, а его середина попадала в слот предыдущего слайда
+function taskViewRect(){
+  const fr = taskFrame();
+  if (!fr) return visibleBoardRect();
+  const a = deckArea();
+  const x0 = Math.max(fr.x, cam.x + a.x / cam.zoom), y0 = Math.max(fr.y, cam.y + a.y / cam.zoom);
+  const x1 = Math.min(fr.x + fr.w, cam.x + (a.x + a.w) / cam.zoom), y1 = Math.min(fr.y + fr.h, cam.y + (a.y + a.h) / cam.zoom);
+  return (x1 - x0 > 1 && y1 - y0 > 1) ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : fr;
+}
 function findFreeSpotInView(w, h){
-  const v = visibleBoardRect();
+  const v = taskViewRect();
   const cx = v.x + v.w / 2, cy = v.y + v.h / 2;
   const obs = taskObstacles();
   const first = { x: cx - w / 2, y: cy - h / 2, w, h };
@@ -7533,13 +7552,14 @@ function noteTaskScale(o){
 }
 // предел размера: шестая часть листа — на листе помещаются 2 столбика по 3
 function taskMaxBox(){
-  const sw = sheetWpx(), sh = sheetHpx();
+  const fr = taskFrame();   // в презентации «лист» — это слайд
+  const sw = fr ? fr.w : sheetWpx(), sh = fr ? fr.h : sheetHpx();
   const g = taskGapFor(sh / STACK_ROWS);
   return { w: (sw - 3 * g) / 2, h: (sh - (STACK_ROWS + 1) * g) / STACK_ROWS };
 }
 // масштаб первого задания новой стопки (css — размер карточки в CSS-пикселях)
 function scaleForNewStack(css){
-  const v = visibleBoardRect();
+  const v = taskViewRect();
   const max = taskMaxBox();
   // три задания высотой h и четыре отступа (сверху, два между, снизу) по
   // TASK_GAP_K·h — видимая высота (с запасом TASK_VIEW_K). Отдалили так, что
@@ -7563,7 +7583,7 @@ function currentTaskStack(){
   });
   if (!last) return null;
   const members = B.objects.filter(o => o.type === 'image' && o.stack && o.stack.id === last.stack.id && o.points && o.points[0]);
-  const v = visibleBoardRect();
+  const v = taskViewRect();
   if (!members.some(o => bbVisible(objectBBox(o), v))) return null;
   return { id: last.stack.id, last, members, x0: last.stack.x0, y0: last.stack.y0 };
 }
@@ -7590,8 +7610,9 @@ function stackSlot(st, w, h){
   const bandOf = o => Number.isFinite(o.stack.b) ? o.stack.b : 0;
   const sw = sheetWpx(), sh = sheetHpx();
   const left = st.x0;
-  const pageL = Math.floor(st.x0 / sw) * sw + g, right = pageL - g + sw - g;
-  const pageBottom = top => (Math.floor(top / sh) + 1) * sh - g;
+  const fr = taskFrame();   // в презентации «лист» — это слайд, и следующего листа нет
+  const pageL = fr ? fr.x + g : Math.floor(st.x0 / sw) * sw + g, right = fr ? fr.x + fr.w - g : pageL - g + sw - g;
+  const pageBottom = top => fr ? fr.y + fr.h - g : (Math.floor(top / sh) + 1) * sh - g;
   // задание шире, чем осталось от начала стопки до края листа (другой
   // тренажёр крупнее), — новый ряд начинается левее, но в пределах листа
   const bandX = () => (left + w <= right) ? left : Math.max(pageL, right - w);
@@ -7625,6 +7646,7 @@ function stackSlot(st, w, h){
     // ниже на листе места нет — с верха листа под ним
     b++;
     let top = bandBot + g;
+    if (fr && top + h > pageBottom(bandTop)) break;   // слайд заполнен — место ниже по коду
     if (top + h > pageBottom(bandTop)) top = (Math.floor(bandTop / sh) + 1) * sh + g;
     colX = bandX(); colR = colX + w; y = top; bandTop = top; bandBot = top;
   }
@@ -7634,6 +7656,7 @@ function stackSlot(st, w, h){
 // соседний лист справа (снизу), к самому краю с отступом g. Задание крупнее
 // листа так не поставить — остаётся как есть
 function snapIntoSheet(r, g){
+  if (taskFrame()) return r;   // у слайда нет границ листов: сдвиг увёл бы за его край
   const sw = sheetWpx(), sh = sheetHpx();
   let x = r.x, y = r.y;
   if (r.w <= sw - 2 * g){
@@ -7653,7 +7676,7 @@ function snapIntoSheet(r, g){
 // поперёк границы листа (snapIntoSheet). Сначала ищем место, где поместится
 // весь столбик, потом — хотя бы задание
 function newStackSpot(w, h, g){
-  const v = visibleBoardRect();
+  const v = taskViewRect();
   const obs = taskObstacles();
   const area = { x: v.x + g, y: v.y + g, w: Math.max(0, v.w - 2 * g), h: Math.max(0, v.h - 2 * g) };
   const snap = r => snapIntoSheet(r, g);
@@ -7710,6 +7733,13 @@ async function insertTaskImage(dataUrl, task, gen, beside, shot, cw, place){
       pt = { x: spot.x, y: spot.y };
       stack = { id: 'st' + uid(), i: 0, x0: pt.x, y0: pt.y, c: 0, b: 0 };
     }
+  }
+  // №117: откуда бы ни пришло место (стопка, «ещё такое же», призрак), в
+  // презентации задание целиком на слайде, иначе deckClipSlide его обрежет
+  if (taskFrame()){
+    const q = deckFitTaskRect({ x: pt.x, y: pt.y, w: sz.w, h: sz.h }, gap);
+    pt = { x: q.x, y: q.y }; sz.w = q.w; sz.h = q.h;
+    if (stack && stack.i === 0){ stack.x0 = pt.x; stack.y0 = pt.y; }
   }
   // Промпт №66: задание с тренажёра сразу закреплено — ластиком его не
   // стереть и случайным касанием не сдвинуть (двигают его после двойного
@@ -7857,6 +7887,8 @@ function boardLinkBusy(){
   if (document.querySelector('.bd-modal-backdrop.open')) return true;
   if (linkAskEl.classList.contains('show')) return true;
   if (placeGhost) return true;   // идёт ручное размещение — следующее ждёт
+  // №117: слайды листают ползунком — неясно, на какой класть; ждём, где остановятся
+  if (B.kind === 'deck' && typeof deckFast !== 'undefined' && deckFast) return true;
   return false;
 }
 // присланное устройством проверяем по форме: ключ знает только своё
@@ -8066,7 +8098,7 @@ async function placeTaskManually(it, who){
   if (placeGhost) throw new Error('уже идёт размещение');
   if (!B || !boardActive) return 'cancelled';
   const sz = await placeGhostStartSize(it);
-  const v = visibleBoardRect();
+  const v = taskViewRect();
   const css = it.shot && it.shot.css;
   const g = {
     board: B, it,
@@ -8974,6 +9006,7 @@ function syncTaskOverlays(){
   if (boardActive && B && Array.isArray(B.objects)){
     const pad = 40 / cam.zoom;
     const vx0 = cam.x - pad, vy0 = cam.y - pad, vx1 = cam.x + cssW / cam.zoom + pad, vy1 = cam.y + cssH / cam.zoom + pad;
+    const fr = (B.kind === 'deck' && typeof deckCurRect === 'function') ? deckCurRect() : null;
     for (let oi = 0; oi < B.objects.length; oi++){
       const o = B.objects[oi];
       if (o.type !== 'image' || !o.points || !o.points[0]) continue;
@@ -8984,6 +9017,8 @@ function syncTaskOverlays(){
       if (!live && !o.gen && !hasSol) continue;
       const x = o.points[0].x, y = o.points[0].y;
       if (x + o.w < vx0 || x > vx1 || y + o.h < vy0 || y > vy1) continue;
+      // №117: задание за рамкой слайда обрезано на холсте — поля без него не нужны
+      if (fr && (x + o.w <= fr.x || x >= fr.x + fr.w || y + o.h <= fr.y || y >= fr.y + fr.h)) continue;
       seen.add(o.id);
       let rec = taskEls.get(o.id);
       // форма живого слоя: у задания могли смениться места полей (новая
@@ -9036,8 +9071,42 @@ function syncTaskOverlays(){
     taskEls.delete(id);
   });
   layer.style.display = boardActive ? '' : 'none';
+  if (typeof deckLiveLayerSync === 'function') deckLiveLayerSync();   // конец полёта — поля снова видны
 }
 
+// №117: на снимке задания кнопка — пустая синяя подложка, подпись даёт живая
+// кнопка поверх (bakeTaskRows в trainer-tasks.js). Вне экрана живой кнопки нет,
+// поэтому подпись рисуем сами в тех же долях, что и syncTaskOverlays:
+// на летящей картинке слайда поле и кнопка совпадают с живыми
+function drawTaskFace(c, obj, x, y, w, h){
+  const hot = obj.task && obj.task.hot;
+  if (!hot) return;
+  const sty = hot.style || {};
+  const k = w / (hot.w || w);
+  const font = sty.font || UI_FONT_FAMILY;
+  c.save();
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  if (hot.check && obj.task.kind !== 'choice'){
+    const q = hot.check, qx = x + q.x * w, qy = y + q.y * h, qw = q.w * w, qh = q.h * h;
+    c.beginPath(); roundRectPath(c, qx, qy, qw, qh, (sty.btnRadius != null ? sty.btnRadius : 10) * k);
+    c.fillStyle = sty.btnBg || themeVar('--ink') || '#2E7DE0'; c.fill();
+    c.fillStyle = sty.btnFg || '#fff';
+    c.font = '700 ' + Math.max(4, qh * 0.4) + 'px ' + font;
+    c.fillText(hot.checkText || 'Проверить', qx + qw / 2, qy + qh / 2, qw * 0.94);
+  }
+  if (typeof deckCardFace !== 'undefined' && deckCardFace && obj.task.kind === 'fields' && !obj.task.st){
+    const d = taskDrafts.get(obj.id);
+    obj.task.fields.forEach((f, i) => {
+      const q = hot.fields[i]; if (!q) return;
+      const qx = x + q.x * w, qy = y + q.y * h, qw = q.w * w, qh = q.h * h;
+      const val = d && d.vals && d.vals[f.id];
+      c.fillStyle = val ? (sty.inFg || '#1c1c1e') : 'rgba(120,120,128,.75)';
+      c.font = '600 ' + Math.max(4, qh * 0.46) + 'px ' + font;
+      c.fillText(val || '?', qx + qw / 2, qy + qh / 2, qw * 0.92);
+    });
+  }
+  c.restore();
+}
 // выгрузка PNG/PDF: живых элементов там нет — рисуем состояние на холсте
 function drawTaskStateForExport(c, obj, x, y, w, h){
   const t = obj.task, st = t.st, hot = t.hot;

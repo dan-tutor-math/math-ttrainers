@@ -982,10 +982,10 @@ html[data-theme="dark"] .deck-nav{box-shadow:var(--shadow),inset 0 1px 0 rgba(25
 @keyframes deckInVb{from{transform:translateY(-6%);opacity:.35}to{transform:none;opacity:1}}
 @keyframes deckInH{from{transform:translateX(6%);opacity:.35}to{transform:none;opacity:1}}
 @keyframes deckInHb{from{transform:translateX(-6%);opacity:.35}to{transform:none;opacity:1}}
-#boardCv.deck-in-v{animation:deckInV .26s cubic-bezier(.2,.8,.2,1)}
-#boardCv.deck-in-vb{animation:deckInVb .26s cubic-bezier(.2,.8,.2,1)}
-#boardCv.deck-in-h{animation:deckInH .26s cubic-bezier(.2,.8,.2,1)}
-#boardCv.deck-in-hb{animation:deckInHb .26s cubic-bezier(.2,.8,.2,1)}
+#boardCv.deck-in-v,#bdTaskLayer.deck-in-v{animation:deckInV .26s cubic-bezier(.2,.8,.2,1)}
+#boardCv.deck-in-vb,#bdTaskLayer.deck-in-vb{animation:deckInVb .26s cubic-bezier(.2,.8,.2,1)}
+#boardCv.deck-in-h,#bdTaskLayer.deck-in-h{animation:deckInH .26s cubic-bezier(.2,.8,.2,1)}
+#boardCv.deck-in-hb,#bdTaskLayer.deck-in-hb{animation:deckInHb .26s cubic-bezier(.2,.8,.2,1)}
 
 /* Промпт №85: лента миниатюр. Ширина постоянная — миниатюры разного
    формата вписываются в одну рамку 116×80 */
@@ -1108,6 +1108,12 @@ html.deck-mode .bd-rail.pos-top{left:172px;right:auto}
 .deck-menu-sep{height:1px;background:var(--glass-border);margin:4px 6px}
 .deck-toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);z-index:430;padding:9px 14px;border-radius:12px;background:var(--pencil);color:var(--bg);font-family:var(--font-ui);font-size:13px;font-weight:600;box-shadow:var(--shadow);pointer-events:none}
 .deck-toast[hidden]{display:none}
+.deck-strays{position:fixed;transform:translateX(-50%);z-index:240;display:flex;align-items:center;gap:8px;height:34px;padding:0 4px 0 12px;border-radius:17px;background:var(--glass-strong);border:1px solid var(--glass-border);box-shadow:var(--shadow);color:var(--pencil);font-family:var(--font-ui);font-size:13px;font-weight:600;white-space:nowrap}
+.deck-strays[hidden]{display:none}
+.deck-strays button{height:26px;border:none;border-radius:13px;font:inherit;cursor:pointer}
+#deckStraysBtn{padding:0 11px;background:var(--ink);color:#fff}
+#deckStraysClose{width:26px;padding:0;background:transparent;color:var(--muted-2)}
+#deckStraysClose:hover{background:var(--hover-1)}
 
 /* Промпт №87г: шаг узора, косая линейка, «−» у своего размера */
 .deck-step{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--pencil)}
@@ -1572,6 +1578,12 @@ function resolveBasketTexInHtml(html){
     </div>
   </div>
   <div class="deck-toast" id="deckToast" hidden role="status"></div>
+  <!-- №117: задания за рамкой слайдов; плашка только когда они есть (deckStraySync) -->
+  <div class="deck-strays" id="deckStrays" hidden role="status">
+    <span>Заданий за рамкой слайдов: <b id="deckStraysNo">0</b></span>
+    <button type="button" id="deckStraysBtn" title="Перенести их на ближайшие слайды, не наезжая на другие задания. Можно отменить">Вернуть на слайды</button>
+    <button type="button" id="deckStraysClose" title="Скрыть" aria-label="Скрыть">×</button>
+  </div>
   <div class="deck-menu" id="deckFileMenu" hidden role="menu">
     <button data-file="import" role="menuitem">Импорт из PowerPoint или PDF…</button>
     <span class="deck-menu-sep"></span>
