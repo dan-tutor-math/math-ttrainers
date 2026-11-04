@@ -746,8 +746,24 @@
     if (mode === 'img'){
       const notes = [...(S.slice ? [] : S.root.querySelectorAll('aside.notes,.speaker-notes,[data-notes],[data-deck-notes]'))].map(e => (e.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean);
       if (!S.slice) S.root.querySelectorAll('aside.notes,.speaker-notes,[data-notes],[data-deck-notes]').forEach(e => e.style.setProperty('display', 'none', 'important'));
+      // «„анимации по щелчку“»: помеченное data-deck-step — отдельной
+      // прозрачной картинкой со своим шагом, а с подложки стираем
+      const steps = [];
+      if (!S.slice){
+        const marked = outer([...S.root.querySelectorAll('[data-deck-step]')]).filter(e => shown(e));
+        for (const e of marked){
+          const r = e.getBoundingClientRect(), n = parseInt(e.getAttribute('data-deck-step'), 10);
+          if (!(n > 0) || !(r.width > 1 && r.height > 1)) continue;
+          prepSvgs();
+          let cv = null;
+          try { cv = await html2canvas(e, { backgroundColor: null, scale: Math.min(2, 2400 / Math.max(R.width, R.height)), logging: false, useCORS: true }); } catch (err) { cv = null; }
+          if (!cv) continue;
+          steps.push({ t: 'img', step: n, x: r.left - R.left, y: r.top - R.top, w: r.width, h: r.height, src: cv.toDataURL('image/png'), natW: cv.width, natH: cv.height });
+        }
+        marked.forEach(e => setSt(e, 'visibility', 'hidden'));
+      }
       const shot = await shoot(S, R, bg);
-      return { w: R.width, h: R.height, raster: shot.src, rw: shot.w, rh: shot.h, notes: notes.join('\n\n') };
+      return { w: R.width, h: R.height, raster: shot.src, rw: shot.w, rh: shot.h, notes: notes.join('\n\n'), items: steps };
     }
     const P = parse(S, R);
     const out = [];
@@ -797,6 +813,9 @@
     P.items.forEach(it => {
       if (it.skip) return;
       const o = { t: it.t === 'atom' ? 'img' : it.t, x: it.x, y: it.y, w: it.w, h: it.h };
+      // шаг анимации — от ближайшего помеченного предка внутри слайда
+      const se = it.el && it.el.closest && it.el.closest('[data-deck-step]');
+      if (se && (S.slice || S.root.contains(se))){ const n = parseInt(se.getAttribute('data-deck-step'), 10); if (n > 0) o.step = n; }
       if (it.t === 'atom'){ Object.assign(o, { src: it.src, natW: it.natW, natH: it.natH }); if (it.op < 0.99) o.op = +it.op.toFixed(3); }
       if (it.t === 'box'){ Object.assign(o, { geom: it.geom, fill: it.fill, line: it.line }); if (it.adj != null) o.adj = it.adj; if (it.text){ o.text = it.text; o.pad = it.pad; o.anchor = it.anchor; } }
       if (it.t === 'text') o.text = it.text;

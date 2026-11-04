@@ -1256,7 +1256,10 @@ async function ioPlaceSlides(pkg, prepared, opt){
     } else {
       if (P.bgImgSrc){ s.bg = { k: 'plain' }; deckPutBgImg(s, P.bgImgSrc, P.bgImgSize); }
       else await ioApplyBg(pkg, s, P.bg, r.w, r.h);
-      P.objs.forEach(o => {
+    }
+    // у снимка («картинками») объекты тоже бывают — шаги анимаций HTML
+    {
+      (P.objs || []).forEach(o => {
         ioScaleObj(o, k);
         ioShiftObj(o, r.x, r.y);
         o.lay = 'base';
@@ -1311,6 +1314,8 @@ async function ioImportPptx(file){
       P.raster = await ioRaster(wPx, hPx, bgColor, bgSrc, S.objects);
       const k2 = Math.min(2, 2400 / wPx);
       P.rasterW = Math.round(wPx * k2); P.rasterH = Math.round(hPx * k2);
+      // слайд уже весь в снимке — объектами поверх его не кладём
+      P.objs = [];
     }
     prepared.push(P);
   }
@@ -1662,6 +1667,12 @@ function ioHtmlText(T, k, pad, anchor){
     def: { sz: runs[0].sz, c: runs[0].c, f: runs[0].f } };
 }
 function ioHtmlObj(it, k){
+  const o = ioHtmlObj1(it, k);
+  // «„анимации по щелчку“»: шаг из data-deck-step
+  if (it.step > 0) o.step = it.step;
+  return o;
+}
+function ioHtmlObj1(it, k){
   const o = { id: uid(), points: [{ x: +(it.x * k).toFixed(2), y: +(it.y * k).toFixed(2) }], w: Math.max(0.5, +(it.w * k).toFixed(2)), h: Math.max(0.5, +(it.h * k).toFixed(2)) };
   if (it.t === 'img') return Object.assign(o, { type: 'image', src: it.src, natW: it.natW || 0, natH: it.natH || 0 });
   if (it.t === 'table'){
@@ -1762,7 +1773,11 @@ async function ioImportHtml(file){
       if (m.mxio !== 'slide') continue;
       const d = m.data || {};
       const P = { wPx: (d.w || pr.w) * k, hPx: (d.h || pr.h) * k, objs: [], notes: d.notes || '' };
-      if (opt.mode === 'img'){ Object.assign(P, { raster: d.raster, rasterW: d.rw, rasterH: d.rh }); }
+      if (opt.mode === 'img'){
+        Object.assign(P, { raster: d.raster, rasterW: d.rw, rasterH: d.rh });
+        // шаги анимаций — картинками поверх снимка
+        P.objs = (d.items || []).map(it => ioHtmlObj(it, k));
+      }
       else {
         P.objs = (d.items || []).map(it => ioHtmlObj(it, k));
         P.bgImgSrc = d.under; P.bgImgSize = { w: d.uw, h: d.uh };

@@ -43,6 +43,7 @@ const DTB_ICONS = {
   more: '<circle cx="6" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><circle cx="18" cy="12" r="1.3" fill="currentColor" stroke="none"/>',
   caret: '<path d="M8 10.5l4 4 4-4"/>',
   order: '<rect x="3.5" y="9.5" width="11" height="10" rx="1.8"/><path d="M8.5 9.5V6a1.5 1.5 0 0 1 1.5-1.5h8.5A1.5 1.5 0 0 1 20 6v8.5a1.5 1.5 0 0 1-1.5 1.5h-4" />',
+  anim: '<path d="M4 18.5l5-5M4 13.5h3.5M9.5 20v-3.5"/><path d="M14.5 3.5l1.4 3.6 3.6 1.4-3.6 1.4-1.4 3.6-1.4-3.6-3.6-1.4 3.6-1.4z" fill="currentColor" fill-opacity=".25"/>',
   styles: '<rect x="3.5" y="4" width="10" height="7" rx="1.6" fill="currentColor" fill-opacity=".25"/><rect x="10.5" y="13" width="10" height="7" rx="1.6"/><path d="M6 15.5h2.5M6 18.5h2.5" stroke-width="1.4"/>',
   line: '<path d="M5 19L19 5"/>',
   image: '<rect x="3.5" y="4.5" width="17" height="15" rx="2.2"/><circle cx="9" cy="9.7" r="1.7"/><path d="M20.5 15.5l-5-4.6-8.7 8.6"/>',
@@ -89,6 +90,9 @@ const DECK_CMDS = [
     sel: true, enabled: () => dtbSel().length > 0 },
   { id: 'styles', group: 'arrange', icon: 'styles', label: 'Стили', title: 'Быстрые стили фигуры', prio: 3, pop: 'styles', btnId: 'deckStylesBtn',
     sel: true, enabled: () => dtbSel().some(dtbStylable) },
+  // «„анимации по щелчку“»: шаг появления выделенного (deck-core.js, deckAnim…)
+  { id: 'anim', group: 'arrange', icon: 'anim', label: 'Анимация', title: 'Анимация по щелчку: на каком шаге появится выделенное', prio: 4, pop: 'anim', btnId: 'deckAnimBtn',
+    sel: true, enabled: () => dtbSel().length > 0 && typeof deckAnimAssign === 'function' },
   { id: 'slide', group: 'slide', node: 'deckSlideBtn', label: 'Слайд', prio: 5 },
   { id: 'file', group: 'slide', node: 'deckFileBtn', label: 'Файл', prio: 5 },
   { id: 'mode', group: 'mode', node: 'deckModeSeg', label: 'Конструктор / Урок', keep: true },
@@ -595,8 +599,8 @@ function dtbBuildPops(){
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape') dtbPopToggle(null); });
 }
 // №104: «slide» дописывает dtbBuildSlideMenu
-const DTB_POP_IDS = { shapes: 'dtbPopShapes', lines: 'dtbPopLines', table: 'dtbPopTable', arrange: 'dtbPopArrange', styles: 'dtbPopStyles' };
-const DTB_POP_BTNS = { shapes: 'deckShapesBtn', lines: 'deckLinesBtn', table: 'deckTableBtn', arrange: 'deckArrangeBtn', styles: 'deckStylesBtn' };
+const DTB_POP_IDS = { shapes: 'dtbPopShapes', lines: 'dtbPopLines', table: 'dtbPopTable', arrange: 'dtbPopArrange', styles: 'dtbPopStyles', anim: 'dtbPopAnim' };
+const DTB_POP_BTNS = { shapes: 'deckShapesBtn', lines: 'deckLinesBtn', table: 'deckTableBtn', arrange: 'deckArrangeBtn', styles: 'deckStylesBtn', anim: 'deckAnimBtn' };
 function dtbPopToggle(kind, anchor){
   Object.keys(DTB_POP_IDS).forEach(k => {
     const p = document.getElementById(DTB_POP_IDS[k]);
@@ -609,6 +613,7 @@ function dtbPopToggle(kind, anchor){
     p.classList.toggle('big', dtbStyle() === 'hybrid');
     if (k === 'table') p.querySelector('#dtbTblSize').textContent = 'Таблица';
     if (k === 'arrange') dtbSyncArrangeMenu();
+    if (k === 'anim') dtbFillAnimMenu();
     const r = (anchor || document.getElementById(DTB_POP_BTNS[k])).getBoundingClientRect();
     p.style.left = Math.max(8, Math.min(window.innerWidth - p.offsetWidth - 8, r.left)) + 'px';
     p.style.top = (r.bottom + 8) + 'px';
@@ -938,12 +943,40 @@ function dtbBuildArrangePops(){
   st.innerHTML = '<div class="dtb-pop-h">Быстрые стили</div><div class="dtb-styles">' + DTB_QUICK_STYLES.map((q, i) =>
     '<button type="button" role="menuitem" data-arr="style-' + i + '" title="' + q.n + '"><i style="background:' + (q.f || 'transparent') + ';border-color:' + (q.l || q.f || 'transparent') + ';color:' + q.t + '">Аа</i></button>').join('') + '</div>';
   host.appendChild(st);
+  // «„анимации по щелчку“»: пункты строятся при открытии — шагов на слайде
+  // столько, сколько уже назначено, плюс «новый»
+  const an = document.createElement('div');
+  an.className = 'dtb-pop dtb-list';
+  an.id = DTB_POP_IDS.anim;
+  an.hidden = true;
+  an.setAttribute('role', 'menu');
+  host.appendChild(an);
+  an.addEventListener('click', (e) => {
+    const b = e.target.closest('button[data-step]');
+    if (!b) return;
+    dtbPopToggle(null);
+    deckAnimAssign(dtbSel(), +b.dataset.step);
+  });
   [p, st].forEach(el => el.addEventListener('click', (e) => {
     const b = e.target.closest('button[data-arr]');
     if (!b || b.disabled) return;
     dtbPopToggle(null);
     dtbArrange(b.dataset.arr);
   }));
+}
+function dtbFillAnimMenu(){
+  const p = document.getElementById(DTB_POP_IDS.anim);
+  if (!p) return;
+  const sel = dtbSel(), s = typeof deckCur === 'function' ? deckCur() : null;
+  const max = s && typeof deckAnimMax === 'function' ? deckAnimMax(s) : 0;
+  const have = new Set(sel.map(o => o.step || 0));
+  const one = have.size === 1 ? [...have][0] : -1;
+  const btn = (n, t, hint) => '<button type="button" role="menuitem" data-step="' + n + '"' + (n === one ? ' aria-checked="true" class="on"' : '') + '>' + t + (hint ? ' <small>' + hint + '</small>' : '') + '</button>';
+  let h = '<div class="dtb-pop-h">Появление по щелчку</div>' + btn(0, 'Без анимации', 'видно сразу');
+  for (let i = 1; i <= max; i++) h += btn(i, 'Шаг ' + i);
+  h += btn(max + 1, 'Новый шаг ' + (max + 1), 'после всех');
+  h += '<div class="dtb-pop-note">В «Уроке» и показе шаги открываются по щелчку, стрелкой или кружками с номерами</div>';
+  p.innerHTML = h;
 }
 // пункты меню, которые сейчас не к месту, — погашены (как в PowerPoint)
 function dtbSyncArrangeMenu(){
@@ -1280,9 +1313,13 @@ function dtbShowStop(){
 }
 function dtbShowStep(dir){
   if (!dtbShow) return false;
+  // «„анимации по щелчку“»: сначала шаги слайда, потом следующий слайд
+  if (typeof deckAnimStep === 'function' && deckAnimStep(dir)){ dtbShowSync(); return true; }
   const j = dtbShowFind(deckCurIndex() + dir, dir);
   if (j < 0){ if (dir > 0) deckToast('Конец показа — Esc, чтобы выйти'); return false; }
   deckGo(j, 0);
+  // назад — на предыдущий слайд со всеми открытыми шагами, как в PowerPoint
+  if (dir < 0 && typeof deckAnimEnter === 'function'){ deckAnimEnter(deckCur(), -1); deckAnimChanged(); }
   // короткое проявление вместо выезда: слой глубины в показе спрятан
   const cv = document.getElementById('boardCv');
   if (cv){ cv.classList.remove('dtb-show-in'); void cv.offsetWidth; cv.classList.add('dtb-show-in'); }
@@ -1879,6 +1916,9 @@ function dtbInjectStyle(){
     '.dtb-list button:hover:not(:disabled){background:var(--hover-2)}',
     '.dtb-list button:disabled{opacity:.4;cursor:default}',
     '.dtb-list .dtb-pop-h{margin:8px 10px 2px}',
+    '.dtb-list button small{color:var(--muted-1);font-size:11.5px;margin-left:4px}',
+    '.dtb-list button.on{color:var(--ink);font-weight:700}',
+    '.dtb-pop-note{font-family:var(--font-ui);font-size:11.5px;line-height:1.35;color:var(--muted-1);margin:6px 10px 4px;max-width:240px}',
     '.dtb-list .dtb-pop-h:first-child{margin-top:4px}',
     '.dtb-styles{display:grid;grid-template-columns:repeat(4,52px);gap:6px}',
     '.dtb-styles button{border:none;background:none;padding:3px;border-radius:9px;cursor:pointer}',

@@ -20,6 +20,8 @@
       движок вписывает его в окно масштабом, служебная панель data-deck-ui
       внутри слайда
   deck_import_a4.html     — разметка по гайду, книжный А4 1240 × 1754
+  deck_import_steps.html  — разметка по гайду и анимации по щелчку:
+      data-deck-step="1" и "2" (второй — карточка-фигура с текстом)
 
 reveal.js берётся из распакованного npm-пакета:
   npm pack reveal.js@5 && tar xzf reveal.js-*.tgz
@@ -185,6 +187,19 @@ h1{font-size:64px;margin:0 0 30px}p{font-size:32px}</style></head><body>
 </body></html>
 """
 
+STEPS = """<!doctype html>
+<html><head><meta charset="utf-8"><meta name="deck" content="1920x1080"><title>шаги</title>
+<style>body{margin:0}[data-deck-slide]{width:1920px;height:1080px;padding:120px;box-sizing:border-box;font-family:Arial, sans-serif;background:#FFFFFF}
+h2{font-size:64px;margin:0 0 40px}p{font-size:48px;margin:0 0 30px}.ans{background:#DFF5E1;border:3px solid #2E9E5B;border-radius:24px;padding:24px 40px;font-size:48px;width:700px}</style></head><body>
+<section data-deck-slide>
+  <h2>Решите уравнение</h2>
+  <p>x<sup>2</sup> = 9</p>
+  <p data-deck-step="1">x = 3 или x = −3</p>
+  <div class="ans" data-deck-step="2">Ответ: −3; 3</div>
+</section>
+</body></html>
+"""
+
 REVEAL = """<!doctype html>
 <html><head><meta charset="utf-8"><title>reveal</title>
 <style>@@CSS@@</style></head>
@@ -206,6 +221,7 @@ def main():
     out("deck_import_stage.html", STAGE)
     out("deck_import_4k.html", K4)
     out("deck_import_a4.html", A4)
+    out("deck_import_steps.html", STEPS)
     if len(sys.argv) > 1:
         pkg = sys.argv[1]
         rd = lambda p: open(os.path.join(pkg, "dist", p), encoding="utf-8").read()

@@ -397,6 +397,9 @@
         v.fl = deckFlow();
         // №105: режим показа — ученику тоже только слайд (deckViewerView)
         if (typeof dtbShowOn === 'function' && dtbShowOn()) v.sh = 1;
+        // «„анимации по щелчку“»: сколько шагов открыто на слайде — ученик
+        // прячет те же объекты (нет поля — у ученика всё видно)
+        if (typeof deckAnimWire === 'function') { const st = deckAnimWire(); if (st !== undefined) v.st = st; }
         /* Кадр — рядом со старыми x, y, zoom, а не вместо: ученик со страницей
            из кэша кадра не поймёт и пойдёт за камерой, как раньше. Новый
            ученик в режимах с кадром камеру не смотрит, поэтому приближение и
@@ -1013,7 +1016,7 @@
         if (!fr) { viewSig = ''; scheduleRedraw(); return; }
         // учитель двигает камеру — bd_view идёт часто, а кадр тот же: не
         // перерисовываем ученику слайд, который у него не изменился
-        const sig = [to.x, to.y, to.zoom, view.ds, view.fl, view.sh, view.fm, view.an].join();
+        const sig = [to.x, to.y, to.zoom, view.ds, view.fl, view.sh, view.fm, view.an, view.st].join();
         if (sig === viewSig) return;
         viewSig = sig;
         scheduleRedraw();
@@ -1024,7 +1027,7 @@
       if (fr) {
         const c = deckFrameCam(fr, cssW, cssH);
         cam.x = c.x; cam.y = c.y; cam.zoom = c.zoom;
-        const sig = [c.x, c.y, c.zoom, view.ds, view.fl, view.sh, view.fm].join();
+        const sig = [c.x, c.y, c.zoom, view.ds, view.fl, view.sh, view.fm, view.st].join();
         if (sig === viewSig) return;
         viewSig = sig;
         scheduleRedraw();

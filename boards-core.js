@@ -4873,8 +4873,12 @@ function renderBase(c, w, h, camv, isScreen, renderDpr, opts){
   // рамка — из кеша (шаг 2): раньше её пересчитывали по всем точкам каждого
   // штриха на каждом кадре
   const vis = (o) => { const b = objectBBoxRef(o); return !(b.maxX < visMinX || b.minX > visMaxX || b.maxY < visMinY || b.minY > visMaxY); };
+  // «„анимации по щелчку“» (deck-core.js): закрытый шаг на экране не рисуем;
+  // миниатюры, выгрузка и PNG — всегда целиком (там isScreen ложь)
+  const animHide = isDeck && isScreen && typeof deckAnimHidden === 'function' && deckAnimOn();
   ((opts && opts.list) || B.objects).forEach(o => {
     if (editingId && o.id === editingId) return;
+    if (animHide && o.step && deckAnimHidden(o)) return;
     if (skip && skip.has(o)) return;
     if (eg){
       if (eg.mode === 'object' && eg.hit.has(o.id)){ if (vis(o)) drawErasedFaded(c, o, camv); return; }
@@ -4909,6 +4913,7 @@ function renderOverlay(c, camv, renderDpr){
   }
   if (dragMode === 'marquee' && marqueeStart && marqueeCur) drawMarquee(c, camv);
   if (dragMode === 'lasso' && lassoPts) drawLasso(c);
+  if (typeof deckAnimBadges === 'function') deckAnimBadges(c, camv);
   c.restore();
   updateUnlockBtn(); updateContextMenu();
   if (typeof bxEditorSync === 'function') bxEditorSync();   // №97: поле правки блока идёт за камерой
@@ -5508,6 +5513,8 @@ function hitTestObject(obj, pt, tol){
   // ни за ручки. Одна проверка закрывает сразу все способы его тронуть.
   if (!mayTouch(obj)) return false;
   if (obj.type==='deck') return false;   // список слайдов не ловится ничем (промпт №84)
+  // закрытый шаг анимации не виден — значит, и не ловится (deck-core.js)
+  if (obj.step && typeof deckAnimHidden === 'function' && deckAnimHidden(obj)) return false;
   if (typeof bxHitTest === 'function'){ const r = bxHitTest(obj, pt, tol); if (r !== undefined) return r; }   // №97
   if (obj.type==='pen' || obj.type==='line'){
     for (let i=0;i<obj.points.length-1;i++) if (distToSeg(pt,obj.points[i],obj.points[i+1])<=tol) return true;

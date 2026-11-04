@@ -10,6 +10,12 @@
    когда открывают презентацию, — уже ПОСЛЕ boards-core.js. Функции читают
    B, cam, cssW и прочее из boards-core.js только в момент вызова.
    ═══════════════════════════════════════════════════════════════════════ */
+// «„анимации по щелчку“» (конец файла): объявлены здесь, до кода, который их
+// трогает (deckGo, deckSetMode, deckViewerView), — иначе let у конца файла
+// дал бы «нельзя до объявления» при раннем вызове
+let deckAnim = {};                 // id слайда → сколько шагов открыто (урок, показ)
+let deckViewerStep = null;         // у ученика: открытый шаг слайда учителя или null — всё видно
+let deckAnimSig = '';
 
 // размер слайда по умолчанию — 16:9 в клетках доски (64×36 по 24 px):
 // края слайда всегда попадают на линию сетки, как у листов А4 на доске
@@ -244,6 +250,9 @@ function deckViewerView(v){
   }
   deckViewerFlow = v.fl || null;
   deckViewerSlide = next;
+  // шаги анимаций учителя: число открытых или null (всё видно)
+  const stp = typeof v.st === 'number' ? v.st : null;
+  if (stp !== deckViewerStep){ deckViewerStep = stp; if (typeof boardCacheReset === 'function') boardCacheReset('anim'); }
   deckViewerFm = v.fm || null;
   deckViewerMg = v.mg || 0;
   // сразу, а не с первым кадром: камера уже может быть в координатах нового слайда
@@ -560,6 +569,7 @@ function deckSyncFlowUI(){
 
 let deckNavShown = '';
 function deckUpdateNav(){
+  deckAnimSyncUI();
   const i = deckCurIndex(), n = deckSlides().length;
   const txt = (i + 1) + ' / ' + n;
   if (txt === deckNavShown) return;
@@ -578,7 +588,10 @@ function deckGo(idx, dir){
   // №85в: текущий слайд картинкой уезжает назад, новый выезжает вперёд;
   // без слоя глубины (или при «меньше движения») — старый сдвиг холста
   if (dir && !deckFlipAnim()) deckAnimate(dir);
+  // «„анимации по щелчку“»: на новый слайд — шаги закрыты, назад — открыты
+  if (s.id !== deckCurId) deckAnimEnter(s, dir);
   deckCurId = s.id;
+  deckAnimSig = '';
   deckFitCam(s, deckFitted ? deckZf : 1);
   deckFitted = true;
   scheduleRedraw();
@@ -594,6 +607,8 @@ function deckResetZoom(){
   scheduleRedraw(); rememberView();
 }
 function deckStep(dir){
+  // «„анимации по щелчку“»: сначала шаги текущего слайда, потом листание
+  if (deckAnimStep(dir)) return true;
   // №105: в показе листание пропускает скрытые слайды (deck-toolbar.js)
   if (typeof dtbShowOn === 'function' && dtbShowOn()) return dtbShowStep(dir);
   return deckGo(deckCurIndex() + dir, dir);
@@ -2422,6 +2437,10 @@ function deckSetMode(m){
   if (m === deckMode && document.documentElement.classList.contains(m === 'lesson' ? 'deck-lesson' : 'deck-edit')) return;
   deckStampLayers();                  // всё созданное до переключения — по старому режиму
   deckMode = m;
+  // в «Урок» — с закрытыми шагами анимаций, как в начале показа
+  deckAnim = {};
+  if (typeof boardCacheReset === 'function') boardCacheReset('anim');
+  deckAnimSig = '';
   // выделенное в конструкторе — в уроке заготовка, её трогать нельзя
   if (m === 'lesson'){
     if (selectedId){ const o = B.objects.find(x => x.id === selectedId); if (o && o.lay === 'base') selectedId = null; }
@@ -2658,4 +2677,167 @@ function deckThumbsInvalidate(){
   deckSlides().forEach(sl => deckThumbDirty.add(sl.id));
   if (typeof deckMarkCardsDirty === 'function') deckMarkCardsDirty(deckSlides().map(sl => sl.id));
   deckScheduleThumbs(true);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   «„анимации по щелчку“» (05.11.2026, HANDOFF 6б): объекты слайда
+   появляются по шагам, как анимации по щелчку в PowerPoint — на том же
+   слайде, а не копиями слайдов.
+
+   Модель: у объекта слайда поле step (1, 2, 3…); без него — виден всегда.
+   Сколько шагов открыто — состояние урока (deckAnim: id слайда → число), в
+   доску не пишется: открыть решение на уроке — не правка презентации.
+
+   «Конструктор» показывает всё (у объектов с шагом — номер в кружке), а
+   «Урок» и показ — только открытые шаги: остальное не рисуется и не
+   ловится мышью. «Дальше» (стрелка, пробел, щелчок в показе, PageDown)
+   сначала открывает шаг, потом листает; «назад» закрывает шаг, а на
+   предыдущий слайд приходит со всеми открытыми шагами (как в PowerPoint).
+   Кружки 1, 2, 3… справа снизу — открыть сразу до нужного шага.
+   Ученик видит те же шаги: учитель шлёт открытый шаг в bd_view (st).
+   ═══════════════════════════════════════════════════════════════════════ */
+function deckAnimOn(){
+  if (window.deckViewerMode) return deckViewerStep != null;
+  return isDeckBoard() && (deckLessonMode() || (typeof dtbShowOn === 'function' && dtbShowOn()));
+}
+function deckSlideOfObj(o){ const sl = deckSlotOf(o); return deckSlides().find(s => s.slot === sl) || null; }
+function deckAnimMax(s){
+  if (!s) return 0;
+  let m = 0;
+  deckSlotObjects(s).forEach(o => { if (o.step > m) m = o.step; });
+  return m;
+}
+function deckAnimCur(s){
+  if (!s) return 0;
+  if (window.deckViewerMode) return s.id === deckViewerSlide ? (deckViewerStep || 0) : 0;
+  return Math.min(deckAnim[s.id] || 0, deckAnimMax(s));
+}
+// объект спрятан, пока его шаг не открыт; в «Конструкторе» видно всё
+function deckAnimHidden(o){
+  if (!o || !(o.step > 0) || !deckAnimOn()) return false;
+  const s = deckSlideOfObj(o);
+  return !!s && o.step > deckAnimCur(s);
+}
+function deckAnimChanged(){
+  if (typeof boardCacheReset === 'function') boardCacheReset('anim');
+  // спрятанное не может оставаться выделенным — его не видно и не тронуть
+  if (selectedId){ const o = B.objects.find(x => x.id === selectedId); if (o && deckAnimHidden(o)) selectedId = null; }
+  if (multiSelectIds && multiSelectIds.length) multiSelectIds = multiSelectIds.filter(id => { const o = B.objects.find(x => x.id === id); return !(o && deckAnimHidden(o)); });
+  scheduleRedraw();
+  deckAnimSyncUI();
+}
+function deckAnimSet(s, n){
+  if (!s) return;
+  n = Math.max(0, Math.min(deckAnimMax(s), n));
+  if ((deckAnim[s.id] || 0) === n) return;
+  deckAnim[s.id] = n;
+  deckAnimChanged();
+}
+// пришли на слайд: вперёд — все шаги закрыты, назад — все открыты
+function deckAnimEnter(s, dir){
+  if (!s) return;
+  deckAnim[s.id] = dir < 0 ? deckAnimMax(s) : 0;
+}
+// «дальше / назад» сначала по шагам; true — шаг сделан, листать не надо
+function deckAnimStep(dir){
+  if (window.deckViewerMode || !deckAnimOn()) return false;
+  const s = deckCur(), max = deckAnimMax(s), cur = deckAnimCur(s);
+  if (!max) return false;
+  if (dir > 0 && cur < max){ deckAnimSet(s, cur + 1); return true; }
+  if (dir < 0 && cur > 0){ deckAnimSet(s, cur - 1); return true; }
+  return false;
+}
+// что слать ученику: число открытых шагов текущего слайда; нет шагов или
+// «Конструктор» — ничего, у ученика тогда всё видно
+function deckAnimWire(){
+  if (!deckAnimOn()) return undefined;
+  const s = deckCur();
+  if (!s || !deckAnimMax(s)) return undefined;
+  return deckAnimCur(s);
+}
+
+/* Кружки шагов: 1, 2, 3… — щелчок открывает всё до этого шага, щелчок по
+   последнему открытому закрывает его. В показе они в полосе показа (она
+   сама прячется), иначе — плашкой справа снизу */
+function deckAnimSyncUI(){
+  const s = isDeckBoard() && !window.deckViewerMode ? deckCur() : null;
+  const max = s && deckAnimOn() ? deckAnimMax(s) : 0;
+  const cur = max ? deckAnimCur(s) : 0;
+  const show = typeof dtbShowOn === 'function' && dtbShowOn();
+  const sig = [s ? s.id : '', max, cur, show].join('|');
+  if (sig === deckAnimSig && (max === 0 || document.getElementById('deckAnimDots'))) return;
+  deckAnimSig = sig;
+  let el = document.getElementById('deckAnimDots');
+  if (!max){ if (el) el.hidden = true; return; }
+  if (!el){
+    el = document.createElement('div');
+    el.id = 'deckAnimDots';
+    el.className = 'deck-anim-dots';
+    el.setAttribute('role', 'group');
+    el.setAttribute('aria-label', 'Шаги анимации по щелчку');
+    el.addEventListener('click', (e) => {
+      const b = e.target.closest('button[data-step]');
+      if (!b) return;
+      e.stopPropagation();
+      const sl = deckCur(), n = +b.dataset.step;
+      deckAnimSet(sl, n === deckAnimCur(sl) ? n - 1 : n);
+    });
+    // щелчок по кружку в показе не должен листать слайд
+    ['pointerdown', 'pointerup'].forEach(t => el.addEventListener(t, (e) => e.stopPropagation()));
+  }
+  const host = (show && document.getElementById('dtbShowBar')) || document.getElementById('screenBoard') || document.body;
+  if (el.parentElement !== host) host.appendChild(el);
+  el.classList.toggle('in-show', show);
+  el.hidden = false;
+  let h = '<span class="deck-anim-lbl">Шаги</span>';
+  for (let i = 1; i <= max; i++) h += '<button type="button" data-step="' + i + '" class="' + (i <= cur ? 'on' : '') + (i === cur ? ' cur' : '') + '" title="' + (i === cur ? 'Закрыть шаг ' + i : 'Открыть до шага ' + i) + '" aria-pressed="' + (i <= cur) + '">' + i + '</button>';
+  el.innerHTML = h;
+}
+(function deckAnimStyle(){
+  const st = document.createElement('style');
+  // справа снизу, левее ползунка листания: по центру снизу всплывают
+  // сообщения доски (deckToast) и закрывали бы кружки
+  st.textContent = '.deck-anim-dots{position:fixed;right:72px;bottom:96px;z-index:310;display:flex;align-items:center;gap:6px;padding:5px 8px;border-radius:999px;background:var(--glass-strong);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid var(--glass-border);box-shadow:var(--shadow);font-family:var(--font-ui)}'
+    + '.deck-anim-dots[hidden]{display:none}'
+    + '.deck-anim-dots.in-show{position:static;box-shadow:none;background:none;border:none;padding:0 6px;backdrop-filter:none;-webkit-backdrop-filter:none}'
+    + '.deck-anim-lbl{font-size:12px;font-weight:600;color:var(--muted-1);margin-right:2px}'
+    + '.deck-anim-dots.in-show .deck-anim-lbl{color:#aaa}'
+    + '.deck-anim-dots button{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--ink);background:none;color:var(--ink);font:700 13px/1 var(--font-ui);cursor:pointer;padding:0}'
+    + '.deck-anim-dots button.on{background:color-mix(in srgb, var(--ink) 22%, transparent)}'
+    + '.deck-anim-dots button.cur{background:var(--ink);color:#fff}'
+    + '.deck-anim-dots.in-show button{border-color:#4A93F0;color:#ddd}.deck-anim-dots.in-show button.cur{background:#4A93F0;color:#fff}';
+  document.head.appendChild(st);
+})();
+
+// «Конструктор»: номер шага в кружке у объекта — видно, что и когда появится
+function deckAnimBadges(c, camv){
+  if (!isDeckBoard() || window.deckViewerMode || deckAnimOn()) return;
+  const s = deckCur();
+  if (!s) return;
+  const list = deckSlotObjects(s).filter(o => o.step > 0);
+  if (!list.length) return;
+  c.save();
+  c.font = '700 11px ' + (getComputedStyle(document.body).fontFamily || 'sans-serif');
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  const ink = typeof themeVar === 'function' ? themeVar('--ink') : '#004C99';
+  list.forEach(o => {
+    const b = objectBBox(o);
+    const p = worldToScreen({ x: b.minX, y: b.minY });
+    const x = p.x - 4, y = p.y - 4;
+    c.beginPath(); c.arc(x, y, 9, 0, Math.PI * 2);
+    c.fillStyle = ink; c.fill();
+    c.lineWidth = 1.5; c.strokeStyle = '#fff'; c.stroke();
+    c.fillStyle = '#fff'; c.fillText(String(o.step), x, y + 0.5);
+  });
+  c.restore();
+}
+
+// шаг выделенным объектам: 0 — без анимации, иначе номер шага
+function deckAnimAssign(list, n){
+  if (!list || !list.length || typeof pushUndo !== 'function') return;
+  pushUndo();
+  list.forEach(o => { if (n > 0) o.step = n; else delete o.step; });
+  saveDB();
+  scheduleRedraw();
+  deckAnimSyncUI();
 }
