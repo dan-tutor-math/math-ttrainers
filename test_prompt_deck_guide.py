@@ -6,7 +6,9 @@
 Проверяем:
   1. У презентации в верхней строке — «Импорт», у обычной доски его нет;
      меню: «PowerPoint или PDF» и «HTML» с «Гайд (и для нейросети)» рядом;
-     «HTML» открывает выбор только .html, «PowerPoint или PDF» — .pptx и .pdf
+     «HTML» открывает выбор только .html, «PowerPoint или PDF» — .pptx и .pdf;
+     из гайда «← К презентации» — назад во вкладку презентации (или в неё
+     же, если вкладки нет), чужой адрес в from не принимается
   2. Страница гайда: гайд показан, образец достаётся из гайда; тема — как
      на сайте (не системная), кнопка темы переключает и запоминает
   3. Образец из гайда «полностью»: «✓ Разметка по гайду», 3 слайда 16:9,
@@ -111,6 +113,29 @@ def main():
         check(page.is_hidden("#deckImpMenu"), "меню закрылось")
         page.evaluate("() => deckIoEnsure()")
 
+        print("1б. Из гайда — назад в презентацию")
+        bid = page.evaluate("() => B.id")
+        page.click("#deckImpBtn")
+        with page.context.expect_page() as pi:
+            page.click("#deckImpGuide")
+        gp = pi.value
+        gp.wait_for_selector("#doc h1")
+        bl = gp.eval_on_selector("#backLink", "a => [a.getAttribute('href'), a.textContent]")
+        check(bl == ["boards.html#board=" + bid, "← К презентации"], "в гайде «← К презентации» с адресом этой презентации", str(bl))
+        gp.click("#backLink")
+        page.wait_for_timeout(500)
+        check(gp.is_closed(), "«← К презентации» закрывает вкладку гайда — презентация в своей вкладке")
+        g2 = browser.new_page()
+        g2.goto(T.BASE + "/deck-guide.html?from=" + "boards.html%23board%3D" + bid)
+        g2.wait_for_selector("#doc h1")
+        g2.click("#backLink")
+        g2.wait_for_url("**/boards.html#board=" + bid, timeout=10000)
+        check(True, "без вкладки-источника — переходит в ту же презентацию")
+        g2.goto(T.BASE + "/deck-guide.html?from=" + "https%3A%2F%2Fexample.com")
+        g2.wait_for_selector("#doc h1")
+        check(g2.eval_on_selector("#backLink", "a => [a.getAttribute('href'), a.textContent]") == ["boards.html", "← К доскам"], "чужой адрес в from не принимается")
+        g2.close()
+
         print("3. Образец из гайда «полностью»")
         info = do_import(page, sample_path)
         check("✓ Разметка по гайду" in info and "3 слайда" in info and "1920 × 1080" in info, "окно: по гайду, 3 слайда 1920 × 1080", info)
@@ -164,7 +189,7 @@ def main():
         print("6. Файл без разметки")
         info = do_import(page, F("deck_import_custom.html"))
         check("Без разметки по гайду" in info, "предупреждение «без разметки»", info)
-        check(page.evaluate("() => !!document.querySelector('#ioInfo a[href=\"deck-guide.html\"]')"), "в окне ссылка на гайд")
+        check(page.evaluate("() => !!document.querySelector('#ioInfo a[href^=\"deck-guide.html?from=boards.html\"]')"), "в окне ссылка на гайд — с адресом этой презентации")
 
         print("7. Шрифты")
         faces = page.evaluate("(names) => names.map(n => [n, bxFace(n), BX_FONT_MENU.includes(n)])", GUIDE_FONTS)

@@ -46,7 +46,7 @@ body{margin:0;background:var(--bg);color:var(--pencil);font-family:'Onest',-appl
 </head>
 <body>
 <div class="top">
-  <a class="back" href="boards.html">← К доскам</a>
+  <a class="back" id="backLink" href="boards.html">← К доскам</a>
   <button class="main" id="copyBtn">Скопировать для нейросети</button>
   <button id="mdBtn">Скачать .md</button>
   <button id="sampleBtn">Скачать образец</button>
@@ -120,6 +120,27 @@ document.getElementById('copyBtn').onclick = async () => {
 };
 document.getElementById('mdBtn').onclick = () => save('deck-guide.md', MD, 'text/markdown');
 document.getElementById('sampleBtn').onclick = () => save('deck-sample.html', sample(), 'text/html');
+/* «Назад» — туда, откуда открыли гайд (?from=boards.html#board=…). Открыт из
+   презентации новой вкладкой — возвращаемся в её вкладку и закрываем эту:
+   иначе одна доска оказалась бы открыта дважды. Вкладки уже нет — открываем
+   ту презентацию здесь. В from берём только адрес досок этого сайта */
+(function(){
+  const from = new URLSearchParams(location.search).get('from') || '';
+  if (!/^boards\.html(#board=[\w%.-]+)?$/.test(from)) return;
+  const a = document.getElementById('backLink');
+  a.href = from;
+  a.textContent = '← К презентации';
+  a.addEventListener('click', (e) => {
+    let op = null;
+    try { op = window.opener && !window.opener.closed && window.opener.location.pathname ? window.opener : null; } catch (err) { op = null; }
+    if (!op) return;
+    e.preventDefault();
+    try { op.focus(); } catch (err) {}
+    window.close();
+    // браузер не дал закрыть вкладку — тогда просто переходим
+    setTimeout(() => { location.href = from; }, 250);
+  });
+})();
 // та же кнопка темы, что на сайте: тот же ключ — выбор общий со всеми страницами
 const themeBtn = document.getElementById('themeToggle');
 const curTheme = () => document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';

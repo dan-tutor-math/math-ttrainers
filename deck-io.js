@@ -1752,7 +1752,7 @@ async function ioImportHtml(file){
     // как получится; во втором случае ссылка на гайд прямо в окне
     const check = pr.contract
       ? '<span class="io-ok">✓ Разметка по гайду' + (pr.meta ? '' : ' (без размера кадра — взят у слайда)') + '</span>'
-      : '<span class="io-warn">Без разметки по гайду — переносим как получится.</span> <a href="deck-guide.html" target="_blank" rel="noopener">Гайд</a>';
+      : '<span class="io-warn">Без разметки по гайду — переносим как получится.</span> <a href="' + (typeof deckGuideHref === 'function' ? deckGuideHref() : 'deck-guide.html') + '" target="_blank" rel="opener">Гайд</a>';
     const opt = await ioAsk({ name: file.name, html: true, pages: n, rangeLabel: 'Слайды', checkHtml: check,
       text: ioPlural(n, 'слайд', 'слайда', 'слайдов') + ', ' + pr.w + ' × ' + pr.h + ' px'
         + (pr.kind === 'page' ? ' (слайдов не нашлось — страница разрезана по высоте экрана)' : '')

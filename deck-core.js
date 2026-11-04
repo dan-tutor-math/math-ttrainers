@@ -2613,6 +2613,12 @@ document.addEventListener('pointerdown', (e) => {
    один пункт (читает их один и тот же импорт), HTML — отдельно, рядом —
    гайд, как делать HTML под нас (deck-guide.html). Поле выбора файла одно:
    перед открытием сужаем, какие файлы оно предлагает */
+// адрес гайда с адресом этой презентации; у ссылки rel="opener" (Chrome с 88-й
+// версии сам ставит noopener ссылкам в новую вкладку) — тогда гайд может
+// просто вернуть в эту вкладку и закрыться
+function deckGuideHref(){
+  return 'deck-guide.html' + (B && B.id ? '?from=' + encodeURIComponent('boards.html#board=' + B.id) : '');
+}
 const DECK_ACCEPT_ALL = '.pptx,.pdf,.html,.htm,application/pdf,text/html,application/vnd.openxmlformats-officedocument.presentationml.presentation';
 const DECK_ACCEPT = {
   office: '.pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -2625,7 +2631,9 @@ document.getElementById('deckImpBtn')?.addEventListener('click', () => {
 });
 document.getElementById('deckImpMenu')?.addEventListener('click', (e) => {
   const b = e.target.closest('button[data-imp]');
-  if (e.target.closest('#deckImpGuide')){ deckMenuToggle('deckImpMenu', 'deckImpBtn', false); return; }
+  // гайд узнаёт, из какой презентации пришли: его «Назад» — сюда, а не к списку досок
+  const g = e.target.closest('#deckImpGuide');
+  if (g){ g.href = deckGuideHref(); deckMenuToggle('deckImpMenu', 'deckImpBtn', false); return; }
   if (!b || b.disabled) return;
   deckMenuToggle('deckImpMenu', 'deckImpBtn', false);
   const inp = document.getElementById('deckImportFile');
