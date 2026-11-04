@@ -7,7 +7,8 @@
   1. У презентации в верхней строке — «Импорт», у обычной доски его нет;
      меню: «PowerPoint или PDF» и «HTML» с «Гайд (и для нейросети)» рядом;
      «HTML» открывает выбор только .html, «PowerPoint или PDF» — .pptx и .pdf
-  2. Страница гайда: гайд показан, образец достаётся из гайда
+  2. Страница гайда: гайд показан, образец достаётся из гайда; тема — как
+     на сайте (не системная), кнопка темы переключает и запоминает
   3. Образец из гайда «полностью»: «✓ Разметка по гайду», 3 слайда 16:9,
      заметки у своих слайдов, служебная кнопка data-deck-ui не попала,
      шапка — надписью, список — с маркерами, таблица — таблицей доски
@@ -73,6 +74,17 @@ def main():
         page.wait_for_selector("#doc h1", timeout=10000)
         check("HTML-презентации" in page.inner_text("#doc h1"), "гайд показан", page.inner_text("#doc h1"))
         check(page.locator("#doc table").count() >= 1 and page.locator("#doc pre").count() >= 1, "таблица размеров и образец кода на странице")
+        # тема — сайта, а не системы: светлая на сайте → светлый гайд, кнопка меняет и запоминает
+        page.emulate_media(color_scheme="dark")
+        page.evaluate("() => localStorage.setItem('theme', 'light')")
+        page.reload()
+        page.wait_for_selector("#doc h1")
+        bg = page.evaluate("() => getComputedStyle(document.body).backgroundColor")
+        check(page.evaluate("() => document.documentElement.dataset.theme") == "light" and bg == "rgb(238, 241, 247)", "при светлой теме сайта гайд светлый (хотя система тёмная)", bg)
+        page.click("#themeToggle")
+        check(page.evaluate("() => [document.documentElement.dataset.theme, localStorage.getItem('theme'), getComputedStyle(document.body).backgroundColor]") == ["dark", "dark", "rgb(11, 14, 26)"], "кнопка темы — тёмная и запомнена")
+        page.click("#themeToggle")
+        page.emulate_media(color_scheme="light")
         smp = page.evaluate("() => sample()")
         check('<meta name="deck" content="1920x1080">' in smp and smp.count("data-deck-slide>") == 3, "«Скачать образец» берёт образец из гайда")
 

@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Гайд: HTML-презентации — Mathh</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<!-- тема сайта (localStorage 'theme') — до первой отрисовки, как на всех
+     страницах: иначе гайд брал тему системы и в светлой теме сайта
+     открывался тёмным -->
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
 <style>
 /* Страница показывает deck-guide.md как есть: текст гайда один — и для
    людей, и для нейросети (кнопка «Скопировать» берёт тот же файл), чтобы
@@ -12,13 +16,14 @@
 @font-face{font-family:'Onest';src:url(fonts/onest-cyrillic.woff2) format('woff2');unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
 @font-face{font-family:'Onest';src:url(fonts/onest-latin.woff2) format('woff2');unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 :root{--bg:#EEF1F7;--card:#FFFFFF;--ink:#004C99;--pencil:#1D1D1F;--muted:#6E6E73;--line:#DCE4F0;--code:#F5F7FB}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0B0E1A;--card:#151A2C;--ink:#4A93F0;--pencil:#F2F3F5;--muted:#9A9AA2;--line:#2A3150;--code:#1B2136}}
+:root[data-theme="dark"]{--bg:#0B0E1A;--card:#151A2C;--ink:#4A93F0;--pencil:#F2F3F5;--muted:#9A9AA2;--line:#2A3150;--code:#1B2136}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--pencil);font-family:'Onest',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;font-size:16px;line-height:1.55}
 .top{position:sticky;top:0;z-index:5;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 16px;background:color-mix(in srgb, var(--bg) 82%, transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--line)}
 .top a.back{color:var(--ink);text-decoration:none;font-weight:600;margin-right:auto}
 .top button{height:36px;padding:0 14px;border-radius:10px;border:1.5px solid var(--ink);background:none;color:var(--ink);font:600 14px/1 inherit;font-family:inherit;cursor:pointer}
 .top button.main{background:var(--ink);color:#fff}
+.top button.theme{width:36px;padding:0;border-color:var(--line);font-size:17px}
 .wrap{max-width:860px;margin:0 auto;padding:24px 16px 80px}
 .doc{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:28px 32px}
 @media (max-width:600px){.doc{padding:18px 16px}}
@@ -45,6 +50,7 @@ body{margin:0;background:var(--bg);color:var(--pencil);font-family:'Onest',-appl
   <button class="main" id="copyBtn">Скопировать для нейросети</button>
   <button id="mdBtn">Скачать .md</button>
   <button id="sampleBtn">Скачать образец</button>
+  <button class="theme" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
 </div>
 <div class="wrap"><article class="doc" id="doc">Загружаем гайд…</article></div>
 <div class="toast" id="toast"></div>
@@ -114,6 +120,18 @@ document.getElementById('copyBtn').onclick = async () => {
 };
 document.getElementById('mdBtn').onclick = () => save('deck-guide.md', MD, 'text/markdown');
 document.getElementById('sampleBtn').onclick = () => save('deck-sample.html', sample(), 'text/html');
+// та же кнопка темы, что на сайте: тот же ключ — выбор общий со всеми страницами
+const themeBtn = document.getElementById('themeToggle');
+const curTheme = () => document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+function applyTheme(t, persist){
+  document.documentElement.setAttribute('data-theme', t);
+  themeBtn.textContent = t === 'dark' ? '☀️' : '🌙';
+  if (persist){ try { localStorage.setItem('theme', t); } catch (e) {} }
+}
+applyTheme(curTheme(), false);
+themeBtn.onclick = () => applyTheme(curTheme() === 'dark' ? 'light' : 'dark', true);
+// тему сменили в соседней вкладке (на досках) — гайд следом
+addEventListener('storage', (e) => { if (e.key === 'theme' && (e.newValue === 'dark' || e.newValue === 'light')) applyTheme(e.newValue, false); });
 </script>
 </body>
 </html>
