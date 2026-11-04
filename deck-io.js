@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════
-   deck-io.js — импорт PPTX и PDF в презентацию и выгрузка в PDF и PPTX
-   (промпты №98–100, HANDOFF.md раздел 6г).
+   deck-io.js — импорт PPTX, PDF и HTML в презентацию и выгрузка в PDF и
+   PPTX (промпты №98–100, «„импорт HTML“»; HANDOFF.md раздел 6г).
 
    Подгружается по нажатию «Файл» (deckIoEnsure в deck-core.js): ни доски,
    ни сама презентация без него ничего не теряют. Библиотеки — свои копии
@@ -1193,10 +1193,13 @@ function ioAsk(info){
     d.querySelector('#ioTitle').textContent = 'Импорт: ' + info.name;
     d.querySelector('#ioInfo').textContent = info.text;
     d.querySelector('#ioPagesSec').hidden = !info.pages;
+    d.querySelector('#ioPagesSec .deck-pop-h').textContent = info.rangeLabel || 'Страницы';
     if (info.pages){ const f = d.querySelector('#ioFrom'), t = d.querySelector('#ioTo'); f.max = t.max = info.pages; f.value = 1; t.value = Math.min(info.pages, 60); }
     d.querySelector('#ioModeSec .io-opt span').innerHTML = info.pdf
       ? '<b>Полностью</b> — текст страницы можно править (рисунки и линии остаются фоном)'
-      : '<b>Полностью</b> — текст, фигуры, таблицы и картинки можно двигать и править';
+      : info.html
+        ? '<b>Полностью</b> — текст, картинки, формулы и простые фигуры можно двигать и править (тени, градиенты и узоры остаются фоном)'
+        : '<b>Полностью</b> — текст, фигуры, таблицы и картинки можно двигать и править';
     d.querySelector('#ioProg').hidden = true;
     d.querySelector('#ioGo').disabled = false;
     d.querySelector('#ioCancel').disabled = false;
@@ -1269,9 +1272,11 @@ async function deckIoImportFile(file){
   if (!deckMayEdit()){ deckToast('Импорт — только тому, кто правит презентацию'); return; }
   const isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
   const isPptx = /\.pptx$/i.test(file.name);
-  if (!isPdf && !isPptx){ deckToast(/\.ppt$/i.test(file.name) ? 'Старый формат .ppt — сохраните его в PowerPoint как .pptx' : 'Нужен файл .pptx или .pdf'); return; }
+  const isHtml = /\.x?html?$/i.test(file.name) || file.type === 'text/html';
+  if (!isPdf && !isPptx && !isHtml){ deckToast(/\.ppt$/i.test(file.name) ? 'Старый формат .ppt — сохраните его в PowerPoint как .pptx' : 'Нужен файл .pptx, .pdf или .html'); return; }
   try {
     if (isPptx) await ioImportPptx(file);
+    else if (isHtml) await ioImportHtml(file);
     else await ioImportPdf(file);
   } catch (e) {
     console.error('[deck-io] импорт', e);
@@ -1551,6 +1556,180 @@ async function ioImportPdf(file){
   ioDialog().hidden = true;
   deckToast('Импортировано: ' + ioPlural(placed, 'страница', 'страницы', 'страниц') + (opt.mode === 'full' && !anyText ? ' (текста в файле нет — это скан)' : ''));
   doc.destroy();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ИМПОРТ HTML («„импорт HTML“», 04.11.2026)
+   HTML-презентация (reveal.js, Marp, свои слайды из ИИ, просто страница)
+   открывается в невидимом кадре с адресом data: — у такого кадра свой
+   «пустой» адрес, чужой доске: скрипты презентации работают (многие
+   движки строят слайды скриптом), но до localStorage, входа в Supabase и
+   самой доски им не достать. Цена — доска не видит DOM кадра, поэтому
+   внутрь вместе с HTML кладётся разборщик (deck-io-html-frame.js) и
+   html2canvas, а слайды приходят postMessage. Почему не srcdoc и не
+   sandbox без allow-same-origin — см. «Грабли» (html2canvas).
+   «Картинками» — снимок слайда подложкой. «Полностью» — как у PDF, только
+   богаче: надписи, картинки, svg, формулы и простые фигуры (заливка,
+   рамка, скругление) — объектами, всё остальное (градиенты, тени, узоры)
+   — подложкой, с которой эти объекты стёрты.
+   ═══════════════════════════════════════════════════════════════════════ */
+const IO_HTML_W = 1280, IO_HTML_H = 720;   // окно песочницы: 16:9, как слайд PowerPoint
+let ioHtmlKit = null;
+async function ioHtmlKitText(){
+  if (ioHtmlKit) return ioHtmlKit;
+  const get = (u) => fetch(u, { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error(u); return r.text(); });
+  const [h2c, frame] = await Promise.all([get('html2canvas.min.js'), get('deck-io-html-frame.js')]);
+  // «</script» внутри кода закрыл бы тег раньше времени
+  const esc = (s) => s.replace(/<\/script/gi, '<\\/script');
+  ioHtmlKit = '<script>' + esc(h2c) + '</' + 'script><script>' + esc(frame) + '</' + 'script>';
+  return ioHtmlKit;
+}
+// разборщик — в самый конец body: к его запуску весь HTML уже разобран
+function ioHtmlDoc(html, kit){
+  const m = /<\/body\s*>(?![\s\S]*<\/body\s*>)/i.exec(html);
+  return m ? html.slice(0, m.index) + kit + html.slice(m.index) : html + kit;
+}
+/* Кадр поднимается крошечной заглушкой data:, а сам HTML приходит в него
+   сообщением и пишется document.write: адрес data: в Chrome не длиннее 2 МБ,
+   а презентация с картинками внутри бывает и 20 МБ.
+   sandbox="allow-scripts allow-same-origin": у data: адрес «пустой» при
+   любых флагах, allow-same-origin лишь даёт html2canvas заглянуть в свой
+   же вложенный кадр-копию (без него у каждого вложенного кадра песочницы
+   свой отдельный адрес, и снимок падал). Остальное песочница запрещает:
+   всплывающие окна, переход всей вкладки, alert, отправку форм */
+const IO_HTML_BOOT = '<!doctype html><meta charset="utf-8"><script>addEventListener("message",function f(e){if(e.source!==parent||!e.data||e.data.mxio!=="doc")return;removeEventListener("message",f);document.open();document.write(e.data.html);document.close();});parent.postMessage({mxio:"boot"},"*");</' + 'script>';
+function ioHtmlSession(doc, w, h){
+  const fr = document.createElement('iframe');
+  fr.setAttribute('sandbox', 'allow-scripts allow-same-origin');
+  fr.setAttribute('aria-hidden', 'true');
+  fr.tabIndex = -1;
+  fr.className = 'io-html-frame';
+  // кадр в окне, а не за краем: браузер не рисует и придерживает таймеры
+  // кадров вне экрана, а движкам слайдов нужен requestAnimationFrame
+  fr.style.cssText = 'position:fixed;left:0;top:0;width:' + w + 'px;height:' + h + 'px;border:0;opacity:0;pointer-events:none;z-index:-1';
+  const queue = [];
+  let wait = null;
+  const listener = (e) => {
+    if (e.source !== fr.contentWindow || !e.data || typeof e.data.mxio !== 'string' || e.data.mxio === 'boot') return;
+    if (wait){ const w2 = wait; wait = null; w2(e.data); } else queue.push(e.data);
+  };
+  window.addEventListener('message', listener);
+  fr.src = 'data:text/html;charset=utf-8,' + encodeURIComponent(IO_HTML_BOOT);
+  document.body.appendChild(fr);
+  // заглушка поднялась — отдать ей презентацию; «boot» дальше не нужен
+  let booted = false;
+  const boot = (e) => {
+    if (booted || e.source !== fr.contentWindow || !e.data || e.data.mxio !== 'boot') return;
+    booted = true;
+    fr.contentWindow.postMessage({ mxio: 'doc', html: doc }, '*');
+  };
+  window.addEventListener('message', boot);
+  return {
+    next(ms){
+      if (queue.length) return Promise.resolve(queue.shift());
+      return new Promise((res, rej) => {
+        const t = setTimeout(() => { wait = null; rej(new Error('страница не ответила за ' + Math.round(ms / 1000) + ' с')); }, ms);
+        wait = (m) => { clearTimeout(t); res(m); };
+      });
+    },
+    post(m){ fr.contentWindow.postMessage(m, '*'); },
+    close(){ window.removeEventListener('message', listener); window.removeEventListener('message', boot); fr.remove(); },
+  };
+}
+function ioHtmlText(T, k, pad, anchor){
+  const runs = T.runs.map(r => {
+    const o = { t: r.t, sz: +(r.fs * k).toFixed(2), c: r.c || '#000000', f: r.f || 'Arial' };
+    ['b', 'i', 'u', 's', 'bl'].forEach(f => { if (r[f]) o[f] = r[f]; });
+    return o;
+  });
+  const p = { runs };
+  if (T.al && T.al !== 'l') p.al = T.al;
+  // межстрочный — только если заметно отличается от обычного у шрифта доски
+  if (T.lh && T.lines > 1 && typeof bxMetrics === 'function'){
+    const m = bxMetrics(runs[0]), nat = runs[0].sz * (m.asc + m.desc), want = T.lh * k;
+    if (Math.abs(want / nat - 1) > 0.05) p.lsPx = +want.toFixed(2);
+  }
+  if (T.bu){
+    p.bu = Object.assign({}, T.bu);
+    if (p.bu.start === 1) delete p.bu.start;
+  }
+  return { paras: [p], anchor: anchor || 't', pad: (pad || [0, 0, 0, 0]).map(v => +(v * k).toFixed(2)), fit: 'shrink',
+    def: { sz: runs[0].sz, c: runs[0].c, f: runs[0].f } };
+}
+function ioHtmlObj(it, k){
+  const o = { id: uid(), points: [{ x: +(it.x * k).toFixed(2), y: +(it.y * k).toFixed(2) }], w: Math.max(0.5, +(it.w * k).toFixed(2)), h: Math.max(0.5, +(it.h * k).toFixed(2)) };
+  if (it.t === 'img') return Object.assign(o, { type: 'image', src: it.src, natW: it.natW || 0, natH: it.natH || 0 });
+  if (it.t === 'box'){
+    Object.assign(o, { type: 'box', geom: it.geom || 'rect', fill: null, line: null });
+    if (it.fill){ o.fill = { c: it.fill.c }; if (it.fill.a < 0.995) o.fill.a = it.fill.a; }
+    if (it.line){ o.line = { c: it.line.c, w: +(it.line.w * k).toFixed(2) }; if (it.line.dash) o.line.dash = it.line.dash; if (it.line.a < 0.995) o.line.a = it.line.a; }
+    if (it.adj != null) o.adj = { adj: it.adj };
+    if (it.text) o.text = ioHtmlText(it.text, k, it.pad, it.anchor);
+    return o;
+  }
+  // надпись без фигуры: чуть шире, чем в браузере, — шрифт доски может
+  // оказаться шире шрифта страницы, и строка перенеслась бы раньше
+  Object.assign(o, { type: 'box', geom: 'rect', fill: null, line: null, text: ioHtmlText(it.text, k, [0, 0, 0, 0], 't') });
+  const p = o.text.paras[0], extra = o.w * 0.04;
+  o.w += extra;
+  if (p.al === 'c') o.points[0].x -= extra / 2; else if (p.al === 'r') o.points[0].x -= extra;
+  if (p.bu){
+    // маркер списка в браузере стоит слева от текста — там же и на доске
+    const ind = +(p.runs[0].sz * 1.25).toFixed(2);
+    p.ind = ind; p.fi = -ind;
+    o.points[0].x -= ind; o.w += ind;
+  }
+  return o;
+}
+async function ioImportHtml(file){
+  const html = await file.text();
+  const kit = await ioHtmlKitText();
+  const doc = ioHtmlDoc(html, kit);
+  let ses = ioHtmlSession(doc, IO_HTML_W, IO_HTML_H);
+  try {
+    deckToast('Открываем презентацию…');
+    let pr = await ses.next(25000);
+    if (pr.mxio === 'err') throw new Error(pr.msg);
+    // движки вписывают слайд в окно масштабом; снимать надо в настоящем
+    // размере — открываем заново в окне ровно под слайд
+    const w0 = pr.w, h0 = pr.h;
+    if (pr.kind !== 'page' && (Math.abs(w0 - IO_HTML_W) > 2 || Math.abs(h0 - IO_HTML_H) > 2) && w0 >= 200 && h0 >= 120 && w0 <= 4000 && h0 <= 4000){
+      ses.close();
+      ses = ioHtmlSession(doc, w0, h0);
+      pr = await ses.next(25000);
+      if (pr.mxio === 'err') throw new Error(pr.msg);
+    }
+    const n = pr.n;
+    if (!n){ deckToast('В файле не нашлось слайдов'); return; }
+    const opt = await ioAsk({ name: file.name, html: true, pages: n, rangeLabel: 'Слайды',
+      text: ioPlural(n, 'слайд', 'слайда', 'слайдов') + ', ' + pr.w + ' × ' + pr.h + ' px'
+        + (pr.kind === 'page' ? ' (слайдов не нашлось — страница разрезана по высоте экрана)' : '')
+        + (pr.missing ? '. ' + ioPlural(pr.missing, 'картинка', 'картинки', 'картинок') + ' не нашлись рядом с файлом — сохраните презентацию одним файлом' : '') });
+    if (!opt) return;
+    const from = Math.min(n, opt.from), to = Math.min(n, opt.to), total = to - from + 1;
+    const k = 0.75 * ioPtPx();   // 1 CSS px = 0,75 пт
+    ses.post({ mxio: 'go', mode: opt.mode, from: from - 1, to: to - 1 });
+    const prepared = [];
+    for (;;){
+      ioProgress(prepared.length, total, 'Читаем слайд ' + (from + prepared.length) + ' из ' + to + '…');
+      const m = await ses.next(90000);
+      if (m.mxio === 'err') throw new Error(m.msg);
+      if (m.mxio === 'done') break;
+      if (m.mxio !== 'slide') continue;
+      const d = m.data || {};
+      const P = { wPx: (d.w || pr.w) * k, hPx: (d.h || pr.h) * k, objs: [], notes: d.notes || '' };
+      if (opt.mode === 'img'){ Object.assign(P, { raster: d.raster, rasterW: d.rw, rasterH: d.rh }); }
+      else {
+        P.objs = (d.items || []).map(it => ioHtmlObj(it, k));
+        P.bgImgSrc = d.under; P.bgImgSize = { w: d.uw, h: d.uh };
+      }
+      prepared.push(P);
+    }
+    ioProgress(1, 1, 'Раскладываем по слайдам…');
+    const placed = await ioPlaceSlides(null, prepared, opt);
+    ioDialog().hidden = true;
+    deckToast('Импортировано: ' + ioPlural(placed, 'слайд', 'слайда', 'слайдов'));
+  } finally { ses.close(); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
