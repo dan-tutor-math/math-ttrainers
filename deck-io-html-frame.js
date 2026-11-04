@@ -44,6 +44,7 @@
     const st = document.createElement('style');
     st.textContent = '*,*::before,*::after{animation-delay:0s!important;animation-duration:0.001s!important;animation-iteration-count:1!important;transition-duration:0s!important;transition-delay:0s!important;caret-color:transparent!important}'
       + '.reveal .fragment{opacity:1!important;visibility:visible!important;transform:none!important}'
+      + '[data-mxio-stage]{transform:none!important;scale:none!important;translate:none!important;zoom:1!important;left:0!important;top:0!important;right:auto!important;bottom:auto!important;margin:0!important}'
       + '.mxio-t{color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important}';
     (document.head || document.documentElement).appendChild(st);
   }
@@ -73,7 +74,14 @@
       const els = outer([...document.querySelectorAll(sel)]).filter(el => !el.closest('[aria-hidden="true"].thumbs, .thumbnails, nav'));
       if (els.length < 2) continue;
       const big = els.some(el => { if (!shown(el)) return false; const r = el.getBoundingClientRect(); return r.width * r.height >= area * 0.25; });
-      if (big) return { kind: sel, list: els.map(el => ({ root: el, host: el, frame: el })) };
+      if (big){
+        const st = findStage(els);
+        // слайды на сцене: слайдом считается вся сцена (фишки, рамки, фон
+        // вокруг слайда — тоже часть кадра), разбираем тоже её — у скрытых
+        // слайдов display: none, они сами не попадут
+        if (st) return { kind: sel, stage: true, list: els.map(el => ({ root: st, host: el, frame: st })) };
+        return { kind: sel, list: els.map(el => ({ root: el, host: el, frame: el })) };
+      }
     }
     // один длинный документ: режем на страницы по высоте окна
     const H = Math.max(VH(), document.documentElement.scrollHeight, document.body ? document.body.scrollHeight : 0);
@@ -81,6 +89,28 @@
     const list = [];
     for (let i = 0; i < n; i++) list.push({ root: document.body, host: null, frame: document.body, slice: { y: i * VH(), h: VH() } });
     return { kind: 'page', list };
+  }
+
+  /* «Сцена»: многие движки (и наши шаблоны разборов) рисуют кадр
+     постоянного размера — 1920 × 1080 — и вписывают его в окно через
+     transform: scale. Слайды тогда лишь часть кадра (у разборов — левая
+     колонка, а фишки, рамка камеры и подпись лежат вне слайдов), и размер
+     слайда выходил 1336 × 872 вместо 16:9. Признак сцены: общий предок
+     всех слайдов с transform / scale / zoom и размером не больше двух
+     слайдов (иначе это лента всех слайдов подряд, а не кадр) */
+  function findStage(els){
+    const vis = els.find(shown) || els[0];
+    const sw = Math.max(1, vis.offsetWidth), sh = Math.max(1, vis.offsetHeight);
+    let best = null;
+    for (let p = vis.parentElement; p && p !== document.body && p !== document.documentElement; p = p.parentElement){
+      if (!els.every(e => p.contains(e))) continue;
+      const cs = getComputedStyle(p);
+      // уже найденная сцена: масштаб с неё снят нашим же стилем
+      const tf = p.hasAttribute('data-mxio-stage') || (cs.transform && cs.transform !== 'none') || (cs.scale && cs.scale !== 'none') || (cs.zoom && cs.zoom !== '1' && cs.zoom !== 'normal');
+      if (tf && p.offsetWidth >= sw && p.offsetHeight >= sh && p.offsetWidth <= sw * 2.05 && p.offsetHeight <= sh * 2.05) best = p;
+    }
+    if (best) best.setAttribute('data-mxio-stage', '');
+    return best;
   }
 
   /* «Активный» слайд у своих движков почти всегда отличается классом
@@ -107,6 +137,35 @@
     ['display', 'visibility', 'opacity'].forEach(p => forced.style.removeProperty(p));
     forced = null;
   }
+  let keyNav = null;   // null — не проверяли, true/false — отвечает ли на клавиши
+  const curIdx = (all) => all.findIndex(o => o.host && shown(o.host));
+  function press(key){
+    const code = { ArrowRight: 39, ArrowLeft: 37, Home: 36 }[key];
+    const t = document.activeElement && document.activeElement !== document.body ? document.activeElement : document.body;
+    t.dispatchEvent(new KeyboardEvent('keydown', { key, code: key, keyCode: code, which: code, bubbles: true, cancelable: true }));
+    t.dispatchEvent(new KeyboardEvent('keyup', { key, code: key, keyCode: code, which: code, bubbles: true, cancelable: true }));
+  }
+  async function keyGo(all, i){
+    let at = curIdx(all);
+    if (at < 0) return false;
+    if (keyNav === null){
+      // проверка: шаг вперёд (или назад с последнего) должен сменить слайд
+      const k = at < all.length - 1 ? 'ArrowRight' : 'ArrowLeft';
+      press(k); await frames(2); finishAll();
+      const now = curIdx(all);
+      keyNav = now >= 0 && now !== at && Math.abs(now - at) === 1;
+      if (!keyNav) return false;
+      at = now;
+    }
+    for (let n = 0; at !== i && n < all.length + 2; n++){
+      press(at < i ? 'ArrowRight' : 'ArrowLeft');
+      await frames(2); finishAll();
+      const now = curIdx(all);
+      if (now === at){ keyNav = false; return false; }   // застряли — дальше классами
+      at = now;
+    }
+    return at === i;
+  }
   async function show(S, all, kind){
     if (kind === 'reveal'){
       const ix = Reveal.getIndices(S.root);
@@ -115,6 +174,10 @@
       return;
     }
     if (S.slice){ window.scrollTo(0, 0); await frames(2); return; }
+    // листаем клавишами самой презентации, если она на них отвечает: её
+    // функция листания меняет и то, что вокруг слайда (номер, подпись в
+    // шапке, решение), а не только какой слайд виден
+    if (keyNav !== false && await keyGo(all, all.indexOf(S))) return;
     const ac = activeClasses(all);
     unforce();
     all.forEach(o => { if (o.host && o.host !== S.host) ac.forEach(c => o.host.classList.remove(c)); });
@@ -161,12 +224,13 @@
 
   /* ── шрифты: семейство страницы → одно из шрифтов доски по похожести.
      Доска рисует надписи своими файлами (одинаковые метрики у учителя и
-     ученика), поэтому «Inter» или «Unbounded» станут ближайшим из её семи */
+     ученика), поэтому «Inter» станет ближайшим из её восьми; Unbounded
+     (шаблоны разборов) у доски есть свой */
   const SERIF = /serif|georgia|times|garamond|palatino|cambria|merriweather|lora|playfair|pt serif|noto serif|source serif|crimson|baskerville/i;
   const MONO = /mono|courier|consolas|menlo|monaco|code/i;
   function family(ff){
     const list = String(ff || '').split(',').map(s => s.trim().replace(/^["']|["']$/g, ''));
-    const known = ['Calibri', 'Arial', 'Helvetica', 'Times New Roman', 'Cambria', 'Courier New', 'PT Sans', 'PT Serif', 'Georgia', 'Verdana', 'Tahoma', 'Segoe UI', 'Roboto', 'Open Sans', 'Montserrat', 'Consolas'];
+    const known = ['Unbounded', 'Calibri', 'Arial', 'Helvetica', 'Times New Roman', 'Cambria', 'Courier New', 'PT Sans', 'PT Serif', 'Georgia', 'Verdana', 'Tahoma', 'Segoe UI', 'Roboto', 'Open Sans', 'Montserrat', 'Consolas', 'Onest'];
     for (const f of list){ const k = known.find(x => x.toLowerCase() === f.toLowerCase()); if (k) return k; }
     for (const f of list){
       if (/sans-serif/i.test(f)) return 'Arial';
@@ -375,6 +439,42 @@
      поэтому переносим вычисленные значения в атрибуты (и для подложки:
      html2canvas рисует svg так же — сериализацией) */
   const SVG_PROPS = ['fill', 'fill-opacity', 'stroke', 'stroke-width', 'stroke-opacity', 'stroke-dasharray', 'stroke-linecap', 'stroke-linejoin', 'opacity', 'font-family', 'font-size', 'font-weight', 'font-style', 'text-anchor', 'dominant-baseline', 'visibility', 'display'];
+  /* <use href="#star"> ссылается на значок в другом svg страницы — в
+     отдельной картинке ссылка пустая, и значок пропадал. Разворачиваем
+     ссылку в копию фигур (до переноса стилей: заливку они наследуют) */
+  function expandUse(svg){
+    svg.querySelectorAll('use').forEach(u => {
+      const ref = (u.getAttribute('href') || u.getAttribute('xlink:href') || '').replace(/^#/, '');
+      const src = ref && document.getElementById(ref);
+      if (!src || src.contains(u)) return;
+      const NS = 'http://www.w3.org/2000/svg';
+      let el;
+      if (src.tagName.toLowerCase() === 'symbol'){
+        el = document.createElementNS(NS, 'svg');
+        if (src.getAttribute('viewBox')) el.setAttribute('viewBox', src.getAttribute('viewBox'));
+        ['x', 'y'].forEach(a => { if (u.getAttribute(a)) el.setAttribute(a, u.getAttribute(a)); });
+        el.setAttribute('width', u.getAttribute('width') || '100%');
+        el.setAttribute('height', u.getAttribute('height') || '100%');
+        [...src.childNodes].forEach(c => el.appendChild(c.cloneNode(true)));
+      } else {
+        el = document.createElementNS(NS, 'g');
+        const x = +u.getAttribute('x') || 0, y = +u.getAttribute('y') || 0;
+        if (x || y) el.setAttribute('transform', 'translate(' + x + ' ' + y + ')');
+        el.appendChild(src.cloneNode(true));
+        el.firstChild.removeAttribute('id');
+      }
+      [...u.attributes].forEach(a => { if (!/^(href|xlink:href|x|y|width|height)$/.test(a.name)) el.setAttribute(a.name, a.value); });
+      u.replaceWith(el);
+    });
+  }
+  // сначала разворачиваем <use> во всех svg, потом переносим стили: иначе
+  // образец значка (<symbol> в невидимом svg) успевал получить «свой»
+  // чёрный цвет и копия теряла цвет, унаследованный от места вставки
+  function prepSvgs(){
+    const all = [...document.querySelectorAll('svg')];
+    all.forEach(sv => { if (!sv.__mxioUse){ sv.__mxioUse = true; expandUse(sv); } });
+    all.forEach(inlineSvg);
+  }
   function inlineSvg(svg){
     if (svg.__mxioDone) return;
     svg.__mxioDone = true;
@@ -405,25 +505,127 @@
         try { const png = /\.png|image\/png|\.svg|svg\+xml|\.gif/i.test(el.currentSrc || el.src); return { src: cv.toDataURL(png ? 'image/png' : 'image/jpeg', 0.9), natW: cv.width, natH: cv.height }; } catch (e) { return null; }
       }
     }
-    if (el instanceof SVGSVGElement){ inlineSvg(el); return svgData(el, r); }
-    if (el.tagName === 'CANVAS'){ try { return { src: el.toDataURL('image/png'), natW: el.width, natH: el.height }; } catch (e) { return null; } }
+    if (el instanceof SVGSVGElement){ prepSvgs(); return svgData(el, r); }
+    if (el.tagName === 'CANVAS'){
+      try {
+        // прозрачный слой для рисования поверх кадра (как у разборов) лёг бы
+        // пустой картинкой на весь слайд и мешал бы выделять
+        const t = document.createElement('canvas'); t.width = 96; t.height = 54;
+        const tc = t.getContext('2d'); tc.drawImage(el, 0, 0, 96, 54);
+        const d = tc.getImageData(0, 0, 96, 54).data; let any = false;
+        for (let i = 3; i < d.length && !any; i += 4) if (d[i] > 8) any = true;
+        if (!any) return { empty: true };
+        return { src: el.toDataURL('image/png'), natW: el.width, natH: el.height };
+      } catch (e) { return null; }
+    }
     try {
       const cv = await html2canvas(el, { backgroundColor: null, scale: Math.min(3, Math.max(1, 1600 / Math.max(r.width, r.height))), logging: false, useCORS: true });
       return { src: cv.toDataURL('image/png'), natW: cv.width, natH: cv.height };
     } catch (e) { return null; }
   }
 
+  /* html2canvas рисует svg своей сериализацией и часть значков теряет
+     совсем (звезда у подписи в шаблоне разборов не рисовалась ни с какими
+     стилями), а та же картинка через <img> рисуется всегда. Поэтому перед
+     снимком видимые svg заменяются картинками ровно того же места: вид и
+     положение переносятся вычисленными значениями, классы оставляем */
+  const BOX_PROPS = ['display', 'position', 'left', 'top', 'right', 'bottom', 'transform', 'transform-origin', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left',
+    'vertical-align', 'flex', 'align-self', 'z-index', 'opacity', 'visibility', 'float'];
+  async function svgToImg(root){
+    const list = [...root.querySelectorAll('svg')].filter(sv => !sv.parentElement.closest('svg') && !sv.hasAttribute('data-marpit-svg') && !sv.closest('foreignObject'));
+    for (const sv of list){
+      const r = sv.getBoundingClientRect();
+      if (!(r.width > 0.5 && r.height > 0.5)) continue;
+      const cs = getComputedStyle(sv);
+      if (cs.display === 'none') continue;
+      const d = await svgData(sv, { width: sv.clientWidth || r.width, height: sv.clientHeight || r.height });
+      const im = document.createElement('img');
+      im.src = d.src;
+      try { await im.decode(); } catch (e) { continue; }
+      im.className = sv.getAttribute('class') || '';
+      BOX_PROPS.forEach(p => im.style.setProperty(p, cs.getPropertyValue(p)));
+      im.style.width = (sv.clientWidth || r.width) + 'px';
+      im.style.height = (sv.clientHeight || r.height) + 'px';
+      im.style.boxSizing = 'content-box';
+      sv.replaceWith(im);
+      undo.push(['swap', im, sv]);
+    }
+  }
+  /* html2canvas рисует градиент холстом, а холст смешивает цвета без учёта
+     прозрачности: «голубой → transparent» (transparent = чёрный с
+     прозрачностью 0) по пути темнел, и мягкие цветные пятна на фоне
+     выходили серыми. Заменяем каждый transparent тем же цветом соседней
+     точки с прозрачностью 0 — так считает и сам браузер */
+  function fixGrad(v){
+    const out = [];
+    let i = 0;
+    while (i < v.length){
+      const m = /(?:repeating-)?(?:linear|radial|conic)-gradient\(/g;
+      m.lastIndex = i;
+      const f = m.exec(v);
+      if (!f){ out.push(v.slice(i)); break; }
+      out.push(v.slice(i, f.index + f[0].length));
+      let depth = 1, j = f.index + f[0].length;
+      while (j < v.length && depth){ if (v[j] === '(') depth++; else if (v[j] === ')') depth--; j++; }
+      const body = v.slice(f.index + f[0].length, j - 1);
+      const cols = [];
+      body.replace(/rgba?\([^)]*\)/g, (c, at) => { cols.push({ c, at }); return c; });
+      let nb = body;
+      for (let k = cols.length - 1; k >= 0; k--){
+        if (!/^rgba\(\s*0,\s*0,\s*0,\s*0\s*\)$/.test(cols[k].c)) continue;
+        const near = (cols[k - 1] && !/,\s*0\s*\)$/.test(cols[k - 1].c) && cols[k - 1]) || (cols[k + 1] && !/,\s*0\s*\)$/.test(cols[k + 1].c) && cols[k + 1]);
+        if (!near) continue;
+        const rgb = /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/.exec(near.c);
+        if (!rgb) continue;
+        nb = nb.slice(0, cols[k].at) + 'rgba(' + rgb[1] + ', ' + rgb[2] + ', ' + rgb[3] + ', 0)' + nb.slice(cols[k].at + cols[k].c.length);
+      }
+      out.push(nb + ')');
+      i = j;
+    }
+    return out.join('');
+  }
+  function fixGradients(root){
+    [root, ...root.querySelectorAll('*')].forEach(e => {
+      const bi = getComputedStyle(e).backgroundImage;
+      if (!bi || bi === 'none' || bi.indexOf('gradient') < 0 || bi.indexOf('rgba(0, 0, 0, 0)') < 0) return;
+      e.style.setProperty('background-image', fixGrad(bi), 'important');
+    });
+  }
   async function shoot(S, R, bg){
     const sc = Math.min(2, 2400 / Math.max(R.width, R.height));
     const opt = { backgroundColor: bg, scale: sc, logging: false, useCORS: true, windowWidth: VW(), windowHeight: VH(), scrollX: 0, scrollY: -window.scrollY };
     let el = S.frame;
     if (S.slice) Object.assign(opt, { x: 0, y: S.slice.y, width: VW(), height: S.slice.h, scrollY: 0 });
-    document.querySelectorAll('svg').forEach(inlineSvg);
+    prepSvgs();
+    await svgToImg(el);
+    fixGradients(el);
     const cv = await html2canvas(el, opt);
     return { src: cv.toDataURL('image/jpeg', 0.9), w: cv.width, h: cv.height };
   }
 
+  /* Всё, что разборщик меняет в странице ради снимка (прячет текст и фон
+     фигур, меняет svg на картинки), после слайда откатывается: фишки,
+     рамки и подписи вокруг слайдов на сцене общие — без отката со второго
+     слайда у них уже не было ни фона, ни значков */
+  const undo = [];
+  function setSt(el, p, v){
+    undo.push(['st', el, p, el.style.getPropertyValue(p), el.style.getPropertyPriority(p)]);
+    el.style.setProperty(p, v, 'important');
+  }
+  function rollback(){
+    while (undo.length){
+      const u = undo.pop();
+      try {
+        if (u[0] === 'st'){ if (u[3]) u[1].style.setProperty(u[2], u[3], u[4]); else u[1].style.removeProperty(u[2]); }
+        else if (u[0] === 'wrap'){ if (u[1].parentNode) u[1].replaceWith(...u[1].childNodes); }
+        else if (u[0] === 'swap'){ if (u[1].parentNode) u[1].replaceWith(u[2]); }
+      } catch (e) {}
+    }
+  }
   async function slide(S, all, kind, mode){
+    try { return await slide1(S, all, kind, mode); } finally { rollback(); }
+  }
+  async function slide1(S, all, kind, mode){
     await show(S, all, kind);
     finishAll();
     if (document.fonts && document.fonts.ready) await document.fonts.ready;
@@ -445,19 +647,19 @@
       if (!(r.width > 2 && r.height > 2) || r.right < R.left || r.left > R.left + R.width || r.bottom < R.top || r.top > R.top + R.height) { it.skip = true; continue; }
       if (++atoms > 40) { it.skip = true; continue; }
       const d = await snap(it.el, r);
-      if (!d){ it.skip = true; continue; }
+      if (!d || d.empty){ it.skip = true; continue; }
       Object.assign(it, d, { x: r.left - R.left, y: r.top - R.top, w: r.width, h: r.height });
     }
     // подложка: всё, что стало объектами, с неё убрать
     P.items.forEach(it => {
       if (it.skip) return;
-      if (it.t === 'atom') it.el.style.setProperty('visibility', 'hidden', 'important');
+      if (it.t === 'atom') setSt(it.el, 'visibility', 'hidden');
       if (it.t === 'box'){
-        if (it.fill) it.el.style.setProperty('background-color', 'transparent', 'important');
-        if (it.line) it.el.style.setProperty('border-color', 'transparent', 'important');
+        if (it.fill) setSt(it.el, 'background-color', 'transparent');
+        if (it.line) setSt(it.el, 'border-color', 'transparent');
       }
       // маркер списка рисует сама надпись — родной с подложки убрать
-      if (it.text && it.text.bu) it.el.style.setProperty('list-style-type', 'none', 'important');
+      if (it.text && it.text.bu) setSt(it.el, 'list-style-type', 'none');
       // текст прячем обёрткой каждого куска, а не цветом блока: иначе
       // пропали бы и значки из ::before/::after, которых нет среди объектов
       (it.nodes || []).forEach(n => {
@@ -465,6 +667,7 @@
         const sp = document.createElement('span');
         sp.className = 'mxio-t';
         n.parentNode.insertBefore(sp, n);
+        undo.push(['wrap', sp]);
         sp.appendChild(n);
       });
     });
@@ -502,6 +705,10 @@
       const c = Reveal.getConfig ? Reveal.getConfig() : {};
       if (+c.width > 0) w = +c.width;
       if (+c.height > 0) h = +c.height;
+    } else if (found.stage){
+      const st = found.list[0].frame;
+      await frames(2);
+      w = st.offsetWidth; h = st.offsetHeight;
     } else if (found.kind !== 'page'){
       // настоящий размер слайда — без масштаба, которым движок вписал его в окно
       const vis = found.list.find(s => shown(s.frame)) || found.list[0];
@@ -516,7 +723,7 @@
     if (e.source !== parent || !e.data || e.data.mxio !== 'go') return;
     const { mode, from, to } = e.data;
     try {
-      found = findSlides();
+      if (!found) found = findSlides();
       actCls = null;
       const list = found.list;
       for (let i = Math.max(0, from); i <= Math.min(list.length - 1, to); i++){

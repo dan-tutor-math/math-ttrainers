@@ -1664,7 +1664,16 @@ function ioHtmlObj(it, k){
     if (it.fill){ o.fill = { c: it.fill.c }; if (it.fill.a < 0.995) o.fill.a = it.fill.a; }
     if (it.line){ o.line = { c: it.line.c, w: +(it.line.w * k).toFixed(2) }; if (it.line.dash) o.line.dash = it.line.dash; if (it.line.a < 0.995) o.line.a = it.line.a; }
     if (it.adj != null) o.adj = { adj: it.adj };
-    if (it.text) o.text = ioHtmlText(it.text, k, it.pad, it.anchor);
+    if (it.text){
+      o.text = ioHtmlText(it.text, k, it.pad, it.anchor);
+      // доска, как PowerPoint, сама отступает от скругления и овала (область
+      // текста фигуры); поля CSS уже считают от края — вычитаем этот отступ,
+      // иначе у «таблеток» текст ужимался вдвое
+      const ss = Math.min(o.w, o.h);
+      const ins = o.geom === 'roundRect' ? [1, 1, 1, 1].map(() => ss * (it.adj != null ? it.adj : 16667) / 100000 * 0.29289)
+        : o.geom === 'ellipse' ? [o.w * 0.1464, o.h * 0.1464, o.w * 0.1464, o.h * 0.1464] : [0, 0, 0, 0];
+      o.text.pad = o.text.pad.map((v, i) => +Math.max(0, v - ins[i]).toFixed(2));
+    }
     return o;
   }
   // надпись без фигуры: чуть шире, чем в браузере, — шрифт доски может
@@ -1672,6 +1681,9 @@ function ioHtmlObj(it, k){
   Object.assign(o, { type: 'box', geom: 'rect', fill: null, line: null, text: ioHtmlText(it.text, k, [0, 0, 0, 0], 't') });
   const p = o.text.paras[0], extra = o.w * 0.04;
   o.w += extra;
+  // и чуть выше: рамка в браузере ровно по строкам, а раскладка доски
+  // добавляет к первой строке свой запас — абзац без запаса ужимался
+  o.h += Math.max(2, p.runs[0].sz * 0.3);
   if (p.al === 'c') o.points[0].x -= extra / 2; else if (p.al === 'r') o.points[0].x -= extra;
   if (p.bu){
     // маркер списка в браузере стоит слева от текста — там же и на доске
@@ -1707,7 +1719,10 @@ async function ioImportHtml(file){
         + (pr.missing ? '. ' + ioPlural(pr.missing, 'картинка', 'картинки', 'картинок') + ' не нашлись рядом с файлом — сохраните презентацию одним файлом' : '') });
     if (!opt) return;
     const from = Math.min(n, opt.from), to = Math.min(n, opt.to), total = to - from + 1;
-    const k = 0.75 * ioPtPx();   // 1 CSS px = 0,75 пт
+    // 1 CSS px = 0,75 пт; кадр шире 1280 px (разборы 1920 × 1080) ужимаем
+    // до ширины слайда PowerPoint 16:9 — иначе он ложился вдвое крупнее
+    // остальных слайдов презентации
+    const k = 0.75 * ioPtPx() * Math.min(1, IO_HTML_W / Math.max(1, pr.w));
     ses.post({ mxio: 'go', mode: opt.mode, from: from - 1, to: to - 1 });
     const prepared = [];
     for (;;){

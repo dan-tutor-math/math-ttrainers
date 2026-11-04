@@ -11,6 +11,11 @@
   deck_import_marp.html   — разметка как у Marp: svg[data-marpit-svg] >
       foreignObject > section
   deck_import_page.html   — обычная длинная страница без слайдов
+  deck_import_stage.html  — как шаблон разборов: сцена 1920 × 1080, вписанная в
+      окно transform: scale, слайды — только левая колонка, фишки, рамка
+      камеры и подпись со значком <use href="#star"> вне слайдов, номер в
+      фишке меняет функция листания (клавиши), фон — пятно radial-gradient
+      до transparent, поверх кадра пустой холст для рисования
 
 reveal.js берётся из распакованного npm-пакета:
   npm pack reveal.js@5 && tar xzf reveal.js-*.tgz
@@ -111,6 +116,45 @@ PAGE = """<!doctype html>
 </body></html>
 """
 
+STAGE = """<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><title>сцена</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;background:#000;overflow:hidden}
+.stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;overflow:hidden;font-family:Arial, sans-serif;color:#1D1D1F;
+  background:radial-gradient(circle at 8% 0%, rgba(120,150,255,.30) 0%, transparent 34%), #EEF1F7;transform-origin:center center}
+.abs{position:absolute}
+.top{left:56px;top:56px;display:flex;gap:12px}
+.chip{border-radius:999px;padding:16px 28px;font-size:26px;background:rgba(255,255,255,.72);border:2px solid rgba(255,255,255,.85)}
+.cam{left:1424px;top:56px;width:440px;height:760px;border-radius:40px;background:#FFFFFF}
+.author{left:1424px;top:840px;width:440px;text-align:center;font-size:52px}
+.star{width:40px;height:40px;fill:#004C99;vertical-align:middle}
+.slide{position:absolute;left:56px;top:152px;width:1336px;bottom:56px;display:none;flex-direction:column;gap:24px}
+.slide.on{display:flex}
+.card{border-radius:32px;padding:30px 40px;font-size:30px;background:#FFFFFF}
+#ink{position:absolute;left:0;top:0;width:1920px;height:1080px;z-index:5}
+</style></head><body>
+<div class="stage" id="stage">
+  <svg width="0" height="0" style="position:absolute"><symbol id="star" viewBox="0 0 40 40"><path d="M20 0L26 14L40 20L26 26L20 40L14 26L0 20L14 14Z"/></symbol></svg>
+  <div class="abs top"><div class="chip">Mathh.</div><div class="chip" id="num"></div></div>
+  <div class="abs cam"></div>
+  <div class="abs author"><svg class="star"><use href="#star"/></svg> Даня</div>
+  <div id="slides">
+    <section class="slide"><div class="card">Первый слайд: условие задачи</div></section>
+    <section class="slide"><div class="card">Второй слайд: решение</div></section>
+  </div>
+  <canvas id="ink" width="3840" height="2160"></canvas>
+</div>
+<script>
+const els = [...document.querySelectorAll('.slide')];
+let cur = 0;
+function go(i){ cur = Math.max(0, Math.min(els.length - 1, i)); els.forEach((e, k) => e.classList.toggle('on', k === cur)); document.getElementById('num').textContent = 'Слайд ' + (cur + 1); }
+addEventListener('keydown', e => { if (e.key === 'ArrowRight') go(cur + 1); if (e.key === 'ArrowLeft') go(cur - 1); });
+function layout(){ const s = Math.min(innerWidth / 1920, innerHeight / 1080); document.getElementById('stage').style.transform = 'translate(-50%,-50%) scale(' + s + ')'; }
+addEventListener('resize', layout); layout(); go(0);
+</script></body></html>
+"""
+
 REVEAL = """<!doctype html>
 <html><head><meta charset="utf-8"><title>reveal</title>
 <style>@@CSS@@</style></head>
@@ -129,6 +173,7 @@ def main():
     out("deck_import_custom.html", CUSTOM)
     out("deck_import_marp.html", MARP)
     out("deck_import_page.html", PAGE)
+    out("deck_import_stage.html", STAGE)
     if len(sys.argv) > 1:
         pkg = sys.argv[1]
         rd = lambda p: open(os.path.join(pkg, "dist", p), encoding="utf-8").read()

@@ -21,7 +21,14 @@
      виден, заметка, фон слайда из data-background-color
   7. Marp: 2 слайда, заголовок своим цветом
   8. Страница без слайдов: режется по высоте, каждый абзац ровно один раз
-  9. Нет ошибок на странице
+  9. Сцена как у шаблона разборов (deck_import_stage.html): слайд — вся сцена
+     1920 × 1080, приведённая к 16:9 PowerPoint (67,7 × 38,1 клетки);
+     номер в фишке — свой у каждого слайда (листание клавишами); фишки и
+     рамка камеры — фигурами на каждом слайде, а не только на первом;
+     значок <use> — картинкой с цветом; пустой холст поверх кадра — не
+     объект; пятно градиента на снимке светлое, а не серое; Unbounded —
+     шрифт доски
+ 10. Нет ошибок на странице
 
 Запуск: python3 test_prompt_deck_html_import.py
 """
@@ -183,6 +190,25 @@ def main():
             texts += [o["plain"] for o in boxes(page.evaluate(SLIDE, i))]
         nums = sorted(int(t.split(":")[0].split()[-1]) for t in texts if t.startswith("Абзац номер"))
         check(n >= 2 and nums == list(range(1, 41)), "каждый из 40 абзацев ровно один раз", f"{n} слайдов, {nums}")
+
+        print("9. Сцена 1920 × 1080")
+        info = do_import(page, F("deck_import_stage.html"))
+        check("2 слайда" in info and "1920 × 1080" in info, "окно: 2 слайда, размер сцены", info)
+        sl = page.evaluate("() => deckSlides().map(s => [s.w, s.h])")
+        check(len(sl) == 2 and all(abs(a - 67.73) < 0.1 and abs(b - 38.1) < 0.1 for a, b in sl), "слайд — вся сцена, к 16:9 PowerPoint", str(sl))
+        for i in (0, 1):
+            o = page.evaluate(SLIDE, i)
+            num = find(o, "Слайд ")
+            check(num is not None and num["plain"] == f"Слайд {i + 1}" and num.get("fill"), f"слайд {i + 1}: фишка со своим номером и фоном", num["plain"] if num else str([b["plain"] for b in boxes(o)]))
+            cam = [b for b in o if b["type"] == "box" and not b.get("text") and (b.get("fill") or {}).get("c") == "#FFFFFF" and b["h"] > 300]
+            check(len(cam) == 1, f"слайд {i + 1}: рамка камеры — фигурой", str(len(cam)))
+            imgs = [b for b in o if b["type"] == "image" and not b.get("bgOf")]
+            check(len(imgs) == 1 and "0%2C%2076%2C%20153" in imgs[0]["src"] and imgs[0]["w"] < 60, f"слайд {i + 1}: значок <use> — синей картинкой, пустого холста нет", str([(b["w"], b["src"][:60]) for b in imgs]))
+        do_import(page, F("deck_import_stage.html"), mode="img")
+        page.wait_for_timeout(300)
+        blob = page.evaluate(PIXEL, [0, 0.03, 0.03])
+        check(sum(blob) > 640 and blob[2] > 235, "пятно градиента светлое, без серого", str(blob))
+        check(page.evaluate("() => bxFace('Unbounded')") == "MX Unbounded" and "Unbounded" in page.evaluate("() => BX_FONT_MENU"), "Unbounded — свой шрифт доски и есть в списке")
 
         check(not errors, "нет ошибок на странице", " | ".join(errors[:3]))
         browser.close()

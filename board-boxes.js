@@ -48,7 +48,13 @@ const BX_FACES = {
   'MX Cousine': { latin: 'cousine', 'latin-ext': 'cousine', cyrillic: 'cousine', greek: 'cousine' },
   'MX PT Sans': { latin: 'pt-sans', 'latin-ext': 'pt-sans', cyrillic: 'pt-sans', greek: 'arimo' },
   'MX PT Serif':{ latin: 'pt-serif', 'latin-ext': 'pt-serif', cyrillic: 'pt-serif', greek: 'tinos' },
+  // фирменный шрифт Mathh (шаблоны разборов, HTML-презентации); греческого
+  // у него нет — у соседа без засечек
+  'MX Unbounded': { latin: 'unbounded', 'latin-ext': 'unbounded', cyrillic: 'unbounded', greek: 'arimo' },
 };
+// у Unbounded нет курсива: файлы курсива не регистрируем (их нет — были бы
+// лишние запросы), наклон браузер нарисует сам
+const BX_NO_ITALIC = new Set(['unbounded']);
 // имена из PowerPoint → наш файл. Calibri ↔ Carlito, Cambria ↔ Caladea,
 // Arial ↔ Arimo, Times ↔ Tinos, Courier ↔ Cousine совпадают по ширине букв
 // один в один; остальное — ближайшее по виду
@@ -62,9 +68,10 @@ const BX_FONT_MAP = {
   'garamond': 'MX Tinos', 'book antiqua': 'MX Tinos', 'palatino linotype': 'MX Tinos',
   'courier new': 'MX Cousine', 'courier': 'MX Cousine', 'cousine': 'MX Cousine', 'consolas': 'MX Cousine', 'lucida console': 'MX Cousine', 'liberation mono': 'MX Cousine',
   'pt sans': 'MX PT Sans', 'pt sans narrow': 'MX PT Sans', 'pt serif': 'MX PT Serif',
+  'unbounded': 'MX Unbounded',
 };
 // что предлагать в списке шрифтов при правке
-const BX_FONT_MENU = ['Calibri', 'Arial', 'Times New Roman', 'Cambria', 'Courier New', 'PT Sans', 'PT Serif'];
+const BX_FONT_MENU = ['Calibri', 'Arial', 'Times New Roman', 'Cambria', 'Courier New', 'PT Sans', 'PT Serif', 'Unbounded'];
 const BX_DEF_FONT = 'Calibri';
 function bxFace(f){
   const k = String(f || BX_DEF_FONT).trim().toLowerCase();
@@ -86,6 +93,7 @@ function bxRegisterFonts(){
     const by = BX_FACES[fam];
     Object.keys(by).forEach(sub => {
       [['400', 'normal'], ['700', 'normal'], ['400', 'italic'], ['700', 'italic']].forEach(([w, st]) => {
+        if (st === 'italic' && BX_NO_ITALIC.has(by[sub])) return;
         try {
           const ff = new FontFace(fam, `url(fonts/${by[sub]}-${sub}-${w}-${st}.woff2) format("woff2")`,
             { weight: w, style: st, unicodeRange: BX_RANGES[sub], display: 'swap' });
