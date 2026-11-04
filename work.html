@@ -164,8 +164,27 @@
 .res-item .tx{flex:1;font-size:14.5px;line-height:1.45;color:var(--muted-3);}
 .res-item .tx b{color:var(--pencil);}
 .res-item .open{flex:0 0 auto;}
+/* ── видео от учителя («видео в работах»): над заданием, к которому оно ── */
+.wvids{display:flex;flex-direction:column;gap:10px;margin:0 0 12px;}
+.wvids.after{margin:14px 0 0;}
+.wvid{display:flex;gap:12px;align-items:center;padding:10px;border-radius:16px;background:var(--glass);border:1px solid var(--glass-border);}
+.wvid .vposter{position:relative;flex:0 0 150px;width:150px;aspect-ratio:16/9;border-radius:11px;overflow:hidden;background:#0f1115;border:none;padding:0;cursor:pointer;}
+.wvid .vposter img{display:block;width:100%;height:100%;object-fit:cover;}
+.wvid .vposter::after{content:'▶';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:24px;text-shadow:0 1px 6px rgba(0,0,0,.6);}
+.wvid .vbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px;}
+.wvid .vt{font-weight:700;font-size:15px;line-height:1.3;color:var(--pencil);}
+.wvid .vk{font-size:13px;color:var(--muted-2);line-height:1.35;}
+.wvid .vprog{height:5px;border-radius:3px;background:var(--muted-7);overflow:hidden;margin-top:2px;}
+.wvid .vprog i{display:block;height:100%;width:0;background:var(--ink);border-radius:inherit;}
+.wvid .vst{font-size:12.5px;font-weight:600;color:var(--muted-2);}
+.wvid.seen .vst{color:var(--ok);}
+.wvid.seen .vprog i{background:var(--ok);}
+.wvid .btn{align-self:flex-start;margin-top:4px;}
+.res-item.vid .ic{background:var(--ink);}
 @media (max-width:620px){
   .panel{padding:14px;}
+  .wvid{flex-direction:column;align-items:stretch;}
+  .wvid .vposter{width:100%;flex:none;}
   .start-row{flex-direction:column;}
 }
 </style>
@@ -233,6 +252,8 @@
 <script src="supabase-js.umd.js"></script>
 <script src="subjects-catalog.js"></script>
 <script src="trainer-tasks.js"></script>
+<script src="video-links.js"></script>
+<script src="video-player.js"></script>
 <script src="works-cloud.js"></script>
 <script>
 (function(){
@@ -294,6 +315,8 @@ const maxTries = () => {
 };
 const taskBlocks = () => (S.blocks || []).filter(b => (b.type || 'task') === 'task');
 const curBlock = () => taskBlocks()[S.cur];
+const videoBlocks = () => (S.blocks || []).filter(b => b.type === 'video');
+const isVideoId = id => videoBlocks().some(b => b.id === id);
 const ans = id => S.answers[id] || null;
 const draft = id => (S.drafts[id] = S.drafts[id] || { vals: {}, pick: null, picks: [] });
 const blank = () => ({ status: 'pending', value: null, tries: 0, hint_used: false, solution_shown: false, time_ms: 0 });
@@ -338,6 +361,9 @@ function startTick(){
     if (document.hidden || S.finished || !S.att) return;
     S.activeMs += 1000;
     const b = curBlock();
+    // пока открыто видео, время идёт работе, но не заданию: у учителя
+    // «12 минут на задании» не должно значить «смотрел разбор»
+    if (window.VideoPlayer && VideoPlayer.isOpen()) return;
     if (b && !isFinal(ans(b.id))) S.taskMs += 1000;
   }, 1000);
 }
@@ -365,8 +391,9 @@ function bankAndSave(){
    повтор одного и того же ответа ничего не портит. */
 let queue = [];
 let flushP = null;   // идущая отправка: второй вызов ждёт её же, а не возвращается пустым
-function enqueue(taskId){
-  const a = S.answers[taskId]; if (!a || S.finished) return;
+function enqueue(taskId, evenFinished){
+  // после «Завершить» ответы не меняются, а видео досмотреть можно (works-schema.sql)
+  const a = S.answers[taskId]; if (!a || (S.finished && !evenFinished)) return;
   queue = queue.filter(q => q.task_id !== taskId);
   queue.push(Object.assign({ task_id: taskId }, a));
   lsSet(LS.queue(), queue);
@@ -382,6 +409,9 @@ function flush(){
         await C.save(S.att.attempt, S.att.secret, q, S.activeMs);
       } catch (e) {
         if (e.code === 'network' || e.code === 'other'){ $('netBanner').hidden = false; break; }
+        // отметка просмотра — не ответ: не принялась (старая база без видео,
+        // приём закрыт) — молча выбрасываем, работа и задания идут дальше
+        if (isVideoId(q.task_id)){ if (queue[0] === q) queue.shift(); lsSet(LS.queue(), queue); continue; }
         // работа закрыта, заход завершён или удалён учителем — дальше слать бессмысленно
         queue = []; lsSet(LS.queue(), queue);
         handleFatal(e);
@@ -485,6 +515,7 @@ async function startWork(){
     C.remember(code, S.att);
     S.answers = {}; S.drafts = {}; S.notes = {}; S.cur = 0; queue = [];
     lsSet(LS.queue(), []); lsSet(LS.drafts(), {}); lsSet(LS.idx(), 0); lsSet(LS.notes(), {});
+    lsSet('work:vid:' + code, {}); VW = null;
     showWho(); startTick(); showTask();
   } catch (e) {
     $('startMsg').textContent = e.message;
@@ -498,6 +529,7 @@ function showWho(){
   $('wNotMe').addEventListener('click', () => {
     // начать заново на этом устройстве: прежний заход остаётся у учителя как есть
     C.forget(code); lsSet(LS.queue(), []); lsSet(LS.drafts(), {}); lsSet(LS.idx(), 0); lsSet(LS.notes(), {});
+    lsSet('work:vid:' + code, {});
     location.reload();
   });
 }
@@ -581,6 +613,8 @@ function buildView(b, i){
   const v = { b, i, root, inputs: [], opts: [], check: null, checkText: '', belowMode: false };
   root.appendChild(el('div', 'task-meta', '<b class="tnum">Задание ' + (i + 1) + ' из ' + n + '</b><span><span class="chip mode' + (train ? '' : ' exam') + '">'
     + (train ? 'Тренировка' : 'Экзамен') + '</span> <span class="tries"></span></span>'));
+  const vids = videosAround(b);
+  if (vids.before.length) root.appendChild(videoList(vids.before, ''));
   // теория к заданию (ОГЭ №1–5): открыта сразу — без неё задачу не решить
   if (b.theory && imgOf(b.theory)){
     const d = el('details', 'theory'); d.open = true;
@@ -622,6 +656,7 @@ function buildView(b, i){
   v.tbox.innerHTML = '<div class="tb-head"><span class="tb-note">Это же задание в тренажёре — подсказки, решение, свойства</span><button class="btn quiet small b-tclose">Свернуть</button></div><div class="tb-body"><iframe title="Тренажёр"></iframe></div>';
   root.appendChild(v.tbox);
   v.frame = v.tbox.querySelector('iframe');
+  if (vids.after.length) root.appendChild(videoList(vids.after, 'after'));
   v.bCheck.addEventListener('click', () => check(v));
   v.bNext.addEventListener('click', () => goNext(v));
   v.bSkip.addEventListener('click', () => skip(v));
@@ -1408,6 +1443,133 @@ function closeTrainer(v){
   if (v.frame.getAttribute('src')) v.frame.src = 'about:blank';
 }
 
+/* ── видео от учителя («видео в работах») ──
+   Видео — блок работы без ответа: стоит над заданием, которое идёт за ним
+   в списке учителя (так в «по одному» его видно именно тогда, когда оно
+   нужно), а видео после последнего задания — под ним. Номеров у видео нет.
+   Учитель видит, кто открыл и сколько посмотрел: засчитываются только
+   секунды, которые реально проиграны (шаг времени до 3 с между тиками),
+   перемотка вперёд ничего не засчитывает. Посмотренные секунды — в
+   браузере (work:vid:<КОД>), в базу — сумма w и длина отрывка d тем же
+   work_save_answer: досмотрено — от 90 % отрывка, «досмотрел» не
+   откатывается и на сервере. */
+const VID_DONE = 0.9;        // доля отрывка, после которой «досмотрел»
+const VID_SAVE_EVERY = 15;   // секунд просмотра между сохранениями
+LS.vid = () => 'work:vid:' + code;
+let VW = null;               // id видео → строка '0'/'1' по секундам отрывка
+function vidMarks(){ if (!VW) VW = lsGet(LS.vid(), {}) || {}; return VW; }
+function videoOf(b){
+  const db = window.VIDEO_LINKS;
+  const v = ((db && db.videos) || []).find(x => x.slug === b.slug && x.hls_url);
+  if (v) return v;
+  // запись убрали из video-links.js — играем по снимку, сохранённому в работе
+  const snap = b.video || {};
+  return snap.hls_url ? Object.assign({ slug: b.slug, title: b.title, kind: b.kind }, snap) : null;
+}
+const segFrom = b => Math.max(0, Number(b.from) || 0);
+const segTo = b => Number(b.to) || Number((videoOf(b) || {}).duration) || Number((b.video || {}).duration) || 0;
+const segLen = b => Math.max(1, Math.round(segTo(b) - segFrom(b)));
+function fmtDur(sec){
+  sec = Math.max(0, Math.round(Number(sec) || 0));
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), x = sec % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0');
+}
+// задание → видео перед ним (после предыдущего задания) и, у последнего, после него
+function videosAround(task){
+  const bl = S.blocks || [];
+  const at = bl.indexOf(task);
+  const before = [];
+  for (let k = at - 1; k >= 0 && (bl[k].type || 'task') !== 'task'; k--) if (bl[k].type === 'video') before.unshift(bl[k]);
+  const after = [];
+  const last = taskBlocks()[taskBlocks().length - 1] === task;
+  if (last) for (let k = at + 1; k < bl.length; k++) if (bl[k].type === 'video') after.push(bl[k]);
+  return { before, after };
+}
+// посмотрено, секунд: своё на этом устройстве или то, что знает база (с другого устройства)
+function vidWatched(b){
+  const m = vidMarks()[b.id] || '';
+  let w = 0; for (let k = 0; k < m.length; k++) if (m.charCodeAt(k) === 49) w++;
+  const a = ans(b.id);
+  const srv = a && a.value && Number(a.value.w) || 0;
+  return Math.max(w, srv);
+}
+const vidSeen = b => { const a = ans(b.id); return !!(a && a.status === 'ok') || vidWatched(b) >= VID_DONE * segLen(b); };
+function videoList(list, cls){
+  const box = el('div', 'wvids' + (cls ? ' ' + cls : ''));
+  list.forEach(b => box.appendChild(videoCard(b)));
+  return box;
+}
+function videoCard(b){
+  const v = videoOf(b);
+  const c = el('div', 'wvid'); c.dataset.vid = b.id;
+  const poster = (v && v.poster_url) || '';
+  c.innerHTML = '<button class="vposter" type="button" aria-label="Смотреть видео">' + (poster ? '<img alt="">' : '') + '</button>'
+    + '<div class="vbody"><div class="vt"></div><div class="vk"></div><div class="vprog"><i></i></div><div class="vst"></div>'
+    + '<button class="btn small" type="button">▶ Смотреть</button></div>';
+  // обложка не загрузилась — остаётся тёмный кадр с ▶, а не значок битой картинки
+  if (poster){ const im = c.querySelector('img'); im.onerror = () => im.remove(); im.src = poster; }
+  c.querySelector('.vt').textContent = b.title || (v && v.title) || 'Видео';
+  c.querySelector('.vk').textContent = (b.kind === 'guide' ? 'Гайд' : 'Видеоразбор') + ' · ' + (b.chapter ? '«' + b.chapter + '» · ' : '') + fmtDur(segLen(b));
+  const go = () => openVideo(b);
+  c.querySelector('.vposter').addEventListener('click', go);
+  c.querySelector('.btn').addEventListener('click', go);
+  if (!v){ c.querySelector('.btn').disabled = true; c.querySelector('.vposter').disabled = true; }
+  syncVideoCard(c, b);
+  return c;
+}
+function syncVideoCard(c, b){
+  const v = videoOf(b);
+  const p = Math.min(100, Math.round(vidWatched(b) / segLen(b) * 100));
+  const seen = vidSeen(b);
+  c.classList.toggle('seen', seen);
+  c.querySelector('.vprog i').style.width = (seen ? 100 : p) + '%';
+  c.querySelector('.vst').textContent = !v ? 'Видео недоступно — напиши учителю' : seen ? '✓ Досмотрено' : p ? 'Посмотрено ' + p + '%' : 'Учитель просит посмотреть';
+}
+function syncVideoCards(id){
+  const b = videoBlocks().find(x => x.id === id); if (!b) return;
+  document.querySelectorAll('.wvid[data-vid="' + id + '"]').forEach(c => syncVideoCard(c, b));
+}
+function saveVideo(b){
+  const w = vidWatched(b), d = segLen(b);
+  const prev = ans(b.id);
+  const a = S.answers[b.id] = Object.assign(blank(), prev || {});
+  a.status = (prev && prev.status === 'ok') || w >= VID_DONE * d ? 'ok' : 'pending';
+  a.value = { w, d };
+  a.time_ms = Math.max(a.time_ms || 0, w * 1000);
+  enqueue(b.id, true);
+}
+function openVideo(b){
+  const v = videoOf(b);
+  if (!v || !window.VideoPlayer) return;
+  const from = segFrom(b), d = segLen(b);
+  const marks = vidMarks();
+  let m = marks[b.id] || '';
+  if (m.length !== d) m = (m + '0'.repeat(d)).slice(0, d);
+  let prev = null, sinceSave = 0;
+  const wasSeen = vidSeen(b);
+  const commit = () => { marks[b.id] = m; lsSet(LS.vid(), marks); };
+  // открыл — уже отметка («открывал, 0 %»): учитель видит, кто вообще включал
+  saveVideo(b);
+  VideoPlayer.open(v, {
+    start: from, end: b.to || null,
+    onTime(t, playing){
+      if (!playing){ prev = null; return; }
+      // засчитываем только проигранное подряд: скачок больше 3 с — перемотка
+      if (prev != null && t > prev && t - prev <= 3){
+        for (let s = Math.floor(prev); s < Math.floor(t); s++){
+          const k = s - from;
+          if (k >= 0 && k < d && m.charCodeAt(k) !== 49){ m = m.slice(0, k) + '1' + m.slice(k + 1); sinceSave++; }
+        }
+      }
+      prev = t;
+      if (sinceSave >= VID_SAVE_EVERY || (!wasSeen && sinceSave && (m.split('1').length - 1) >= VID_DONE * d)){
+        sinceSave = 0; commit(); saveVideo(b); syncVideoCards(b.id);
+      }
+    },
+    onClose(){ commit(); saveVideo(b); syncVideoCards(b.id); if (S.finished) showDoneVideos(); },
+  });
+}
+
 /* ── завершение ── */
 $('wFinish').addEventListener('click', askFinish);
 function askFinish(){
@@ -1441,6 +1603,23 @@ function finishLocal(){
   lsSet(LS.drafts(), {});
   showDone();
 }
+// видео в итоге: досмотреть разбор после сдачи можно — учитель это увидит
+function showDoneVideos(){
+  const list = $('dList');
+  list.querySelectorAll('.res-item.vid').forEach(x => x.remove());
+  videoBlocks().forEach(b => {
+    const p = Math.min(100, Math.round(vidWatched(b) / segLen(b) * 100));
+    const item = el('div', 'res-item vid');
+    item.dataset.vid = b.id;
+    item.innerHTML = '<div class="ic">▶</div><div class="tx"><b>Видео.</b> ' + esc(b.title || 'Видеоразбор') + (b.chapter ? ' — «' + esc(b.chapter) + '»' : '')
+      + '<br>' + (vidSeen(b) ? 'Досмотрено' : p ? 'Посмотрено ' + p + '%' : 'Не открывал(а)') + '</div>';
+    const btn = el('button', 'btn quiet small open', '▶ Смотреть');
+    btn.disabled = !videoOf(b);
+    btn.addEventListener('click', () => openVideo(b));
+    item.appendChild(btn);
+    list.appendChild(item);
+  });
+}
 function showDone(){
   const bl = taskBlocks();
   const ok = bl.filter(b => (ans(b.id) || {}).status === 'ok').length;
@@ -1461,6 +1640,7 @@ function showDone(){
     item.appendChild(btn);
     list.appendChild(item);
   });
+  showDoneVideos();
   show('scrDone');
   // после сдачи заданий смотреть можно, но не менять: кнопка «Завершить»
   // уже ни к чему, вместо неё — назад к итогу
@@ -1468,7 +1648,7 @@ function showDone(){
 }
 
 document.addEventListener('visibilitychange', () => { if (!document.hidden) flush(); });
-window.__work = { S, renderTasks, flush, get queue(){ return queue; }, get views(){ return VIEWS; } };   // для тестов и отладки из консоли
+window.__work = { S, renderTasks, flush, openVideo, vidWatched, get queue(){ return queue; }, get views(){ return VIEWS; } };   // для тестов и отладки из консоли
 boot();
 })();
 </script>

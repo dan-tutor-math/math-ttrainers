@@ -355,6 +355,39 @@ def main():
         err = pg.fails('select count(*) from work_attempts', 'anon')
         check(err is not None and 'permission denied' in err, 'и права те же (anon в таблицы не пускают)')
         check(j(pg.ok(f"select work_open('{code1}')", 'anon')) is not None, 'а по ссылке открывается')
+
+        print('N. видео в работе («видео в работах»)')
+        wv = pg.ok("insert into works (kind, title) values ('hw', 'С видео') returning id", 'authenticated', T1)
+        vb = json.dumps([
+            {'id': 'v1', 'type': 'video', 'slug': 'oge1-5-tire-razbor', 'from': 190, 'to': 268},
+            {'id': 't1', 'type': 'task', 'mode': 'exam'},
+            {'id': 'x1', 'type': 'text'},
+        ], ensure_ascii=False)
+        cv = pg.ok(f"insert into work_variants (work_id, blocks) values ('{wv}', '{vb}') returning code", 'authenticated', T1)
+        sv = j(pg.ok(f"select work_start('{cv}', 'Оля')", 'anon'))
+        AV, KV = sv['attempt'], sv['secret']
+        r = j(pg.ok(save({'task_id': 'v1', 'status': 'pending', 'value': {'w': 30, 'd': 78}, 'time_ms': 30000}, att=AV, sec=KV), 'anon'))
+        check(r == {'ok': True}, 'отметка просмотра видео сохраняется')
+        err = pg.fails(save({'task_id': 'x1', 'status': 'ok'}, att=AV, sec=KV), 'anon')
+        check(err is not None and 'task_not_found' in err, 'блок неизвестного вида — task_not_found')
+        for bad in ('bad', 'skipped'):
+            err = pg.fails(save({'task_id': 'v1', 'status': bad}, att=AV, sec=KV), 'anon')
+            check(err is not None and 'bad_answer' in err, f'у видео статус «{bad}» — bad_answer')
+        pg.ok(save({'task_id': 'v1', 'status': 'ok', 'value': {'w': 75, 'd': 78}, 'time_ms': 75000}, att=AV, sec=KV), 'anon')
+        pg.ok(save({'task_id': 'v1', 'status': 'pending', 'value': {'w': 10, 'd': 78}, 'time_ms': 10000}, att=AV, sec=KV), 'anon')
+        row = pg.ok(f"select status, value->>'w', time_ms from work_answers where attempt_id = '{AV}' and task_id = 'v1'")
+        check(row == 'ok|75|75000', f'«досмотрел» и посмотренное не откатываются со старой вкладки ({row})')
+        pg.ok(save({'task_id': 'v1', 'status': 'pending', 'value': {'w': 'x'}}, att=AV, sec=KV), 'anon')
+        check(pg.ok(f"select value->>'w' from work_answers where attempt_id = '{AV}' and task_id = 'v1'") == '75',
+              'нечисловое w не ломает функцию и не затирает посмотренное')
+        pg.ok(f"select work_finish('{AV}', '{KV}')", 'anon')
+        err = pg.fails(save({'task_id': 't1', 'status': 'ok'}, att=AV, sec=KV), 'anon')
+        check(err is not None and 'attempt_finished' in err, 'после сдачи ответ на задание не сохранить')
+        r = j(pg.ok(save({'task_id': 'v1', 'status': 'ok', 'value': {'w': 78, 'd': 78}}, att=AV, sec=KV), 'anon'))
+        check(r == {'ok': True}, 'а досмотреть видео после сдачи можно')
+        pg.ok(f"update works set closed = true where id = '{wv}'", 'authenticated', T1)
+        err = pg.fails(save({'task_id': 'v1', 'status': 'ok'}, att=AV, sec=KV), 'anon')
+        check(err is not None and 'work_closed' in err, 'в закрытой работе видео не отмечается')
     finally:
         pg.stop()
 

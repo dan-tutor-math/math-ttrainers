@@ -157,6 +157,26 @@ table.res td.nm small{display:block;color:var(--muted-2);font-size:12px;}
 .detail{margin-top:12px;font-size:14px;line-height:1.55;}
 .detail b{color:var(--pencil);}
 .score{font-weight:700;}
+/* ── видео в работе («видео в работах») ── */
+.cat-item.vid .n{font-size:13px;}
+.vid-list{overflow:auto;flex:1;display:flex;flex-direction:column;gap:10px;padding-right:2px;}
+.vcard{display:grid;grid-template-columns:132px 1fr;gap:12px;padding:10px;border-radius:14px;background:var(--card);border:1px solid var(--glass-border);}
+.vposter{position:relative;width:132px;aspect-ratio:16/9;border-radius:10px;overflow:hidden;background:#0f1115;border:none;padding:0;cursor:pointer;}
+.vposter img{display:block;width:100%;height:100%;object-fit:cover;}
+.vposter::after{content:'▶';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;text-shadow:0 1px 6px rgba(0,0,0,.6);}
+.vposter .dur{position:absolute;right:5px;bottom:5px;z-index:1;background:rgba(0,0,0,.72);color:#fff;font-size:11.5px;font-weight:600;padding:1px 5px;border-radius:5px;}
+.vcard .vt{font-weight:700;font-size:15px;line-height:1.3;}
+.vcard .vk{font-size:12.5px;color:var(--muted-2);margin:2px 0 8px;}
+.vcard .vrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.vcard select{flex:1;min-width:150px;max-width:100%;font-family:var(--font-ui);font-size:13.5px;color:var(--pencil);background:var(--glass);border:1px solid var(--glass-border);border-radius:11px;padding:7px 9px;}
+.ti.vi{grid-template-columns:28px 1fr;}
+.ti.vi .ti-num{color:var(--ink);}
+.ti-vid{display:flex;gap:10px;align-items:center;}
+.ti-vid .vposter{width:110px;flex:0 0 110px;}
+.ti-vid .vt{font-weight:700;font-size:14px;line-height:1.3;}
+.ti-vid .vk{font-size:12.5px;color:var(--muted-2);margin-top:2px;}
+.cell.vid{font-size:12px;min-width:38px;}
+.cell.vid.ok{background:var(--ink);}
 @media (max-width:980px){
   .ed{grid-template-columns:1fr;}
   .ed-left{position:relative;top:0;height:78vh;}
@@ -201,6 +221,7 @@ table.res td.nm small{display:block;color:var(--muted-2);font-size:12px;}
           <input class="field cat-search" id="catSearch" placeholder="Поиск">
         </div>
         <div class="cat-list" id="catList"></div>
+        <div class="vid-list" id="vidList" hidden></div>
         <div class="frame-wrap" id="frameWrap" hidden>
           <iframe id="trFrame" title="Тренажёр"></iframe>
           <div class="frame-cover" id="frameCover" hidden>
@@ -304,6 +325,8 @@ table.res td.nm small{display:block;color:var(--muted-2);font-size:12px;}
 <script src="lazy-libs.js" data-preload="html2canvas"></script>
 <script src="subjects-catalog.js"></script>
 <script src="trainer-tasks.js"></script>
+<script src="video-links.js"></script>
+<script src="video-player.js"></script>
 <script src="works-cloud.js"></script>
 <script>
 (function(){
@@ -339,6 +362,43 @@ const fmtMin = ms => { const m = Math.round((ms || 0) / 60000); return m < 1 ? (
 function trainerName(tid){
   for (const g of TRAINERS_PANEL_GROUPS) for (const it of g.items) if (it.id === tid) return it.name;
   return tid;
+}
+
+/* ── видео в работе («видео в работах») ──
+   Видео — блок работы рядом с заданиями: { id, type: 'video', slug, title,
+   kind, from, to, chapter, video: { hls_url, poster_url, duration } }.
+   Ролик ищется по slug в video-links.js (перезалили — hls_url там новый,
+   и работа подхватит его сама), а video — запасной снимок на случай, если
+   запись из video-links.js уберут. from/to — отрывок (глава): учитель даёт
+   не весь часовой разбор, а только нужное задание. Ответа у видео нет; что
+   ученик посмотрел, пишется той же work_save_answer (works-schema.sql). */
+const isTask = b => (b.type || 'task') === 'task';
+const isVideo = b => !!b && b.type === 'video';
+function platformVideos(){
+  const db = window.VIDEO_LINKS;
+  // без ссылки — видео заведено заранее, но ещё не загружено
+  return ((db && db.videos) || []).filter(v => v.hls_url);
+}
+function fmtDur(sec){
+  sec = Math.max(0, Math.round(Number(sec) || 0));
+  const h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), x = sec % 60;
+  return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0');
+}
+function videoOf(b){
+  const v = platformVideos().find(x => x.slug === b.slug);
+  if (v) return v;
+  const snap = b.video || {};
+  return snap.hls_url ? Object.assign({ slug: b.slug, title: b.title, kind: b.kind }, snap) : null;
+}
+const segLen = b => Math.max(1, (b.to || (b.video && b.video.duration) || 0) - (b.from || 0));
+function segText(b){
+  return b.chapter ? 'отрывок «' + b.chapter + '», ' + fmtDur(b.from) + '–' + (b.to ? fmtDur(b.to) : 'конец') + ' (' + fmtDur(segLen(b)) + ')'
+    : 'весь ролик, ' + fmtDur((b.video && b.video.duration) || 0);
+}
+function previewVideo(b){
+  const v = videoOf(b);
+  if (!v || !window.VideoPlayer){ toast('Этого видео больше нет на платформе'); return; }
+  VideoPlayer.open(v, { start: b.from || 0, end: b.to || null });
 }
 
 /* ── вход ── */
@@ -404,7 +464,8 @@ async function openList(){
   worksCache.forEach(w => {
     const vs = (w.work_variants || []).slice().sort((a, b) => a.num - b.num);
     const v = vs[0];
-    const n = v ? (v.blocks || []).filter(b => (b.type || 'task') === 'task').length : 0;
+    const n = v ? (v.blocks || []).filter(isTask).length : 0;
+    const nv = v ? (v.blocks || []).filter(isVideo).length : 0;
     const atts = w.work_attempts || [];
     const fin = atts.filter(a => a.finished_at).length;
     const el = document.createElement('div');
@@ -412,7 +473,7 @@ async function openList(){
     el.dataset.id = w.id;
     el.innerHTML = '<div class="wk">' + esc(C.kindLabel(w.kind, w.settings)) + (w.closed ? '<span class="badge">приём закрыт</span>' : '') + '</div>'
       + '<div class="wt">' + esc(w.title || 'Без названия') + '</div>'
-      + '<div class="wm">Заданий: ' + n + (vs.length > 1 ? ' · вариантов: ' + vs.length : '') + ' · ' + (w.settings && w.settings.feedback === 'end' ? 'результат в конце' : 'результат сразу')
+      + '<div class="wm">Заданий: ' + n + (nv ? ' · видео: ' + nv : '') + (vs.length > 1 ? ' · вариантов: ' + vs.length : '') + ' · ' + (w.settings && w.settings.feedback === 'end' ? 'результат в конце' : 'результат сразу')
       + '<br>Начали: ' + atts.length + ' · сдали: ' + fin + ' · создана ' + esc(fmtDate(w.created_at)) + '</div>'
       + '<div class="wb"><button class="btn small" data-a="res">Результаты</button><button class="btn quiet small" data-a="edit">Изменить</button>'
       + (v ? '<button class="btn quiet small" data-a="copy">' + (vs.length > 1 ? 'Ссылки' : 'Ссылка') + '</button>' : '') + '<button class="btn danger small" data-a="del">Удалить</button></div>';
@@ -540,13 +601,13 @@ function renderVariants(){
   const add = document.createElement('button');
   add.id = 'varAdd'; add.textContent = '+ Новый вариант';
   add.title = 'Те же задания — того же типа и уровня, с другими числами';
-  add.disabled = !E.blocks.length;
+  add.disabled = !E.blocks.some(isTask);
   add.addEventListener('click', newVariant);
   box.appendChild(add);
   $('varTools').hidden = E.cur === 0;
 }
 function newVariant(){
-  if (!E.blocks.length){ toast('Сначала добавьте задания в вариант 1'); return; }
+  if (!E.blocks.some(isTask)){ toast('Сначала добавьте задания в вариант 1'); return; }
   // номер — следующий за наибольшим: номера не переиспользуются, пока
   // вариант не удалён, — по ним ученики и учитель узнают варианты
   const num = Math.max(...E.variants.map(v => v.num)) + 1;
@@ -572,11 +633,18 @@ function syncVariant(v){
   const bySrc = new Map(v.blocks.map(b => [b.src, b]));
   v.blocks = master.map(m => {
     const have = bySrc.get(m.id);
+    // видео во всех вариантах одно и то же — других чисел у него нет
+    if (isVideo(m)) return Object.assign(have || { id: 'v' + ttUid(), src: m.id }, videoFields(m));
     if (have){ have.mode = m.mode || 'exam'; have.name = m.name; return have; }
     const b = { id: 't' + ttUid(), src: m.id, type: 'task', mode: m.mode || 'exam', name: m.name, tid: m.tid, _gen: 'wait' };
     return b;
   });
   v.blocks.filter(b => b._gen === 'wait').forEach(b => fillBlock(b));
+}
+function videoFields(m){
+  const out = {};
+  Object.keys(m).forEach(k => { if (k !== 'id' && k !== 'src' && k[0] !== '_') out[k] = JSON.parse(JSON.stringify(m[k])); });
+  return out;
 }
 function masterOf(b){ return b.src ? E.variants[0].blocks.find(m => m.id === b.src) : null; }
 
@@ -586,14 +654,18 @@ function renderTasks(){
   const isMaster = v === E.variants[0];
   syncVariant(v);
   const tasks = v.blocks;
-  $('wkCount').textContent = tasks.length ? '(' + tasks.length + ')' : '';
-  $('varAdd') && ($('varAdd').disabled = !E.blocks.length);
+  const nT = tasks.filter(isTask).length, nV = tasks.length - nT;
+  $('wkCount').textContent = tasks.length ? '(' + nT + (nV ? ' + видео: ' + nV : '') + ')' : '';
+  $('varAdd') && ($('varAdd').disabled = !E.blocks.some(isTask));
   if (!tasks.length){
-    box.innerHTML = '<div class="empty">Слева выберите тренажёр, откройте нужное задание и нажмите «Добавить в работу».</div>';
+    box.innerHTML = '<div class="empty">Слева выберите тренажёр, откройте нужное задание и нажмите «Добавить в работу». Видео с платформы — в разделе «Видео» там же.</div>';
     return;
   }
   box.innerHTML = '';
+  let tn = 0;   // номера — только у заданий: у ученика видео тоже без номера
   tasks.forEach((b, i) => {
+    if (isVideo(b)){ box.appendChild(videoRow(b, i, tasks, isMaster)); return; }
+    const num = ++tn;
     const im = (b.img || {})[curTheme()] || (b.img || {}).light || {};
     const el = document.createElement('div');
     el.className = 'ti'; el.dataset.id = b.id;
@@ -610,7 +682,7 @@ function renderTasks(){
     else if (b.same) note = '<div class="ti-gen same">У этого задания других чисел нет (одно задание или один прототип) — оно такое же, как в варианте 1</div>';
     else if (b._up) note = '<div class="ti-up">Картинка ещё загружается…</div>';
     if (b.theory) note = '<div class="ti-theory">📘 с теорией к заданию</div>' + note;
-    el.innerHTML = '<div class="ti-num">' + (i + 1) + '</div><div><div class="ti-img">' + (im.url ? '<img alt="Задание ' + (i + 1) + '">' : '<div class="ti-ph">' + (busy ? 'Создаётся…' : 'Нет картинки') + '</div>') + '</div>'
+    el.innerHTML = '<div class="ti-num">' + num + '</div><div><div class="ti-img">' + (im.url ? '<img alt="Задание ' + num + '">' : '<div class="ti-ph">' + (busy ? 'Создаётся…' : 'Нет картинки') + '</div>') + '</div>'
       + '<div class="ti-row"><span class="ti-name">' + esc(b.name || trainerName(b.tid)) + '</span>' + modeUi
       + '<div class="ti-btns">' + btns + '</div></div>' + note + '</div>';
     const img = el.querySelector('img'); if (img) img.src = im.url;
@@ -631,6 +703,29 @@ function renderTasks(){
     box.appendChild(el);
   });
 }
+// строка видео в листе работы: обложка (по ней — посмотреть), отрывок, ↑ ↓ ✕
+function videoRow(b, i, list, isMaster){
+  const v = videoOf(b);
+  const el = document.createElement('div');
+  el.className = 'ti vi'; el.dataset.id = b.id;
+  const poster = (v && v.poster_url) || (b.video && b.video.poster_url) || '';
+  el.innerHTML = '<div class="ti-num" title="Видео">▶</div><div><div class="ti-vid"><button class="vposter" type="button" title="Посмотреть">'
+    + (poster ? '<img alt="">' : '') + '</button><div><div class="vt">' + esc(b.title || (v && v.title) || 'Видео') + '</div>'
+    + '<div class="vk">' + esc(segText(b)) + (v ? '' : ' · <b>видео убрано с платформы</b>') + '</div></div></div>'
+    + '<div class="ti-row"><span class="ti-name">' + (list.slice(i + 1).some(isTask) ? 'У ученика — над следующим заданием' : 'У ученика — после последнего задания') + '</span>'
+    + (isMaster ? '<div class="ti-btns"><button data-a="up" title="Выше">↑</button><button data-a="down" title="Ниже">↓</button><button data-a="rm" class="rm" title="Убрать из работы (из всех вариантов)">✕</button></div>' : '')
+    + '</div></div>';
+  const img = el.querySelector('img'); if (img){ img.onerror = () => img.remove(); img.src = poster; }
+  el.querySelector('.vposter').addEventListener('click', () => previewVideo(b));
+  if (isMaster){
+    const up = el.querySelector('[data-a="up"]'), down = el.querySelector('[data-a="down"]');
+    up.disabled = i === 0; down.disabled = i === list.length - 1;
+    up.addEventListener('click', () => { [list[i - 1], list[i]] = [list[i], list[i - 1]]; markDirty(); renderTasks(); });
+    down.addEventListener('click', () => { [list[i + 1], list[i]] = [list[i], list[i + 1]]; markDirty(); renderTasks(); });
+    el.querySelector('[data-a="rm"]').addEventListener('click', () => { list.splice(i, 1); markDirty(); renderTasks(); renderVariants(); });
+  }
+  return el;
+}
 function renderLink(){
   const v = curVar();
   const has = !!(v && v.code);
@@ -645,7 +740,8 @@ let saving = false;
 $('wkSave').addEventListener('click', save);
 async function save(){
   if (saving) return;
-  if (!E.blocks.length){ toast('Добавьте хотя бы одно задание'); return; }
+  // работа из одних видео ученику не сдать: «Завершить» и итог — по заданиям
+  if (!E.blocks.some(isTask)){ toast('Добавьте хотя бы одно задание'); return; }
   saving = true; $('wkSave').disabled = true; $('wkSaved').textContent = 'Сохраняем…';
   try {
     // все варианты — по образцу, и ждём, пока создадутся их задания
@@ -682,16 +778,23 @@ function renderCatalog(q){
     '<div><div class="cat-group-title">' + esc(g.title) + '</div>' + g.items.map((it, i) =>
       '<button class="cat-item" data-id="' + esc(it.id) + '" data-href="' + esc(it.href) + '" data-name="' + esc(it.name) + '">'
       + '<span class="n">' + String(i + 1).padStart(2, '0') + '</span><span class="nm">' + esc(it.name) + '</span><span class="eq">' + esc(it.eq) + '</span></button>').join('') + '</div>').join('');
-  $('catList').innerHTML = ttSubjectTabsHtml() + (html || '<div class="empty">Ничего не нашлось</div>');
+  const vids = platformVideos();
+  const ql = String(q || '').trim().toLowerCase();
+  const vidHit = vids.length && (!ql || 'видео разбор гайд'.indexOf(ql) >= 0 || vids.some(v => String(v.title).toLowerCase().indexOf(ql) >= 0));
+  const vidHtml = vidHit ? '<div><div class="cat-group-title">Видео</div><button class="cat-item vid" data-vid="1"><span class="n">▶</span>'
+    + '<span class="nm">Видео с платформы</span><span class="eq">' + vids.length + '</span></button></div>' : '';
+  $('catList').innerHTML = ttSubjectTabsHtml() + vidHtml + (html || (vidHtml ? '' : '<div class="empty">Ничего не нашлось</div>'));
   ttBindSubjectTabs($('catList'), () => renderCatalog($('catSearch').value));
 }
 $('catSearch').addEventListener('input', () => renderCatalog($('catSearch').value));
 $('catList').addEventListener('click', e => {
   const b = e.target.closest('.cat-item'); if (!b) return;
+  if (b.dataset.vid){ openVideos(); return; }
   openTrainer(b.dataset.id, b.dataset.href, b.dataset.name);
 });
 function openTrainer(id, href, name){
   openTid = id; openHref = href;
+  $('vidList').hidden = true;
   $('catTitle').textContent = name;
   $('catBack').hidden = false; $('catSearch').hidden = true;
   $('catList').hidden = true; $('frameWrap').hidden = false; $('frameActions').hidden = false;
@@ -726,7 +829,52 @@ function closeTrainer(){
   $('catTitle').textContent = 'Тренажёры';
   $('catBack').hidden = true; $('catSearch').hidden = false;
   $('catList').hidden = false; $('frameWrap').hidden = true; $('frameActions').hidden = true;
+  $('vidList').hidden = true;
   $('trFrame').src = 'about:blank';
+}
+/* Раздел «Видео»: ролики с платформы (video-links.js) — обложка, длительность,
+   выбор отрывка по главам и «＋ В работу». Кадр тренажёра при этом закрыт. */
+function openVideos(){
+  if (openTid) closeTrainer();
+  $('catTitle').textContent = 'Видео с платформы';
+  $('catBack').hidden = false; $('catSearch').hidden = true;
+  $('catList').hidden = true; $('vidList').hidden = false;
+  const box = $('vidList'); box.innerHTML = '';
+  platformVideos().forEach(v => {
+    const c = document.createElement('div');
+    c.className = 'vcard'; c.dataset.slug = v.slug;
+    const chs = v.chapters || [];
+    c.innerHTML = '<button class="vposter" type="button" title="Посмотреть">' + (v.poster_url ? '<img alt="">' : '') + '<span class="dur">' + esc(fmtDur(v.duration)) + '</span></button>'
+      + '<div><div class="vt">' + esc(v.title) + '</div><div class="vk">' + (v.kind === 'guide' ? 'Гайд' : 'Разбор') + (chs.length ? ' · глав: ' + chs.length : '') + '</div>'
+      + '<div class="vrow"><select aria-label="Что дать ученику"><option value="-1">Весь ролик</option>'
+      + chs.map((ch, k) => '<option value="' + k + '">' + esc(fmtDur(ch.t) + ' — ' + ch.title) + '</option>').join('') + '</select>'
+      + '<button class="btn small" type="button">＋ В работу</button></div></div>';
+    if (v.poster_url){ const im = c.querySelector('img'); im.onerror = () => im.remove(); im.src = v.poster_url; }
+    const sel = c.querySelector('select');
+    sel.hidden = !chs.length;
+    c.querySelector('.vposter').addEventListener('click', () => previewVideo(videoBlock(v, +sel.value)));
+    c.querySelector('.btn').addEventListener('click', () => addVideo(v, +sel.value));
+    box.appendChild(c);
+  });
+  if (!box.childElementCount) box.innerHTML = '<div class="empty">На платформе пока нет видео</div>';
+}
+// отрывок — глава k: от её начала до начала следующей (последняя — до конца)
+function videoBlock(v, k){
+  const chs = v.chapters || [];
+  const ch = k >= 0 ? chs[k] : null;
+  const b = { id: 'v' + ttUid(), type: 'video', slug: v.slug, title: v.title, kind: v.kind || 'razbor', from: 0, to: null, chapter: null,
+    video: { hls_url: v.hls_url, poster_url: v.poster_url || '', duration: v.duration || 0 } };
+  if (ch){ b.from = ch.t; b.to = chs[k + 1] ? chs[k + 1].t : null; b.chapter = ch.title; }
+  return b;
+}
+function addVideo(v, k){
+  const b = videoBlock(v, k);
+  // как задание — в образец (вариант 1), варианты получат копию сами
+  if (addPos === 'start') E.variants[0].blocks.unshift(b); else E.variants[0].blocks.push(b);
+  markDirty(); renderVariants(); renderTasks();
+  toast('Видео добавлено' + (b.chapter ? ': «' + b.chapter + '»' : ''));
+  const row = $('wkTasks').querySelector('.ti[data-id="' + (E.cur === 0 ? b.id : '') + '"]');
+  if (row) row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 $('catBack').addEventListener('click', closeTrainer);
 $('refreshBtn2').addEventListener('click', () => {
@@ -1172,9 +1320,10 @@ function renderResults(){
   const w = RS.work;
   const vs = (w.work_variants || []).slice().sort((a, b) => a.num - b.num);
   const v1 = vs[0];
-  const tasks = v1 ? (v1.blocks || []).filter(b => (b.type || 'task') === 'task') : [];
+  const tasks = v1 ? (v1.blocks || []).filter(isTask) : [];
+  const vids = v1 ? (v1.blocks || []).filter(isVideo) : [];
   const byVar = new Map(vs.map(v => [v.id, v]));
-  RS.tasks = tasks; RS.byVar = byVar;
+  RS.tasks = tasks; RS.vids = vids; RS.byVar = byVar;
   $('rsTitle').textContent = C.kindLabel(w.kind, w.settings) + (w.title ? ' · ' + w.title : '');
   $('rsLink').value = v1 ? C.linkFor(v1.code) : '';
   $('rsLinkName').hidden = vs.length < 2;
@@ -1194,7 +1343,8 @@ function renderResults(){
     $('rsDetail').textContent = '';
     return;
   }
-  let html = '<thead><tr><th class="nm">Ученик</th><th>Итог</th><th>Время</th>' + tasks.map((b, i) => '<th title="' + esc(b.name || '') + '">' + (i + 1) + '</th>').join('') + '<th></th></tr></thead><tbody>';
+  let html = '<thead><tr><th class="nm">Ученик</th><th>Итог</th><th>Время</th>' + tasks.map((b, i) => '<th title="' + esc(b.name || '') + '">' + (i + 1) + '</th>').join('')
+    + vids.map((b, i) => '<th title="' + esc((b.title || 'Видео') + (b.chapter ? ' — ' + b.chapter : '')) + '">▶' + (vids.length > 1 ? i + 1 : '') + '</th>').join('') + '<th></th></tr></thead><tbody>';
   RS.rows.forEach((r, ri) => {
     const v = byVar.get(r.variant_id) || v1;
     const by = {}; (r.work_answers || []).forEach(a => { by[a.task_id] = a; });
@@ -1212,10 +1362,18 @@ function renderResults(){
       const aid = a && (a.solution_shown || a.hint_used) ? '<span class="aid" title="' + (a.solution_shown ? 'Смотрел(а) решение' : 'Открывал(а) подсказки') + '">💡</span>' : '';
       html += '<td><span class="cell ' + st + '" data-r="' + ri + '" data-t="' + ti + '">' + sym + sup + aid + '</span></td>';
     });
+    // видео: «досмотрел» — залитая ячейка, начал — доля посмотренного, не открывал — точка
+    vids.forEach((m, k) => {
+      const b = taskInVariant(v, m);
+      const a = b ? by[b.id] : null;
+      const p = videoPct(a);
+      const st = !a ? 'none' : a.status === 'ok' ? 'ok' : 'seen';
+      html += '<td><span class="cell vid ' + st + '" data-r="' + ri + '" data-v="' + k + '">' + (!a ? '·' : a.status === 'ok' ? '✓' : p + '%') + '</span></td>';
+    });
     html += '<td><button class="btn danger small" data-del="' + ri + '" title="Удалить этот заход">🗑</button></td></tr>';
   });
   t.innerHTML = html + '</tbody>';
-  t.querySelectorAll('.cell').forEach(c => c.addEventListener('click', () => showDetail(+c.dataset.r, +c.dataset.t)));
+  t.querySelectorAll('.cell').forEach(c => c.addEventListener('click', () => c.dataset.v != null ? showVideoDetail(+c.dataset.r, +c.dataset.v) : showDetail(+c.dataset.r, +c.dataset.t)));
   t.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', async () => {
     const r = RS.rows[+b.dataset.del];
     if (!confirm('Удалить заход «' + r.student_name + '» (' + fmtDate(r.started_at) + ')? Его ответы пропадут.')) return;
@@ -1248,6 +1406,22 @@ function showDetail(ri, ti){
       + ' · подсказки в тренажёре: ' + (a.hint_used ? 'открывал(а)' : 'нет') + ' · решение: ' + (a.solution_shown ? 'смотрел(а)' : 'нет')
       : 'Не открывал(а) это задание');
 }
+// доля посмотренного отрывка: value = { w: секунд посмотрено, d: длина отрывка }
+function videoPct(a){
+  const w = a && a.value && Number(a.value.w), d = a && a.value && Number(a.value.d);
+  if (!w || !d) return 0;
+  return Math.min(100, Math.round(w / d * 100));
+}
+function showVideoDetail(ri, k){
+  const r = RS.rows[ri];
+  const v = RS.byVar.get(r.variant_id);
+  const b = taskInVariant(v, RS.vids[k]) || RS.vids[k];
+  const a = (r.work_answers || []).find(x => x.task_id === b.id);
+  $('rsDetail').innerHTML = '<b>' + esc(r.student_name) + ' · видео «' + esc(b.title || '') + '»</b> (' + esc(segText(b)) + ')<br>'
+    + (!a ? 'Не открывал(а) это видео'
+      : (a.status === 'ok' ? 'Досмотрел(а)' : 'Открывал(а), не досмотрел(а)') + ' · посмотрено ' + fmtDur((a.value && a.value.w) || 0)
+        + ' из ' + fmtDur((a.value && a.value.d) || segLen(b)) + ' (' + videoPct(a) + '%)');
+}
 $('rsBack').addEventListener('click', () => go('#/'));
 $('rsRefresh').addEventListener('click', () => openResults(RS.id));
 $('rsEdit').addEventListener('click', () => go('#/edit/' + RS.id));
@@ -1258,7 +1432,7 @@ $('rsClose').addEventListener('click', async () => {
   catch (e) { toast(e.message); }
 });
 
-window.__works = { E, addFromFrame, openTrainer, save, route, gens, canon };   // для тестов и отладки из консоли
+window.__works = { E, addFromFrame, openTrainer, openVideos, addVideo, save, route, gens, canon };   // для тестов и отладки из консоли
 boot();
 })();
 </script>

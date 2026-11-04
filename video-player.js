@@ -27,6 +27,12 @@
      const v = VideoPlayer.findFor({ page: 'oge1_5', block: 'tire', task: curMode });
      VideoPlayer.syncButton(кнопка, v);   // покажет «Смотреть разбор» или спрячет
      VideoPlayer.open(v) / VideoPlayer.close() / VideoPlayer.isOpen()
+
+   Отрывок и отметка просмотра (работы, work.html — «видео в работах»):
+     VideoPlayer.open(v, { start, end, onTime(t, playing), onClose() })
+     start/end — секунды отрывка (глава ролика): открывается с start, если
+     место остановки не лежит внутри отрывка; onTime зовётся на каждом
+     timeupdate — по нему страница работы считает посмотренные секунды.
    ═══════════════════════════════════════════════════════════════════════ */
 (function () {
   if (window.VideoPlayer) return;
@@ -210,6 +216,7 @@
   // ── окно ─────────────────────────────────────────────────────────────
   let ui = null;          // элементы открытого окна
   let cur = null;         // открытое видео
+  let opt = {};           // отрывок и обработчики открытия (open(video, opts))
   let hls = null;
   let lastFocus = null;
   let saveTimer = 0, hideTimer = 0;
@@ -579,10 +586,11 @@
   }
 
   // ── открыть / закрыть ────────────────────────────────────────────────
-  function open(video) {
+  function open(video, opts) {
     if (!video || !video.hls_url) return;
     if (ui) close();
     cur = video;
+    opt = opts || {};
     lastFocus = document.activeElement;
     ui = build(video);
     if (!document.getElementById('videoPlayerIdle')) {
@@ -609,7 +617,7 @@
     ui.qB.addEventListener('click', () => toggleMenu(ui.qMenu, () => fillMenu(ui.qMenu, qualityItems(), setQuality)));
     ui.box.addEventListener('pointermove', wake);
     ui.box.addEventListener('click', e => { if (!e.target.closest('.vp-menu-wrap')) closeMenus(); });
-    ui.fromStart.addEventListener('click', () => { seekTo(0); lsDel(POS_PREFIX + cur.slug); });
+    ui.fromStart.addEventListener('click', () => { seekTo(opt.start || 0); lsDel(POS_PREFIX + cur.slug); });
     bindBar();
 
     ['timeupdate', 'progress', 'durationchange', 'seeked'].forEach(ev => v.addEventListener(ev, renderTime));
@@ -617,6 +625,12 @@
     v.addEventListener('play', () => { renderPlay(); wake(); showMsg(''); });
     v.addEventListener('pause', () => { renderPlay(); wake(); savePos(); });
     v.addEventListener('ended', () => { lsDel(POS_PREFIX + cur.slug); renderPlay(); });
+    // отметка просмотра в работе: страница сама решает, какие секунды засчитать
+    if (typeof opt.onTime === 'function') {
+      const tick = () => { if (ui && ui.v === v) { try { opt.onTime(v.currentTime || 0, !v.paused && !v.ended); } catch (e) {} } };
+      v.addEventListener('timeupdate', tick);
+      v.addEventListener('ended', tick);
+    }
     v.addEventListener('waiting', () => { if (!v.paused) showMsg('Загрузка…'); });
     v.addEventListener('playing', () => showMsg(''));
     v.addEventListener('ratechange', () => { if (ui) ui.rateB.textContent = fmtRate(v.playbackRate); });
@@ -632,13 +646,23 @@
     const rate = readRate();
     const startAt = readPos(video.slug);
     const d0 = video.duration || 0;
-    const resumeAt = startAt > 3 && (!d0 || startAt < d0 - 5) ? startAt : 0;
+    let resumeAt = startAt > 3 && (!d0 || startAt < d0 - 5) ? startAt : 0;
+    // отрывок: начинаем с его начала, а продолжаем, только если остановились
+    // внутри него — иначе ученик, смотревший раньше весь ролик, попал бы
+    // не в ту главу, которую дал учитель
+    const segStart = Math.max(0, Number(opt.start) || 0);
+    let quietStart = false;
+    if (segStart) {
+      const segEnd = Number(opt.end) || d0 || Infinity;
+      if (!(resumeAt > segStart + 3 && resumeAt < segEnd - 5)) { resumeAt = segStart; quietStart = true; }
+    }
     // скорость ставим и после загрузки: hls.js и Safari сбрасывают её при
     // подключении источника
     const applyStart = () => {
       if (!ui || ui.v !== v) return;
       setRate(rate);
-      if (resumeAt) {
+      if (resumeAt && quietStart) v.currentTime = resumeAt;
+      else if (resumeAt) {
         v.currentTime = resumeAt;
         ui.resumeText.textContent = 'Продолжаем с ' + fmtTime(resumeAt);
         ui.resume.hidden = false;
@@ -712,6 +736,9 @@
     document.documentElement.classList.remove('vp-lock');
     ui = null;
     cur = null;
+    const onClose = opt.onClose;
+    opt = {};
+    if (typeof onClose === 'function') { try { onClose(); } catch (e) {} }
     if (lastFocus && lastFocus.focus && document.contains(lastFocus)) { try { lastFocus.focus({ preventScroll: true }); } catch (e) {} }
     lastFocus = null;
   }

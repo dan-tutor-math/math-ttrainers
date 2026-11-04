@@ -222,16 +222,23 @@ FAKE_SB_JS = r"""
     work_save_answer(db, a){
       const x = db.work_attempts.find(r => r.id === a.p_attempt && r.secret === a.p_secret);
       if (!x) throw new Error('attempt_not_found');
-      if (x.finished_at) throw new Error('attempt_finished');
       const w = db.works.find(r => r.id === x.work_id);
-      if (w.closed) throw new Error('work_closed');
       const v = db.work_variants.find(r => r.id === x.variant_id);
       const p = a.p_answer || {};
-      if (!v.blocks.some(b => b.id === p.task_id)) throw new Error('task_not_found');
-      if (['pending', 'ok', 'bad', 'skipped'].indexOf(p.status || 'pending') < 0) throw new Error('bad_answer');
+      // блок — задание или видео («видео в работах»), как в works-schema.sql
+      const blk = v.blocks.find(b => b.id === p.task_id && ['task', 'video'].indexOf(b.type || 'task') >= 0);
+      if (!blk) throw new Error('task_not_found');
+      const vid = blk.type === 'video';
+      if (x.finished_at && !vid) throw new Error('attempt_finished');
+      if (w.closed) throw new Error('work_closed');
+      if ((vid ? ['pending', 'ok'] : ['pending', 'ok', 'bad', 'skipped']).indexOf(p.status || 'pending') < 0) throw new Error('bad_answer');
       let r = db.work_answers.find(z => z.attempt_id === x.id && z.task_id === p.task_id);
       if (!r){ r = { attempt_id: x.id, task_id: p.task_id, status: 'pending', value: null, tries: 0, hint_used: false, solution_shown: false, time_ms: 0 }; db.work_answers.push(r); }
-      r.status = p.status || 'pending'; r.value = p.value == null ? null : p.value;
+      const wOf = o => (o && typeof o.w === 'number') ? o.w : 0;
+      if (vid){
+        r.status = r.status === 'ok' ? 'ok' : (p.status || 'pending');
+        if (!(wOf(r.value) > wOf(p.value))) r.value = p.value == null ? null : p.value;
+      } else { r.status = p.status || 'pending'; r.value = p.value == null ? null : p.value; }
       r.tries = Math.max(r.tries, p.tries || 0); r.hint_used = r.hint_used || !!p.hint_used; r.solution_shown = r.solution_shown || !!p.solution_shown;
       r.time_ms = Math.max(r.time_ms, p.time_ms || 0); r.updated_at = now();
       x.last_seen_at = now(); x.active_ms = Math.max(x.active_ms, a.p_active_ms || 0);
