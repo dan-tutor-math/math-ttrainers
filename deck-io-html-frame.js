@@ -44,6 +44,7 @@
     const st = document.createElement('style');
     st.textContent = '*,*::before,*::after{animation-delay:0s!important;animation-duration:0.001s!important;animation-iteration-count:1!important;transition-duration:0s!important;transition-delay:0s!important;caret-color:transparent!important}'
       + '.reveal .fragment{opacity:1!important;visibility:visible!important;transform:none!important}'
+      + '[data-deck-ui]{display:none!important}'
       + '[data-mxio-stage]{transform:none!important;scale:none!important;translate:none!important;zoom:1!important;left:0!important;top:0!important;right:auto!important;bottom:auto!important;margin:0!important}'
       + '.mxio-t{color:transparent!important;-webkit-text-fill-color:transparent!important;text-shadow:none!important}';
     (document.head || document.documentElement).appendChild(st);
@@ -56,7 +57,33 @@
   function outer(list){ return list.filter(el => !list.some(o => o !== el && o.contains(el))); }
   function shown(el){ const cs = getComputedStyle(el); return cs.display !== 'none' && cs.visibility !== 'hidden' && +cs.opacity > 0.05; }
 
+  /* ── разметка по гайду (deck-guide.md) ────────────────────────────────
+     <meta name="deck" content="1920x1080"> — размер кадра; каждый слайд —
+     элемент с data-deck-slide, всё видимое лежит внутри него; служебное
+     автора (стрелки, панели, кнопки) — data-deck-ui, заметки —
+     data-deck-notes. Тогда ничего не угадываем: слайд — ровно этот элемент.
+     Имена без «Mathh» нарочно: разметка общая, не про одну школу */
+  function deckMeta(){
+    const m = document.querySelector('meta[name="deck"]');
+    if (!m) return null;
+    const v = /(\d{2,5})\s*[x×х*]\s*(\d{2,5})/i.exec(m.getAttribute('content') || '');
+    return v ? { w: +v[1], h: +v[2] } : {};
+  }
+  // движок автора мог вписать кадр в окно масштабом — снимаем его со слайда
+  // и со всех предков (тем же стилем, что и у «сцены»)
+  function unscaleUp(el){
+    for (let p = el; p && p !== document.documentElement; p = p.parentElement){
+      const cs = getComputedStyle(p);
+      if ((cs.transform && cs.transform !== 'none') || (cs.scale && cs.scale !== 'none') || (cs.zoom && cs.zoom !== '1' && cs.zoom !== 'normal')) p.setAttribute('data-mxio-stage', '');
+    }
+  }
   function findSlides(){
+    const marked = outer([...document.querySelectorAll('[data-deck-slide]')]);
+    if (marked.length){
+      marked.forEach(unscaleUp);
+      keyNav = false;   // по разметке листать не нужно: слайды самодостаточны
+      return { kind: 'deck', contract: true, list: marked.map(el => ({ root: el, host: el, frame: el })) };
+    }
     // reveal.js: слайды и листание — его же API, фон слайда лежит вне section
     // (.backgrounds), поэтому снимаем всё окно .reveal, а не сам слайд
     if (window.Reveal && typeof Reveal.getSlides === 'function' && document.querySelector('.reveal')){
@@ -132,6 +159,7 @@
     return actCls;
   }
   let forced = null;
+  let visDisplay = null;   // display видимого слайда — для скрытых (у слайдов часто flex)
   function unforce(){
     if (!forced) return;
     ['display', 'visibility', 'opacity'].forEach(p => forced.style.removeProperty(p));
@@ -178,6 +206,7 @@
     // функция листания меняет и то, что вокруг слайда (номер, подпись в
     // шапке, решение), а не только какой слайд виден
     if (keyNav !== false && await keyGo(all, all.indexOf(S))) return;
+    if (!visDisplay){ const v = all.find(o => o.host && shown(o.host)); if (v) visDisplay = getComputedStyle(v.host).display; }
     const ac = activeClasses(all);
     unforce();
     all.forEach(o => { if (o.host && o.host !== S.host) ac.forEach(c => o.host.classList.remove(c)); });
@@ -186,7 +215,10 @@
     // класса не нашлось (или его мало) — видимость напрямую
     const h = S.host, cs = getComputedStyle(h);
     if (cs.display === 'none' || cs.visibility === 'hidden' || +cs.opacity < 1) forced = h;
-    if (cs.display === 'none'){ h.style.setProperty('display', 'block', 'important'); }
+    if (cs.display === 'none'){
+      const vis = all.find(o => o.host && o.host !== h && shown(o.host));
+      h.style.setProperty('display', (vis && getComputedStyle(vis.host).display) || visDisplay || 'block', 'important');
+    }
     if (cs.visibility === 'hidden') h.style.setProperty('visibility', 'visible', 'important');
     if (+cs.opacity < 1) h.style.setProperty('opacity', '1', 'important');
     // слайды друг под другом (длинная страница) — подвести нужный к окну
@@ -224,13 +256,13 @@
 
   /* ── шрифты: семейство страницы → одно из шрифтов доски по похожести.
      Доска рисует надписи своими файлами (одинаковые метрики у учителя и
-     ученика), поэтому «Inter» станет ближайшим из её восьми; Unbounded
-     (шаблоны разборов) у доски есть свой */
+     ученика); девятнадцать шрифтов гайда (deck-guide.md, раздел 4) у доски
+     свои, остальное — ближайшее по виду */
   const SERIF = /serif|georgia|times|garamond|palatino|cambria|merriweather|lora|playfair|pt serif|noto serif|source serif|crimson|baskerville/i;
   const MONO = /mono|courier|consolas|menlo|monaco|code/i;
   function family(ff){
     const list = String(ff || '').split(',').map(s => s.trim().replace(/^["']|["']$/g, ''));
-    const known = ['Unbounded', 'Calibri', 'Arial', 'Helvetica', 'Times New Roman', 'Cambria', 'Courier New', 'PT Sans', 'PT Serif', 'Georgia', 'Verdana', 'Tahoma', 'Segoe UI', 'Roboto', 'Open Sans', 'Montserrat', 'Consolas', 'Onest'];
+    const known = ['Unbounded', 'Montserrat', 'Inter', 'Roboto', 'Open Sans', 'Manrope', 'Nunito', 'Rubik', 'Comfortaa', 'Lora', 'Playfair Display', 'Caveat', 'Calibri', 'Arial', 'Helvetica', 'Times New Roman', 'Cambria', 'Courier New', 'PT Sans', 'PT Serif', 'Georgia', 'Verdana', 'Tahoma', 'Segoe UI', 'Roboto', 'Open Sans', 'Montserrat', 'Consolas', 'Onest'];
     for (const f of list){ const k = known.find(x => x.toLowerCase() === f.toLowerCase()); if (k) return k; }
     for (const f of list){
       if (/sans-serif/i.test(f)) return 'Arial';
@@ -249,7 +281,7 @@
     if (el instanceof SVGSVGElement) return !(el.closest('svg[data-marpit-svg]') === el);
     return el.classList && (el.classList.contains('katex') || el.classList.contains('katex-display') || el.classList.contains('MathJax') || t === 'MJX-CONTAINER');
   };
-  const NOTES = (el) => (el.tagName === 'ASIDE' && el.classList.contains('notes')) || el.classList.contains('speaker-notes') || el.hasAttribute('data-notes');
+  const NOTES = (el) => (el.tagName === 'ASIDE' && el.classList.contains('notes')) || el.classList.contains('speaker-notes') || el.hasAttribute('data-notes') || el.hasAttribute('data-deck-notes');
   // поворот или наклон — такой узел оставляем на подложке как есть:
   // доска не знает, вокруг чего его вращала страница
   function turned(tf){
@@ -262,7 +294,11 @@
   }
 
   function parse(S, R){
-    const items = [], blocks = new Map(), notes = [], rotatedText = [];
+    // blocks — текущий отрезок текста блока; segs — все отрезки по порядку.
+    // Отрезков у блока несколько, когда текст лежит прямо в нём, а между
+    // кусками — вложенный блок (таблица, картинка, абзац): иначе текст до и
+    // после склеивался в одну надпись поверх вложенного
+    const items = [], blocks = new Map(), segs = [], notes = [], rotatedText = [], tables = [];
     let order = 0, bgColor = null;
     const rootRect = R;
     const inside = (r) => r.width > 0.5 && r.height > 0.5 && r.right > rootRect.left + 1 && r.left < rootRect.left + rootRect.width - 1 && r.bottom > rootRect.top + 1 && r.top < rootRect.top + rootRect.height - 1;
@@ -315,7 +351,7 @@
       else if (tt === 'lowercase') t = t.toLowerCase();
       else if (tt === 'capitalize') t = t.replace(/(^|\s)(\S)/g, (a, s, c) => s + c.toUpperCase());
       let B = blocks.get(block);
-      if (!B){ B = { el: block, ord: order, runs: [], nodes: [], rects: [] }; blocks.set(block, B); }
+      if (!B){ B = { el: block, ord: order, runs: [], nodes: [], rects: [] }; blocks.set(block, B); segs.push(B); }
       const rg = document.createRange();
       rg.selectNodeContents(node);
       const rs = [...rg.getClientRects()].filter(r => r.width > 0 && r.height > 0);
@@ -357,6 +393,7 @@
       const r2 = rot || turned(cs.transform);
       const ord = ++order;
       if (ATOMIC(el)){ if (!hidden && !r2) items.push({ t: 'atom', ord, el, op: o }); return; }
+      if (el.tagName === 'TABLE' && !hidden && !r2 && !el.parentElement.closest('table')) tables.push({ el, ord });
       const isBlock = cs.display !== 'inline' && cs.display !== 'contents';
       const my = isBlock ? el : block;
       if (isBlock && !hidden && !r2) shape(el, cs, o, ord);
@@ -367,7 +404,9 @@
           addText(my, ch, cs, o);
         } else if (ch.nodeType === 1){
           if (ch.tagName === 'BR'){ const B = blocks.get(my); if (B) B.runs.push({ t: '\n', br: true }); continue; }
+          const chd = getComputedStyle(ch).display;
           walk(ch, o, my, r2);
+          if (chd !== 'inline' && chd !== 'contents' && chd !== 'none') blocks.delete(my);
         }
       }
     }
@@ -375,8 +414,8 @@
     // корень сам может быть фигурой-фоном: его заливка — цвет слайда
     walk(start, 1, start, false);
 
-    // блоки текста → надписи (или текст внутри своей фигуры)
-    blocks.forEach(B => {
+    // блок текста → { runs, al, lh, lines, bu } или null, если текста нет
+    function blockText(B){
       // склеить куски одного вида, обрезать пробелы по краям строк
       const runs = [];
       B.runs.forEach(r => {
@@ -392,13 +431,9 @@
         runs.forEach(r => { r.t = r.t.replace(/ *\n */g, '\n'); });
       }
       const kept = runs.filter(r => r.t);
-      if (!kept.length || !kept.some(r => r.t.trim())) return;
+      if (!kept.length || !kept.some(r => r.t.trim())) return null;
       const cs = getComputedStyle(B.el);
-      const er = B.el.getBoundingClientRect();
-      const tl = Math.min(...B.rects.map(r => r.left)), tr = Math.max(...B.rects.map(r => r.right));
       const tt = Math.min(...B.rects.map(r => r.top)), tb = Math.max(...B.rects.map(r => r.bottom));
-      const px = (k) => parseFloat(cs[k]) || 0;
-      const cl = er.left + px('borderLeftWidth') + px('paddingLeft'), cr = er.right - px('borderRightWidth') - px('paddingRight');
       const ta = cs.textAlign;
       const al = /center/.test(ta) ? 'c' : /right|end/.test(ta) && cs.direction !== 'rtl' ? 'r' : ta === 'justify' ? 'j' : 'l';
       const lh = cs.lineHeight === 'normal' ? null : parseFloat(cs.lineHeight) || null;
@@ -415,7 +450,80 @@
         const mc = rgba(getComputedStyle(B.el, '::marker').color);
         if (mc && mc.c !== kept[0].c) T.bu.c = mc.c;
       }
-      const sh = items.find(it => it.t === 'box' && it.el === B.el);
+      return T;
+    }
+
+    /* Таблицы — таблицами доски: сетка по краям ячеек (объединённые ячейки
+       перекрывают несколько полос), текст ячейки — абзацами её блоков,
+       заливка и границы — свои у каждой ячейки. Блоки и фигуры внутри
+       таблицы в отдельные надписи уже не идут */
+    const near = (a) => { const o = []; a.sort((x, y) => x - y).forEach(v => { if (!o.length || v - o[o.length - 1] > 1.5) o.push(v); }); return o; };
+    const idx = (arr, v) => { let b = 0; arr.forEach((x, i) => { if (Math.abs(x - v) < Math.abs(arr[b] - v)) b = i; }); return b; };
+    tables.forEach(TB => {
+      const tb = TB.el;
+      const cellEls = [...tb.querySelectorAll('td,th')].filter(c => c.closest('table') === tb && getComputedStyle(c).display !== 'none');
+      const rects = cellEls.map(c => c.getBoundingClientRect()).filter(r => r.width > 0 && r.height > 0);
+      if (!rects.length) return;
+      const xs = near(rects.flatMap(r => [r.left, r.right])), ys = near(rects.flatMap(r => [r.top, r.bottom]));
+      if (xs.length < 2 || ys.length < 2) return;
+      const C = xs.length - 1, R = ys.length - 1;
+      const grid = Array.from({ length: R }, () => Array(C).fill(null));
+      const tbg = rgba(getComputedStyle(tb).backgroundColor);
+      const nodes = [], hide = [tb];
+      cellEls.forEach(cell => {
+        const r = cell.getBoundingClientRect();
+        if (!(r.width > 0 && r.height > 0)) return;
+        const ci = idx(xs, r.left), ce = Math.max(ci + 1, idx(xs, r.right)), ri = idx(ys, r.top), re = Math.max(ri + 1, idx(ys, r.bottom));
+        if (grid[ri][ci]) return;
+        const cs = getComputedStyle(cell), px = (k) => parseFloat(cs[k]) || 0;
+        const paras = [];
+        segs.filter(B => !B.used && (B.el === cell || (cell.contains(B.el) && B.el.closest('td,th') === cell))).sort((a, b) => a.ord - b.ord).forEach(B => {
+          const T = blockText(B);
+          B.used = true;
+          if (T){ paras.push(T); nodes.push(...B.nodes); }
+        });
+        const c = { paras, pad: [px('paddingLeft'), px('paddingTop'), px('paddingRight'), px('paddingBottom')] };
+        const va = cs.verticalAlign;
+        c.anchor = va === 'middle' ? 'm' : va === 'bottom' ? 'b' : 't';
+        const tr = cell.parentElement && cell.parentElement.tagName === 'TR' ? cell.parentElement : null;
+        const f = rgba(cs.backgroundColor) || (tr && rgba(getComputedStyle(tr).backgroundColor));
+        const fc = f && f.a > 0.02 ? f : (tbg && tbg.a > 0.02 ? tbg : null);
+        if (fc) c.fill = { c: fc.c, a: fc.a };
+        const bd = {};
+        [['Left', 'l'], ['Top', 't'], ['Right', 'r'], ['Bottom', 'b']].forEach(([k, sd]) => {
+          const w = parseFloat(cs['border' + k + 'Width']) || 0, st = cs['border' + k + 'Style'], col = rgba(cs['border' + k + 'Color']);
+          if (w > 0 && st !== 'none' && st !== 'hidden' && col && col.a > 0.02) bd[sd] = { c: col.c, w, dash: st === 'dashed' ? 'dash' : st === 'dotted' ? 'sysDot' : null };
+        });
+        if (Object.keys(bd).length) c.bd = bd;
+        if (ce - ci > 1) c.gs = ce - ci;
+        if (re - ri > 1) c.rs = re - ri;
+        grid[ri][ci] = c;
+        for (let rr = ri; rr < re && rr < R; rr++) for (let cc = ci; cc < ce && cc < C; cc++){
+          if (rr === ri && cc === ci) continue;
+          grid[rr][cc] = rr === ri ? { hm: true, paras: [] } : { vm: true, paras: [] };
+        }
+        hide.push(cell);
+        if (tr && !hide.includes(tr)) hide.push(tr);
+      });
+      for (let rr = 0; rr < R; rr++) for (let cc = 0; cc < C; cc++) if (!grid[rr][cc]) grid[rr][cc] = { paras: [] };
+      // фигуры ячеек и самой таблицы — уже в таблице
+      for (let i = items.length - 1; i >= 0; i--) if (items[i].t === 'box' && (items[i].el === tb || tb.contains(items[i].el))) items.splice(i, 1);
+      items.push({ t: 'table', ord: TB.ord, el: tb, x: xs[0] - rootRect.left, y: ys[0] - rootRect.top, w: xs[C] - xs[0], h: ys[R] - ys[0],
+        cols: xs.slice(1).map((v, i) => v - xs[i]), rows: ys.slice(1).map((v, i) => v - ys[i]), cells: grid, nodes, hide });
+    });
+
+    // блоки текста → надписи (или текст внутри своей фигуры)
+    segs.forEach(B => {
+      if (B.used) return;
+      const T = blockText(B);
+      if (!T) return;
+      const cs = getComputedStyle(B.el);
+      const er = B.el.getBoundingClientRect();
+      const tl = Math.min(...B.rects.map(r => r.left)), tr = Math.max(...B.rects.map(r => r.right));
+      const tt = Math.min(...B.rects.map(r => r.top)), tb = Math.max(...B.rects.map(r => r.bottom));
+      const px = (k) => parseFloat(cs[k]) || 0;
+      const cl = er.left + px('borderLeftWidth') + px('paddingLeft'), cr = er.right - px('borderRightWidth') - px('paddingRight');
+      const sh = items.find(it => it.t === 'box' && it.el === B.el && !it.text);
       if (sh){
         // текст в своей фигуре: поля — как отступы CSS, по вертикали — где стоит
         sh.text = T;
@@ -592,7 +700,11 @@
     });
   }
   async function shoot(S, R, bg){
-    const sc = Math.min(2, 2400 / Math.max(R.width, R.height));
+    // по разметке гайда снимок до 4K: кадр 2560 — в свой размер, 4K и 8K —
+    // в 3840 по длинной стороне; без разметки, как раньше, 2400
+    const side = Math.max(R.width, R.height);
+    const target = found && found.contract ? Math.min(3840, Math.max(2400, side)) : 2400;
+    const sc = Math.min(2, target / side);
     const opt = { backgroundColor: bg, scale: sc, logging: false, useCORS: true, windowWidth: VW(), windowHeight: VH(), scrollX: 0, scrollY: -window.scrollY };
     let el = S.frame;
     if (S.slice) Object.assign(opt, { x: 0, y: S.slice.y, width: VW(), height: S.slice.h, scrollY: 0 });
@@ -632,8 +744,8 @@
     const R = frameRect(S);
     const bg = pageBg(S.frame === document.body ? document.body : S.frame);
     if (mode === 'img'){
-      const notes = [...(S.slice ? [] : S.root.querySelectorAll('aside.notes,.speaker-notes,[data-notes]'))].map(e => (e.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean);
-      if (!S.slice) S.root.querySelectorAll('aside.notes,.speaker-notes,[data-notes]').forEach(e => e.style.setProperty('display', 'none', 'important'));
+      const notes = [...(S.slice ? [] : S.root.querySelectorAll('aside.notes,.speaker-notes,[data-notes],[data-deck-notes]'))].map(e => (e.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean);
+      if (!S.slice) S.root.querySelectorAll('aside.notes,.speaker-notes,[data-notes],[data-deck-notes]').forEach(e => e.style.setProperty('display', 'none', 'important'));
       const shot = await shoot(S, R, bg);
       return { w: R.width, h: R.height, raster: shot.src, rw: shot.w, rh: shot.h, notes: notes.join('\n\n') };
     }
@@ -654,7 +766,15 @@
     P.items.forEach(it => {
       if (it.skip) return;
       if (it.t === 'atom') setSt(it.el, 'visibility', 'hidden');
+      if (it.t === 'table') it.hide.forEach(e => { setSt(e, 'background-color', 'transparent'); setSt(e, 'border-color', 'transparent'); });
       if (it.t === 'box'){
+        // внутреннюю тень (блик «стекла») html2canvas рисует белой рамкой во
+        // всё поле — у фигуры её не будет, внешнюю тень оставляем подложке
+        const bs = getComputedStyle(it.el).boxShadow;
+        if (bs && /inset/.test(bs)){
+          const parts = bs.split(/,(?![^(]*\))/).filter(x => !/inset/.test(x));
+          setSt(it.el, 'box-shadow', parts.length ? parts.join(',') : 'none');
+        }
         if (it.fill) setSt(it.el, 'background-color', 'transparent');
         if (it.line) setSt(it.el, 'border-color', 'transparent');
       }
@@ -680,6 +800,7 @@
       if (it.t === 'atom'){ Object.assign(o, { src: it.src, natW: it.natW, natH: it.natH }); if (it.op < 0.99) o.op = +it.op.toFixed(3); }
       if (it.t === 'box'){ Object.assign(o, { geom: it.geom, fill: it.fill, line: it.line }); if (it.adj != null) o.adj = it.adj; if (it.text){ o.text = it.text; o.pad = it.pad; o.anchor = it.anchor; } }
       if (it.t === 'text') o.text = it.text;
+      if (it.t === 'table') Object.assign(o, { cols: it.cols, rows: it.rows, cells: it.cells });
       // кусок слайда-страницы: надписи и фигуры, начавшиеся на другой странице, не берём
       if (S.slice && (o.y < -2 || o.y > R.height - 2)) return;
       out.push(o);
@@ -705,6 +826,10 @@
       const c = Reveal.getConfig ? Reveal.getConfig() : {};
       if (+c.width > 0) w = +c.width;
       if (+c.height > 0) h = +c.height;
+    } else if (found.contract){
+      const mt = deckMeta() || {};
+      const vis = found.list.find(s => shown(s.frame)) || found.list[0];
+      w = mt.w || vis.frame.offsetWidth || w; h = mt.h || vis.frame.offsetHeight || h;
     } else if (found.stage){
       const st = found.list[0].frame;
       await frames(2);
@@ -717,7 +842,7 @@
       if (found.kind === 'marp'){ const vb = vis.host.viewBox && vis.host.viewBox.baseVal; if (vb && vb.width) { w = vb.width; h = vb.height; } }
     }
     const missing = [...document.images].filter(im => im.complete && !im.naturalWidth && im.getAttribute('src')).length;
-    send({ mxio: 'probe', n: found.list.length, w: Math.round(w), h: Math.round(h), kind: found.kind, missing, title: document.title || '' });
+    send({ mxio: 'probe', n: found.list.length, w: Math.round(w), h: Math.round(h), kind: found.kind, contract: !!found.contract, meta: !!deckMeta(), missing, title: document.title || '' });
   }
   window.addEventListener('message', async (e) => {
     if (e.source !== parent || !e.data || e.data.mxio !== 'go') return;

@@ -1023,6 +1023,21 @@ html.deck-mode .bd-rail.pos-top{left:172px;right:auto}
 .deck-thumb.lifted canvas{box-shadow:0 0 0 2.5px var(--ink),0 16px 32px rgba(20,30,60,.30)}
 .deck-thumb.lifted .deck-thumb-menu{opacity:0}
 .deck-strip-list.sorting .deck-thumb.settling{transition:transform .18s cubic-bezier(.2,.8,.2,1);z-index:5}
+.bd-imp-btn{flex:none;display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 15px 0 12px;margin-right:10px;border:none;border-radius:12px;background:var(--ink);color:#fff;font-family:var(--font-ui);font-weight:700;font-size:14px;cursor:pointer;box-shadow:var(--shadow)}
+.bd-imp-btn[hidden]{display:none}
+.bd-imp-btn svg{width:18px;height:18px}
+.bd-imp-btn:disabled{opacity:.5;cursor:default}
+@media (max-width:760px){ .bd-imp-btn span{display:none} .bd-imp-btn{padding:0 9px;margin-right:4px} }
+.bd-imp-menu{min-width:300px;gap:4px;padding:6px}
+.bd-imp-menu button,.bd-imp-menu a{display:flex;align-items:center;gap:10px;padding:9px 10px;border:none;border-radius:10px;background:none;color:var(--pencil);text-decoration:none;font-family:var(--font-ui);font-size:14px;text-align:left;cursor:pointer}
+.bd-imp-menu button:hover,.bd-imp-menu a:hover{background:color-mix(in srgb, var(--ink) 9%, transparent)}
+.bd-imp-menu button:disabled{opacity:.45;cursor:default}
+.bd-imp-menu svg{width:22px;height:22px;flex:none;color:var(--ink)}
+.bd-imp-menu b{display:block;font-weight:700}
+.bd-imp-menu small{display:block;font-size:12px;color:var(--muted-1);margin-top:1px}
+.bd-imp-row{display:flex;gap:6px;align-items:stretch}
+.bd-imp-row .bd-imp-html{flex:1;background:color-mix(in srgb, var(--ink) 10%, transparent)}
+.bd-imp-guide{flex:none;flex-direction:column;justify-content:center;align-items:flex-start!important;gap:0!important;border:1.5px solid color-mix(in srgb, var(--ink) 45%, transparent)!important;color:var(--ink)!important}
 .deck-menu{position:fixed;z-index:420;display:flex;flex-direction:column;min-width:170px;padding:5px;border-radius:12px;background:var(--glass-strong);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid var(--glass-border);box-shadow:var(--shadow)}
 .deck-menu[hidden]{display:none}
 .deck-menu button{border:none;background:none;text-align:left;font-family:var(--font-ui);font-size:13.5px;font-weight:500;color:var(--pencil);padding:8px 10px;border-radius:8px;cursor:pointer}
@@ -1450,6 +1465,12 @@ function resolveBasketTexInHtml(html){
       Назад к доскам
     </a>
     <div class="bd-topbar-spacer"></div>
+    <!-- «„импорт на виду“»: импорт презентации — крупно в верхней строке,
+         HTML отдельно с гайдом (deck-core.js, deckImp…); у обычной доски скрыт -->
+    <button class="bd-imp-btn" id="deckImpBtn" hidden aria-haspopup="menu" aria-expanded="false" title="Импорт слайдов: PowerPoint, PDF или HTML">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 3.5v11M7.5 10l4.5 4.5 4.5-4.5" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M4.5 15.5v3a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+      <span>Импорт</span>
+    </button>
     <input class="bd-name" id="bdName" spellcheck="false">
     <button class="bd-gear" id="bdBasketBtn" title="Добавить задание из Подборки">
       <svg viewBox="0 0 24 24" fill="none"><path d="M3 9l2-5h14l2 5M3 9v9a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9M3 9h18" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 13a3 3 0 0 0 6 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -1589,6 +1610,21 @@ function resolveBasketTexInHtml(html){
     <span class="deck-menu-sep"></span>
     <button data-file="pdf" role="menuitem">Скачать PDF</button>
     <button data-file="pptx" role="menuitem">Скачать PowerPoint (PPTX)</button>
+  </div>
+ <div class="deck-menu bd-imp-menu" id="deckImpMenu" hidden role="menu">
+    <button data-imp="office" role="menuitem">
+      <svg viewBox="0 0 24 24" fill="none"><rect x="4" y="3.5" width="16" height="17" rx="2.5" stroke="currentColor" stroke-width="1.6"/><path d="M8 8.5h8M8 12h8M8 15.5h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span><b>PowerPoint или PDF</b><small>.pptx и .pdf</small></span>
+    </button>
+    <div class="bd-imp-row">
+      <button data-imp="html" role="menuitem" class="bd-imp-html">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M8.5 7.5L4 12l4.5 4.5M15.5 7.5L20 12l-4.5 4.5M13.5 5l-3 14" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span><b>HTML</b><small>презентации из нейросети</small></span>
+      </button>
+      <a class="bd-imp-guide" id="deckImpGuide" href="deck-guide.html" target="_blank" rel="noopener" role="menuitem">
+        <b>Гайд</b><small>(и для нейросети)</small>
+      </a>
+    </div>
   </div>
   <input type="file" id="deckImportFile" accept=".pptx,.pdf,.html,.htm,application/pdf,text/html,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
   <div class="deck-menu" id="deckMenu" hidden role="menu">

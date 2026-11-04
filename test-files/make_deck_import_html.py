@@ -16,6 +16,10 @@
       камеры и подпись со значком <use href="#star"> вне слайдов, номер в
       фишке меняет функция листания (клавиши), фон — пятно radial-gradient
       до transparent, поверх кадра пустой холст для рисования
+  deck_import_4k.html     — разметка по гайду (deck-guide.md), кадр 3840 × 2160,
+      движок вписывает его в окно масштабом, служебная панель data-deck-ui
+      внутри слайда
+  deck_import_a4.html     — разметка по гайду, книжный А4 1240 × 1754
 
 reveal.js берётся из распакованного npm-пакета:
   npm pack reveal.js@5 && tar xzf reveal.js-*.tgz
@@ -155,6 +159,32 @@ addEventListener('resize', layout); layout(); go(0);
 </script></body></html>
 """
 
+K4 = """<!doctype html>
+<html><head><meta charset="utf-8"><meta name="deck" content="3840x2160"><title>4k</title>
+<style>
+body{margin:0;background:#000;overflow:hidden}
+.wrap{position:absolute;left:0;top:0;transform-origin:0 0}
+[data-deck-slide]{width:3840px;height:2160px;background:#102A43;color:#F0F4F8;font-family:Rubik, sans-serif;padding:200px;box-sizing:border-box;display:none}
+[data-deck-slide].cur{display:block}
+h1{font-size:200px;margin:0}
+.ui{position:absolute;right:40px;bottom:40px;font-size:60px;background:#F00;color:#FFF;padding:20px}
+</style></head><body>
+<div class="wrap" id="w">
+<section data-deck-slide class="cur"><h1>Кадр 4K</h1><div class="ui" data-deck-ui>ПАНЕЛЬ АВТОРА</div></section>
+<section data-deck-slide><h1>Второй</h1><aside data-deck-notes>Заметка 4K</aside></section>
+</div>
+<script>const k = Math.min(innerWidth / 3840, innerHeight / 2160); document.getElementById('w').style.transform = 'scale(' + k + ')';</script>
+</body></html>
+"""
+
+A4 = """<!doctype html>
+<html><head><meta charset="utf-8"><meta name="deck" content="1240x1754"><title>a4</title>
+<style>body{margin:0}[data-deck-slide]{width:1240px;height:1754px;padding:100px;box-sizing:border-box;font-family:Lora, serif;background:#FFFFFF}
+h1{font-size:64px;margin:0 0 30px}p{font-size:32px}</style></head><body>
+<section data-deck-slide><h1>Лист заданий</h1><p>Решите уравнения.</p></section>
+</body></html>
+"""
+
 REVEAL = """<!doctype html>
 <html><head><meta charset="utf-8"><title>reveal</title>
 <style>@@CSS@@</style></head>
@@ -174,6 +204,8 @@ def main():
     out("deck_import_marp.html", MARP)
     out("deck_import_page.html", PAGE)
     out("deck_import_stage.html", STAGE)
+    out("deck_import_4k.html", K4)
+    out("deck_import_a4.html", A4)
     if len(sys.argv) > 1:
         pkg = sys.argv[1]
         rd = lambda p: open(os.path.join(pkg, "dist", p), encoding="utf-8").read()

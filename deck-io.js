@@ -1166,6 +1166,10 @@ function ioDialog(){
 .io-dlg{gap:12px}
 .io-dlg .deck-pop-sec[hidden]{display:none}
 .io-dlg .io-info{font-size:13px;color:var(--muted-1);line-height:1.4}
+.io-dlg .io-check{margin-top:6px}
+.io-dlg .io-ok{color:var(--ok,#2E9E5B);font-weight:600}
+.io-dlg .io-warn{color:var(--moved,#C27A10)}
+.io-dlg .io-check a{color:var(--ink)}
 .io-dlg .io-opt{display:flex;gap:8px;align-items:flex-start;font-size:13.5px;line-height:1.35;color:var(--pencil);cursor:pointer}
 .io-dlg .io-opt input{margin-top:3px}
 .io-dlg .io-row{display:flex;gap:14px;font-size:13.5px;color:var(--pencil)}
@@ -1192,6 +1196,7 @@ function ioAsk(info){
     const d = ioDialog();
     d.querySelector('#ioTitle').textContent = 'Импорт: ' + info.name;
     d.querySelector('#ioInfo').textContent = info.text;
+    if (info.checkHtml){ const c = document.createElement('div'); c.className = 'io-check'; c.innerHTML = info.checkHtml; d.querySelector('#ioInfo').appendChild(c); }
     d.querySelector('#ioPagesSec').hidden = !info.pages;
     d.querySelector('#ioPagesSec .deck-pop-h').textContent = info.rangeLabel || 'Страницы';
     if (info.pages){ const f = d.querySelector('#ioFrom'), t = d.querySelector('#ioTo'); f.max = t.max = info.pages; f.value = 1; t.value = Math.min(info.pages, 60); }
@@ -1659,6 +1664,25 @@ function ioHtmlText(T, k, pad, anchor){
 function ioHtmlObj(it, k){
   const o = { id: uid(), points: [{ x: +(it.x * k).toFixed(2), y: +(it.y * k).toFixed(2) }], w: Math.max(0.5, +(it.w * k).toFixed(2)), h: Math.max(0.5, +(it.h * k).toFixed(2)) };
   if (it.t === 'img') return Object.assign(o, { type: 'image', src: it.src, natW: it.natW || 0, natH: it.natH || 0 });
+  if (it.t === 'table'){
+    // таблица HTML → таблица доски: тот же вид, что даёт импорт PPTX
+    const px = (v) => +(v * k).toFixed(2);
+    const cells = it.cells.map(row => row.map(c => {
+      const cell = {};
+      ['gs', 'rs', 'hm', 'vm'].forEach(f => { if (c[f]) cell[f] = c[f]; });
+      if (c.fill){ cell.fill = { c: c.fill.c }; if (c.fill.a < 0.995) cell.fill.a = c.fill.a; }
+      if (c.bd){
+        cell.bd = {};
+        Object.keys(c.bd).forEach(sd => { const b = c.bd[sd]; cell.bd[sd] = { c: b.c, w: Math.max(0.5, px(b.w)) }; if (b.dash) cell.bd[sd].dash = b.dash; });
+      }
+      const paras = (c.paras || []).map(T => ioHtmlText(T, k, null, 't').paras[0]);
+      const r0 = paras.length && paras[0].runs[0];
+      cell.text = { paras, anchor: c.anchor || 't', pad: (c.pad || [0, 0, 0, 0]).map(px),
+        def: r0 ? { sz: r0.sz, c: r0.c, f: r0.f } : { sz: +(12 * ioPtPx()).toFixed(2), c: '#000000', f: 'Arial' } };
+      return cell;
+    }));
+    return Object.assign(o, { type: 'table', cols: it.cols.map(px), rows: it.rows.map(px), cells });
+  }
   if (it.t === 'box'){
     Object.assign(o, { type: 'box', geom: it.geom || 'rect', fill: null, line: null });
     if (it.fill){ o.fill = { c: it.fill.c }; if (it.fill.a < 0.995) o.fill.a = it.fill.a; }
@@ -1705,7 +1729,7 @@ async function ioImportHtml(file){
     // движки вписывают слайд в окно масштабом; снимать надо в настоящем
     // размере — открываем заново в окне ровно под слайд
     const w0 = pr.w, h0 = pr.h;
-    if (pr.kind !== 'page' && (Math.abs(w0 - IO_HTML_W) > 2 || Math.abs(h0 - IO_HTML_H) > 2) && w0 >= 200 && h0 >= 120 && w0 <= 4000 && h0 <= 4000){
+    if (pr.kind !== 'page' && (Math.abs(w0 - IO_HTML_W) > 2 || Math.abs(h0 - IO_HTML_H) > 2) && w0 >= 200 && h0 >= 120 && w0 <= 8000 && h0 <= 8000){
       ses.close();
       ses = ioHtmlSession(doc, w0, h0);
       pr = await ses.next(25000);
@@ -1713,7 +1737,12 @@ async function ioImportHtml(file){
     }
     const n = pr.n;
     if (!n){ deckToast('В файле не нашлось слайдов'); return; }
-    const opt = await ioAsk({ name: file.name, html: true, pages: n, rangeLabel: 'Слайды',
+    // проверка до импорта: по гайду файл переносится предсказуемо, без —
+    // как получится; во втором случае ссылка на гайд прямо в окне
+    const check = pr.contract
+      ? '<span class="io-ok">✓ Разметка по гайду' + (pr.meta ? '' : ' (без размера кадра — взят у слайда)') + '</span>'
+      : '<span class="io-warn">Без разметки по гайду — переносим как получится.</span> <a href="deck-guide.html" target="_blank" rel="noopener">Гайд</a>';
+    const opt = await ioAsk({ name: file.name, html: true, pages: n, rangeLabel: 'Слайды', checkHtml: check,
       text: ioPlural(n, 'слайд', 'слайда', 'слайдов') + ', ' + pr.w + ' × ' + pr.h + ' px'
         + (pr.kind === 'page' ? ' (слайдов не нашлось — страница разрезана по высоте экрана)' : '')
         + (pr.missing ? '. ' + ioPlural(pr.missing, 'картинка', 'картинки', 'картинок') + ' не нашлись рядом с файлом — сохраните презентацию одним файлом' : '') });

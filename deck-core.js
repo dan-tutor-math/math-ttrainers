@@ -135,6 +135,8 @@ function deckOnOpen(b){
   if (typeof applyDockLayout === 'function') applyDockLayout();
   const nav = document.getElementById('deckNav');
   if (nav) nav.hidden = b.kind !== 'deck';
+  const imp = document.getElementById('deckImpBtn');
+  if (imp) imp.hidden = b.kind !== 'deck';
   document.documentElement.classList.toggle('deck-mode', b.kind === 'deck');
   deckSyncFlowUI();
   // №101: панель инструментов (deck-toolbar.js) — видимость, свёрнута ли, «⋯»
@@ -2567,8 +2569,12 @@ function deckMenuToggle(menuId, btnId, open){
   const m = document.getElementById(menuId), b = document.getElementById(btnId);
   if (!m || !b) return;
   const on = open === undefined ? m.hidden : open;
-  ['deckFileMenu'].forEach(id => { const x = document.getElementById(id); if (x && id !== menuId) x.hidden = true; });
-  ['deckFileBtn', 'dtbMoreBtn'].forEach(id => document.getElementById(id)?.setAttribute('aria-expanded', 'false'));
+  // соседние меню прячем только при открытии этого: закрытие «Файла» при
+  // каждом нажатии мимо него прятало и меню «Импорт» прямо из-под щелчка
+  if (on){
+    ['deckFileMenu', 'deckImpMenu'].forEach(id => { const x = document.getElementById(id); if (x && id !== menuId) x.hidden = true; });
+    ['deckFileBtn', 'dtbMoreBtn', 'deckImpBtn'].forEach(id => document.getElementById(id)?.setAttribute('aria-expanded', 'false'));
+  }
   m.hidden = !on;
   b.setAttribute('aria-expanded', on ? 'true' : 'false');
   if (!on) return;
@@ -2581,8 +2587,34 @@ document.getElementById('deckFileBtn')?.addEventListener('click', () => {
   deckMenuToggle('deckFileMenu', 'deckFileBtn');
 });
 document.addEventListener('pointerdown', (e) => {
-  if (e.target.closest('#deckFileMenu,#deckFileBtn')) return;
-  deckMenuToggle('deckFileMenu', 'deckFileBtn', false);
+  if (!e.target.closest('#deckFileMenu,#deckFileBtn')) deckMenuToggle('deckFileMenu', 'deckFileBtn', false);
+  if (!e.target.closest('#deckImpMenu,#deckImpBtn')) deckMenuToggle('deckImpMenu', 'deckImpBtn', false);
+});
+/* «„импорт на виду“»: кнопка «Импорт» в верхней строке. PowerPoint и PDF —
+   один пункт (читает их один и тот же импорт), HTML — отдельно, рядом —
+   гайд, как делать HTML под нас (deck-guide.html). Поле выбора файла одно:
+   перед открытием сужаем, какие файлы оно предлагает */
+const DECK_ACCEPT_ALL = '.pptx,.pdf,.html,.htm,application/pdf,text/html,application/vnd.openxmlformats-officedocument.presentationml.presentation';
+const DECK_ACCEPT = {
+  office: '.pptx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  html: '.html,.htm,text/html',
+};
+document.getElementById('deckImpBtn')?.addEventListener('click', () => {
+  document.querySelectorAll('#deckImpMenu [data-imp]').forEach(b => { b.disabled = !deckMayEdit(); });
+  deckMenuToggle('deckImpMenu', 'deckImpBtn');
+  deckIoEnsure().catch(() => {});
+});
+document.getElementById('deckImpMenu')?.addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-imp]');
+  if (e.target.closest('#deckImpGuide')){ deckMenuToggle('deckImpMenu', 'deckImpBtn', false); return; }
+  if (!b || b.disabled) return;
+  deckMenuToggle('deckImpMenu', 'deckImpBtn', false);
+  const inp = document.getElementById('deckImportFile');
+  if (!inp) return;
+  inp.accept = DECK_ACCEPT[b.dataset.imp] || DECK_ACCEPT_ALL;
+  inp.click();
+  // следующий выбор из меню «Файл» — снова все виды файлов
+  setTimeout(() => { inp.accept = DECK_ACCEPT_ALL; }, 1000);
 });
 // общий обработчик вставки: значки и галереи панели (deck-toolbar.js)
 function deckInsertAt(kind){

@@ -51,10 +51,23 @@ const BX_FACES = {
   // фирменный шрифт Mathh (шаблоны разборов, HTML-презентации); греческого
   // у него нет — у соседа без засечек
   'MX Unbounded': { latin: 'unbounded', 'latin-ext': 'unbounded', cyrillic: 'unbounded', greek: 'arimo' },
+  // «„шрифты для HTML“»: популярные шрифты с кириллицей — их знает гайд
+  // HTML-презентаций (deck-guide.md); у каждого — свой файл, без замены
+  'MX Montserrat': { latin: 'montserrat', 'latin-ext': 'montserrat', cyrillic: 'montserrat', greek: 'arimo' },
+  'MX Inter': { latin: 'inter', 'latin-ext': 'inter', cyrillic: 'inter', greek: 'arimo' },
+  'MX Roboto': { latin: 'roboto', 'latin-ext': 'roboto', cyrillic: 'roboto', greek: 'arimo' },
+  'MX Open Sans': { latin: 'open-sans', 'latin-ext': 'open-sans', cyrillic: 'open-sans', greek: 'arimo' },
+  'MX Manrope': { latin: 'manrope', 'latin-ext': 'manrope', cyrillic: 'manrope', greek: 'arimo' },
+  'MX Nunito': { latin: 'nunito', 'latin-ext': 'nunito', cyrillic: 'nunito', greek: 'arimo' },
+  'MX Rubik': { latin: 'rubik', 'latin-ext': 'rubik', cyrillic: 'rubik', greek: 'arimo' },
+  'MX Comfortaa': { latin: 'comfortaa', 'latin-ext': 'comfortaa', cyrillic: 'comfortaa', greek: 'arimo' },
+  'MX Lora': { latin: 'lora', 'latin-ext': 'lora', cyrillic: 'lora', greek: 'tinos' },
+  'MX Playfair Display': { latin: 'playfair-display', 'latin-ext': 'playfair-display', cyrillic: 'playfair-display', greek: 'tinos' },
+  'MX Caveat': { latin: 'caveat', 'latin-ext': 'caveat', cyrillic: 'caveat', greek: 'arimo' },
 };
 // у Unbounded нет курсива: файлы курсива не регистрируем (их нет — были бы
 // лишние запросы), наклон браузер нарисует сам
-const BX_NO_ITALIC = new Set(['unbounded']);
+const BX_NO_ITALIC = new Set(['unbounded', 'manrope', 'comfortaa', 'caveat']);
 // имена из PowerPoint → наш файл. Calibri ↔ Carlito, Cambria ↔ Caladea,
 // Arial ↔ Arimo, Times ↔ Tinos, Courier ↔ Cousine совпадают по ширине букв
 // один в один; остальное — ближайшее по виду
@@ -63,15 +76,26 @@ const BX_FONT_MAP = {
   'cambria': 'MX Caladea', 'cambria math': 'MX Caladea', 'caladea': 'MX Caladea', 'constantia': 'MX Caladea',
   'arial': 'MX Arimo', 'arimo': 'MX Arimo', 'helvetica': 'MX Arimo', 'helvetica neue': 'MX Arimo', 'liberation sans': 'MX Arimo',
   'verdana': 'MX Arimo', 'tahoma': 'MX Arimo', 'trebuchet ms': 'MX Arimo', 'century gothic': 'MX Arimo', 'franklin gothic medium': 'MX Arimo',
-  'open sans': 'MX Arimo', 'roboto': 'MX Arimo', 'montserrat': 'MX Arimo', 'arial narrow': 'MX Arimo', 'arial black': 'MX Arimo', 'onest': 'MX Arimo',
+  'arial narrow': 'MX Arimo', 'arial black': 'MX Arimo', 'onest': 'MX Arimo',
   'times new roman': 'MX Tinos', 'times': 'MX Tinos', 'tinos': 'MX Tinos', 'liberation serif': 'MX Tinos', 'georgia': 'MX Tinos',
   'garamond': 'MX Tinos', 'book antiqua': 'MX Tinos', 'palatino linotype': 'MX Tinos',
   'courier new': 'MX Cousine', 'courier': 'MX Cousine', 'cousine': 'MX Cousine', 'consolas': 'MX Cousine', 'lucida console': 'MX Cousine', 'liberation mono': 'MX Cousine',
   'pt sans': 'MX PT Sans', 'pt sans narrow': 'MX PT Sans', 'pt serif': 'MX PT Serif',
   'unbounded': 'MX Unbounded',
+  'montserrat': 'MX Montserrat',
+  'inter': 'MX Inter',
+  'roboto': 'MX Roboto',
+  'open sans': 'MX Open Sans',
+  'manrope': 'MX Manrope',
+  'nunito': 'MX Nunito',
+  'rubik': 'MX Rubik',
+  'comfortaa': 'MX Comfortaa',
+  'lora': 'MX Lora',
+  'playfair display': 'MX Playfair Display',
+  'caveat': 'MX Caveat',
 };
 // что предлагать в списке шрифтов при правке
-const BX_FONT_MENU = ['Calibri', 'Arial', 'Times New Roman', 'Cambria', 'Courier New', 'PT Sans', 'PT Serif', 'Unbounded'];
+const BX_FONT_MENU = ['Calibri', 'Arial', 'Times New Roman', 'Cambria', 'Courier New', 'PT Sans', 'PT Serif', 'Unbounded', 'Montserrat', 'Inter', 'Roboto', 'Open Sans', 'Manrope', 'Nunito', 'Rubik', 'Comfortaa', 'Lora', 'Playfair Display', 'Caveat'];
 const BX_DEF_FONT = 'Calibri';
 function bxFace(f){
   const k = String(f || BX_DEF_FONT).trim().toLowerCase();
