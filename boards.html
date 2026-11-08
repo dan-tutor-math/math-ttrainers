@@ -1152,8 +1152,11 @@ html.deck-mode .bd-rail.pos-top{left:172px;right:auto}
 .deck-strip.collapsed .deck-strip-rs{display:none}
 
 /* Промпт №88: режимы «Конструктор / Урок» */
-.deck-mode{display:inline-flex;padding:2px;border-radius:11px;background:var(--hover-1);gap:2px}
-.deck-mode[hidden]{display:none}
+/* только по id: класс deck-mode есть и у <html> презентации (deck-core.js), и
+   общее правило делало всю страницу flex-контейнером — body сжимался по
+   содержимому, и после выхода к списку справа оставалась пустая полоса */
+#deckModeSeg{display:inline-flex;padding:2px;border-radius:11px;background:var(--hover-1);gap:2px}
+#deckModeSeg[hidden]{display:none}
 .deck-mode-btn{height:30px;padding:0 11px;border:none;border-radius:9px;background:transparent;color:var(--muted-2);font-family:var(--font-ui);font-size:13px;font-weight:600;cursor:pointer}
 .deck-mode-btn[aria-pressed="true"]{background:var(--glass-strong);color:var(--ink);box-shadow:0 1px 4px rgba(20,30,60,.12)}
 html.deck-lesson .deck-mode-btn#deckModeLesson[aria-pressed="true"]{color:var(--teacher)}

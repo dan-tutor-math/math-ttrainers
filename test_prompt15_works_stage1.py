@@ -707,6 +707,7 @@ def run():
         tp.click("#rsTable tbody tr:nth-child(1) .cell >> nth=0")
         det = tp.inner_text("#rsDetail")
         check("F5 подробности: ответ, верный, попытки", "123123" in det and "Попыток: 2" in det and str(t1["fields"][0]["value"]) in det, det)
+        tp.keyboard.press("Escape")   # щелчок по ячейке открывает просмотр задания поверх таблицы
         tp.once("dialog", lambda dlg: dlg.accept())
         tp.click("#rsTable tbody tr:nth-child(2) [data-del]")
         tp.wait_for_timeout(600)
