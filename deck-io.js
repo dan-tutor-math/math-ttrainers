@@ -1803,7 +1803,7 @@ async function ioImportHtml(file){
    первым слайдом выгружалась вся книжной) */
 function ioSizeGroups(){
   const groups = [];
-  deckSlides().forEach((s, i) => {
+  ioExportSlides().forEach((s, i) => {
     const key = (+s.w).toFixed(2) + 'x' + (+s.h).toFixed(2);
     let g = groups.find(x => x.key === key);
     if (!g){ g = { key, w: +s.w, h: +s.h, n: 0, first: i }; groups.push(g); }
@@ -1820,11 +1820,13 @@ function ioSizeLabel(g){
   const orient = Math.abs(r - 1) < 0.02 ? 'Квадрат' : r > 1 ? 'Альбомный' : 'Книжный';
   return orient + (ratio ? ' ' + ratio : '') + ', ' + cm(g.w) + ' × ' + cm(g.h) + ' см — ' + ioPlural(g.n, 'слайд', 'слайда', 'слайдов');
 }
+// слайд, скрытый из показа, — черновик учителя: в файл для учеников он не идёт
+function ioExportSlides(){ return deckSlides().filter(s => !s.hide); }
 function ioAskExport(kind){
   return new Promise((resolve) => {
     const d = ioDialog();
     d.querySelector('#ioTitle').textContent = kind === 'pdf' ? 'Скачать PDF' : 'Скачать PowerPoint (PPTX)';
-    const n = deckSlides().length;
+    const n = ioExportSlides().length;
     d.querySelector('#ioInfo').textContent = ioPlural(n, 'слайд', 'слайда', 'слайдов') + (kind === 'pptx'
       ? '. Надписи, фигуры, таблицы и картинки — объектами PowerPoint; записи пером и чертежи — картинками.' : '.');
     d.querySelector('#ioPagesSec').hidden = true;
@@ -1911,11 +1913,12 @@ function ioDownload(blob, name){
 function ioFileName(ext){ return String((B && B.name) || 'Презентация').replace(/[\\/:*?"<>|]+/g, ' ').trim() + '.' + ext; }
 
 async function deckIoExportPdf(){
+  if (!ioExportSlides().length){ deckToast('Все слайды скрыты — выгружать нечего'); return; }
   const opt = await ioAskExport('pdf');
   if (!opt) return;
   try {
     const lib = await MathhLibs.load('jspdf');
-    const sl = deckSlides();
+    const sl = ioExportSlides();
     let pdf = null;
     for (let i = 0; i < sl.length; i++){
       ioProgress(i, sl.length, 'Слайд ' + (i + 1) + ' из ' + sl.length + '…');
@@ -2058,12 +2061,13 @@ function ioRasterGroup(objs, s, k2){
   return { data: cv.toDataURL('image/png'), x: minX - sr.x, y: minY - sr.y, w: maxX - minX, h: maxY - minY };
 }
 async function deckIoExportPptx(){
+  if (!ioExportSlides().length){ deckToast('Все слайды скрыты — выгружать нечего'); return; }
   const opt = await ioAskExport('pptx');
   if (!opt) return;
   try {
     const PptxGenJS = await MathhLibs.load('pptxgen');
     const pptx = new PptxGenJS();
-    const sl = deckSlides();
+    const sl = ioExportSlides();
     // размер слайда в PPTX один на всю презентацию — выбранный в окне (по
     // умолчанию у большинства слайдов, №106); слайды другого формата
     // вписываются в него по центру
