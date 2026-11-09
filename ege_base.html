@@ -933,6 +933,110 @@ function ensureFipi(n, cb){
 /* Доска (trainer-tasks.js) снимает задания в невидимом кадре этой страницы
    и сразу зовёт openTask/pidAfter: пока файл номера в пути, кадр не готов */
 window.__fipiBusy = () => Object.keys(fipiState).some(n => fipiState[n] === 'loading');
+
+/* ═══════════════ глобальный объект catalog для работы с заданиями и группами ═══════════════ */
+
+// возвращает массив заданий из t.protos по protoId
+function catalogTasks(t, protoId) {
+  const protosList = t.protos || [];
+  if (protoId === 'loose') {
+    return protosList.filter(p => !p.group);
+  } else {
+    return protosList.filter(p => p.group === protoId);
+  }
+}
+
+// возвращает массив прототипов в формате catalog
+function catalogProtos(t) {
+  const protosList = t.protos || [];
+  const groups = t.groups || [];
+  const result = [];
+
+  // задания без группы идут первыми
+  const looseTasks = catalogTasks(t, 'loose');
+  if (looseTasks.length > 0) {
+    result.push({
+      id: 'loose',
+      title: 'Прототипы',
+      section: null,
+      tasks: looseTasks.map(p => p.id),
+      fipi: looseTasks.map(p => p.fipi || null),
+      hasGen: false
+    });
+  }
+
+  // затем группы в порядке объявления
+  groups.forEach(function(g) {
+    const groupTasks = catalogTasks(t, g.id);
+    if (groupTasks.length > 0) {
+      result.push({
+        id: g.id,
+        title: rich(g.title),
+        section: g.section || null,
+        tasks: groupTasks.map(p => p.id),
+        fipi: groupTasks.map(p => p.fipi || null),
+        hasGen: false
+      });
+    }
+  });
+
+  return result;
+}
+
+window.__trainerCatalog = {
+  // list(n) — массив прототипов задания n
+  list: function(n) {
+    return new Promise(function(resolve, reject) {
+      ensureFipi(n || S.n, function() {
+        const t = task(n || S.n);
+        if (!t) {
+          resolve([]);
+          return;
+        }
+        resolve(catalogProtos(t));
+      });
+    });
+  },
+
+  // openAt(protoId, pos, n) — открывает задание на экране
+  openAt: function(protoId, pos, n) {
+    return new Promise(function(resolve, reject) {
+      ensureFipi(n || S.n, function() {
+        const t = task(n || S.n);
+        if (!t) {
+          resolve({ ok: false, reason: 'unknown' });
+          return;
+        }
+
+        const groups = t.groups || [];
+
+        // если protoId не 'loose' и группы с таким id нет в t.groups — unknown
+        if (protoId !== 'loose' && !groups.find(g => g.id === protoId)) {
+          resolve({ ok: false, reason: 'unknown' });
+          return;
+        }
+
+        const targetTasks = catalogTasks(t, protoId);
+
+        if (pos < 0 || pos >= targetTasks.length) {
+          resolve({ ok: false, reason: 'end', total: targetTasks.length });
+          return;
+        }
+
+        openTask(n || S.n, targetTasks[pos].id);
+
+        resolve({
+          ok: true,
+          pid: targetTasks[pos].id,
+          fipi: targetTasks[pos].fipi || null,
+          pos: pos,
+          total: targetTasks.length
+        });
+      });
+    });
+  }
+};
+
 // задания, уже лежащие в оглавлении (если их туда положили), — сразу
 if (EXAM.fipi && EXAM.fipi.tasks) Object.keys(EXAM.fipi.tasks).forEach(n => {
   if (!(EXAM.fipi.files && EXAM.fipi.files[n])) { mergeFipiNumber(n); fipiState[n] = 'done'; }
