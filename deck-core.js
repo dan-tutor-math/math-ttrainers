@@ -119,6 +119,7 @@ function deckOnOpen(b){
     deckCurId = null;
   }
   deckFitted = true;
+  deckEarlyGo = null;
   deckStripSig = ''; deckStripCurShown = null; deckLastRev = null;
   deckSlotSig = {}; deckThumbDirty.clear();
   deckSyncStrip();
@@ -580,10 +581,26 @@ function deckUpdateNav(){
   if (nx) nx.disabled = i >= n - 1;
 }
 
+/* Презентация уже открыта (boardActive), а вид ещё не восстановлен: это делает
+   первый кадр в openBoardReady. Сдвиг камеры в этот промежуток тот кадр просто
+   перепишет, а rememberView до него молчит, и переход терялся без следа: слайд
+   не менялся, в запомненный вид не попадал. Поэтому переход откладываем и
+   выполняем сразу после восстановления (deckFlushEarlyGo). Слайд помним по id:
+   за кадр номера могли сдвинуться. deckCurId ставим сразу, чтобы deckStep и
+   deckCur в этом же промежутке считали уже от нового слайда */
+let deckEarlyGo = null;
+function deckFlushEarlyGo(){
+  const g = deckEarlyGo;
+  deckEarlyGo = null;
+  if (!g || !boardActive) return;
+  const i = deckSlides().findIndex(s => s.id === g.id);
+  if (i >= 0) deckGo(i, g.dir);
+}
 function deckGo(idx, dir){
   const sl = deckSlides();
   if (idx < 0 || idx >= sl.length) return false;
   const s = sl[idx];
+  if (boardActive && !viewReady){ deckCurId = s.id; deckEarlyGo = { id: s.id, dir }; return true; }
   if (deckIsScroll()){ deckScrollTo(s); scheduleRedraw(); rememberView(); return true; }
   // №85в: текущий слайд картинкой уезжает назад, новый выезжает вперёд;
   // без слоя глубины (или при «меньше движения») — старый сдвиг холста

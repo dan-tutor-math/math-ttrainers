@@ -10,7 +10,8 @@ board-stage.js; HANDOFF.md раздел 6б).
      адрес #decks; после перезагрузки с #decks открыт этот раздел
   4. «Создать презентацию» подгружает модуль и открывает презентацию
   5. Перезагрузка с #board=<id презентации> открывает её (модуль грузится
-     при старте); «Назад к доскам» из раздела «Презентации» — снова #decks
+     при старте); «Назад к доскам» из раздела «Презентации» — снова #decks;
+     слайд, перелистнутый до первого кадра доски, не теряется и запоминается
   6. Модуль не загрузился (нет сети) — сообщение, остаёмся на списке
   7. Ученик в совместной сессии (доска учителя, board-stage.js): модуль
      подгружается сам, слайд — учительский (бумага тёмного слайда тёмная),
@@ -171,6 +172,36 @@ def run_single(browser):
     check("5: #board=<презентация> открывает её после перезагрузки", ok)
     page.wait_for_timeout(400)
     check("5: на том же слайде (2 / 2)", page.inner_text("#deckNo").strip() == "2 / 2", page.inner_text("#deckNo"))
+
+    # Листаем заведомо в промежутке: сразу после openBoardReady, до его первого
+    # кадра. Раньше такой переход пропадал, отсюда и плавающий провал проверки выше
+    print("5б. Листание до первого кадра доски")
+    page.evaluate("() => backToList()")
+    page.wait_for_timeout(200)
+    gap = page.evaluate("""() => new Promise(resolve => {
+      const orig = window.openBoardReady;
+      window.openBoardReady = (b, id) => {
+        window.openBoardReady = orig;
+        orig(b, id);
+        const was = viewReady;
+        deckGo(0);
+        resolve(was);
+      };
+      openBoard('bDeck');
+    })""")
+    check("5б: переход пришёлся на промежуток до восстановления вида", gap is False, str(gap))
+    ok = wait_js(page, "() => viewReady && deckCurIndex() === 0 && document.getElementById('deckNo').textContent === '1 / 2'", 3000)
+    check("5б: перешли на первый слайд", ok, page.inner_text("#deckNo"))
+    check("5б: камера на первом слайде", page.evaluate("() => deckSlideAtY(cam.y + cssH / 2 / cam.zoom)?.id") == "sA")
+    # защита от краша: перезагрузка в первые 4 с после открытия по адресу оставляет
+    # на списке (AUTO_OPEN_GUARD_KEY), поэтому ждём, пока метка снимется
+    page.wait_for_function("() => sessionStorage.getItem(AUTO_OPEN_GUARD_KEY) === null", timeout=6000)
+    page.reload()
+    page.evaluate(BOOT_JS)
+    ok = wait_js(page, "() => typeof deckOnOpen === 'function' && boardActive && viewReady && getCurrentBoard().id === 'bDeck'", 6000)
+    check("5б: после перезагрузки презентация открыта", ok)
+    page.wait_for_timeout(400)
+    check("5б: и на том же первом слайде (1 / 2)", page.inner_text("#deckNo").strip() == "1 / 2", page.inner_text("#deckNo"))
 
     print("6. Модуль не загрузился")
     page2 = ctx.new_page()

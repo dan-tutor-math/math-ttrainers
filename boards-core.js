@@ -220,6 +220,10 @@ function unpinAllBoards(){ boardsPinned = Math.max(0, boardsPinned - 1); }
 
 function unloadBoard(b){
   if (boardsPinned > 0) return;              // идёт операция «нужны все доски целиком» — не мешаем
+  // выгрузка ждёт записи на диск (backToList), а за это время ту же доску могли
+  // открыть снова: открытую выгружать нельзя — кадр упадёт на B.objects.forEach,
+  // а штрихи перестанут сохраняться. Выгрузится при следующем выходе в список
+  if (b === B && boardActive) return;
   if (!b || b.objects === undefined) return; // уже не подгружена — нечего выгружать
   const srcs = new Set();
   (b.objects || []).forEach(o => { if (o.type === 'image' && o.src) srcs.add(o.src); });
@@ -3304,6 +3308,12 @@ function openBoard(id){
   }, alertBoardReadFailed);
 }
 function openBoardReady(b, id){
+  // пока ждали модуль презентации, доску могла выгрузить отложенная выгрузка
+  // (см. unloadBoard). Читаем заново: строка «B.objects || []» ниже показала бы
+  // её пустой, и первое же сохранение затёрло бы на диске весь урок
+  if (b.objects === undefined){
+    return ensureBoardLoaded(b).then(() => openBoardReady(b, id), alertBoardReadFailed);
+  }
   // «Вид и вкладки»: недописанный вид прошлой доски — дописать сейчас, пока
   // B не стала другой доской
   flushPendingView();
@@ -3422,6 +3432,7 @@ function openBoardReady(b, id){
     // потом на чужом месте
     lastViewCam = { x: cam.x, y: cam.y, zoom: cam.zoom };
     viewReady = true;
+    if (typeof deckFlushEarlyGo === 'function') deckFlushEarlyGo();   // листнули до этого кадра
     updateZoomLabel();
     updateSettingsUI();
     renderSwatches();
