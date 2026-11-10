@@ -437,6 +437,10 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .soft-btn:hover{border-color:var(--ink)}
 .soft-btn:active{transform:scale(.96)}
 .explain .answer-line{margin-top:10px;}
+.fipi-inline{display:inline-block;vertical-align:middle;max-width:100%;height:auto;}
+:root[data-theme="dark"] .fipi-inline{filter:invert(.88) hue-rotate(180deg);}
+.vf{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;line-height:1.2;margin:0 .2em;}
+.vf>span:first-child{border-bottom:1px solid;padding:0 .15em .08em;}.vf>span:last-child{padding:.08em .15em 0;}
 </style>
 </head>
 <body>
@@ -687,6 +691,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="fipi-mix.js"></script>
 <script src="oge15_18-kinds.js"></script>
 <script src="oge15_18-fipi-bank.js"></script>
+<script src="oge18-fipi-bank.js"></script>
 <script>
 /* ═══════════════ утилиты ═══════════════ */
 const ri = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
@@ -970,6 +975,18 @@ if (FIPI_BANK && window.FipiMix && GK) {
     m.gen = () => FipiMix.next(FIPI_PAGE, m.id, m.fipiList, own);
   }));
 }
+const FIPI18_BANK=window.OGE18_FIPI || null;
+function fipiTask(t){return Object.assign({prompt:t.prompt,correctValue:t.ans,explain:sol(t.sol)},t.checked?{}:{unchecked:true});}
+if(FIPI18_BANK && window.FipiMix){
+ const titles={triangle_ratio:'Отношение отрезков треугольника',parallelogram_area:'Площадь параллелограмма',trapezoid_area:'Площадь трапеции',triangle_midline:'Средняя линия треугольника',figure_length:'Длина отрезка',rhombus_area:'Площадь ромба',triangle_area:'Площадь треугольника',triangle_long_leg:'Больший катет',circle_ratio:'Радиус и диаметр окружности',trapezoid_midline:'Средняя линия трапеции',rhombus_diagonal:'Диагональ ромба',point_distance:'Расстояние между точками'};
+ const group=GROUPS.find(g=>g.title==='№18. Клетчатая бумага');
+ Object.entries(titles).forEach(([kind,title])=>{
+  const list=FIPI18_BANK.tasks.filter(t=>t.kind===kind && (t.checked||FIPI_ALL));if(!list.length)return;
+  const m={id:'fipi18_'+kind,title,fipiOnly:true,ex:'только задания ФИПИ'};
+  m.fipiList=list.map(t=>({fipi:t.fipi,make:()=>fipiTask(t)}));
+  m.gen=()=>FipiMix.next(FIPI_PAGE,m.id,m.fipiList,null);group.modes.push(m);
+ });
+}
 const ALL_MODES = GROUPS.flatMap(g => g.modes);
 // «Случайно» берёт только генераторы: нулевой тип из демоверсии — всегда одно
 // и то же задание, в случайной подборке оно выпадало бы снова и снова
@@ -1183,12 +1200,12 @@ function renderPicker() {
   els.modesGrid.innerHTML = GROUPS.map(g => `
     <div class="group-title">${g.title}</div>
     <div class="modes">
-      ${g.modes.map(m => {
+      ${g.modes.filter(m=>!m.fipiOnly || !window.FipiMix || FipiMix.filter().fipi).map(m => {
         const p = loadProg(m.id);
         const meds = p && p.medals;
         const badges = meds ? ['gold', 'silver', 'bronze'].filter(t => meds[t]).map(t => `${MEDAL_EMOJI[t]}${meds[t]}`).join(' ') : '';
         // «10+ заданий»: сколько заданий ФИПИ у вида и что дальше генератор (fipi-mix.js)
-        const fl = window.FipiMix && m.fipiList ? FipiMix.countLabel(FIPI_PAGE, m.id, m.fipiList) : '';
+        const fl = window.FipiMix && m.fipiList ? FipiMix.countLabel(FIPI_PAGE, m.id, m.fipiList, !m.fipiOnly) : '';
         return `<div class="mode-card${m.demo ? ' demo' : ''}" data-id="${m.id}"><div class="mtitle">${m.title}</div>${m.ex ? `<div class="msub">${m.ex}</div>` : ''}${fl ? `<div class="msub fipi-count">${fl}</div>` : ''}${badges ? `<div class="mode-medals">${badges}</div>` : ''}</div>`;
       }).join('')}
       ${g.mix ? `<div class="mode-card mix" data-id="${g.mix}"><div class="mtitle">🎲 ${RANDOM_TITLES[g.mix]}</div></div>` : ''}
@@ -1306,11 +1323,12 @@ els.backBtn.onclick = () => {
   renderPicker();
 };
 function navigateType(delta){
-  const idx = ALL_MODES.findIndex(x=>x.id===curMode);
+  const visibleModes=ALL_MODES.filter(m=>!m.fipiOnly || !window.FipiMix || FipiMix.filter().fipi);
+  const idx = visibleModes.findIndex(x=>x.id===curMode);
   if(idx===-1) return; // в «случайно» стрелки скрыты
-  const newIdx = (idx + delta + ALL_MODES.length) % ALL_MODES.length;
-  curMode = ALL_MODES[newIdx].id;
-  els.taskTitle.textContent = ALL_MODES[newIdx].title;
+  const newIdx = (idx + delta + visibleModes.length) % visibleModes.length;
+  curMode = visibleModes[newIdx].id;
+  els.taskTitle.textContent = visibleModes[newIdx].title;
   curProg = loadProgOrFresh(curMode);
   renderMedalBadges();
   renderExampleHistory();
@@ -1387,7 +1405,7 @@ function renderCurrentTask() {
 }
 
 function newTask() {
-  const m = isRandomMode(curMode) ? pick(RANDOM_POOLS[curMode]) : ALL_MODES.find(x => x.id === curMode);
+  const m = isRandomMode(curMode) ? pick(RANDOM_POOLS[curMode].filter(m=>!m.fipiOnly || !window.FipiMix || FipiMix.filter().fipi)) : ALL_MODES.find(x => x.id === curMode);
   // Промпт №18 нового списка: без повторов — тот же генератор, но задание,
   // совпавшее с недавним (целиком или ответом подряд), перегенерируется
   // (no-repeat.js); avoid — заменяемое задание на экране
@@ -1577,7 +1595,7 @@ setupFloatingKeypad();
 renderPicker();
 // фильтр «Задания ФИПИ / На основе ФИПИ» — только если банк загрузился;
 // смена фильтра меняет подписи «10+ заданий» на карточках
-if (window.FipiMix && FIPI_BANK) FipiMix.mountFilter(document.getElementById('fipiFilter'), () => renderPicker());
+if (window.FipiMix && (FIPI_BANK || FIPI18_BANK)) FipiMix.mountFilter(document.getElementById('fipiFilter'), () => renderPicker());
 
 
 /* ═══ Промпт №32: совместная работа не только на доске, но и в самом задании ═══

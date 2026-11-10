@@ -38,7 +38,7 @@ def numeric_bank(browser,base,slug,bank_name,total,counts,own_mode):
     assert dict(Counter(t['g'] for t in bank['tasks']))==counts
     assert all(t['checked'] for t in bank['tasks'])
     assert p.locator('#fipiFilter .fm-btn').is_visible()
-    p.evaluate("curMode='"+own_mode+"';openTask();playMedalAnimation=()=>{}")
+    p.evaluate("curMode='"+(own_mode or bank['tasks'][0]['g'])+"';openTask();playMedalAnimation=()=>{}")
     bad=p.evaluate('''(bank)=>{const bad=[];for(const t of bank.tasks){
       curMode=t.g;curTask=Object.assign(fipiTask(t),{fipi:t.fipi});curProg=freshProg();taskAnswered=false;hadWrongPick=false;
       renderCurrentTask();if(/NaN|Infinity|undefined/.test(curTask.explain))bad.push([t.fipi,'разбор']);if(Math.abs(curTask.correctValue-t.ans)>1e-8)bad.push([t.fipi,'build']);
@@ -52,7 +52,9 @@ def numeric_bank(browser,base,slug,bank_name,total,counts,own_mode):
     if own_mode:
         p.evaluate("curMode='"+own_mode+"';newTask()")
         assert p.evaluate('curTask.basedOnFipi && !curTask.fipi && !!curTask.fipiNotice')
-        p.click('#backBtn');assert f'ФИПИ решено {counts[own_mode]} из {counts[own_mode]}' in p.locator(f'.mode-card[data-id="{own_mode}"]').inner_text()
+    p.click('#backBtn')
+    if own_mode:
+        assert f'ФИПИ решено {counts[own_mode]} из {counts[own_mode]}' in p.locator(f'.mode-card[data-id="{own_mode}"]').inner_text()
     p.click('#fipiFilter .fm-btn');p.locator('.fm-pop input[data-k="fipi"]').uncheck()
     assert p.evaluate('!FipiMix.filter().fipi && FipiMix.filter().own')
     assert p.locator('.fm-pop label').all_text_contents()==['Задания ФИПИ','На основе ФИПИ']
@@ -73,6 +75,7 @@ def numeric_bank(browser,base,slug,bank_name,total,counts,own_mode):
         p.evaluate('(id)=>{curMode=id;openTask();switchSubMode("practice");}',mid)
         if p.locator('#showSolutionBtn').is_visible():p.click('#showSolutionBtn')
         assert p.evaluate('document.documentElement.scrollWidth<=innerWidth+1'),mid
+    p.evaluate("keypadOpen=false;syncKeypadVisibility()");p.wait_for_timeout(400)
     p.screenshot(path=f'/private/tmp/{slug}-fipi-phone.png',full_page=True)
     p.evaluate("document.documentElement.dataset.theme='dark'")
     p.screenshot(path=f'/private/tmp/{slug}-fipi-dark.png',full_page=True)
