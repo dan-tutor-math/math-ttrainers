@@ -28,8 +28,12 @@
   function uid() { return (window.CURRENT_USER && window.CURRENT_USER.id) || ''; }
   function ready() {
     return !!(uid() && window.SB && window.SB.from && window.ImageStore && !window.ImageStore.isOff()
-      && typeof getDB === 'function' && Array.isArray(getDB().boards));
+      && typeof getDB === 'function' && Array.isArray(getDB().boards) && !locked());
   }
+  // Замок хранилища (boards-core.js, lockStorage): на диске формат новее, и
+  // пометку «доска уже на сервере» записать нельзя. Перенос тогда завёл бы
+  // строку в boards, а следующий заход о ней не узнал бы и завёл вторую
+  function locked() { return typeof window.boardsStorageLocked === 'function' && window.boardsStorageLocked(); }
   function isOpen(b) { return typeof boardActive !== 'undefined' && boardActive && typeof B !== 'undefined' && B && B.id === b.id; }
   // доски из корзины на сервер не везём: через 5 дней их всё равно сотрут
   function pendingBoards() { return ready() ? getDB().boards.filter(b => !b.cloudBoardId && !b.trashedAt && !isOpen(b)) : []; }
@@ -61,6 +65,8 @@
       b.cloudPendingId = id;
       markBoardDirty(b.id);
       await idbSaveDB();
+      // номер строки не записался — дальше не идём: доеду новым кодом
+      if (locked()) throw new Error('хранилище досок заперто — на диске формат новее');
     }
     const rows = (b.objects || []).map(o => ({ board_id: id, obj_id: o.id, data: o, updated_by: uid() }));
     for (let i = 0; i < rows.length; i += 100) {

@@ -97,23 +97,82 @@ function idbGet(key){
     tx.onabort = () => reject(tx.error || new Error('чтение прервано'));
   });
 }
+/* ═══ Замок хранилища по номеру формата ═══
+   Вкладка со старым кодом после деплоя читает хранилище, сливает со своей
+   памятью и пишет обратно ПО-СТАРОМУ. Пока формат не меняется, это безвредно
+   (слияние idbSaveMerged), но после смены формата такая вкладка затёрла бы
+   урок записью, которую новый код не поймёт. Поэтому код отказывается
+   писать, если на диске индекс с номером формата больше IDB_INDEX_VERSION:
+   его записал более новый код. Раньше такая запись считалась «старым
+   форматом» и уходила в migrateToSplitStorage — та переписывала её и
+   затирала boarddata пустыми досками (у лёгкого индекса нет objects).
+   Замок выкатывается раньше первой смены формата, чтобы к тому моменту
+   попасть во все браузеры. Флаг ставится один раз и не снимается: снимает
+   его только перезагрузка с новым кодом — сама страница не
+   перезагружается, идёт урок. Любой новый путь записи в IndexedDB обязан
+   проверять этот флаг. */
+let boardsStorageLocked = false;
+function storedIsNewer(stored){
+  return !!stored && typeof stored.__v === 'number' && stored.__v > IDB_INDEX_VERSION;
+}
+function lockStorage(){
+  if (boardsStorageLocked) return;
+  boardsStorageLocked = true;
+  console.warn('[boards] на диске формат хранилища новее, чем понимает эта вкладка, — запись в хранилище остановлена');
+  // ученик на просмотре доски учителя в хранилище не пишет вовсе — его
+  // посреди урока не дёргаем
+  if (window.__boardViewer) return;
+  try { showOutdatedBanner(); } catch (e) {}
+}
+window.boardsStorageLocked = () => boardsStorageLocked;
+// запись индекса и тяжёлой части доски: номер формата на диске сверяется в
+// ТОЙ ЖЕ транзакции, что и запись, — иначе соседняя вкладка с новым кодом
+// успела бы переписать индекс между проверкой и записью
+// Снимки (db_snap*) — тоже копия формата досок: снимок старым кодом поверх
+// снимков нового испортил бы восстановление из копии
+function idbKeyNeedsFormatCheck(key){
+  return typeof key === 'string' && (key === 'db' || key.indexOf(IDB_BOARD_PREFIX) === 0 || key.indexOf('db_snap') === 0);
+}
+// work(store) выполняется внутри транзакции, только если на диске формат не
+// новее нашего; иначе поднимается замок и ничего не пишется
+function idbGuardedWrite(store, key, work){
+  if (!idbKeyNeedsFormatCheck(key)) { work(); return; }
+  const r = store.get('db');
+  // исключение внутри обработчика (например, DataCloneError в put) браузер
+  // превращает в откат транзакции — дойдёт до onabort, как и раньше
+  r.onsuccess = () => {
+    if (storedIsNewer(r.result)) { lockStorage(); return; }
+    work();
+  };
+}
+
 function idbPut(key, value){
+  // при замке молча ничего не пишем: это не сбой записи, и красная плашка
+  // «Доска не сохраняется» тут была бы неправдой — о замке своя плашка
+  if (boardsStorageLocked) return Promise.resolve(false);
   return idbRun((db, resolve, reject) => {
     const tx = db.transaction(IDB_STORE, 'readwrite');
-    // «„скорость досок“»: сколько стоила сериализация записи доски — по
-    // ней saveDB решает, ждать ли паузу подлиннее (scheduleIdbSave)
-    const t0 = performance.now();
-    tx.objectStore(IDB_STORE).put(value, key);
-    if (typeof key === 'string' && key.indexOf(IDB_BOARD_PREFIX) === 0) idbLastHeavyPutMs = performance.now() - t0;
-    tx.oncomplete = () => resolve(true);
+    const store = tx.objectStore(IDB_STORE);
+    let wrote = false;
+    idbGuardedWrite(store, key, () => {
+      // «„скорость досок“»: сколько стоила сериализация записи доски — по
+      // ней saveDB решает, ждать ли паузу подлиннее (scheduleIdbSave)
+      const t0 = performance.now();
+      store.put(value, key);
+      wrote = true;
+      if (typeof key === 'string' && key.indexOf(IDB_BOARD_PREFIX) === 0) idbLastHeavyPutMs = performance.now() - t0;
+    });
+    tx.oncomplete = () => resolve(wrote);
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error('запись прервана'));
   });
 }
 function idbDelete(key){
+  if (boardsStorageLocked) return Promise.resolve(false);
   return idbRun((db, resolve, reject) => {
     const tx = db.transaction(IDB_STORE, 'readwrite');
-    tx.objectStore(IDB_STORE).delete(key);
+    const store = tx.objectStore(IDB_STORE);
+    idbGuardedWrite(store, key, () => store.delete(key));
     tx.oncomplete = () => resolve(true);
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error('удаление прервано'));
@@ -285,6 +344,16 @@ let idbWorks = false;
 function idbLoadDB(){
   return idbGet('db').then(saved => {
     idbWorks = true;
+    // Замок: индекс записан более новым кодом. Раньше он уходил ниже в
+    // migrateToSplitStorage как «старый формат» и переписывался — с пустыми
+    // boarddata. Теперь только показываем список как есть и ничего не пишем
+    // (замок мог поднять и rebuildResume — тогда тоже ни миграции, ни
+    // переезда из localStorage: он удалил бы старый ключ, ничего не записав)
+    if (boardsStorageLocked || storedIsNewer(saved)) {
+      DB = (saved && Array.isArray(saved.boards)) ? saved : { folders: [], boards: [] };
+      lockStorage();
+      return true;
+    }
     if (saved && Array.isArray(saved.boards)) {
       if (saved.__v === IDB_INDEX_VERSION) {
         // Промпт №47: раньше тут же, при самой загрузке страницы, тяжёлые
@@ -518,6 +587,110 @@ function clearSaveFailedWarning(){
   const bar = document.getElementById('saveFailBanner');
   if (bar) bar.remove();
 }
+
+/* ── Плашки сверху: место ищется как у «Добавьте пароль» (placePwBanner в
+   boards-cloud.js) ──
+   В фиксированный угол ставить нельзя: там «К тренажёрам», поиск, рейл
+   доски, и плашка их перекрывала (так было с «Вы вошли как»). Сначала —
+   верхняя строка правее «Назад к доскам» (на доске) или заголовка (в
+   списке); не влезло — первое свободное место в верхних 200 px; нет и
+   такого — плашка сжимается до короткого текста (класс mini) и ищет снова.
+   Экраны переключаются без событий, поэтому пока плашка на странице —
+   сверяемся раз в полсекунды. Плашки живут в body, а не в #screenBoard:
+   показ презентации (deck-toolbar.js) прячет всё на #screenBoard, кроме
+   своего списка, а эти плашки в показе должны оставаться видны.
+   Ею пользуется и update-check.js (window.placeTopBanner). */
+const TOP_BANNER_BLOCKERS = '#screenList button, #screenList a, #screenList input, #screenList .bl-title, '
+  + '#screenBoard button, #screenBoard a, #screenBoard input, .bd-rail, #bdShareBtn, #lgMenuToggle, '
+  + '.ag-user-pill, .ag-pill-handle, #agPwBanner, #bdOutdated, #bdUpdate, #dtbShowBar';
+function topBannerBlockers(el){
+  const out = [];
+  document.querySelectorAll(TOP_BANNER_BLOCKERS).forEach(b => {
+    if (b === el || el.contains(b)) return;
+    const r = b.getBoundingClientRect();
+    if (r.width && r.height && r.top < 260 && getComputedStyle(b).visibility !== 'hidden') out.push(r);
+  });
+  return out;
+}
+function topBannerFree(left, top, w, h, rects){
+  if (left < 6 || top < 6 || left + w > window.innerWidth - 6) return false;
+  return !rects.some(r => left < r.right + 4 && r.left - 4 < left + w && top < r.bottom + 4 && r.top - 4 < top + h);
+}
+function topBannerSpot(el, rects){
+  const w = el.offsetWidth, h = el.offsetHeight;
+  const vis = a => { if (!a) return null; const r = a.getBoundingClientRect(); return r.width ? r : null; };
+  const anchor = vis(document.getElementById('bdBack')) || vis(document.getElementById('blTitle'))
+    || vis(document.getElementById('blToIndex'));
+  if (anchor){
+    const l = Math.round(anchor.right + 10), t = Math.round(anchor.top + (anchor.height - h) / 2);
+    if (topBannerFree(l, t, w, h, rects)) return [l, t];
+  }
+  for (let t = 8; t <= 200; t += 6)
+    for (let l = 8; l + w <= window.innerWidth - 6; l += 6)
+      if (topBannerFree(l, t, w, h, rects)) return [l, t];
+  return null;
+}
+function topBannerKey(el){
+  const board = document.getElementById('screenBoard');
+  return [window.innerWidth, window.innerHeight, board && getComputedStyle(board).display,
+    document.documentElement.classList.contains('deck-show'), el.classList.contains('mini')].join('|');
+}
+function placeTopBanner(el){
+  if (!el || !el.isConnected) return;
+  const rects = topBannerBlockers(el);
+  const cur = el.getBoundingClientRect();
+  if (el.__placeKey === topBannerKey(el) && topBannerFree(cur.left, cur.top, cur.width, cur.height, rects)) return;
+  el.classList.remove('mini');
+  let spot = topBannerSpot(el, rects);
+  // и сжатой места нет — всё равно показываем: плашка важнее, чем то, что
+  // она на время прикроет
+  if (!spot){ el.classList.add('mini'); spot = topBannerSpot(el, rects) || [16, 64]; }
+  el.style.left = spot[0] + 'px';
+  el.style.top = spot[1] + 'px';
+  el.__placeKey = topBannerKey(el);
+}
+function keepTopBannerPlaced(el){
+  placeTopBanner(el);
+  const t = setInterval(() => { if (!el.isConnected){ clearInterval(t); return; } placeTopBanner(el); }, 500);
+  window.addEventListener('resize', () => placeTopBanner(el));
+}
+window.placeTopBanner = placeTopBanner;
+window.keepTopBannerPlaced = keepTopBannerPlaced;
+
+// Плашка замка хранилища (см. lockStorage). Закрыть нельзя и сама страница
+// не перезагружается: идёт урок, перезагрузить — решение человека
+const OUTDATED_TEXT = 'Вышло обновление. Перезагрузите страницу — правки в этой вкладке не сохраняются';
+function showOutdatedBanner(){
+  if (document.getElementById('bdOutdated')) return;
+  if (!document.getElementById('bdTopBannerCss')){
+    const css = document.createElement('style');
+    css.id = 'bdTopBannerCss';
+    css.textContent = '#bdOutdated{position:fixed;left:16px;top:64px;z-index:1000;display:inline-flex;align-items:center;gap:10px;'
+      + 'box-sizing:border-box;min-height:34px;padding:4px 6px 4px 12px;border-radius:10px;white-space:nowrap;'
+      + 'border:2px solid #FF3B30;background:var(--glass-strong,rgba(255,255,255,.96));color:var(--ink,#1b2230);'
+      + 'font:600 13.5px/1.3 var(--font-ui,system-ui),sans-serif;box-shadow:0 0 0 3px rgba(255,59,48,.16),var(--shadow,0 4px 16px rgba(0,0,0,.12));'
+      + 'backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%)}'
+      + '#bdOutdated button{flex:none;font:inherit;font-weight:700;border:0;border-radius:8px;padding:5px 12px;cursor:pointer;background:#FF3B30;color:#fff}'
+      + '#bdOutdated .tb-short{display:none}#bdOutdated.mini .tb-long{display:none}#bdOutdated.mini .tb-short{display:inline}';
+    document.head.appendChild(css);
+  }
+  const bar = document.createElement('div');
+  bar.id = 'bdOutdated';
+  bar.setAttribute('role', 'alert');
+  const long = document.createElement('span');
+  long.className = 'tb-long';
+  long.textContent = OUTDATED_TEXT;
+  const short = document.createElement('span');
+  short.className = 'tb-short';
+  short.textContent = 'Вышло обновление';
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.textContent = 'Перезагрузить';
+  btn.addEventListener('click', () => location.reload());
+  bar.appendChild(long); bar.appendChild(short); bar.appendChild(btn);
+  document.body.appendChild(bar);
+  keepTopBannerPlaced(bar);
+}
 /* ═══ Промпт №40: сохранение больше не затирает чужую работу ═══
    Все доски лежат в хранилище ОДНОЙ записью, а каждая вкладка держит свою
    копию в памяти и раньше писала её туда целиком. Достаточно было открыть
@@ -631,9 +804,13 @@ function idbSaveIndexMerged(){
     const tx = db.transaction(IDB_STORE, 'readwrite');
     const store = tx.objectStore(IDB_STORE);
     const req = store.get('db');
-    let activeLost = false;
+    let activeLost = false, locked = false;
     req.onsuccess = () => {
       try {
+        // Замок: индекс на диске записан более новым кодом — не сливаем и не
+        // пишем (проверка в этой же транзакции, до mergeDbs: между чтением
+        // и записью соседняя вкладка сюда не влезет)
+        if (storedIsNewer(req.result)) { locked = true; lockStorage(); return; }
         const stored = (req.result && Array.isArray(req.result.boards)) ? req.result : null;
         activeLost = activeLostTo(stored);
         // сравниваем и переставляем ЛЁГКИЕ копии — mergeDbs не трогает
@@ -653,7 +830,7 @@ function idbSaveIndexMerged(){
       } catch (e) { reject(e); return; }
     };
     req.onerror = () => reject(req.error);
-    tx.oncomplete = () => resolve({ activeLost });
+    tx.oncomplete = () => resolve({ activeLost, locked });
     tx.onerror = () => reject(tx.error);
     tx.onabort = () => reject(tx.error || new Error('запись прервана'));
   });
@@ -747,13 +924,18 @@ function listSnapshots(){
    (dirtyBoardIds, см. touchBoard). Пока правят одну открытую доску, это
    значит: индекс + ровно одна запись, а не двадцать две. */
 function idbSaveDB(){
+  // Замок: ничего не пишем, правки остаются в памяти вкладки. false — как
+  // «не сохранилось»: выход в список по нему доску не выгружает
+  if (boardsStorageLocked) return Promise.resolve(false);
   maybeSnapshot().catch(() => {});
   const toFlush = Array.from(dirtyBoardIds);
   dirtyBoardIds = new Set();
   // №92: дошли ли до записи тяжёлых частей — значит, список досок записался
   let indexSaved = false;
   return idbSaveIndexMerged()
-    .then(({ activeLost }) => {
+    .then(({ activeLost, locked }) => {
+      // индекс на диске оказался новее — тяжёлые части тоже не пишем
+      if (locked) { toFlush.forEach(id => dirtyBoardIds.add(id)); return 'locked'; }
       indexSaved = true;
       const jobs = [];
       if (activeLost) {
@@ -777,7 +959,7 @@ function idbSaveDB(){
       });
       return Promise.all(jobs);
     })
-    .then(() => { clearSaveFailedWarning(); pingOtherTabs(); return true; })
+    .then(r => { if (r === 'locked') return false; clearSaveFailedWarning(); pingOtherTabs(); return true; })
     .catch(err => {
       // не получилось — возвращаем доски в список «грязных», чтобы
       // следующее сохранение попробовало ещё раз
@@ -823,6 +1005,11 @@ function pingOtherTabs(){
 // свежий вид из соседней вкладки, даже если эта видима (см. adoptFresherView)
 function refreshFromStore(visibleToo){
   return idbGet('db').then(stored => {
+    // Замок: соседняя вкладка уже на новом коде — её индекс в память не
+    // сливаем (его формат нам непонятен), а запись останавливаем сразу,
+    // не дожидаясь первого сохранения
+    if (boardsStorageLocked) return;
+    if (storedIsNewer(stored)) { lockStorage(); return; }
     if (!stored || !Array.isArray(stored.boards)) return;
     const lost = activeLostTo(stored);
     const mineIndex = { folders: DB.folders, deleted: DB.deleted, sortMode: DB.sortMode, boards: DB.boards.map(stripHeavy) };
@@ -1122,7 +1309,12 @@ async function downloadArchiveStreamed(fileName){
 // шаги 4–5: из временной базы в новую и уборка; зовётся и кнопкой, и при
 // загрузке страницы, если прошлая пересборка оборвалась после удаления
 async function rebuildFinish(){
+  if (boardsStorageLocked) return;
   const tmp = await rawIdbOpen(IDB_TMP_NAME);
+  // Замок: оборванную пересборку начинал более новый код (индекс в копии
+  // новее нашего) — дописывать её по-старому нельзя. Копию и этап не
+  // трогаем: их доведёт новый код после перезагрузки
+  if (storedIsNewer(await rawIdbReq(tmp, 'readonly', st => st.get('db')))) { tmp.close(); lockStorage(); return; }
   const main = await idbOpen();
   await rawIdbCopy(tmp, main, (i, n) => rebuildStatus(`Запись заново: ${i} из ${n}`));
   tmp.close();
@@ -1131,6 +1323,9 @@ async function rebuildFinish(){
 }
 async function rebuildStorage(){
   if (!window.indexedDB) return;
+  // Замок: пересборка переписывает всё хранилище — при новом формате на
+  // диске это затёрло бы его старым кодом
+  if (boardsStorageLocked) { alert(OUTDATED_TEXT); return; }
   if (!confirm('Пересобрать хранилище досок?\n\nЭто лечит случай, когда доски сильно тормозят или вкладка падает. '
     + 'Сначала скачается файл со всеми досками (страховка), потом хранилище запишется заново. '
     + 'Займёт до пары минут — вкладку не закрывайте.')) return;
@@ -1144,6 +1339,17 @@ async function rebuildStorage(){
     const tmp = await rawIdbOpen(IDB_TMP_NAME);
     const main = await idbOpen();
     await rawIdbCopy(main, tmp, (i, n) => rebuildStatus(`Копирую: ${i} из ${n}`));
+    // пока шла пересборка, соседняя вкладка могла обновиться — тогда в копии
+    // индекс нового формата, и удалять основную базу ради записи старым
+    // кодом нельзя: убираем копию и останавливаемся
+    if (boardsStorageLocked || storedIsNewer(await rawIdbReq(tmp, 'readonly', st => st.get('db')))) {
+      tmp.close();
+      await rawIdbDelete(IDB_TMP_NAME);
+      lockStorage();
+      rebuildStatus('');
+      alert(OUTDATED_TEXT);
+      return;
+    }
     tmp.close();
     // с этого места записи живут во временной базе — шаг помечаем ДО удаления
     rebuildStage('copied');
@@ -1417,6 +1623,8 @@ async function mergeArchiveReady(payload){
 }
 
 function importAnyBoardsFile(file){
+  // Замок: доски из файла некуда записать — не делаем вид, что загрузили
+  if (boardsStorageLocked) { alert(OUTDATED_TEXT); return; }
   const reader = new FileReader();
   reader.onload = async () => {
     let payload = null;
@@ -11627,6 +11835,9 @@ window.boardsPersistQuiet = function(board){
    вкладка досок и не потеряется отметка «грязная» */
 async function importNotesOutbox(){
   if (!window.NotesStore || !window.NotesStore.takeOutbox) return 0;
+  // Замок: takeOutbox забирает доски из конспектов насовсем, а записать их
+  // к себе мы не сможем — пусть дождутся вкладки с новым кодом
+  if (boardsStorageLocked) return 0;
   let items = [];
   try { items = await window.NotesStore.takeOutbox(); } catch (e) { return 0; }
   let n = 0;

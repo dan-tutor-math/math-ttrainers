@@ -9642,6 +9642,8 @@ Safari, с видеозвонками в нём бывают сюрпризы. �
 
 - Просмотр работы ученика (`works.html`, `#rv`) и выход из презентации без полосы справа (`#deckModeSeg` вместо `.deck-mode`). Тест — `test_prompt_works_review.py`.
 
+- (10.11.2026) Замок хранилища досок: если на диске `'db'` с `__v` больше `IDB_INDEX_VERSION`, вкладка поднимает `boardsStorageLocked` и ничего не пишет в IndexedDB (проверка в той же транзакции, что запись `'db'`, `boarddata:*`, `db_snap*`), плашка `#bdOutdated`; плюс `update-check.js` — плашка `#bdUpdate` «Есть обновление платформы» по смене ETag `boards-core.js`. Тесты `test_prompt_boards_format_lock.py`, `test_prompt_update_check.py`.
+
 ---
 
 ## 12. С чего начать новой сессии

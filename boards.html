@@ -2161,6 +2161,8 @@ window.__boardViewer = /[?&]s=[^&#]/.test(location.search);</script>
 <!-- Промпт №84: презентации — до boards-core.js, доска может открыться сразу по #board= -->
 <!-- deck-core.js подгружается по требованию, когда открывают презентацию (№96, ensureDeckModule в boards-core.js) -->
 <script src="boards-core.js"></script>
+<!-- сигнал «есть обновление платформы»: сверяет ETag boards-core.js, плашку ставит placeTopBanner из boards-core.js -->
+<script src="update-check.js"></script>
 <!-- Промпт №17: готовые фигуры — плоские (поля fig у poly/circle), меню и
      панель; тела и 3D-конструктор догружаются из него же по требованию -->
 <script src="board-figures.js"></script>
