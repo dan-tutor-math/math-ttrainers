@@ -10,6 +10,9 @@ def run():
         assert p.evaluate("!ALL_MODES.find(m=>m.id==='t4').fipiList")
         assert p.evaluate('build_t10(4,2,25).correctValue')==6
         assert p.evaluate('build_t10(.1,2,20).correctValue')==1
+        assert '≈ 6,67' in p.evaluate('build_t10(1.8,3,10).explain')
+        assert '0-м' not in p.evaluate('build_t10(.1,2,20).explain')
+        assert 'первый отскок' in p.evaluate('build_t10(.1,2,20).explain')
         ctx.close();browser.close()
     print('готово')
 if __name__=='__main__':run()
