@@ -483,6 +483,11 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .home-btn:hover{border-color:var(--ink)}
 .home-btn:active{transform:scale(.92)}
 
+.source-note{font:500 12.5px var(--font-ui);color:var(--muted-3);margin:12px 0;}
+.fipi-count{font:500 12.5px var(--font-ui);color:var(--muted-3);margin-top:6px;}
+.sol-line{line-height:1.6;margin:6px 0;}.sol-note{margin-bottom:10px;}
+.vf{display:inline-flex;flex-direction:column;vertical-align:middle;text-align:center;line-height:1.2;margin:0 .2em;}
+.vf>span:first-child{border-bottom:1px solid;padding:0 .15em .08em;}.vf>span:last-child{padding:.08em .15em 0;}
 </style>
 <link rel="stylesheet" href="katex-0.18.5.css" id="katexCss">
 <script src="katex-0.18.5.js"></script>
@@ -673,6 +678,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
     <div class="mode-card random" data-id="random">
       <div class="mtitle">🎲 Случайно — из всех типов</div>
     </div>
+    <div id="fipiFilter"></div>
     <div id="modesGrid"></div>
   </div>
 
@@ -712,7 +718,9 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
                карточек: только условие и поле ввода. Это и то, что забирает «В подборку»,
                и граница, ниже которой начинается общая с добавленными часть плитки. -->
           <div class="added-card-question" id="card1Question">
+          <div id="fipiNotice" class="fipi-notice" style="display:none"></div>
           <div class="prompt" id="questionPromptText"></div>
+          <div class="source-note" id="sourceNote" style="display:none"></div>
           <div class="input-answer-row" id="inputAnswerArea">
             <input type="text" inputmode="decimal" class="answer-input" id="answerInput" placeholder="?" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
             <button class="check-btn" id="checkAnswerBtn">Проверить</button>
@@ -789,6 +797,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="mode-card-keys.js"></script>
 <script src="keypad.js"></script>
 <script src="no-repeat.js"></script>
+<script src="fipi-mix.js"></script>
+<script src="oge8-fipi-bank.js"></script>
 <script src="hard-toggle.js"></script>
 <script src="exam-nav.js"></script>
 <script src="lazy-libs.js" data-preload="html2canvas jspdf"></script>
@@ -904,85 +914,183 @@ function natProdPowPow(){
   return { base, m, n, p, net: m + n*p };
 }
 
+// Старые генераторы сохраняют свой разбор; задания банка получают числовые шаги.
+function n8Finish(n,args,task,legacy){
+  if(legacy) return task;
+  const a=args.map(v=>typeof v==='string' && /^-?\d/.test(v) ? n8Number(v) : v);
+  const f=fmtNum, pow=(x,e)=>`${sg(x)}^{${e}}`, lines=[];
+  const add=s=>lines.push(tex(s));
+  const v=task.correctValue;
+  if(n<=13){
+    let base=a[0], e;
+    if([1,2,8].includes(n)){ const [,m,k,p]=a; add(`${m}+${sg(k)}=${m+k}`); e=m+k-p; add(`${m+k}-${sg(p)}=${e}`); }
+    if([3,5,12].includes(n)){ const [,m,k,p]=a; add(`${m}\\cdot ${sg(k)}=${m*k}`); e=m*k-p; add(`${m*k}-${sg(p)}=${e}`); }
+    if([4,13].includes(n)){const [,m,k,p]=a; add(`${k}\\cdot ${p}=${k*p}`); e=m+k*p; add(`${sg(m)}+${k*p}=${e}`);}
+    if(n===6){const [,m,k,p,q]=a;add(`${m}\\cdot ${k}=${m*k}`);add(`${m*k}+${p}=${m*k+p}`);e=m*k+p-q;add(`${m*k+p}-${sg(q)}=${e}`);}
+    if(n===7){const [,b,m,k,p,q]=a;add(`(b^{${k}})^{${p}}=b^{${k*p}}`);lines.push(`В знаменателе (ab)<sup>${q}</sup> = a<sup>${q}</sup>b<sup>${q}</sup>. Одинаковые степени ненулевого b сокращаются.`);e=m-q;add(`${m}-${q}=${e}`);}
+    if(n===9){const [c,M,k]=a;add(`${c**k}=${c}^{${k}}`);e=M-k;add(`${M}-${k}=${e}`);}
+    if(n===10){const [c,ea,eb,X,Y]=a;add(`${c**ea}=${c}^{${ea}}`);add(`${c**eb}=${c}^{${eb}}`);add(`${ea}\\cdot ${X}=${ea*X}`);add(`${eb}\\cdot ${Y}=${eb*Y}`);e=ea*X-eb*Y;add(`${ea*X}-${sg(eb*Y)}=${e}`);}
+    if(n===11){const [,m,k,single]=a;e=single?k-m:-m-k;lines.push('Обратная степень меняет знак показателя.');add(`${single?k:-m}-${sg(single?m:k)}=${e}`);}
+    lines.unshift('При умножении одинаковых оснований показатели складываем, при делении — вычитаем; в степени степени перемножаем.');
+    add(e<0?`${pow(base,e)}=\\dfrac{1}{${pow(base,-e)}}=${f(v)}`:`${pow(base,e)}=${f(v)}`);
+  } else if(n<=16){
+    const [c,d,x,y,z]=a, top=n===15?y:x, ec=n===16?x-y:0, ed=n===15?y-x:x-(n===16?z:y);
+    add(`(${c}\\cdot ${d})^{${n===15?x:top}}=${c}^{${n===15?x:top}}\\cdot ${d}^{${n===15?x:top}}`);
+    add(`${n===15?x:top}-${n===16?y:n===15?x:top}=${ec}`);add(`${top}-${n===16?z:n===15?x:y}=${ed}`);
+    add(`${c}^{${ec}}=${f(c**ec)}`);add(`${d}^{${ed}}=${f(d**ed)}`);add(`${f(c**ec)}\\cdot ${f(d**ed)}=${f(v)}`);
+  } else if(n<=18){const [k,r,m]=a;add(`${k}^{2}=${k*k}`);add(`${k*k}\\cdot ${r}=${k*k*r}`);add(`\\dfrac{${n===17?k*k*r:m}}{${n===17?m:k*k*r}}=${f(v)}`);
+  } else if(n===19){const [r,k]=a;add(`${r}^{${k}}=${r**k}`);add(`\\sqrt{${r**k}}=${f(v)}`);add(`${f(v)}^{2}=${r**k}`);
+  } else if([20,21,22].includes(n)){
+    let rad,coeff=1;
+    if(n===20){const [p,x,q,y,z]=a;coeff=p*q;add(`${p}\\cdot ${q}=${coeff}`);add(`${x}\\cdot ${y}=${x*y}`);add(`${x*y}\\cdot ${z}=${x*y*z}`);rad=x*y*z;}
+    if(n===21){const [x,y,z]=a;add(`${x}\\cdot ${y}=${x*y}`);add(`${x*y}\\cdot ${z}=${x*y*z}`);rad=x*y*z;}
+    if(n===22){const [x,y,d]=a;add(`${x}\\cdot ${y}=${x*y}`);add(`\\dfrac{${x*y}}{${d}}=${x*y/d}`);rad=x*y/d;}
+    add(`\\sqrt{${rad}}=${Math.sqrt(rad)}`);if(coeff!==1)add(`${coeff}\\cdot ${Math.sqrt(rad)}=${f(v)}`);
+  } else if(n<=24){const [x,y]=a;add(`${x}\\cdot ${y}=${x*y}`);add(`\\sqrt{${x*y}}=${Math.sqrt(x*y)}`);add(`${Math.sqrt(x*y)}${n===23?'+':'-'}${y}=${f(v)}`);
+  } else if(n<=26){const [x,y]=a;lines.push('Применяем разность квадратов: (u − v)(u + v) = u² − v².');if(n===26)add(`${y}^{2}=${y*y}`);add(`${x}-${n===25?y:y*y}=${f(v)}`);
+  } else if(n===27){const [x,y,s]=a;add(`(\\sqrt{${x}}${s}${y})^{2}=${x}${s}${2*y}\\sqrt{${x}}+${y*y}`);lines.push('Противоположные слагаемые с корнем сокращаются.');add(`${y}^{2}=${y*y}`);add(`${x}+${y*y}=${f(v)}`);
+  } else if(n===28){const [x,m,k]=a;lines.push('Оба показателя чётные — знак минус исчезает.');add(`${m}+${k}=${m+k}`);add(`\\sqrt{${x}^{${m+k}}}=${x}^{${(m+k)/2}}=${f(v)}`);
+  } else if(n===29){const [K,M,N,x,mul]=a;add(`${M}-${N}=${M-N}`);add(`\\sqrt{${K}}=${Math.sqrt(K)}`);add(`${x}^{${(M-N)/2}}=${x**((M-N)/2)}`);add(mul?`${Math.sqrt(K)}\\cdot ${x**((M-N)/2)}=${f(v)}`:`\\dfrac{${x**((M-N)/2)}}{${Math.sqrt(K)}}=${f(v)}`);
+  } else if(n<=31){const [C,px,third,fourth,fifth]=a,py=n===30?third:2,x=n===30?fourth:third,y=n===30?fifth:fourth;add(`\\sqrt{${C}}=${Math.sqrt(C)}`);add(`${x}^{${px/2}}=${x**(px/2)}`);add(`${y}^{${py/2}}=${y**(py/2)}`);add(n===30?`\\dfrac{${x**(px/2)}\\cdot ${y**(py/2)}}{${Math.sqrt(C)}}=${f(v)}`:`\\dfrac{${Math.sqrt(C)}\\cdot ${x**(px/2)}}{${y**(py/2)}}=${f(v)}`);
+  } else if(n<=33){const [p,q,x,y]=a,sign=n===32?'+':'-',value=n===32?p*x+q*y:p*x-q*y;add(`\\sqrt{(${p}a${sign}${q}b)^{2}}=|${p}a${sign}${q}b|`);add(`${p}\\cdot ${sg(x)}=${f(p*x)}`);add(`${q}\\cdot ${sg(y)}=${f(q*y)}`);add(`${f(p*x)}${sign}${sg(q*y)}=${f(value)}`);add(`|${f(value)}|=${f(v)}`);
+  } else {const [c,d]=a;lines.push('При положительных a и b: √a · √b = √(ab). Сокращаем ненулевой корень в числителе и знаменателе.');add(`${c}\\cdot ${d}=${f(v)}`);}
+  task.explain='<div class="sol-note">'+task.prompt+'</div><div class="sol">'+lines.map(s=>`<div class="sol-line">${s}</div>`).join('')+'</div>';
+  return task;
+}
+
+function n8Number(v){
+  if(typeof v === 'number') return v;
+  const a=String(v).split('/').map(Number);
+  return a.length===2 ? a[0]/a[1] : Number(v);
+}
+
 /* ───────── степени ───────── */
+
+function build_p1(a, m, n, p, legacy=false){
+  const net=m+n-p;
+  const correct = powVal(a, net);
+  return n8Finish(1, [a, m, n, p], {
+    prompt: `Найдите значение выражения ${tex(`a^{${m}} \\cdot a^{${n}} : a^{${p}}`)} при a = ${a}.`,
+    correctValue: correct,
+    explain: `Показатель степени: ${m}+${sg(n)}−${sg(p)} = ${net}. Значение = ${tex(`a^{${net}} = (${a})^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, p, net],
+  }, legacy);
+
+}
 
 function gen_p1_pow_colon(nat){
   const {base:a, net} = pickBaseAndNet(true, 4, nat);
   let m, p, n;
   do { m = ri(4,20); p = ri(4,20); n = net - m + p; } while (nat && n < 1);
+  return build_p1(a, m, n, p, true);
+}
+
+function build_p2(a, m, n, p, legacy=false){
+  const net=m+n-p;
   const correct = powVal(a, net);
-  return {
-    prompt: `Найдите значение выражения ${tex(`a^{${m}} \\cdot a^{${n}} : a^{${p}}`)} при a = ${a}.`,
+  return n8Finish(2, [a, m, n, p], {
+    prompt: `Найдите значение выражения ${tex(`\\dfrac{a^{${m}} \\cdot a^{${n}}}{a^{${p}}}`)} при a = ${a}.`,
     correctValue: correct,
     explain: `Показатель степени: ${m}+${sg(n)}−${sg(p)} = ${net}. Значение = ${tex(`a^{${net}} = (${a})^{${net}}`)} = ${fmtNum(correct)}.`,
     exps: [m, n, p, net],
-  };
+  }, legacy);
+
 }
 
 function gen_p2_pow_frac(nat){
   const {base:a, net} = pickBaseAndNet(true, 4, nat);
   let m, p, n;
   do { m = ri(4,20); p = ri(4,20); n = net - m + p; } while (nat && n < 1);
+  return build_p2(a, m, n, p, true);
+}
+
+function build_p3(a, m, n, p, legacy=false){
+  const net=m*n-p;
   const correct = powVal(a, net);
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\dfrac{a^{${m}} \\cdot a^{${n}}}{a^{${p}}}`)} при a = ${a}.`,
+  return n8Finish(3, [a, m, n, p], {
+    prompt: `Найдите значение выражения ${tex(`\\dfrac{(a^{${m}})^{${n}}}{a^{${p}}}`)} при a = ${a}.`,
     correctValue: correct,
-    explain: `Показатель степени: ${m}+${sg(n)}−${sg(p)} = ${net}. Значение = ${tex(`a^{${net}} = (${a})^{${net}}`)} = ${fmtNum(correct)}.`,
+    explain: `${tex(`(a^{${m}})^{${n}} = a^{${m*n}}`)}. Показатель степени: ${m*n}−${sg(p)} = ${net}. Значение = ${tex(`(${a})^{${net}}`)} = ${fmtNum(correct)}.`,
     exps: [m, n, p, net],
-  };
+  }, legacy);
+
 }
 
 function gen_p3_powpow_frac(nat){
   const {base:a, net} = pickBaseAndNet(true, 4, nat);
   let m, n, p;
   do { m = ri(2,6); n = ri(2,5); p = m*n - net; } while (nat && p < 1);
+  return build_p3(a, m, n, p, true);
+}
+
+function build_p4(a, m, n, p, legacy=false){
+  const net=m+n*p;
   const correct = powVal(a, net);
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\dfrac{(a^{${m}})^{${n}}}{a^{${p}}}`)} при a = ${a}.`,
+  return n8Finish(4, [a, m, n, p], {
+    // aᵐ при m = 1 пишем просто a — как в учебнике
+    prompt: `Найдите значение выражения ${tex(`${m === 1 ? 'a' : `a^{${m}}`} \\cdot (a^{${n}})^{${p}}`)} при a = ${a}.`,
     correctValue: correct,
-    explain: `${tex(`(a^{${m}})^{${n}} = a^{${m*n}}`)}. Показатель степени: ${m*n}−${sg(p)} = ${net}. Значение = ${tex(`(${a})^{${net}}`)} = ${fmtNum(correct)}.`,
+    explain: `${tex(`(a^{${n}})^{${p}} = a^{${n*p}}`)}. Показатель степени: ${sg(m)}+${n*p} = ${net}. Значение = ${tex(`(${a})^{${net}}`)} = ${fmtNum(correct)}.`,
     exps: [m, n, p, net],
-  };
+  }, legacy);
+
 }
 
 function gen_p4_prod_powpow(nat){
   let a, net, m, n, p;
   if (nat) ({ base: a, m, n, p, net } = natProdPowPow());
   else { ({base:a, net} = pickBaseAndNet(true)); n = ri(2,6); p = ri(2,5); m = net - n*p; }
+  return build_p4(a, m, n, p, true);
+}
+
+function build_p5(a, m, n, p, legacy=false){
+  const net=m*n-p;
   const correct = powVal(a, net);
-  return {
-    // aᵐ при m = 1 пишем просто a — как в учебнике
-    prompt: `Найдите значение выражения ${tex(`${m === 1 ? 'a' : `a^{${m}}`} \\cdot (a^{${n}})^{${p}}`)} при a = ${a}.`,
+  return n8Finish(5, [a, m, n, p], {
+    prompt: `Найдите значение выражения ${tex(`(a^{${m}})^{${n}} : a^{${p}}`)} при a = ${a}.`,
     correctValue: correct,
-    explain: `${tex(`(a^{${n}})^{${p}} = a^{${n*p}}`)}. Показатель степени: ${sg(m)}+${n*p} = ${net}. Значение = ${tex(`(${a})^{${net}}`)} = ${fmtNum(correct)}.`,
+    explain: `${tex(`(a^{${m}})^{${n}} = a^{${m*n}}`)}. Показатель степени: ${m*n}−${sg(p)} = ${net}. Значение = ${tex(`(${a})^{${net}}`)} = ${fmtNum(correct)}.`,
     exps: [m, n, p, net],
-  };
+  }, legacy);
+
 }
 
 function gen_p5_powpow_colon(nat){
   const {base:a, net} = pickBaseAndNet(true, 4, nat);
   let m, n, p;
   do { m = ri(2,6); n = ri(2,5); p = m*n - net; } while (nat && p < 1);
+  return build_p5(a, m, n, p, true);
+}
+
+function build_p6(a, m, n, p, q, legacy=false){
+  const net=m*n+p-q;
   const correct = powVal(a, net);
-  return {
-    prompt: `Найдите значение выражения ${tex(`(a^{${m}})^{${n}} : a^{${p}}`)} при a = ${a}.`,
+  return n8Finish(6, [a, m, n, p, q], {
+    prompt: `Найдите значение выражения ${tex(`\\dfrac{(a^{${m}})^{${n}} \\cdot a^{${p}}}{a^{${q}}}`)} при a = ${a}.`,
     correctValue: correct,
-    explain: `${tex(`(a^{${m}})^{${n}} = a^{${m*n}}`)}. Показатель степени: ${m*n}−${sg(p)} = ${net}. Значение = ${tex(`(${a})^{${net}}`)} = ${fmtNum(correct)}.`,
-    exps: [m, n, p, net],
-  };
+    explain: `${tex(`(a^{${m}})^{${n}}\\cdot a^{${p}} = a^{${m*n+p}}`)}. Показатель степени: ${m*n+p}−${sg(q)} = ${net}. Значение = ${tex(`(${a})^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, p, q, net],
+  }, legacy);
+
 }
 
 function gen_p6_powpow_mul_frac(nat){
   const {base:a, net} = pickBaseAndNet(true, 4, nat);
   let m, n, p, q;
   do { m = ri(2,6); n = ri(2,5); p = ri(3,15); q = m*n + p - net; } while (nat && q < 1);
-  const correct = powVal(a, net);
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\dfrac{(a^{${m}})^{${n}} \\cdot a^{${p}}}{a^{${q}}}`)} при a = ${a}.`,
+  return build_p6(a, m, n, p, q, true);
+}
+
+function build_p7(a, b, m, n, p, q, legacy=false){
+  const netA=m-q; const bDisplay = b && b.sqrt ? tex(`\\sqrt{${b.sqrt}}`) : String(b);
+  const correct = powVal(a, netA);
+  return n8Finish(7, [a, b, m, n, p, q], {
+    prompt: `Найдите значение выражения ${tex(`\\dfrac{a^{${m}} \\cdot (b^{${n}})^{${p}}}{(a\\cdot b)^{${q}}}`)} при a = ${a} и b = ${bDisplay}.`,
     correctValue: correct,
-    explain: `${tex(`(a^{${m}})^{${n}}\\cdot a^{${p}} = a^{${m*n+p}}`)}. Показатель степени: ${m*n+p}−${sg(q)} = ${net}. Значение = ${tex(`(${a})^{${net}}`)} = ${fmtNum(correct)}.`,
-    exps: [m, n, p, q, net],
-  };
+    explain: `${tex(`(b^{${n}})^{${p}} = b^{${q}}`)}, а ${tex(`(a\\cdot b)^{${q}} = a^{${q}}\\cdot b^{${q}}`)}. Степени b одинаковые в числителе и знаменателе — b сокращается полностью (при b≠0), независимо от его значения. Остаётся ${tex(`a^{${m}} : a^{${q}} = a^{${m-q}} = (${a})^{${netA}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, p, q, netA],
+  }, legacy);
+
 }
 
 function gen_p7_twovar_cancel(nat){
@@ -993,27 +1101,38 @@ function gen_p7_twovar_cancel(nat){
   const m = q + netA;
   const useIrrationalB = Math.random() < 0.4;
   const bRaw = useIrrationalB ? pick([2,3,5,6,7,10,11]) : ri(2,9);
-  const bDisplay = useIrrationalB ? tex(`\\sqrt{${bRaw}}`) : String(bRaw);
-  const correct = powVal(a, netA);
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\dfrac{a^{${m}} \\cdot (b^{${n}})^{${p}}}{(a\\cdot b)^{${q}}}`)} при a = ${a} и b = ${bDisplay}.`,
+  return build_p7(a, useIrrationalB ? {sqrt:bRaw} : bRaw, m, n, p, q, true);
+}
+
+function build_p8(c, m, n, p, legacy=false){
+  const net=m+n-p;
+  const correct = powVal(c, net);
+  return n8Finish(8, [c, m, n, p], {
+    prompt: `Найдите значение выражения ${tex(`\\dfrac{${baseTex(c)}^{${m}} \\cdot ${baseTex(c)}^{${n}}}{${baseTex(c)}^{${p}}}`)}.`,
     correctValue: correct,
-    explain: `${tex(`(b^{${n}})^{${p}} = b^{${q}}`)}, а ${tex(`(a\\cdot b)^{${q}} = a^{${q}}\\cdot b^{${q}}`)}. Степени b одинаковые в числителе и знаменателе — b сокращается полностью (при b≠0), независимо от его значения. Остаётся ${tex(`a^{${m}} : a^{${q}} = a^{${m-q}} = (${a})^{${netA}}`)} = ${fmtNum(correct)}.`,
-    exps: [m, n, p, q, netA],
-  };
+    explain: `Показатель степени: ${m}+${sg(n)}−${sg(p)} = ${net}. Значение = ${tex(`${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, p, net],
+  }, legacy);
+
 }
 
 function gen_p8_numeric_samebase(nat){
   const {base:c, net} = pickBaseAndNet(true, 4, nat);
   let m, p, n;
   do { m = ri(4,20); p = ri(4,20); n = net - m + p; } while (nat && n < 1);
+  return build_p8(c, m, n, p, true);
+}
+
+function build_p9(c, M, k, legacy=false){
+  const net=M-k; const denomLiteral=Math.pow(c,k);
   const correct = powVal(c, net);
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\dfrac{${baseTex(c)}^{${m}} \\cdot ${baseTex(c)}^{${n}}}{${baseTex(c)}^{${p}}}`)}.`,
+  return n8Finish(9, [c, M, k], {
+    prompt: `Найдите значение выражения ${tex(`\\dfrac{${c}^{${M}}}{${denomLiteral}}`)}.`,
     correctValue: correct,
-    explain: `Показатель степени: ${m}+${sg(n)}−${sg(p)} = ${net}. Значение = ${tex(`${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`,
-    exps: [m, n, p, net],
-  };
+    explain: `${denomLiteral} = ${tex(`${c}^{${k}}`)}. ${tex(`\\dfrac{${c}^{${M}}}{${c}^{${k}}} = ${c}^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [M, k, net],
+  }, legacy);
+
 }
 
 function gen_p9_hidden_denom(nat){
@@ -1029,13 +1148,19 @@ function gen_p9_hidden_denom(nat){
     net = nat ? ri(1,5) : riLowZeroBias(5);
     M = k + net;
   }
+  return build_p9(c, M, k, true);
+}
+
+function build_p10(c, ea, eb, X, Y, legacy=false){
+  const net=ea*X-eb*Y; const litA=Math.pow(c,ea),litB=Math.pow(c,eb);
   const correct = powVal(c, net);
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\dfrac{${c}^{${M}}}{${denomLiteral}}`)}.`,
+  return n8Finish(10, [c, ea, eb, X, Y], {
+    prompt: `Найдите значение выражения ${tex(`\\dfrac{${litA}^{${X}}}{${litB}^{${Y}}}`)}.`,
     correctValue: correct,
-    explain: `${denomLiteral} = ${tex(`${c}^{${k}}`)}. ${tex(`\\dfrac{${c}^{${M}}}{${c}^{${k}}} = ${c}^{${net}}`)} = ${fmtNum(correct)}.`,
-    exps: [M, k, net],
-  };
+    explain: `${litA} = ${tex(`${c}^{${ea}}`)}, ${litB} = ${tex(`${c}^{${eb}}`)}. Выражение = ${tex(`\\dfrac{${c}^{${ea*X}}}{${c}^{${eb*Y}}} = ${c}^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [X, Y, ea, eb, net],
+  }, legacy);
+
 }
 
 function gen_p10_double_hidden(nat){
@@ -1052,13 +1177,27 @@ function gen_p10_double_hidden(nat){
     }
   } while (nat && net < 1);
   const litA = Math.pow(c, ea), litB = Math.pow(c, eb);
-  const correct = powVal(c, net);
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\dfrac{${litA}^{${X}}}{${litB}^{${Y}}}`)}.`,
+  return build_p10(c, ea, eb, X, Y, true);
+}
+
+function build_p11(c, m, n, single, legacy=false){
+  const net=single ? n-m : -m-n;
+  const correct=powVal(c,net);
+  if(single){
+    return n8Finish(11, [c, m, n, single], {
+      prompt: `Найдите значение выражения ${tex(`\\dfrac{1}{${baseTex(c)}^{${m}}} \\cdot ${baseTex(c)}^{${n}}`)}.`,
+      correctValue: correct,
+      explain: `${tex(`\\dfrac{1}{${baseTex(c)}^{${m}}} \\cdot ${baseTex(c)}^{${n}} = \\dfrac{${baseTex(c)}^{${n}}}{${baseTex(c)}^{${m}}} = ${baseTex(c)}^{${n}-${m}} = ${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`,
+      exps: [m, n, net],
+    }, legacy);
+  }
+  return n8Finish(11, [c, m, n, single], {
+    prompt: `Найдите значение выражения ${tex(`\\left(\\dfrac{1}{${baseTex(c)}^{${m}}}\\right) \\cdot \\left(\\dfrac{1}{${baseTex(c)}^{${n}}}\\right)`)}.`,
     correctValue: correct,
-    explain: `${litA} = ${tex(`${c}^{${ea}}`)}, ${litB} = ${tex(`${c}^{${eb}}`)}. Выражение = ${tex(`\\dfrac{${c}^{${ea*X}}}{${c}^{${eb*Y}}} = ${c}^{${net}}`)} = ${fmtNum(correct)}.`,
-    exps: [X, Y, ea, eb, net],
-  };
+    explain: `${tex(`\\dfrac{1}{${baseTex(c)}^{${m}}} = ${baseTex(c)}^{${-m}}`)}, ${tex(`\\dfrac{1}{${baseTex(c)}^{${n}}} = ${baseTex(c)}^{${-n}}`)}. Произведение = ${tex(`${baseTex(c)}^{${-m-n}} = ${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, -m, -n, net],
+  }, legacy);
+
 }
 
 function gen_p11_recip_product(nat){
@@ -1068,92 +1207,121 @@ function gen_p11_recip_product(nat){
     // 1/cᵐ · cⁿ = cⁿ⁻ᵐ, n > m — та же «обратная степень», но итог натуральный
     const {base:c, net} = pickBaseAndNet(false, 4, true);
     const m = ri(5,20), n = m + net;
-    const correct = powVal(c, net);
-    return {
-      prompt: `Найдите значение выражения ${tex(`\\dfrac{1}{${baseTex(c)}^{${m}}} \\cdot ${baseTex(c)}^{${n}}`)}.`,
-      correctValue: correct,
-      explain: `${tex(`\\dfrac{1}{${baseTex(c)}^{${m}}} \\cdot ${baseTex(c)}^{${n}} = \\dfrac{${baseTex(c)}^{${n}}}{${baseTex(c)}^{${m}}} = ${baseTex(c)}^{${n}-${m}} = ${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`,
-      exps: [m, n, net],
-    };
+    return build_p11(c,m,n,true, true);
   }
   const {base:c, net} = pickBaseAndNet(true);
   const m = pick([1,-1])*ri(5,20);
   const n = -net - m;
+  return build_p11(c,m,n,false, true);
+}
+
+function build_p12(c, m, n, p, legacy=false){
+  const net=m*n-p;
   const correct = powVal(c, net);
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\left(\\dfrac{1}{${baseTex(c)}^{${m}}}\\right) \\cdot \\left(\\dfrac{1}{${baseTex(c)}^{${n}}}\\right)`)}.`,
+  return n8Finish(12, [c, m, n, p], {
+    prompt: `Найдите значение выражения ${tex(`\\dfrac{(${baseTex(c)}^{${m}})^{${n}}}{${baseTex(c)}^{${p}}}`)}.`,
     correctValue: correct,
-    explain: `${tex(`\\dfrac{1}{${baseTex(c)}^{${m}}} = ${baseTex(c)}^{${-m}}`)}, ${tex(`\\dfrac{1}{${baseTex(c)}^{${n}}} = ${baseTex(c)}^{${-n}}`)}. Произведение = ${tex(`${baseTex(c)}^{${-m-n}} = ${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`,
-    exps: [m, n, -m, -n, net],
-  };
+    explain: `${tex(`(${baseTex(c)}^{${m}})^{${n}} = ${baseTex(c)}^{${m*n}}`)}. Показатель степени: ${m*n}−${sg(p)} = ${net}. Значение = ${tex(`${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, p, m*n, net],
+  }, legacy);
+
 }
 
 function gen_p12_numeric_powpow_frac(nat){
   const {base:c, net} = pickBaseAndNet(true, 4, nat);
   let m, n, p;
   do { m = ri(2,10); n = nat ? pick([2,3,4]) : pick([-4,-3,-2,2,3,4]); p = m*n - net; } while (nat && p < 1);
+  return build_p12(c, m, n, p, true);
+}
+
+function build_p13(c, m, n, p, legacy=false){
+  const net=m+n*p;
   const correct = powVal(c, net);
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\dfrac{(${baseTex(c)}^{${m}})^{${n}}}{${baseTex(c)}^{${p}}}`)}.`,
+  return n8Finish(13, [c, m, n, p], {
+    prompt: `Найдите значение выражения ${tex(`${m === 1 ? baseTex(c) : `${baseTex(c)}^{${m}}`} \\cdot (${baseTex(c)}^{${n}})^{${p}}`)}.`,
     correctValue: correct,
-    explain: `${tex(`(${baseTex(c)}^{${m}})^{${n}} = ${baseTex(c)}^{${m*n}}`)}. Показатель степени: ${m*n}−${sg(p)} = ${net}. Значение = ${tex(`${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`,
-    exps: [m, n, p, m*n, net],
-  };
+    explain: `${tex(`(${baseTex(c)}^{${n}})^{${p}} = ${baseTex(c)}^{${n*p}}`)}. Показатель степени: ${sg(m)}+${n*p} = ${net}. Значение = ${tex(`${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`,
+    exps: [m, n, p, net],
+  }, legacy);
+
 }
 
 function gen_p13_numeric_prod_powpow(nat){
   let c, net, m, n, p;
   if (nat) ({ base: c, m, n, p, net } = natProdPowPow());
   else { ({base:c, net} = pickBaseAndNet(true)); n = ri(2,5); p = ri(2,4); m = net - n*p; }
-  const correct = powVal(c, net);
-  return {
-    prompt: `Найдите значение выражения ${tex(`${m === 1 ? baseTex(c) : `${baseTex(c)}^{${m}}`} \\cdot (${baseTex(c)}^{${n}})^{${p}}`)}.`,
+  return build_p13(c, m, n, p, true);
+}
+
+function build_p14(c, d, n, k, legacy=false){
+
+  const correct = Math.pow(d, n-k);
+  return n8Finish(14, [c, d, n, k], {
+    prompt: `Найдите значение выражения ${tex(`\\dfrac{(${c}\\cdot ${d})^{${n}}}{${c}^{${n}}\\cdot ${d}^{${k}}}`)}.`,
     correctValue: correct,
-    explain: `${tex(`(${baseTex(c)}^{${n}})^{${p}} = ${baseTex(c)}^{${n*p}}`)}. Показатель степени: ${sg(m)}+${n*p} = ${net}. Значение = ${tex(`${baseTex(c)}^{${net}}`)} = ${fmtNum(correct)}.`,
-    exps: [m, n, p, net],
-  };
+    explain: `${tex(`(${c}\\cdot ${d})^{${n}} = ${c}^{${n}}\\cdot ${d}^{${n}}`)}. Выражение = ${tex(`\\dfrac{${c}^{${n}}\\cdot ${d}^{${n}}}{${c}^{${n}}\\cdot ${d}^{${k}}} = ${d}^{${n-k}}`)} = ${correct}.`,
+    exps: [n, k, n-k],
+  }, legacy);
+
 }
 
 function gen_p14_prod_pow_cancel_c(){
   const c = ri(2,9), d = ri(2,9);
   const n = ri(4,6);
   const k = ri(2, n-1);
+  return build_p14(c, d, n, k, true);
+}
+
+function build_p15(c, d, k, n, legacy=false){
+
   const correct = Math.pow(d, n-k);
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\dfrac{(${c}\\cdot ${d})^{${n}}}{${c}^{${n}}\\cdot ${d}^{${k}}}`)}.`,
+  return n8Finish(15, [c, d, k, n], {
+    prompt: `Найдите значение выражения ${tex(`\\dfrac{${c}^{${k}} \\cdot ${d}^{${n}}}{(${c}\\cdot ${d})^{${k}}}`)}.`,
     correctValue: correct,
-    explain: `${tex(`(${c}\\cdot ${d})^{${n}} = ${c}^{${n}}\\cdot ${d}^{${n}}`)}. Выражение = ${tex(`\\dfrac{${c}^{${n}}\\cdot ${d}^{${n}}}{${c}^{${n}}\\cdot ${d}^{${k}}} = ${d}^{${n-k}}`)} = ${correct}.`,
-    exps: [n, k, n-k],
-  };
+    explain: `${tex(`(${c}\\cdot ${d})^{${k}} = ${c}^{${k}}\\cdot ${d}^{${k}}`)}. Выражение = ${tex(`\\dfrac{${c}^{${k}}\\cdot ${d}^{${n}}}{${c}^{${k}}\\cdot ${d}^{${k}}} = ${d}^{${n-k}}`)} = ${correct}.`,
+    exps: [k, n, n-k],
+  }, legacy);
+
 }
 
 function gen_p15_prod_pow_cancel_denom(){
   const c = ri(2,9), d = ri(2,9);
   const k = ri(4,6);
   const n = ri(k+1, k+3);
-  const correct = Math.pow(d, n-k);
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\dfrac{${c}^{${k}} \\cdot ${d}^{${n}}}{(${c}\\cdot ${d})^{${k}}}`)}.`,
+  return build_p15(c, d, k, n, true);
+}
+
+function build_p16(c, d, n, mExp, kExp, legacy=false){
+
+  const correct = Math.pow(c, n-mExp) * Math.pow(d, n-kExp);
+  return n8Finish(16, [c, d, n, mExp, kExp], {
+    prompt: `Найдите значение выражения ${tex(`\\dfrac{(${c}\\cdot ${d})^{${n}}}{${c}^{${mExp}}\\cdot ${d}^{${kExp}}}`)}.`,
     correctValue: correct,
-    explain: `${tex(`(${c}\\cdot ${d})^{${k}} = ${c}^{${k}}\\cdot ${d}^{${k}}`)}. Выражение = ${tex(`\\dfrac{${c}^{${k}}\\cdot ${d}^{${n}}}{${c}^{${k}}\\cdot ${d}^{${k}}} = ${d}^{${n-k}}`)} = ${correct}.`,
-    exps: [k, n, n-k],
-  };
+    explain: `${tex(`(${c}\\cdot ${d})^{${n}} = ${c}^{${n}}\\cdot ${d}^{${n}}`)}. Выражение = ${tex(`\\dfrac{${c}^{${n}}\\cdot ${d}^{${n}}}{${c}^{${mExp}}\\cdot ${d}^{${kExp}}} = ${c}^{${n-mExp}}\\cdot ${d}^{${n-kExp}}`)} = ${correct}.`,
+    exps: [n, mExp, kExp, n-mExp, n-kExp],
+  }, legacy);
+
 }
 
 function gen_p16_composite_both_remain(){
   const c = ri(2,4), d = ri(2,4);
   const n = ri(3,4);
   const mExp = ri(1, n-1), kExp = ri(1, n-1);
-  const correct = Math.pow(c, n-mExp) * Math.pow(d, n-kExp);
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\dfrac{(${c}\\cdot ${d})^{${n}}}{${c}^{${mExp}}\\cdot ${d}^{${kExp}}}`)}.`,
-    correctValue: correct,
-    explain: `${tex(`(${c}\\cdot ${d})^{${n}} = ${c}^{${n}}\\cdot ${d}^{${n}}`)}. Выражение = ${tex(`\\dfrac{${c}^{${n}}\\cdot ${d}^{${n}}}{${c}^{${mExp}}\\cdot ${d}^{${kExp}}} = ${c}^{${n-mExp}}\\cdot ${d}^{${n-kExp}}`)} = ${correct}.`,
-    exps: [n, mExp, kExp, n-mExp, n-kExp],
-  };
+  return build_p16(c, d, n, mExp, kExp, true);
 }
 
 /* ───────── корни ───────── */
+
+function build_p17(k, n, m, legacy=false){
+  const num=k*k*n;
+  const correct = num / m;
+  return n8Finish(17, [k, n, m], {
+    prompt: `Найдите значение выражения ${tex(`\\dfrac{(${k}\\sqrt{${n}})^{2}}{${m}}`)}.`,
+    correctValue: correct,
+    explain: `${tex(`(${k}\\sqrt{${n}})^{2} = ${k}^{2}\\cdot ${n} = ${k*k}\\cdot ${n} = ${num}`)}. ${tex(`\\dfrac{${num}}{${m}} = ${correct}`)}.`
+  }, legacy);
+
+}
 
 function gen_p17_ksqrt_sq_over_m(){
   const k = ri(2,6), n = ri(2,20);
@@ -1161,12 +1329,17 @@ function gen_p17_ksqrt_sq_over_m(){
   const divisors = [];
   for (let d=2; d<num; d++) if (num % d === 0) divisors.push(d);
   const m = divisors.length ? pick(divisors) : 1;
-  const correct = num / m;
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\dfrac{(${k}\\sqrt{${n}})^{2}}{${m}}`)}.`,
-    correctValue: correct,
-    explain: `${tex(`(${k}\\sqrt{${n}})^{2} = ${k}^{2}\\cdot ${n} = ${k*k}\\cdot ${n} = ${num}`)}. ${tex(`\\dfrac{${num}}{${m}} = ${correct}`)}.`
-  };
+  return build_p17(k, n, m, true);
+}
+
+function build_p18(k, n, m, legacy=false){
+  const denom=k*k*n, q=m/denom;
+  return n8Finish(18, [k, n, m], {
+    prompt: `Найдите значение выражения ${tex(`\\dfrac{${m}}{(${k}\\sqrt{${n}})^{2}}`)}.`,
+    correctValue: q,
+    explain: `${tex(`(${k}\\sqrt{${n}})^{2} = ${k}^{2}\\cdot ${n} = ${denom}`)}. ${tex(`\\dfrac{${m}}{${denom}} = ${q}`)}.`
+  }, legacy);
+
 }
 
 function gen_p18_m_over_ksqrt_sq(){
@@ -1174,11 +1347,19 @@ function gen_p18_m_over_ksqrt_sq(){
   const denom = k*k*n;
   const q = ri(2,12);
   const m = denom*q;
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\dfrac{${m}}{(${k}\\sqrt{${n}})^{2}}`)}.`,
-    correctValue: q,
-    explain: `${tex(`(${k}\\sqrt{${n}})^{2} = ${k}^{2}\\cdot ${n} = ${denom}`)}. ${tex(`\\dfrac{${m}}{${denom}} = ${q}`)}.`
-  };
+  return build_p18(k, n, m, true);
+}
+
+function build_p19(n, k, decomposition, legacy=false){
+  const [c,b]=decomposition || [n,1];
+  const totalExp=b*k;
+  const correct = Math.pow(c, totalExp/2);
+  return n8Finish(19, [n, k], {
+    prompt: `Найдите значение выражения ${tex(`\\sqrt{${n}^{${k}}}`)}.`,
+    correctValue: correct,
+    explain: `${n} = ${tex(`${c}^{${b}}`)}, поэтому ${tex(`${n}^{${k}} = ${c}^{${totalExp}}`)}. ${tex(`\\sqrt{${c}^{${totalExp}}} = ${c}^{${totalExp/2}}`)} = ${correct}.`
+  }, legacy);
+
 }
 
 function gen_p19_sqrt_of_power(){
@@ -1188,12 +1369,18 @@ function gen_p19_sqrt_of_power(){
   if ((b*k) % 2 !== 0) k = 2;
   const n = Math.pow(c,b);
   const totalExp = b*k;
-  const correct = Math.pow(c, totalExp/2);
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\sqrt{${n}^{${k}}}`)}.`,
+  return build_p19(n, k, [c,b], true);
+}
+
+function build_p20(p, x, q, y, z, legacy=false){
+
+  const correct = p*q*Math.sqrt(x*y*z);
+  return n8Finish(20, [p, x, q, y, z], {
+    prompt: `Найдите значение выражения ${tex(`${p}\\sqrt{${x}} \\cdot ${q}\\sqrt{${y}} \\cdot \\sqrt{${z}}`)}.`,
     correctValue: correct,
-    explain: `${n} = ${tex(`${c}^{${b}}`)}, поэтому ${tex(`${n}^{${k}} = ${c}^{${totalExp}}`)}. ${tex(`\\sqrt{${c}^{${totalExp}}} = ${c}^{${totalExp/2}}`)} = ${correct}.`
-  };
+    explain: `${tex(`\\sqrt{${x}}\\cdot\\sqrt{${y}}\\cdot\\sqrt{${z}} = \\sqrt{${x}\\cdot ${y}\\cdot ${z}} = \\sqrt{${x*y*z}} = ${x*y}`)} (так как ${x}·${y}·${z} = (${x*y})²). Итог: ${p}·${q}·${x*y} = ${correct}.`
+  }, legacy);
+
 }
 
 function gen_p20_triple_sqrt_product(){
@@ -1202,83 +1389,113 @@ function gen_p20_triple_sqrt_product(){
   const y = pick(pool.filter(v=>v!==x));
   const z = x*y;
   const p = ri(2,4), q = ri(2,4);
-  const correct = p*q*x*y;
-  return {
-    prompt: `Найдите значение выражения ${tex(`${p}\\sqrt{${x}} \\cdot ${q}\\sqrt{${y}} \\cdot \\sqrt{${z}}`)}.`,
+  return build_p20(p, x, q, y, z, true);
+}
+
+function build_p21(a, b, c, legacy=false){
+  const m1=a,m2=b;
+  const correct = Math.sqrt(a*b*c);
+  return n8Finish(21, [a, b, c], {
+    prompt: `Найдите значение выражения ${tex(`\\sqrt{${a}\\cdot ${b}} \\cdot \\sqrt{${c}}`)}.`,
     correctValue: correct,
-    explain: `${tex(`\\sqrt{${x}}\\cdot\\sqrt{${y}}\\cdot\\sqrt{${z}} = \\sqrt{${x}\\cdot ${y}\\cdot ${z}} = \\sqrt{${x*y*z}} = ${x*y}`)} (так как ${x}·${y}·${z} = (${x*y})²). Итог: ${p}·${q}·${x*y} = ${correct}.`
-  };
+    explain: `${tex(`\\sqrt{${a}\\cdot ${b}}\\cdot\\sqrt{${c}} = \\sqrt{${a}\\cdot ${b}\\cdot ${c}} = \\sqrt{${a*b*c}} = ${correct}`)} (так как ${a}·${b}·${c} = ${correct}²).`
+  }, legacy);
+
 }
 
 function gen_p21_sqrt_ab_times_sqrt_c(){
   const m1 = ri(3,15), m2 = ri(3,15);
   const a = m1, b = m2, c = m1*m2;
-  const correct = m1*m2;
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\sqrt{${a}\\cdot ${b}} \\cdot \\sqrt{${c}}`)}.`,
-    correctValue: correct,
-    explain: `${tex(`\\sqrt{${a}\\cdot ${b}}\\cdot\\sqrt{${c}} = \\sqrt{${a}\\cdot ${b}\\cdot ${c}} = \\sqrt{${a*b*c}} = ${correct}`)} (так как ${a}·${b}·${c} = ${correct}²).`
-  };
+  return build_p21(a, b, c, true);
+}
+
+function build_p22(numA, numB, denom, legacy=false){
+  const r=Math.sqrt(numA*numB/denom);
+  return n8Finish(22, [numA, numB, denom], {
+    prompt: `Найдите значение выражения ${tex(`\\dfrac{\\sqrt{${numA}}\\cdot\\sqrt{${numB}}}{\\sqrt{${denom}}}`)}.`,
+    correctValue: r,
+    explain: `${tex(`\\dfrac{\\sqrt{${numA}}\\cdot\\sqrt{${numB}}}{\\sqrt{${denom}}} = \\sqrt{\\dfrac{${numA}\\cdot ${numB}}{${denom}}} = \\sqrt{${numA*numB/denom}} = ${r}`)}.`
+  }, legacy);
+
 }
 
 function gen_p22_sqrt_quotient(){
   const r = ri(4,20), f = ri(2,9);
   const numA = f*r, numB = r, denom = f;
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\dfrac{\\sqrt{${numA}}\\cdot\\sqrt{${numB}}}{\\sqrt{${denom}}}`)}.`,
-    correctValue: r,
-    explain: `${tex(`\\dfrac{\\sqrt{${numA}}\\cdot\\sqrt{${numB}}}{\\sqrt{${denom}}} = \\sqrt{\\dfrac{${numA}\\cdot ${numB}}{${denom}}} = \\sqrt{${numA*numB/denom}} = ${r}`)}.`
-  };
+  return build_p22(numA, numB, denom, true);
+}
+
+function build_p23(a, b, legacy=false){
+  const k=Math.sqrt(a/b);
+  const correct = b*k + b;
+  return n8Finish(23, [a, b], {
+    prompt: `Найдите значение выражения ${tex(`(\\sqrt{${a}} + \\sqrt{${b}}) \\cdot \\sqrt{${b}}`)}.`,
+    correctValue: correct,
+    explain: `${tex(`(\\sqrt{${a}}+\\sqrt{${b}})\\cdot\\sqrt{${b}} = \\sqrt{${a}\\cdot ${b}} + ${b} = \\sqrt{${a*b}} + ${b} = ${b*k} + ${b} = ${correct}`)}.`
+  }, legacy);
+
 }
 
 function gen_p23_distribute_sum(){
   const b = ri(2,10), k = ri(2,6);
   const a = b*k*k;
-  const correct = b*k + b;
-  return {
-    prompt: `Найдите значение выражения ${tex(`(\\sqrt{${a}} + \\sqrt{${b}}) \\cdot \\sqrt{${b}}`)}.`,
+  return build_p23(a, b, true);
+}
+
+function build_p24(a, b, legacy=false){
+  const k=Math.sqrt(a/b);
+  const correct = b*k - b;
+  return n8Finish(24, [a, b], {
+    prompt: `Найдите значение выражения ${tex(`(\\sqrt{${a}} - \\sqrt{${b}}) \\cdot \\sqrt{${b}}`)}.`,
     correctValue: correct,
-    explain: `${tex(`(\\sqrt{${a}}+\\sqrt{${b}})\\cdot\\sqrt{${b}} = \\sqrt{${a}\\cdot ${b}} + ${b} = \\sqrt{${a*b}} + ${b} = ${b*k} + ${b} = ${correct}`)}.`
-  };
+    explain: `${tex(`(\\sqrt{${a}}-\\sqrt{${b}})\\cdot\\sqrt{${b}} = \\sqrt{${a}\\cdot ${b}} - ${b} = \\sqrt{${a*b}} - ${b} = ${b*k} - ${b} = ${correct}`)}.`
+  }, legacy);
+
 }
 
 function gen_p24_distribute_diff(){
   const b = ri(2,10), k = ri(2,6);
   const a = b*k*k;
-  const correct = b*k - b;
-  return {
-    prompt: `Найдите значение выражения ${tex(`(\\sqrt{${a}} - \\sqrt{${b}}) \\cdot \\sqrt{${b}}`)}.`,
+  return build_p24(a, b, true);
+}
+
+function build_p25(a, b, legacy=false){
+
+  const correct = a-b;
+  return n8Finish(25, [a, b], {
+    prompt: `Найдите значение выражения ${tex(`(\\sqrt{${a}} - \\sqrt{${b}}) (\\sqrt{${a}} + \\sqrt{${b}})`)}.`,
     correctValue: correct,
-    explain: `${tex(`(\\sqrt{${a}}-\\sqrt{${b}})\\cdot\\sqrt{${b}} = \\sqrt{${a}\\cdot ${b}} - ${b} = \\sqrt{${a*b}} - ${b} = ${b*k} - ${b} = ${correct}`)}.`
-  };
+    explain: `${tex(`(\\sqrt{${a}}-\\sqrt{${b}})(\\sqrt{${a}}+\\sqrt{${b}}) = ${a} - ${b} = ${correct}`)}.`
+  }, legacy);
+
 }
 
 function gen_p25_diff_of_squares_both_roots(){
   const a = ri(10,40), bOff = ri(2,15);
   const b = Math.max(2, a-bOff);
-  const correct = a-b;
-  return {
-    prompt: `Найдите значение выражения ${tex(`(\\sqrt{${a}} - \\sqrt{${b}}) (\\sqrt{${a}} + \\sqrt{${b}})`)}.`,
+  return build_p25(a, b, true);
+}
+
+function build_p26(a, b, legacy=false){
+
+  const correct = a - b*b;
+  return n8Finish(26, [a, b], {
+    prompt: `Найдите значение выражения ${tex(`(\\sqrt{${a}} - ${b}) (\\sqrt{${a}} + ${b})`)}.`,
     correctValue: correct,
-    explain: `${tex(`(\\sqrt{${a}}-\\sqrt{${b}})(\\sqrt{${a}}+\\sqrt{${b}}) = ${a} - ${b} = ${correct}`)}.`
-  };
+    explain: `${tex(`(\\sqrt{${a}}-${b})(\\sqrt{${a}}+${b}) = ${a} - ${b}^{2} = ${a} - ${b*b} = ${correct}`)}.`
+  }, legacy);
+
 }
 
 function gen_p26_diff_of_squares_mixed(){
   const b = ri(2,6);
   const extra = ri(1,15);
   const a = b*b + extra;
-  const correct = a - b*b;
-  return {
-    prompt: `Найдите значение выражения ${tex(`(\\sqrt{${a}} - ${b}) (\\sqrt{${a}} + ${b})`)}.`,
-    correctValue: correct,
-    explain: `${tex(`(\\sqrt{${a}}-${b})(\\sqrt{${a}}+${b}) = ${a} - ${b}^{2} = ${a} - ${b*b} = ${correct}`)}.`
-  };
+  return build_p26(a, b, true);
 }
 
-function gen_p27_square_expand(){
-  const a = ri(5,50), b = ri(2,10);
-  const sign = pick(['+','-']);
+function build_p27(a, b, sign, legacy=false){
+
   const correct = a + b*b;
   const twoB = 2*b;
   const prompt = sign==='+'
@@ -1287,24 +1504,57 @@ function gen_p27_square_expand(){
   const explain = sign==='+'
     ? `${tex(`(\\sqrt{${a}}+${b})^{2} = ${a} + ${twoB}\\sqrt{${a}} + ${b*b}`)}. Минус ${twoB}√${a}: остаётся ${a} + ${b*b} = ${correct}.`
     : `${tex(`(\\sqrt{${a}}-${b})^{2} = ${a} - ${twoB}\\sqrt{${a}} + ${b*b}`)}. Плюс ${twoB}√${a}: остаётся ${a} + ${b*b} = ${correct}.`;
-  return { prompt, correctValue: correct, explain };
+  return n8Finish(27, [a, b, sign], { prompt, correctValue: correct, explain }, legacy);
+
+}
+
+function gen_p27_square_expand(){
+  const a = ri(5,50), b = ri(2,10);
+  const sign = pick(['+','-']);
+  return build_p27(a, b, sign, true);
+}
+
+function build_p28(a, m, n, firstIsNeg, legacy=false){
+
+  const total = m+n;
+  const correct = Math.pow(a, total/2);
+  const leftTerm = firstIsNeg ? `(-a)^{${m}}` : `a^{${m}}`;
+  const rightTerm = firstIsNeg ? `a^{${n}}` : `(-a)^{${n}}`;
+  const negExp = firstIsNeg ? m : n;
+  return n8Finish(28, [a, m, n, firstIsNeg], {
+    prompt: `Найдите значение выражения ${tex(`\\sqrt{${leftTerm} \\cdot ${rightTerm}}`)} при a = ${a}.`,
+    correctValue: correct,
+    explain: `Чётная степень «убирает» минус: ${tex(`(-a)^{${negExp}} = a^{${negExp}}`)}. Под корнем получаем ${tex(`a^{${total}}`)}. ${tex(`\\sqrt{a^{${total}}} = a^{${total/2}} = (${a})^{${total/2}}`)} = ${correct}.`
+  }, legacy);
+
 }
 
 function gen_p28_sqrt_neg_base(){
   const a = ri(2,6);
   const m = ri(1,2)*2;
   const n = ri(1,2)*2;
-  const total = m+n;
-  const correct = Math.pow(a, total/2);
   const firstIsNeg = Math.random()<0.5;
-  const leftTerm = firstIsNeg ? `(-a)^{${m}}` : `a^{${m}}`;
-  const rightTerm = firstIsNeg ? `a^{${n}}` : `(-a)^{${n}}`;
-  const negExp = firstIsNeg ? m : n;
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\sqrt{${leftTerm} \\cdot ${rightTerm}}`)} при a = ${a}.`,
-    correctValue: correct,
-    explain: `Чётная степень «убирает» минус: ${tex(`(-a)^{${negExp}} = a^{${negExp}}`)}. Под корнем получаем ${tex(`a^{${total}}`)}. ${tex(`\\sqrt{a^{${total}}} = a^{${total/2}} = (${a})^{${total/2}}`)} = ${correct}.`
-  };
+  return build_p28(a, m, n, firstIsNeg, true);
+}
+
+function build_p29(K, M, N, aVal, numeratorCoeffVariant, legacy=false){
+  const sqrtK=Math.sqrt(K),diff=M-N,half=diff/2;
+  if(numeratorCoeffVariant){
+    const correct=sqrtK*Math.pow(aVal,half);
+    return n8Finish(29, [K, M, N, aVal, numeratorCoeffVariant], {
+      prompt: `Найдите значение выражения ${tex(`\\sqrt{\\dfrac{${K}a^{${M}}}{a^{${N}}}}`)} при a = ${aVal}.`,
+      correctValue: correct,
+      explain: `${tex(`\\dfrac{${K}a^{${M}}}{a^{${N}}} = ${K}a^{${diff}}`)}. ${tex(`\\sqrt{${K}a^{${diff}}} = \\sqrt{${K}}\\cdot a^{${half}} = ${sqrtK}\\cdot a^{${half}}`)}. При a=${aVal}: ${sqrtK}·${Math.pow(aVal,half)} = ${correct}.`
+    }, legacy);
+  } else {
+    const correct=Math.pow(aVal,half)/sqrtK;
+    return n8Finish(29, [K, M, N, aVal, numeratorCoeffVariant], {
+      prompt: `Найдите значение выражения ${tex(`\\sqrt{\\dfrac{a^{${M}}}{${K}a^{${N}}}}`)} при a = ${aVal}.`,
+      correctValue: correct,
+      explain: `${tex(`\\dfrac{a^{${M}}}{${K}a^{${N}}} = \\dfrac{a^{${diff}}}{${K}}`)}. ${tex(`\\sqrt{\\dfrac{a^{${diff}}}{${K}}} = \\dfrac{a^{${half}}}{${sqrtK}}`)}. При a=${aVal}: ${tex(`\\dfrac{${Math.pow(aVal,half)}}{${sqrtK}}`)} = ${fmtNum(correct)}.`
+    }, legacy);
+  }
+
 }
 
 function gen_p29_sqrt_single_var_frac(){
@@ -1318,11 +1568,7 @@ function gen_p29_sqrt_single_var_frac(){
     const aVal = ri(2,5);
     const half = diff/2;
     const correct = sqrtK * Math.pow(aVal, half);
-    return {
-      prompt: `Найдите значение выражения ${tex(`\\sqrt{\\dfrac{${K}a^{${M}}}{a^{${N}}}}`)} при a = ${aVal}.`,
-      correctValue: correct,
-      explain: `${tex(`\\dfrac{${K}a^{${M}}}{a^{${N}}} = ${K}a^{${diff}}`)}. ${tex(`\\sqrt{${K}a^{${diff}}} = \\sqrt{${K}}\\cdot a^{${half}} = ${sqrtK}\\cdot a^{${half}}`)}. При a=${aVal}: ${sqrtK}·${Math.pow(aVal,half)} = ${correct}.`
-    };
+    return build_p29(K,M,N,aVal,true, true);
   } else {
     const sqrtK = pick([2,3,4,5]);
     const K = sqrtK*sqrtK;
@@ -1332,12 +1578,19 @@ function gen_p29_sqrt_single_var_frac(){
     const half = diff/2;
     const aVal = sqrtK * ri(1,3);
     const correct = Math.pow(aVal, half) / sqrtK;
-    return {
-      prompt: `Найдите значение выражения ${tex(`\\sqrt{\\dfrac{a^{${M}}}{${K}a^{${N}}}}`)} при a = ${aVal}.`,
-      correctValue: correct,
-      explain: `${tex(`\\dfrac{a^{${M}}}{${K}a^{${N}}} = \\dfrac{a^{${diff}}}{${K}}`)}. ${tex(`\\sqrt{\\dfrac{a^{${diff}}}{${K}}} = \\dfrac{a^{${half}}}{${sqrtK}}`)}. При a=${aVal}: ${tex(`\\dfrac{${Math.pow(aVal,half)}}{${sqrtK}}`)} = ${fmtNum(correct)}.`
-    };
+    return build_p29(K,M,N,aVal,false, true);
   }
+}
+
+function build_p30(D, px, py, x, y, legacy=false){
+  const k=Math.sqrt(D);
+  const correct = Math.pow(x, px/2) * Math.pow(y, py/2) / k;
+  return n8Finish(30, [D, px, py, x, y], {
+    prompt: `Найдите значение выражения ${tex(`\\sqrt{\\dfrac{1}{${D}}\\cdot x^{${px}}y^{${py}}}`)} при x = ${x} и y = ${y}.`,
+    correctValue: correct,
+    explain: `${tex(`\\sqrt{\\dfrac{1}{${D}}\\cdot x^{${px}}y^{${py}}} = \\dfrac{x^{${px/2}}y^{${py/2}}}{${k}}`)}. При x=${x}, y=${y}: ${tex(`\\dfrac{${Math.pow(x,px/2)}\\cdot ${Math.pow(y,py/2)}}{${k}}`)} = ${fmtNum(correct)}.`
+  }, legacy);
+
 }
 
 function gen_p30_sqrt_two_var_coeff(){
@@ -1346,12 +1599,18 @@ function gen_p30_sqrt_two_var_coeff(){
   const px = ri(1,2)*2, py = ri(1,2)*2;
   const x = k*ri(1,2);
   const y = ri(2,5);
-  const correct = Math.pow(x, px/2) * Math.pow(y, py/2) / k;
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\sqrt{\\dfrac{1}{${D}}\\cdot x^{${px}}y^{${py}}}`)} при x = ${x} и y = ${y}.`,
+  return build_p30(D, px, py, x, y, true);
+}
+
+function build_p31(coeff, px, x, y, legacy=false){
+  const sqrtCoeff=Math.sqrt(coeff),pxHalf=px/2,py=2;
+  const correct = sqrtCoeff * Math.pow(x,pxHalf) / y;
+  return n8Finish(31, [coeff, px, x, y], {
+    prompt: `Найдите значение выражения ${tex(`\\sqrt{\\dfrac{${coeff}x^{${px}}}{y^{${py}}}}`)} при x = ${x} и y = ${y}.`,
     correctValue: correct,
-    explain: `${tex(`\\sqrt{\\dfrac{1}{${D}}\\cdot x^{${px}}y^{${py}}} = \\dfrac{x^{${px/2}}y^{${py/2}}}{${k}}`)}. При x=${x}, y=${y}: ${tex(`\\dfrac{${Math.pow(x,px/2)}\\cdot ${Math.pow(y,py/2)}}{${k}}`)} = ${fmtNum(correct)}.`
-  };
+    explain: `${tex(`\\sqrt{\\dfrac{${coeff}x^{${px}}}{y^{${py}}}} = \\dfrac{${sqrtCoeff}x^{${pxHalf}}}{y}`)}. При x=${x}, y=${y}: ${tex(`\\dfrac{${sqrtCoeff}\\cdot ${Math.pow(x,pxHalf)}}{${y}}`)} = ${correct}.`
+  }, legacy);
+
 }
 
 function gen_p31_sqrt_two_var_num_denom(){
@@ -1361,12 +1620,21 @@ function gen_p31_sqrt_two_var_num_denom(){
   const px = pxHalf*2, py = 2;
   const y = ri(2,5), k = ri(1,3);
   const x = y*k;
-  const correct = sqrtCoeff * Math.pow(y, pxHalf-1) * Math.pow(k, pxHalf);
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\sqrt{\\dfrac{${coeff}x^{${px}}}{y^{${py}}}}`)} при x = ${x} и y = ${y}.`,
+  return build_p31(coeff, px, x, y, true);
+}
+
+function build_p32(p, q, aVal, bVal, legacy=false){
+
+  aVal=n8Number(aVal); bVal=n8Number(bVal);
+  const aCoeffSq = p*p, bCoeffSq = q*q, midCoeff = 2*p*q;
+  const correct = Math.round(Math.abs(p*aVal+q*bVal)*100)/100;
+  const aTerm = p>1 ? `${p}a` : 'a';
+  return n8Finish(32, [p, q, aVal, bVal], {
+    prompt: `Найдите значение выражения ${tex(`\\sqrt{${aCoeffSq>1?aCoeffSq:''}a^{2} + ${midCoeff}ab + ${bCoeffSq}b^{2}}`)} при a = ${fmtNum(aVal)} и b = ${fmtNum(bVal)}.`,
     correctValue: correct,
-    explain: `${tex(`\\sqrt{\\dfrac{${coeff}x^{${px}}}{y^{${py}}}} = \\dfrac{${sqrtCoeff}x^{${pxHalf}}}{y}`)}. При x=${x}, y=${y}: ${tex(`\\dfrac{${sqrtCoeff}\\cdot ${Math.pow(x,pxHalf)}}{${y}}`)} = ${correct}.`
-  };
+    explain: `${tex(`${aCoeffSq>1?aCoeffSq:''}a^{2}+${midCoeff}ab+${bCoeffSq}b^{2} = (${aTerm} + ${q}b)^{2}`)}. ${tex(`\\sqrt{(${aTerm} + ${q}b)^{2}} = |${aTerm} + ${q}b|`)}. При a=${fmtNum(aVal)}, b=${fmtNum(bVal)}: |${fmtNum(p*aVal)} + ${fmtNum(q*bVal)}| = ${correct}.`
+  }, legacy);
+
 }
 
 function gen_p32_perfect_square_plus(){
@@ -1387,14 +1655,21 @@ function gen_p32_perfect_square_plus(){
     aVal = ri(2,9);
     bVal = useNegB ? -ri(1,6) : ri(1,6);
   }
+  return build_p32(p, q, aVal, bVal, true);
+}
+
+function build_p33(p, q, aVal, bVal, legacy=false){
+
+  aVal=n8Number(aVal); bVal=n8Number(bVal);
   const aCoeffSq = p*p, bCoeffSq = q*q, midCoeff = 2*p*q;
-  const correct = Math.round(Math.abs(p*aVal+q*bVal)*100)/100;
+  const correct = Math.abs(p*aVal - q*bVal);
   const aTerm = p>1 ? `${p}a` : 'a';
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\sqrt{${aCoeffSq>1?aCoeffSq:''}a^{2} + ${midCoeff}ab + ${bCoeffSq}b^{2}}`)} при a = ${fmtNum(aVal)} и b = ${fmtNum(bVal)}.`,
+  return n8Finish(33, [p, q, aVal, bVal], {
+    prompt: `Найдите значение выражения ${tex(`\\sqrt{${aCoeffSq>1?aCoeffSq:''}a^{2} - ${midCoeff}ab + ${bCoeffSq}b^{2}}`)} при a = ${aVal} и b = ${bVal}.`,
     correctValue: correct,
-    explain: `${tex(`${aCoeffSq>1?aCoeffSq:''}a^{2}+${midCoeff}ab+${bCoeffSq}b^{2} = (${aTerm} + ${q}b)^{2}`)}. ${tex(`\\sqrt{(${aTerm} + ${q}b)^{2}} = |${aTerm} + ${q}b|`)}. При a=${fmtNum(aVal)}, b=${fmtNum(bVal)}: |${fmtNum(p*aVal)} + ${fmtNum(q*bVal)}| = ${correct}.`
-  };
+    explain: `${tex(`${aCoeffSq>1?aCoeffSq:''}a^{2}-${midCoeff}ab+${bCoeffSq}b^{2} = (${aTerm} - ${q}b)^{2}`)}. ${tex(`\\sqrt{(${aTerm} - ${q}b)^{2}} = |${aTerm} - ${q}b|`)}. При a=${aVal}, b=${bVal}: |${p*aVal} − ${q*bVal}| = ${correct}.`
+  }, legacy);
+
 }
 
 function gen_p33_perfect_square_minus(){
@@ -1402,25 +1677,24 @@ function gen_p33_perfect_square_minus(){
   const q = ri(2,6);
   const aVal = ri(3,12);
   const bVal = ri(1,6);
-  const aCoeffSq = p*p, bCoeffSq = q*q, midCoeff = 2*p*q;
-  const correct = Math.abs(p*aVal - q*bVal);
-  const aTerm = p>1 ? `${p}a` : 'a';
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\sqrt{${aCoeffSq>1?aCoeffSq:''}a^{2} - ${midCoeff}ab + ${bCoeffSq}b^{2}}`)} при a = ${aVal} и b = ${bVal}.`,
+  return build_p33(p, q, aVal, bVal, true);
+}
+
+function build_p34(c1, c2, a, b, legacy=false){
+
+  const correct = c1*c2;
+  return n8Finish(34, [c1, c2, a, b], {
+    prompt: `Найдите значение выражения ${tex(`\\dfrac{${c1}\\sqrt{a} \\cdot ${c2}\\sqrt{b}}{\\sqrt{ab}}`)} при a = ${a} и b = ${b}.`,
     correctValue: correct,
-    explain: `${tex(`${aCoeffSq>1?aCoeffSq:''}a^{2}-${midCoeff}ab+${bCoeffSq}b^{2} = (${aTerm} - ${q}b)^{2}`)}. ${tex(`\\sqrt{(${aTerm} - ${q}b)^{2}} = |${aTerm} - ${q}b|`)}. При a=${aVal}, b=${bVal}: |${p*aVal} − ${q*bVal}| = ${correct}.`
-  };
+    explain: `${tex(`${c1}\\sqrt{a}\\cdot ${c2}\\sqrt{b} = ${c1*c2}\\sqrt{ab}`)}. Разделив на √(ab), получаем ${c1*c2} — значение не зависит от a и b (при a,b>0). Ответ: ${correct}.`
+  }, legacy);
+
 }
 
 function gen_p34_sqrt_coeff_cancel(){
   const c1 = ri(2,20), c2 = ri(2,20);
   const a = ri(2,12), b = ri(2,12);
-  const correct = c1*c2;
-  return {
-    prompt: `Найдите значение выражения ${tex(`\\dfrac{${c1}\\sqrt{a} \\cdot ${c2}\\sqrt{b}}{\\sqrt{ab}}`)} при a = ${a} и b = ${b}.`,
-    correctValue: correct,
-    explain: `${tex(`${c1}\\sqrt{a}\\cdot ${c2}\\sqrt{b} = ${c1*c2}\\sqrt{ab}`)}. Разделив на √(ab), получаем ${c1*c2} — значение не зависит от a и b (при a,b>0). Ответ: ${correct}.`
-  };
+  return build_p34(c1, c2, a, b, true);
 }
 
 /* ═══════════════ демоверсия ОГЭ-2027 ═══════════════
@@ -1481,6 +1755,26 @@ const GROUPS = [
     { id: 'p34', title: '№34. Сокращение коэффициентов под корнем', gen: gen_p34_sqrt_coeff_cancel },
   ]},
 ];
+const FIPI_PAGE='oge8', FIPI_BANK=window.OGE8_FIPI || null;
+const FIPI_ALL=new URLSearchParams(location.search).get('all')==='1';
+const FIPI_BUILD={p1:build_p1,p2:build_p2,p3:build_p3,p4:build_p4,p5:build_p5,p6:build_p6,p7:build_p7,p8:build_p8,p9:build_p9,p10:build_p10,p11:build_p11,p12:build_p12,p13:build_p13,p14:build_p14,p15:build_p15,p16:build_p16,p17:build_p17,p18:build_p18,p19:build_p19,p20:build_p20,p21:build_p21,p22:build_p22,p23:build_p23,p24:build_p24,p25:build_p25,p26:build_p26,p27:build_p27,p28:build_p28,p29:build_p29,p30:build_p30,p31:build_p31,p32:build_p32,p33:build_p33,p34:build_p34};
+function fipiHtml(s){return s.replace(/\$([^$]+)\$/g,(_,formula)=>tex(formula));}
+function fipiTask(t){
+  const x=FIPI_BUILD[t.g] ? FIPI_BUILD[t.g](...t.args) : {prompt:fipiHtml(t.prompt),correctValue:t.ans,explain:'<div class="sol">'+t.sol.map(s=>'<div class="sol-line">'+fipiHtml(s)+'</div>').join('')+'</div>'};
+  return Object.assign(x,t.checked?{}:{unchecked:true});
+}
+if(FIPI_BANK && window.FipiMix){
+  const titles={new_composite_numerator:'Составное основание в числителе',new_composite_denominator:'Составное основание в знаменателе',new_root_var_ratio:'Корень из дроби с двумя степенями',new_perfect_square_fraction:'Полный квадрат с дробными подстановками',new_conjugate_reciprocals:'Сумма обратных сопряжённых выражений'};
+  GROUPS.push({title:'Другие виды ФИПИ',modes:Object.entries(titles).filter(([g])=>FIPI_BANK.tasks.some(t=>t.g===g && (t.checked||FIPI_ALL))).map(([id,title])=>({id,title,fipiOnly:true}))});
+  GROUPS.forEach(group=>group.modes.forEach(m=>{
+    const list=FIPI_BANK.tasks.filter(t=>t.g===m.id && (t.checked||FIPI_ALL));
+    if(!list.length)return;
+    m.fipiList=list.map(t=>({fipi:t.fipi,make:()=>fipiTask(t)}));
+    const own=m.gen;
+    m.gen=(hard)=>FipiMix.next(FIPI_PAGE,m.id,m.fipiList,own ? ()=>own(hard) : null);
+  }));
+}
+
 const ALL_MODES = GROUPS.flatMap(g => g.modes);
 
 /* ═══ Промпт №18 нового списка: галочка «Нулевые и отрицательные степени» ═══
@@ -1535,7 +1829,9 @@ function nrKeys(t){
 function genUnique(m){
   const hard = wantHard(m);
   const avoid = [curTask].concat(addedTasks.map(bt => bt && bt.task));
-  return NoRepeat.pick('oge8:' + curMode, () => m.gen(hard), { keys: nrKeys, avoid });
+  const t=NoRepeat.pick('oge8:' + curMode, () => m.gen(hard), { keys: nrKeys, avoid });
+  if(m.fipiList)FipiMix.commit(FIPI_PAGE,m.id,t,m.fipiList);
+  return t;
 }
 // «Случайно» берёт только генераторы: нулевой тип из демоверсии — всегда одно
 // и то же задание, в случайной подборке оно выпадало бы снова и снова
@@ -1591,7 +1887,7 @@ const els = {
    поэтому переход между типами не теряет ни текущий пример, ни счётчик медалей —
    и всё это переживает перезагрузку страницы. */
 const PROGRESS_NS = 'ogeProg:oge8:';
-const TASK_RENDER_VERSION = 3; // 2 — переход на KaTeX; 3 — промпт №18 нового списка: сохранённое раньше задание могло быть
+const TASK_RENDER_VERSION = 4; // 2 — переход на KaTeX; 3 — промпт №18 нового списка: сохранённое раньше задание могло быть
                                // с отрицательной степенью, а без галочки их теперь нет — пусть придумается заново
 // память в оперативной памяти страницы — работает ВСЕГДА, независимо от того,
 // насколько надёжно localStorage ведёт себя в конкретном браузере (бывает
@@ -1723,6 +2019,8 @@ function playMedalAnimation(tier) {
 }
 
 function recordSolveFor(task, hadWrongPick) {
+  if(task && task.fipi){const m=ALL_MODES.find(m=>m.fipiList && m.fipiList.some(t=>t.fipi===task.fipi));if(m)FipiMix.markDone(FIPI_PAGE,m.id,task);}
+
   // ввод текстом всегда завершается показом верного значения (даже после ошибок) —
   // "верно"/"неверно" тут не различаем, только было ли по пути 🟡-исправление (hadError).
   // Вынесено из recordSolve(), чтобы тем же механизмом истории/медалей мог пользоваться
@@ -1787,11 +2085,13 @@ function renderPicker() {
   els.modesGrid.innerHTML = GROUPS.map(g => `
     <div class="group-title">${g.title}</div>
     <div class="modes">
-      ${g.modes.map(m => {
+      ${g.modes.filter(m=>!m.fipiOnly || !window.FipiMix || FipiMix.filter().fipi).map(m => {
         const p = loadProg(m.id);
+        const fl=m.fipiList ? FipiMix.countLabel(FIPI_PAGE,m.id,m.fipiList,!m.fipiOnly) : '';
+        const label=m.fipiOnly ? fl.replace('+','')+' · только задания ФИПИ' : fl;
         const meds = p && p.medals;
         const badges = meds ? ['gold', 'silver', 'bronze'].filter(t => meds[t]).map(t => `${MEDAL_EMOJI[t]}${meds[t]}`).join(' ') : '';
-        return `<div class="mode-card${m.demo ? ' demo' : ''}" data-id="${m.id}"><div class="mtitle">${m.title}</div>${badges ? `<div class="mode-medals">${badges}</div>` : ''}</div>`;
+        return `<div class="mode-card${m.demo ? ' demo' : ''}" data-id="${m.id}"><div class="mtitle">${m.title}</div>${label ? `<div class="fipi-count">${label}</div>` : ''}${badges ? `<div class="mode-medals">${badges}</div>` : ''}</div>`;
       }).join('')}
     </div>
   `).join('');
@@ -1846,12 +2146,13 @@ els.backBtn.onclick = guardStudentAction('switchTask', () => {
   if (window.TrainerSession) window.TrainerSession.push();
 });
 function navigateType(delta){
-  const idx = ALL_MODES.findIndex(x=>x.id===curMode);
+  const visibleModes=ALL_MODES.filter(m=>!m.fipiOnly || !window.FipiMix || FipiMix.filter().fipi);
+  const idx = visibleModes.findIndex(x=>x.id===curMode);
   if(idx===-1) return; // в «случайно» стрелки скрыты
   snapshotAndClear('whole', els.tasksColumnsWrap);
-  const newIdx = (idx + delta + ALL_MODES.length) % ALL_MODES.length;
-  curMode = ALL_MODES[newIdx].id;
-  els.taskTitle.textContent = ALL_MODES[newIdx].title;
+  const newIdx = (idx + delta + visibleModes.length) % visibleModes.length;
+  curMode = visibleModes[newIdx].id;
+  els.taskTitle.textContent = visibleModes[newIdx].title;
   syncHardToggle();
   curProg = loadProgOrFresh(curMode);
   renderMedalBadges();
@@ -1908,6 +2209,11 @@ function renderCurrentTask() {
   window.scrollTo(0, 0);
   els.questionPanel.style.display = 'block';
   els.questionPromptText.innerHTML = curTask.prompt;
+  const src=window.FipiMix ? FipiMix.sourceText(curTask) : '';
+  document.getElementById('sourceNote').textContent=src;
+  document.getElementById('sourceNote').style.display=src?'block':'none';
+  document.getElementById('fipiNotice').textContent=curTask.fipiNotice||'';
+  document.getElementById('fipiNotice').style.display=curTask.fipiNotice?'block':'none';
 
   els.answerInput.value = '';
   els.answerInput.classList.remove('good', 'bad', 'shake');
@@ -1929,7 +2235,7 @@ function newTask(opts) {
   // первом входе в тип, nextBatchAll после своего собственного снимка всей
   // страницы), чтобы не задваивать снимок/очистку одного и того же задания
   if (!opts.skipSnapshot) snapshotAndClear('single', document.getElementById('card1Wrapper'));
-  const m = curMode === 'random' ? pick(RANDOM_MODES) : ALL_MODES.find(x => x.id === curMode);
+  const m = curMode === 'random' ? pick(RANDOM_MODES.filter(m=>!m.fipiOnly || !window.FipiMix || FipiMix.filter().fipi)) : ALL_MODES.find(x => x.id === curMode);
   curTask = genUnique(m);
   taskAnswered = false;
   hadWrongPick = false;
@@ -2116,7 +2422,7 @@ function syncAddedSolutionUI(){
 let addRailOpen = false; // Промпт №32: развёрнута ли боковая колонка добавления
 
 function genAddedTask(){
-  const m = curMode === 'random' ? pick(RANDOM_MODES) : ALL_MODES.find(x => x.id === curMode);
+  const m = curMode === 'random' ? pick(RANDOM_MODES.filter(m=>!m.fipiOnly || !window.FipiMix || FipiMix.filter().fipi)) : ALL_MODES.find(x => x.id === curMode);
   return { task: genUnique(m), answered: false, hadWrongPick: false, solutionRevealed: false };
 }
 // «В подборку» работает на трёх уровнях: личная кнопка у КАЖДОЙ карточки (включая первую) —
@@ -2183,6 +2489,7 @@ function addedCardInnerHTML(bt){
   return `
     <div class="added-card-question">
       <div class="prompt">${t.prompt}</div>
+      <div class="source-note">${window.FipiMix ? FipiMix.sourceText(t) : ''}</div>
       <div class="input-answer-row">
         <input type="text" inputmode="decimal" class="answer-input added-answer-input ${stateCls}" placeholder="?" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" value="${val}" ${disabled}>
         <button class="check-btn added-check-btn" ${disabled}>Проверить</button>
@@ -2539,6 +2846,7 @@ function syncKeypadVisibility(){
 }
 setupFloatingKeypad();
 
+if(window.FipiMix && FIPI_BANK)FipiMix.mountFilter(document.getElementById('fipiFilter'),renderPicker);
 renderPicker();
 syncVideoBtns();
 
