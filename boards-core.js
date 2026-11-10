@@ -6355,6 +6355,7 @@ canvas.addEventListener('pointerdown', (e) => {
       if (hitTestObject(obj, pt, 8/cam.zoom)){
         if (obj.type === 'image' && obj.locked){
           armedHandId = obj.id; selectedId = obj.id;
+          raiseTaskCard(obj.id);   // задание внахлёст — наверх
           scheduleRedraw();
           return;
         }
@@ -8430,8 +8431,18 @@ function wirePlaceGhost(g){
   // точка указателя в единицах доски (холст начинается правее панели)
   const worldAt = (e) => { const r = canvas.getBoundingClientRect(); return screenToWorld(e.clientX - r.left, e.clientY - r.top); };
   let drag = null;
+  // правая кнопка не открывает меню браузера на призраке
+  el.addEventListener('contextmenu', (e) => e.preventDefault());
   el.addEventListener('pointerdown', (e) => {
     e.preventDefault(); e.stopPropagation();
+    // Призрак двигает и растягивает только левая кнопка. Колесо и правая —
+    // всегда панорама доски, как на холсте: отдаём нажатие холсту, он сам
+    // захватит указатель и поведёт доску (призрак при этом стоит на месте
+    // относительно листа и едет вместе с доской через syncPlaceGhost)
+    if (e.button !== 0){
+      canvas.dispatchEvent(new PointerEvent('pointerdown', e));
+      return;
+    }
     if (g.reflowing) return;   // пока перестраивается — не трогаем
     const h = e.target.closest('.bd-ghost-h');
     const sd = e.target.closest('.bd-ghost-s');
@@ -8771,6 +8782,12 @@ function taskLayer(){
   taskLayerEl = document.createElement('div');
   taskLayerEl.id = 'bdTaskLayer';
   canvas.insertAdjacentElement('afterend', taskLayerEl);
+  // клик по полю или кнопке карточки поднимает её целиком (capture — до
+  // обработчиков самих полей, фокус и ввод это не ломает)
+  taskLayerEl.addEventListener('pointerdown', (e) => {
+    const r = e.target.closest && e.target.closest('.bd-task');
+    if (e.button === 0 && r && r.dataset.id) raiseTaskCard(r.dataset.id);   // колесо и правая — панорама, не подъём
+  }, true);
   // колесо над полем или вариантом — всё равно масштаб/прокрутка доски
   taskLayerEl.addEventListener('wheel', (e) => {
     e.preventDefault();
@@ -9230,6 +9247,63 @@ function taskMoreBlocked(o){
   }
   return false;
 }
+// Порядок слоёв, который переживает облако. В базе объекты читаются по obj_id
+// (порядка добавления там нет), поэтому «подняли карточку» нельзя записать
+// перестановкой в массиве — у собеседника она бы не появилась. Подъём пишется
+// числом zr в самом объекте (это обычная правка объекта: версия rv, запись в
+// базу и рассылка идут как у любой другой). Карточки с zr переставляются
+// между СВОИМИ местами в массиве по возрастанию zr; остальные объекты стоят
+// где стояли. Так у всех участников порядок карточек одинаковый, а штрихи и
+// фигуры не прыгают. Вызывается на каждом входе чужих объектов (boards-cloud.js)
+function applyLayerOrder(arr){
+  if (!Array.isArray(arr)) return arr;
+  const slots = [], items = [];
+  for (let i = 0; i < arr.length; i++){
+    if (arr[i] && typeof arr[i].zr === 'number'){ slots.push(i); items.push(arr[i]); }
+  }
+  if (items.length < 2) return arr;
+  const sorted = items.slice().sort((p, q) => p.zr - q.zr);   // сорт устойчивый: равные — как лежали
+  for (let k = 0; k < slots.length; k++) arr[slots[k]] = sorted[k];
+  return arr;
+}
+window.boardsApplyLayerOrder = applyLayerOrder;
+// Клик по карточке задания (по картинке на холсте или по её полю) поднимает её
+// над теми, кто её закрывает. Поднимаем, только если сверху действительно лежит
+// другое изображение: пустые подъёмы не нужны. Один клик — одна правка (один
+// pushUndo/saveDB), а не по записи на движение. Закрывающим карточкам без zr
+// тоже ставим zr (по их текущему месту), иначе подъём нечем сравнить с ними;
+// это разовая запись у таких карточек. Если среди них есть чужая (mayTouch),
+// писать нельзя — порядок меняется только на этом экране
+function raiseTaskCard(id){
+  if (!B || !Array.isArray(B.objects)) return false;
+  const i = B.objects.findIndex(o => o.id === id);
+  if (i < 0 || i === B.objects.length - 1) return false;
+  const o = B.objects[i];
+  if (o.type !== 'image' || !o.points || !o.points[0] || !(o.task || o.gen)) return false;
+  const x0 = o.points[0].x, y0 = o.points[0].y;
+  const above = [];
+  B.objects.forEach((q, qi) => {
+    if (qi > i && q.type === 'image' && q.points && q.points[0] &&
+        q.points[0].x < x0 + o.w && q.points[0].x + q.w > x0 && q.points[0].y < y0 + o.h && q.points[0].y + q.h > y0) above.push(q);
+  });
+  if (!above.length) return false;
+  const targets = [o].concat(above.filter(q => typeof q.zr !== 'number'));
+  if (!targets.every(mayTouch)){
+    // только у себя: без записи
+    B.objects.splice(i, 1); B.objects.push(o);
+    scheduleRedraw();
+    return true;
+  }
+  pushUndo({ ids: targets.map(q => q.id) });
+  let top = B.objects.length;
+  B.objects.forEach(q => { if (typeof q.zr === 'number' && q.zr > top) top = q.zr; });
+  B.objects.forEach((q, qi) => { if (targets.includes(q) && q !== o) q.zr = qi + 1; });
+  o.zr = top + 1;
+  applyLayerOrder(B.objects);
+  saveDB();
+  scheduleRedraw();
+  return true;
+}
 // вызывается на каждый кадр перерисовки: создать/подвинуть/убрать живые
 // элементы у заданий, которые сейчас в кадре
 function syncTaskOverlays(){
@@ -9273,6 +9347,30 @@ function syncTaskOverlays(){
       // он выше всех
       root.style.zIndex = String((hasSol && o.sol.open ? B.objects.length : 0) + oi + 1);
       root.style.left = p0.x + 'px'; root.style.top = p0.y + 'px';
+      // Сама карточка нарисована на холсте, а поле и «Проверить» — DOM-слой
+      // над холстом, поэтому z-index не помогает: любой DOM выше любой
+      // картинки холста. Чтобы верхняя карточка закрывала живые элементы
+      // нижней, вырезаем из нижнего корня прямоугольники карточек выше
+      // (clip-path с дырами): вырезанное не рисуется и не ловит клики.
+      // z-index полю ввода ставить нельзя — он «выпрыгнет» на уровень слоя
+      // и спорит с соседними карточками; порядок один — номер в B.objects.
+      // Раскрытый разбор лежит выше всех — его не режем
+      let clip = '';
+      if (!(hasSol && o.sol.open)){
+        let holes = '';
+        for (let qi = oi + 1; qi < B.objects.length; qi++){
+          const q = B.objects[qi];
+          if (q.type !== 'image' || !q.points || !q.points[0]) continue;
+          const qp = worldToScreen(q.points[0]);
+          const rx = qp.x - p0.x, ry = qp.y - p0.y, rw = q.w * cam.zoom, rh = q.h * cam.zoom;
+          if (rx >= sw || ry >= sh || rx + rw <= 0 || ry + rh <= 0) continue;
+          holes += 'M' + rx + ' ' + ry + 'h' + rw + 'v' + rh + 'h' + (-rw) + 'Z';
+        }
+        // внешний прямоугольник большой: кнопка «ещё такое же» и разбор
+        // торчат за границы корня и должны остаться видимыми
+        if (holes) clip = "path(evenodd,'M-20000 -20000H40000V40000H-20000Z" + holes + "')";
+      }
+      if (rec.clip !== clip){ rec.clip = clip; root.style.clipPath = clip; }
       // пока тянут ширину, поля старого снимка не на своих местах — прячем
       root.style.visibility = taskWidthPreview.has(o.id) ? 'hidden' : '';
       root.style.width = sw + 'px'; root.style.height = sh + 'px';

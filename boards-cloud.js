@@ -1588,6 +1588,7 @@
     if (local && JSON.stringify(local) === JSON.stringify(inc)) return 'same';
     const copy = cloneObj(inc);
     if (idx >= 0) board.objects[idx] = copy; else board.objects.push(copy);
+    if (window.boardsApplyLayerOrder) window.boardsApplyLayerOrder(board.objects);   // порядок слоёв карточек (zr)
     cloudTombs.delete(inc.id);
     // Промпт №10: пришло от собеседника — значит, в базе оно есть (или вот-вот
     // будет); и на диск эту доску пора переписать
@@ -1704,6 +1705,7 @@
       board.objects[idx] = c;
       out.updated.push({ id: u.id, before: cur, after: c });
     });
+    if (window.boardsApplyLayerOrder) window.boardsApplyLayerOrder(board.objects);   // отмена/повтор подъёма
     return out;
   }
 
@@ -2632,6 +2634,7 @@
         return false;
       });
     }
+    if (window.boardsApplyLayerOrder) window.boardsApplyLayerOrder(next);   // порядок слоёв карточек (zr)
     board.objects = next;
     // №90: тип доски («презентация») на сервер не ездит — его узнают по
     // служебному объекту слайдов, а он приходит только сейчас, из базы
