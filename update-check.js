@@ -4,10 +4,16 @@
    Зачем. Пуш в main сразу оказывается на сайте, а открытые вкладки об этом
    не знают и продолжают работать на старом коде часами — до перезагрузки.
    Файла версии не заводим: сам сервер (GitHub Pages) отдаёт у каждого файла
-   ETag (или Last-Modified), и он меняется при каждом деплое. Запоминаем его
-   у boards-core.js при первой удачной проверке и сверяем при возврате на
-   вкладку и раз в 10 минут. Изменился — спокойная плашка «Есть обновление
+   Last-Modified и ETag, и они меняются при каждом деплое. Запоминаем метку
+   boards-core.js при первой удачной проверке и сверяем при возврате на
+   вкладку и раз в 10 минут. Стала новее — спокойная плашка «Есть обновление
    платформы» с кнопкой «Обновить».
+
+   Главная метка — Last-Modified, и плашка только если дата стала ПОЗЖЕ.
+   ETag тут ненадёжен: у одного и того же файла CDN отдаёт то W/"x" (ответ
+   сжат), то "x" (не сжат), и простое сравнение строк давало плашку снова и
+   снова без всякого деплоя. А узлы CDN после деплоя минут десять отдают
+   кто старую, кто новую версию — «стала старше» не повод звать обновляться.
 
    Чего здесь нет нарочно: никаких записей в хранилище и никаких
    перезагрузок без нажатия — идёт урок. Ошибка сети, пустой заголовок,
@@ -21,8 +27,24 @@
 
   const PROBE = 'boards-core.js';
   const EVERY_MS = 10 * 60 * 1000;
-  let known = null;     // ETag/Last-Modified с первой удачной проверки
+  let known = null;     // метка boards-core.js с первой удачной проверки
   let busy = false;
+
+  // Метка версии: время из Last-Modified (число), а без него — ETag без
+  // приставки слабого W/ (строка). Ничего пригодного — null.
+  function stamp(r) {
+    const lm = Date.parse(r.headers.get('Last-Modified') || '');
+    if (!isNaN(lm)) return lm;
+    const et = (r.headers.get('ETag') || '').replace(/^W\//, '').trim();
+    return et || null;
+  }
+
+  function isNewer(v, was) {
+    if (typeof v === 'number' && typeof was === 'number') return v > was;
+    // разного рода метки (заголовок то был, то нет) не сравниваем — молчим
+    if (typeof v !== typeof was) return false;
+    return v !== was;
+  }
 
   async function check() {
     if (busy || document.getElementById('bdUpdate')) return;
@@ -30,10 +52,10 @@
     try {
       const r = await fetch(PROBE, { method: 'HEAD', cache: 'no-store' });
       if (r.status !== 200) return;
-      const v = r.headers.get('ETag') || r.headers.get('Last-Modified');
-      if (!v) return;
+      const v = stamp(r);
+      if (v === null) return;
       if (known === null) { known = v; return; }
-      if (v !== known) show();
+      if (isNewer(v, known)) show();
     } catch (e) {
       // сеть пропала или сервер не ответил — не повод беспокоить человека
     } finally {

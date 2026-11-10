@@ -11,6 +11,11 @@
   2. Тот же ETag — плашки нет
   3. Ответ 500, пустой заголовок, обрыв сети — плашки нет
   4. Страница просмотра ?s=КОД — проверка не запускается вовсе
+  5. Как на живом сайте: ETag скачет между W/"x" и "x" (сжатый и несжатый
+     ответ), Last-Modified тот же — плашки нет (из-за этого плашка
+     вылезала снова и снова без деплоя)
+  6. Last-Modified стал позже — плашка есть
+  7. Last-Modified стал раньше (узел CDN ещё со старой версией) — плашки нет
 
 Запуск: ~/.venvs/trainers/bin/python test_prompt_update_check.py
 """
@@ -39,7 +44,7 @@ def run():
 
     def open_page(browser, answers, url="/boards.html"):
         """answers — список ответов на HEAD по порядку; последний повторяется.
-        Ответ: ("ok", etag) | ("status", код) | ("empty",) | ("abort",)"""
+        Ответ: ("ok", etag) | ("hdr", {заголовки}) | ("status", код) | ("empty",) | ("abort",)"""
         ctx = browser.new_context()
         page = ctx.new_page()
         errors = []
@@ -54,6 +59,8 @@ def run():
             heads.append(a)
             if a[0] == "ok":
                 route.fulfill(status=200, headers={"ETag": a[1]}, body="")
+            elif a[0] == "hdr":
+                route.fulfill(status=200, headers=a[1], body="")
             elif a[0] == "status":
                 route.fulfill(status=a[1], body="")
             elif a[0] == "empty":
@@ -116,6 +123,46 @@ def run():
         page.wait_for_timeout(500)
         check("4: проверка не запускалась — запросов HEAD нет", len(heads) == 0)
         check("4: плашки нет", not page.evaluate(BANNER))
+        ctx.close()
+
+        LM1 = "Tue, 10 Nov 2026 06:44:02 GMT"
+        LM2 = "Tue, 10 Nov 2026 12:00:00 GMT"
+        LM0 = "Mon, 09 Nov 2026 20:01:30 GMT"
+
+        def visits(page, n):
+            for _ in range(n):
+                page.evaluate(VISIBLE)
+                page.wait_for_timeout(300)
+
+        print("5. ETag скачет W/\"x\" ↔ \"x\", дата та же — тишина")
+        flip = [("hdr", {"ETag": 'W/"6af2bd32-b44ad"', "Last-Modified": LM1}),
+                ("hdr", {"ETag": '"6af2bd32-b44ad"', "Last-Modified": LM1}),
+                ("hdr", {"ETag": 'W/"6af2bd32-b44ad"', "Last-Modified": LM1}),
+                ("hdr", {"ETag": '"6af2bd32-b44ad"', "Last-Modified": LM1})]
+        ctx, page, heads, errors = open_page(browser, flip)
+        visits(page, 3)
+        check("5: проверок было несколько", len(heads) >= 4)
+        check("5: плашки нет", not page.evaluate(BANNER))
+        ctx.close()
+
+        print("5б. Только ETag, скачет W/\"x\" ↔ \"x\" — тишина")
+        ctx, page, heads, errors = open_page(browser, [("ok", 'W/"x"'), ("ok", '"x"'), ("ok", 'W/"x"')])
+        visits(page, 2)
+        check("5б: плашки нет", not page.evaluate(BANNER))
+        ctx.close()
+
+        print("6. Last-Modified позже — плашка")
+        ctx, page, heads, errors = open_page(browser, [("hdr", {"ETag": '"a"', "Last-Modified": LM1}),
+                                                       ("hdr", {"ETag": 'W/"b"', "Last-Modified": LM2})])
+        visits(page, 1)
+        check("6: плашка bdUpdate видна", page.evaluate(BANNER))
+        ctx.close()
+
+        print("7. Last-Modified раньше (старый узел CDN) — тишина")
+        ctx, page, heads, errors = open_page(browser, [("hdr", {"ETag": '"a"', "Last-Modified": LM1}),
+                                                       ("hdr", {"ETag": '"z"', "Last-Modified": LM0})])
+        visits(page, 2)
+        check("7: плашки нет", not page.evaluate(BANNER))
         ctx.close()
 
         browser.close()
