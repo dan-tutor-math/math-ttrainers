@@ -1,0 +1,22 @@
+{
+  "gen_t1_amphi_row:true": "f033ca0b6c70b25f0da26501150128323b80dcc34a391578e54c65430f4492e7",
+  "gen_t1_amphi_row:false": "d764088c4e6dd4289f9048a08948c24013925a6cad37ac9c51348b16e2c8049f",
+  "gen_t2_amphi_total:true": "7388fc101cc29ce55cb0f3cf1943f835f301f13d18285d68efaf7a0e3d236c78",
+  "gen_t2_amphi_total:false": "5b185910877f308dd848eac31b41e5b1e7d4ea892744761237e8aed311acec5e",
+  "gen_t3_amphi_two_rows:true": "e814eeafc0986d14c237a03b3b71932f12fd9e865c687e1128399c835432feb3",
+  "gen_t3_amphi_two_rows:false": "7c738bf3e21c6a1aef0cb9d7960238a7a3a3969dc709cad9e53367f432a63ca1",
+  "gen_t4_cooling:true": "6ea1ba392db608536de1e9da652b84c54b094e10a4a06931c7d6f6f4f48c97cc",
+  "gen_t4_cooling:false": "d5be1e84984516f4b1fa302f134f8adf4277cb05d422a53bf5b2f0805ffb6b5f",
+  "gen_t5_braking_sum:true": "3b62d7848800b6c7c1a99d1b77906bade13f87e1d57f3d2d9f1c74398c6a4904",
+  "gen_t5_braking_sum:false": "7eaedada3be1cc3382e7cbeb1fe6f11093e11072d19e256c8fb30230a3475812",
+  "gen_t6_braking_stop:true": "7e81b43e357b4fbe24f822c0ad2a603110a4c73878db806e1a07d4fdd59d2115",
+  "gen_t6_braking_stop:false": "882f94c629d662cbb09c2dbf3e2da7af8c4d768d4da06ecefbef7948197dff1f",
+  "gen_t7_train:true": "ff96bca8a8b9ddc1f6f430e55d17255c99dc1e34663a31d1e19136207be9877d",
+  "gen_t7_train:false": "651b106f30dc562448e4ed23f7fca9c5b9f38d965492dba53a926faf1a216757",
+  "gen_t8_bacteria:true": "a61feeff34faf315f152fda632ded8ca77f4f817f6b6ab3ac6605f72c0248e98",
+  "gen_t8_bacteria:false": "19d25ed4b51ca552f2419bab4563855753a7b8afd072629e4b57a7fb8dd39c43",
+  "gen_t9_isotope:true": "296f8300ef48e3623814517801beae76ea7e9024bc152279cbe70795bbcafc64",
+  "gen_t9_isotope:false": "a3b1d6bb12e0fe2df11f21e959b2631e5ee175d52070a2b3cd0d9f0f39d74f53",
+  "gen_t10_ball:true": "8700041e37cf39786fd64fe5ee26542c8cf9bef74a5c62c49aa156898e49b5e2",
+  "gen_t10_ball:false": "86217bdc7d3d3d62b3966d8780487204b9c9fa771cc54cb81db1b4abadb96c74"
+}

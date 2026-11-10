@@ -63,7 +63,8 @@
   }
 
   function next(page, mode, list, ownGen) {
-    const f = filter();
+    const selected = filter(), hasOwn = typeof ownGen === 'function';
+    const f = {fipi: selected.fipi || !hasOwn, own: selected.own && hasOwn};
     list = list || [];
     if (f.fipi && list.length) {
       const r = rec(page, mode);
@@ -83,7 +84,7 @@
       if (!f.own) {
         // «только ФИПИ» и всё решено: второй круг — пустого экрана не бывает
         const t = withFipi(pick(list));
-        t.fipiNotice = `Все ${list.length} ${plural(list.length)} ФИПИ этого вида решены — начинаем второй круг. Новые задания этого вида — галочка «На основе ФИПИ» в фильтре над списком.`;
+        t.fipiNotice = `Все ${list.length} ${plural(list.length)} ФИПИ этого вида решены — начинаем второй круг.` + (hasOwn ? ' Новые задания этого вида — галочка «На основе ФИПИ» в фильтре над списком.' : '');
         t.fipiCycle = true;
         return t;
       }
@@ -110,16 +111,16 @@
     const r = rec(page, mode);
     if (r.done.indexOf(task.fipi) < 0) { r.done.push(task.fipi); saveRec(page, mode, r); }
   }
-  function countLabel(page, mode, list) {
+  function countLabel(page, mode, list, hasOwn = true) {
     if (!list || !list.length) return '';
     // карточку рисуют, когда ученик на экране выбора типов, то есть вышел из вида:
     // пропуск ⟳ забываем, и при новом заходе задание ФИПИ снова идёт первым.
     // Нарочно здесь, а не в страницах: так правило одинаково для всех номеров
     delete shownFipi[page + ':' + mode];
     const f = filter(), n = list.length;
-    if (!f.fipi) return 'на основе ФИПИ';
+    if (!f.fipi && hasOwn) return 'на основе ФИПИ';
     const d = rec(page, mode).done.filter(id => list.some(x => x.fipi === id)).length;
-    const base = f.own ? `${n}+ ${plural(n)}` : `${n} ${plural(n)} ФИПИ`;
+    const base = f.own && hasOwn ? `${n}+ ${plural(n)}` : `${n} ${plural(n)} ФИПИ`;
     return d ? `${base} · ФИПИ решено ${d} из ${n}` : base;
   }
   function sourceText(task) {

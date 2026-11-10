@@ -1,0 +1,19 @@
+{
+  "gen_int_bracket": "70971ea4bfd2475122bbcaafc6c00e9ae938a55c7e2738cef842f47eafe3c681",
+  "gen_decimal_interval": "c93057fc9987ed3a4db6e2b2c3b8e7c4b8b1dcd8bb2a34062b740d7e7effe978",
+  "gen_between_fracs": "e645d59dd1fe9d496631e087a8b156f46cd6f10fff484b57cc6c8ab1f789faf8",
+  "gen_point_on_line_int": "f5b53208855c93165b677c31f90bc9113e2b4eba4f47de59d41af244c8583164",
+  "gen_point_on_line_decimal": "94db1269429946335a95a58b1860327f8b86202f418e8f0b9bbf84964a1e0e5e",
+  "gen_point_value_at_letter": "eacdda8d7c6f051c54c1ae76ad5f5bdec3fcfc61e85d65dfb64ab9585395d9fe",
+  "gen_segment_member": "e5dae5c773d2da88963abd2914ebbf769dadc3810f57e5494ddfa9409a7a4ca4",
+  "gen_decimal_order": "a17f1520de663d5dfcb57debec0735e886a226ae5c5dd814398716ec0b2d5180",
+  "gen_sign_diff_positive": "170ae6d6df18ce53ab2b3530c2eedff2c890fbe010dda5a5e78841dcc437231b",
+  "gen_sign_diff_negative": "0c51f5c4bea9f915e90bb6c993936bbe4b7cad543f077b4e09c5adba92e6b269",
+  "gen_ineq_single": "3877341afc528a6328e4720238cc0de5d379c0f886d004646d7c86b35619db31",
+  "gen_ineq_double": "31a02ce692692d02d8dd5c1ced88fc0b3394bd22686d2916c9c06029db6812c1",
+  "gen_sqrt_bracket": "9a17ae9931e60125da1bf66bf8305176798d06b7379d141742fae34b8f0c16ec",
+  "gen_sqrt_segment": "4667ccf113b6a633b2c66225ff496d4488593b9a4d5ff8f5b718d5d9bcf30c33",
+  "gen_sqrt_point_at_letter": "be7e50915b1d48d5a6b02df7f105827dbddb34e0122916422c6b0e45ebdc9c40",
+  "gen_sqrt_choice": "89b87cd7792e121d1eabf2e5bbdb9590ac8e26e965163137640b085ac547521c",
+  "gen_demo2027": "45431cf47f1b8ddb2fa30e9b0b5a8ba326cca10428cf39bb6d46c0bb27abbd4d"
+}

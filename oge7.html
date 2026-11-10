@@ -1457,15 +1457,101 @@ function gen_between_fracs(){
   return build_between_fracs(a, b, c, d, [0,1,2,3].map(k=>`${ip},${startOpt+k}`));
 }
 
-function gen_point_on_line_int(){
-  // числа с разными целыми частями — 1 деление в столбик даёт целую часть и остаток
-  const D = ri(11,23);
-  const base = ri(2,6);
-  const nums = [0,1,2,3].map(i=>{
-    const rem = ri(1,D-1);
-    return { ip: base+i, num:(base+i)*D+rem, rem, den: D };
-  });
-  const correctIndex = ri(0,3);
+// Дроби в args — точные пары/строки. Их запись не берём из картинок вариантов.
+function n7Value(v){if(Array.isArray(v))return v[0]/v[1];const a=String(v).split('/').map(Number);return a.length===2?a[0]/a[1]:a[0];}
+function n7Fmt(v){return String(Math.round(v*1e8)/1e8).replace('.',',').replace('-','−');}
+function n7Math(s){return tex(String(s).replace(/−/g,'-').replace(/≥/g,'\\ge ').replace(/≤/g,'\\le ').replace(/</g,'\\lt ').replace(/>/g,'\\gt ').replace(/\^(\d)/g,'^{$1}'));}
+// Маленький разборщик только арифметики вариантов; произвольный JS не выполняется.
+function n7Eval(s,env){
+  const tokens=String(s).replace(/\s/g,'').replace(/−/g,'-').match(/\d+(?:\.\d+)?|[a-z]|[()+\-*/^]/g)||[];
+  let i=0;
+  function atom(){let t=tokens[i++];if(t==='-')return -atom();if(t==='+')return atom();if(t==='('){const v=sum();if(tokens[i++]!==')')throw Error('Скобки варианта');return v;}if(t in env)return env[t];const v=Number(t);if(!Number.isFinite(v))throw Error('Число варианта');return v;}
+  function power(){const v=atom();if(tokens[i]==='^'){i++;return v**power();}return v;}
+  function product(){let v=power();while(i<tokens.length && !['+','-',')'].includes(tokens[i])){const op=tokens[i];if(op==='*'||op==='/'){i++;const r=power();v=op==='*'?v*r:v/r;}else v*=power();}return v;}
+  function sum(){let v=product();while(tokens[i]==='+'||tokens[i]==='-'){const op=tokens[i++],r=product();v=op==='+'?v+r:v-r;}return v;}
+  const v=sum();if(i!==tokens.length)throw Error('Не разобран вариант');return v;
+}
+function n7Inequality(s,env){const m=s.match(/^(.*?)([<>≤≥])(.*)$/);if(!m)throw Error('Знак варианта');const v=n7Eval(m[1],env)-n7Eval(m[3],env);return m[2]==='<'?v<0:m[2]==='>'?v>0:m[2]==='≤'?v<=0:v>=0;}
+function n7Line(min,max,labels,points,step){
+  const minor=[];
+  if(step>0)for(let k=Math.ceil(min/step);k*step<=max+1e-8;k++){const v=Math.round(k*step*1e8)/1e8;if(!labels.some(t=>Math.abs(t-v)<1e-8))minor.push(`<div class="nl-tick" style="left:${((v-min)/(max-min)*100).toFixed(2)}%"><span class="nl-tickmark"></span></div>`);}
+  const line=numberLineHTML(min,max,labels,points).replace(/(<span class="nl-ticklabel">)([^<]+)/g,(_,tag,v)=>tag+n7Fmt(Number(v)));
+  return line.replace('</div></div>',minor.join('')+'</div></div>');
+}
+function n7FipiTask(g,d){
+  let prompt='',numline='',options=[],truth=[],plan='Сопоставим положение точек на числовой прямой с каждым вариантом ответа.',lines=[];
+  const val=n7Value,f=n7Fmt,T=n7Math,frac=fracStr;
+  if(g==='point_on_line_int'||g==='point_on_line_decimal'||g==='sqrt_choice'){
+    const [lo,hi]=d.point_A_interval.map(val),labels=d.axis.labels.map(val),step=val(d.axis.step);
+    const min=Math.min(...labels,Math.floor(lo)),max=Math.max(...labels,Math.ceil(hi));
+    numline=n7Line(min,max,labels,[{frac:((lo+hi)/2-min)/(max-min),label:'A'}],step);
+    lines.push('По подписанным делениям и середине единичного отрезка на рисунке: '+T(`${f(lo)}<A<${f(hi)}`)+'.');
+    if(g==='sqrt_choice'){
+      options=d.radicands.map(sqrtStr);truth=d.radicands.map(n=>lo*lo<n&&n<hi*hi);
+      lines.push(T(`${f(lo)}^{2}=${f(lo*lo)}`),T(`${f(hi)}^{2}=${f(hi*hi)}`));
+      d.radicands.forEach((n,i)=>lines.push(`Вариант ${i+1}: `+T(`${f(lo*lo)}<${n}<${f(hi*hi)}`)+' — '+(truth[i]?'верно.':'неверно.')));
+    }else{
+      options=d.values.map(([p,q])=>frac(p,q));truth=d.values.map(([p,q])=>lo<p/q&&p/q<hi);
+      d.values.forEach(([p,q],i)=>{const whole=Math.floor(p/q),r=p-whole*q;lines.push(`Вариант ${i+1}: `+T(`${p}=${q}\\cdot ${whole}+${r}`),frac(p,q)+' = '+whole+' + '+frac(r,q)+' ≈ '+f(p/q)+'. '+(truth[i]?'Попадает':'Не попадает')+' в отмеченный участок.');});
+    }
+    const chosen=truth.indexOf(true),point=g==='sqrt_choice'?Math.sqrt(d.radicands[chosen]):val(d.values[chosen]);
+    numline=n7Line(min,max,labels,[{frac:(point-min)/(max-min),label:'A'}],step);
+    prompt=`Одно из чисел ${listRu(options)} отмечено на числовой прямой точкой <b>A</b>. Какое это число?`;
+  }else if(g==='sqrt_point_at_letter'||g==='point_value_at_letter'){
+    const root=g==='sqrt_point_at_letter',x=root?Math.sqrt(d.radicand):val(d.target),labels=d.axis.labels.map(val),bounds=Object.values(d.points).flat().map(val);
+    const min=Math.min(...labels,...bounds),max=Math.max(...labels,...bounds);
+    numline=n7Line(min,max,labels,Object.entries(d.points).map(([label,b])=>({label,frac:((val(b[0])+val(b[1]))/2-min)/(max-min)})),val(d.axis.step));
+    options=d.options;truth=options.map(l=>{const [lo,hi]=d.points[l].map(val);return root?lo*lo<d.radicand&&d.radicand<hi*hi:lo<x&&x<hi;});
+    const chosenLetter=options[truth.indexOf(true)];
+    numline=n7Line(min,max,labels,Object.entries(d.points).map(([label,b])=>({label,frac:((label===chosenLetter?x:(val(b[0])+val(b[1]))/2)-min)/(max-min)})),val(d.axis.step));
+    const target=root?sqrtStr(d.radicand):frac(...d.target);
+    prompt=`На координатной прямой отмечены точки ${listRu(d.options)}. Одна из них соответствует числу <b>${target}</b>. Какая это точка?`;
+    if(!root){const [p,q]=d.target,whole=Math.floor(p/q),r=p-whole*q;lines.push(T(`${p}=${q}\\cdot ${whole}+${r}`),frac(p,q)+' = '+whole+' + '+frac(r,q)+' ≈ '+f(x)+'.');}
+    options.forEach((letter,i)=>{const [lo,hi]=d.points[letter].map(val);lines.push(`Точка ${letter} находится в участке `+T(`${f(lo)}<${letter}<${f(hi)}`)+'.');if(root)lines.push(T(`${f(lo)}^{2}=${f(lo*lo)}`),T(`${f(hi)}^{2}=${f(hi*hi)}`),T(`${f(lo*lo)}<${d.radicand}<${f(hi*hi)}`)+' — '+(truth[i]?'верно.':'неверно.'));else lines.push('Дробь '+(truth[i]?'попадает':'не попадает')+' в этот участок.');});
+  }else if(g==='decimal_order'){
+    const values=d.values.map(val),sorted=[...values].sort((a,b)=>a-b),rank=sorted.indexOf(val(d.target));options=d.options;truth=options.map(l=>l===d.order[rank]);
+    prompt=`На координатной прямой точки ${listRu(d.order)} соответствуют числам ${d.values.map(v=>f(val(v))).join('; ')}. Какой точке соответствует число <b>${f(val(d.target))}</b>?`;
+    numline=numberLineHTML(0,3,[],d.order.map((label,i)=>({label,frac:i/3})));
+    lines.push('Слева направо числа возрастают: '+T(d.order.join('<'))+'.','Упорядочим числа: '+T(sorted.map(f).join('<'))+'.',`Число ${f(val(d.target))} занимает ${rank+1}-е место слева — это точка ${d.order[rank]}.`);
+  }else if(g.startsWith('sign_diff_')){
+    const positive=g==='sign_diff_positive',pairs=d.options.slice(0,3).map(s=>s.match(/[a-z]/g));options=[...d.options.slice(0,3).map(T),d.options[3]];
+    truth=pairs.map(([a,b])=>positive?d.order.indexOf(a)>d.order.indexOf(b):d.order.indexOf(a)<d.order.indexOf(b));truth.push(!truth.some(Boolean));
+    const exprs=d.options.slice(0,3).map(T);prompt=`На координатной прямой отмечены числа ${listRu(d.order)}. Какая из разностей ${listRu(exprs)} ${positive?'положительна':'отрицательна'}?`;
+    numline=numberLineHTML(0,2,[],d.order.map((label,i)=>({label,frac:i/2})));
+    lines.push('По рисунку слева направо: '+T(d.order.join('<'))+'.','Из большего вычитаем меньшее — разность положительна; из меньшего большее — отрицательна.');
+    pairs.forEach(([a,b],i)=>{const pos=d.order.indexOf(a)>d.order.indexOf(b);lines.push(`Вариант ${i+1}: `+T(`${a}${pos?'>':'<'}${b}`)+', поэтому '+T(`${a}-${b}${pos?'>':'<'}0`)+'.');});
+  }else if(g==='ineq_single'){
+    const [lo,hi]=d.point_a_interval.map(val),x=(lo+hi)/2,labels=d.axis.labels.map(val),min=Math.min(...labels,lo)-1,max=Math.max(...labels,hi)+1;
+    numline=n7Line(min,max,labels,[{label:'a',frac:(x-min)/(max-min)}],val(d.axis.step));
+    options=d.options.map(T);truth=d.options.map(s=>n7Inequality(s,{a:x}));
+    prompt='На координатной прямой отмечено число <b>a</b>. Какое из утверждений для этого числа является верным?';
+    lines.push('По рисунку: '+T(`${f(lo)}<a<${f(hi)}`)+'.');
+    d.options.forEach((s,i)=>{const expr=s.match(/^(.*?)[<>≤≥]/)[1],left=n7Eval(expr,{a:lo}),right=n7Eval(expr,{a:hi});lines.push(`Вариант ${i+1}: `+T(`${f(Math.min(left,right))}<${expr}<${f(Math.max(left,right))}`)+'. Неравенство '+T(s)+' — '+(truth[i]?'верно.':'неверно.'));});
+  }else if(g==='ineq_double'){
+    const env=Object.fromEntries(Object.entries(d.signs).map(([name,sign])=>[name,sign*(name===d.abs_greater?3:1)]));
+    const min=Math.min(0,...Object.values(env))-1,max=Math.max(0,...Object.values(env))+1;
+    numline=numberLineHTML(min,max,[0],Object.entries(env).map(([label,v])=>({label,frac:(v-min)/(max-min)})));
+    options=d.options.map(T);truth=d.options.map(s=>n7Inequality(s,env));
+    prompt=`На координатной прямой отмечены числа ${listRu(Object.keys(d.signs))}. Какое из следующих неравенств верно?`;
+    lines.push('На рисунке: '+T(d.order.join('<'))+'.','Дальше от нуля находится '+d.abs_greater+', поэтому его модуль больше. Знак суммы чисел разных знаков совпадает со знаком числа с большим модулем.','Знак произведения определяется знаками множителей; квадрат ненулевого числа положителен. В разности сравниваем порядок точек.');
+    d.options.forEach((s,i)=>{const expr=s.match(/^(.*?)[<>≤≥]/)[1],v=n7Eval(expr,env);lines.push(`Вариант ${i+1}: выражение `+T(expr)+' '+(v>0?'положительно':v<0?'отрицательно':'равно нулю')+'. Неравенство '+T(s)+' — '+(truth[i]?'верно.':'неверно.'));});
+  }else throw Error('Неизвестный вид ФИПИ №7: '+g);
+  if(truth.filter(Boolean).length!==1)throw Error('Неединственный ответ ФИПИ №7: '+g);
+  const correctIndex=truth.indexOf(true);lines.push(`Единственный верный вариант — ${correctIndex+1}.`);
+  let steps=[];
+  if(g.startsWith('point_on_line_'))steps=[{type:'choice',question:'Выбери дробь: разделим её в столбик и сопоставим с положением точки A.',candidates:d.values.map(([p,q])=>({num:p,den:q,ip:Math.floor(p/q),rem:p%q})),decimal:g==='point_on_line_decimal',maxDecimalDigits:2}];
+  else if(g==='point_value_at_letter'){const [p,q]=d.target;steps=[{type:'div',dividend:String(p),divisor:q,decimal:false,question:'Разделим числитель на знаменатель в столбик.'},{type:'mixed',question:'Запиши смешанное число: целая часть указывает единичный отрезок.',sourceNum:p,sourceDen:q,whole:Math.floor(p/q),num:p%q,den:q}];}
+  else if(g==='sqrt_choice'){const [lo,hi]=d.point_A_interval.map(val);steps=[{type:'qa',question:`Возведи левую границу ${f(lo)} в квадрат.`,answer:lo*lo},{type:'qa',question:`Возведи правую границу ${f(hi)} в квадрат.`,answer:hi*hi}];}
+  else if(g==='sqrt_point_at_letter'){const k=Math.floor(Math.sqrt(d.radicand));steps=[{type:'qa',question:`Чему равно ${k}²?`,answer:k*k},{type:'qa',question:`Чему равно ${k+1}²?`,answer:(k+1)*(k+1)}];}
+  else if(g==='decimal_order')steps=[{type:'qa',question:'Какое из данных чисел наименьшее?',answer:f(Math.min(...d.values.map(val)))}];
+  else if(g.startsWith('sign_diff_'))steps=[{type:'qa',question:'Какая буква расположена правее всех?',answer:d.order[d.order.length-1]}];
+  else {if(g==='ineq_single')steps.push({type:'qa',question:'Между какими целыми числами находится a? Введи меньшее.',answer:Math.floor(val(d.point_a_interval[0]))});else steps.push({type:'qa',question:'Какой знак у произведения двух отмеченных чисел? Введи «-» или «+».',answer:Object.values(d.signs).reduce((a,b)=>a*b,1)>0?'+':'-'});steps.push(...options.map((text,i)=>({type:'qa',question:`Вариант ${i+1}: ${text}. Верно — 1, неверно — 0.`,answer:truth[i]?1:0})));}
+  return {prompt,numline,options,correctIndex,plan,steps,explain:'<div class="sol">'+lines.map(s=>'<div class="sol-line">'+s+'</div>').join('')+'</div>'};
+}
+
+function build_point_on_line_int(data){
+  if(data.bank)return n7FipiTask('point_on_line_int',data);
+  const {nums, D, base, correctIndex}=data;
   const target = nums[correctIndex];
   const opts = nums.map(x=>fracStr(x.num,D));
   const frac = target.ip + target.rem/D;
@@ -1480,17 +1566,24 @@ function gen_point_on_line_int(){
     options: opts, correctIndex,
     explain: `${fracStr(target.num,D)} = ${target.ip} целых ${fracStr(target.rem,D)}. На прямой отмечено число между ${target.ip} и ${target.ip+1} — это и есть ${fracStr(target.num,D)}.`
   };
+
 }
 
-function gen_point_on_line_decimal(){
-  // числа с одинаковой целой частью — нужно деление в столбик до сотых
-  const D = ri(19,29);
-  const ip0 = ri(0,2);
-  const remSet = new Set();
-  while(remSet.size<4) remSet.add(ri(1,D-1));
-  const rems = [...remSet].sort((x,y)=>x-y);
-  const nums = rems.map(r=>({ ip:ip0, num:ip0*D+r, rem:r, den:D }));
+function gen_point_on_line_int(){
+  // числа с разными целыми частями — 1 деление в столбик даёт целую часть и остаток
+  const D = ri(11,23);
+  const base = ri(2,6);
+  const nums = [0,1,2,3].map(i=>{
+    const rem = ri(1,D-1);
+    return { ip: base+i, num:(base+i)*D+rem, rem, den: D };
+  });
   const correctIndex = ri(0,3);
+  return build_point_on_line_int({nums, D, base, correctIndex});
+}
+
+function build_point_on_line_decimal(data){
+  if(data.bank)return n7FipiTask('point_on_line_decimal',data);
+  const {nums, D, ip0, correctIndex}=data;
   const target = nums[correctIndex];
   const opts = nums.map(x=>fracStr(x.num,D));
   const frac = target.rem/D;
@@ -1507,6 +1600,40 @@ function gen_point_on_line_decimal(){
     options: opts, correctIndex,
     explain: `${fracStr(target.num,D)} = 0,${String(val100).padStart(2,'0')}… ⇒ ${fracStr(target.num,D)} ≈ ${(ip0+val100/100).toFixed(2)}. Это и есть точка, отмеченная на прямой.`
   };
+
+}
+
+function gen_point_on_line_decimal(){
+  // числа с одинаковой целой частью — нужно деление в столбик до сотых
+  const D = ri(19,29);
+  const ip0 = ri(0,2);
+  const remSet = new Set();
+  while(remSet.size<4) remSet.add(ri(1,D-1));
+  const rems = [...remSet].sort((x,y)=>x-y);
+  const nums = rems.map(r=>({ ip:ip0, num:ip0*D+r, rem:r, den:D }));
+  const correctIndex = ri(0,3);
+  return build_point_on_line_decimal({nums, D, ip0, correctIndex});
+}
+
+function build_point_value_at_letter(data){
+  if(data.bank)return n7FipiTask('point_value_at_letter',data);
+  const {D, base, cands, ip, rem, num, best}=data;
+  const options = ['A','B','C','D'];
+  const correctIndex = best;
+  return {
+    prompt: `На координатной прямой отмечены точки A, B, C, D. Одна из них соответствует числу <b>${fracStr(num,D)}</b>. Какая это точка?`,
+    plan: `Переведём дробь в смешанное число делением в столбик — целая часть покажет нужный отрезок прямой, а дробный остаток подскажет, к какой из отмеченных точек число ближе всего.`,
+    steps: [
+      {type:'div', dividend:String(num), divisor:D, decimal:false,
+        question:`Разделим дробь в столбик, чтобы перевести её в смешанное число.`},
+      {type:'mixed', question:`Запишем дробь в виде смешанного числа — впиши целую часть, числитель и знаменатель остатка сам. Целая часть укажет нужный отрезок прямой.`,
+        sourceNum: num, sourceDen: D, whole: ip, num: rem, den: D},
+    ],
+    numline: numberLineHTML(base, base+2, [base,base+1,base+2], cands),
+    options, correctIndex,
+    explain: `${fracStr(num,D)} = ${ip} целых ${fracStr(rem,D)} ≈ ${(ip+rem/D).toFixed(2)}. На прямой это ближе всего к точке ${options[best]}.`
+  };
+
 }
 
 function gen_point_value_at_letter(){
@@ -1529,21 +1656,7 @@ function gen_point_value_at_letter(){
     });
     if(second-bestGap>=0.08) break;
   }
-  const options = ['A','B','C','D'];
-  const correctIndex = best;
-  return {
-    prompt: `На координатной прямой отмечены точки A, B, C, D. Одна из них соответствует числу <b>${fracStr(num,D)}</b>. Какая это точка?`,
-    plan: `Переведём дробь в смешанное число делением в столбик — целая часть покажет нужный отрезок прямой, а дробный остаток подскажет, к какой из отмеченных точек число ближе всего.`,
-    steps: [
-      {type:'div', dividend:String(num), divisor:D, decimal:false,
-        question:`Разделим дробь в столбик, чтобы перевести её в смешанное число.`},
-      {type:'mixed', question:`Запишем дробь в виде смешанного числа — впиши целую часть, числитель и знаменатель остатка сам. Целая часть укажет нужный отрезок прямой.`,
-        sourceNum: num, sourceDen: D, whole: ip, num: rem, den: D},
-    ],
-    numline: numberLineHTML(base, base+2, [base,base+1,base+2], cands),
-    options, correctIndex,
-    explain: `${fracStr(num,D)} = ${ip} целых ${fracStr(rem,D)} ≈ ${(ip+rem/D).toFixed(2)}. На прямой это ближе всего к точке ${options[best]}.`
-  };
+  return build_point_value_at_letter({D, base, cands, ip, rem, num, best});
 }
 
 function build_segment_member(D, nums, n){
@@ -1575,18 +1688,9 @@ function gen_segment_member(){
   return build_segment_member(D, [correctNum, below, above1, above2].sort((x,y)=>x-y), n);
 }
 
-function gen_decimal_order(){
-  const vals = [];
-  while(vals.length<4){
-    const sign = Math.random()<0.4 ? -1 : 1;
-    const v = sign * (Math.random()*1.2);
-    const rounded = Math.round(v*1000)/1000;
-    if(vals.some(x=>Math.abs(x-rounded)<0.01)) continue;
-    vals.push(rounded);
-  }
-  const sorted = [...vals].sort((a,b)=>a-b);
-  const letters = ['A','B','C','D'];
-  const target = pick(vals);
+function build_decimal_order(data){
+  if(data.bank)return n7FipiTask('decimal_order',data);
+  const {vals, sorted, letters, target}=data;
   const correctIndex = sorted.indexOf(target);
   const fmt = x=>{
     let s = x.toFixed(3).replace(/0+$/,'').replace(/\.$/,'');
@@ -1601,6 +1705,42 @@ function gen_decimal_order(){
     options: letters, correctIndex,
     explain: `Упорядочим числа: ${sorted.map(fmt).join(' < ')}. Так как на координатной прямой A < B < C < D, числу ${fmt(target)} соответствует точка ${letters[correctIndex]}.`
   };
+
+}
+
+function gen_decimal_order(){
+  const vals = [];
+  while(vals.length<4){
+    const sign = Math.random()<0.4 ? -1 : 1;
+    const v = sign * (Math.random()*1.2);
+    const rounded = Math.round(v*1000)/1000;
+    if(vals.some(x=>Math.abs(x-rounded)<0.01)) continue;
+    vals.push(rounded);
+  }
+  const sorted = [...vals].sort((a,b)=>a-b);
+  const letters = ['A','B','C','D'];
+  const target = pick(vals);
+  return build_decimal_order({vals, sorted, letters, target});
+}
+
+function build_sign_diff_core(data){
+  if(data.bank)return n7FipiTask(data.askPositive?'sign_diff_positive':'sign_diff_negative',data);
+  const {askPositive, letters, order, pairs, exprs, opts, correctIndex}=data;
+  const lines = pairs.map(([mi,su],i)=>{
+    const posVal = order.indexOf(mi) > order.indexOf(su);
+    const rel = posVal ? `${mi} > ${su}` : `${mi} < ${su}`;
+    const sign = posVal ? 'положительна' : 'отрицательна';
+    return `${exprs[i]}: так как ${rel}, разность ${sign}`;
+  }).join('. ');
+  return {
+    prompt: `На координатной прямой отмечены числа ${listRu(letters)}. Какая из разностей ${listRu(exprs)} ${askPositive?'положительна':'отрицательна'}?`,
+    plan: `Разность двух чисел положительна, если из большего вычесть меньшее, и отрицательна — если наоборот. Поэтому сначала нужно понять, как буквы расположены друг относительно друга на прямой (левее — меньше, правее — больше), а потом проверить каждую разность по очереди.`,
+    steps: [{type:'qa', question:`Чтобы сравнивать числа, определим порядок букв на прямой. Какая буква расположена правее всех (то есть больше всех)?`, answer: order[2]}],
+    numline: numberLineHTML(0,2,[], order.map((l,i)=>({frac:i/2, label:l}))),
+    options: opts, correctIndex,
+    explain: `${lines}. ${correctIndex===3 ? 'Ни одна из разностей не подходит.' : `Подходит: ${exprs[correctIndex]}.`}`
+  };
+
 }
 
 function gen_sign_diff_core(askPositive){
@@ -1625,21 +1765,10 @@ function gen_sign_diff_core(askPositive){
     const posVal = order.indexOf(mi) > order.indexOf(su);
     if(askPositive ? posVal : !posVal) correctIndex = i;
   });
-  const lines = pairs.map(([mi,su],i)=>{
-    const posVal = order.indexOf(mi) > order.indexOf(su);
-    const rel = posVal ? `${mi} > ${su}` : `${mi} < ${su}`;
-    const sign = posVal ? 'положительна' : 'отрицательна';
-    return `${exprs[i]}: так как ${rel}, разность ${sign}`;
-  }).join('. ');
-  return {
-    prompt: `На координатной прямой отмечены числа ${listRu(letters)}. Какая из разностей ${listRu(exprs)} ${askPositive?'положительна':'отрицательна'}?`,
-    plan: `Разность двух чисел положительна, если из большего вычесть меньшее, и отрицательна — если наоборот. Поэтому сначала нужно понять, как буквы расположены друг относительно друга на прямой (левее — меньше, правее — больше), а потом проверить каждую разность по очереди.`,
-    steps: [{type:'qa', question:`Чтобы сравнивать числа, определим порядок букв на прямой. Какая буква расположена правее всех (то есть больше всех)?`, answer: order[2]}],
-    numline: numberLineHTML(0,2,[], order.map((l,i)=>({frac:i/2, label:l}))),
-    options: opts, correctIndex,
-    explain: `${lines}. ${correctIndex===3 ? 'Ни одна из разностей не подходит.' : `Подходит: ${exprs[correctIndex]}.`}`
-  };
+  return build_sign_diff_core({askPositive, letters, order, pairs, exprs, opts, correctIndex});
 }
+function build_sign_diff_positive(data){return build_sign_diff_core({...data,askPositive:true});}
+function build_sign_diff_negative(data){return build_sign_diff_core({...data,askPositive:false});}
 function gen_sign_diff_positive(){ return gen_sign_diff_core(true); }
 function gen_sign_diff_negative(){ return gen_sign_diff_core(false); }
 
@@ -1653,27 +1782,9 @@ function cMinusA(c){
   if(c>0) return `${c} − a`;
   return `−${-c} − a`;
 }
-function gen_ineq_single(){
-  // три равновероятных случая расположения a: правее 1, между 0 и 1, левее 0
-  const zone = pick(['right','middle','left']);
-  const IP = zone==='right' ? ri(3,8) : (zone==='middle' ? 0 : -ri(1,7));
-
-  const bases = [
-    { trueE:`${aMinusC(IP)} > 0`,     falseE:`${aMinusC(IP)} < 0` },
-    { trueE:`${cMinusA(IP)} < 0`,     falseE:`${cMinusA(IP)} > 0` },
-    { trueE:`${cMinusA(IP+1)} > 0`,   falseE:`${cMinusA(IP+1)} < 0` },
-    { trueE:`${aMinusC(IP+1)} < 0`,   falseE:`${aMinusC(IP+1)} > 0` },
-    { trueE:`${aMinusC(IP+2)} < 0`,   falseE:`${aMinusC(IP+2)} > 0` },
-    { trueE:`${cMinusA(IP-1)} < 0`,   falseE:`${cMinusA(IP-1)} > 0` },
-  ];
-  const idxs = bases.map((_,i)=>i);
-  for(let i=idxs.length-1;i>0;i--){ const j=ri(0,i); [idxs[i],idxs[j]]=[idxs[j],idxs[i]]; }
-  const trueBaseIdx = idxs[0];
-  const falseBaseIdxs = idxs.slice(1,4);
-  const opts = [bases[trueBaseIdx].trueE, ...falseBaseIdxs.map(i=>bases[i].falseE)];
-  const {shuffled, correctIndex} = shuffleWithIndex(opts, 0);
-
-  const sampleA = IP + (0.3+Math.random()*0.4);
+function build_ineq_single(data){
+  if(data.bank)return n7FipiTask('ineq_single',data);
+  const {zone, IP, bases, trueBaseIdx, falseBaseIdxs, shuffled, correctIndex, sampleA}=data;
   const sampleAbsStr = Math.abs(sampleA).toFixed(1).replace('.', ',');
   const sampleStr = sampleA<0 ? `−${sampleAbsStr}` : sampleAbsStr;
   const subStr = sampleA<0 ? `(${sampleStr})` : sampleStr;
@@ -1710,6 +1821,84 @@ function gen_ineq_single(){
     options: shuffled, correctIndex,
     explain: `Число a находится между ${IP} и ${IP+1}, то есть ${IP} < a < ${IP+1}. Пусть a ≈ ${sampleStr} (для проверки знаков конкретное значение неважно). ${explainLines}.`
   };
+
+}
+
+function gen_ineq_single(){
+  // три равновероятных случая расположения a: правее 1, между 0 и 1, левее 0
+  const zone = pick(['right','middle','left']);
+  const IP = zone==='right' ? ri(3,8) : (zone==='middle' ? 0 : -ri(1,7));
+
+  const bases = [
+    { trueE:`${aMinusC(IP)} > 0`,     falseE:`${aMinusC(IP)} < 0` },
+    { trueE:`${cMinusA(IP)} < 0`,     falseE:`${cMinusA(IP)} > 0` },
+    { trueE:`${cMinusA(IP+1)} > 0`,   falseE:`${cMinusA(IP+1)} < 0` },
+    { trueE:`${aMinusC(IP+1)} < 0`,   falseE:`${aMinusC(IP+1)} > 0` },
+    { trueE:`${aMinusC(IP+2)} < 0`,   falseE:`${aMinusC(IP+2)} > 0` },
+    { trueE:`${cMinusA(IP-1)} < 0`,   falseE:`${cMinusA(IP-1)} > 0` },
+  ];
+  const idxs = bases.map((_,i)=>i);
+  for(let i=idxs.length-1;i>0;i--){ const j=ri(0,i); [idxs[i],idxs[j]]=[idxs[j],idxs[i]]; }
+  const trueBaseIdx = idxs[0];
+  const falseBaseIdxs = idxs.slice(1,4);
+  const opts = [bases[trueBaseIdx].trueE, ...falseBaseIdxs.map(i=>bases[i].falseE)];
+  const {shuffled, correctIndex} = shuffleWithIndex(opts, 0);
+
+  const sampleA = IP + (0.3+Math.random()*0.4);
+  return build_ineq_single({zone, IP, bases, trueBaseIdx, falseBaseIdxs, shuffled, correctIndex, sampleA});
+}
+
+function build_ineq_double(data){
+  if(data.bank)return n7FipiTask('ineq_double',data);
+  const {N1, N2, config, v1, v2, bases, trueBaseIdx, falseBaseIdxs, shuffled, correctIndex}=data;
+  const subVal = v => { const s = Math.abs(v).toFixed(1).replace('.', ','); return v<0 ? `(−${s})` : s; };
+  const explainLines = [bases[trueBaseIdx].trueE, ...falseBaseIdxs.map(i=>bases[i].falseE)]
+    .map(e => `${e} → ${e.replaceAll(N1, subVal(v1)).replaceAll(N2, subVal(v2))}`).join('; ');
+
+  let pictureDesc;
+  if(config==='bothPos'){
+    const [closer, farther] = v1<v2 ? [N1,N2] : [N2,N1];
+    pictureDesc = `На рисунке оба числа лежат правее нуля: ${closer} ближе к нулю, ${farther} — дальше от него, то есть 0 < ${closer} < ${farther}.`;
+  } else if(config==='bothNeg'){
+    const [closer, farther] = v1>v2 ? [N1,N2] : [N2,N1]; // ближе к нулю = больше (менее отрицательное)
+    pictureDesc = `На рисунке оба числа лежат левее нуля: ${closer} ближе к нулю, ${farther} — дальше от него, то есть ${farther} < ${closer} < 0.`;
+  } else {
+    const [negName, posName] = v1<0 ? [N1,N2] : [N2,N1];
+    pictureDesc = config==='negCloser'
+      ? `На рисунке ${negName} лежит левее нуля и находится ближе к нулю, а ${posName} — правее нуля и дальше от него.`
+      : `На рисунке ${negName} лежит левее нуля и находится дальше от него, а ${posName} — правее нуля и ближе к нулю.`;
+  }
+
+  // диапазон числовой прямой: 0 остаётся крайней точкой отсчёта, когда оба числа
+  // одного знака, и оказывается примерно посередине, когда числа разных знаков
+  let minV, maxV;
+  if(config==='bothPos'){ minV=0; maxV=Math.max(v1,v2)+1; }
+  else if(config==='bothNeg'){ maxV=0; minV=Math.min(v1,v2)-1; }
+  else { const m=Math.max(Math.abs(v1),Math.abs(v2))+1; minV=-m; maxV=m; }
+  const span = maxV-minV;
+
+  const prodSign = v1*v2>0 ? '+' : '-';
+
+  // после того как знаки чисел по рисунку понятны, ученик по очереди проверяет
+  // истинность КАЖДОГО из четырёх вариантов и только затем сам нажимает на верный
+  const optionSteps = shuffled.map((optText,i)=>({
+    type:'qa',
+    question:`Вариант <b>${i+1}) ${optText}</b> — верно ли это неравенство при таком расположении чисел? Введи 1, если верно, и 0, если неверно.`,
+    answer: i===correctIndex ? 1 : 0
+  }));
+
+  return {
+    prompt: `На координатной прямой отмечены числа <b>${N1}</b> и <b>${N2}</b>. Какое из следующих неравенств верно?`,
+    plan: `${pictureDesc} Точные значения не важны: расположения относительно нуля и друг друга достаточно, чтобы определить знак каждого выражения из вариантов. Проверим по очереди все четыре варианта, а затем выберем верный.`,
+    steps: [
+      {type:'qa', question:`Убедимся, что верно определили знаки чисел по рисунку. Какой знак у произведения ${N1}·${N2}? Введи «-» или «+».`, answer:prodSign},
+      ...optionSteps,
+    ],
+    numline: numberLineHTML(minV, maxV, [0], [{frac:(v1-minV)/span, label:N1},{frac:(v2-minV)/span, label:N2}]),
+    options: shuffled, correctIndex,
+    explain: `${pictureDesc} Пусть ${N1} ≈ ${subVal(v1)}, ${N2} ≈ ${subVal(v2)} (для проверки знаков конкретные значения неважны). ${explainLines}.`
+  };
+
 }
 
 function gen_ineq_double(){
@@ -1761,53 +1950,7 @@ function gen_ineq_double(){
   const opts = [bases[trueBaseIdx].trueE, ...falseBaseIdxs.map(i=>bases[i].falseE)];
   const {shuffled, correctIndex} = shuffleWithIndex(opts, 0);
 
-  const subVal = v => { const s = Math.abs(v).toFixed(1).replace('.', ','); return v<0 ? `(−${s})` : s; };
-  const explainLines = [bases[trueBaseIdx].trueE, ...falseBaseIdxs.map(i=>bases[i].falseE)]
-    .map(e => `${e} → ${e.replaceAll(N1, subVal(v1)).replaceAll(N2, subVal(v2))}`).join('; ');
-
-  let pictureDesc;
-  if(config==='bothPos'){
-    const [closer, farther] = v1<v2 ? [N1,N2] : [N2,N1];
-    pictureDesc = `На рисунке оба числа лежат правее нуля: ${closer} ближе к нулю, ${farther} — дальше от него, то есть 0 < ${closer} < ${farther}.`;
-  } else if(config==='bothNeg'){
-    const [closer, farther] = v1>v2 ? [N1,N2] : [N2,N1]; // ближе к нулю = больше (менее отрицательное)
-    pictureDesc = `На рисунке оба числа лежат левее нуля: ${closer} ближе к нулю, ${farther} — дальше от него, то есть ${farther} < ${closer} < 0.`;
-  } else {
-    const [negName, posName] = v1<0 ? [N1,N2] : [N2,N1];
-    pictureDesc = config==='negCloser'
-      ? `На рисунке ${negName} лежит левее нуля и находится ближе к нулю, а ${posName} — правее нуля и дальше от него.`
-      : `На рисунке ${negName} лежит левее нуля и находится дальше от него, а ${posName} — правее нуля и ближе к нулю.`;
-  }
-
-  // диапазон числовой прямой: 0 остаётся крайней точкой отсчёта, когда оба числа
-  // одного знака, и оказывается примерно посередине, когда числа разных знаков
-  let minV, maxV;
-  if(config==='bothPos'){ minV=0; maxV=Math.max(v1,v2)+1; }
-  else if(config==='bothNeg'){ maxV=0; minV=Math.min(v1,v2)-1; }
-  else { const m=Math.max(Math.abs(v1),Math.abs(v2))+1; minV=-m; maxV=m; }
-  const span = maxV-minV;
-
-  const prodSign = v1*v2>0 ? '+' : '-';
-
-  // после того как знаки чисел по рисунку понятны, ученик по очереди проверяет
-  // истинность КАЖДОГО из четырёх вариантов и только затем сам нажимает на верный
-  const optionSteps = shuffled.map((optText,i)=>({
-    type:'qa',
-    question:`Вариант <b>${i+1}) ${optText}</b> — верно ли это неравенство при таком расположении чисел? Введи 1, если верно, и 0, если неверно.`,
-    answer: i===correctIndex ? 1 : 0
-  }));
-
-  return {
-    prompt: `На координатной прямой отмечены числа <b>${N1}</b> и <b>${N2}</b>. Какое из следующих неравенств верно?`,
-    plan: `${pictureDesc} Точные значения не важны: расположения относительно нуля и друг друга достаточно, чтобы определить знак каждого выражения из вариантов. Проверим по очереди все четыре варианта, а затем выберем верный.`,
-    steps: [
-      {type:'qa', question:`Убедимся, что верно определили знаки чисел по рисунку. Какой знак у произведения ${N1}·${N2}? Введи «-» или «+».`, answer:prodSign},
-      ...optionSteps,
-    ],
-    numline: numberLineHTML(minV, maxV, [0], [{frac:(v1-minV)/span, label:N1},{frac:(v2-minV)/span, label:N2}]),
-    options: shuffled, correctIndex,
-    explain: `${pictureDesc} Пусть ${N1} ≈ ${subVal(v1)}, ${N2} ≈ ${subVal(v2)} (для проверки знаков конкретные значения неважны). ${explainLines}.`
-  };
+  return build_ineq_double({N1, N2, config, v1, v2, bases, trueBaseIdx, falseBaseIdxs, shuffled, correctIndex});
 }
 
 function build_sqrt_bracket(n, pairs){
@@ -1863,20 +2006,9 @@ function gen_sqrt_segment(){
   return build_sqrt_segment([correctR, below, above1, above2].sort((x,y)=>x-y), n);
 }
 
-function gen_sqrt_point_at_letter(){
-  const k = ri(3,9);
-  const n = ri(k*k+1, (k+1)*(k+1)-1);
-  const cands = [
-    {frac:0.15,label:'A'}, {frac:0.4,label:'B'}, {frac:0.6,label:'C'}, {frac:0.85,label:'D'}
-  ];
-  const trueFrac = Math.sqrt(n)-k;
-  let best=0, bestGap=Infinity, second=Infinity;
-  cands.forEach((c,i)=>{
-    const gap = Math.abs(c.frac-trueFrac);
-    if(gap<bestGap){ second=bestGap; bestGap=gap; best=i; }
-    else if(gap<second){ second=gap; }
-  });
-  if(second-bestGap < 0.08) return gen_sqrt_point_at_letter();
+function build_sqrt_point_at_letter(data){
+  if(data.bank)return n7FipiTask('sqrt_point_at_letter',data);
+  const {k, n, cands, best}=data;
   const options = ['A','B','C','D'];
   const correctIndex = best;
   const closer = (n - k*k) > ((k+1)*(k+1) - n) ? (k+1) : k;
@@ -1891,6 +2023,44 @@ function gen_sqrt_point_at_letter(){
     options, correctIndex,
     explain: `${k}² = ${k*k} < ${n} < ${(k+1)*(k+1)} = ${k+1}², значит ${k} < √${n} < ${k+1}. Число √${n} ближе к ${closer} — это точка ${options[best]}.`
   };
+
+}
+
+function gen_sqrt_point_at_letter(){
+  const k = ri(3,9);
+  const n = ri(k*k+1, (k+1)*(k+1)-1);
+  const cands = [
+    {frac:0.15,label:'A'}, {frac:0.4,label:'B'}, {frac:0.6,label:'C'}, {frac:0.85,label:'D'}
+  ];
+  const trueFrac = Math.sqrt(n)-k;
+  let best=0, bestGap=Infinity, second=Infinity;
+  cands.forEach((c,i)=>{
+    const gap = Math.abs(c.frac-trueFrac);
+    if(gap<bestGap){ second=bestGap; bestGap=gap; best=i; }
+    else if(gap<second){ second=gap; }
+  });
+  if(second-bestGap < 0.08) return gen_sqrt_point_at_letter();
+  return build_sqrt_point_at_letter({k, n, cands, best});
+}
+
+function build_sqrt_choice(data){
+  if(data.bank)return n7FipiTask('sqrt_choice',data);
+  const {n, lowSq, highSq, c1, c2, target, nums, closerToLow}=data;
+  const correctIndex = nums.indexOf(target);
+  const opts = nums.map(sqrtStr);
+  const frac = Math.sqrt(target)-n;
+  return {
+    prompt: `Одно из чисел ${listRu(opts)} отмечено на прямой точкой <b>A</b>. Какое это число?`,
+    plan: `Возведём границы отрезка [${n};${n+1}] в квадрат, чтобы понять, какие из чисел под корнем в него попадают, — остальные варианты сразу отпадут. Затем по положению точки A определим, какой из оставшихся подходит.`,
+    steps: [
+      {type:'qa', question:`Возведём в квадрат левую границу отрезка. Чему равно ${n}²?`, answer:n*n},
+      {type:'qa', question:`Теперь возведём в квадрат правую границу. Чему равно ${n+1}²?`, answer:(n+1)*(n+1)},
+    ],
+    numline: numberLineHTML(n,n+1,[n,n+1], [{frac, label:'A'}]),
+    options: opts, correctIndex,
+    explain: `${n}² = ${lowSq}, ${(n+1)}² = ${highSq}. Из вариантов в интервал (${lowSq}; ${highSq}) попадают √${c1} и √${c2}. Точка A на прямой ${closerToLow?`ближе к ${n}`:`ближе к ${n+1}`}, значит это ${sqrtStr(target)}.`
+  };
+
 }
 
 function gen_sqrt_choice(){
@@ -1906,20 +2076,7 @@ function gen_sqrt_choice(){
   const closerToLow = Math.random()<0.5;
   const target = closerToLow ? c1 : c2;
   const nums = [c1,c2,d1,d2].sort((x,y)=>x-y);
-  const correctIndex = nums.indexOf(target);
-  const opts = nums.map(sqrtStr);
-  const frac = Math.sqrt(target)-n;
-  return {
-    prompt: `Одно из чисел ${listRu(opts)} отмечено на прямой точкой <b>A</b>. Какое это число?`,
-    plan: `Возведём границы отрезка [${n};${n+1}] в квадрат, чтобы понять, какие из чисел под корнем в него попадают, — остальные варианты сразу отпадут. Затем по положению точки A определим, какой из оставшихся подходит.`,
-    steps: [
-      {type:'qa', question:`Возведём в квадрат левую границу отрезка. Чему равно ${n}²?`, answer:n*n},
-      {type:'qa', question:`Теперь возведём в квадрат правую границу. Чему равно ${n+1}²?`, answer:(n+1)*(n+1)},
-    ],
-    numline: numberLineHTML(n,n+1,[n,n+1], [{frac, label:'A'}]),
-    options: opts, correctIndex,
-    explain: `${n}² = ${lowSq}, ${(n+1)}² = ${highSq}. Из вариантов в интервал (${lowSq}; ${highSq}) попадают √${c1} и √${c2}. Точка A на прямой ${closerToLow?`ближе к ${n}`:`ближе к ${n+1}`}, значит это ${sqrtStr(target)}.`
-  };
+  return build_sqrt_choice({n, lowSq, highSq, c1, c2, target, nums, closerToLow});
 }
 
 /* ═══════════════ демоверсия ОГЭ-2027 ═══════════════
@@ -1982,7 +2139,8 @@ const FIPI_BANK = window.OGE7_FIPI || null;
 const FIPI_ALL = new URLSearchParams(location.search).get('all') === '1';
 const FIPI_BUILD = { int_bracket: build_int_bracket, decimal_interval: build_decimal_interval,
   between_fracs: build_between_fracs, segment_member: build_segment_member,
-  sqrt_bracket: build_sqrt_bracket, sqrt_segment: build_sqrt_segment };
+  sqrt_bracket: build_sqrt_bracket, sqrt_segment: build_sqrt_segment ,
+  point_on_line_int: build_point_on_line_int, point_on_line_decimal: build_point_on_line_decimal, point_value_at_letter: build_point_value_at_letter, decimal_order: build_decimal_order, sign_diff_positive: build_sign_diff_positive, sign_diff_negative: build_sign_diff_negative, ineq_single: build_ineq_single, ineq_double: build_ineq_double, sqrt_point_at_letter: build_sqrt_point_at_letter, sqrt_choice: build_sqrt_choice };
 if (FIPI_BANK && window.FipiMix) {
   MODES.forEach(m => {
     if (m.demo || !FIPI_BUILD[m.id]) return;
