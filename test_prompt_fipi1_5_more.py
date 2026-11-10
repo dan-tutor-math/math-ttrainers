@@ -1,7 +1,7 @@
 """
 Правка «банк ФИПИ №15–18 и №1–5, без сайта»: в oge1_5 — сюжеты «Листы
 бумаги» (20 заданий, по 4 на номер) и «Печь для бани» (8 заданий, по 2 на
-номера 1–4; задание 5 — радиус арки по рисунку — ждёт картинок ФИПИ) из
+номера 1–5; задание 5 — радиус арки по рисунку, добавлено 10.11.2026) из
 открытого банка ФИПИ. Условие ФИПИ хранится в банке как есть (с таблицами),
 решение — строками. Ответы ещё не сверены сайтом ФИПИ — ученику не видны,
 ?all=1 — предпросмотр.
@@ -48,7 +48,11 @@ EXPECT = {
     "EA5C1C": 1250, "CC70B9": 4800, "B8AF15": 21, "07E7B1": 11,          # масса пачки, шрифт
     "30DDBA": 312, "74CB1E": 321, "CD3CFF": 15.4, "2789BB": 7.7,         # баня
     "888F31": 2000, "908015": 4500, "8A06F1": 16200, "FEDFE6": 17550,
+    # радиус арки: R² = (ширина / 2)² + высота стенки², размеры с рисунка 2
+    "BE99C7": 65,    # 25² + 60² = 4225 = 65²
+    "59DCD0": 50,    # 30² + 40² = 2500 = 50²
 }
+ARCH = {"BE99C7", "59DCD0"}
 
 
 @contextlib.contextmanager
@@ -114,13 +118,16 @@ def answer(page, v):
 
 def test_bank(bank):
     more = [t for t in bank["tasks"] if t["plot"] in ("paper", "bath")]
-    check("банк: 28 заданий листов и бани, номера уникальны", len(more) == 28 and len({t["fipi"] for t in more}) == 28, str(len(more)))
+    check("банк: 30 заданий листов и бани, номера уникальны", len(more) == 30 and len({t["fipi"] for t in more}) == 30, str(len(more)))
     per = {(p, n): sum(1 for t in more if t["plot"] == p and t["n"] == n) for p in ("paper", "bath") for n in range(1, 6)}
-    check("банк: у листов по 4 задания на номер 1–5, у бани по 2 на 1–4",
-          all(per[("paper", n)] == 4 for n in range(1, 6)) and all(per[("bath", n)] == 2 for n in range(1, 5)) and per[("bath", 5)] == 0, str(per))
+    check("банк: у листов по 4 задания на номер 1–5, у бани по 2 на 1–5",
+          all(per[("paper", n)] == 4 for n in range(1, 6)) and all(per[("bath", n)] == 2 for n in range(1, 6)), str(per))
     bad = [(t["fipi"], t["ans"], EXPECT.get(t["fipi"])) for t in more if EXPECT.get(t["fipi"]) is None or abs(t["ans"] - EXPECT[t["fipi"]]) > 1e-9]
     check("банк: ответ каждого задания совпал с посчитанным вручную", not bad, str(bad[:3]))
-    check("банк: у бани задание 5 (радиус арки) ждёт картинок", bank["plots"]["bath"]["wait"] == [5, 5], str(bank["plots"]["bath"].get("wait")))
+    check("банк: у бани ничего не ждёт картинок", bank["plots"]["bath"]["wait"] == [], str(bank["plots"]["bath"].get("wait")))
+    arch = [t for t in more if t["fipi"] in ARCH]
+    check("банк: у радиуса арки в условии оба рисунка ФИПИ",
+          len(arch) == 2 and all(t["prompt"].count('<img class="fipi-fig" src="oge1_5-fipi/') == 2 for t in arch))
     junk = [t["fipi"] for t in more if re.search(r"MsoNormal|<m:|</p>\s*<p>\s*</td>|&nbsp;|<script", t["prompt"])]
     check("банк: условие ФИПИ вычищено (без MsoNormal, MathML, скриптов)", not junk, str(junk[:3]))
 
@@ -130,7 +137,7 @@ def test_page(browser, bank):
     soon = page.eval_on_selector_all('#modesGrid .group-title', 'es => es.map(e => e.textContent.trim())')
     # после сверки 02.11.2026 листы и баня открыты ученику; до неё — «скоро»
     more = [t for t in bank["tasks"] if t["plot"] in ("paper", "bath")]
-    verified = all(t.get("checked") for t in more)
+    verified = all(t.get("checked") for t in more if t["fipi"] not in ARCH)
     if verified:
         check("без ?all=1: листы и баня открыты (ответы сверены ФИПИ)",
               page.query_selector('.mode-card[data-id="paper_fipi"]') and page.query_selector('.mode-card[data-id="bath_fipi"]'), str(soon))
@@ -184,12 +191,18 @@ def test_page(browser, bank):
     ctx, page, errors = new_page(browser, f"{BASE}/oge1_5.html?all=1")
     page.click('.mode-card[data-id="bath_fipi"]'); page.wait_for_timeout(300)
     nav = page.evaluate("curTasksetRef.tasks.map(t => t.id)")
-    check("баня: задания 1–4", nav == ["bathfipi_t1", "bathfipi_t2", "bathfipi_t3", "bathfipi_t4"], str(nav))
+    check("баня (?all=1): задания 1–5", nav == ["bathfipi_t1", "bathfipi_t2", "bathfipi_t3", "bathfipi_t4", "bathfipi_t5"], str(nav))
     th = page.evaluate("document.getElementById('theoryContent').innerHTML")
     check("баня: в теории таблица печей", "data-table" in th and "электрическая" in th and "9–15,5" in th)
     t = by[SRC_RE.match(src(page)).group(1)]
     answer(page, fmt(EXPECT[t["fipi"]]))
     check("баня: задание 1 (соответствие) засчитано", page.evaluate("taskAnswered"), t["fipi"])
+    page.evaluate("setCurMode('bathfipi_t5'); openTask()"); page.wait_for_timeout(400)
+    t = by[SRC_RE.match(src(page)).group(1)]
+    imgs = page.eval_on_selector_all('#questionPromptText img.fipi-fig', 'es => es.map(e => e.naturalWidth)')
+    check("баня, задание 5: оба рисунка загрузились", len(imgs) == 2 and all(w > 0 for w in imgs), str(imgs))
+    answer(page, str(EXPECT[t["fipi"]]))
+    check("баня, задание 5: радиус засчитан", page.evaluate("taskAnswered"), t["fipi"])
     check("баня: без ошибок JS", not errors, str(errors[:1]))
     ctx.close()
 
