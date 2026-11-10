@@ -18,6 +18,8 @@ IDB_INDEX_VERSION станет больше 2), такая вкладка зат
   В. Обычная работа с __v: 2 — объект сохраняется, плашки нет
   Г. «Пересобрать хранилище» при замке ничего не пишет
   Д. Страница просмотра (?s=КОД) — плашки нет
+  Е. Пересборка: соседняя вкладка обновилась после копирования основной базы —
+     основную базу не удаляем, формат нового кода не откатывается
 
 Запуск: ~/.venvs/trainers/bin/python test_prompt_boards_format_lock.py
 """
@@ -214,6 +216,32 @@ def run():
         disk = page.evaluate(READ_DISK)
         check(f"Д: хранилище не тронуто ({disk})", disk["v"] == 3 and disk["objs"] == 3)
 
+    def case_e(page):
+        seed(page, 2)
+        boot(page)
+        # соседняя вкладка с новым кодом успевает записать индекс __v: 3 в основную
+        # базу СРАЗУ ПОСЛЕ того, как пересборка скопировала её во временную, —
+        # в копии остаётся старый формат, и проверка одной копии это не ловит
+        page.evaluate("() => { const orig = rawIdbCopy; let done = false;"
+                      " rawIdbCopy = async (...a) => { const r = await orig(...a);"
+                      " if (!done) { done = true; await (" + BUMP_TO_V3 + ")(); } return r; }; }")
+        page.evaluate("() => { window.__rb = rebuildStorage(); }")
+        page.wait_for_timeout(3500)
+        disk = None
+        for _ in range(8):   # на старом коде страница после пересборки перезагружается
+            try:
+                disk = page.evaluate(READ_DISK)
+                break
+            except Exception:
+                page.wait_for_timeout(500)
+        check(f"Е: формат нового кода не откатился, доска цела ({disk})", bool(disk) and disk["v"] == 3 and disk["objs"] == 3)
+        check("Е: замок поднят", page.evaluate(LOCKED))
+        check("Е: плашка bdOutdated видна", page.evaluate(BANNER_VISIBLE))
+        dbs = page.evaluate("() => indexedDB.databases().then(l => l.map(d => d.name))")
+        check(f"Е: временной базы пересборки нет ({dbs})", "ogeBoardsDB_rebuild" not in dbs)
+        check("Е: этап пересборки не записан",
+              page.evaluate("() => localStorage.getItem('boardsRebuildStage')") is None)
+
     with T48.local_server(), sync_playwright() as p:
         browser = p.chromium.launch()
         case(browser, "А. На диске формат новее", case_a)
@@ -222,6 +250,7 @@ def run():
         case(browser, "В. Обычная работа с __v: 2", case_v)
         case(browser, "Г. Пересборка хранилища при замке", case_g)
         case(browser, "Д. Страница просмотра ?s=КОД", case_d)
+        case(browser, "Е. Пересборка: соседняя вкладка обновилась после копирования", case_e)
         browser.close()
 
     print()

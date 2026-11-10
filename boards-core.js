@@ -1339,10 +1339,16 @@ async function rebuildStorage(){
     const tmp = await rawIdbOpen(IDB_TMP_NAME);
     const main = await idbOpen();
     await rawIdbCopy(main, tmp, (i, n) => rebuildStatus(`Копирую: ${i} из ${n}`));
-    // пока шла пересборка, соседняя вкладка могла обновиться — тогда в копии
-    // индекс нового формата, и удалять основную базу ради записи старым
-    // кодом нельзя: убираем копию и останавливаемся
-    if (boardsStorageLocked || storedIsNewer(await rawIdbReq(tmp, 'readonly', st => st.get('db')))) {
+    // пока шла пересборка, соседняя вкладка могла обновиться — тогда индекс
+    // нового формата лежит в копии (успела до копирования) или ТОЛЬКО в
+    // основной базе (записала уже после): смотрим обе, и основную — самой
+    // последней, чтобы от проверки до удаления шло только синхронное. Тогда
+    // удалять основную базу ради записи старым кодом нельзя: убираем копию
+    // и останавливаемся. Полностью закрыть щель нельзя — IndexedDB не умеет
+    // «проверить и удалить» одним действием, — но она сжата до долей секунды
+    const tmpIdx = await rawIdbReq(tmp, 'readonly', st => st.get('db'));
+    const mainIdx = await rawIdbReq(main, 'readonly', st => st.get('db'));
+    if (boardsStorageLocked || storedIsNewer(tmpIdx) || storedIsNewer(mainIdx)) {
       tmp.close();
       await rawIdbDelete(IDB_TMP_NAME);
       lockStorage();
