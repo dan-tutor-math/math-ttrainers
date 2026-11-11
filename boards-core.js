@@ -8832,7 +8832,11 @@ function buildTaskOverlay(obj){
       const r = hot.fields[i]; if (!r) return;
       const inp = document.createElement('input');
       inp.type = 'text'; inp.className = 'bd-task-in'; inp.autocomplete = 'off'; inp.spellcheck = false;
-      inp.setAttribute('inputmode', f.type === 'yesno' ? 'text' : 'decimal');
+      // слово, словосочетание, «да/нет» набирают буквами — обычная клавиатура
+      // устройства; числа и номера вариантов — цифровая (taFieldIsText)
+      const isText = typeof taFieldIsText === 'function' ? taFieldIsText(f) : f.type === 'yesno';
+      inp.setAttribute('inputmode', isText ? 'text' : 'decimal');
+      if (isText){ inp.setAttribute('autocapitalize', 'off'); inp.setAttribute('autocorrect', 'off'); }
       inp.placeholder = '?';
       inp.dataset.fid = f.id;
       if (sty.inBg) inp.style.background = sty.inBg;
@@ -8846,8 +8850,8 @@ function buildTaskOverlay(obj){
       });
       inp.addEventListener('keydown', (e) => { if (e.key === 'Enter'){ e.preventDefault(); taskCheck(id); } });
       // №108: своя клавиатура с √ / ± ; — системной цифровой этих знаков
-      // нет, а «да/нет» набирают словами, ему она не нужна
-      if (window.BoardAnswerPad && f.type !== 'yesno') BoardAnswerPad.attach(inp, { onCheck: () => taskCheck(id) });
+      // нет, а «да/нет» и слова набирают буквами, им она не нужна
+      if (window.BoardAnswerPad && !isText) BoardAnswerPad.attach(inp, { onCheck: () => taskCheck(id) });
       root.appendChild(inp);
       rec.inputs.push(inp);
     });
@@ -9108,7 +9112,9 @@ function taskCheck(id){
       const empty = t.fields.some(f => !vals[f.id]);
       const f0 = t.fields.find(f => marks[f.id] === null) || t.fields[0];
       taskFlash(id, empty ? 'Сначала впишите ответ'
-        : (f0.seq ? 'Цифры подряд, без запятых — например, 135'
+        : (f0.seq ? (f0.exactLen ? 'Цифры подряд, без запятых: ровно ' + String(f0.value).length : 'Цифры подряд, без запятых — например, 135')
+          : f0.type === 'yesno' ? (f0.choices && f0.choices.length ? 'Впишите номер варианта: ' + f0.choices.join(', ') : 'Ответьте «да» или «нет»')
+          : (f0.type === 'word' || f0.type === 'term') ? 'Впишите слово'
           : (f0.type === 'nums' ? 'Числа через «;», например: −2; 5' : 'Запишите числом, например 2,5 или 3/4')));
       return;
     }

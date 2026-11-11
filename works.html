@@ -1453,7 +1453,9 @@ function answerText(t, v){
 }
 function correctText(t){
   if (!t) return '';
-  if (t.kind === 'fields') return (t.fields || []).map(f => String(f.value == null ? '' : f.value) || 'нет корней').join('; ');
+  // у слова запасные ответы ключа ФИПИ (alts) тоже верные — учителю видно, что ещё принимается
+  if (t.kind === 'fields') return (t.fields || []).map(f => (String(f.value == null ? '' : f.value) || 'нет корней')
+    + ((f.type === 'word' || f.type === 'term') && (f.alts || []).length ? ' (или ' + f.alts.join(', ') + ')' : '')).join('; ');
   if (t.kind === 'choice') return 'вариант ' + (t.correct + 1);
   if (t.kind === 'multi') return (t.correct || []).map(i => i + 1).join(', ') || 'ни одного';
   return '';

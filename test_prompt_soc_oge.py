@@ -11,7 +11,9 @@
   3. навигация как в математике: ◀ ▶ над названием по №1–20, «← все задания», «◀ Предыдущий тип /
      Следующий тип ▶» по видам внутри номера, «◀ Предыдущее / Следующее задание ▶», ⟳ — задание
      того же вида, 📥 «В подборку», счётчик и «История решённого» самой нижней кнопкой;
-  4. ответы: выбор — одна попытка в «Экзамене» и две в «Тренировке», №2 без регистра и «ё/е», №3
+  4. ответы: выбор — нажатием на сам вариант, как в ОГЭ №7 (без строки «Ответ: 1 2 3 4»), одна
+     попытка в «Экзамене» и две в «Тренировке», цифры 1–4 с клавиатуры и Enter, тот же st.yn у
+     собеседника в совместной сессии; №2 без регистра и «ё/е», №3
      с перестановкой внутри колонки (и без неё, если нет флага), №14 — «1 балл из 2» без указания
      позиции, неполный ответ — просьба дописать, а не ошибка, разбор и ответ после решения;
   5. как в математике, но без калькулятора, клавиатуры, «+» и клетки на доске; цвет — зелёный
@@ -103,6 +105,17 @@ def open_first_task(page, n):
 def check_btn(page):
     page.click("#answerArea .check-btn")
     page.wait_for_timeout(150)
+
+
+def opt(val):
+    """Вариант ответа — кнопка в самом условии (EXAM.optButtons), а не строка «Ответ: 1 2 3 4»"""
+    return f'#questionText .soc-opts > .soc-opt[data-val="{val}"]'
+
+
+def opt_state(page):
+    """классы четырёх вариантов: ['sel', 'correct wrong', …]"""
+    return page.evaluate("[...document.querySelectorAll('#questionText .soc-opts > .soc-opt')].map(e => "
+                         "['sel', 'correct', 'wrong', 'disabled'].filter(c => e.classList.contains(c)).join(' '))")
 
 
 def stats(page):
@@ -232,32 +245,99 @@ def main():
         check(page.evaluate("S.n") == 17, "▶ с №16 — №17, задание из демоверсии")
 
         print("4. ответы: выбор, №2, №3, №14")
-        # выбор одного из четырёх
+        # выбор одного из четырёх — нажатием на сам вариант, как в ОГЭ №7
         open_first_task(page, 9)
         key = page.evaluate("fieldsOf(curProto)[0].value")
         wrong = next(c for c in "1234" if c != key)
-        check(page.locator("#answerArea .yn-btn").count() == 4, "выбор — кнопки 1, 2, 3, 4")
-        check("Проверить" == page.inner_text("#answerArea .check-btn").strip(), "кнопка «Проверить»")
+        check(page.locator("#answerArea .yn-btn").count() == 0 and page.locator("#answerArea .p2-field").count() == 0,
+              "строки «Ответ: 1 2 3 4» нет")
+        check(page.locator("#questionText .soc-opts > div.soc-opt.opt-btn[role=button][data-bd-opt]").count() == 4
+              and [page.get_attribute(f"#questionText .soc-opt >> nth={i}", "data-val") for i in range(4)] == list("1234"),
+              "варианты — четыре кнопки (role=button) с пометкой data-bd-opt, по номерам 1–4")
+        check(page.evaluate("document.querySelector('#questionText .soc-opt').textContent.trim().startsWith('1)')"),
+              "в кнопке номер и текст варианта")
+        check("Проверить" == page.inner_text("#answerArea .check-btn").strip(), "кнопка «Проверить» (для клавиатуры)")
         check_btn(page)
-        check("Заполни" in page.inner_text("#answerArea .answer-msg") and stats(page)[1] == 0, "без выбора — просьба ответить, не ошибка")
-        page.click(f'#answerArea .yn-btn[data-val="{wrong}"]')
-        check_btn(page)
+        check("Выбери" in page.inner_text("#answerArea .answer-msg") and stats(page)[1] == 0, "без выбора — просьба ответить, не ошибка")
+        page.click(opt(wrong))
+        page.wait_for_timeout(150)
         check(page.evaluate("S.answered && !S.correct") and stats(page)[1] == 1, "«Экзамен»: одна попытка на выбор, сразу ответ")
+        st = opt_state(page)
+        check(st[int(wrong) - 1] == "wrong disabled" and st[int(key) - 1] == "correct disabled",
+              f"выбранный — красным, верный подсвечен, все закрыты ({st})")
+        before = stats(page)
+        page.click(opt(key), force=True)
+        page.wait_for_timeout(100)
+        check(stats(page) == before and page.evaluate("!S.correct"), "после ответа варианты не нажимаются")
+        check(page.evaluate("S.yn.a") == wrong or page.evaluate("Object.values(S.yn)[0]") == wrong, "выбор лежит в S.yn (то же состояние, что у кнопок-номеров)")
         check(page.is_visible("#solSteps") and "Верный вариант" in page.inner_text("#solSteps"), "открыт верный вариант")
         check(page.is_visible("#solAnswer") and key in page.inner_text("#solAnswer"), "ответ под разбором")
         check("(1)" in page.inner_text("#exampleHistoryToggle"), "история решённого — 1")
         page.click("#nextBtn")
         page.wait_for_timeout(150)
+        check(opt_state(page) == [""] * 4 and not page.evaluate("S.answered"), "в новом задании варианты чистые")
         page.click("#tabPractice")
         key = page.evaluate("fieldsOf(curProto)[0].value")
         wrong = next(c for c in "1234" if c != key)
         check(page.is_visible("#showSolutionBtn"), "«Тренировка»: кнопка «Показать решение и ответ»")
-        page.click(f'#answerArea .yn-btn[data-val="{wrong}"]')
-        check_btn(page)
+        page.click(opt(wrong))
+        page.wait_for_timeout(150)
         check(not page.evaluate("S.answered"), "«Тренировка»: после ошибки можно ещё раз")
-        page.click(f'#answerArea .yn-btn[data-val="{key}"]')
-        check_btn(page)
+        st = opt_state(page)
+        check(st[int(wrong) - 1] == "wrong" and st[int(key) - 1] == "", f"неверный — красным, верный пока не открыт ({st})")
+        page.click(opt(key))
+        page.wait_for_timeout(150)
         check(page.evaluate("S.answered && S.correct"), "вторая попытка верна — засчитано")
+        st = opt_state(page)
+        check(st[int(key) - 1] == "correct disabled", f"верный — зелёным ({st})")
+
+        # клавиатура: цифра выбирает, Enter проверяет
+        page.click("#nextBtn")
+        page.wait_for_timeout(150)
+        page.click("#tabExam")
+        key = page.evaluate("fieldsOf(curProto)[0].value")
+        wrong = next(c for c in "1234" if c != key)
+        page.evaluate("document.activeElement && document.activeElement.blur()")
+        page.keyboard.press("7")
+        check(opt_state(page) == [""] * 4, "цифры вне 1–4 ничего не выбирают")
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(100)
+        check("Выбери" in page.inner_text("#answerArea .answer-msg") and not page.evaluate("S.answered"), "Enter без выбора — просьба выбрать")
+        page.keyboard.press(wrong)
+        check(page.evaluate("S.yn.a") == wrong and not page.evaluate("S.answered"), "цифра выбирает вариант, не проверяя")
+        check(opt_state(page)[int(wrong) - 1] == "sel", "выбранный вариант с рамкой")
+        check(page.evaluate("document.activeElement.dataset.val") == wrong, "фокус на выбранном варианте: Enter на нём проверяет")
+        page.keyboard.press(key)
+        check(page.evaluate("S.yn.a") == key and opt_state(page).count("sel") == 1, "другая цифра переносит выбор")
+        page.keyboard.press("Enter")
+        page.wait_for_timeout(150)
+        check(page.evaluate("S.answered && S.correct"), "Enter — проверить: верно")
+        st = opt_state(page)
+        check(st[int(key) - 1] == "correct disabled", "верный выбранный зелёный")
+        # цифра в поле ввода — это цифра в поле, а не выбор
+        open_first_task(page, 3)
+        page.click("#answerArea input.answer-input")
+        page.keyboard.type("12")
+        check(page.input_value("#answerArea input.answer-input") == "12" and not page.evaluate("Object.keys(S.yn).length"),
+              "№3 (поле): цифры набираются в поле")
+
+        # у всех заданий с выбором — кнопки, у остальных — прежнее поле
+        bad = page.evaluate("""async (nums) => {
+          const bad = [];
+          for (const n of nums) {
+            await new Promise(r => ensureFipi(n, r));
+            for (const p of protos(n)) {
+              openTask(n, p.id);
+              const f = fieldsOf(p)[0];
+              const btns = document.querySelectorAll('#questionText .soc-opts > div.soc-opt.opt-btn[role=button][data-bd-opt]').length;
+              const rows = document.querySelectorAll('#answerArea .yn-btn').length;
+              if (f.type === 'yesno') { if (btns !== f.choices.length || rows) bad.push(p.id + ': ' + btns + '/' + rows); }
+              else if (btns || !document.querySelector('#answerArea input.answer-input')) bad.push(p.id + ': поле');
+            }
+          }
+          return bad;
+        }""", [4, 5, 6, 9, 10, 11, 13, 15, 16])
+        check(not bad, f"№4, 5, 6, 9, 10, 11, 13, 15, 16: у каждого задания с выбором — кнопки-варианты, строки «Ответ» нет ({bad[:4]})")
         # №2: слово
         open_first_task(page, 2)
         key = page.evaluate("fieldsOf(curProto)[0].value")
@@ -335,8 +415,9 @@ def main():
         open_first_task(page, 10)
         page.click("#nextProtoBtn")
         page.wait_for_timeout(150)
-        page.click(f'#answerArea .yn-btn[data-val="{page.evaluate("fieldsOf(curProto)[0].value")}"]')
-        check_btn(page)
+        key10 = page.evaluate("fieldsOf(curProto)[0].value")
+        page.click(opt(key10))
+        page.wait_for_timeout(150)
         snap = page.evaluate("tsGetState()")
         ctx2, page2, err2 = new_page(browser)
         open_n(page2, 1)
@@ -344,12 +425,28 @@ def main():
         page2.wait_for_timeout(800)
         check(page2.evaluate("S.n") == 10 and page2.evaluate("S.pid") == snap["egePid"], "снимок переносит номер и задание")
         check(page2.evaluate("S.answered && S.correct"), "и результат проверки")
+        check(opt_state(page2)[int(key10) - 1] == "correct disabled" and page2.evaluate("Object.values(S.yn)[0]") == key10,
+              "у собеседника верный вариант зелёный: тот же S.yn")
+        # и наоборот: собеседник выбирает цифрой (ещё без проверки) — выбор виден первой вкладке
+        page2.evaluate("openTask(S.n, protoNeighbour(1).id)")
+        page2.wait_for_timeout(150)
+        k2 = page2.evaluate("fieldsOf(curProto)[0].value")
+        w2 = next(c for c in "1234" if c != k2)
+        page2.keyboard.press(w2)
+        snap2 = page2.evaluate("tsGetState()")
+        page.evaluate("s => tsApplyState(s)", snap2)
+        page.wait_for_timeout(400)
+        check(page.evaluate("S.pid") == snap2["egePid"] and page.evaluate("Object.values(S.yn)[0]") == w2
+              and opt_state(page)[int(w2) - 1] == "sel", "выбор собеседника виден на первой вкладке")
         check(not err2, f"на второй вкладке ошибок нет ({err2[:2]})")
         ctx2.close()
         page.click("#basketAddBtn")
         page.wait_for_timeout(300)
         items = page.evaluate("window.Basket ? Basket.all() : []")
         check(any(it.get("trainerId") == "soc10" for it in items), "«В подборку» — задание с id soc10")
+        mine = next((it for it in items if it.get("trainerId") == "soc10"), {})
+        check("<button" not in mine.get("html", "") and all(f'<div class="basket-block">{i})' in mine.get("html", "") for i in "1234")
+              and "opt-btn" not in mine.get("html", ""), "в подборке варианты прежним списком, без кнопок")
 
         print("7. главная и старые адреса")
         page.goto(f"{BASE}/index.html?subject=soc")

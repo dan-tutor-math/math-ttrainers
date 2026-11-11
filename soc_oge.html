@@ -240,6 +240,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .basket-add-btn.ok{background:var(--ok, #34c759);border-color:var(--ok, #34c759);color:#fff;}
 .task-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3);}
 .panel{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:20px;margin-bottom:14px;}
+@keyframes correctPop{0%{transform:scale(.94);}55%{transform:scale(1.025);}100%{transform:scale(1);}}
 @keyframes revealUp{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
 #mainPanel.reveal{animation:revealUp .38s cubic-bezier(.22,.9,.35,1) both;}
 
@@ -512,6 +513,20 @@ html[data-theme="dark"][data-subject="soc"] .next-btn{background:#1F7A36;}
 .soc-opts{display:flex;flex-direction:column;gap:6px;margin-top:12px;}
 .soc-opt{display:flex;gap:10px;}
 .soc-opt b{flex:0 0 auto;min-width:20px;color:var(--ink);}
+/* Варианты ответа нажатием (EXAM.optButtons, обществознание): тот же вид, что у .mcq-btn в ОГЭ №7
+   (oge7.html) — рамка, наведение, нажатие, «верно» зелёным, «неверно» красным. Вариант — div с
+   role=button: с клавиатуры в него попадают Tab, Enter и пробел, а на снимке для доски он помечен data-bd-opt */
+.soc-opt.opt-btn{align-items:center;text-align:left;font-family:var(--font-ui);font-weight:400;font-size:clamp(16px,2.6vw,18px);line-height:1.45;color:var(--pencil);
+  background:var(--card);border:1.5px solid var(--glass-border);border-radius:14px;padding:12px 16px;cursor:pointer;
+  transition:transform .15s, border-color .12s, background .12s;}
+.soc-opt.opt-btn b{font-weight:700;color:var(--muted-1);}
+.soc-opt.opt-btn:hover:not(.disabled){border-color:var(--ink);}
+.soc-opt.opt-btn:active:not(.disabled){transform:scale(.98);}
+.soc-opt.opt-btn:focus-visible{outline:3px solid var(--ink);outline-offset:2px;}
+.soc-opt.opt-btn.sel{border-color:var(--ink);background:var(--hl-10);}
+.soc-opt.opt-btn.correct{border-color:var(--ok);background:var(--ok-tint);color:var(--ok);animation:correctPop .32s ease;}
+.soc-opt.opt-btn.wrong{border-color:var(--teacher);background:rgba(255,59,48,.1);color:var(--teacher);}
+.soc-opt.opt-btn.disabled{cursor:default;}
 .soc-note{font-size:13.5px;line-height:1.45;color:var(--pencil);background:var(--hl-10);border-radius:12px;padding:10px 12px;margin-bottom:12px;}
 .soc-text-box{background:var(--card);border:1px solid var(--glass-border);border-radius:16px;margin-bottom:16px;}
 .soc-text-box summary{cursor:pointer;padding:12px 16px;font-weight:600;font-size:14px;color:var(--ink);}
@@ -873,6 +888,7 @@ const EXAM = {
   proofLabel: 'Сверить с образцом и критериями',
   subject: 'soc',            // зелёный цвет обществознания, как на главной
   noKeypad: true,            // цифровой клавиатуры нет
+  optButtons: true,          // выбор 1–4 — нажатием на сам вариант, как в ОГЭ №7, а не строкой «Ответ: 1 2 3 4»
   noAddRail: true,           // колонки «+» (ещё задания рядом) нет
   noBoardGrid: true,         // доска на тренажёре без клетчатой подложки
   proofDraft: true,          // поле-черновик у развёрнутого ответа
@@ -1059,7 +1075,8 @@ if (EXAM.boardPinned) document.documentElement.setAttribute('data-board-pinned',
    - noMathSyms — нет π, √ и знаков промежутков ни под полем, ни на клавиатуре;
    - refreshBtn — кнопка ⟳ «Обновить задание», как в ОГЭ №1–19;
    - lang — язык условий (подсказка проверки орфографии и раскладка полей);
-   - backLabel / proofLabel — подписи кнопок «← все задания» и самопроверки */
+   - backLabel / proofLabel — подписи кнопок «← все задания» и самопроверки;
+   - optButtons — задание с одним полем «1–4» отвечается нажатием на сам вариант (обществознание) */
 if (EXAM.noCalc) document.documentElement.setAttribute('data-no-calc', '');
 if (EXAM.refreshBtn) document.documentElement.setAttribute('data-refresh-btn', '');
 if (EXAM.lang) document.documentElement.setAttribute('data-lang', EXAM.lang);
@@ -1728,6 +1745,39 @@ function fieldsOf(p){
          alts: p.alts || [], anyOrder: !!p.anyOrder, seq: !!p.seq }]
     : (p.fields || []);
 }
+/* ═══ варианты ответа нажатием (EXAM.optButtons, обществознание) ═══
+   У задания с ОДНИМ полем yesno и цифровыми вариантами в условии уже лежит готовая
+   разметка .soc-opts > .soc-opt (банк ФИПИ не правим). Сами пункты условия становятся
+   кнопками (role=button) вида .mcq-btn из ОГЭ №7, а строку «Ответ: 1 2 3 4» (.yn-btn) не рисуем.
+   Выбор пишется в то же st.yn[f.id], что у кнопок-номеров: совместная сессия, история
+   решённого, «Подборка» и память задания про них не знают. Условие у основного
+   задания (#egeQuestion) и у карточки «+» (.added-card-question) — соседний узел
+   поля ответа, поэтому ищем его от корня поля. */
+function optBox(root){
+  const par = root && root.parentElement;
+  return par ? par.querySelector('#egeQuestion, .added-card-question') : null;
+}
+// кнопки-варианты, уже нарисованные для этого поля ответа (пусто — обычные кнопки-номера)
+function optButtons(root){
+  const box = optBox(root);
+  return box ? [...box.querySelectorAll('.soc-opts > .soc-opt.opt-btn')] : [];
+}
+// можно ли у этого задания отвечать нажатием на вариант: одно поле yesno, у него
+// цифровые варианты, и в условии столько же пунктов .soc-opt
+function optPlan(root, list){
+  if (!EXAM.optButtons || list.length !== 1) return null;
+  const f = list[0];
+  if (f.type !== 'yesno' || !Array.isArray(f.choices) || !f.choices.length || !f.choices.every(c => /^\d+$/.test(c))) return null;
+  const box = optBox(root);
+  const items = box ? [...box.querySelectorAll('.soc-opts > .soc-opt')] : [];
+  return items.length === f.choices.length ? { f, items } : null;
+}
+// выбор варианта (мышью или цифрой). Отметка «неверно» от прошлой попытки на новом
+// выборе не нужна — иначе вариант, который ученик ещё не проверил, был бы красным
+function pickOption(st, f, val){
+  st.yn[f.id] = val;
+  if (st.marks[f.id] === 'bad') st.marks[f.id] = '';
+}
 /* Поля ответа рисуются одинаково для основного задания и для добавленных
    карточек — отличаются только корневым узлом, состоянием и префиксом id,
    под которым поле регистрируется в совместной сессии. */
@@ -1757,7 +1807,9 @@ function buildAnswerArea(root, p, st, prefix, onChanged){
     return;
   }
   let html = '';
+  const plan = optPlan(root, list);
   list.forEach(f => {
+    if (plan && plan.f === f) return;   // строки «Ответ: 1 2 3 4» нет — ответ нажатием на вариант
     html += '<div class="p2-field" data-fid="' + f.id + '">';
     html += '<span class="p2-label">' + f.label + '</span>';
     if (f.type === 'yesno') {
@@ -1798,6 +1850,35 @@ function buildAnswerArea(root, p, st, prefix, onChanged){
       onChanged();
     };
   });
+  if (plan) {
+    // как в ОГЭ №7: нажатие на вариант — сразу и выбор, и проверка (в «Экзамене» на
+    // выбор одна попытка, в остальных режимах две — это решает runCheck, как раньше).
+    // Кнопки делаем из пунктов условия заново при каждой сборке: прежние обработчики
+    // относились к прежнему состоянию st
+    plan.items.forEach((it, i) => {
+      const m = /\d+/.exec((it.querySelector('b') || {}).textContent || '');
+      const val = m && plan.f.choices.indexOf(m[0]) >= 0 ? m[0] : plan.f.choices[i];
+      // остаётся div (role=button), а не <button>: «В подборку» (basket-core.js)
+      // переносит блок .soc-opt отдельной строкой, а у <button> варианты слиплись бы
+      it.classList.add('opt-btn');
+      it.setAttribute('role', 'button');
+      it.tabIndex = 0;
+      it.dataset.val = val;
+      it.setAttribute('data-bd-opt', '');
+      it.onclick = () => {
+        if (st.answered) return;
+        pickOption(st, plan.f, val);
+        runCheck(p, st, root);
+        onChanged();
+      };
+      // с клавиатуры Enter и пробел — тот же щелчок, как у настоящей кнопки
+      it.onkeydown = e => {
+        if (e.key !== 'Enter' && e.key !== ' ') return;
+        e.preventDefault();
+        it.click();
+      };
+    });
+  }
   root.querySelectorAll('.sym-btn').forEach(btn => {
     btn.onclick = () => insertSymbol(root, btn.dataset.ch);
   });
@@ -1819,8 +1900,23 @@ function insertSymbol(root, ch){
 }
 // подсветка полей и кнопки по состоянию — тоже общая для задания и карточек
 function applyAnswerMarks(root, p, st){
+  const opts = optButtons(root);
   fieldsOf(p).forEach(f => {
     const mark = st.marks[f.id] || '';
+    if (opts.length) {
+      // варианты-кнопки: выбранный — рамкой, после проверки — зелёный/красный; после
+      // ответа неверного верный вариант подсвечивается (как в ОГЭ №7)
+      const picked = st.yn[f.id];
+      opts.forEach(b => {
+        const v = b.dataset.val, mine = v === picked;
+        b.classList.toggle('sel', mine && !mark);
+        b.classList.toggle('correct', (mark === 'good' && mine) || (mark === 'fixed' && v === f.value));
+        b.classList.toggle('wrong', (mark === 'bad' || mark === 'fixed') && mine && v !== f.value);
+        b.classList.toggle('disabled', !!st.answered);
+        b.setAttribute('aria-pressed', mine ? 'true' : 'false');
+        b.setAttribute('aria-disabled', st.answered ? 'true' : 'false');
+      });
+    }
     const inp = root.querySelector('input.answer-input[data-fid="' + f.id + '"]');
     if (inp) {
       inp.classList.remove('good', 'bad', 'fixed');
@@ -2156,6 +2252,7 @@ function runCheck(p, st, root){
   const msgEl = root.querySelector('.answer-msg');
   if (unparsed) {
     const seqBad = list.some(f => f.seq && results[f.id] === null);
+    if (msgEl && optButtons(root).length) { msgEl.textContent = 'Выбери вариант ответа'; return; }
     if (msgEl) msgEl.textContent = seqBad
       ? (list.some(f => f.exactLen) ? 'Запишите все цифры подряд, по одной на клетку бланка: ' + String(list[0].value).length + ' — без запятых и других знаков'
         : 'Запишите номера подряд — без запятых и других знаков, как на бланке')
@@ -2200,6 +2297,32 @@ function runCheck(p, st, root){
   }
 }
 function check(){ runCheck(curProto, S, els.answerArea); render(); }
+/* Клавиатура у вариантов-кнопок (обществознание): цифра выбирает вариант (проверка — по
+   Enter, как у кнопки «Проверить»; нажатие мышью, как в ОГЭ №7, проверяет сразу). В полях
+   ввода, текстовых блоках доски и с Ctrl/Alt/Cmd клавиши не наши. Enter на кнопке
+   (вариант, вкладка режима) — её собственный щелчок, поэтому «Проверить» по Enter — только
+   когда фокус нигде, как после цифры */
+document.addEventListener('keydown', e => {
+  if (!EXAM.optButtons || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+  if (S.screen !== 'task' || !curProto || S.answered) return;
+  const t = e.target;
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+  const opts = optButtons(els.answerArea);
+  if (!opts.length) return;
+  if (/^[1-9]$/.test(e.key)) {
+    const f = fieldsOf(curProto)[0];
+    if (!f || f.choices.indexOf(e.key) < 0) return;
+    e.preventDefault();
+    pickOption(S, f, e.key);
+    render();
+    // фокус на выбранный вариант: Enter на нём — его собственный щелчок, то есть «проверить»
+    const b = opts.find(x => x.dataset.val === e.key);
+    if (b) b.focus({ preventScroll: true });
+  } else if (e.key === 'Enter' && (!t || t === document.body || t === document.documentElement)) {
+    e.preventDefault();
+    check();
+  }
+});
 
 /* ═══════════════ кнопки ═══════════════ */
 function switchMode(mode){

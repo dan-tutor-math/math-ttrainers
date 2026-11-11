@@ -113,6 +113,10 @@ a.mode-card{text-decoration:none;box-sizing:border-box}
 .picker-head{display:flex;margin-bottom:4px}
 
 .task-head{display:flex;flex-wrap:wrap;row-gap:8px;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.type-nav{display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;gap:8px;}
+.type-nav-btn{height:34px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-ui);font-weight:600;font-size:12px;line-height:1;cursor:pointer;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;transition:transform .12s, border-color .12s;}
+.type-nav-btn:hover{border-color:var(--ink)}
+.type-nav-btn:active{transform:scale(.9)}
 .corner{display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;gap:8px;}
 .task-title{font-weight:600;font-size:15px;color:var(--muted-3)}
 .back-btn,.nav-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 14px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s,border-color .15s;}
@@ -242,7 +246,11 @@ a.mode-card{text-decoration:none;box-sizing:border-box}
 
   <div id="taskArea" style="display:none">
     <div class="task-head">
-      <button class="back-btn" id="backBtn">← все задания</button>
+      <div class="type-nav">
+        <button class="back-btn" id="backBtn">← все задания</button>
+        <button class="type-nav-btn" id="prevTypeBtn" title="Предыдущий тип">◀ Предыдущий тип</button>
+        <button class="type-nav-btn" id="nextTypeBtn" title="Следующий тип">Следующий тип ▶</button>
+      </div>
       <div class="corner">
         <button class="nav-btn" id="prevBtn" title="Предыдущее задание" aria-label="Предыдущее задание">◀</button>
         <div class="task-title" id="taskTitle"></div>
@@ -267,6 +275,7 @@ a.mode-card{text-decoration:none;box-sizing:border-box}
 </div>
 
 <script src="rus-oge-fipi.js"></script>
+<script src="exam-nav.js"></script>
 <script>
 (function(){
 'use strict';
@@ -521,11 +530,12 @@ function renderTask(animate){
 
   if (t.k === 'mask') {
     html += '<div class="opts" id="opts">' + (t.o || []).map((o, i) =>
-      `<button class="opt" data-i="${i}" type="button"><span class="obox"></span><span class="onum">${i + 1})</span><span class="otext">${o}</span></button>`).join('') + '</div>';
+      `<button class="opt" data-i="${i}" data-bd-opt type="button"><span class="obox"></span><span class="onum">${i + 1})</span><span class="otext">${o}</span></button>`).join('') + '</div>';
   } else if (t.k === 'match') {
     const L = ['А', 'Б', 'В', 'Г', 'Д'];
     const cnt = String(t.a).length;
-    html += '<div class="answer-label" style="margin-bottom:8px">Ответ:</div><div class="match" id="match">' +
+    // data-bd-field: на доске на месте выпадающих списков — одно поле «254» (цифры подряд, как в бланке)
+    html += '<div class="answer-label" style="margin-bottom:8px">Ответ:</div><div class="match" id="match" data-bd-field>' +
       Array.from({length: cnt}, (_, i) => `<label>${L[i]}<select data-i="${i}"><option value="">—</option>${[1,2,3,4,5].map(d => `<option value="${d}">${d}</option>`).join('')}</select></label>`).join('') + '</div>';
   } else {
     html += `<div class="answer-row"><label class="answer-label" for="answerInput">Ответ:</label>
@@ -533,7 +543,9 @@ function renderTask(animate){
       ${HINTS[t.n] ? `<div class="answer-hint">${HINTS[t.n]}</div>` : ''}</div>`;
   }
 
-  html += '<button class="check-btn" id="checkBtn">Проверить</button>';
+  // data-bd-check — «Проверить» для живого задания на доске (trainer-tasks.js, замер hot);
+  // у задания без проверки на доске (ok: 0) кнопку со снимка по-прежнему вырезает TT_RUS_STRIP
+  html += '<button class="check-btn" id="checkBtn" data-bd-check>Проверить</button>';
   html += '<div class="feedback" id="feedback"></div>';
   html += '<div id="answerBox"></div>';
   if (mode === 'practice') html += '<div class="sol-row" id="solRow"><button class="soft-btn" id="showBtn">Показать ответ</button></div>';
@@ -711,6 +723,26 @@ function goPicker(){
 $('backBtn').addEventListener('click', () => topicsOf(S.n).length ? renderTopics(S.n) : goPicker());
 $('prevBtn').addEventListener('click', () => openTask(S.idx - 1));
 $('nextBtnTop').addEventListener('click', () => openTask(S.idx + 1));
+// «Предыдущий / Следующий тип» — как у математики. Тип номера с подтемами — подтема
+// (по кругу; из «Все вперемешку» вперёд — в первую, назад — в последнюю), у номера без
+// подтем соседний тип — соседний номер из тех, где есть подтверждённые задания.
+// Заходим тем же openNumber, поэтому у каждой темы и номера своё «где остановились»
+function typeNeighbour(delta){
+  const tps = topicsOf(S.n);
+  if (tps.length) {
+    const ids = tps.map(tp => tp.id);
+    const i = S.topic ? ids.indexOf(S.topic) : -1;
+    const j = i < 0 ? (delta > 0 ? 0 : ids.length - 1) : (i + delta + ids.length) % ids.length;
+    openNumber(S.n, null, ids[j]);
+    return;
+  }
+  const ns = NUMS.map(m => m.n).filter(n => (POOL[n] || []).length);
+  const i = ns.indexOf(S.n);
+  if (i < 0 || ns.length < 2) return;
+  openNumber(ns[(i + delta + ns.length) % ns.length]);
+}
+$('prevTypeBtn').addEventListener('click', () => typeNeighbour(-1));
+$('nextTypeBtn').addEventListener('click', () => typeNeighbour(1));
 function setMode(m){
   if (mode === m) return;
   mode = m; LS.set('rusOge:mode', m);
@@ -732,8 +764,48 @@ else if (SHOW_ALL) renderPicker();
 // старая закладка на rus_oge.html без номера — на главную, к номерам русского
 else location.replace(HOME);
 
+// ── Задание на доске живое ──────────────────────────────────────────────────
+// Доска (trainer-tasks.js, trainerTaskInfo) берёт отсюда, что верно в открытом
+// задании: функции страницы из кадра не видны (всё в замыкании, tsGetState нет).
+// Формы ответа — те же, что проверяет checkAnswer выше:
+//   mask (варианты) — несколько отметок и «Проверить», верные — позиции с '1';
+//   match (№4) — цифры подряд, порядок важен (бланк: цифра под каждой буквой);
+//   №5 и №7 — цифры в любом порядке;
+//   слово — с поблажками normText (регистр, ё = е, пробелы и знаки), запасные ответы alt.
+// Задание, чей ответ ФИПИ не подтвердил (ok: 0), остаётся картинкой: неверный
+// ключ на доске хуже, чем отсутствие проверки.
+window.__boardTaskInfo = function(cardIdx){
+  if (cardIdx >= 0 || S.screen !== 'task') return null;   // карточек «+» у русского нет
+  const t = curTask();
+  if (!t || !t.ok || t.a == null || t.a === '') return null;
+  const a = String(t.a);
+  if (t.k === 'mask') {
+    const n = (t.o || []).length;
+    if (!n || a.length !== n) return null;
+    const correct = [];
+    a.split('').forEach((c, i) => { if (c === '1') correct.push(i); });
+    return correct.length ? { kind: 'multi', n, correct } : null;
+  }
+  if (t.k === 'match')
+    return { kind: 'fields', fields: [{ id: 'main', label: 'Ответ:', type: 'plain', value: a, alts: [], seq: true, anyOrder: false }] };
+  if (isDigitsTask(t))
+    return { kind: 'fields', fields: [{ id: 'main', label: 'Ответ:', type: 'plain', value: a, alts: (t.alt || []).map(String), seq: true, anyOrder: true }] };
+  if (t.k === 'text')
+    return { kind: 'fields', fields: [{ id: 'main', label: 'Ответ:', type: 'word', norm: 'ru', value: a, alts: (t.alt || []).map(String) }] };
+  return null;
+};
+
+// Хук для стрелок между номерами (exam-nav.js): номер меняется без перезагрузки тем же
+// openNumber, что и выбор на экране. Без pid открывается то, где остановились в номере
+// (память страницы rusOge:last). Номер без подтверждённых заданий не открываем
+window.__examNav = {
+  n: () => S.n,
+  pid: () => (S.screen === 'task' && curTask()) ? curTask().id : null,
+  open: (n, pid) => { if ((POOL[n] || []).length) openNumber(n, pid || null, null); },
+};
+
 // для тестов: состояние страницы без доступа к замыканию
-window.__rusOge = { S, POOL, TOPICS, topicsOf, checkAnswer, answerText, normDigits, EXAM_ATTEMPTS };
+window.__rusOge = { S, POOL, TOPICS, topicsOf, checkAnswer, answerText, normDigits, normText, EXAM_ATTEMPTS };
 })();
 </script>
 </body>

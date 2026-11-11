@@ -701,7 +701,8 @@ function renderCard(v){
         const inp = el('input', 'tc-in');
         inp.type = 'text'; inp.autocomplete = 'off'; inp.spellcheck = false;
         inp.setAttribute('autocapitalize', 'off');
-        inp.setAttribute('inputmode', f.type === 'yesno' ? 'text' : 'decimal');
+        // слово и словосочетание (русский, обществознание, английский) — буквами (taFieldIsText в trainer-tasks.js)
+        inp.setAttribute('inputmode', taFieldIsText(f) ? 'text' : 'decimal');
         inp.placeholder = '?';
         inp.dataset.fid = f.id;
         if (sty.inBg) inp.style.background = sty.inBg;
@@ -758,7 +759,7 @@ function buildBelow(v){
         const row = el('div', 'below-row');
         const lbl = el('span', 'lbl'); lbl.textContent = taPlainLabel(f.label) || 'Ответ:';
         const inp = el('input', 'field'); inp.autocomplete = 'off'; inp.dataset.fid = f.id;
-        inp.setAttribute('inputmode', f.type === 'yesno' ? 'text' : 'decimal');
+        inp.setAttribute('inputmode', taFieldIsText(f) ? 'text' : 'decimal');
         wireInput(v, inp, f.id);
         row.appendChild(lbl); row.appendChild(inp);
         if (f.unit){ const u = el('span'); u.textContent = f.unit; row.appendChild(u); }
@@ -1299,17 +1300,20 @@ function evaluate(b){
   const t = b.task || {}, d = draft(b.id);
   if (t.kind === 'fields'){
     const vals = {};
-    let unread = false, right = true, empty = false;
+    let unread = null, right = true, empty = false;
     (t.fields || []).forEach(f => {
       const raw = String((d.vals || {})[f.id] || '').trim();
       vals[f.id] = raw;
       if (!raw){ empty = true; return; }
       const r = taCheckField(f, raw);
-      if (r === null) unread = true;
+      if (r === null) unread = unread || f;
       else if (!r) right = false;
     });
     if (empty) return { err: (t.fields || []).length > 1 ? 'Заполни все поля' : 'Впиши ответ' };
-    if (unread) return { err: 'Не получилось разобрать запись — запиши иначе (например, 0,5 или 1/2)' };
+    // подсказка — под вид поля: цифры подряд (соответствия, №3 обществознания), номер варианта, число
+    if (unread) return { err: unread.seq ? 'Запиши цифры подряд, без запятых и пробелов'
+      : unread.type === 'yesno' ? (unread.choices && unread.choices.length ? 'Впиши номер варианта: ' + unread.choices.join(', ') : 'Ответь «да» или «нет»')
+      : 'Не получилось разобрать запись — запиши иначе (например, 0,5 или 1/2)' };
     return { right, value: { vals } };
   }
   if (t.kind === 'choice'){

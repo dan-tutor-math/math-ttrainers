@@ -107,6 +107,10 @@ h1{font-weight:700;letter-spacing:-.02em;font-size:clamp(24px,5vw,34px);text-ali
 .mode-card .mprog{font-size:13px;font-weight:600;color:var(--ok);}
 
 .task-head{display:flex;flex-wrap:wrap;row-gap:8px;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+.type-nav{display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;gap:8px;}
+.type-nav-btn{height:34px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-ui);font-weight:600;font-size:12px;line-height:1;cursor:pointer;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;transition:transform .12s, border-color .12s;}
+.type-nav-btn:hover{border-color:var(--ink)}
+.type-nav-btn:active{transform:scale(.9)}
 .corner{display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;gap:8px;}
 .task-title{font-weight:600;font-size:15px;color:var(--muted-3)}
 .back-btn,.nav-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 14px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s,border-color .15s;}
@@ -262,7 +266,11 @@ button.tag:hover{background:var(--ok);color:#fff}
 
   <div id="taskArea" style="display:none">
     <div class="task-head">
-      <button class="back-btn" id="backBtn">← все тексты</button>
+      <div class="type-nav">
+        <button class="back-btn" id="backBtn">← все тексты</button>
+        <button class="type-nav-btn" id="prevTypeBtn" title="Предыдущий тип">◀ Предыдущий тип</button>
+        <button class="type-nav-btn" id="nextTypeBtn" title="Следующий тип">Следующий тип ▶</button>
+      </div>
       <div class="corner">
         <button class="nav-btn" id="prevBtn" title="Предыдущий текст" aria-label="Предыдущий текст">◀</button>
         <div class="task-title" id="taskTitle"></div>
@@ -286,6 +294,7 @@ button.tag:hover{background:var(--ok);color:#fff}
 </div>
 
 <script src="rus-oge13-fipi.js"></script>
+<script src="exam-nav.js"></script>
 <script src="rus-titles.js"></script>
 <script>
 (function(){
@@ -589,6 +598,10 @@ $('backBtn').addEventListener('click', () => {
 });
 $('prevBtn').addEventListener('click', () => openTask(S.idx - 1));
 $('nextBtnTop').addEventListener('click', () => openTask(S.idx + 1));
+// «Предыдущий / Следующий тип»: у этого номера подтем нет, поэтому тип — соседний номер
+// (по кругу №1 … №13, как у математики стрелки типов ходят по кругу)
+$('prevTypeBtn').addEventListener('click', () => { location.href = 'rus_oge.html?n=12'; });
+$('nextTypeBtn').addEventListener('click', () => { location.href = 'rus_oge01.html'; });
 function setMode(m){
   if (mode === m) return;
   mode = m; LS.set('rusOge13:mode', m);
@@ -604,6 +617,17 @@ const startIdx = startId ? TASKS.findIndex(t => t.id === startId) : -1;
 if (startIdx >= 0) openTask(startIdx);
 else renderPicker();
 
+// Хук для стрелок между номерами (exam-nav.js): страница — один номер, поэтому n() пустое,
+// а open возвращает на последний открытый текст этого номера (память страницы rusOge13:last)
+window.__examNav = {
+  n: () => null,
+  pid: () => ($('taskArea').style.display !== 'none' && cur()) ? cur().id : null,
+  open: (n, pid) => {
+    const id = pid || LS.get('rusOge13:last', null);
+    const i = id ? TASKS.findIndex(t => t.id === id) : -1;
+    if (i >= 0) openTask(i);
+  },
+};
 window.__rusOge13 = { S, TASKS, countWords, CRIT, MAX_SCORE };
 })();
 </script>

@@ -499,7 +499,13 @@ async function captureTrainerNode(el, task, opts){
       cleanCloneForCard(c, card);
       hideDeadSolutionButtons(c);
       const strip = c.getAttribute('data-bd-strip');
-      if (strip) { try { c.querySelectorAll(strip).forEach(e => e.style.setProperty('display', 'none', 'important')); } catch (e) {} }
+      // «Проверить» с пометкой data-bd-check у задания с проверкой (task) остаётся
+      // на снимке: поверх неё доска кладёт живую кнопку. Без проверки (русский с
+      // ok: 0, теория) кнопка мёртвая — её прячем, как раньше
+      if (strip) { try { c.querySelectorAll(strip).forEach(e => {
+        if (task && e.hasAttribute('data-bd-check')) return;
+        e.style.setProperty('display', 'none', 'important');
+      }); } catch (e) {} }
       // столбик с ответом под записью — место для решения не нужно
       if (answerSide !== 'right') c.querySelectorAll('.bd-col-blank').forEach(e => e.remove());
       if (task) hot = prepareTaskClone(c, task);
@@ -924,7 +930,8 @@ function ttPanelItemForLocation(loc){
    task = {
      v: 1,
      kind: 'fields' | 'choice' | 'multi',
-     fields: [{ id, label, type, value, alts, seq, anyOrder, unit }],  // fields
+     fields: [{ id, label, type, value, alts, seq, anyOrder, unit,     // fields
+                anyCols, exactLen, choices, norm }],  // по виду поля: ttTaskFields
      n, correct,            // choice: номер верного; multi: массив номеров
      hot: { w, h,           // размер снятого узла в CSS-пикселях тренажёра
             fields: [{x,y,w,h}], opts: [{x,y,w,h}], check: {x,y,w,h},
@@ -974,7 +981,7 @@ function taskFromCurTask(t){
   return null;
 }
 
-function egeTaskInfo(win, cardIdx){
+function egeTaskInfo(win, cardIdx, el){
   const p = trainerEval(win, cardIdx >= 0
     ? 'protoById(S.n, S.cards[' + cardIdx + '].pid)'
     : 'protoById(S.n, S.pid)');
@@ -983,13 +990,70 @@ function egeTaskInfo(win, cardIdx){
   let list;
   try { list = win.fieldsOf(p); } catch (e) { return null; }
   if (!Array.isArray(list) || !list.length) return null;
-  const fields = list.map(f => ({
-    id: String(f.id), label: String(f.label || ''), type: f.type,
-    value: f.value == null ? '' : String(f.value),
-    alts: (f.alts || []).map(String), seq: !!f.seq, anyOrder: !!f.anyOrder, unit: f.unit || '',
-  }));
-  if (fields.some(f => ['plain', 'num', 'nums', 'set', 'yesno', 'pairs'].indexOf(f.type) < 0)) return null;
+  // слово (word) на страницах-копиях ege_prof.html проверяется wordKey —
+  // правилом английского (can't = cannot): так делает и сама страница
+  const fields = ttTaskFields(list, 'en');
+  if (!fields) return null;
+  // обществознание (№4, 5, 6, 9, 10, 11, 13, 15, 16): одно поле «1–4», а сами
+  // варианты — кнопки в условии (data-bd-opt, EXAM.optButtons страницы). На
+  // доске такое задание — выбор нажатием на вариант (kind 'choice', проверка
+  // сразу по нажатию, «Проверить» не нужна). Только когда на снимке ровно
+  // столько видимых вариантов, сколько в поле: иначе запасной путь — поле с
+  // цифрой (taCheckField сравнивает её с choices и value)
+  const f = fields.length === 1 ? fields[0] : null;
+  if (f && f.type === 'yesno' && f.choices && f.choices.length && f.choices.every(c => /^\d+$/.test(c)) && el && el.querySelectorAll){
+    const shown = [...el.querySelectorAll('[data-bd-opt]')].filter(e => {
+      const r = e.getBoundingClientRect();
+      return r.width > 1 && r.height > 1;
+    });
+    const at = f.choices.indexOf(f.value);
+    if (at >= 0 && shown.length === f.choices.length) return { kind: 'choice', n: f.choices.length, correct: at };
+  }
   return { kind: 'fields', fields };
+}
+
+// Виды полей, которые доска умеет проверить (taCheckField). word — слово
+// (norm: 'ru' — как normText rus_oge.html, 'en' — как wordKey eng_oge.html),
+// term — слово или словосочетание обществознания (termKey soc_oge.html)
+const TT_FIELD_TYPES = ['plain', 'num', 'nums', 'set', 'yesno', 'pairs', 'word', 'term'];
+// поля тренажёра → поля задания на доске; null — есть поле, которое доска
+// проверить не умеет (тогда всё задание — картинка). Переносим только то, что
+// нужно проверке: флаги порядка цифр (anyOrder — весь ответ, anyCols — внутри
+// колонок «2 + 2», №3 обществознания), exactLen, варианты yesno (choices)
+function ttTaskFields(list, wordNorm){
+  if (!Array.isArray(list) || !list.length) return null;
+  const fields = list.map(f => {
+    const o = {
+      id: String(f.id), label: String(f.label || ''), type: f.type,
+      value: f.value == null ? '' : String(f.value),
+      alts: (f.alts || []).map(String), seq: !!f.seq, anyOrder: !!f.anyOrder, unit: f.unit || '',
+    };
+    if (f.anyCols) o.anyCols = true;
+    if (f.exactLen) o.exactLen = true;
+    if (f.type === 'yesno' && Array.isArray(f.choices) && f.choices.length) o.choices = f.choices.map(String);
+    if (f.type === 'word') o.norm = f.norm === 'ru' || f.norm === 'en' ? f.norm : (wordNorm || 'en');
+    return o;
+  });
+  return fields.some(f => TT_FIELD_TYPES.indexOf(f.type) < 0) ? null : fields;
+}
+// ответ хука __boardTaskInfo → задание или null (непонятное — картинкой)
+function ttCheckHookInfo(info){
+  if (!info || typeof info !== 'object') return null;
+  const okN = n => Number.isInteger(n) && n > 0;
+  if (info.kind === 'fields'){
+    const fields = ttTaskFields(info.fields, 'ru');
+    return fields ? { kind: 'fields', fields } : null;
+  }
+  if (info.kind === 'choice')
+    return okN(info.n) && Number.isInteger(info.correct) && info.correct >= 0 && info.correct < info.n
+      ? { kind: 'choice', n: info.n, correct: info.correct } : null;
+  if (info.kind === 'multi'){
+    // несколько отметок и «Проверить» (русский: варианты №2, 3, 6, 10, 11, 12)
+    const c = info.correct;
+    return okN(info.n) && Array.isArray(c) && c.length && c.every(i => Number.isInteger(i) && i >= 0 && i < info.n)
+      ? { kind: 'multi', n: info.n, correct: c.slice().sort((a, b) => a - b) } : null;
+  }
+  return null;
 }
 
 function soloTaskInfo(trainerId, P){
@@ -1030,14 +1094,11 @@ function trainerTaskInfo(win, trainerId, el){
   try {
     const card = el.closest ? el.closest('.added-task-card[data-idx]') : null;
     const cardIdx = card ? Number(card.dataset.idx) : -1;
-    if (isEgeLikeTrainer(trainerId)) return egeTaskInfo(win, cardIdx);
+    if (isEgeLikeTrainer(trainerId)) return egeTaskInfo(win, cardIdx, el);
     // Промпт №71: тренажёр, у которого верный ответ лежит прямо в объекте
     // задания («Проценты»), отдаёт его сам готовым — доске не нужно знать
     // его модель задания. Новым тренажёрам достаточно завести этот хук
-    if (typeof win.__boardTaskInfo === 'function') {
-      const info = plainCopy(win.__boardTaskInfo(cardIdx));
-      return info && (info.kind === 'fields' ? Array.isArray(info.fields) && info.fields.length : info.kind === 'choice') ? info : null;
-    }
+    if (typeof win.__boardTaskInfo === 'function') return ttCheckHookInfo(plainCopy(win.__boardTaskInfo(cardIdx)));
     if (el.id === 'theoryContent') return null;
     const st = typeof win.tsGetState === 'function' ? plainCopy(win.tsGetState()) : null;
     if (!st) return null;
@@ -1231,30 +1292,54 @@ function prepareTaskClone(c, task){
   // следы уже данного ответа на снимке не нужны: задание на доске начинается
   // с чистого листа, разбор и «Следующий пример» тоже убираем
   c.querySelectorAll('.explain, .added-explain, .next-btn, .answer-msg, #mainPanel').forEach(e => { e.style.display = 'none'; });
-  c.querySelectorAll('input, .mcq-btn, .stmt, .check-btn').forEach(e => {
-    ['good', 'bad', 'shake', 'correct', 'wrong', 'disabled', 'picked', 'ok', 'reveal', 'struck'].forEach(k => e.classList.remove(k));
+  c.querySelectorAll('input, .mcq-btn, .stmt, .check-btn, [data-bd-opt], [data-bd-check]').forEach(e => {
+    ['good', 'bad', 'shake', 'correct', 'wrong', 'disabled', 'picked', 'ok', 'reveal', 'struck', 'sel'].forEach(k => e.classList.remove(k));
     if (e.tagName === 'INPUT'){ e.value = ''; e.setAttribute('value', ''); }
     if ('disabled' in e) e.disabled = false;
     e.removeAttribute('disabled');
   });
   const unhide = btn => { if (btn && btn.style.display === 'none') btn.style.display = ''; };
   let fieldEl = null, checkEl = null, optEls = null;
+  // Страница сама может пометить места для доски: data-bd-opt — варианты,
+  // data-bd-check — «Проверить», data-bd-field — место поля ответа. Пометки
+  // — запасной путь после классов ОГЭ (.mcq-btn, .stmt, input.answer-input):
+  // у русского варианты .opt, а кнопка не в родителе поля
+  const marked = sel => [...c.querySelectorAll(sel)].filter(visible);
+  const markedCheck = () => marked('[data-bd-check]')[0] || null;
   if (task.kind === 'fields' && task.fields.length === 1){
     const ins = [...c.querySelectorAll('input.answer-input')].filter(visible);
     if (ins.length === 1){
       fieldEl = ins[0];
-      checkEl = fieldEl.parentElement && fieldEl.parentElement.querySelector('.check-btn');
+      checkEl = (fieldEl.parentElement && fieldEl.parentElement.querySelector('.check-btn')) || markedCheck();
       unhide(checkEl);
+    } else if (!ins.length){
+      const spot = marked('[data-bd-field]');
+      if (spot.length === 1){
+        fieldEl = spot[0];
+        // место не поле (№4 русского: выпадающие списки по буквам) — на снимке
+        // вместо него пустое поле того же вида, что у остальных номеров: на
+        // доске ответ один, цифрами подряд, как в бланке
+        if (fieldEl.tagName !== 'INPUT'){
+          const inp = c.ownerDocument.createElement('input');
+          inp.className = 'answer-input';
+          inp.setAttribute('value', '');
+          fieldEl.replaceChildren(inp);
+          fieldEl = inp;
+        }
+        checkEl = markedCheck();
+      }
     }
   }
   if (task.kind === 'choice'){
-    const btns = [...c.querySelectorAll('.mcq-btn')].filter(visible);
+    let btns = [...c.querySelectorAll('.mcq-btn')].filter(visible);
+    if (btns.length !== task.n) btns = marked('[data-bd-opt]');
     if (btns.length === task.n) optEls = btns;
   }
   if (task.kind === 'multi'){
-    const items = [...c.querySelectorAll('.stmt')].filter(visible);
+    let items = [...c.querySelectorAll('.stmt')].filter(visible);
+    if (items.length !== task.n) items = marked('[data-bd-opt]');
     if (items.length === task.n) optEls = items;
-    checkEl = c.querySelector('.check-btn');
+    checkEl = c.querySelector('[data-bd-check]') || c.querySelector('.check-btn');
     if (checkEl && getComputedStyle(checkEl).display === 'none') checkEl.style.display = 'block';
   }
   // замер — после всех правок вёрстки клона
@@ -1278,11 +1363,21 @@ function prepareTaskClone(c, task){
   hot.style = {
     inBg: fs ? fs.backgroundColor : null, inFg: fs ? fs.color : null, inBorder: fs ? fs.borderTopColor : null,
     inRadius: fs ? parseFloat(fs.borderTopLeftRadius) || 0 : null,
-    btnBg: bs ? bs.backgroundColor : null, btnFg: bs ? bs.color : null,
+    btnBg: bs ? ttButtonBg(bs) : null, btnFg: bs ? bs.color : null,
     btnRadius: bs ? parseFloat(bs.borderTopLeftRadius) || 0 : null,
     font: win.getComputedStyle(c).fontFamily || null,
   };
   return hot;
+}
+
+// фон кнопки «Проверить» для живой кнопки на доске. У русского он градиентом
+// (background-image), а backgroundColor прозрачный — живая кнопка была бы
+// прозрачной, и сквозь её подпись просвечивала нарисованная на снимке
+function ttButtonBg(cs){
+  const col = cs.backgroundColor || '';
+  const transparent = !col || col === 'transparent' || /rgba\([^)]*,\s*0\s*\)$/.test(col);
+  if (transparent && /gradient\(/.test(cs.backgroundImage || '')) return cs.backgroundImage;
+  return col || null;
 }
 
 function hotIsUsable(task, hot){
@@ -1355,7 +1450,7 @@ function bakeTaskRows(canvas, task, hot, bgColor, scale, side){
     const isLast = i === rows.length - 1;
     const room = totalW - x0 - PAD - (isLast ? BTN_W + GAP : 0);
     if (task.kind === 'fields'){
-      const wide = r.field.type === 'nums' || r.field.type === 'set' || r.field.seq;
+      const wide = r.field.type === 'nums' || r.field.type === 'set' || r.field.type === 'term' || r.field.seq;
       const w = Math.min(room, wide ? 280 : 180);
       box(x0, y, w, ROW, boxBg, boxBorder);
       hot2.fields.push(frac(x0, y, w, ROW));
@@ -1613,6 +1708,30 @@ function taSameSets(a, b){
   return a.every((iv, k) => taSameNum(iv.lo, b[k].lo) && taSameNum(iv.hi, b[k].hi)
     && (!isFinite(iv.lo) || iv.loC === b[k].loC) && (!isFinite(iv.hi) || iv.hiC === b[k].hiC));
 }
+// Ключи сравнения слов — копии со страниц тренажёров (правите там — правьте здесь):
+// русский — normText rus_oge.html: регистр, ё = е, пробелы и знаки не важны
+function taRuWordKey(s){ return String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[\s.,;:!?«»"'()]+/g, ''); }
+// английский — wordKey eng_oge.html: один апостроф на все написания, n't = not
+function taEnWordKey(s){
+  return String(s || '').toLowerCase()
+    .replace(/[\u2018\u2019\u02BC\u0060\u00B4]/g, "'")
+    .replace(/\bcan't\b/g, 'cannot').replace(/\bwon't\b/g, 'will not').replace(/\bshan't\b/g, 'shall not')
+    .replace(/n't\b/g, ' not')
+    .replace(/[\s.,!?;:]+/g, '');
+}
+// обществознание №2 — termKey soc_oge.html: ещё и тире, дефисы не важны
+function taTermKey(s){ return String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[\s.,;:!?«»"'()–—-]+/g, ''); }
+// обществознание №3 — colsKey soc_oge.html: порядок важен только между колонками
+function taColsKey(s){ s = String(s); return s.slice(0, 2).split('').sort().join('') + '|' + s.slice(2).split('').sort().join(''); }
+// поле, ответ в которое набирают буквами: обычная клавиатура устройства, а не
+// цифровая (BoardAnswerPad на доске, inputmode у работ). yesno с номерами
+// вариантов — цифры
+function taFieldIsText(f){
+  if (!f) return false;
+  if (f.type === 'word' || f.type === 'term') return true;
+  if (f.type === 'yesno') return !(Array.isArray(f.choices) && f.choices.length && f.choices.every(c => /^\d+$/.test(String(c))));
+  return false;
+}
 // → true / false / null (null — запись не разобрали: это не ошибка ученика,
 // а просьба записать иначе, отметка «неверно» не ставится)
 function taCheckField(f, value){
@@ -1620,14 +1739,32 @@ function taCheckField(f, value){
   if (!raw) return null;
   const accepted = [f.value].concat(f.alts || []);
   if (f.type === 'yesno'){
-    const v = raw.toLowerCase().replace(/[.!]/g, '');
-    if (v !== 'да' && v !== 'нет') return null;
+    // варианты — «да/нет» или номера (обществознание №4, 5, 6…: choices '1'–'4'):
+    // ответ сверяем с тем вариантом, что вписан, а не требуем «да/нет»
+    const choices = Array.isArray(f.choices) && f.choices.length ? f.choices.map(c => String(c).toLowerCase()) : ['да', 'нет'];
+    const v = taStrip(raw).toLowerCase().replace(/[.!)]+$/, '');
+    if (choices.indexOf(v) < 0) return null;
     return v === String(f.value).toLowerCase();
+  }
+  if (f.type === 'word'){
+    // слово: правило — по полю norm, а не по тексту ответа (русское слово и
+    // английское проверяются по-разному, а угадывать язык по буквам ненадёжно)
+    const key = f.norm === 'ru' ? taRuWordKey : taEnWordKey;
+    const v = key(raw);
+    return v ? accepted.some(a => key(a) === v) : null;
+  }
+  if (f.type === 'term'){
+    const v = taTermKey(raw);
+    return v ? accepted.some(a => taTermKey(a) === v) : null;
   }
   if (f.type === 'plain' && f.seq){
     const d = taStrip(raw);
     if (!/^\d+$/.test(d)) return null;
-    const key = x => f.anyOrder ? String(x).split('').sort().join('') : String(x);
+    // не столько цифр, сколько клеток бланка, — просьба переписать, а не ошибка (как на странице)
+    if (f.exactLen && d.length !== String(f.value).length) return null;
+    // anyOrder — порядок цифр не важен вовсе (русский №5, №7); anyCols — только
+    // внутри колонок «две цифры сходства | две различия» (обществознание №3)
+    const key = x => f.anyOrder ? String(x).split('').sort().join('') : f.anyCols ? taColsKey(x) : String(x);
     return accepted.some(a => key(a) === key(d));
   }
   if (f.type === 'plain'){
