@@ -176,9 +176,9 @@ def test_lazy(browser, F):
     page.on("pageerror", lambda e: errors.append(str(e)))
     page.on("request", lambda r: got.append(r.url.rsplit('/', 1)[-1]))
     page.route("https://**/*", lambda route: route.abort())
-    page.goto(f"{BASE}/oge_part2.html?n=22")
+    page.goto(f"{BASE}/oge_part2.html?n=23")
     page.wait_for_timeout(1200)
-    check("раздельно: на №22 файлы №20 и №21 не грузятся",
+    check("раздельно: на №23 файлы №20–№22 не грузятся",
           'oge-part2-fipi.js' in got and not any(u.startswith('oge-part2-fipi2') for u in got), str([u for u in got if 'fipi' in u]))
     p = F["tasks"]["21"]["protos"][37]
     page.evaluate("(pid) => window.__examNav.open(21, pid)", p["id"])
@@ -187,7 +187,7 @@ def test_lazy(browser, F):
           'oge-part2-fipi21.js' in got and page.evaluate("curProto.fipi") == p["fipi"], page.evaluate("curProto && curProto.fipi"))
     ctx.close()
     # ученик на другом номере получает снимок с заданием ФИПИ
-    ctx, page, errors2 = new_page(browser, f"{BASE}/oge_part2.html?n=22")
+    ctx, page, errors2 = new_page(browser, f"{BASE}/oge_part2.html?n=23")
     st = {"egeScreen": "task", "egeN": 21, "egePid": p["id"], "curSubMode": "exam", "cards": [], "marks": {}, "yn": {}}
     page.evaluate("(s) => tsApplyState(s)", st)
     page.wait_for_timeout(800)

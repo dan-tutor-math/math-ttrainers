@@ -287,7 +287,7 @@ def test_without_fipi(browser):
           page.inner_text('#taskTitle') == '№0. Задание из демоверсии ОГЭ 2027' and 'Источник' not in page.inner_text('#egeQuestion'))
     check("без файла ФИПИ: без ошибок JS", not errors, str(errors[:1]))
     ctx.close()
-    for url in ("ege_prof.html?n=7", "ege_base.html?n=3", "oge_part2.html?n=22"):
+    for url in ("ege_prof.html?n=7", "ege_base.html?n=3", "oge_part2.html?n=23"):
         ctx, page, errors = new_page(browser, f"{BASE}/{url}")
         t = page.eval_on_selector('#pickerTitle', 'e => e.textContent')
         check(f"{url}: список прототипов как раньше", t.startswith('Прототипы задания №')

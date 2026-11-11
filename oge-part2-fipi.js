@@ -1,12 +1,12 @@
 /* ═══════════════════════════════════════════════════════════════════════
    oge-part2-fipi.js — ОГЭ, часть 2: оглавление заданий из открытого банка
    ФИПИ (oge.fipi.ru, ОГЭ, математика). Подключается в oge_part2.html; сами
-   задания лежат по номерам (files: oge-part2-fipi20.js, …21.js) и грузятся,
+   задания лежат по номерам (files: oge-part2-fipi20.js, …21.js, …22.js) и грузятся,
    только когда номер открыли, — страница сливает их с ручным банком
    oge-part2-bank.js (ensureFipi / mergeFipiNumber).
 
    ФАЙЛ СОБИРАЕТСЯ СКРИПТОМ — руками не правится: папка fipi-pilot вне
-   репозитория (tools/n20_build.py, n20_images.py, n21_build.py →
+   репозитория (tools/n20_build.py, n20_images.py, n21_build.py, n22_build.py →
    tools/n20_export.py), описание —
    claude/fipi-bank-pilot.md в проекте на claude.ai.
 
@@ -25,7 +25,8 @@ window.OGE_PART2_FIPI = {
  "source": "Открытый банк заданий ФИПИ",
  "files": {
   "20": "oge-part2-fipi20.js",
-  "21": "oge-part2-fipi21.js"
+  "21": "oge-part2-fipi21.js",
+  "22": "oge-part2-fipi22.js"
  },
  "tasks": {}
 };
