@@ -90,6 +90,9 @@
   Object.keys(EXAMS).forEach(id => { if (EXAMS[id].list.some(p => p.slug === slug)) examId = id; });
   if (!examId) return;
   const EXAM = EXAMS[examId];
+  const subjectId = examId === 'rus_oge' ? 'rus' : examId === 'soc_oge' ? 'soc' : examId === 'eng_oge' ? 'eng' : 'math';
+  const catalogExamId = subjectId === 'math' ? examId : 'oge';
+  const assetBase = new URL('.', document.currentScript ? document.currentScript.src : location.href);
 
   const MEM_KEY = 'examNav:mem:v1';
   const ARRIVE_KEY = 'examNav:arrive';
@@ -192,7 +195,13 @@
     const i = curIndex();
     const target = EXAM.list[i + delta];
     if (i < 0 || !target) return;
+    navigatePosition(target);
+  }
+  function navigatePosition(target) {
     record();
+    closeJumpMenu(true);
+    const current = EXAM.list[curIndex()];
+    if (current && posKey(current) === posKey(target)) return;
     if (target.slug === slug && hook() && typeof hook().open === 'function') {
       openHere(target);   // тот же файл (ЕГЭ, ОГЭ часть 2) — без перезагрузки
       render();
@@ -206,6 +215,193 @@
   function guarded(action, fn) {
     const ts = TS();
     return ts && typeof ts.guardStudentAction === 'function' ? ts.guardStudentAction(action, fn) : fn;
+  }
+
+  /* Каталог тот же, что на главной: новые номера и предметы не требуют
+     второго списка. Загружаем его только при первом открытии меню. */
+  let catalogPromise = null;
+  function loadCatalog() {
+    if (window.MathhCatalog) return Promise.resolve(window.MathhCatalog);
+    if (!catalogPromise) {
+      catalogPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = new URL('subjects-catalog.js', assetBase).href;
+        script.onload = () => window.MathhCatalog ? resolve(window.MathhCatalog) : reject(new Error('catalog'));
+        script.onerror = () => reject(new Error('catalog'));
+        document.head.appendChild(script);
+      }).catch(error => { catalogPromise = null; throw error; });
+    }
+    return catalogPromise;
+  }
+  let jumpTrigger = null, jumpMenu = null, jumpBody = null;
+  let jumpCatalog = null, browseSubject = subjectId, browseExam = catalogExamId;
+  function el(tag, className, label) {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (label != null) node.textContent = label;
+    return node;
+  }
+  function menuButton(className, label, action) {
+    const button = el('button', className, label);
+    button.type = 'button';
+    button.addEventListener('click', action);
+    return button;
+  }
+  function positionJumpMenu() {
+    if (!jumpMenu || jumpMenu.hidden) return;
+    const rect = jumpTrigger.getBoundingClientRect();
+    if (!rect.width || !rect.height) { closeJumpMenu(); return; }
+    const viewport = window.visualViewport;
+    const width = viewport ? viewport.width : innerWidth;
+    const height = viewport ? viewport.height : innerHeight;
+    const offsetTop = viewport ? viewport.offsetTop : 0;
+    const offsetLeft = viewport ? viewport.offsetLeft : 0;
+    const menuWidth = Math.min(740, width - 24);
+    const top = Math.min(Math.max(offsetTop + 12, rect.bottom + 12), offsetTop + Math.max(12, height - 280));
+    const left = Math.max(offsetLeft + 12, Math.min(rect.left + rect.width / 2 - menuWidth / 2, offsetLeft + width - menuWidth - 12));
+    Object.assign(jumpMenu.style, { width: menuWidth + 'px', left: left + 'px', top: top + 'px', maxHeight: Math.max(120, offsetTop + height - top - 12) + 'px' });
+  }
+  function closeJumpMenu(focus) {
+    if (!jumpMenu || jumpMenu.hidden) return;
+    jumpMenu.hidden = true;
+    jumpTrigger.setAttribute('aria-expanded', 'false');
+    if (focus) jumpTrigger.focus({ preventScroll: true });
+  }
+  function renderJumpMenu(focusSelector) {
+    if (!jumpCatalog || !jumpBody) return;
+    const subjects = jumpCatalog.subjects;
+    const exams = jumpCatalog.exams.filter(e => e.subject === browseSubject && !e.soon && e.groups.length);
+    const selectedExam = exams.find(e => e.id === browseExam) || exams[0];
+    if (selectedExam) browseExam = selectedExam.id;
+    jumpMenu.dataset.subject = browseSubject;
+    const content = document.createDocumentFragment();
+    const tabs = el('div', 'exam-jump-subjects');
+    tabs.setAttribute('role', 'group');
+    tabs.setAttribute('aria-label', 'Предмет');
+    subjects.forEach(subject => {
+      const button = menuButton('exam-jump-subject', subject.title, () => {
+        browseSubject = subject.id;
+        renderJumpMenu('[data-subject-id="' + subject.id + '"]');
+      });
+      button.dataset.subjectId = subject.id;
+      button.setAttribute('aria-pressed', String(subject.id === browseSubject));
+      tabs.appendChild(button);
+    });
+    content.appendChild(tabs);
+    if (exams.length > 1) {
+      const row = el('div', 'exam-jump-exams');
+      row.setAttribute('role', 'group');
+      row.setAttribute('aria-label', 'Экзамен');
+      exams.forEach(exam => {
+        const button = menuButton('exam-jump-exam', exam.title, () => {
+          browseExam = exam.id;
+          renderJumpMenu('[data-exam-id="' + exam.id + '"]');
+        });
+        button.dataset.examId = exam.id;
+        button.setAttribute('aria-pressed', String(exam.id === browseExam));
+        row.appendChild(button);
+      });
+      content.appendChild(row);
+    }
+    const list = el('div', 'exam-jump-numbers');
+    list.setAttribute('aria-label', selectedExam ? selectedExam.title + ': номера заданий' : 'Номера заданий');
+    const current = EXAM.list[curIndex()];
+    const items = selectedExam ? selectedExam.groups.flatMap(group => group.items) : [];
+    items.forEach(id => {
+      const trainer = jumpCatalog.trainers[id];
+      if (!trainer || !trainer.href) return;
+      const url = new URL(trainer.href, location.href);
+      const target = { slug: url.pathname.split('/').pop().replace(/\.html?$/i, ''), n: Number(url.searchParams.get('n')) || null };
+      const button = menuButton('exam-jump-number', null, guarded('navigate', () => navigatePosition(target)));
+      button.dataset.trainer = id;
+      const split = trainer.name.indexOf('. ');
+      const label = split < 0 ? trainer.name : trainer.name.slice(0, split);
+      const name = split < 0 ? '' : trainer.name.slice(split + 2);
+      button.appendChild(el('span', 'exam-jump-number-label', label));
+      button.appendChild(el('span', 'exam-jump-number-name', name));
+      if (current && posKey(current) === posKey(target)) {
+        button.setAttribute('aria-current', 'page');
+        const check = el('span', 'exam-jump-check');
+        check.setAttribute('aria-hidden', 'true');
+        button.appendChild(check);
+      }
+      list.appendChild(button);
+    });
+    content.appendChild(list);
+    jumpBody.replaceChildren(content);
+    jumpMenu.scrollTop = 0;
+    positionJumpMenu();
+    if (focusSelector) {
+      const focusTarget = jumpBody.querySelector(focusSelector);
+      if (focusTarget) focusTarget.focus({ preventScroll: true });
+    }
+  }
+  async function openJumpMenu() {
+    if (!jumpMenu.hidden) { closeJumpMenu(true); return; }
+    browseSubject = subjectId;
+    browseExam = catalogExamId;
+    jumpMenu.dataset.subject = subjectId;
+    jumpMenu.hidden = false;
+    jumpTrigger.setAttribute('aria-expanded', 'true');
+    jumpBody.replaceChildren(el('p', 'exam-jump-status', 'Загрузка списка…'));
+    positionJumpMenu();
+    try {
+      jumpCatalog = await loadCatalog();
+      if (!jumpMenu.hidden) renderJumpMenu();
+    } catch (error) {
+      if (jumpMenu.hidden) return;
+      const status = el('p', 'exam-jump-status', 'Не удалось загрузить список.');
+      const retry = menuButton('exam-jump-exam', 'Повторить', () => { closeJumpMenu(); openJumpMenu(); });
+      jumpBody.replaceChildren(status, retry);
+    }
+  }
+  function mountJumpMenu() {
+    document.documentElement.dataset.examSubject = subjectId;
+    const stylesheet = document.createElement('link');
+    stylesheet.rel = 'stylesheet';
+    stylesheet.href = new URL('exam-nav.css', assetBase).href;
+    document.head.appendChild(stylesheet);
+    jumpTrigger = document.querySelector('.exam-nav-text');
+    jumpTrigger.setAttribute('aria-expanded', 'false');
+    jumpTrigger.setAttribute('aria-controls', 'examJumpMenu');
+    jumpTrigger.setAttribute('aria-label', 'Выбрать предмет и номер задания');
+    jumpTrigger.addEventListener('click', openJumpMenu);
+    jumpMenu = el('div', 'exam-jump-menu');
+    jumpMenu.id = 'examJumpMenu';
+    jumpMenu.hidden = true;
+    jumpMenu.setAttribute('role', 'region');
+    jumpMenu.setAttribute('aria-label', 'Переход к заданию');
+    const head = el('div', 'exam-jump-head');
+    head.appendChild(el('span', '', 'Перейти к заданию'));
+    const close = menuButton('exam-jump-close', null, () => closeJumpMenu(true));
+    close.setAttribute('aria-label', 'Закрыть меню');
+    head.appendChild(close);
+    jumpBody = el('div', 'exam-jump-body');
+    jumpMenu.append(head, jumpBody);
+    document.body.appendChild(jumpMenu);
+    document.addEventListener('click', event => {
+      // Путь сохраняет клик внутри меню, даже если его кнопки уже пересобраны.
+      const path = event.composedPath();
+      if (!path.includes(jumpMenu) && !path.includes(jumpTrigger)) closeJumpMenu();
+    });
+    document.addEventListener('keydown', event => {
+      if (jumpMenu.hidden) return;
+      if (event.key === 'Escape') { event.preventDefault(); closeJumpMenu(true); }
+      if (event.key === 'ArrowDown' && event.target === jumpTrigger) {
+        event.preventDefault();
+        const first = jumpBody.querySelector('button');
+        if (first) first.focus();
+      }
+    });
+    window.addEventListener('resize', positionJumpMenu);
+    window.addEventListener('scroll', positionJumpMenu, true);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', positionJumpMenu);
+      window.visualViewport.addEventListener('scroll', positionJumpMenu);
+    }
+    new MutationObserver(() => {
+      if (document.documentElement.dataset.focus === 'on') closeJumpMenu();
+    }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-focus'] });
   }
 
   /* ── кнопки ── */
@@ -274,15 +470,22 @@ h1.exam-nav-h1 .exam-nav-text{min-width:0;}
     document.head.appendChild(style);
     // текст заголовка — в свой элемент: ЕГЭ-страница меняет его (номер в
     // заголовке), и стрелки при этом не должны пропадать
-    const text = document.createElement('span');
+    const text = document.createElement('button');
+    text.type = 'button';
     text.className = 'exam-nav-text';
-    while (h1.firstChild) text.appendChild(h1.firstChild);
+    const label = document.createElement('span');
+    while (h1.firstChild) label.appendChild(h1.firstChild);
+    text.appendChild(label);
+    const chevron = el('span', 'exam-jump-chevron');
+    chevron.setAttribute('aria-hidden', 'true');
+    text.appendChild(chevron);
     prevBtn = makeBtn('examPrevBtn', '◀', -1);
     nextBtn = makeBtn('examNextBtn', '▶', 1);
     h1.classList.add('exam-nav-h1');
     h1.appendChild(prevBtn);
     h1.appendChild(text);
     h1.appendChild(nextBtn);
+    mountJumpMenu();
     render();
   }
 
