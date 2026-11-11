@@ -675,7 +675,7 @@ function n14Finish(n,a,t,legacy){
   a=a.map(Number);const f=fmtNum,l=[];let result=t.correctValue;
   if(n<=2){const [R,a1,d,k]=a,N=n===1?k:R,last=a1+(N-1)*d;l.push(`Из условия: первый ряд — ${a1} мест, прибавка — ${d}, рядов — ${R}.`,`${N} − 1 = ${N-1} переходов.`,`${N-1} · ${d} = ${(N-1)*d} мест.`,`${a1} + ${(N-1)*d} = ${last} мест в ${N}-м ряду.`);if(n===2)l.push(`${a1} + ${last} = ${a1+last}`,`${a1+last} · ${R} = ${(a1+last)*R}`,vf((a1+last)*R,2)+` = ${result} мест.`);}
   else if(n===3){const [R,i,ai,j,aj]=a,d=(aj-ai)/(j-i);l.push(`Из условия: в ${i}-м ряду ${ai} мест, в ${j}-м — ${aj}; последний ряд — ${R}-й.`,`${aj} − ${ai} = ${aj-ai} мест.`,`${j} − ${i} = ${j-i} переходов.`,vf(aj-ai,j-i)+` = ${d} мест за один переход.`,`${R} − ${j} = ${R-j} переходов.`,`${R-j} · ${d} = ${(R-j)*d} мест.`,`${aj} + ${(R-j)*d} = ${result} мест.`);}
-  else if(n===4){const [D,r,k,start]=a;l.push(`Начальная температура — ${f(start)} °C; каждую минуту она ниже на ${r} °C.`,`${r} · ${k} = ${r*k} °C.`,`${f(start)} − ${r*k} = ${f(result)} °C.`);}
+  else if(n===4){const [D,r,k,start]=a;l.push(`Из условия: начальная температура — ${f(start)} °C; каждую минуту она уменьшается на ${r} °C; нужна температура через ${k} мин.`,`За ${k} мин температура уменьшится на ${r} · ${k} = ${r*k} °C.`,`Температура через ${k} мин: ${f(start)} − ${r*k} = ${f(result)} °C.`);}
   else if(n<=7){let [a1,d,N]=a;if(n===6)N=a1/d;const change=(N-1)*d,last=a1+(n===7?change:-change);l.push(`За первую секунду ${n===7?'поезд':'автомобиль'} проходит ${f(a1)} м; каждую следующую — на ${f(d)} м ${n===7?'больше':'меньше'}.`);if(n===6)l.push(vf(a1,d)+` = ${N} положительных секундных отрезков; следующий будет нулевым.`);l.push(`${N} − 1 = ${N-1}`,`${N-1} · ${f(d)} = ${f(change)} м.`,`${f(a1)} ${n===7?'+':'−'} ${f(change)} = ${f(last)} м.`,`${f(a1)} + ${f(last)} = ${f(a1+last)} м.`,`${f(a1+last)} · ${N} = ${f((a1+last)*N)} м.`,vf(f((a1+last)*N),2)+` = ${f(result)} м.`);}
   else if(n<=9){const P=n===8?a[1]:a[0],m=n===8?a[0]:a[1],q=n===8?a[2]:2,T=n===8?a[3]:a[2],k=T/P;l.push(`Начальная масса — ${m} мг; каждые ${P} минут она ${n===8?'увеличивается в '+q+' раза':'уменьшается вдвое'}.`,vf(T,P)+` = ${k} периодов.`,`${q}<sup>${k}</sup> = ${q**k}`,n===8?`${m} · ${q**k} = ${f(result)} мг.`:vf(m,q**k)+` = ${f(result)} мг.`);}
   else {const [h,q,threshold]=a;let cm=Math.round(h*100*1e6)/1e6;l.push(`Первый отскок — ${f(h)} м; каждый следующий в ${q} раза ниже. Порог — ${threshold} см.`,`${f(h)} · 100 = ${f(cm)} см.`);for(let k=2;k<=result;k++){const next=cm/q,exact=Math.abs(next*100-Math.round(next*100))<1e-8;l.push(`${k}-й отскок: ${vf(f(cm),q)} ${exact?'=':'≈'} ${f(next)} см.`);cm=next;}if(result===1)l.push(`Уже первый отскок ниже порога: ${f(cm)} &lt; ${threshold} см. Поэтому ответ — 1.`);else l.push(`На ${result-1}-м отскоке высота ещё не меньше ${threshold} см. На ${result}-м — впервые меньше: ${f(cm)} &lt; ${threshold}. Равенство порогу ещё считается достижением.`);}
@@ -1352,7 +1352,8 @@ function resumeOrNewTask() {
 
 function submitInputAnswer() {
   if (taskAnswered) return;
-  const raw = els.answerInput.value.trim().replace(',', '.');
+  // «−» (U+2212) из разбора и подсказки — тоже минус: у охлаждения ответы отрицательные
+  const raw = els.answerInput.value.trim().replace(',', '.').replace(/[−–]/g, '-');
   if (raw === '') return;
   const val = parseFloat(raw);
   const isCorrect = Number.isFinite(val) && Math.abs(val - curTask.correctValue) < 1e-9;
