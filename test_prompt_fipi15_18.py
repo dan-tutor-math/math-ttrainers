@@ -1,12 +1,12 @@
 """
 Правка «банк ФИПИ №15–18, без сайта»: oge15_18.html переделан с выбора
-вариантов на ввод числа (как на экзамене и как в №6, №9), в №15–17 — 70 видов
-заданий открытого банка ФИПИ (oge15_18-kinds.js) и 824 задания банка, условие
+вариантов на ввод числа (как на экзамене и как в №6, №9), в №15–17 — 77 видов
+заданий открытого банка ФИПИ (oge15_18-kinds.js) и 890 заданий банка, условие
 которых целиком в тексте (oge15_18-fipi-bank.js). Ответы ещё не сверены сайтом
 ФИПИ (до 27.10 банк закрыт) — ученику не видны, ?all=1 — предпросмотр.
 
 Проверяет:
-  1. банк: 824 задания, номера уникальны, вид каждого есть в oge15_18-kinds.js;
+  1. банк: 890 заданий, номера уникальны, вид каждого есть в oge15_18-kinds.js;
      условие и ответ каждого задания строит вид страницы, ответ совпадает с
      ответом сборки (n1518_build.py), без «undefined», «NaN», плоских «[p/q]» и
      «√(»; ответ — целый или до двух знаков; решение столбиком;
@@ -116,8 +116,8 @@ def card(page, mid):
 
 def test_bank(browser, bank):
     tasks = bank["tasks"]
-    check("банк: 824 задания, номера ФИПИ уникальны", len(tasks) == 824 and len({t["fipi"] for t in tasks}) == 824, str(len(tasks)))
-    check("банк: ждут картинок — по номерам 15, 16, 17, 18", sorted(bank["wait"]) == ["15", "16", "17", "18"] and bank["wait"]["18"] == 154, str(bank["wait"]))
+    check("банк: 890 заданий, номера ФИПИ уникальны", len(tasks) == 890 and len({t["fipi"] for t in tasks}) == 890, str(len(tasks)))
+    check("банк: ждёт картинок только №18 (клетчатая бумага) — 154", bank["wait"] == {"18": 154}, str(bank["wait"]))
     ctx, page, errors = new_page(browser, f"{BASE}/oge15_18.html")
     res = page.evaluate("""(tasks) => {
       const G = window.GEOM_KINDS, bad = [];
@@ -134,7 +134,7 @@ def test_bank(browser, bank):
       return { bad: bad.slice(0, 5), n: bad.length, kinds: G.list.length };
     }""", tasks)
     check("банк: условие и ответ каждого задания строит вид, ответ совпадает со сборкой", res["n"] == 0, str(res["bad"]))
-    check("виды: 70", res["kinds"] == 70, str(res["kinds"]))
+    check("виды: 77", res["kinds"] == 77, str(res["kinds"]))
     gen = page.evaluate("""() => {
       const G = window.GEOM_KINDS, bad = [];
       for (const k of G.list) for (let i = 0; i < 100; i++) {
@@ -145,6 +145,15 @@ def test_bank(browser, bank):
     }""")
     check("генераторы: по 100 заданий каждого вида — ответ для бланка, без «undefined»", not gen, str(gen[:2]))
     check("банк: без ошибок JS", not errors, str(errors[:1]))
+    fig = page.evaluate("""() => {
+      const G = window.GEOM_KINDS, bad = [];
+      for (const id of ['q_par_fig', 'q_trap_fig_big', 'q_trap_fig_small']) {
+        const k = G.byId[id], a = k.gen(), withFig = G.build(k, a).prompt, free = G.build(k, a, true).prompt;
+        if (!/рисун/.test(withFig) || /рисун/.test(free) || free.length < withFig.length) bad.push([id, withFig, free]);
+      }
+      return bad;
+    }""")
+    check("чертёжные виды: с чертежом — «см. рисунок», без него (на основе ФИПИ) — полное условие", not fig, str(fig))
     ctx.close()
 
 

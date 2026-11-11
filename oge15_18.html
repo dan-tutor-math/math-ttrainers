@@ -923,7 +923,8 @@ function gen_grid_area(){
    видах условие полное и без него. */
 const GK = window.GEOM_KINDS;
 function geomTask(k, a, img){
-  const b = GK.build(k, a);
+  // без чертежа (генератор «на основе ФИПИ») у видов с «см. рисунок» берётся полное условие — textFree
+  const b = GK.build(k, a, !img);
   return {
     prompt: b.prompt + (img ? `<img class="fipi-fig" src="${img}" alt="чертёж к заданию">` : ''),
     correctValue: b.correctValue,
