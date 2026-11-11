@@ -280,8 +280,6 @@ button.tag:hover{background:var(--ok);color:#fff}
     <div class="task-head">
       <div class="type-nav">
         <button class="back-btn" id="backBtn">← все тексты</button>
-        <button class="type-nav-btn" id="prevTypeBtn" title="Предыдущий тип">◀ Предыдущий тип</button>
-        <button class="type-nav-btn" id="nextTypeBtn" title="Следующий тип">Следующий тип ▶</button>
       </div>
       <div class="corner">
         <button class="nav-btn" id="prevBtn" title="Предыдущий текст" aria-label="Предыдущий текст">◀</button>
@@ -621,10 +619,6 @@ $('backBtn').addEventListener('click', () => {
 });
 $('prevBtn').addEventListener('click', () => openTask(S.idx - 1));
 $('nextBtnTop').addEventListener('click', () => openTask(S.idx + 1));
-// «Предыдущий / Следующий тип»: у этого номера подтем нет, поэтому тип — соседний номер
-// (по кругу №1 … №13, как у математики стрелки типов ходят по кругу)
-$('prevTypeBtn').addEventListener('click', () => { location.href = 'rus_oge13.html'; });
-$('nextTypeBtn').addEventListener('click', () => { location.href = 'rus_oge.html?n=2'; });
 function setMode(m){
   if (mode === m) return;
   mode = m; LS.set('rusOge01:mode', m);

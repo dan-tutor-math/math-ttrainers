@@ -12,8 +12,8 @@
   C. стрелки по бокам заголовка, на одной высоте с ним, круглые; в кадре
      (iframe панели доски) и в карточке ?card=1 стрелок нет;
   D. «Предыдущий/Следующий тип»: у номера с подтемами (№9) — соседняя подтема по
-     кругу, у номера без подтем (№2) — соседний номер; ◀ ▶ заданий по-прежнему
-     ходят по кругу; у №1 и №13 типы ведут на соседние номера;
+     кругу; без подтем (№1, №2–4, №6–7, №10) кнопок типов нет; ◀ ▶ заданий
+     по-прежнему ходят по кругу; у №13 типы — 13.1–13.3 с отдельными черновиками;
   E. ширина 375 и 320 — без горизонтальной прокрутки, стрелки не под кнопками в углах;
   F. ошибок JS нет.
 
@@ -94,6 +94,7 @@ def check_inpage(browser, failures, errors):
     page = t54.new_page(ctx, errors)
     page.goto(f"{BASE}/rus_oge.html?n=5")
     settle(page)
+    page.click("#modesGrid .mode-card[data-tp='']")
     # листаем в №5 на второе задание и запоминаем, какое открыто
     page.click("#nextBtnTop")
     page.wait_for_timeout(200)
@@ -187,30 +188,63 @@ def check_types(browser, failures, errors):
         page.wait_for_timeout(200)
         if page.evaluate("() => window.__rusOge.S.idx") != n - 1:
             failures.append("D: ◀ задания из первого не пошла по кругу")
-    # №2 без подтем: соседний номер
-    page.goto(f"{BASE}/rus_oge.html?n=2")
+    # Без подтем показываем только стрелки заданий; они не меняют номер.
+    for n in (2, 3, 4, 6, 7, 10):
+        page.goto(f"{BASE}/rus_oge.html?n={n}")
+        settle(page)
+        if page.locator("#prevTypeBtn:visible, #nextTypeBtn:visible").count():
+            failures.append(f"D: у №{n} без подтем видны кнопки типов")
+        first = page.evaluate("() => window.__rusOge.S.idx")
+        page.click("#nextBtnTop")
+        page.click("#prevBtn")
+        if page.evaluate("() => [window.__rusOge.S.n, window.__rusOge.S.idx]") != [n, first]:
+            failures.append(f"D: стрелки заданий №{n} не вернули исходное задание")
+        # Даже программный клик по скрытой кнопке не должен менять номер.
+        page.evaluate("() => document.getElementById('nextTypeBtn').click()")
+        if page.evaluate("() => window.__rusOge.S.n") != n:
+            failures.append(f"D: скрытая кнопка типа №{n} переключила номер")
+    # Видимость пересчитывается при переходе стрелками номера без перезагрузки.
+    page.goto(f"{BASE}/rus_oge.html?n=7")
     settle(page)
-    page.click("#nextTypeBtn")
-    page.wait_for_timeout(300)
-    if page.evaluate("() => window.__rusOge.S.n") != 3:
-        failures.append("D: №2 «Следующий тип» не открыл №3")
-    page.goto(f"{BASE}/rus_oge.html?n=2")
-    settle(page)
-    page.click("#prevTypeBtn")
-    page.wait_for_timeout(300)
-    if page.evaluate("() => window.__rusOge.S.n") != 12:
-        failures.append("D: №2 «Предыдущий тип» не пошёл по кругу на №12")
-    # №1 и №13: типы ведут на соседние номера
-    for url, btn, want in (("rus_oge01.html", "nextTypeBtn", "rus_oge.html?n=2"),
-                           ("rus_oge13.html", "prevTypeBtn", "rus_oge.html?n=12")):
+    for n in (8, 9, 10, 11, 12):
+        page.click("#examNextBtn")
+        page.wait_for_function("n => window.__rusOge.S.n === n", arg=n)
+        visible = page.locator("#prevTypeBtn:visible, #nextTypeBtn:visible").count()
+        if visible != (0 if n == 10 else 2):
+            failures.append(f"D: после перехода на №{n} видно {visible} кнопок типов")
+    # На №1 и №13 остаются стрелки текстов и отдельные стрелки номеров.
+    for url in ("rus_oge01.html",):
         page.goto(f"{BASE}/{url}")
         settle(page)
         page.click("#textsGrid .mode-card")
-        page.wait_for_timeout(300)
-        with page.expect_navigation():
-            page.click("#" + btn)
-        if where(page) != want:
-            failures.append(f"D: {url} {btn} → {where(page)}, ждали {want}")
+        if page.locator("#prevTypeBtn:visible, #nextTypeBtn:visible").count():
+            failures.append(f"D: {url} показывает типы вместо номеров")
+        first = page.evaluate("() => new URLSearchParams(location.search).get('t')")
+        page.click("#nextBtnTop")
+        page.click("#prevBtn")
+        if page.evaluate("() => new URLSearchParams(location.search).get('t')") != first:
+            failures.append(f"D: {url} стрелки текстов не вернули исходный текст")
+    # №13: типы сочинения меняются в том же тексте, у каждого свой черновик.
+    page.goto(f"{BASE}/rus_oge13.html")
+    settle(page)
+    page.click("#textsGrid .mode-card")
+    text = page.evaluate("() => new URLSearchParams(location.search).get('t')")
+    page.click("#prevTypeBtn")
+    if page.locator(".theme.picked").get_attribute("data-k") != "2":
+        failures.append("D: №13 из пустого выбора назад не открыл 13.3")
+    page.fill("#essay", "Черновик для 13.3")
+    page.click("#nextTypeBtn")
+    if page.locator(".theme.picked").get_attribute("data-k") != "0" or page.input_value("#essay"):
+        failures.append("D: №13 следующий тип не открыл чистый 13.1 по кругу")
+    page.fill("#essay", "Черновик для 13.1")
+    page.click("#prevTypeBtn")
+    if page.input_value("#essay") != "Черновик для 13.3":
+        failures.append("D: №13 потерял черновик при смене типа")
+    if page.evaluate("() => new URLSearchParams(location.search).get('t')") != text:
+        failures.append("D: №13 смена типа переключила текст")
+    page.click("#submitBtn")
+    if not all(page.is_disabled("#" + b) for b in ("prevTypeBtn", "nextTypeBtn")):
+        failures.append("D: №13 сданное сочинение допускает смену типа")
     # возврат стрелкой номера на №13 открывает последний открытый текст
     page.goto(f"{BASE}/rus_oge13.html")
     settle(page)
@@ -225,19 +259,19 @@ def check_types(browser, failures, errors):
     if page.evaluate("() => new URLSearchParams(location.search).get('t')") != last:
         failures.append("D: стрелка на №13 не вернула последний открытый текст")
     ctx.close()
-    print("  D: «Предыдущий/Следующий тип» — подтемы №9, соседние номера; ◀ ▶ заданий по кругу")
+    print("  D: «Предыдущий/Следующий тип» — только подтемы; без подтем скрыты; ◀ ▶ заданий по кругу")
 
 
 def check_phone(browser, failures, errors):
     for w in (375, 320):
         ctx = browser.new_context(viewport={"width": w, "height": 740}, is_mobile=True, has_touch=True)
         page = t54.new_page(ctx, errors)
-        for url in ("rus_oge01.html", "rus_oge.html?n=2", "rus_oge.html?n=9", "rus_oge13.html"):
+        for url in ("rus_oge01.html", "rus_oge.html?n=2", "rus_oge.html?n=5", "rus_oge.html?n=9", "rus_oge13.html"):
             page.goto(f"{BASE}/{url}")
             settle(page)
             if url == "rus_oge01.html" or url == "rus_oge13.html":
                 page.click("#textsGrid .mode-card")
-            elif url.endswith("n=9"):
+            elif url.endswith(("n=5", "n=9")):
                 page.click("#modesGrid .mode-card[data-tp='']")
             page.wait_for_timeout(400)
             r = page.evaluate("""() => {
@@ -273,7 +307,7 @@ def run():
         for f in failures:
             print("  - " + f)
         sys.exit(1)
-    print("\nВсё прошло.")
+    print("\nГотово: всё прошло.")
 
 
 if __name__ == "__main__":

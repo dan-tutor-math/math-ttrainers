@@ -497,6 +497,16 @@ html[data-no-add-rail] #addRail{display:none!important}
    Цвет — зелёный обществознания с главной. Светлый акцент тёмной темы даёт с белым
    текстом меньше 4,5:1, поэтому залитые кнопки в тёмной теме красятся отдельно */
 html[data-subject="soc"]{--ink:#17694F;--ink-active:#10523D;--hl-10:rgba(23,105,79,.10);--hl-35:rgba(23,105,79,.35);--blob-1:rgba(36,137,106,.16)}
+/* Счётчик и его стрелки держим вместе, как в русском; справа нет колонки «+». */
+html[data-subject="soc"]:not([data-focus="on"]) .sub{max-height:none;}
+html[data-subject="soc"] .task-head{padding-right:0;}
+html[data-subject="soc"] .corner{margin-left:auto;justify-content:flex-end;}
+html[data-subject="soc"] .task-pagination{display:flex;align-items:center;gap:8px;}
+html[data-subject="soc"] .task-pagination .task-title{white-space:nowrap;}
+html[data-subject="soc"] .nav-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 12px;min-width:40px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s,border-color .15s;}
+html[data-subject="soc"] .nav-btn:hover{border-color:var(--ink);}
+html[data-subject="soc"] .nav-btn:active{transform:scale(.96);}
+html[data-subject="soc"] .nav-btn:focus-visible{outline:3px solid var(--ink);outline-offset:2px;}
 html[data-theme="dark"][data-subject="soc"]{--ink:#2F8F70;--ink-active:#3FA584;--hl-10:rgba(58,158,126,.16);--hl-35:rgba(58,158,126,.5);--blob-1:rgba(58,158,126,.22)}
 html[data-theme="dark"][data-subject="soc"] .submode-tab.active,html[data-theme="dark"][data-subject="soc"] .check-btn,html[data-theme="dark"][data-subject="soc"] .yn-btn.sel,html[data-theme="dark"][data-subject="soc"] .proof-score-btn.active,html[data-theme="dark"][data-subject="soc"] .board-visibility-toggle.active{background:#1E7A5C;border-color:#1E7A5C;}
 html[data-theme="dark"][data-subject="soc"] .next-btn{background:#1F7A36;}
@@ -1386,6 +1396,15 @@ const els = {};
  'solAnswer','critBox','critSummary','critTable','nextBtn','tabLearn','tabPractice','tabExam',
  'basketAddBtn','refreshBtn','stSolved','stErrors','stStreak','proofScore','extraTaskBtn'].forEach(id => { els[id] = document.getElementById(id); });
 
+if (EXAM.subject === 'soc') {
+  // Переносим существующие кнопки, чтобы обработчики и переходы внутри типа остались общими.
+  const pagination = document.createElement('div');
+  pagination.className = 'task-pagination';
+  els.taskTitle.before(pagination);
+  pagination.append(els.prevProtoBtn, els.taskTitle, els.nextProtoBtn);
+  [els.prevProtoBtn, els.nextProtoBtn].forEach(btn => btn.classList.replace('type-nav-btn', 'nav-btn'));
+}
+
 /* отметки «решено» живут в общем для всех тренажёров localStorage под
    ключом ogeProg: — их стирает кнопка сброса прогресса на главной */
 const PROG_KEY = 'ogeProg:' + EXAM.slug + ':solved';
@@ -1726,8 +1745,12 @@ function fieldHint(f){
 // у базового уровня частей нет — все задания считаются первой частью
 function partOf(n){ return (task(n) || {}).part || 1; }
 function subtitleOf(t){
+  // Список типов тоже обновляет подзаголовок при открытом задании — сохраняем здесь его название.
+  const grp = EXAM.subject === 'soc' && S.screen === 'task' && curProto && curProto.group
+    ? groupById(S.n, curProto.group) : null;
   return t.title + (EXAM.showPart ? ' · часть ' + t.part : '') + ' · ' +
-    t.points + ' ' + plural(t.points, 'балл', 'балла', 'баллов');
+    t.points + ' ' + plural(t.points, 'балл', 'балла', 'баллов') +
+    (grp && grp.title !== t.title ? ' · ' + grp.title : '');
 }
 // «Ответ: 12 (порядок цифр не важен)», «Ответ: 6840 (подходят также: …)» —
 // ученик, записавший другой верный вариант, должен увидеть, что он тоже верен
@@ -2013,7 +2036,10 @@ function openTask(n, pid){
   // демоверсии ОГЭ 2027»), тогда в шапке оно, а не порядковый номер; номер
   // задания и так стоит в заголовке страницы
   const grp = p.group ? groupById(n, p.group) : null;
-  if (grp) {
+  if (EXAM.subject === 'soc') {
+    const sl = sibs(p.id);
+    els.taskTitle.textContent = 'задание ' + (sl.findIndex(x => x.id === p.id) + 1) + ' из ' + sl.length;
+  } else if (grp) {
     // в названии группы бывают формулы — поэтому разметкой, а номер считаем внутри группы
     const sl = sibs(p.id);
     els.taskTitle.innerHTML = rich(grp.title) + ' · задание ' + (sl.findIndex(x => x.id === p.id) + 1) + ' из ' + sl.length;
@@ -2066,10 +2092,14 @@ function render(){
   els.prevProtoBtn.style.display = many ? 'inline-flex' : 'none';
   els.nextProtoBtn.style.display = many ? 'inline-flex' : 'none';
   const inGroup = !!curProto.group;
-  els.prevProtoBtn.textContent = inGroup ? '◀ Предыдущее задание' : '◀ Предыдущий прототип';
-  els.nextProtoBtn.textContent = inGroup ? 'Следующее задание ▶' : 'Следующий прототип ▶';
+  els.prevProtoBtn.textContent = EXAM.subject === 'soc' ? '◀' : (inGroup ? '◀ Предыдущее задание' : '◀ Предыдущий прототип');
+  els.nextProtoBtn.textContent = EXAM.subject === 'soc' ? '▶' : (inGroup ? 'Следующее задание ▶' : 'Следующий прототип ▶');
   els.prevProtoBtn.title = inGroup ? 'Предыдущее задание этого вида' : 'Предыдущий прототип';
   els.nextProtoBtn.title = inGroup ? 'Следующее задание этого вида' : 'Следующий прототип';
+  if (EXAM.subject === 'soc') {
+    els.prevProtoBtn.setAttribute('aria-label', 'Предыдущее задание');
+    els.nextProtoBtn.setAttribute('aria-label', 'Следующее задание');
+  }
   // в номере с группами ◀ ▶ выше ходят внутри вида, поэтому переход между
   // видами — отдельной парой рядом (как «Предыдущий/Следующий тип» в №1–19)
   const manyTypes = typeUnits().length > 1;

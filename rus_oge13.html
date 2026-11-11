@@ -412,6 +412,8 @@ function render(animate){
   renderStats();
 
   const locked = S.submitted;
+  $('prevTypeBtn').disabled = locked;
+  $('nextTypeBtn').disabled = locked;
   let h = textHTML(t);
   h += '<div class="step-title">Выбери тему</div><div class="themes" id="themes">' +
     t.th.map((th, k) => `<button class="theme${S.k === k ? ' picked' : ''}" data-k="${k}" type="button"${locked ? ' disabled' : ''}>` +
@@ -498,6 +500,8 @@ function submit(){
   const ta = $('essay');
   if (!ta.value.trim()) { $('wc').textContent = 'Сначала напиши сочинение'; return; }
   S.submitted = true;
+  $('prevTypeBtn').disabled = true;
+  $('nextTypeBtn').disabled = true;
   stopTimer();
   saveResult(null);
   ta.readOnly = true;
@@ -598,10 +602,16 @@ $('backBtn').addEventListener('click', () => {
 });
 $('prevBtn').addEventListener('click', () => openTask(S.idx - 1));
 $('nextBtnTop').addEventListener('click', () => openTask(S.idx + 1));
-// «Предыдущий / Следующий тип»: у этого номера подтем нет, поэтому тип — соседний номер
-// (по кругу №1 … №13, как у математики стрелки типов ходят по кругу)
-$('prevTypeBtn').addEventListener('click', () => { location.href = 'rus_oge.html?n=12'; });
-$('nextTypeBtn').addEventListener('click', () => { location.href = 'rus_oge01.html'; });
+// Типы сочинения — 13.1–13.3; используем тот же выбор, чтобы сохранить черновики.
+function typeNeighbour(delta){
+  if (S.submitted) return;
+  const n = cur().th.length;
+  const k = S.k == null ? (delta > 0 ? 0 : n - 1) : (S.k + delta + n) % n;
+  const theme = $('themes').querySelector(`[data-k="${k}"]`);
+  if (theme) theme.click();
+}
+$('prevTypeBtn').addEventListener('click', () => typeNeighbour(-1));
+$('nextTypeBtn').addEventListener('click', () => typeNeighbour(1));
 function setMode(m){
   if (mode === m) return;
   mode = m; LS.set('rusOge13:mode', m);

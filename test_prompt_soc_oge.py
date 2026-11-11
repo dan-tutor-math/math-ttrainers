@@ -9,7 +9,7 @@
      принятым ФИПИ ключом, флагом any у №3, числом пунктов №14, всеми вариантами; ключ проходит
      проверку самой страницы; нет «$» (съел бы KaTeX) и обрывков разметки ФИПИ; номера КИМ 2027;
   3. навигация как в математике: ◀ ▶ над названием по №1–20, «← все задания», «◀ Предыдущий тип /
-     Следующий тип ▶» по видам внутри номера, «◀ Предыдущее / Следующее задание ▶», ⟳ — задание
+     Следующий тип ▶» по видам внутри номера, «◀ задание N из M ▶» справа, как в русском, ⟳ — задание
      того же вида, 📥 «В подборку», счётчик и «История решённого» самой нижней кнопкой;
   4. ответы: выбор — нажатием на сам вариант, как в ОГЭ №7 (без строки «Ответ: 1 2 3 4»), одна
      попытка в «Экзамене» и две в «Тренировке», цифры 1–4 с клавиатуры и Enter, тот же st.yn у
@@ -105,6 +105,36 @@ def open_first_task(page, n):
 def check_btn(page):
     page.click("#answerArea .check-btn")
     page.wait_for_timeout(150)
+
+
+def check_task_nav(page, label, same_row=False):
+    layout = page.evaluate("""() => {
+      const ids = ['prevProtoBtn', 'taskTitle', 'nextProtoBtn'];
+      const nodes = ids.map(id => document.getElementById(id));
+      const boxes = nodes.map(e => e.getBoundingClientRect());
+      const corner = document.querySelector('.task-head .corner').getBoundingClientRect();
+      const head = document.querySelector('.task-head').getBoundingClientRect();
+      const types = document.querySelector('.type-nav').getBoundingClientRect();
+      return {
+        order: [...nodes[1].parentElement.children].map(e => e.id),
+        labels: [nodes[0], nodes[2]].every(e => e.getAttribute('aria-label') && e.title),
+        inside: nodes.every(e => e.closest('.corner') && !e.closest('.type-nav')),
+        aligned: boxes.every(b => Math.abs(b.y + b.height / 2 - boxes[1].y - boxes[1].height / 2) < 2),
+        right: Math.abs(corner.right - head.right) < 2,
+        row: Math.abs(types.y + types.height / 2 - corner.y - corner.height / 2) < 2,
+        overflow: document.documentElement.scrollWidth > innerWidth,
+        bounds: boxes.every(b => b.x >= 0 && b.right <= innerWidth)
+      };
+    }""")
+    check(layout['order'] == ['prevProtoBtn', 'taskTitle', 'nextProtoBtn'] and layout['inside'],
+          f'{label}: стрелки по бокам счётчика в правом блоке')
+    check(layout['aligned'] and layout['right'] and layout['bounds'] and not layout['overflow'],
+          f'{label}: счётчик со стрелками в одну строку, справа, без переполнения')
+    check(layout['labels'], f'{label}: у стрелок есть доступные подписи и подсказки')
+    check(page.evaluate("document.getElementById('pageSub').scrollHeight <= document.getElementById('pageSub').clientHeight"),
+          f'{label}: название типа в подзаголовке не обрезано')
+    if same_row:
+        check(layout['row'], f'{label}: на компьютере счётчик на одной высоте с кнопками типов')
 
 
 def opt(val):
@@ -206,12 +236,23 @@ def main():
         page.wait_for_timeout(200)
         check(page.inner_text("#backBtn").strip() == "← все задания", "кнопка «← все задания»")
         check(page.is_visible("#prevTypeBtn") and page.is_visible("#nextTypeBtn"), "«◀ Предыдущий тип / Следующий тип ▶»")
-        check(page.inner_text("#prevProtoBtn").strip() == "◀ Предыдущее задание" and page.inner_text("#nextProtoBtn").strip() == "Следующее задание ▶",
-              "«◀ Предыдущее задание / Следующее задание ▶»")
+        check(page.inner_text("#prevProtoBtn").strip() == "◀" and page.inner_text("#nextProtoBtn").strip() == "▶",
+              "компактные стрелки, как в русском")
+        check_task_nav(page, '1280 px', same_row=True)
+        check(page.inner_text('#taskTitle').strip() == 'задание 1 из 34', 'счётчик без длинного названия типа')
+        check(page.evaluate("document.getElementById('pageSub').textContent.includes(groupById(S.n, curProto.group).title)"),
+              'название типа видно в подзаголовке')
         g0, p0 = page.evaluate("[curProto.group, S.pid]")
         page.click("#nextProtoBtn")
         page.wait_for_timeout(150)
         check(page.evaluate("curProto.group") == g0 and page.evaluate("S.pid") != p0, "«Следующее задание ▶» — того же вида")
+        check(page.inner_text('#taskTitle').strip() == 'задание 2 из 34', 'счётчик обновился при переходе вперёд')
+        page.click('#prevProtoBtn')
+        check(page.evaluate('S.pid') == p0 and page.evaluate('curProto.group') == g0, 'левая стрелка вернула предыдущее задание')
+        page.click('#prevProtoBtn')
+        check(page.inner_text('#taskTitle').strip() == 'задание 34 из 34', 'переход назад с первого задания — в конец этого же типа')
+        page.click('#nextProtoBtn')
+        check(page.evaluate('S.pid') == p0, 'переход вперёд с последнего задания — в начало этого же типа')
         page.click("#refreshBtn")
         page.wait_for_timeout(150)
         check(page.evaluate("curProto.group") == g0, "⟳ «Обновить задание» — другое задание того же вида")
@@ -489,6 +530,7 @@ def main():
             open_first_task(page, n)
             sw = page.evaluate("document.documentElement.scrollWidth")
             check(sw <= 361, f"№{n}: без горизонтальной прокрутки ({sw})")
+            check_task_nav(page, f'360 px, №{n}')
         wide = page.evaluate("""async () => {
           const bad = [];
           for (const n of [2, 3, 14]) {
@@ -518,7 +560,7 @@ def main():
         ctx.close()
         browser.close()
 
-    print("\nИТОГ:", "всё ок" if not FAILS else f"{len(FAILS)} ошибок")
+    print("\nИТОГ:", "готово" if not FAILS else f"{len(FAILS)} ошибок")
     sys.exit(1 if FAILS else 0)
 
 

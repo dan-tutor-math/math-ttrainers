@@ -18,7 +18,7 @@
      «← все задания» ведёт на главную (index.html?subject=rus), а не на свой список
      номеров — он остался только для предпросмотра ?all=1; голый rus_oge.html — тоже на главную;
   7. тёмная тема и ширина телефона — без ошибок JS и без горизонтальной прокрутки;
-  8. подтемы внутри номера (список преподавателя): у каждого задания №8, 9, 11, 12
+  8. подтемы внутри номера (список преподавателя): у каждого задания №5, 8, 9, 11, 12
      есть подтема, в каждой подтеме из файла есть подтверждённые задания, №9 размечен
      по направлению замены из самого условия; номер с подтемами открывает экран тем,
      тема даёт задания только этой темы, «Все вперемешку» — весь номер, «← темы»
@@ -107,10 +107,10 @@ def test_data(D):
 
     print("1б. подтемы")
     TP = D.get("topics", {})
-    check(all(str(n) in TP for n in (8, 9, 11, 12)), f"подтемы есть у №8, 9, 11, 12 ({sorted(TP, key=int)})")
+    check(all(str(n) in TP for n in (5, 8, 9, 11, 12)), f"подтемы есть у №5, 8, 9, 11, 12 ({sorted(TP, key=int)})")
     ids = {n: {x["id"] for x in v} for n, v in TP.items()}
-    no_tp = [t["id"] for t in T if str(t["n"]) in ("8", "9", "11", "12") and not t.get("tp")]
-    check(not no_tp, f"у каждого задания №8, 9, 11, 12 есть подтема (без неё: {no_tp[:5]})")
+    no_tp = [t["id"] for t in T if str(t["n"]) in ("5", "8", "9", "11", "12") and not t.get("tp")]
+    check(not no_tp, f"у каждого задания №5, 8, 9, 11, 12 есть подтема (без неё: {no_tp[:5]})")
     bad_tp = [t["id"] for t in T if any(x not in ids.get(str(t["n"]), ()) for x in t.get("tp", []))]
     check(not bad_tp, f"подтемы заданий есть в списке тем номера (чужих: {bad_tp[:5]})")
     empty = [(n, x["id"]) for n, v in TP.items() for x in v
@@ -124,6 +124,9 @@ def test_data(D):
         m = re.search(r"основе\s+(\w+).*?связью\s+(\w+)", plain(t["q"]))
         if not m or t.get("tp") != [code(m.group(1)) + "-" + code(m.group(2))]: bad9.append(t["id"])
     check(not bad9, f"№9: подтема совпадает с направлением замены в условии (не совпало: {bad9[:5]})")
+    expected5 = {"dash": 16, "colon": 10, "comma": 41, "quote": 9}
+    got5 = {key: sum(t["n"] == 5 and t.get("tp") == [key] for t in T) for key in expected5}
+    check(got5 == expected5, f"№5: все 76 заданий распределены по четырём знакам ({got5})")
     bad11 = [t["id"] for t in T if t["n"] == 11 and t.get("tp") == ["metaphor"] and "метафор" not in t["q"]]
     check(not bad11, "№11: в «Метафоре» только задания, где спрашивают метафору")
 
@@ -275,6 +278,39 @@ def main():
         check("/index.html" in pg.url, "у ученика «← все задания» ведёт на главную, не на копию списка")
 
         print("8. подтемы на экране выбора")
+        pg.goto(BASE + "/rus_oge.html?n=5")
+        check(pg.is_visible("#topicsBack"), "№5 открывает выбор типа")
+        expected5 = {"dash": 16, "colon": 10, "comma": 41, "quote": 9}
+        cards5 = pg.eval_on_selector_all('.mode-card[data-tp]', "els => els.map(e => e.dataset.tp)")
+        check(cards5 == [""] + list(expected5), "№5: все вперемешку и четыре типа в прежнем порядке")
+        for key, count in expected5.items():
+            pg.click(f'.mode-card[data-tp="{key}"]')
+            expected_ids = [t["id"] for t in D["tasks"] if t["n"] == 5 and t.get("tp") == [key] and t["ok"]]
+            got_ids = pg.evaluate("window.__rusOge.S.list.map(t => t.id)")
+            check(got_ids == expected_ids and len(got_ids) == count, f"№5: {key} содержит ровно свои {count} заданий")
+            check(pg.is_visible("#nextTypeBtn") and pg.is_visible("#prevTypeBtn"), "№5: кнопки типов видны")
+            pg.click("#nextBtnTop")
+            saved_url = pg.url
+            saved_id = pg.evaluate("window.__rusOge.S.list[window.__rusOge.S.idx].id")
+            pg.reload()
+            check(pg.evaluate("window.__rusOge.S.topic") == key and pg.evaluate("window.__rusOge.S.list[window.__rusOge.S.idx].id") == saved_id,
+                  "№5: ссылка и перезагрузка сохраняют тип и задание")
+            pg.click("#nextTypeBtn")
+            want = list(expected5)[(list(expected5).index(key) + 1) % 4]
+            check(pg.evaluate("window.__rusOge.S.n") == 5 and pg.evaluate("window.__rusOge.S.topic") == want,
+                  "№5: следующий тип по кругу внутри номера")
+            pg.click("#prevTypeBtn")
+            check(pg.url == saved_url, "№5: предыдущий тип возвращает к запомненному заданию")
+            pg.click("#backBtn")
+        pg.click('.mode-card[data-tp=""]')
+        check(pg.evaluate("window.__rusOge.S.list.length") == 76, "№5: все вперемешку содержит все 76 заданий")
+        pg.click("#prevTypeBtn")
+        check(pg.evaluate("window.__rusOge.S.topic") == "quote", "№5: из смеси назад — кавычки")
+        pg.goto(BASE + "/rus_oge.html?n=5")
+        pg.click('.mode-card[data-tp=""]')
+        pg.click("#nextTypeBtn")
+        check(pg.evaluate("window.__rusOge.S.topic") == "dash", "№5: из смеси вперёд — тире")
+
         pg = new_page()
         pg.goto(BASE + "/rus_oge.html?all=1")
         check("тем" in pg.inner_text('.mode-card[data-n="9"] .msub'), "в предпросмотре у №9 на карточке написано число тем")
@@ -316,7 +352,7 @@ def main():
         check(pg.is_visible("#taskArea"), "№2 без подтем открывается сразу заданием")
         check(pg.inner_text("#backBtn") == "← все задания", "и кнопка назад у него прежняя")
         pm = new_page(390, 844, "dark")
-        for n in (8, 12):
+        for n in (5, 8, 12):
             pm.goto(BASE + f"/rus_oge.html?n={n}")
             sw = pm.evaluate("document.documentElement.scrollWidth")
             check(pm.is_visible("#topicsBack") and sw <= 390, f"экран тем №{n} на 390 px без горизонтальной прокрутки ({sw})")

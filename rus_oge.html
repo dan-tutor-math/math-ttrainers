@@ -115,6 +115,7 @@ a.mode-card{text-decoration:none;box-sizing:border-box}
 .task-head{display:flex;flex-wrap:wrap;row-gap:8px;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
 .type-nav{display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;gap:8px;}
 .type-nav-btn{height:34px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-ui);font-weight:600;font-size:12px;line-height:1;cursor:pointer;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;transition:transform .12s, border-color .12s;}
+.type-nav-btn[hidden]{display:none;}
 .type-nav-btn:hover{border-color:var(--ink)}
 .type-nav-btn:active{transform:scale(.9)}
 .corner{display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;gap:8px;}
@@ -248,8 +249,8 @@ a.mode-card{text-decoration:none;box-sizing:border-box}
     <div class="task-head">
       <div class="type-nav">
         <button class="back-btn" id="backBtn">← все задания</button>
-        <button class="type-nav-btn" id="prevTypeBtn" title="Предыдущий тип">◀ Предыдущий тип</button>
-        <button class="type-nav-btn" id="nextTypeBtn" title="Следующий тип">Следующий тип ▶</button>
+        <button class="type-nav-btn" id="prevTypeBtn" hidden title="Предыдущий тип">◀ Предыдущий тип</button>
+        <button class="type-nav-btn" id="nextTypeBtn" hidden title="Следующий тип">Следующий тип ▶</button>
       </div>
       <div class="corner">
         <button class="nav-btn" id="prevBtn" title="Предыдущее задание" aria-label="Предыдущее задание">◀</button>
@@ -514,6 +515,10 @@ function renderTask(animate){
   $('pageSub').textContent = `№${S.n}. ${meta.title}` + (S.topic ? ` · ${topicTitle()}` : '');
   $('taskTitle').textContent = `задание ${S.idx + 1} из ${S.list.length}`;
   $('backBtn').textContent = topicsOf(S.n).length ? '← темы' : '← все задания';
+  // Номера переключаются стрелками заголовка; кнопки типов нужны только для подтем.
+  const hasTypes = topicsOf(S.n).length > 1;
+  $('prevTypeBtn').hidden = !hasTypes;
+  $('nextTypeBtn').hidden = !hasTypes;
   $('tabPractice').classList.toggle('active', mode === 'practice');
   $('tabExam').classList.toggle('active', mode === 'exam');
   $('modeHint').textContent = mode === 'exam'
@@ -723,23 +728,13 @@ function goPicker(){
 $('backBtn').addEventListener('click', () => topicsOf(S.n).length ? renderTopics(S.n) : goPicker());
 $('prevBtn').addEventListener('click', () => openTask(S.idx - 1));
 $('nextBtnTop').addEventListener('click', () => openTask(S.idx + 1));
-// «Предыдущий / Следующий тип» — как у математики. Тип номера с подтемами — подтема
-// (по кругу; из «Все вперемешку» вперёд — в первую, назад — в последнюю), у номера без
-// подтем соседний тип — соседний номер из тех, где есть подтверждённые задания.
-// Заходим тем же openNumber, поэтому у каждой темы и номера своё «где остановились»
+// Из «Все вперемешку» вперёд — первая подтема, назад — последняя; дальше по кругу.
 function typeNeighbour(delta){
-  const tps = topicsOf(S.n);
-  if (tps.length) {
-    const ids = tps.map(tp => tp.id);
-    const i = S.topic ? ids.indexOf(S.topic) : -1;
-    const j = i < 0 ? (delta > 0 ? 0 : ids.length - 1) : (i + delta + ids.length) % ids.length;
-    openNumber(S.n, null, ids[j]);
-    return;
-  }
-  const ns = NUMS.map(m => m.n).filter(n => (POOL[n] || []).length);
-  const i = ns.indexOf(S.n);
-  if (i < 0 || ns.length < 2) return;
-  openNumber(ns[(i + delta + ns.length) % ns.length]);
+  const ids = topicsOf(S.n).map(tp => tp.id);
+  if (ids.length < 2) return;
+  const i = S.topic ? ids.indexOf(S.topic) : -1;
+  const j = i < 0 ? (delta > 0 ? 0 : ids.length - 1) : (i + delta + ids.length) % ids.length;
+  openNumber(S.n, null, ids[j]);
 }
 $('prevTypeBtn').addEventListener('click', () => typeNeighbour(-1));
 $('nextTypeBtn').addEventListener('click', () => typeNeighbour(1));
