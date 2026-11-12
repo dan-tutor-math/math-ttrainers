@@ -162,6 +162,19 @@
   addNumbered('soc', SOC_OGE_TITLES, (n, t) => ({ href: 'soc_oge.html?n=' + n, subject: 'soc', cap: 'ege',
     eq: SOC_LONG.indexOf(n) >= 0 ? 'развёрнутый' : 'краткий ответ', full: 'Обществознание ОГЭ №' + n + '. ' + t }));
 
+  // ЕГЭ отделён префиксом: прогресс, подборка и доска ОГЭ не пересекаются с ним.
+  const SOC_EGE_TITLES = {
+    1: 'Понятия: исключение лишнего', 2: 'Человек и общество: суждения',
+    3: 'Человек и общество: соответствие', 4: 'Человек и общество: применение знаний',
+    5: 'Экономика: суждения', 6: 'Экономика: соответствие', 7: 'Экономика: применение знаний',
+    8: 'Социальные отношения: суждения', 9: 'Анализ диаграммы опроса',
+    10: 'Политика: суждения', 11: 'Политика: применение знаний',
+    12: 'Конституция Российской Федерации', 13: 'Политика: соответствие',
+    14: 'Право: суждения', 15: 'Право: соответствие', 16: 'Право: применение знаний',
+  };
+  addNumbered('soce', SOC_EGE_TITLES, (n, t) => ({ href: 'soc_ege.html?n=' + n, subject: 'soc', cap: 'ege',
+    eq: 'краткий ответ', full: 'Обществознание ЕГЭ №' + n + '. ' + t }));
+
   /* Английский, ОГЭ (КИМ 2027): все позиции — eng_oge.html, копия страницы ЕГЭ.
      Позиция — набор КИМ (одна аудиозапись или один текст и все его вопросы),
      в адресе первый номер набора (?n=20 — №20–28). Аудирование в панель не
@@ -209,7 +222,9 @@
       { title: 'Задания 1–17', items: range('soc', 1, 17) },
       { title: 'Задания 18–20 — к тексту', items: range('soc', 18, 20), continueNum: true },
     ] },
-    { subject: 'soc', id: 'ege', title: 'ЕГЭ', groups: [], soon: true },
+    { subject: 'soc', id: 'ege', title: 'ЕГЭ', groups: [
+      { title: 'Часть 1 — краткий ответ', items: range('soce', 1, 16) },
+    ] },
     { subject: 'eng', id: 'oge', title: 'ОГЭ', groups: [
       { title: 'Аудирование', items: ['eng1', 'eng5', 'eng6'] },
       { title: 'Чтение', items: ['eng12', 'eng13'] },
@@ -268,7 +283,7 @@
     panelGroups,
     range,
     titles: { egeProf: EGE_PROF_TITLES, egeBase: EGE_BASE_TITLES, ogePart2: OGE_PART2_TITLES,
-              rusOge: RUS_OGE_TITLES, socOge: SOC_OGE_TITLES, engOge: ENG_OGE },
+              rusOge: RUS_OGE_TITLES, socOge: SOC_OGE_TITLES, socEge: SOC_EGE_TITLES, engOge: ENG_OGE },
     subjectOf: id => (T[id] && T[id].subject) || null,
   };
 })();
