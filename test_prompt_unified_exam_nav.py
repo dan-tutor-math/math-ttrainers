@@ -34,7 +34,14 @@ def subject(page, name):
 
 def choose(page, name, trainer):
     subject(page, name)
+    pick_number(page, trainer)
+
+
+def pick_number(page, trainer):
     page.locator(f'.exam-jump-number[data-trainer="{trainer}"]').click()
+    resume = page.locator(f'[data-continue="{trainer}"]')
+    if page.locator('#examJumpMenu').is_visible() and resume.is_visible():
+        resume.click()
 
 
 def wait_url(page, path):
@@ -48,7 +55,7 @@ def check_routes(browser, errors):
     page.goto(BASE + '/oge6.html')
     menu(page)
     assert page.locator('.exam-jump-number').count() == 18
-    assert page.locator('[aria-current="page"]').get_attribute('data-trainer') == 'oge6'
+    assert page.locator('.exam-jump-number[aria-current="page"]').get_attribute('data-trainer') == 'oge6'
     assert page.locator('[data-trainer="oge6"]').inner_text().startswith('№6')
     # Не рисуем собственное задание: открываем штатный тип и сохраняем снимок.
     page.keyboard.press('Escape')
@@ -77,13 +84,13 @@ def check_routes(browser, errors):
     subject(page, 'math')
     page.locator('[data-exam-id="ege_prof"]').click()
     assert page.locator('.exam-jump-number').count() == 20
-    page.locator('[data-trainer="ege7"]').click()
+    pick_number(page, 'ege7')
     wait_url(page, 'ege_prof.html?n=7')
     page.wait_for_function('() => __examNav.n() === 7 && __examNav.pid()')
     menu(page)
     page.locator('[data-exam-id="ege_base"]').click()
     assert page.locator('.exam-jump-number').count() == 21
-    page.locator('[data-trainer="egeb15"]').click()
+    pick_number(page, 'egeb15')
     wait_url(page, 'ege_base.html?n=15')
     page.wait_for_function('() => __examNav.n() === 15 && __examNav.pid()')
     choose(page, 'rus', 'rus1')
@@ -92,6 +99,79 @@ def check_routes(browser, errors):
     wait_url(page, 'rus_oge13.html')
     ctx.close()
     print('A: четыре предмета, ОГЭ/ЕГЭ, переходы внутри страницы, память задания — OK', flush=True)
+
+
+def pick_type(page, subject_id, trainer, token, exam=None):
+    subject(page, subject_id)
+    if exam:
+        page.locator(f'[data-exam-id="{exam}"]').click()
+    page.locator(f'.exam-jump-number[data-trainer="{trainer}"]').click()
+    page.locator(f'#examJumpTypes [data-type="{token}"]').click()
+
+
+def check_types(browser, errors):
+    ctx = browser.new_context(viewport={'width': 1280, 'height': 900})
+    page = t54.new_page(ctx, errors)
+    page.goto(BASE + '/oge6.html')
+    menu(page)
+    assert page.locator('#examJumpTypes').is_visible()
+    for width in (1280, 768, 390, 320):
+        page.set_viewport_size({'width': width, 'height': 900})
+        for theme in ('light', 'dark'):
+            page.evaluate('t => document.documentElement.dataset.theme=t', theme)
+            n6 = page.locator('.exam-jump-number[data-trainer="oge6"]')
+            n6.locator('.exam-jump-disclosure').click()
+            assert n6.get_attribute('aria-expanded') == 'false'
+            assert page.locator('#examJumpTypes').is_hidden()
+            page.wait_for_timeout(150)
+            n6.click()
+            assert n6.get_attribute('aria-expanded') == 'true'
+            page.wait_for_timeout(150)
+            assert page.locator('#examJumpTypes [data-type="m:p6"]').is_visible()
+            assert page.evaluate('document.documentElement.scrollWidth <= innerWidth')
+            if width in (1280, 320):
+                SHOTS.mkdir(exist_ok=True)
+                page.screenshot(path=str(SHOTS / f'types-{width}-{theme}.png'))
+    # Нативные повторные клики не ждут окончания предыдущего перехода.
+    page.evaluate("""async () => { for(let i=0;i<10;i++){document.querySelector('.exam-jump-number[data-trainer="oge6"]').dispatchEvent(new MouseEvent('click',{bubbles:true,detail:1}));await new Promise(r=>setTimeout(r,20));}}""")
+    page.wait_for_timeout(150)
+    assert page.locator('#examJumpTypes').is_visible()
+    assert page.locator('.exam-jump-exit').count() == 0
+    page.emulate_media(reduced_motion='reduce')
+    page.locator('.exam-jump-number[data-trainer="oge6"]').click()
+    assert page.locator('#examJumpMenu').evaluate('e => e.getAnimations({subtree:true}).every(a=>a.playState!=="running")')
+    page.locator('.exam-jump-number[data-trainer="oge6"]').click()
+    page.emulate_media(reduced_motion='no-preference')
+    page.locator('#examJumpTypes [data-type="m:p6"]').click()
+    page.wait_for_function("() => tsGetState().picker === false && tsGetState().curMode === 'p6'")
+    previous = page.evaluate('JSON.stringify(tsGetState().curTask)')
+    page.set_viewport_size({'width': 1280, 'height': 900})
+    pick_type(page, 'math', 'oge9', 'm:p8')
+    wait_url(page, 'oge9.html')
+    page.wait_for_function("() => tsGetState().picker === false && tsGetState().curMode === 'p8'")
+    choose(page, 'math', 'oge6')
+    wait_url(page, 'oge6.html')
+    page.wait_for_function("() => tsGetState().picker === false && tsGetState().curMode === 'p6'")
+    assert page.evaluate('JSON.stringify(tsGetState().curTask)') == previous
+    pick_type(page, 'rus', 'rus5', 'r:colon')
+    wait_url(page, 'rus_oge.html?n=5')
+    page.wait_for_function("() => __rusOge.S.n === 5 && __rusOge.S.topic === 'colon'")
+    pick_type(page, 'rus', 'rus9', 'r:prim-upr')
+    page.wait_for_function("() => __rusOge.S.n === 9 && __rusOge.S.topic === 'prim-upr'")
+    pick_type(page, 'rus', 'rus13', 'w:2')
+    wait_url(page, 'rus_oge13.html')
+    page.wait_for_function('() => __rusOge13.S.k === 2')
+    subject(page, 'soc')
+    page.locator('[data-trainer="soc9"]').click()
+    token = page.locator('#examJumpTypes .exam-jump-type').first.get_attribute('data-type')
+    page.locator('#examJumpTypes .exam-jump-type').first.click()
+    wait_url(page, 'soc_oge.html?n=9')
+    page.wait_for_function('() => __examNav.n() === 9 && __examNav.pid()')
+    menu(page)
+    assert page.locator('#examJumpTypes .exam-jump-type[aria-current="page"]').get_attribute('data-type') == token
+    # Выбор ученика не должен обходить guard через новую кнопку типа.
+    ctx.close()
+    print('E: типы математики, русского и обществознания; стрелка, 120 мс, память, быстрые клики, reduced-motion — OK', flush=True)
 
 
 def check_layout(browser, errors):
@@ -188,6 +268,17 @@ def check_session(browser, errors):
     teacher.wait_for_function('() => __examNav.n() === 10 && __examNav.pid()')
     student.wait_for_function('() => __examNav.n() === 10 && __examNav.pid()', timeout=10000)
     assert student.evaluate('__examNav.pid()') == teacher.evaluate('__examNav.pid()')
+    pick_type(teacher, 'math', 'oge9', 'm:p8')
+    wait_url(teacher, 'oge9.html')
+    wait_url(student, 'oge9.html')
+    teacher.wait_for_function("() => tsGetState().curMode === 'p8' && tsGetState().picker === false")
+    student.wait_for_function("() => tsGetState().curMode === 'p8' && tsGetState().picker === false", timeout=10000)
+    menu(student)
+    student.locator('#examJumpTypes [data-type="m:p3"]').click()
+    assert student.evaluate('tsGetState().curMode') == 'p8'
+    assert student.locator('#tsRestrictedHint').evaluate("el => el.style.opacity === '1'")
+    pick_type(teacher, 'math', 'oge9', 'm:p5')
+    student.wait_for_function("() => tsGetState().curMode === 'p5'", timeout=10000)
     ctx.close()
     print('D: ограничения ученика, смена предмета и номера учителем — OK (заглушка)', flush=True)
 
@@ -196,7 +287,7 @@ def run():
     errors = []
     with t54.local_server(), sync_playwright() as p:
         browser = p.chromium.launch()
-        for check in (check_routes, check_layout, check_retry, check_session):
+        for check in (check_routes, check_types, check_layout, check_retry, check_session):
             check(browser, errors)
         browser.close()
     assert not errors, errors
