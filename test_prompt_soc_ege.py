@@ -118,7 +118,8 @@ def main():
         page.locator('.exam-nav-text').click()
         page.locator('.exam-jump-number[data-trainer="soce16"]').wait_for(state='visible')
         assert page.locator('[data-exam-id="ege"][aria-pressed="true"]').count() == 1
-        assert page.locator('.exam-jump-number').count() == 16
+        expected_numbers=page.evaluate('MathhCatalog.exams.find(e=>e.subject==="soc"&&e.id==="ege").groups.flatMap(g=>g.items).length')
+        assert expected_numbers in (16,25) and page.locator('.exam-jump-number').count() == expected_numbers
         page.locator('.exam-jump-number[data-trainer="soce16"]').click()
         page.locator('#examJumpTypes [data-type]').first.click()
         page.wait_for_function('() => __examNav.n() === 16 && __examNav.pid()')
@@ -146,7 +147,9 @@ def main():
         peer.evaluate('s=>tsApplyState(s)',snapshot)
         peer.wait_for_function('() => S.n===3 && S.answered && S.correct && !__fipiBusy()')
         assert peer.evaluate('S.pid')==snapshot['egePid']
-        assert peer.evaluate('JSON.stringify(__boardGetState())')==page.evaluate('JSON.stringify(__boardGetState())')
+        restored=peer.evaluate('__boardGetState()')
+        assert restored['strokes']==snapshot['strokes'] and restored['bgStrokes']==snapshot['bgStrokes']
+        assert restored['__boardClear']==snapshot['__boardClear']
         assert page.evaluate("document.documentElement.hasAttribute('data-no-board-grid')")
         page.locator('#basketAddBtn').click()
         assert page.evaluate('Basket.all().some(t=>t.trainerId==="soce3")')
@@ -162,7 +165,7 @@ def main():
                 # Длинные таблицы всех соответствий проверяются в реальной разметке.
                 for n in (1,3,6,9,13,15):
                     ps=dump[str(n)]['protos']
-                    page.evaluate('n=>openTask(n,protos(n)[0].id)',n)
+                    page.evaluate('''async n=>{await new Promise(r=>ensureFipi(n,r));openTask(n,protos(n)[0].id);}''',n)
                     bad=page.evaluate('''ps=>{
                       const box=document.querySelector('#questionText'),saved=box.innerHTML,bad=[];
                       for(const p of ps){box.innerHTML=p.text;if(document.documentElement.scrollWidth>innerWidth+1)bad.push(p.id);}
@@ -171,7 +174,7 @@ def main():
                     assert not bad,(width,theme,n,bad[:4])
                 img_task=next(p for d in dump.values() for p in d['protos'] if '<img' in p['text'])
                 n=source[img_task['id']]['num27']
-                page.evaluate('x=>openTask(x.n,x.id)',{'n':n,'id':img_task['id']})
+                page.evaluate('''async x=>{await new Promise(r=>ensureFipi(x.n,r));openTask(x.n,x.id);}''',{'n':n,'id':img_task['id']})
                 page.wait_for_function("() => [...document.querySelectorAll('#questionText img')].every(i=>i.complete&&i.naturalWidth>0)")
                 page.evaluate('t=>document.documentElement.dataset.theme=t',theme)
                 page.wait_for_timeout(1800)

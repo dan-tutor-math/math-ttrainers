@@ -82,7 +82,7 @@
     ege_base: { title: 'ЕГЭ база', list: range(1, 21).map(n => ({ slug: 'ege_base', n: n, label: '№' + n })) },
     ege_prof: { title: 'ЕГЭ профиль', list: range(1, 20).map(n => ({ slug: 'ege_prof', n: n, label: '№' + n })) },
     soc_oge: { title: 'ОГЭ обществознание', list: range(1, 20).map(n => ({ slug: 'soc_oge', n: n, label: '№' + n })) },
-    soc_ege: { title: 'ЕГЭ обществознание', list: range(1, 16).map(n => ({ slug: 'soc_ege', n: n, label: '№' + n })) },
+    soc_ege: { title: 'ЕГЭ обществознание', list: range(1, 25).map(n => ({ slug: n<=16 ? 'soc_ege' : 'soc_ege_long', n: n, label: '№' + n })) },
     // русский ОГЭ: №1 и №13 — свои страницы (изложение, сочинение), №2–12 — одна
     // страница rus_oge.html, номер в адресе, меняется без перезагрузки (хук __examNav)
     rus_oge: { title: 'ОГЭ русский', list: [{ slug: 'rus_oge01', label: '№1' }]
