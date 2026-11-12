@@ -22,7 +22,7 @@ def menu(page):
     ready(page)
     if page.locator('#examJumpMenu').is_hidden():
         page.locator('.exam-nav-text').click()
-    page.locator('.exam-jump-number').first.wait_for()
+    page.locator('.exam-jump-number:visible').first.wait_for()
 
 
 def subject(page, name):
@@ -212,7 +212,7 @@ def check_layout(browser, errors):
                 assert page.locator('#examJumpMenu').is_hidden()
                 assert page.locator('.exam-nav-text').evaluate('el => el === document.activeElement')
                 page.keyboard.press('Enter')
-                page.locator('.exam-jump-number').first.wait_for()
+                page.locator('.exam-jump-number:visible').first.wait_for()
                 page.locator('.exam-jump-close').click()
                 assert page.locator('#examJumpMenu').is_hidden()
     page.goto(BASE + '/oge6.html?card=1')

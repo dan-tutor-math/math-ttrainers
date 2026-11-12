@@ -43,16 +43,23 @@
   window.__examNavLoaded = true;
 
   const params = new URLSearchParams(location.search);
-  // в карточке «+» (кадр ?card=1) и в живом задании на доске страница
-  // открыта в iframe: там видно только задание, заголовка нет, а своя память
-  // кадра перебивала бы память вкладки.
+  // Панели выбора для доски — полноценные тренажёры. Отличаем их от
+  // карточек «+», снимков и живых заданий на холсте: там меню не нужно.
   // Промпт №11 нового списка: кадр сцены ученика (stage.html, окно с именем tsStageFrame) —
   // исключение: это целая страница, и стрелки у заголовка должны стоять как
   // у учителя, иначе заголовок сверстается иначе и съедет всё, что ниже.
   // Нажать их ученик всё равно не может — guardStudentAction
-  let inFrame = false;
-  try { inFrame = window.top !== window.self; } catch (e) { inFrame = true; }
-  if (params.get('card') === '1' || (inFrame && window.name !== 'tsStageFrame')) return;
+  let inFrame = false, panelFrameId = '', panelCatalog = null;
+  try {
+    inFrame = window.top !== window.self;
+    const frame = window.frameElement;
+    if (frame && frame.matches('#bdTrainersIframe,#bpIframe')) {
+      panelFrameId = frame.id;
+      panelCatalog = window.parent.MathhCatalog;
+    }
+  } catch (e) { inFrame = true; }
+  if (params.get('card') === '1' || params.get('bdgen') === '1'
+      || (inFrame && !panelFrameId && window.name !== 'tsStageFrame')) return;
 
   const slug = (location.pathname.split('/').pop() || '').replace(/\.html?$/i, '');
   const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
@@ -89,14 +96,22 @@
   let examId = null;
   Object.keys(EXAMS).forEach(id => { if (EXAMS[id].list.some(p => p.slug === slug)) examId = id; });
   if (!examId) return;
-  const EXAM = EXAMS[examId];
+  // В панели доступны те же номера, что в её каталоге: аудио и сочинения
+  // без снимка задания не должны уводить из окна добавления на доску.
+  const panelPositions = panelCatalog ? new Set(panelCatalog.panelGroups().flatMap(g => g.items.map(t => t.href))) : null;
+  const EXAM = panelPositions ? Object.assign({}, EXAMS[examId], {
+    list: EXAMS[examId].list.filter(p => panelPositions.has(p.slug + '.html' + (p.n ? '?n=' + p.n : ''))),
+  }) : EXAMS[examId];
   const subjectId = examId === 'rus_oge' ? 'rus' : examId === 'soc_oge' ? 'soc' : examId === 'eng_oge' ? 'eng' : 'math';
   const catalogExamId = subjectId === 'math' ? examId : 'oge';
   const assetBase = new URL('.', document.currentScript ? document.currentScript.src : location.href);
 
-  const MEM_KEY = 'examNav:mem:v1';
-  const ARRIVE_KEY = 'examNav:arrive';
-  const TYPE_MEM_KEY = 'examNav:types:v1';
+  // Кадр и основная вкладка делят sessionStorage; подбор для доски не
+  // должен подменять сохранённое задание открытого рядом тренажёра.
+  const memorySuffix = panelFrameId ? ':' + panelFrameId : '';
+  const MEM_KEY = 'examNav:mem:v1' + memorySuffix;
+  const ARRIVE_KEY = 'examNav:arrive' + memorySuffix;
+  const TYPE_MEM_KEY = 'examNav:types:v1' + memorySuffix;
   let liveUnits = [], liveUnitsN = null;
   const ARRIVE_TTL_MS = 60 * 1000;   // метка «пришли стрелкой» старше минуты — не наша
   const posKey = p => p.slug + (p.n ? '?n=' + p.n : '');
@@ -343,7 +358,20 @@
     button.addEventListener('click', action);
     return button;
   }
+  function syncTouchTargets() {
+    if (!matchMedia('(pointer: coarse)').matches) return;
+    let scale = 1;
+    // Телефонная панель вписывает кадр масштабом: 44 CSS-пикселя внутри
+    // него могут стать 33 пикселями под пальцем. Компенсируем только кнопки.
+    if (panelFrameId) {
+      const frame = window.frameElement;
+      scale = frame && frame.clientWidth ? Math.min(1, frame.getBoundingClientRect().width / frame.clientWidth) : 1;
+    }
+    const value = (44 / Math.max(.1, scale)) + 'px', style = document.documentElement.style;
+    if (style.getPropertyValue('--ej-touch-size') !== value) style.setProperty('--ej-touch-size', value);
+  }
   function positionJumpMenu() {
+    syncTouchTargets();
     if (!jumpMenu || jumpMenu.hidden) return;
     const rect = jumpTrigger.getBoundingClientRect();
     if (!rect.width || !rect.height) { closeJumpMenu(); return; }
@@ -481,7 +509,7 @@
     const items = selectedExam ? selectedExam.groups.flatMap(group => group.items) : [];
     items.forEach(id => {
       const trainer = jumpCatalog.trainers[id];
-      if (!trainer || !trainer.href) return;
+      if (!trainer || !trainer.href || (panelFrameId && trainer.panel === false)) return;
       const target = trainerTarget(trainer), types = trainerTypes(id);
       const expanded = selectedTrainer === id && typesExpanded;
       const button = menuButton('exam-jump-number', null, event => {
@@ -772,6 +800,7 @@ h1.exam-nav-h1 .exam-nav-text{min-width:0;}
   }
 
   function start() {
+    syncTouchTargets();
     mountButtons();
     arrive();
     record();
