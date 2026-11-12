@@ -390,12 +390,12 @@ TIRE_ANS = ["195", "107,25", "549,8", "2,75", "1,4"]
 def test_tires(browser):
     ctx, page, errors = new_page(browser, f"{BASE}/oge1_5.html")
     tires = page.eval_on_selector_all('#modesGrid .modes', 'gs => [...gs[0].querySelectorAll(".mode-card")].map(e => [e.dataset.id, e.innerText])')
-    # третьей темой — «Шины · задания ФИПИ»: ученику она видна с тех пор, как
-    # сайт ФИПИ принял ответы (02.11.2026); до сверки её не было
-    check("oge1_5: в «Шинах» Шина 0 (демоверсия), прежняя Шина 1 и задания ФИПИ",
-          [t[0] for t in tires] in (['tire_demo2027', 'tire_set1'], ['tire_demo2027', 'tire_set1', 'tire_fipi'])
-          and 'Демоверсия ОГЭ 2027' in tires[0][1]
-          and tires[1][1].startswith('Шина 1'), str(tires))
+    # «Шины · задания ФИПИ» — сразу за демоверсией (видна ученику с 02.11.2026,
+    # когда сайт ФИПИ принял ответы); названий «Шина 0 / Шина 1» больше нет (11.2026)
+    check("oge1_5: в «Шинах» демоверсия, задания ФИПИ, потом прежние шины",
+          [t[0] for t in tires] in (['tire_demo2027', 'tire_set1'], ['tire_demo2027', 'tire_fipi', 'tire_set1'])
+          and tires[0][1].startswith('Шины · Демоверсия ОГЭ 2027')
+          and tires[-1][1].strip() == 'Шины', str(tires))
     check("oge1_5: в «Случайно» заданий демоверсии нет",
           page.evaluate("RANDOM_MODES.every(m => !m.demo) && ALL_MODES.filter(m => m.demo).length === 5"))
     open_type(page, 'tire_demo2027', wait=700)

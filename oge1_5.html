@@ -25,6 +25,9 @@
   --glass-strong:rgba(255,255,255,.72);
   --glass-border:rgba(255,255,255,.85);
   --glass-inset:rgba(255,255,255,.55);
+  /* линии таблиц: белая --glass-border на светлом фоне не видна */
+  --table-line:rgba(0,76,153,.2);
+  --table-head:rgba(0,76,153,.06);
   --hl:var(--hl-14);
   --muted-1:#8E8E93;
   --muted-2:#6E6E73;
@@ -56,6 +59,8 @@ html[data-theme="dark"]{
   --glass-strong:rgba(46,53,84,.65);
   --glass-border:rgba(255,255,255,.12);
   --glass-inset:rgba(255,255,255,.07);
+  --table-line:rgba(255,255,255,.16);
+  --table-head:rgba(255,255,255,.05);
   --hl:rgba(40,110,214,.26);
   --grid:#232A44;
   --ink:#2E7DE0;
@@ -328,9 +333,11 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .prompt{font-family:var(--font-ui);font-weight:500;font-size:clamp(16px,3vw,19px);color:var(--muted-5);margin-bottom:14px;line-height:1.5;}
 
 /* ─── таблица данных ─── */
-.data-table{width:100%;border-collapse:collapse;margin:10px 0 4px;font-family:var(--font-mono);font-size:14px;}
-.data-table th,.data-table td{border:1px solid var(--glass-border);padding:6px 10px;text-align:center;}
-.data-table th{background:var(--glass);font-family:var(--font-ui);font-weight:600;color:var(--muted-3);}
+/* рамка — скруглённая обводка вокруг таблицы (box-shadow, т.к. border-radius
+   не работает с border-collapse), внутри — тонкие линии цвета --table-line */
+.data-table{width:100%;border-collapse:collapse;margin:10px 0 4px;font-family:var(--font-mono);font-size:14px;background:var(--card);border-radius:12px;overflow:hidden;box-shadow:0 0 0 1px var(--table-line);border-style:hidden;}
+.data-table th,.data-table td{border:1px solid var(--table-line);padding:7px 10px;text-align:center;}
+.data-table th{background:var(--table-head);font-family:var(--font-ui);font-weight:600;color:var(--muted-3);}
 /* Промпт №63: на телефоне таблица из условия (в шинах — «215/55; 215/50» в
    трёх столбцах) не помещалась в экран даже с переносами и растягивала страницу
    вбок. На узком экране у ячеек меньше поля и мельче шрифт */
@@ -486,6 +493,21 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .home-btn{position:fixed;top:16px;left:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);font-size:19px;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);z-index:200;transition:transform .15s, border-color .12s;text-decoration:none;}
 .home-btn:hover{border-color:var(--ink)}
 .home-btn:active{transform:scale(.92)}
+/* левый верхний угол: «Все задания» (на index.html) и «← Назад» (к выбору
+   тем) — одной ширины столбиком. Кнопка «Назад» раньше жила в шапке задания и
+   терялась среди «◀ Предыдущий тип / Следующий тип ▶». Столбик фиксирован, пока
+   слева от колонки .wrap (820px) хватает места; уже — встаёт строкой над
+   заголовком и уезжает вместе со страницей, чтобы не налезать на задание */
+.corner-nav{position:fixed;top:16px;left:16px;z-index:200;display:grid;gap:8px;}
+.corner-nav .home-btn{position:static;width:auto;}
+.corner-nav .home-btn,.corner-nav .back-btn{height:40px;box-sizing:border-box;border-radius:14px;padding:0 14px;gap:8px;display:flex;align-items:center;justify-content:flex-start;font-family:var(--font-ui);font-weight:600;font-size:14px;line-height:1;color:var(--ink);background:var(--glass-strong);border:1px solid var(--glass-border);box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);white-space:nowrap;}
+.corner-nav .back-btn[hidden]{display:none}
+.corner-nav svg{width:18px;height:18px;flex:0 0 auto}
+@media(max-width:1239px){
+  .corner-nav{position:static;grid-auto-flow:column;grid-auto-columns:1fr;justify-content:start;margin:0 0 12px;}
+}
+/* на телефоне в строку не влезают — справа вверху свои кнопки (тема, доска) */
+@media(max-width:599px){.corner-nav{grid-auto-flow:row;grid-auto-columns:auto}}
 /* этот файл не использует .sheet (тетрадный лист) как в калькуляторах/уравнениях —
    доска (#boardCanvas, position:fixed, z-index:2) поэтому подгоняется под весь
    #taskArea целиком (см. resolveBoardTarget). Из-за этого при включённой доске она
@@ -497,7 +519,11 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="tire-math.js"></script>
 </head>
 <body>
-<a class="home-btn" id="homeBtn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам">←</a>
+<nav class="corner-nav" id="cornerNav">
+  <a class="home-btn" id="homeBtn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l-5-5 5-5"/><path d="M11 12h10"/></svg>Все задания</a>
+  <!-- показывается, только пока открыто задание (#taskArea), см. syncBackBtn -->
+  <button class="back-btn" id="backBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>Назад</button>
+</nav>
 <button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
 <button class="theme-toggle board-visibility-toggle" id="boardVisibilityToggle" title="Показать доску" aria-label="Показать/скрыть доску">🖊️</button>
 <script>(function(){
@@ -636,7 +662,6 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
   <div id="taskArea" style="display:none">
     <div class="task-head">
       <div class="type-nav">
-        <button class="back-btn" id="backBtn">← назад</button>
         <button class="type-nav-btn" id="prevTypeBtn" title="Предыдущий тип">◀ Предыдущий тип</button>
         <button class="type-nav-btn" id="nextTypeBtn" title="Следующий тип">Следующий тип ▶</button>
       </div>
@@ -668,7 +693,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       <div class="theory-block-head">
         <a class="taskset-nav-btn" id="tire3dTheoryLink" href="tire3d.html" style="display:none">3D-модель шины</a>
         <button class="theory-toggle" id="theoryToggleBtn">📖 Показать теорию</button>
-        <button class="taskset-nav-btn" id="newTireBtn" style="display:none" title="Выбрать новую заводскую шину и начать «Шину 1» заново — прогресс по всем 5 её заданиям сбросится">🔄 Новая шина</button>
+        <button class="taskset-nav-btn" id="newTireBtn" style="display:none" title="Выбрать новую заводскую шину и начать задания заново — прогресс по всем 5 её заданиям сбросится">🔄 Новая шина</button>
         <button class="basket-add-btn" id="theoryBasketAddBtn" style="display:none" title="Теорию в подборку">📥</button>
       </div>
       <div class="theory-content" id="theoryContent" style="display:none"></div>
@@ -1169,61 +1194,21 @@ const TIRE_DEMO_TASKS = [
   { id: 'tire0_t5', title: 'Задание 5', demo: true, gen: gen_tire_demo5 },
 ];
 
-/* ═══════════════ ТЕМА «ТАРИФЫ» ═══════════════ */
-function gen_tariff1() {
-  const base = pick([300,350,400,450,500]);
-  const includedMin = pick([300,400,500]);
-  const overRate = pick([1,2,3]);
-  const used = includedMin + ri(10,80);
-  const over = used - includedMin;
-  const correct = base + over*overRate;
-  const wrong1 = base + used*overRate;
-  const wrong2 = over*overRate;
-  const wrong3 = base + over*overRate + includedMin;
-  const options = buildOptions(String(correct), shuffleArr([wrong1,wrong2,wrong3]).map(String), k => String(correct + (k%2?1:-1)*10*k));
-  return {
-    prompt: `Тариф «Стандарт»: абонентская плата ${base} ₽ в месяц, включено ${includedMin} минут разговора. Каждая минута сверх лимита стоит ${overRate} ₽.<br>В этом месяце абонент разговаривал ${used} минут. Сколько рублей он должен заплатить?`,
-    options, correctIndex: options.indexOf(String(correct)),
-    explain: `Сверх лимита: ${used} − ${includedMin} = ${over} мин. Доплата: ${over} × ${overRate} = ${over*overRate} ₽. Итого: ${base} + ${over*overRate} = ${correct} ₽.`
-  };
-}
-
-function gen_tariff2() {
-  for (let t = 0; t < 300; t++) {
-    const baseA = pick([300,350,400]), incA = pick([300,400]), rateA = pick([1,2]);
-    const baseB = pick([250,450,500]), incB = pick([200,500]), rateB = pick([2,3]);
-    const used = ri(250,600);
-    const costA = baseA + Math.max(0, used-incA)*rateA;
-    const costB = baseB + Math.max(0, used-incB)*rateB;
-    if (costA === costB) continue;
-    const diff = Math.abs(costA-costB);
-    const cheaper = costA<costB ? 'A' : 'B';
-    const options = buildOptions(String(diff), shuffleArr([costA, costB, diff+ri(20,60)]).map(String), k => String(diff + (k%2?1:-1)*20*k));
-    return {
-      prompt: `Тариф A: абонплата ${baseA} ₽, включено ${incA} минут, сверх лимита — ${rateA} ₽/мин.<br>Тариф B: абонплата ${baseB} ₽, включено ${incB} минут, сверх лимита — ${rateB} ₽/мин.<br>Абонент разговаривает ${used} минут в месяц. На сколько рублей выгоднее более дешёвый тариф?`,
-      options, correctIndex: options.indexOf(String(diff)),
-      explain: `Тариф A: ${baseA} + max(0, ${used}−${incA})·${rateA} = ${costA} ₽. Тариф B: ${baseB} + max(0, ${used}−${incB})·${rateB} = ${costB} ₽. Разница: |${costA}−${costB}| = ${diff} ₽ (выгоднее тариф ${cheaper}).`
-    };
-  }
-  return gen_tariff2();
-}
-
 /* ═══════════════ реестр тем ═══════════════ */
 const GROUPS = [
   // key — ключ блока для привязки видео (video-links.js, block_key): заголовок
   // с эмодзи для этого не годится, его меняют ради вида
   { title: '🚗 Шины', key: 'tire', modes: [
-    { id: 'tire_demo2027', title: 'Шина 0 · Демоверсия ОГЭ 2027', kind: 'taskset', demo: true,
+    { id: 'tire_demo2027', title: 'Шины · Демоверсия ОГЭ 2027', kind: 'taskset', demo: true,
       tasks: TIRE_DEMO_TASKS, theory: buildDemoTireTheoryHTML },
-    { id: 'tire_set1', title: 'Шина 1', kind: 'taskset', tasks: TIRE1_TASKS,
+    { id: 'tire_set1', title: 'Шины', kind: 'taskset', tasks: TIRE1_TASKS,
       // теория по заводской шине, которая сейчас у страницы: у присоединившегося
       // к сессии она приходит снимком (factoryTire), у кадра карточки — тоже
       theory: () => buildTireTheoryHTML(ensureFactoryTire()) },
   ]},
-  { title: '📱 Тарифы', modes: [
-    { id: 'tariff1', title: 'Стоимость связи по тарифу', gen: gen_tariff1 },
-    { id: 'tariff2', title: 'Сравнение двух тарифов', gen: gen_tariff2 },
-  ]},
+  // свои генераторы тарифов убраны (11.2026) — в плашке только задания ФИПИ;
+  // пустая плашка держит место темы в списке, без ФИПИ она убирается ниже
+  { title: '📱 Тарифы', modes: [] },
 ];
 /* ═══════════════ задания из открытого банка ФИПИ ═══════════════
    №1–5 банка ФИПИ — oge1_5-fipi-bank.js, собран скриптами
@@ -1288,7 +1273,7 @@ function gen_tire_fipi(kind){
 }
 if (TIRE_FIPI.length) {
   const n = TIRE_FIPI.length;
-  GROUPS[0].modes.push({ id: 'tire_fipi', title: 'Шины · задания ФИПИ', kind: 'taskset', fipi: true,
+  GROUPS[0].modes.splice(1, 0, { id: 'tire_fipi', title: 'Шины · задания ФИПИ', kind: 'taskset', fipi: true,
     sub: `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'текст' : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? 'текста' : 'текстов'} ФИПИ`,
     tasks: TIRE_KINDS.map((k, i) => ({ id: 'tirefipi_t' + (i + 1), title: 'Задание ' + (i + 1),
       gen: () => gen_tire_fipi(k) })),
@@ -1391,6 +1376,7 @@ PLOT_FIPI.forEach(p => {
   if (g) g.modes.push(mode); else GROUPS.push({ title: p.group, modes: [mode] });
   if (PLOT_FIPI_ON.indexOf(p.group) < 0) PLOT_FIPI_ON.push(p.group);
 });
+for (let i = GROUPS.length - 1; i >= 0; i--) if (!GROUPS[i].modes.length) GROUPS.splice(i, 1);
 // тема с несколькими текстами ФИПИ: «Шины · ФИПИ» или сюжет с vars
 function isTextSet(){ return !!(curTasksetRef && (curTasksetRef.id === 'tire_fipi' || curTasksetRef.varPlot)); }
 // темы «скоро» — без тех, что уже пришли из банка ФИПИ (ответы сверены или ?all=1)
@@ -1689,7 +1675,7 @@ function enterTaskset(tasksetMode) {
 function rerollFactoryTire() {
   if (isTextSet()) { switchTireFipiVar(true); return; }
   if (!curTasksetRef || curTasksetRef.id !== 'tire_set1') return;
-  if (!confirm('Выбрать новую заводскую шину и начать «Шину 1» заново?\nПрогресс по всем 5 заданиям этой темы будет сброшен.')) return;
+  if (!confirm('Выбрать новую заводскую шину и начать задания заново?\nПрогресс по всем 5 заданиям этой темы будет сброшен.')) return;
   curFactoryTire = pickFactoryTire();
   saveFactoryTire(curFactoryTire);
   curTasksetTheory = buildTireTheoryHTML(curFactoryTire);
@@ -2717,6 +2703,17 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
 if (window.TrainerSession) {
   window.TrainerSession.mountShareButton();
 }
+/* «Назад» вынесена из #taskArea в угол — прячем и показываем её вслед за ним:
+   #taskArea открывают и закрывают в нескольких местах (выбор темы, «Назад»,
+   снимок сессии), проще следить за его style, чем править каждое. В кадре
+   карточки угол не нужен совсем (там и «Все задания» прячет trainer-multi.js) */
+(function syncBackBtn(){
+  const area = document.getElementById('taskArea'), btn = document.getElementById('backBtn');
+  if (IS_CARD_FRAME) { document.getElementById('cornerNav').style.display = 'none'; return; }
+  const sync = () => { btn.hidden = area.style.display === 'none'; };
+  new MutationObserver(sync).observe(area, { attributes: true, attributeFilter: ['style'] });
+  sync();
+})();
 document.getElementById('homeBtn').addEventListener('click', function (e) {
   e.preventDefault();
   var go = function () {

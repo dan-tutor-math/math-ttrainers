@@ -245,7 +245,7 @@ def main():
             page.click('.mode-card[data-id="tire_fipi"]')
             page.wait_for_selector("#taskArea", state="visible")
             check("кнопка есть у «Шин · ФИПИ»", btn_visible(page))
-            open_mode(page, "tariff1")
+            open_mode(page, "tariff_fipi")
             check("у «Тарифов» кнопки нет (видео не привязано)", not btn_visible(page))
             page.click("#backBtn")
             page.click('.mode-card[data-id="tire_set1"]')

@@ -217,8 +217,8 @@ def run():
 
         # ── 10. ОГЭ №1–5: теория своей кнопкой ──────────────────────────
         open_trainer(page, "oge1_5", "oge1_5.html")
-        sets = page.evaluate(f"() => [...{FRAME}.contentDocument.querySelectorAll('.mode-card:not(.soon)')].map(c => c.textContent.trim().slice(0, 30))")
-        tire = next(i for i, t in enumerate(sets) if "Шина 1" in t)
+        sets = page.evaluate(f"() => [...{FRAME}.contentDocument.querySelectorAll('.mode-card:not(.soon)')].map(c => c.dataset.id)")
+        tire = sets.index("tire_set1")
         page.evaluate(f"() => {FRAME}.contentWindow.eval(\"document.querySelectorAll('.mode-card:not(.soon)')[{tire}].click()\")")
         page.wait_for_timeout(700)
         tb = page.evaluate(f"""() => {{ const d = {FRAME}.contentDocument, b = d.getElementById('bdTheoryAddBtn'), t = d.getElementById('theoryToggleBtn');

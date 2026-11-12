@@ -468,8 +468,8 @@ def test_other_trainers(browser):
 
     # ОГЭ: типы с большим числом вариантов — 25 подряд без повторов и без одинаковых ответов подряд
     cases = [("oge6", "p1", "open"), ("oge9", "p12", "open"), ("oge12", "f3", "open"), ("oge14", "t4", "open"),
-             ("oge15_18", "t_third", "open"), ("oge7", "point_on_line_decimal", "start"), ("oge10", "type1", "start"),
-             ("oge1_5", "tariff1", "open")]
+             ("oge15_18", "t_third", "open"), ("oge7", "point_on_line_decimal", "start"), ("oge10", "type1", "start")]
+    # oge1_5 здесь больше нет: генераторы тарифов убраны (11.2026), остались наборы шин
     for slug, mid, how in cases:
         ctx, page, errors = open_page(browser, url=slug + ".html")
         opener = "startMode(id)" if how == "start" else "(curMode = id, openTask())"
