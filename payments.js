@@ -59,7 +59,7 @@
     { id: 'practice', name: 'тренировочное', free: true },
   ];
   const REASONS = ['болезнь', 'предупредил заранее', 'не пришёл', 'семейные обстоятельства'];
-  const PAY_DEFAULTS = { skipRule: 'free', reason: 'болезнь', remindLeft: 1, remindDays: 3, flags: [] };
+  const PAY_DEFAULTS = { skipRule: 'free', reason: 'болезнь', remindLeft: 1, remindDays: 3, flags: [], monthMode: 'x4' };
   function paySettings(s){
     const raw = (s && s.pay) || {};
     return Object.assign({}, PAY_DEFAULTS, raw, { flags: Array.isArray(raw.flags) ? raw.flags : [] });
@@ -301,9 +301,90 @@
   const deleteRate = id => run(need().from('student_rates').delete().eq('id', id));
   const setMode = (studentId, mode) => run(need().from('students').update({ pay_mode: mode === 'pack' || mode === 'lesson' ? mode : null }).eq('id', String(studentId)).select('id, pay_mode').single());
 
+  /* ══ «в месяц», часы, итог дня (В4(б)) ══ */
+
+  // Часы — по времени занятий, пересечения не задваиваются: пара и
+  // параллель в одно время — один час работы (как busyHours старого
+  // приложения). items — [{ start_min, dur_min }] одного дня
+  function busyHours(items){
+    const iv = [];
+    let loose = 0;
+    (items || []).forEach(x => { const d = Number(x.dur_min) || 60; if (x.start_min == null) loose += d; else iv.push([x.start_min, x.start_min + d]); });
+    iv.sort((a, b) => a[0] - b[0]);
+    let tot = 0, cs = -1, ce = -1;
+    iv.forEach(([s, e]) => { if (s > ce) { if (ce > cs) tot += ce - cs; cs = s; ce = e; } else if (e > ce) ce = e; });
+    if (ce > cs) tot += ce - cs;
+    return (tot + loose) / 60;
+  }
+  const curRateRow = (rates, day) => { let r = null; (rates || []).forEach(x => { if (x.valid_from <= day && (!r || x.valid_from > r.valid_from)) r = x; }); return r; };
+
+  // Ученик в шаблоне недели: сколько раз стоит и сколько это в неделю по
+  // ставке на сегодня (в паре и группе — по групповой цене)
+  function tplLoad(tpl, sid, rates, day){
+    let n = 0, sum = 0, noRate = false;
+    ((tpl && tpl.slots) || []).forEach(s => {
+      if (s.is_event || !(s.people || []).some(p => String(p.student_id) === String(sid))) return;
+      n++;
+      const pr = rateOn(rates, day, s.format);
+      if (pr == null) noRate = true; else sum += pr;
+    });
+    return { n, week: sum, noRate };
+  }
+
+  // «В месяц» у ученика. Способ выбирает преподаватель (решение Даниила
+  // 13.11): 'x4' — ставка × занятий в неделю × 4; 'tpl' — сколько занятий
+  // ученика в активном шаблоне недели × 4. Ручное значение у ставки
+  // (student_rates.monthly) важнее любого способа: оно для тех, кто платит
+  // фиксированную сумму. В ×4 «занятий в неделю» — со ставки (per_week), а
+  // если не вписано — из шаблона: так число есть сразу, без ручного ввода.
+  // ×4, а не ×4,33 — так считает старое приложение, числа должны совпадать
+  function monthlyOf(o){
+    const day = o.today || today(), r = curRateRow(o.rates, day);
+    if (r && r.monthly != null) return { sum: Number(r.monthly), how: 'manual', text: 'вписано вручную', rate: r };
+    if (!r) return { sum: null, how: 'none', text: 'ставка не задана', rate: null };
+    const t = tplLoad(o.tpl, o.sid, o.rates, day);
+    if (o.mode === 'tpl') {
+      if (!o.tpl) return { sum: null, how: 'tpl', text: 'нет активного шаблона недели', rate: r };
+      return { sum: t.week * 4, how: 'tpl', per: t.n, rate: r,
+        text: t.n ? plural(t.n, 'занятие', 'занятия', 'занятий') + ' в шаблоне × 4' : 'в шаблоне недели нет' };
+    }
+    const per = r.per_week != null ? Number(r.per_week) : t.n;
+    const perTxt = String(per).replace('.', ',');
+    return { sum: Number(r.price) * per * 4, how: 'x4', per, rate: r,
+      text: per ? perTxt + ' в неделю' + (r.per_week != null ? '' : ' (по шаблону)') + ' × ' + money(r.price) + ' × 4' : 'занятий в неделю не задано' };
+  }
+  // per_week и monthly живут в строке ставки, действующей сегодня
+  function setRateExtra(rateId, f){
+    const o = {};
+    const num = v => (v === '' || v == null ? null : Number(v));
+    if ('per_week' in f) { const v = num(f.per_week); o.per_week = v == null || !(v >= 0) ? null : Math.min(30, Math.round(v * 10) / 10); }
+    if ('monthly' in f) { const v = num(f.monthly); o.monthly = v == null || !(v >= 0) ? null : Math.round(v * 100) / 100; }
+    return run(need().from('student_rates').update(o).eq('id', rateId).select(RATE_COLS).single());
+  }
+
+  // Ручной итог дня (cabinet-stats.sql). Таблицы ещё нет — пустой список:
+  // доход дня просто считается из отметок
+  const DT_COLS = 'id, day, amount, note';
+  async function listDayTotals(from, to){
+    try {
+      return await all(() => { let q = need().from('day_totals').select(DT_COLS); if (from) q = q.gte('day', from); if (to) q = q.lte('day', to); return q.order('day', { ascending: true }); });
+    } catch (e) { if (missing(e)) return []; throw e; }
+  }
+  // amount null/'' — убрать итог (снова считается из отметок). Сначала
+  // ищем строку дня: один итог на день (unique owner, day)
+  async function setDayTotal(day, amount, note){
+    const c = need();
+    const has = (await run(c.from('day_totals').select(DT_COLS).eq('day', day))) || [];
+    if (amount === '' || amount == null) { if (has.length) await run(c.from('day_totals').delete().eq('day', day)); return null; }
+    const o = { amount: Math.max(0, Math.round(Number(amount) * 100) / 100), note: String(note || '').slice(0, 300) };
+    if (has.length) return run(c.from('day_totals').update(o).eq('id', has[0].id).select(DT_COLS).single());
+    return run(c.from('day_totals').insert(Object.assign({ day }, o)).select(DT_COLS).single());
+  }
+
   window.Payments = {
     FLAG_TEMPLATES, REASONS, PAY_DEFAULTS, paySettings, billOf, reasonOf, rateOn, modeOf, calc,
     loadAll, split, loadStudent, weekInfo, addPayment, updatePayment, deletePayment, setRate, deleteRate, setMode, missing,
+    busyHours, curRateRow, tplLoad, monthlyOf, setRateExtra, listDayTotals, setDayTotal,
     money, plural, dm, dmy, today, addDays, addMonths, daysBetween,
   };
 })();

@@ -17,7 +17,7 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const MONTHS_IN = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре'];
   let ctx = null, host = null;
-  const st = { data: null, per: null, sid: null, err: '', formFor: null, tok: 0, rateOpen: false, showAll: false };
+  const st = { data: null, per: null, sid: null, err: '', formFor: null, tok: 0, rateOpen: false, showAll: false, tpls: [], monOpen: false };
 
   const settings = () => (ctx && ctx.settings && ctx.settings()) || {};
   function calcFor(sid){
@@ -36,8 +36,11 @@
     const tok = ++st.tok;
     st.err = '';
     try {
-      const [students, data] = await Promise.all([ctx.students(), P().loadAll()]);
+      const SC = window.ScheduleCloud;
+      // шаблоны — для «в месяц» по шаблону (В4б); без них страница работает
+      const [students, data, tpls] = await Promise.all([ctx.students(), P().loadAll(), SC ? SC.listTemplates().catch(() => []) : []]);
       if (tok !== st.tok) return;
+      st.tpls = tpls || [];
       st.students = students || [];
       st.data = data;
       st.per = P().split(data, st.students);
@@ -196,6 +199,7 @@
         '<div class="row-btns"><button class="btn" type="submit">Сохранить ставку</button><button type="button" class="btn quiet" data-cancel>Отмена</button><span class="form-msg"></span></div></form>' : '') +
       (rates.length > 1 ? '<div class="pay-rates">' + rates.map(r => '<div class="pay-rate">с ' + P().dmy(r.valid_from) + ' — ' + P().money(r.price) + (r.group_price != null ? ' / ' + P().money(r.group_price) : '') +
         ' <button type="button" class="sc-rm" data-delrate="' + esc(r.id) + '" title="Удалить ставку" aria-label="Удалить ставку">×</button></div>').join('') + '</div>' : '') +
+      monthHtml(d, curRate) +
       '</div>';
     h += '<div class="row-btns" style="margin-bottom:10px"><button type="button" class="btn pay-add" data-add="' + esc(s.id) + '">+ оплата</button></div>' +
       (st.formFor === String(s.id) ? '<div class="pay-formbox">' + formHtml(s, c) + '</div>' : '');
@@ -226,6 +230,21 @@
         : '<div class="hint" style="margin-top:6px">Пока ни оплат, ни отмеченных занятий.</div>') + '</div>';
     return h;
   }
+  /* ── «в месяц» (В4б): способ — в «Статистике», здесь ученику — сколько
+     занятий в неделю и своя сумма. Оба поля живут в строке ставки,
+     действующей сегодня (student_rates.per_week, monthly) ── */
+  function monthHtml(d, curRate){
+    if (!curRate) return '';
+    const ps = P().paySettings(settings());
+    const m = P().monthlyOf({ rates: d.rates, tpl: (st.tpls || []).find(t => t.is_active) || null, sid: d.student.id, mode: ps.monthMode });
+    return '<div class="pay-month" id="psMonth">В месяц: <b>' + (m.sum == null ? '—' : P().money(m.sum)) + '</b> <span class="hint">' + esc(m.text) + '</span>' +
+      ' <button type="button" class="btn quiet small" id="psMonBtn">Изменить</button></div>' +
+      (st.monOpen ? '<form class="pay-ratef" id="psMonForm"><div class="pay-fgrid">' +
+        '<label><span class="label">Занятий в неделю (для ×4)</span><input class="field" type="number" min="0" max="30" step="0.5" name="per_week" value="' + esc(curRate.per_week != null ? Number(curRate.per_week) : '') + '" placeholder="по шаблону"></label>' +
+        '<label><span class="label">Своя сумма в месяц, ₽</span><input class="field" type="number" min="0" name="monthly" value="' + esc(curRate.monthly != null ? Number(curRate.monthly) : '') + '" placeholder="считать само"></label>' +
+        '</div><div class="hint">Своя сумма важнее расчёта — для тех, кто платит фиксированно. Пусто — считается: ×4 недели или по шаблону недели (способ — во вкладке «Статистика»).</div>' +
+        '<div class="row-btns"><button class="btn" type="submit">Сохранить</button><button type="button" class="btn quiet" data-cancel>Отмена</button><span class="form-msg"></span></div></form>' : '');
+  }
   function bindStudent(s){
     const q = sel => host.querySelector(sel);
     host.querySelectorAll('#psMode button').forEach(b => b.addEventListener('click', async () => {
@@ -233,6 +252,18 @@
       catch (e) { ctx.toast('Не сохранилось: ' + e.message); }
     }));
     q('#psRateBtn').addEventListener('click', () => { st.rateOpen = !st.rateOpen; render(); });
+    if (q('#psMonBtn')) q('#psMonBtn').addEventListener('click', () => { st.monOpen = !st.monOpen; render(); });
+    const mf = q('#psMonForm');
+    if (mf) {
+      mf.querySelector('[data-cancel]').addEventListener('click', () => { st.monOpen = false; render(); });
+      mf.addEventListener('submit', async e => {
+        e.preventDefault();
+        const rate = P().curRateRow(st.per[s.id].rates, P().today());
+        const v = n => mf.querySelector('[name="' + n + '"]').value;
+        try { await P().setRateExtra(rate.id, { per_week: v('per_week'), monthly: v('monthly') }); st.monOpen = false; ctx.toast('Сохранено'); await load(); }
+        catch (er) { mf.querySelector('.form-msg').textContent = er.message; }
+      });
+    }
     const rf = q('#psRateForm');
     if (rf) {
       rf.querySelector('[data-cancel]').addEventListener('click', () => { st.rateOpen = false; render(); });
@@ -288,7 +319,7 @@
   function show(box, sid){
     host = box;
     const nsid = sid ? String(sid) : null;
-    if (nsid !== st.sid) { st.formFor = null; st.rateOpen = false; }
+    if (nsid !== st.sid) { st.formFor = null; st.rateOpen = false; st.monOpen = false; }
     st.sid = nsid;
     render();
     return load();

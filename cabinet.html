@@ -28,7 +28,7 @@
 .form-msg{color:var(--teacher);font-size:13.5px;min-height:1em;}
 .empty{text-align:center;color:var(--muted-2);padding:28px 8px;font-size:15px;}
 
-.tabs{display:flex;gap:4px;padding:4px;border-radius:16px;background:var(--glass);border:1px solid var(--glass-border);width:max-content;max-width:100%;margin:0 auto 18px;}
+.tabs{display:flex;gap:4px;padding:4px;border-radius:16px;background:var(--glass);border:1px solid var(--glass-border);width:max-content;max-width:100%;margin:0 auto 18px;overflow-x:auto;}
 .tabs a{font-weight:600;font-size:14.5px;color:var(--muted-3);text-decoration:none;padding:9px 18px;border-radius:12px;}
 .tabs a.on{background:var(--ink);color:#fff;}
 
@@ -120,6 +120,7 @@ textarea.field{min-height:90px;resize:vertical;}
       <a href="#/students" data-tab="students">Ученики</a>
       <a href="#/schedule" data-tab="schedule">Расписание</a>
       <a href="#/payments" data-tab="payments">Оплаты</a>
+      <a href="#/stats" data-tab="stats">Статистика</a>
       <a href="#/settings" data-tab="settings">Настройки</a>
     </nav>
 
@@ -148,6 +149,10 @@ textarea.field{min-height:90px;resize:vertical;}
 
     <section id="tabPayments" hidden>
       <div class="panel" id="payHost"></div>
+    </section>
+
+    <section id="tabStats" hidden>
+      <div class="panel" id="statsHost"></div>
     </section>
 
     <section id="tabSettings" hidden>
@@ -226,6 +231,7 @@ textarea.field{min-height:90px;resize:vertical;}
 <script src="schedule-tpl.js"></script>
 <script src="payments.js"></script>
 <script src="cabinet-payments.js"></script>
+<script src="cabinet-stats.js"></script>
 <script src="schedule.js"></script>
 <script src="student-memory.js" data-picker></script>
 <script src="cabinet-log.js"></script>
@@ -299,18 +305,19 @@ async function route(){
   renderAcct();
   if (!user){ show('scrAuth'); return; }
   const [tab, id] = location.hash.replace(/^#\/?/, '').split('/');
-  const t = ['students', 'schedule', 'payments', 'settings'].indexOf(tab) >= 0 ? tab : 'students';
+  const t = ['students', 'schedule', 'payments', 'stats', 'settings'].indexOf(tab) >= 0 ? tab : 'students';
   show('scrMain');
   // сетке недели нужна ширина: семь колонок дней в 860px не читаются
   document.querySelector('.wrap').classList.toggle('sc-wide', t === 'schedule');
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === t));
-  ['tabStudents', 'tabCard', 'tabSchedule', 'tabPayments', 'tabSettings'].forEach(x => { $(x).hidden = true; });
+  ['tabStudents', 'tabCard', 'tabSchedule', 'tabPayments', 'tabStats', 'tabSettings'].forEach(x => { $(x).hidden = true; });
   // боковая панель занятия висит поверх страницы — с вкладки «Расписание» её уносим
   if (t !== 'schedule' && window.Schedule && Schedule.hide) Schedule.hide();
   if (t === 'students' && id){ $('tabCard').hidden = false; await openCard(id); }
   else if (t === 'students'){ $('tabStudents').hidden = false; await renderList(); }
   else if (t === 'schedule'){ $('tabSchedule').hidden = false; await Schedule.show(id); }
   else if (t === 'payments'){ $('tabPayments').hidden = false; await CabinetPayments.show($('payHost'), id); }
+  else if (t === 'stats'){ $('tabStats').hidden = false; await CabinetStats.show($('statsHost')); }
   else { $('tabSettings').hidden = false; await renderSettings(); }
 }
 
@@ -544,6 +551,11 @@ Schedule.init({
 CabinetPayments.init({ students: () => loadStudents(true), settings: () => TS.get(), toast });
 // флаги и правило прогула приходят с сервера позже первой отрисовки — пересчитать
 TS.onChange(() => CabinetPayments.repaint());
+
+/* ── статистика (cabinet-stats.js, В4б): группы дохода и способ «в месяц» — в настройках ── */
+CabinetStats.init({ students: () => loadStudents(true), settings: () => TS.get(),
+  save: patch => TS.set(patch).catch(e => toast('Не сохранилось на сервере: ' + e.message)), toast });
+TS.onChange(() => CabinetStats.repaint());
 
 /* ── синхронизация со старым приложением (schedule-sync.js, В5) ── */
 const SY = window.ScheduleSync;

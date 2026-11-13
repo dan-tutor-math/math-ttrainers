@@ -87,3 +87,62 @@
   .pay-lr{grid-column:3;text-align:left;}
   .pay-card{left:8px;right:8px;bottom:8px;width:auto;max-width:none;}
 }
+
+/* ── В4(б): доход дня в расписании (schedule.js) ── */
+.sc-dh{flex-wrap:wrap;}
+.sc-dsum{border:none;background:none;padding:1px 6px;border-radius:8px;font:inherit;font-size:12.5px;font-weight:600;color:var(--ok);cursor:pointer;white-space:nowrap;}
+.sc-dsum:hover{background:var(--hl-10);}
+.sc-dsum small{font-weight:400;color:var(--muted-2);}
+.sc-dsum.man{color:var(--warn);}
+.sc-dtf{flex-basis:100%;display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:4px 0 2px;}
+.sc-dtf .field{width:110px;}
+.sc-dtf .hint{flex-basis:100%;font-size:12px;}
+.sc-gmoney{min-height:0;}
+.sc-gmoney .sc-dtf{position:absolute;z-index:5;left:0;top:100%;min-width:220px;padding:8px;background:var(--card);border:1px solid var(--glass-border);border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,.15);}
+.sc-wsum{font-size:13px;font-weight:600;color:var(--ok);white-space:nowrap;}
+
+/* ── В4(б): «в месяц» у ученика (cabinet-payments.js) ── */
+.pay-month{margin-top:8px;font-size:14px;}
+
+/* ── В4(б): вкладка «Статистика» (cabinet-stats.js) ── */
+.st-head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;}
+.st-head .seg{margin-top:0;flex-wrap:wrap;}
+.st-grp{width:auto;max-width:220px;}
+.st-nav{display:flex;align-items:center;gap:6px;margin:10px 0 12px;flex-wrap:wrap;}
+.st-lab{font-weight:700;font-size:15.5px;padding:0 4px;}
+.st-cust{display:flex;align-items:center;gap:6px;font-size:14px;}
+.st-cust .field{width:auto;}
+.st-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px;margin-bottom:12px;}
+.st-cards .pay-stat small{white-space:normal;}
+.st-d{font-style:normal;font-weight:700;}
+.st-d.up{color:var(--ok);}
+.st-d.down{color:var(--teacher);}
+.st-warn{margin:-4px 0 10px;color:var(--warn);}
+.st-bars{display:flex;flex-direction:column;gap:5px;margin-top:8px;}
+.st-bar{display:grid;grid-template-columns:minmax(60px,130px) 1fr auto;gap:8px;align-items:center;font-size:13.5px;}
+.st-bl{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.st-bt{display:flex;flex-direction:column;gap:2px;min-width:40px;}
+.st-bt i{display:block;height:9px;border-radius:5px;background:var(--ink);min-width:2px;}
+.st-bt i.got{height:5px;background:var(--ok);}
+.st-bv{white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums;}
+.st-key{display:inline-block;width:14px;height:8px;border-radius:4px;background:var(--ink);vertical-align:middle;}
+.st-key.got{background:var(--ok);}
+.st-month{display:flex;flex-direction:column;margin-top:8px;}
+.st-mrow{display:grid;grid-template-columns:minmax(80px,160px) auto 1fr;gap:10px;align-items:baseline;padding:5px 0;border-bottom:1px solid var(--glass-border);font-size:14px;}
+.st-mrow a{color:var(--pencil);text-decoration:none;font-weight:600;}
+.st-mtot{margin-top:8px;font-size:14.5px;}
+.st-fold summary{cursor:pointer;}
+.st-fold[open] summary{margin-bottom:8px;}
+.st-presets{margin-bottom:8px;flex-wrap:wrap;}
+.st-calc{margin-top:10px;padding:10px 12px;border:1px solid var(--glass-border);border-radius:12px;font-size:14px;line-height:1.6;}
+.st-calc-warn{color:var(--teacher);}
+.st-calc-ok{color:var(--ok);}
+.st-gbox{border:1px solid var(--glass-border);border-radius:12px;padding:8px 12px;margin-top:8px;}
+.st-gmem{display:flex;flex-wrap:wrap;gap:4px 14px;margin:4px 0;}
+.st-gmem .chk{margin:0;}
+@media (max-width:560px){
+  .st-bar{grid-template-columns:70px 1fr;}
+  .st-bv{grid-column:1 / -1;text-align:left;white-space:normal;}
+  .st-mrow{grid-template-columns:1fr auto;}
+  .st-mrow .hint{grid-column:1 / -1;}
+}

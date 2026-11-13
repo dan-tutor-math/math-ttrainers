@@ -111,7 +111,10 @@
                mode: 'week', groups: [], tpls: [], tplId: null,    // mode: week | tpl | groups (В1б)
                // оплаты недели (В4а, payments.js): способ оплаты учеников,
                // ставки, «оплатил» по id участия; armed — «снять оплату?»
-               pay: { modes: {}, rates: {}, linked: {} }, armed: null };
+               pay: { modes: {}, rates: {}, linked: {} }, armed: null,
+               // ручные итоги дней недели { день: { amount } } (В4б,
+               // cabinet-stats.sql); dtOpen — у какого дня открыта правка
+               totals: {}, dtOpen: null };
   let modal = null;           // открытая карточка занятия
 
   function readView(){
@@ -157,8 +160,10 @@
       if (tok !== st.loadTok) return;
       setStudents(students);
       st.lessons = lessons;
-      st.pay = await payInfo(lessons);
+      const [pay, totals] = await Promise.all([payInfo(lessons), dayTotals()]);
       if (tok !== st.loadTok) return;
+      st.pay = pay;
+      st.totals = totals;
       st.groups = groups;
       st.tpls = tpls;
       if (!st.tpls.some(t => t.id === st.tplId)) st.tplId = (st.tpls.find(t => t.is_active) || st.tpls[0] || {}).id || null;
@@ -178,6 +183,12 @@
     const ids = [];
     lessons.forEach(l => l.people.forEach(p => { if (p.student_id) ids.push(p.student_id); }));
     try { return await P.weekInfo(ids); } catch (e) { return empty; }
+  }
+  async function dayTotals(){
+    const P = window.Payments, out = {};
+    if (!P || !P.listDayTotals) return out;
+    try { (await P.listDayTotals(st.week, addDays(st.week, 6))).forEach(r => { out[r.day] = r; }); } catch (e) {}
+    return out;
   }
   const paySet = () => (window.Payments ? window.Payments.paySettings(settings()) : { flags: [], skipRule: 'free', reason: '' });
   const billOf = (p, l) => (window.Payments ? window.Payments.billOf(p, l, paySet()) : { pay: false });
@@ -444,6 +455,86 @@
     } catch (e) { return { msg: e.message }; }
   }
 
+  /* ── доход дня (В4б) ──
+     Считается из отметок: сумма ставок оплачиваемых участий (проведено,
+     оплачиваемый пропуск). «Запланировано» — не доход, а «ожидается»
+     отдельно: в старом приложении plan шёл в доход дня, и число дня
+     менялось задним числом от прогула. Ручной итог дня, если вписан, —
+     вместо расчёта (решение Даниила 13.11: иногда нужен) */
+  function dayMoney(day){
+    const P = window.Payments;
+    if (!P) return null;
+    let inc = 0, exp = 0, noRate = 0;
+    lessonsOf(day).forEach(l => {
+      if (l.is_event) return;
+      l.people.forEach(p => {
+        if (!p.student_id) return;
+        const b = billOf(p, l), pr = P.rateOn(st.pay.rates[p.student_id], day, l.format);
+        if (b.pay) { if (pr == null) noRate++; else inc += pr; }
+        else if (b.plan && pr != null) exp += pr;
+      });
+    });
+    const man = st.totals[day];
+    return { inc, exp, noRate, man: man ? Number(man.amount) : null, total: man ? Number(man.amount) : inc };
+  }
+  function dayMoneyHtml(day, has){
+    const m = dayMoney(day);
+    if (!m || (!has && m.man == null)) return '';
+    const P = window.Payments;
+    const title = m.man != null ? 'Итог дня вписан вручную; по отметкам — ' + P.money(m.inc) + '. Нажмите, чтобы изменить'
+      : 'Доход дня по отметкам' + (m.exp ? '; ещё ожидается ' + P.money(m.exp) + ' по запланированным' : '') + (m.noRate ? '; без ставки: ' + m.noRate : '') + '. Нажмите, чтобы вписать свой итог';
+    let h = '<button type="button" class="sc-dsum' + (m.man != null ? ' man' : '') + '" data-dsum="' + day + '" title="' + esc(title) + '">' +
+      esc(P.money(m.total)) + (m.man != null ? ' ✎' : '') + (m.man == null && m.exp ? ' <small>+' + esc(P.money(m.exp)) + '</small>' : '') + '</button>';
+    if (st.dtOpen === day) {
+      h += '<form class="sc-dtf" data-dtf="' + day + '"><input class="field" type="number" min="0" step="50" name="amount" value="' + (m.man != null ? m.man : m.inc) + '" aria-label="Итог дня, ₽">' +
+        '<button class="btn small" type="submit">Сохранить</button>' +
+        (m.man != null ? '<button type="button" class="btn quiet small" data-dtauto>По отметкам</button>' : '') +
+        '<button type="button" class="btn quiet small" data-dtcancel>Отмена</button>' +
+        '<div class="hint">Свой итог дня — вместо расчёта по отметкам (' + esc(P.money(m.inc)) + ').</div></form>';
+    }
+    return h;
+  }
+  function weekMoneyHtml(){
+    const P = window.Payments;
+    if (!P) return '';
+    let sum = 0, any = false;
+    for (let i = 0; i < 7; i++) { const day = addDays(st.week, i), m = dayMoney(day); if (m && (m.total || lessonsOf(day).length)) { sum += m.total; any = true; } }
+    return any ? '<span class="sc-wsum" id="scWeekSum" title="Доход недели по отметкам и ручным итогам дней">' + esc(P.money(sum)) + ' за неделю</span>' : '';
+  }
+  async function saveDayTotal(day, amount){
+    try {
+      const r = await window.Payments.setDayTotal(day, amount);
+      if (r) st.totals[day] = r; else delete st.totals[day];
+      st.dtOpen = null;
+    } catch (e) {
+      api.toast(window.Payments.missing(e) ? 'Ручной итог дня ещё не включён: выполните файл cabinet-stats.sql в Supabase' : 'Не сохранилось: ' + e.message);
+    }
+    render();
+  }
+  function bindDayMoney(){
+    host.querySelectorAll('[data-dsum]').forEach(b => b.addEventListener('click', e => {
+      e.stopPropagation();
+      st.dtOpen = st.dtOpen === b.dataset.dsum ? null : b.dataset.dsum;
+      render();
+      const f = host.querySelector('.sc-dtf input');
+      if (f) { f.focus(); f.select(); }
+    }));
+    host.querySelectorAll('.sc-dtf').forEach(f => {
+      f.addEventListener('pointerdown', e => e.stopPropagation());
+      f.addEventListener('click', e => {
+        e.stopPropagation();
+        if (e.target.closest('[data-dtcancel]')) { st.dtOpen = null; render(); }
+        else if (e.target.closest('[data-dtauto]')) saveDayTotal(f.dataset.dtf, null);
+      });
+      f.addEventListener('submit', e => {
+        e.preventDefault();
+        const v = f.querySelector('[name=amount]').value;
+        if (v === '' || !(Number(v) >= 0)) return;
+        saveDayTotal(f.dataset.dtf, v);
+      });
+    });
+  }
+
   /* ── шапка ── */
   function modesHtml(){
     return '<div class="seg sc-modes" role="group" aria-label="Раздел расписания">' +
@@ -457,6 +548,7 @@
         '<div class="sc-nav">' +
           '<a class="btn quiet small sc-arrow" id="scPrev" href="' + esc(api.weekHref(addDays(st.week, -7))) + '" aria-label="Предыдущая неделя">‹</a>' +
           '<span class="sc-range" id="scRange">' + esc(rangeText(st.week)) + '</span>' +
+          (st.loading || st.err ? '' : weekMoneyHtml()) +
           '<a class="btn quiet small sc-arrow" id="scNext" href="' + esc(api.weekHref(addDays(st.week, 7))) + '" aria-label="Следующая неделя">›</a>' +
           '<a class="btn quiet small" id="scToday" href="' + esc(api.weekHref(null)) + '"' + (mondayOf(today()) === st.week ? ' aria-current="true"' : '') + '>Сегодня</a>' +
         '</div>' +
@@ -494,6 +586,7 @@
       h += '<section class="sc-day' + (day === today() ? ' today' : '') + '" data-day="' + day + '">' +
         '<header class="sc-dh"><b>' + DAY_SHORT[i] + '</b><span>' + esc(dayText(day)) + '</span>' +
           '<span class="sc-cnt">' + (ls.length ? plural(ls.length, 'занятие', 'занятия', 'занятий') : '') + '</span>' +
+          dayMoneyHtml(day, ls.length) +
           '<button type="button" class="sc-plus" data-day="' + day + '" aria-label="Добавить занятие: ' + DAY_LONG[i] + ', ' + esc(dayText(day)) + '" title="Добавить занятие">+</button></header>' +
         '<div class="sc-rows">' + (ls.length ? ls.map(l =>
           '<div class="sc-row fmt-' + l.format + '" data-id="' + esc(l.id) + '">' +
@@ -538,6 +631,7 @@
     bindCommon();
   }
   function bindCommon(){
+    bindDayMoney();
     host.querySelectorAll('.sc-st[data-pid]').forEach(b => b.addEventListener('click', e => {
       e.stopPropagation();
       const l = findLesson(b.closest('[data-id]').dataset.id);
@@ -616,6 +710,7 @@
       const untimed = ls.filter(l => l.start_min == null);
       head += '<div class="sc-gday' + (day === today() ? ' today' : '') + '"><b>' + DAY_SHORT[i] + '</b> ' + esc(dayText(day)) +
         '<button type="button" class="sc-plus" data-newday="' + day + '" aria-label="Добавить занятие: ' + DAY_LONG[i] + ', ' + esc(dayText(day)) + '" title="Добавить занятие">+</button>' +
+        '<div class="sc-gmoney">' + dayMoneyHtml(day, ls.length) + '</div>' +
         (untimed.length ? '<div class="sc-untimed">' + untimed.map(l => '<button type="button" class="sc-ut fmt-' + l.format + '" data-open="' + esc(l.id) + '">' + esc(l.people.map(personName).join(', ') || l.title || 'без времени') + '</button>').join('') + '</div>' : '') +
         '</div>';
       const pos = layoutDay(ls);
@@ -1077,6 +1172,7 @@
     const mon = mondayOf(day);
     if (mon === st.week && st.lessons && !st.err && host.querySelector('.sc-body')) { render(); return Promise.resolve(); }
     st.week = mon;
+    st.dtOpen = null;
     closeModal();
     closePanel();
     return load();

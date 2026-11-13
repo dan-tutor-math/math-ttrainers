@@ -23,20 +23,25 @@
                    прогул по умолчанию; reason — причина пропуска по
                    умолчанию; remindLeft — напомнить, когда осталось ≤ N
                    занятий; remindDays — за сколько дней до конца срока;
-                   flags [{id, name, free}] — свои флаги преподавателя }
+                   flags [{id, name, free}] — свои флаги преподавателя;
+                   monthMode 'x4'|'tpl' — как считать «в месяц» (В4б) }
+     incomeGroups — группы дохода (В4б, фильтр статистики):
+                   [{id, name, members [student_id], from, to, auto}];
+                   auto — в группу сами попадают все ученики, кроме out
    ========================================================== */
 (function(){
   const LS_KEY = 'teacher:settings:v1';
   const FORMAT_LABELS = { single: 'Индивидуальное', pair: 'Пара', group: 'Группа', semi: 'Полупараллелка' };
   const DEFAULTS = { sessionBind: 'browser', labels: 'show', labelDates: true, labelCount: true, lessonMin: 60,
                      formatLabels: Object.assign({}, FORMAT_LABELS),
-                     pay: { skipRule: 'free', reason: 'болезнь', remindLeft: 1, remindDays: 3, flags: [] } };
+                     pay: { skipRule: 'free', reason: 'болезнь', remindLeft: 1, remindDays: 3, flags: [], monthMode: 'x4' },
+                     incomeGroups: [] };
   const listeners = [];
   let cur = null;
 
   // чужие и испорченные значения отбрасываем: настройку правят руками в базе
   function normalize(raw){
-    const o = Object.assign({}, DEFAULTS, { pay: normalizePay(null) });
+    const o = Object.assign({}, DEFAULTS, { pay: normalizePay(null), incomeGroups: [] });
     if (!raw || typeof raw !== 'object') return o;
     if (raw.sessionBind === 'tab' || raw.sessionBind === 'browser') o.sessionBind = raw.sessionBind;
     if (['show', 'off', 'hide_solved'].indexOf(raw.labels) >= 0) o.labels = raw.labels;
@@ -54,6 +59,7 @@
       });
     }
     o.pay = normalizePay(raw.pay);
+    o.incomeGroups = normalizeGroups(raw.incomeGroups);
     return o;
   }
   // флаги правят руками на странице — id латиницей, имя до 30 знаков, не больше 20
@@ -61,6 +67,7 @@
     const d = DEFAULTS.pay, o = Object.assign({}, d, { flags: [] });
     if (!raw || typeof raw !== 'object') return o;
     if (raw.skipRule === 'free' || raw.skipRule === 'charge') o.skipRule = raw.skipRule;
+    if (raw.monthMode === 'x4' || raw.monthMode === 'tpl') o.monthMode = raw.monthMode;
     if (typeof raw.reason === 'string') o.reason = raw.reason.trim().slice(0, 60);
     const n = Math.round(Number(raw.remindLeft));
     if (raw.remindLeft !== '' && raw.remindLeft != null && n >= 0 && n <= 20) o.remindLeft = n;
@@ -77,6 +84,21 @@
       });
     }
     return o;
+  }
+  // группы дохода: не больше 20, в составе — id учеников (не имена, как в
+  // старом приложении: опечатка в имени не должна терять ученика)
+  function normalizeGroups(raw){
+    const out = [], seen = new Set();
+    const day = v => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null);
+    const ids = v => (Array.isArray(v) ? Array.from(new Set(v.map(String).filter(x => x && x.length <= 64))).slice(0, 500) : []);
+    (Array.isArray(raw) ? raw : []).forEach(g => {
+      if (!g || typeof g !== 'object' || out.length >= 20) return;
+      const id = String(g.id || ''), name = String(g.name || '').trim().slice(0, 40);
+      if (!/^[a-z0-9_-]{1,24}$/.test(id) || !name || seen.has(id)) return;
+      seen.add(id);
+      out.push({ id, name, members: ids(g.members), out: ids(g.out), from: day(g.from), to: day(g.to), auto: !!g.auto });
+    });
+    return out;
   }
   function readLocal(){
     try { return normalize(JSON.parse(localStorage.getItem(LS_KEY) || 'null')); } catch (e) { return normalize(null); }
