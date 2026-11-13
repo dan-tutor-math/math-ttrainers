@@ -8,13 +8,13 @@ ege_prof (+ копии ege_base, oge_part2), rus_oge, rus_oge01, rus_oge13:
      ключ, совпадающий с подписью «Источник: … задание XXXXXX» на странице;
   2. из рецепта доски trainerGenInfo (тот же рецепт лежит в блоке работы):
      ключ тот же, что из задания;
-  3. задание не из банка — gen-ключ с id типа; «вперемешку» — null (честно:
-     страницы не хранят, какой тип выпал);
+  3. задание не из банка — gen-ключ с id типа; «вперемешку» — тоже настоящий
+     тип (curTask.genKind), а не «random»;
   4. русский язык: снимка и рецепта у страниц нет, ключ берётся из
      window.__examNav.pid() (id задания = номер ФИПИ), рецепт — null;
   5. модуль в одиночку: граничные случаи (пустое, чужие страницы, engine).
 
-Совместный режим не затронут: страницы не менялись. Запуск:
+Страницы ОГЭ получили одно поле curTask.genKind (id типа); совместный режим\nэто задевает, перепроверять на сайте руками. Запуск:
 python3 test_prompt_task_key.py (сервер поднимается сам).
 """
 import contextlib
@@ -59,12 +59,14 @@ def local_server():
         proc.wait(timeout=5)
 
 
-def open_page(browser, url, ready):
+def open_page(browser, url, ready, own_only=False):
     ctx = browser.new_context(viewport={"width": 1300, "height": 1000})
     page = ctx.new_page()
     errors = []
     page.on("pageerror", lambda e: errors.append(str(e)))
     # только ФИПИ-задания не нужны: режим выбирается карточкой, фильтр по умолчанию
+    if own_only:   # фильтр ФИПИ-микса: только свои задания (иначе «вперемешку» долго отдаёт банк)
+        page.add_init_script("try { localStorage.setItem('fipiMix:filter', JSON.stringify({ fipi: false, own: true })); } catch (e) {}")
     page.route("https://**/*", lambda route: route.abort())
     page.goto(f"{BASE}/{url}")
     page.wait_for_function(ready)
@@ -124,19 +126,25 @@ def test_oge(browser):
         ctx.close()
 
 
-def test_random_is_null(browser):
-    ctx, page, errors = open_page(browser, "oge6.html", "() => window.__trainerState")
-    card(page, "random")
-    for _ in range(6):
-        page.evaluate("() => newTask()")
-        r = page.evaluate(PROBE, ["oge6", "oge6"])
-        if r["fipi"]:
-            check("oge6 «вперемешку», задание ФИПИ: ключ fipi", r["kRecipe"] == f"fipi:oge:{r['fipi']}", str(r))
-        else:
-            check("oge6 «вперемешку», своё задание: ключа нет (тип не сохранён страницей)",
-                  r["kState"] is None and r["kRecipe"] is None, str(r))
-            break
-    ctx.close()
+def test_random_kind(browser):
+    """«Вперемешку»: свой (не ФИПИ) тип теперь виден через curTask.genKind."""
+    for pg in ["oge1_5", "oge6", "oge7", "oge9", "oge15_18"]:
+        ctx, page, errors = open_page(browser, f"{pg}.html", "() => window.__trainerState", own_only=True)
+        card(page, "random")
+        got = None
+        for _ in range(40):
+            # у oge1_5 в main нет tire-math.js (он в ветке tire3d): шины падают, их пропускаем
+            page.evaluate("() => { try { newTask(); } catch (e) {} }")
+            r = page.evaluate(PROBE, [pg, pg])
+            if not r["fipi"] and r["kState"]:
+                got = r
+                break
+            if r["fipi"]:
+                check(f"{pg} «вперемешку», задание ФИПИ: ключ fipi", r["kRecipe"] == f"fipi:oge:{r['fipi']}", str(r))
+        check(f"{pg} «вперемешку», своё задание: gen-ключ с настоящим типом, не random",
+              bool(got) and got["kState"] == got["kRecipe"] and got["kState"].startswith(f"gen:{pg}:")
+              and not got["kState"].endswith(":random"), str(got))
+        ctx.close()
 
 
 def test_ege_like(browser):
@@ -210,7 +218,7 @@ def test_module(browser):
 def main():
     with local_server(), sync_playwright() as p:
         browser = p.chromium.launch()
-        for fn in (test_oge, test_random_is_null, test_ege_like, test_rus, test_module):
+        for fn in (test_oge, test_random_kind, test_ege_like, test_rus, test_module):
             try:
                 fn(browser)
             except Exception as e:  # noqa: BLE001
