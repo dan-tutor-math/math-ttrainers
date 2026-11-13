@@ -673,6 +673,8 @@ function finish(kind){
   // итог задания пишем один раз: повторный заход в уже решённое задание не
   // должен ни добавлять «верно», ни портить прошлый результат
   if (!results[t.id]) { results[t.id] = kind; LS.set('rusOge:results', results); }
+  // кабинет (Б2): верно без подсказки — ok, иначе (попытки кончились, ответ подсмотрен) — bad
+  if (window.StudentMemory) StudentMemory.recordTask({ id: t.id }, { page: 'rus_oge', clean: kind === 'ok' });
   $('checkBtn').disabled = true;
   const P = $('questionPanel');
   if (t.k === 'mask') {
@@ -803,6 +805,7 @@ window.__examNav = {
 window.__rusOge = { S, POOL, TOPICS, topicsOf, checkAnswer, answerText, normDigits, normText, EXAM_ATTEMPTS };
 })();
 </script>
+<script src="task-key.js"></script>
 <script src="student-memory.js"></script>
 </body>
 </html>

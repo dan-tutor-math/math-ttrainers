@@ -897,7 +897,7 @@ els.checkBtn.onclick = () => {
     els.stStreak.textContent = streak;
     taskAnswered = true;
     els.checkBtn.style.display = 'none';
-    finishTask();
+    finishTask(true);
   } else if (hadWrongPick) {
     items.forEach((el, i) => {
       el.classList.add('disabled');
@@ -909,7 +909,7 @@ els.checkBtn.onclick = () => {
     els.stStreak.textContent = streak;
     taskAnswered = true;
     els.checkBtn.style.display = 'none';
-    finishTask();
+    finishTask(true);
   } else {
     items.forEach((el, i) => {
       if (pickedSet.has(i) && !correctSet.has(i)) el.classList.add('wrong');
@@ -931,7 +931,9 @@ els.changeAnswerBtn.onclick = () => {
   attachStmtHandlers();
 };
 
-function finishTask() {
+function finishTask(isFreshSolve) {
+  // кабинет (Б2): итог в журнал ученика; вне сессии, на паузе и у follower модуль молчит
+  if (isFreshSolve && window.StudentMemory) StudentMemory.recordTask(curTask, { mode: curMode, clean: !hadWrongPick });
   els.solBtnRow.style.display = 'none';
   els.mainPanel.style.display = 'block';
   els.explainBox.style.display = 'block';
@@ -1340,5 +1342,6 @@ document.getElementById('homeBtn').addEventListener('click', function (e) {
   else go();
 });
 </script>
+<script src="task-key.js"></script>
 <script src="student-memory.js"></script>
 </body></html>

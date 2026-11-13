@@ -1984,6 +1984,8 @@ function renderProofScore(allShown){
       proofScoreMap[p.id] = +btn.dataset.b;
       try { localStorage.setItem(SCORES_KEY, JSON.stringify(proofScoreMap)); } catch (e) {}
       markSolved(p.id);
+      // кабинет (Б2): самооценка доказательства — полный балл считаем ok, меньше — bad
+      if (window.StudentMemory) StudentMemory.recordTask(p, { clean: +btn.dataset.b >= max });
       render();
     };
   });
@@ -2293,6 +2295,8 @@ function runCheck(p, st, root){
   if (allOk) {
     st.answered = true; st.correct = true;
     totalSolved++; streak++;
+    // кабинет (Б2): с первого раза — ok, после ошибки или подсказки — bad
+    if (window.StudentMemory) StudentMemory.recordTask(p, { clean: !st.hadWrong });
     markSolved(p.id);
     addHistory(p, st, true);
     awardMedals();
@@ -2304,6 +2308,7 @@ function runCheck(p, st, root){
     list.forEach(f => { if (!results[f.id]) st.marks[f.id] = 'fixed'; });
     totalErrors++; streak = 0;
     curProg.errorsInBatch = (curProg.errorsInBatch || 0) + 1;
+    if (window.StudentMemory) StudentMemory.recordTask(p, { clean: false });
     addHistory(p, st, false);
   } else {
     st.hadWrong = true;
@@ -3155,5 +3160,6 @@ document.getElementById('homeBtn').addEventListener('click', function (e) {
   else go();
 });
 </script>
+<script src="task-key.js"></script>
 <script src="student-memory.js"></script>
 </body></html>

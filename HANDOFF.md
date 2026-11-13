@@ -683,6 +683,7 @@
   (`data-picker`), только вошедшему. Подключён перед `</body>` на главной, досках,
   boards-panel, работах, кабинете и страницах тренажёров (копии ege_prof — sync_ege_pages.py).
   Тест `test_prompt_b1_student_memory.py`
+  Б2: `StudentMemory.recordTask(задание, {clean, mode, page})` — запись из страниц тренажёров: ключ строит `TaskKey.fromTask`, событие `ok` (с первого раза) или `bad` (после ошибки/подсказки). Зовут `finishTask(true)` в oge1_5/6/7/9/15_18/19, `finish` в rus_oge, `saveResult` в rus_oge01/13 (оценка по критериям), `runCheck` и самооценка доказательства в ege_prof (копии — sync_ege_pages.py). Страницы подключают `task-key.js` перед `student-memory.js`. Тест `test_prompt_b2_trainer_events.py`
 - `works.css` — общий вид обеих страниц: оформление тренажёров, не досок
 - `video-player.js` — свой плеер HLS (`window.VideoPlayer`): окно поверх
   страницы, hls.js 1.5.20 с cdnjs (с integrity) грузится при первом
@@ -7181,6 +7182,7 @@ Realtime в работах не нужен. Из песочницы до Supabas
   sessionStorage вместе с учеником — отличаем по списку `tsSessions:v1` (старый код ещё
   в списке → им живёт соседняя вкладка, эта без ученика; кода нет → та же вкладка сменила код)
 - (13.11.2026, А1 кабинета) Ключ задания: номер ФИПИ в страницах ОГЭ лежит в `curTask.fipi` (идёт в снимок и в рецепт доски), в ЕГЭ-копиях — внутри pid `<n>.fipi.<НОМЕР>`, у русского — id задания (снимка и рецепта нет). В режимах «вперемешку» тип выпавшего задания лежит в `curTask.genKind` (ставит `newTask` в oge1_5/6/7/9/15_18) — по нему gen-ключ; у русского рецепта gen нет нарочно (включил бы «ещё такое же»), ключ лежит отдельным полем `tkey` у объекта доски и блока работы (`trainerTaskKey` в trainer-tasks.js). Подробно — `../claude-notes/task-key-audit.md`
+- (13.11.2026, Б2 кабинета) Запись из тренажёра — только в «свежем» решении (`finishTask(true)`), не при восстановлении состояния: `finishTask(false)` и приём снимка от собеседника пишут то же самое, и событие задвоилось бы. «Вперемешку» (random) в ОГЭ не вызывает `recordSolve` — запись стоит отдельно в `finishTask` и берёт `genKind`. Тест на странице с приглашением `?s=` не может кликать (оверлей `#tsInvite` перехватывает клики) — проверять вызов `recordTask` напрямую. Playwright для Python — в `~/.venvs/trainers/bin/python`, системный python3 его не видит
 
 
 ## 9. Тесты
@@ -9800,6 +9802,8 @@ Safari, с видеозвонками в нём бывают сюрпризы. �
 
 - (13.11.2026, Claude Code, А1 плана кабинета) Аудит ключа задания и модуль `task-key.js`, тест `test_prompt_task_key.py` (77 проверок). В oge1_5/6/7/9/15_18 добавлено `curTask.genKind` (по разрешению Даниила; совместный режим проверить руками); русский — ключ полем `tkey` у объекта доски/блока (trainerTaskKey, insertTaskImage, shootBlock), без рецепта gen; тесты `test_prompt_task_key.py`, `test_prompt_task_key_board.py` — `claude-notes/task-key-audit.md`
 ---
+
+- (13.11.2026, Claude Code, Б2 плана кабинета) Запись событий из тренажёров: `StudentMemory.recordTask` + вызовы в страницах ОГЭ (oge1_5/6/7/9/15_18/19), русском (rus_oge, rus_oge01, rus_oge13) и ege_prof с копиями; `task-key.js` подключён на этих страницах. oge8 и oge14 (есть `FipiMix.markDone`, но не в таблице аудита А1) не подключались. Тест `test_prompt_b2_trainer_events.py`. Ветка claude/trainer-events-889cda, не в main. Совместный режим перепроверить руками: ученик не должен видеть плашку, а в снимок сессии ничего нового не уходит
 
 ## 12. С чего начать новой сессии
 

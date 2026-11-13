@@ -1641,6 +1641,8 @@ function finishTask(isFreshSolve) {
   els.mainPanel.classList.add('reveal');
 
   if (isFreshSolve && !isRandomMode(curMode)) recordSolve();
+  // кабинет (Б2): итог в журнал ученика; вне сессии, на паузе и у follower модуль молчит
+  if (isFreshSolve && window.StudentMemory) StudentMemory.recordTask(curTask, { mode: curMode, clean: !hadWrongPick });
 }
 els.nextBtn.onclick = newTask;
 
@@ -2101,5 +2103,6 @@ document.getElementById('homeBtn').addEventListener('click', function (e) {
   else go();
 });
 </script>
+<script src="task-key.js"></script>
 <script src="student-memory.js"></script>
 </body></html>

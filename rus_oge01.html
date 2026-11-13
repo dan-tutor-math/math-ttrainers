@@ -562,6 +562,8 @@ function saveResult(sc){
   const prev = results[t.id] || {};
   results[t.id] = { w:countWords($('essay').value), sc: sc != null ? sc : (prev.sc != null ? prev.sc : null) };
   LS.set('rusOge01:results', results);
+  // кабинет (Б2): оценка по критериям выставлена — максимум баллов считаем верным решением
+  if (sc != null && window.StudentMemory) StudentMemory.recordTask({ id: t.id }, { page: 'rus_oge01', clean: sc >= MAX_SCORE });
   renderStats();
 }
 
@@ -648,6 +650,7 @@ window.__examNav = {
 window.__rusOge01 = { S, TASKS, audio, countWords, CRIT, MAX_SCORE, EXAM_PLAYS };
 })();
 </script>
+<script src="task-key.js"></script>
 <script src="student-memory.js"></script>
 </body>
 </html>

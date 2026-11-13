@@ -7,6 +7,9 @@
      start({id, name}, {lessonId}) — начать сессию (журнал ученика грузится сразу)
      end(), pause(on)           — закончить; пауза записи
      record(key, event, {source, srcRef, lessonId}) — записать событие
+     recordTask(task, {clean, mode, page}) — итог решения из страницы тренажёра (Б2):
+                                  ключ строит TaskKey.fromTask, событие ok (с первого
+                                  раза) или bad (после ошибок или с подсказкой)
                                   event: hw / board / ok / bad; ключ — task-key.js (А1)
      summary(key, {studentId})  — даты и счётчики по каждому виду события
      kindSummary(prefix, …)     — то же по всем ключам вида («gen:oge9:3», «fipi:oge:9»)
@@ -327,6 +330,21 @@
     return { ok: true, id: row.id };
   }
 
+  // Б2: одно место для всех страниц тренажёров. Страница не знает про ключи и
+  // сессию — отдаёт задание и «чисто ли решено», остальное (нет сессии, пауза,
+  // follower, нет ключа) решает здесь, поэтому вызов безопасен всегда
+  function recordTask(task, opts){
+    opts = opts || {};
+    try {
+      if (!task || !window.TaskKey) return { ok: false, reason: 'no_key' };
+      const page = opts.page || (location.pathname.split('/').pop() || '').replace(/\.html$/, '');
+      const t = (opts.mode && task.mode == null) ? Object.assign({}, task, { mode: opts.mode }) : task;
+      const key = window.TaskKey.fromTask(page, t);
+      if (!key) return { ok: false, reason: 'no_key' };
+      return record(key, opts.clean === false ? 'bad' : 'ok', { source: 'trainer', srcRef: page });
+    } catch (e) { return { ok: false, reason: 'error' }; }
+  }
+
   let flushing = false, flushTimer = null, retryMs = 0;
   function scheduleFlush(ms){
     clearTimeout(flushTimer);
@@ -626,7 +644,7 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 
   window.StudentMemory = {
-    current, start, end, pause, record, summary, kindSummary, keys, logState, forget, fetchLog, loadLog,
+    current, start, end, pause, record, recordTask, summary, kindSummary, keys, logState, forget, fetchLog, loadLog,
     listStudents, onChange, flush, isFollower, bindMode,
     queue: () => readQueue().slice(), deadLetters: () => parse(lsGet(LS_DEAD), []),
     THROTTLE_MS,
