@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0B0E1A">
+<script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Кабинет — Mathh</title>
+<link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/onest-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="onest.css">
+<link rel="stylesheet" href="works.css">
+<style>
+/* Кабинет преподавателя (задача А4): ученики, расписание (заглушка),
+   настройки. Оформление общее с «Работами» (works.css): тот же вход, те же
+   кнопки и стекло — кабинет не должен выглядеть чужим. */
+.wrap{max-width:860px;margin:0 auto;}
+.acct{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;color:var(--muted-2);font-size:14px;margin-bottom:16px;}
+.acct b{color:var(--pencil);}
+.auth-card{max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:12px;}
+.auth-note{font-size:13.5px;color:var(--muted-2);line-height:1.45;}
+.auth-note a{color:var(--ink);}
+.form-msg{color:var(--teacher);font-size:13.5px;min-height:1em;}
+.empty{text-align:center;color:var(--muted-2);padding:28px 8px;font-size:15px;}
+
+.tabs{display:flex;gap:4px;padding:4px;border-radius:16px;background:var(--glass);border:1px solid var(--glass-border);width:max-content;max-width:100%;margin:0 auto 18px;}
+.tabs a{font-weight:600;font-size:14.5px;color:var(--muted-3);text-decoration:none;padding:9px 18px;border-radius:12px;}
+.tabs a.on{background:var(--ink);color:#fff;}
+
+.add-row{display:flex;gap:8px;margin-bottom:14px;}
+.add-row .field{flex:1;min-width:0;}
+.list-tools{display:flex;justify-content:space-between;align-items:center;margin:0 4px 10px;color:var(--muted-2);font-size:13.5px;}
+.slist{display:flex;flex-direction:column;gap:8px;}
+.srow{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:16px;background:var(--card);border:1px solid var(--glass-border);
+  text-decoration:none;color:var(--pencil);}
+.srow:hover{border-color:var(--ink);}
+.srow .nm{font-weight:700;font-size:16px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.srow .mt{font-size:13px;color:var(--muted-2);}
+.srow.arch{opacity:.6;}
+.badge{font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-2);border:1px solid var(--glass-border);border-radius:8px;padding:2px 7px;}
+
+.card-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+.card-head h2{font-size:22px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.fld{margin-bottom:12px;}
+textarea.field{min-height:90px;resize:vertical;}
+.boards-box{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto;padding:6px 2px;}
+.boards-box label{display:flex;align-items:center;gap:8px;font-size:14.5px;cursor:pointer;}
+.hint{font-size:13px;color:var(--muted-2);line-height:1.45;}
+.slot{border:1.5px dashed var(--glass-border);border-radius:14px;padding:16px;color:var(--muted-2);font-size:14px;margin-bottom:12px;}
+.slot b{display:block;color:var(--muted-3);margin-bottom:3px;}
+.row-btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+
+.set-group{margin-bottom:18px;}
+.set-group h3{font-size:16px;margin-bottom:4px;}
+.seg{display:flex;gap:2px;padding:3px;border-radius:12px;background:var(--glass);border:1px solid var(--glass-border);width:max-content;max-width:100%;flex-wrap:wrap;margin-top:8px;}
+.seg button{font-family:var(--font-ui);font-weight:600;font-size:13.5px;color:var(--muted-3);background:transparent;border:none;border-radius:9px;padding:8px 14px;cursor:pointer;}
+.seg button.on{background:var(--ink);color:#fff;}
+.chk{display:flex;align-items:center;gap:8px;font-size:14.5px;margin-top:8px;cursor:pointer;}
+.save-note{font-size:13px;color:var(--muted-2);min-height:1.2em;}
+@media (max-width:620px){
+  .grid2{grid-template-columns:1fr;}
+  .tabs a{padding:9px 12px;}
+}
+</style>
+</head>
+<body>
+<a class="corner-btn left" href="index.html" title="К тренажёрам" aria-label="К тренажёрам">←</a>
+<button class="corner-btn right" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<div class="wrap">
+  <h1>Кабинет</h1>
+  <div class="sub">Ученики, расписание и настройки преподавателя</div>
+  <div class="acct" id="acct" hidden></div>
+
+  <section id="scrLoading" class="empty">Загружаем…</section>
+
+  <section id="scrAuth" hidden>
+    <div class="panel auth-card">
+      <div><label class="label" for="auEmail">Почта</label><input class="field" id="auEmail" type="email" autocomplete="email"></div>
+      <div><label class="label" for="auPass">Пароль</label><input class="field" id="auPass" type="password" autocomplete="current-password"></div>
+      <button class="btn" id="auGo">Войти</button>
+      <div class="form-msg" id="auMsg"></div>
+      <div class="auth-note">Тот же вход, что на «Досках» и в «Работах». Если пароля ещё нет — войдите на <a href="boards.html">Досках</a> по одной почте и вернитесь сюда.</div>
+    </div>
+  </section>
+
+  <div id="scrMain" hidden>
+    <nav class="tabs" id="tabs" aria-label="Разделы кабинета">
+      <a href="#/students" data-tab="students">Ученики</a>
+      <a href="#/schedule" data-tab="schedule">Расписание</a>
+      <a href="#/settings" data-tab="settings">Настройки</a>
+    </nav>
+
+    <section id="tabStudents" hidden>
+      <div class="panel">
+        <div class="add-row">
+          <input class="field" id="newName" maxlength="80" placeholder="Имя нового ученика" aria-label="Имя нового ученика">
+          <button class="btn" id="newGo">Добавить</button>
+        </div>
+        <div class="form-msg" id="newMsg"></div>
+        <div class="list-tools">
+          <span id="listCount"></span>
+          <label class="chk" style="margin:0"><input type="checkbox" id="showArch"> Показать архив</label>
+        </div>
+        <div class="slist" id="studentList"></div>
+      </div>
+    </section>
+
+    <section id="tabCard" hidden>
+      <div class="panel" id="cardBox"></div>
+    </section>
+
+    <section id="tabSchedule" hidden>
+      <div class="panel empty">Расписание появится здесь: занятия по неделям, шаблоны и связь с карточками учеников.</div>
+    </section>
+
+    <section id="tabSettings" hidden>
+      <div class="panel">
+        <div class="set-group">
+          <h3>Сессия с учеником</h3>
+          <div class="hint">К чему привязан «текущий ученик»: ко всему браузеру или к каждой вкладке отдельно (удобно, когда несколько занятий идут в соседних вкладках).</div>
+          <div class="seg" data-set="sessionBind">
+            <button type="button" data-v="browser">Весь браузер</button>
+            <button type="button" data-v="tab">Вкладка</button>
+          </div>
+        </div>
+        <div class="set-group">
+          <h3>Подписи заданий</h3>
+          <div class="hint">Что видит преподаватель на задании: когда его давали ученику. Ученик подписей не видит.</div>
+          <div class="seg" data-set="labels">
+            <button type="button" data-v="show">Подписывать</button>
+            <button type="button" data-v="off">Не подписывать</button>
+            <button type="button" data-v="hide_solved">Скрывать решённые</button>
+          </div>
+          <label class="chk"><input type="checkbox" id="setDates"> Даты в подписи</label>
+          <label class="chk"><input type="checkbox" id="setCount"> Счётчик в подписи</label>
+        </div>
+        <div class="set-group">
+          <h3>Длительность занятия по умолчанию</h3>
+          <div class="hint">У ученика можно задать свою — она важнее.</div>
+          <div class="seg" data-set="lessonMin" id="segMin">
+            <button type="button" data-v="45">45 мин</button>
+            <button type="button" data-v="60">60 мин</button>
+            <button type="button" data-v="90">90 мин</button>
+            <button type="button" data-v="custom">Своя</button>
+          </div>
+          <div class="row-btns" style="margin-top:8px" id="customMinRow" hidden>
+            <input class="field" id="customMin" type="number" min="5" max="720" step="5" style="width:110px" aria-label="Минут в занятии"> <span class="hint">минут</span>
+          </div>
+        </div>
+        <div class="save-note" id="saveNote" role="status"></div>
+      </div>
+    </section>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script src="supabase-config.js"></script>
+<script src="supabase-js.umd.js"></script>
+<script src="cabinet-cloud.js"></script>
+<script src="teacher-settings.js"></script>
+<script>
+(function(){
+'use strict';
+const C = window.CabinetCloud, TS = window.TeacherSettings;
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+/* ── тема ── */
+const themeBtn = $('themeToggle');
+function curTheme(){ return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
+function applyTheme(t, persist){
+  document.documentElement.setAttribute('data-theme', t);
+  themeBtn.textContent = t === 'dark' ? '☀️' : '🌙';
+  if (persist) { try { localStorage.setItem('theme', t); } catch (e) {} }
+}
+applyTheme(curTheme(), false);
+themeBtn.addEventListener('click', () => applyTheme(curTheme() === 'dark' ? 'light' : 'dark', true));
+
+let toastT = 0;
+function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+
+/* ── подписи у значений ── */
+const EXAMS = { '': 'не выбран', oge: 'ОГЭ, математика', ege_prof: 'ЕГЭ, профиль', ege_base: 'ЕГЭ, база', rus_oge: 'ОГЭ, русский' };
+function examLabel(v){ return v ? (EXAMS[v] || v) : ''; }
+function meta(s){
+  return [s.grade ? s.grade + ' класс' : '', examLabel(s.exam)].filter(Boolean).join(' · ');
+}
+
+/* ── вход ── */
+let user = null;
+function show(id){
+  ['scrLoading', 'scrAuth', 'scrMain'].forEach(x => { $(x).hidden = x !== id; });
+}
+async function boot(){
+  if (!C.client()){ show('scrAuth'); $('auMsg').textContent = C.errorText({ message: 'no_config' }); $('auGo').disabled = true; return; }
+  user = await C.currentUser();
+  C.client().auth.onAuthStateChange((ev, session) => {
+    const u = session ? session.user : null;
+    if (!!u !== !!user){ user = u; route(); }
+    user = u;
+  });
+  route();
+  TS.load();
+}
+function renderAcct(){
+  const a = $('acct');
+  if (!user){ a.hidden = true; return; }
+  a.innerHTML = 'Вы вошли: <b>' + esc(user.email || '') + '</b> <button class="btn quiet small" id="auOut">Выйти</button>';
+  a.hidden = false;
+  $('auOut').addEventListener('click', async () => { await C.signOut(); user = null; students = null; route(); });
+}
+$('auGo').addEventListener('click', async () => {
+  const email = $('auEmail').value.trim(), pw = $('auPass').value;
+  if (!email || !pw){ $('auMsg').textContent = 'Введите почту и пароль'; return; }
+  $('auGo').disabled = true; $('auMsg').textContent = '';
+  try { user = await C.signIn(email, pw); route(); }
+  catch (e) { $('auMsg').textContent = e.message; }
+  finally { $('auGo').disabled = false; }
+});
+$('auPass').addEventListener('keydown', e => { if (e.key === 'Enter') $('auGo').click(); });
+
+/* ── маршруты: #/students, #/students/<id>, #/schedule, #/settings ── */
+window.addEventListener('hashchange', () => route());
+let students = null;      // кэш списка: открыть карточку и вернуться без сети
+async function route(){
+  renderAcct();
+  if (!user){ show('scrAuth'); return; }
+  const [tab, id] = location.hash.replace(/^#\/?/, '').split('/');
+  const t = ['students', 'schedule', 'settings'].indexOf(tab) >= 0 ? tab : 'students';
+  show('scrMain');
+  document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === t));
+  ['tabStudents', 'tabCard', 'tabSchedule', 'tabSettings'].forEach(x => { $(x).hidden = true; });
+  if (t === 'students' && id){ $('tabCard').hidden = false; await openCard(id); }
+  else if (t === 'students'){ $('tabStudents').hidden = false; await renderList(); }
+  else if (t === 'schedule'){ $('tabSchedule').hidden = false; }
+  else { $('tabSettings').hidden = false; await renderSettings(); }
+}
+
+/* ── ученики: список ── */
+async function loadStudents(force){
+  if (!students || force) students = await C.listStudents();
+  return students;
+}
+async function renderList(){
+  const box = $('studentList');
+  try { await loadStudents(true); }
+  catch (e) { box.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; return; }
+  const arch = $('showArch').checked;
+  const rows = students.filter(s => arch || !s.archived_at)
+    .sort((a, b) => !!a.archived_at - !!b.archived_at || a.name.localeCompare(b.name, 'ru'));
+  const active = students.filter(s => !s.archived_at).length;
+  $('listCount').textContent = 'Учеников: ' + active + (students.length > active ? ' (в архиве ' + (students.length - active) + ')' : '');
+  box.innerHTML = rows.length ? rows.map(s =>
+    '<a class="srow' + (s.archived_at ? ' arch' : '') + '" href="#/students/' + esc(s.id) + '" data-id="' + esc(s.id) + '">' +
+      '<span class="nm">' + esc(s.name) + '</span>' +
+      '<span class="mt">' + esc(meta(s)) + '</span>' +
+      (s.archived_at ? '<span class="badge">архив</span>' : '') +
+    '</a>').join('') : '<div class="empty">Учеников пока нет — добавьте первого выше.</div>';
+}
+$('showArch').addEventListener('change', renderList);
+async function addStudent(){
+  const name = $('newName').value.trim();
+  if (!name){ $('newMsg').textContent = 'Напишите имя'; return; }
+  $('newGo').disabled = true; $('newMsg').textContent = '';
+  try {
+    const s = await C.addStudent({ name });
+    $('newName').value = '';
+    students = null;
+    location.hash = '#/students/' + s.id;
+  } catch (e) { $('newMsg').textContent = e.message; }
+  finally { $('newGo').disabled = false; }
+}
+$('newGo').addEventListener('click', addStudent);
+$('newName').addEventListener('keydown', e => { if (e.key === 'Enter') addStudent(); });
+
+/* ── ученики: карточка ── */
+async function openCard(id){
+  const box = $('cardBox');
+  box.innerHTML = '<div class="empty">Загружаем…</div>';
+  let s, boards = [];
+  try {
+    s = await C.getStudent(id);
+    try { boards = await C.listBoards(); } catch (e) { boards = []; }
+  } catch (e) { box.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; return; }
+  renderCard(s, boards);
+}
+function renderCard(s, boards){
+  const box = $('cardBox');
+  const def = TS.get().lessonMin;
+  // привязанные доски, которых нет в списке (удалена или список не
+  // загрузился), оставляем в связи: молча терять id при сохранении нельзя
+  const known = new Set(boards.map(b => b.id));
+  const lost = (s.boards || []).filter(b => !known.has(b));
+  const examOpts = Object.keys(EXAMS).map(k => '<option value="' + k + '"' + ((s.exam || '') === k ? ' selected' : '') + '>' + esc(EXAMS[k]) + '</option>').join('')
+    + (s.exam && !(s.exam in EXAMS) ? '<option value="' + esc(s.exam) + '" selected>' + esc(s.exam) + '</option>' : '');
+  box.innerHTML =
+    '<div class="card-head"><a class="btn quiet small" href="#/students">← Ученики</a>' +
+      '<h2 id="cName">' + esc(s.name) + '</h2>' +
+      (s.archived_at ? '<span class="badge">архив</span>' : '') + '</div>' +
+    '<div class="row-btns" style="margin-bottom:14px">' +
+      '<button class="btn" id="cSession" disabled title="Заработает в следующем обновлении">Начать сессию</button>' +
+      '<span class="hint">Ученик получит память заданий и подписи — скоро.</span></div>' +
+    '<div class="fld"><label class="label" for="cName_in">Имя</label><input class="field" id="cName_in" maxlength="80" value="' + esc(s.name) + '"></div>' +
+    '<div class="grid2">' +
+      '<div class="fld"><label class="label" for="cGrade">Класс</label><input class="field" id="cGrade" maxlength="20" list="gradeList" value="' + esc(s.grade || '') + '" placeholder="например, 9">' +
+        '<datalist id="gradeList"><option value="5"><option value="6"><option value="7"><option value="8"><option value="9"><option value="10"><option value="11"><option value="студент"><option value="взрослый"></datalist></div>' +
+      '<div class="fld"><label class="label" for="cExam">Экзамен</label><select class="field" id="cExam">' + examOpts + '</select></div>' +
+    '</div>' +
+    '<div class="fld"><label class="label" for="cDur">Длительность занятия, минут</label>' +
+      '<input class="field" id="cDur" type="number" min="5" max="720" step="5" style="max-width:160px" value="' + (s.dur_min || '') + '" placeholder="' + def + '">' +
+      '<div class="hint">Пусто — по умолчанию из настроек (' + def + ' мин).</div></div>' +
+    '<div class="fld"><label class="label" for="cNote">Заметка</label><textarea class="field" id="cNote" maxlength="5000">' + esc(s.note || '') + '</textarea></div>' +
+    '<div class="fld"><div class="label">Доски ученика</div>' +
+      (boards.length || lost.length
+        ? '<div class="boards-box" id="cBoards">' +
+            boards.map(b => '<label><input type="checkbox" value="' + esc(b.id) + '"' + ((s.boards || []).indexOf(b.id) >= 0 ? ' checked' : '') + '> ' + esc(b.title) + '</label>').join('') +
+            lost.map(b => '<label><input type="checkbox" value="' + esc(b) + '" checked> <span class="hint">доска не найдена: ' + esc(b) + '</span></label>').join('') +
+          '</div>'
+        : '<div class="hint">Досок пока нет — создайте их на странице «Доски».</div>') + '</div>' +
+    '<div class="row-btns" style="margin:4px 0 6px"><button class="btn" id="cSave">Сохранить</button>' +
+      '<button class="btn danger" id="cArch">' + (s.archived_at ? 'Вернуть из архива' : 'В архив') + '</button>' +
+      '<span class="save-note" id="cMsg" role="status"></span></div>' +
+    '<div class="slot" style="margin-top:16px"><b>Память заданий</b>Что выдавали в ДЗ, выводили на доску и решали — появится здесь.</div>' +
+    '<div class="slot"><b>Занятия</b>Ближайшее и последние занятия из расписания — появятся здесь.</div>';
+  $('cSave').addEventListener('click', () => saveCard(s));
+  $('cArch').addEventListener('click', () => archiveCard(s, boards));
+}
+async function saveCard(s){
+  const name = $('cName_in').value.trim();
+  if (!name){ $('cMsg').textContent = 'Имя не может быть пустым'; return; }
+  const boxes = document.querySelectorAll('#cBoards input:checked');
+  $('cSave').disabled = true; $('cMsg').textContent = 'Сохраняем…';
+  try {
+    const fresh = await C.updateStudent(s.id, {
+      name, grade: $('cGrade').value, exam: $('cExam').value, note: $('cNote').value,
+      dur_min: $('cDur').value, boards: Array.from(boxes).map(x => x.value),
+    });
+    students = null;
+    s.name = fresh.name; $('cName').textContent = fresh.name;
+    $('cMsg').textContent = 'Сохранено';
+  } catch (e) { $('cMsg').textContent = e.message; }
+  finally { $('cSave').disabled = false; }
+}
+async function archiveCard(s, boards){
+  $('cArch').disabled = true;
+  try {
+    const fresh = await C.setArchived(s.id, !s.archived_at);
+    students = null;
+    toast(fresh.archived_at ? 'Ученик в архиве' : 'Ученик возвращён из архива');
+    renderCard(fresh, boards);
+  } catch (e) { $('cMsg').textContent = e.message; $('cArch').disabled = false; }
+}
+
+/* ── настройки ── */
+let settingsBound = false;
+function paintSettings(){
+  const s = TS.get();
+  document.querySelectorAll('.seg[data-set]').forEach(seg => {
+    const key = seg.dataset.set;
+    seg.querySelectorAll('button').forEach(b => {
+      let on;
+      if (key === 'lessonMin'){
+        const std = [45, 60, 90].indexOf(s.lessonMin) >= 0;
+        on = b.dataset.v === 'custom' ? !std : (std && Number(b.dataset.v) === s.lessonMin);
+      } else on = b.dataset.v === s[key];
+      b.classList.toggle('on', on);
+    });
+  });
+  $('setDates').checked = s.labelDates;
+  $('setCount').checked = s.labelCount;
+  const custom = [45, 60, 90].indexOf(s.lessonMin) < 0 || $('segMin').dataset.custom === '1';
+  $('customMinRow').hidden = !custom;
+  if (custom && document.activeElement !== $('customMin')) $('customMin').value = s.lessonMin;
+}
+async function save(patch){
+  $('saveNote').textContent = 'Сохраняем…';
+  try { await TS.set(patch); $('saveNote').textContent = 'Сохранено'; }
+  catch (e) { $('saveNote').textContent = 'Не сохранилось на сервере: ' + e.message; }
+}
+async function renderSettings(){
+  paintSettings();
+  if (!settingsBound){
+    settingsBound = true;
+    TS.onChange(paintSettings);
+    document.querySelectorAll('.seg[data-set] button').forEach(b => b.addEventListener('click', () => {
+      const key = b.parentNode.dataset.set;
+      if (key === 'lessonMin'){
+        if (b.dataset.v === 'custom'){
+          $('segMin').dataset.custom = '1'; paintSettings(); $('customMin').focus(); return;
+        }
+        $('segMin').dataset.custom = '';
+        return save({ lessonMin: Number(b.dataset.v) });
+      }
+      save({ [key]: b.dataset.v });
+    }));
+    $('setDates').addEventListener('change', e => save({ labelDates: e.target.checked }));
+    $('setCount').addEventListener('change', e => save({ labelCount: e.target.checked }));
+    $('customMin').addEventListener('change', e => {
+      const n = Math.round(Number(e.target.value));
+      if (n >= 5 && n <= 720) save({ lessonMin: n }); else $('saveNote').textContent = 'От 5 до 720 минут';
+    });
+  }
+  await TS.load();
+  paintSettings();
+}
+
+window.__cabinet = { get students(){ return students; } };
+boot();
+})();
+</script>
+</body>
+</html>
