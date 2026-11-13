@@ -13,8 +13,9 @@
 <link rel="preload" href="fonts/onest-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="onest.css">
 <link rel="stylesheet" href="works.css">
+<link rel="stylesheet" href="schedule.css">
 <style>
-/* Кабинет преподавателя (задача А4): ученики, расписание (заглушка),
+/* Кабинет преподавателя (задача А4): ученики, расписание (В1а, schedule.js),
    настройки. Оформление общее с «Работами» (works.css): тот же вход, те же
    кнопки и стекло — кабинет не должен выглядеть чужим. */
 .wrap{max-width:860px;margin:0 auto;}
@@ -114,7 +115,7 @@ textarea.field{min-height:90px;resize:vertical;}
     </section>
 
     <section id="tabSchedule" hidden>
-      <div class="panel empty">Расписание появится здесь: занятия по неделям, шаблоны и связь с карточками учеников.</div>
+      <div class="panel" id="scHost"></div>
     </section>
 
     <section id="tabSettings" hidden>
@@ -151,6 +152,16 @@ textarea.field{min-height:90px;resize:vertical;}
             <input class="field" id="customMin" type="number" min="5" max="720" step="5" style="width:110px" aria-label="Минут в занятии"> <span class="hint">минут</span>
           </div>
         </div>
+        <div class="set-group">
+          <h3>Названия форматов занятия</h3>
+          <div class="hint">Как подписывать формат на занятии в расписании. Пусто — общее название.</div>
+          <div class="grid2" style="margin-top:8px" id="fmtNames">
+            <label><span class="label">Индивидуальное (один ученик)</span><input class="field" data-fmt="single" maxlength="30"></label>
+            <label><span class="label">Пара (двое одновременно)</span><input class="field" data-fmt="pair" maxlength="30"></label>
+            <label><span class="label">Группа (трое и больше)</span><input class="field" data-fmt="group" maxlength="30"></label>
+            <label><span class="label">Полупараллелка (двое, преподаватель переходит)</span><input class="field" data-fmt="semi" maxlength="30"></label>
+          </div>
+        </div>
         <div class="save-note" id="saveNote" role="status"></div>
       </div>
     </section>
@@ -162,6 +173,9 @@ textarea.field{min-height:90px;resize:vertical;}
 <script src="supabase-js.umd.js"></script>
 <script src="cabinet-cloud.js"></script>
 <script src="teacher-settings.js"></script>
+<script src="schedule-cloud.js"></script>
+<script src="schedule-tpl.js"></script>
+<script src="schedule.js"></script>
 <script src="student-memory.js" data-picker></script>
 <script>
 (function(){
@@ -233,11 +247,13 @@ async function route(){
   const [tab, id] = location.hash.replace(/^#\/?/, '').split('/');
   const t = ['students', 'schedule', 'settings'].indexOf(tab) >= 0 ? tab : 'students';
   show('scrMain');
+  // сетке недели нужна ширина: семь колонок дней в 860px не читаются
+  document.querySelector('.wrap').classList.toggle('sc-wide', t === 'schedule');
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === t));
   ['tabStudents', 'tabCard', 'tabSchedule', 'tabSettings'].forEach(x => { $(x).hidden = true; });
   if (t === 'students' && id){ $('tabCard').hidden = false; await openCard(id); }
   else if (t === 'students'){ $('tabStudents').hidden = false; await renderList(); }
-  else if (t === 'schedule'){ $('tabSchedule').hidden = false; }
+  else if (t === 'schedule'){ $('tabSchedule').hidden = false; await Schedule.show(id); }
   else { $('tabSettings').hidden = false; await renderSettings(); }
 }
 
@@ -398,6 +414,9 @@ function paintSettings(){
       b.classList.toggle('on', on);
     });
   });
+  document.querySelectorAll('#fmtNames input').forEach(inp => {
+    if (document.activeElement !== inp) inp.value = (s.formatLabels || {})[inp.dataset.fmt] || '';
+  });
   $('setDates').checked = s.labelDates;
   $('setCount').checked = s.labelCount;
   const custom = [45, 60, 90].indexOf(s.lessonMin) < 0 || $('segMin').dataset.custom === '1';
@@ -426,6 +445,12 @@ async function renderSettings(){
       save({ [key]: b.dataset.v });
     }));
     $('setDates').addEventListener('change', e => save({ labelDates: e.target.checked }));
+    document.querySelectorAll('#fmtNames input').forEach(inp => inp.addEventListener('change', () => {
+      const fl = Object.assign({}, TS.get().formatLabels);
+      // пустое поле — вернуть общее название
+      fl[inp.dataset.fmt] = inp.value.trim() || TS.FORMAT_LABELS[inp.dataset.fmt];
+      save({ formatLabels: fl });
+    }));
     $('setCount').addEventListener('change', e => save({ labelCount: e.target.checked }));
     $('customMin').addEventListener('change', e => {
       const n = Math.round(Number(e.target.value));
@@ -435,6 +460,17 @@ async function renderSettings(){
   await TS.load();
   paintSettings();
 }
+
+/* ── расписание (schedule.js): ученики — из общего кэша кабинета ── */
+Schedule.init({
+  host: $('scHost'),
+  students: () => loadStudents(),
+  addStudent: async name => { const s = await C.addStudent({ name }); students = null; return s; },
+  settings: () => TS.get(),
+  settingsChanged: f => TS.onChange(f),
+  weekHref: mon => '#/schedule' + (mon ? '/' + mon : ''),
+  toast,
+});
 
 window.__cabinet = { get students(){ return students; } };
 boot();

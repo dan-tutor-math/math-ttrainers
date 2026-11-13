@@ -18,7 +18,7 @@ localStorage, доказывает хранение на сервере. Пра�
   C. архив: ученик уходит из списка, виден по «Показать архив», возврат;
   D. настройки: привязка сессии, подписи, даты/счётчик, длительность (в т.ч.
      своя) — после перезагрузки с пустым localStorage значения те же (с сервера);
-  E. «Расписание» — заглушка; чужой ученик не виден;
+  E. «Расписание» открывается (подробно — test_prompt_cabinet_schedule.py);
   F. главная: четвёртой в капсуле кнопка «Кабинет» ведёт на кабинет;
   G. нет ошибок JavaScript.
 
@@ -327,7 +327,9 @@ def main():
         # ── E. расписание
         page.click("#tabs a[data-tab=schedule]")
         page.wait_for_selector("#tabSchedule", state="visible")
-        check("E1 «Расписание» — заглушка", "Расписание появится" in page.inner_text("#tabSchedule"))
+        # заглушку сменило расписание (В1а); подробно — test_prompt_cabinet_schedule.py
+        page.wait_for_selector("#scHost .sc-views", timeout=5000)
+        check("E1 «Расписание» открывается: шапка недели и переключатель вида", page.is_visible("#scRange"))
 
         # ── F. главная
         page2 = ctx.new_page()

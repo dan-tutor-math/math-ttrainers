@@ -16,10 +16,15 @@
      labels      — подписи заданий: 'show' / 'off' / 'hide_solved'
      labelDates  — даты в подписи; labelCount — счётчик в подписи
      lessonMin   — длительность занятия по умолчанию, минуты (45/60/90/своя)
+     formatLabels — свои названия форматов занятия { single, pair, group, semi }
+                   (как stgLabel старого приложения: «полупараллелку» кто-то
+                   зовёт «параллелью»). Пустое — общее название (В1а)
    ========================================================== */
 (function(){
   const LS_KEY = 'teacher:settings:v1';
-  const DEFAULTS = { sessionBind: 'browser', labels: 'show', labelDates: true, labelCount: true, lessonMin: 60 };
+  const FORMAT_LABELS = { single: 'Индивидуальное', pair: 'Пара', group: 'Группа', semi: 'Полупараллелка' };
+  const DEFAULTS = { sessionBind: 'browser', labels: 'show', labelDates: true, labelCount: true, lessonMin: 60,
+                     formatLabels: Object.assign({}, FORMAT_LABELS) };
   const listeners = [];
   let cur = null;
 
@@ -33,6 +38,15 @@
     if (typeof raw.labelCount === 'boolean') o.labelCount = raw.labelCount;
     const m = Math.round(Number(raw.lessonMin));
     if (m >= 5 && m <= 720) o.lessonMin = m;
+    // объект по умолчанию не делим между копиями: правка одной не должна
+    // менять DEFAULTS
+    o.formatLabels = Object.assign({}, FORMAT_LABELS);
+    if (raw.formatLabels && typeof raw.formatLabels === 'object') {
+      Object.keys(FORMAT_LABELS).forEach(k => {
+        const v = typeof raw.formatLabels[k] === 'string' ? raw.formatLabels[k].trim().slice(0, 30) : '';
+        if (v) o.formatLabels[k] = v;
+      });
+    }
     return o;
   }
   function readLocal(){
@@ -76,5 +90,5 @@
     if (e.key === LS_KEY) { cur = readLocal(); emit(); }
   });
 
-  window.TeacherSettings = { DEFAULTS, get, load, set, onChange, normalize };
+  window.TeacherSettings = { DEFAULTS, FORMAT_LABELS, get, load, set, onChange, normalize };
 })();
