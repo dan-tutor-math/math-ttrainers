@@ -114,10 +114,25 @@ def handle_old(route, request):
     route.fulfill(status=200, content_type="application/json", body=json.dumps({"ok": True, "rev": OLD["rev"]}), headers=CORS)
 
 
+def jsonb(x):
+    # как Postgres хранит jsonb: ключи объекта по длине, потом по байтам —
+    # порядок, в котором их записала страница, не сохраняется
+    if isinstance(x, list):
+        return [jsonb(v) for v in x]
+    if isinstance(x, dict):
+        return {k: jsonb(x[k]) for k in sorted(x, key=lambda k: (len(k.encode()), k.encode()))}
+    return x
+
+
 def handle_sb(route, request):
     if request.method == "POST":
         LOG["sb_bodies"].append(request.post_data or "")
     B1.handle_db(route, request)
+    if request.method == "POST":                # заглушка пишет всю базу разом
+        d = json.loads(B1.STATE["db"])
+        for r in d.get("ext_sync", []):
+            r["base"] = jsonb(r.get("base"))
+        B1.STATE["db"] = json.dumps(d)
 
 
 def old_edit(fn):

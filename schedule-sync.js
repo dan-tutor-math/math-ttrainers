@@ -61,7 +61,12 @@
   const addDays = (s, n) => { const [y, m, d] = s.split('-').map(Number); return ymd(new Date(y, m - 1, d + n)); };
   const today = () => ymd(new Date());
   const copy = x => (x === undefined ? undefined : JSON.parse(JSON.stringify(x)));
-  const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  // сравнение по смыслу, без порядка ключей: база сведения лежит в jsonb, а
+  // Postgres переставляет ключи объектов — иначе после чтения базы любой
+  // день казался «изменённым в кабинете» и правка в старом давала ложный конфликт
+  const stable = x => (Array.isArray(x) ? x.map(stable)
+    : x && typeof x === 'object' ? Object.keys(x).sort().reduce((o, k) => { o[k] = stable(x[k]); return o; }, {}) : x);
+  const eq = (a, b) => JSON.stringify(stable(a)) === JSON.stringify(stable(b));
   const norm = s => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
   const rid = p => (p || 'r') + Math.random().toString(36).slice(2, 10);
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
