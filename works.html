@@ -379,6 +379,7 @@ html.rv-on{overflow:hidden;}
 <script src="supabase-js.umd.js"></script>
 <script src="lazy-libs.js" data-preload="html2canvas"></script>
 <script src="subjects-catalog.js"></script>
+<script src="task-key.js"></script>
 <script src="trainer-tasks.js"></script>
 <script src="video-links.js"></script>
 <script src="video-player.js"></script>
@@ -1047,6 +1048,7 @@ async function shootBlock(win, tid, href, el, info){
   const L = shots.light;
   return {
     tid, href, gen, exact,
+    tkey: trainerTaskKey(win, tid, gen),   // ключ задания для журнала кабинета (task-key.js)
     live: liveOf(el, exact),
     task: Object.assign({}, info),
     hot: L.hot ? { w: L.hot.w, h: L.hot.h, fields: L.hot.fields, opts: L.hot.opts, check: L.hot.check, checkText: L.hot.checkText || null, style: { font: (L.hot.style || {}).font || null } } : null,

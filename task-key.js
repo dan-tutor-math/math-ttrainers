@@ -45,6 +45,10 @@
     if (/^oge2[0-5]$/.test(s)) return 'oge_part2';
     if (/^soc\d+$/.test(s)) return 'soc_oge';
     if (/^eng\d+$/.test(s)) return 'eng_oge';
+    // русский: id тренажёра на доске rus<номер>; №1 и №13 — свои страницы
+    if (s === 'rus1') return 'rus_oge01';
+    if (s === 'rus13') return 'rus_oge13';
+    if (/^rus\d+$/.test(s)) return 'rus_oge';
     return s;
   }
   function examOf(page) {

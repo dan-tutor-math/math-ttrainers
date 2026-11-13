@@ -132,7 +132,7 @@ def test_random_kind(browser):
         ctx, page, errors = open_page(browser, f"{pg}.html", "() => window.__trainerState", own_only=True)
         card(page, "random")
         got = None
-        for _ in range(40):
+        for _ in range(300):
             # у oge1_5 в main нет tire-math.js (он в ветке tire3d): шины падают, их пропускаем
             page.evaluate("() => { try { newTask(); } catch (e) {} }")
             r = page.evaluate(PROBE, [pg, pg])
