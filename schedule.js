@@ -107,7 +107,8 @@
 
   /* ── состояние ── */
   let api = null, host = null;
-  const st = { week: null, lessons: [], students: [], byId: {}, view: null, loadTok: 0, err: '', loading: false };
+  const st = { week: null, lessons: [], students: [], byId: {}, view: null, loadTok: 0, err: '', loading: false,
+               mode: 'week', groups: [], tpls: [], tplId: null };   // mode: week | tpl | groups (В1б)
   let modal = null;           // открытая карточка занятия
 
   function readView(){
@@ -149,10 +150,13 @@
     st.loading = true;
     render(true);
     try {
-      const [students, lessons] = await Promise.all([api.students(), SC.listRange(st.week, addDays(st.week, 6))]);
+      const [students, lessons, groups, tpls] = await Promise.all([api.students(), SC.listRange(st.week, addDays(st.week, 6)), SC.listGroups(), SC.listTemplates()]);
       if (tok !== st.loadTok) return;
       setStudents(students);
       st.lessons = lessons;
+      st.groups = groups;
+      st.tpls = tpls;
+      if (!st.tpls.some(t => t.id === st.tplId)) st.tplId = (st.tpls.find(t => t.is_active) || st.tpls[0] || {}).id || null;
     } catch (e) {
       if (tok !== st.loadTok) return;
       st.err = e.message || String(e);
@@ -191,7 +195,8 @@
   /* ── незнакомые имена: спросить, а не заводить молча ──
      box — куда нарисовать вопросы. Ответ — список участников или null
      (отмена). Новые ученики заводятся только после ответа на все вопросы */
-  function resolveNames(names, box){
+  function resolveNames(names, box, opts){
+    const noGuest = !!(opts && opts.noGuest);
     const list = activeStudents();
     const items = names.map(n => {
       const c = matchName(n, list);
@@ -221,7 +226,7 @@
           '<span class="sc-ask-a">' +
             it.cands.map(s => '<button type="button" class="btn quiet small" data-pick="' + esc(s.id) + '">' + esc(s.name) + '</button>').join('') +
             (it.cands.length ? '' : '<button type="button" class="btn quiet small" data-act="create">Завести ученика</button>') +
-            '<button type="button" class="btn quiet small" data-act="guest">Оставить гостем</button>' +
+            (noGuest ? '' : '<button type="button" class="btn quiet small" data-act="guest">Оставить гостем</button>') +
           '</span></div>').join('') +
         '<div class="sc-ask-foot"><button type="button" class="btn quiet small" data-act="cancel">Отмена</button></div>';
       box.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
@@ -237,17 +242,40 @@
     });
   }
 
-  // новое занятие из текста: день известен, время — из текста или подсказки
-  async function createFromText(day, text, box, hint){
+  /* ── устойчивые пары и группы в быстром вводе (В1б) ──
+     Название пары в строке («Маша + Петя») разворачивается в её учеников;
+     а если ученики строки в точности совпали с составом сохранённой пары
+     или группы, занятие сразу получает её формат, длительность и ссылку */
+  const sameSet = (a, b) => a.length === b.length && a.every(x => b.indexOf(x) >= 0);
+  const liveGroups = () => st.groups.filter(g => !g.archived_at && g.members.length);
+  const groupByName = n => liveGroups().find(g => norm(g.name) === norm(n));
+  const groupOf = ids => (ids.length >= 2 ? liveGroups().find(g => sameSet(g.members, ids)) : null) || null;
+
+  // текст строки → { start, dur, people, format, group_id } | { msg } | { cancelled }
+  async function resolveEntry(text, box, hint){
     const q = parseQuick(text);
     if (!q.names.length) return { msg: 'Напишите имя: «15:00 Маша, Петя»' };
-    const people = await resolveNames(q.names, box);
-    if (!people) return { cancelled: true };
+    const named = [], rest = [];
+    q.names.forEach(n => { const g = groupByName(n); if (g) named.push(g); else rest.push(n); });
+    const found = rest.length ? await resolveNames(rest, box) : [];
+    if (!found) return { cancelled: true };
+    const people = [];
+    const has = p => people.some(x => p.student_id ? x.student_id === p.student_id : x.guest_name === p.guest_name);
+    named.forEach(g => g.members.forEach(id => { if (!has({ student_id: id })) people.push({ student_id: id }); }));
+    found.forEach(p => { if (!has(p)) people.push(p); });
+    const ids = people.map(p => p.student_id);
+    const grp = ids.every(Boolean) ? groupOf(ids) : null;
     const start = q.start != null ? q.start : (hint && hint.start != null ? hint.start : null);
-    let dur = q.end != null && q.start != null ? q.end - q.start : (hint && hint.dur) || durFor(people);
+    let dur = q.end != null && q.start != null ? q.end - q.start : (hint && hint.dur) || (grp && grp.dur_min) || durFor(people);
     if (start != null) dur = Math.min(dur, 1440 - start);
+    return { start, dur: Math.max(5, dur), people, format: grp ? grp.format : defaultFormat(people.length), group_id: grp ? grp.id : null };
+  }
+  // новое занятие из текста: день известен, время — из текста или подсказки
+  async function createFromText(day, text, box, hint){
+    const r = await resolveEntry(text, box, hint);
+    if (!r.people) return r;
     try {
-      const l = await SC.addLesson({ day, start_min: start, dur_min: Math.max(5, dur), format: defaultFormat(people.length) }, people);
+      const l = await SC.addLesson({ day, start_min: r.start, dur_min: r.dur, format: r.format, group_id: r.group_id }, r.people);
       if (l.day >= st.week && l.day <= addDays(st.week, 6)) st.lessons.push(l);
       render();
       return { lesson: l };
@@ -255,15 +283,22 @@
   }
 
   /* ── шапка ── */
+  function modesHtml(){
+    return '<div class="seg sc-modes" role="group" aria-label="Раздел расписания">' +
+      [['week', 'Занятия'], ['tpl', 'Шаблоны недели'], ['groups', 'Пары и группы']].map(m =>
+        '<button type="button" data-mode="' + m[0] + '" class="' + (st.mode === m[0] ? 'on' : '') + '">' + m[1] + '</button>').join('') + '</div>';
+  }
   function headHtml(){
+    if (st.mode !== 'week') return modesHtml();
     const fl = ['single', 'pair', 'group', 'semi'];
-    return '<div class="sc-head">' +
+    return modesHtml() + '<div class="sc-head">' +
         '<div class="sc-nav">' +
           '<a class="btn quiet small sc-arrow" id="scPrev" href="' + esc(api.weekHref(addDays(st.week, -7))) + '" aria-label="Предыдущая неделя">‹</a>' +
           '<span class="sc-range" id="scRange">' + esc(rangeText(st.week)) + '</span>' +
           '<a class="btn quiet small sc-arrow" id="scNext" href="' + esc(api.weekHref(addDays(st.week, 7))) + '" aria-label="Следующая неделя">›</a>' +
           '<a class="btn quiet small" id="scToday" href="' + esc(api.weekHref(null)) + '"' + (mondayOf(today()) === st.week ? ' aria-current="true"' : '') + '>Сегодня</a>' +
         '</div>' +
+        TPL().weekMenuHtml() +
         '<div class="seg sc-views" role="group" aria-label="Вид расписания">' +
           '<button type="button" data-v="list" class="' + (st.view === 'list' ? 'on' : '') + '">Строки</button>' +
           '<button type="button" data-v="grid" class="' + (st.view === 'grid' ? 'on' : '') + '">Неделя</button>' +
@@ -680,12 +715,16 @@
     let body;
     if (loading) body = '<div class="empty">Загружаем…</div>';
     else if (st.err) body = '<div class="empty">' + esc(st.err) + ' <button type="button" class="btn quiet small" id="scRetry">Повторить</button></div>';
+    else if (st.mode !== 'week') body = TPL().paneHtml();
     else body = st.view === 'grid' ? gridHtml() : listHtml();
     host.innerHTML = headHtml() + '<div class="sc-body sc-v-' + st.view + '" id="scBody">' + body + '</div>';
     host.querySelectorAll('.sc-views button').forEach(b => b.addEventListener('click', () => setView(b.dataset.v)));
+    host.querySelectorAll('.sc-modes button').forEach(b => b.addEventListener('click', () => { st.mode = b.dataset.mode; closeModal(); render(); }));
     const retry = host.querySelector('#scRetry');
     if (retry) retry.addEventListener('click', load);
     if (loading || st.err) return;
+    if (st.mode !== 'week') { TPL().bindPane(host); return; }
+    TPL().bindWeekMenu(host);
     if (st.view === 'grid') {
       bindGrid();
       const ngw = host.querySelector('.sc-gwrap');
@@ -703,8 +742,13 @@
     paintEditor();
   }
 
+  // шаблоны, пары и группы живут в schedule-tpl.js; общие приёмы он берёт отсюда
+  const TPL = () => window.ScheduleTpl;
   function init(opts){
     api = opts;
+    TPL().attach({ st, SC, api: () => api, esc, pad, hm, addDays, toDate, mondayOf, DAY_SHORT, DAY_LONG, FMT_HINT, fmtLabel, plural, rangeText, dayText,
+      timeText, timeVal, readTime, parseQuick, norm, resolveNames, resolveEntry, activeStudents, personName, durFor, defaultFormat, groupOf,
+      modalShell, closeModal, getModal: () => modal, render, reload: () => load() });
     host = opts.host;
     st.view = readView();
     if (api.settingsChanged) api.settingsChanged(() => { if (st.week) render(); });
@@ -718,5 +762,5 @@
     return load();
   }
 
-  window.Schedule = { init, show, parseQuick, matchName, mondayOf, _st: st, reload: () => load() };
+  window.Schedule = { init, show, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), setMode: m => { st.mode = m; render(); } };
 })();

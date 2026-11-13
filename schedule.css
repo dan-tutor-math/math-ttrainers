@@ -155,3 +155,31 @@
   .sc-modal{align-items:flex-end;padding:0;}
   .sc-sheet{border-radius:20px 20px 0 0;max-height:88vh;}
 }
+
+/* ── В1б: шаблоны недели, пары и группы (schedule-tpl.js) ── */
+.sc-modes{margin:0 0 10px;}
+.sc-tplmenu{width:auto;min-width:150px;padding:6px 10px;font-size:13.5px;}
+.sc-tplbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;}
+.sc-tplbar .field{width:auto;min-width:150px;flex:1 1 160px;max-width:260px;}
+.sc-act{font-size:13px;color:var(--muted-2);padding:0 4px;white-space:nowrap;}
+.sc-ins{display:flex;flex-direction:column;gap:4px;margin:10px 0;max-height:46vh;overflow:auto;}
+.sc-ins-row{padding:6px 8px;border-radius:10px;background:var(--hl-10);font-size:13.5px;}
+.sc-ins-row .mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums;}
+.sc-ins-row.busy{opacity:.7;}
+.sc-busy{color:var(--warn);font-size:12.5px;}
+.sc-who{margin-top:14px;font-size:13.5px;}
+.sc-who summary{cursor:pointer;font-weight:600;}
+.sc-who-list,.sc-grp-mem{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}
+.sc-chip{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:999px;background:var(--hl-10);font-size:13px;}
+.sc-chip.guest{font-style:italic;}
+.sc-chip .sc-rm{background:none;border:none;cursor:pointer;color:var(--muted-2);font-size:15px;line-height:1;padding:0 2px;}
+.sc-groups{display:flex;flex-direction:column;gap:10px;margin-top:12px;}
+.sc-grp{background:var(--card);border:1px solid var(--glass-border);border-radius:16px;padding:10px 12px;}
+.sc-grp.fmt-pair{border:2px solid var(--fmt-pair);}
+.sc-grp.fmt-group{border:3px double var(--fmt-group);}
+.sc-grp.fmt-semi{border:2px dashed var(--fmt-semi);}
+.sc-grp-top{display:flex;gap:8px;flex-wrap:wrap;}
+.sc-grp-top .grp-name{flex:1 1 180px;min-width:0;}
+.sc-grp-top .field{width:auto;}
+.sc-grp-top .grp-dur{width:80px;}
+.sc-grp-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;}
