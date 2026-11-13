@@ -1534,6 +1534,9 @@ function newTask() {
   // совпавшее с недавним (целиком или ответом подряд), перегенерируется
   // (no-repeat.js); avoid — заменяемое задание на экране
   curTask = NoRepeat.pick('oge9:' + curMode, () => m.gen(), { avoid: [curTask] });
+  // id выпавшего типа: в «вперемешку» curMode остаётся 'random', а ключ задания
+  // для журнала кабинета (task-key.js, gen:<страница>:<вид>) нужен по настоящему типу
+  if (curTask && typeof curTask === 'object' && m && m.id) curTask.genKind = m.id;
   // память «ФИПИ решены / плашка показана» меняется только для выбранного
   // кандидата — NoRepeat зовёт генератор по нескольку раз
   if (window.FipiMix && m.fipiList) FipiMix.commit(FIPI_PAGE, m.id, curTask, m.fipiList);

@@ -2010,6 +2010,9 @@ function newTask() {
   // совпавшее с недавним (целиком или ответом подряд), перегенерируется
   // (no-repeat.js); avoid — заменяемое задание на экране
   curTask = NoRepeat.pick('oge1_5:' + curMode, () => m.gen(), { avoid: [curTask] });
+  // id выпавшего типа: в «вперемешку» curMode остаётся 'random', а ключ задания
+  // для журнала кабинета (task-key.js, gen:<страница>:<вид>) нужен по настоящему типу
+  if (curTask && typeof curTask === 'object' && m && m.id) curTask.genKind = m.id;
   taskAnswered = false;
   optionsLocked = false;
   solutionShown = false;

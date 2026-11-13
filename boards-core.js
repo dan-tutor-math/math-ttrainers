@@ -7983,6 +7983,7 @@ async function insertTaskImage(dataUrl, task, gen, beside, shot, cw, place){
   if (card && card.r > 0) obj.card = card;   // Промпт №70: скругление карточки (renderImageObject)
   if (css) obj.css = Object.assign({}, css, cw ? { cw } : {});
   if (shot && shot.sol) obj.sol = shot.sol;   // «Тренировка»: разбор по кнопке (trainer-tasks.js)
+  if (shot && shot.tkey) obj.tkey = shot.tkey;   // ключ задания для журнала кабинета (task-key.js)
   if (stack) obj.stack = stack;
   obj.gap = gap;
   obj.addedAt = Date.now();
