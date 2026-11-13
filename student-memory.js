@@ -6,7 +6,8 @@
      current()                  — ученик сессии {id, name, paused, lessonId, startedAt, mode} или null
      start({id, name}, {lessonId}) — начать сессию (журнал ученика грузится сразу)
      end(), pause(on)           — закончить; пауза записи
-     record(key, event, {source, srcRef, lessonId}) — записать событие
+     record(key, event, {source, srcRef, lessonId, studentId}) — записать событие
+                                  (studentId — Б5: явному ученику, без сессии)
      recordTask(task, {clean, mode, page}) — итог решения из страницы тренажёра (Б2):
                                   ключ строит TaskKey.fromTask, событие ok (с первого
                                   раза) или bad (после ошибок или с подсказкой)
@@ -314,7 +315,10 @@
     key = String(key || '');
     if (key.length < 3 || key.length > 200 || !KEY_RE.test(key)) return { ok: false, reason: 'bad_key' };
     if (!EV[event]) return { ok: false, reason: 'bad_event' };
-    const s = current();
+    // Б5: «Выдано» в работах пишет явно названному ученику, сессия не нужна и пауза
+    // не мешает — это действие преподавателя, а не фоновая запись урока
+    let s = current();
+    if (opts.studentId) s = { id: String(opts.studentId), paused: false, lessonId: null };
     if (!s) return { ok: false, reason: 'no_session' };
     if (s.paused) return { ok: false, reason: 'paused' };
     const now = Date.now();

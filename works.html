@@ -106,6 +106,12 @@ body.editing .corner-btn{position:absolute;}
 #wkTries .own:disabled{opacity:.45;}
 .check-line{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13.5px;color:var(--muted-3);cursor:pointer;user-select:none;}
 .check-line input{width:17px;height:17px;accent-color:var(--ink);}
+/* Б5: журнал ученика (только у преподавателя в сессии или у работы с учеником) */
+.mem-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.mem-line .check-line{margin-top:0;}
+.mem-line .hint{flex-basis:100%;}
+.add-cap{display:inline-flex;align-items:center;min-width:12px;}
+.add-skip{margin:0 4px 0 0;}
 .ti-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;}
 .ti-name{font-size:13.5px;font-weight:600;color:var(--muted-3);flex:1;min-width:140px;}
 .ti-btns{display:flex;gap:4px;}
@@ -277,6 +283,8 @@ html.rv-on{overflow:hidden;}
           <div class="add-count" id="addCountBox" title="Сколько разных заданий этого типа добавить за раз: тренажёр сам подберёт новые, с теми же настройками">
             <button type="button" id="cntMinus" aria-label="Меньше">−</button><input id="addCount" type="number" min="1" max="30" step="1" value="1" inputmode="numeric" aria-label="Сколько заданий добавить"><button type="button" id="cntPlus" aria-label="Больше">+</button>
           </div>
+          <span class="add-cap" id="addCap"></span>
+          <label class="check-line add-skip" id="addSkipBox" hidden title="Не брать задания ФИПИ, которые уже были у ученика сессии"><input type="checkbox" id="addSkip"> не решённые</label>
           <button class="btn" id="addBtn">＋ Добавить в работу</button>
           <button class="btn quiet" id="refreshBtn2" title="Другой пример того же типа — как ⟳ в тренажёре">⟳ Обновить пример</button>
         </div>
@@ -322,6 +330,17 @@ html.rv-on{overflow:hidden;}
           <div class="var-tools" id="varTools" hidden>
             <div class="hint" id="varHint">Задания — того же типа и уровня, что в варианте 1, с другими числами. Порядок и режим — как в варианте 1, менять их — там. ⟳ у задания — другие числа.</div>
             <button class="btn danger small" id="varDel">Удалить вариант</button>
+          </div>
+        </div>
+        <div class="sheet-row" id="wkMemRow" hidden>
+          <span class="label">Журнал ученика</span>
+          <div class="mem-line">
+            <button class="btn small" id="wkIssued" type="button" title="Записать в журнал ученика, что все задания этого варианта выданы ему в домашнюю работу"></button>
+            <button class="btn quiet small" id="wkIssuedChange" type="button">Другой ученик</button>
+            <select class="field" id="wkIssuedPick" hidden aria-label="Кому выдана работа"></select>
+            <label class="check-line"><input type="checkbox" id="wkSkipSolved"> Не брать уже решённые</label>
+            <span id="wkCapToggle"></span>
+            <div class="hint" id="wkIssuedNote"></div>
           </div>
         </div>
         <span class="label">Задания <span id="wkCount"></span></span>
@@ -594,7 +613,7 @@ async function openEditor(id){
   $('edWarn').textContent = E.attempts ? 'Эту работу уже начали ученики (' + E.attempts + '). Правки увидят те, кто откроет ссылку после сохранения; ответы на удалённые задания пропадут из итогов.' : '';
   $('wkTitle').value = E.title;
   $('wkKindName').value = E.settings.kindName || '';
-  renderSettings(); renderVariants(); renderTasks(); renderLink();
+  renderSettings(); renderVariants(); renderTasks(); renderLink(); renderMem();
   $('wkSaved').textContent = E.id ? 'Сохранено' : '';
   if (!$('catList').childElementCount) renderCatalog('');
 }
@@ -744,6 +763,9 @@ function renderTasks(){
       + '<div class="ti-row"><span class="ti-name">' + esc(b.name || trainerName(b.tid)) + '</span>' + modeUi
       + '<div class="ti-btns">' + btns + '</div></div>' + note + '</div>';
     const img = el.querySelector('img'); if (img) img.src = im.url;
+    // Б5: «уже было у ученика» — точка после названия (только в сессии, по переключателю)
+    const cap = memCaption(b);
+    if (cap){ const nm = el.querySelector('.ti-name'); if (nm) nm.insertAdjacentElement('afterend', cap); }
     el.querySelectorAll('[data-m]').forEach(m => {
       m.classList.toggle('active', mode === m.dataset.m);
       m.addEventListener('click', () => { b.mode = m.dataset.m; markDirty(); renderTasks(); });
@@ -789,6 +811,7 @@ function renderLink(){
   const has = !!(v && v.code);
   $('wkLinkBox').hidden = !has;
   if (has){ const l = C.linkFor(v.code); $('wkLink').value = l; $('wkOpen').href = l; }
+  renderMem();
 }
 $('wkCopy').addEventListener('click', () => copyText($('wkLink').value));
 $('edBack').addEventListener('click', () => go('#/'));
@@ -1157,7 +1180,10 @@ async function addFromFrame(){
   coverText(1);
   batchStopped = false; $('batchStop').disabled = false; $('batchStop').hidden = want <= 1;
   $('frameCover').hidden = false;
-  let added = 0, noAnswer = 0, stopReason = null, onScreenDup = false;
+  let added = 0, noAnswer = 0, stopReason = null, onScreenDup = false, skippedSolved = 0;
+  const skipOn = skipActive();
+  // Б5: ключ ещё не снятого задания — тот же, что попадёт в блок (tkey)
+  const keyOfEl = el => { try { return trainerTaskKey(win, openTid, trainerGenInfo(win, openTid, openHref, el)); } catch (e) { return null; } };
   const fresh = [];
   // уже лежащее в работе (в т.ч. предыдущей пачкой: кадр остановился на её последнем задании)
   // второй раз не добавляем — иначе каждая следующая пачка начиналась бы с повтора
@@ -1175,6 +1201,7 @@ async function addFromFrame(){
         // ответ — до снимка, пока на странице то же задание
         const info = trainerTaskInfo(win, openTid, el);
         if (!info){ noAnswer++; continue; }
+        if (skipOn && solvedKey(keyOfEl(el))){ skippedSolved++; continue; }
         if (want > 1){
           const k = taskKeys(Object.assign({}, info), exactSnap(win, el), nodeText(el));
           if (seen.has(k)){ onScreenDup = true; continue; }
@@ -1191,7 +1218,7 @@ async function addFromFrame(){
       } finally { if (restore) restore(); }
     }
     // остальные из N — «⟳» тренажёра; снимается только основное задание, карточки «+» уже сняты
-    if ((fresh.length || onScreenDup) && want > fresh.length){
+    if ((fresh.length || onScreenDup || skippedSolved) && want > fresh.length){
       let dup = 0;
       while (fresh.length < want){
         if (batchStopped){ stopReason = 'stop'; break; }
@@ -1206,6 +1233,11 @@ async function addFromFrame(){
         try {
           const info = trainerTaskInfo(win, openTid, main.el);
           if (!info){ stopReason = 'noanswer'; break; }
+          if (skipOn && solvedKey(keyOfEl(main.el))){
+            skippedSolved++;
+            if (++dup >= BATCH_TRIES){ stopReason = 'exhausted'; break; }
+            continue;
+          }
           const text = nodeText(main.el);
           const keys = taskKeys(Object.assign({}, info), exactSnap(win, main.el), text);
           if (seen.has(keys)){
@@ -1240,11 +1272,14 @@ async function addFromFrame(){
     markDirty(); renderVariants(); renderTasks();
     const why = { exhausted: 'других заданий этого типа с такими настройками больше нет', single: 'у этого номера один прототип',
       stop: 'остановлено', noanswer: 'у следующего задания нет ответа для проверки', notask: 'тренажёр перестал показывать задание' }[stopReason];
-    if (why && added < want) toast('Добавлено ' + added + ' из ' + want + ': ' + why, 6000);
-    else toast(added === 1 ? 'Задание добавлено' + (E.variants.length > 1 ? ' во все варианты' : '') : 'Добавлено заданий: ' + added);
+    const sk = skippedSolved ? ' (пропущено решённых: ' + skippedSolved + ')' : '';
+    if (why && added < want) toast('Добавлено ' + added + ' из ' + want + ': ' + why + sk, 6000);
+    else toast((added === 1 ? 'Задание добавлено' + (E.variants.length > 1 ? ' во все варианты' : '') : 'Добавлено заданий: ' + added) + sk);
     const list = $('wkTasks'); const edge = addPos === 'start' ? list.firstElementChild : list.lastElementChild;
     if (edge && E.cur === 0) edge.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     fresh.forEach(b => uploadBlock(b).catch(() => {}));
+  } else if (skippedSolved){
+    toast('Все найденные задания уже были у ученика — новых не нашлось (снимите галочку «не решённые», чтобы взять их)', 6000);
   } else if (stopReason === 'exhausted' || stopReason === 'single'){
     toast('Новых заданий этого типа с такими настройками больше нет — все уже в работе', 6000);
   } else {
@@ -1291,7 +1326,14 @@ const gens = new Map();   // id задания → идущее создание
 function regenInto(b, recipe, compareWith){
   if (gens.has(b.id)) return gens.get(b.id);
   b._gen = 'busy';
-  const p = regenFrom(recipe).then(parts => {
+  // Б5: «не брать уже решённые» — у ЕГЭ «другое» это следующий прототип, у ОГЭ другое
+  // задание банка; решённое пробуем заменить, но не бесконечно
+  const fresh = async () => {
+    let parts = await regenFrom(recipe);
+    for (let i = 0; i < 6 && skipActive() && solvedKey(parts.tkey); i++) parts = await regenFrom(recipe);
+    return parts;
+  };
+  const p = fresh().then(parts => {
     // старая картинка ещё могла грузиться — её загрузка больше не нужна
     uploads.delete(b.id);
     const keep = { id: b.id, src: b.src, type: 'task', mode: b.mode, name: b.name };
@@ -1357,6 +1399,153 @@ async function uploadPending(){
   const left = [].concat(...E.variants.map(v => v.blocks)).filter(b => b._up);
   for (const b of left) await uploadBlock(b);
 }
+
+/* ── журнал ученика (Б5 кабинета) ──
+   Всё здесь — только у преподавателя: подписи «уже было у ученика» идут от
+   TaskCaptions (task-captions.js, Б4) и молчат вне сессии; «Выдано» пишет
+   событие hw в журнал ученика (StudentMemory.record с studentId) по каждому
+   заданию варианта — ключ берём из блока (tkey, А1) или из рецепта gen.
+   Ученик работы запоминается в works.settings.issuedTo — только id: настройки
+   работы отдаёт ученику work_open, и имя в них видел бы тот, у кого ссылка.
+   Схему работ это не меняет (settings — jsonb). Результаты работы ученика в
+   журнал здесь не пишутся: для этого нужна личная ссылка на работу. */
+const TCAP = () => (window.TaskCaptions && TaskCaptions.active()) ? window.TaskCaptions : null;
+function blockKey(b){
+  if (!b) return null;
+  if (b.tkey) return b.tkey;
+  try { return (window.TaskKey && b.gen) ? TaskKey.fromRecipe(b.gen) : null; } catch (e) { return null; }
+}
+function memCaption(b){
+  const tc = TCAP(); if (!tc) return null;
+  const k = blockKey(b);
+  return k ? tc.dot([k]) : null;
+}
+// «Не брать уже решённые»: помнится в браузере; пропускаем только задания банка ФИПИ
+// (у сгенерированных ключ — вид задания целиком, «решённым» он не бывает)
+let skipSolvedOn = false;
+try { skipSolvedOn = localStorage.getItem('works:skipSolved') === '1'; } catch (e) {}
+function skipActive(){ return skipSolvedOn && !!TCAP(); }
+function solvedKey(key){
+  if (!key || String(key).indexOf('fipi:') !== 0) return false;
+  const tc = TCAP(); if (!tc) return false;
+  const s = tc.summaryOf(key);
+  return !!(s && s.total);
+}
+function setSkipSolved(on){
+  skipSolvedOn = !!on;
+  try { localStorage.setItem('works:skipSolved', on ? '1' : '0'); } catch (e) {}
+  $('wkSkipSolved').checked = skipSolvedOn; $('addSkip').checked = skipSolvedOn;
+}
+$('wkSkipSolved').addEventListener('change', () => setSkipSolved($('wkSkipSolved').checked));
+$('addSkip').addEventListener('change', () => setSkipSolved($('addSkip').checked));
+
+const issuedNames = new Map();   // id ученика → имя (список из кабинета, грузится один раз)
+let studentsLoad = null;
+function loadStudents(){
+  if (!window.StudentMemory) return Promise.resolve([]);
+  if (!studentsLoad) studentsLoad = StudentMemory.listStudents().then(list => { list.forEach(s => issuedNames.set(s.id, s.name)); return list; })
+    .catch(() => { studentsLoad = null; return []; });
+  return studentsLoad;
+}
+function sessionStudent(){
+  try { const m = window.StudentMemory; return (m && !m.isFollower()) ? m.current() : null; } catch (e) { return null; }
+}
+// кому выдана работа: запомненный в settings, иначе ученик сессии
+function issuedTo(){
+  const id = E.settings.issuedTo ? String(E.settings.issuedTo) : null;
+  if (id){
+    const ss = sessionStudent();
+    const name = (ss && ss.id === id) ? ss.name : issuedNames.get(id);
+    return { id, name: name || '…', remembered: true };
+  }
+  const ss = sessionStudent();
+  return ss ? { id: ss.id, name: ss.name, remembered: false } : null;
+}
+function renderMem(){
+  const row = $('wkMemRow'); if (!row) return;
+  const who = issuedTo();
+  const tc = TCAP();
+  row.hidden = !(who || tc);
+  if (row.hidden) return;
+  const btn = $('wkIssued');
+  btn.hidden = !who;
+  if (who){
+    btn.textContent = 'Выдано: ' + who.name;
+    const k = (curVar().blocks || []).filter(isTask).length;
+    btn.disabled = !k;
+    if (who.remembered && who.name === '…' && window.StudentMemory) loadStudents().then(() => renderMem());
+  }
+  $('wkIssuedChange').hidden = !window.StudentMemory;
+  $('wkSkipSolved').checked = skipSolvedOn;
+  $('wkSkipSolved').closest('label').hidden = !tc;
+  const tg = $('wkCapToggle');
+  if (tc && !tg.firstChild && tc.mountToggle) tc.mountToggle(tg);
+  tg.hidden = !tc;
+}
+$('wkIssued').addEventListener('click', () => {
+  const who = issuedTo(); if (!who || !window.StudentMemory) return;
+  const blocks = (curVar().blocks || []).filter(isTask);
+  let ok = 0, dup = 0, none = 0;
+  blocks.forEach(b => {
+    const k = blockKey(b);
+    if (!k){ none++; return; }
+    const r = StudentMemory.record(k, 'hw', { source: 'work', srcRef: E.id || '', studentId: who.id });
+    if (r.ok) ok++; else if (r.reason === 'throttled') dup++; else none++;
+  });
+  // запомнить ученика у работы — он не пропадёт после перезагрузки
+  if (!E.settings.issuedTo || E.settings.issuedTo !== who.id){ E.settings.issuedTo = who.id; markDirty(); }
+  issuedNames.set(who.id, who.name);
+  renderTasks();   // точки подписей: у только что выданных появилось «В ДЗ»
+  $('wkIssuedNote').textContent = 'Записано в журнал «' + who.name + '»: ' + ok + ' из ' + blocks.length
+    + (dup ? ' · уже записано недавно: ' + dup : '') + (none ? ' · без ключа (не записано): ' + none : '') + '. Не забудьте сохранить работу, чтобы ученик запомнился.';
+  renderMem();
+});
+$('wkIssuedChange').addEventListener('click', async () => {
+  const sel = $('wkIssuedPick');
+  if (!sel.hidden){ sel.hidden = true; return; }
+  const list = await loadStudents();
+  if (!list.length){ toast('Учеников в кабинете нет или нет связи с сервером'); return; }
+  sel.innerHTML = '<option value="">— выберите ученика —</option>' + list.map(s => '<option value="' + esc(s.id) + '">' + esc(s.name) + '</option>').join('');
+  sel.value = E.settings.issuedTo || '';
+  sel.hidden = false;
+});
+$('wkIssuedPick').addEventListener('change', () => {
+  const id = $('wkIssuedPick').value; if (!id) return;
+  E.settings.issuedTo = id; markDirty();
+  $('wkIssuedPick').hidden = true; $('wkIssuedNote').textContent = '';
+  renderMem();
+});
+
+// в панели добавления: галочка и точка у задания, которое сейчас в кадре
+function frameTaskKey(){
+  try {
+    const win = $('trFrame').contentWindow;
+    if (!win || !openTid || !window.TaskKey) return null;
+    const fake = { id: 'x', className: 'x', innerHTML: '', classList: { contains: () => false }, closest: () => null };
+    return trainerTaskKey(win, openTid, trainerGenInfo(win, openTid, openHref || 'x', fake));
+  } catch (e) { return null; }
+}
+let addCapKey = '\u0000';
+function renderAddCap(force){
+  const tc = TCAP();
+  $('addSkipBox').hidden = !tc;
+  if (!tc){ if (addCapKey !== '') { $('addCap').textContent = ''; addCapKey = ''; } return; }
+  $('addSkip').checked = skipSolvedOn;
+  const k = $('frameActions').hidden ? null : frameTaskKey();
+  const sig = (k || '') + '|' + tc.mode();
+  if (!force && sig === addCapKey) return;
+  addCapKey = sig;
+  $('addCap').textContent = '';
+  const d = k ? tc.dot([k]) : null;
+  if (d) $('addCap').appendChild(d);
+}
+setInterval(() => { if (!$('scrEdit').hidden) renderAddCap(false); }, 1200);
+// student-memory.js и task-captions.js подключены внизу страницы, после этого скрипта
+window.addEventListener('load', () => {
+  if (window.TaskCaptions) TaskCaptions.onChange(() => { renderAddCap(true); renderMem(); if (!$('scrEdit').hidden) renderTasks(); });
+  if (window.StudentMemory) StudentMemory.onChange(() => { renderMem(); });
+  if (!$('scrEdit').hidden){ renderMem(); renderTasks(); }
+});
 
 /* ── результаты ── */
 let RS = { id: null, work: null, rows: [] };
@@ -1722,5 +1911,6 @@ boot();
 })();
 </script>
 <script src="student-memory.js"></script>
+<script src="task-captions.js"></script>
 </body>
 </html>
