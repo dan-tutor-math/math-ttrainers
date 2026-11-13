@@ -333,6 +333,9 @@
       '<div class="hint">Прогул по умолчанию — как перенос: не оплачивается. На занятии это можно сменить.</div>' +
       '<div class="seg" id="psSkip"><button type="button" data-v="free" class="' + (ps.skipRule === 'free' ? 'on' : '') + '">Прогул не оплачивается</button>' +
         '<button type="button" data-v="charge" class="' + (ps.skipRule === 'charge' ? 'on' : '') + '">Прогул оплачивается</button></div>' +
+      '<div class="hint" style="margin-top:10px">Занятия вне абонемента (до первой оплаты, после «абонемент истёк») и у ученика без оплат. Как в старом приложении — не долг.</div>' +
+      '<div class="seg" id="psOutside"><button type="button" data-v="free" class="' + (ps.outside !== 'debt' ? 'on' : '') + '">Не считать долгом</button>' +
+        '<button type="button" data-v="debt" class="' + (ps.outside === 'debt' ? 'on' : '') + '">Считать долгом</button></div>' +
       '<div class="pay-fgrid" style="margin-top:10px">' +
         '<label><span class="label">Причина пропуска по умолчанию</span><input class="field" id="psReason" maxlength="60" list="psReasons" value="' + esc(ps.reason) + '">' +
           '<datalist id="psReasons">' + P().REASONS.map(r => '<option value="' + esc(r) + '">').join('') + '</datalist></label>' +
@@ -357,6 +360,7 @@
       const b = e.target.closest('button');
       if (!b) return;
       if (b.closest('#psSkip')) { setPay({ skipRule: b.dataset.v }); box.innerHTML = settingsHtml(); }
+      else if (b.closest('#psOutside')) { setPay({ outside: b.dataset.v }); box.innerHTML = settingsHtml(); }
       else if (b.dataset.tpl) { const t = P().FLAG_TEMPLATES.find(x => x.id === b.dataset.tpl); setPay({ flags: flags().concat([Object.assign({}, t)]) }); box.innerHTML = settingsHtml(); }
       else if (b.id === 'psNewFlag') {
         setPay({ flags: flags().concat([{ id: 'f' + Date.now().toString(36), name: 'новый флаг', free: false }]) });

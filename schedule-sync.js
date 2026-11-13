@@ -16,12 +16,30 @@
      t:<id>       — шаблон недели целиком;
      p:<id>       — устойчивая пара / группа кабинета (в старом — поле pairs,
                     старое приложение его только хранит);
-     a            — активный шаблон.
+     a            — активный шаблон;
+     $:<id>       — оплата (В4(в)): id оплаты старого = payments.ext_id;
+     x:ГГГГ-ММ-ДД — ручной итог дня (day_totals ↔ total дня старого; нет строки /
+                    total: null — доход дня считается из отметок), только окно;
+     r:<имя>      — ставки ученика (price + rates старого ↔ student_rates) и
+                    «как платит» (students.pay_mode ↔ payMode у ученика старого).
    Менял только кабинет — берём кабинет, только старое — старое, оба — спрашиваем
-   (показываем оба варианта). Оплаты и статистика НЕ синхронизируются — придут
-   с В4: их разделы (payments, incomeGroups, rates у учеников) остаются в старом
-   как есть — PUT берёт присланное состояние целиком и меняет только свои разделы.
-   Место под них — RAW_KEYS_LATER ниже.
+   (показываем оба варианта). Удаление оплаты в одном месте — тоже вопрос:
+   деньги молча не пропадают. Группы дохода (incomeGroups) не сводятся — остаются в старом как есть: PUT берёт присланное
+   состояние целиком и меняет только свои разделы.
+
+   Оплаты (claude-notes/payments-audit.md, раздел 3 «… синхронизация (В5)»):
+   старое хранит абонемент с вычисляемыми полями (closed auto, closedFor,
+   remind, keepOpen) — они не сводятся, обе стороны считают их сами по одним
+   правилам (payments.js, шапка). Ручной конец «Абонемент истёк» (closedBy =
+   manual) = end_on. Перенос перебора carry/carryTo = правка adjust: в разделе
+   хранится итоговая правка j = adj − унесённое + принесённое, а при записи в
+   старое adj подбирается так, чтобы с его carry вышло то же j. Разовые оплаты
+   кабинета («оплатил» у занятия, деньги в счёт занятий) в старое не уходят: там
+   любая оплата — абонемент, и она закрыла бы прошлый.
+   Флаги преподавателя в скобках у имени («Маша (пробное)») ↔ lesson_students.flags
+   по названию флага (третий элемент участника в разделе дня — только если флаги
+   есть, чтобы база, сохранённая до В4(в), не поменялась). Незнакомые скобки
+   («(онлайн)») — пометка старого, при записи сохраняются.
 
    Сравниваем не сырые строки старого, а их смысл (rowNorm): время в минутах,
    длительность, формат, имена и статусы. Поэтому цвет полупараллелки, пометки
@@ -49,11 +67,17 @@
   const GROUP_FORMATS = ['pair', 'group', 'semi'];
   const ST = ['plan', 'done', 'skip', 'move'];
   const DEF_DUR = 60;                   // в старом строка без dur — час
-  // eslint-disable-next-line no-unused-vars
-  const RAW_KEYS_LATER = ['payments', 'incomeGroups'];   // В4: оплаты и доход — пока не трогаем
   const LCOLS = 'id, day, start_min, dur_min, format, is_event, title, group_id, ext_id';
   const PCOLS = 'id, lesson_id, student_id, guest_name, status, pos';
   const SCOLS = 'id, name, ext_name, archived_at';
+  const PAYCOLS = 'id, student_id, guest_name, kind, paid_on, amount, lessons, burn, start_on, end_on, adjust, lesson_student_id, payer, archived_at, ext_id';
+  const RATECOLS = 'id, student_id, valid_from, price, per_week, monthly';
+  const FIRST_RATE = '2000-01-01';      // «с самого начала»: у первой ставки старого нет даты
+  const CLOSE_KEYS = ['closed', 'closedBy', 'closedFor', 'carry', 'carryTo', 'overOk'];   // как в старом
+  // денежные разделы: импортируются вместе, с предпросмотром оплат
+  const PAYK = k => k.startsWith('$:') || k.startsWith('r:') || k.startsWith('x:');
+  // флаги преподавателя текущего прохода: id ↔ название (teacher_settings.pay.flags)
+  let FL = { byId: {}, byName: {}, list: [] };
 
   /* ── мелочи ── */
   const pad = n => (n < 10 ? '0' : '') + n;
@@ -92,13 +116,24 @@
   // строка с занятием или событием; пустая строка — окно «развернуть все часы»
   const isLessonRow = r => !!r && (!!r.ev || splitNames(r.names).some(x => stName(x)));
 
+  // скобки у имени: известные флаги преподавателя и прочие пометки старого
+  const parens = raw => (String(raw || '').match(/\([^)]*\)/g) || []).map(x => x.slice(1, -1).trim());
+  const flagNames = names => Array.from(new Set(names.filter(Boolean))).sort();
+  const flagsOfRaw = raw => flagNames(parens(raw).map(t => FL.byId[FL.byName[norm(t)]]));
+  function withFlags(raw, n, fl){
+    const keep = parens(raw).filter(t => !FL.byName[norm(t)]);
+    return [n].concat(keep.map(t => '(' + t + ')'), fl.map(f => '(' + f + ')')).join(' ');
+  }
+  // участник раздела дня: [имя, статус] или [имя, статус, [флаги]]
+  function part(n, st, fl){ const e = [n, st]; if (fl && fl.length) e.push(fl); return e; }
+
   // смысл строки: из него и в него переводится занятие кабинета
   function rowNorm(r, withSt){
     const ev = !!r.ev, seen = {}, names = [];
-    if (!ev) splitNames(r.names).forEach(x => { const n = stName(x); if (n && !seen[norm(n)]) { seen[norm(n)] = 1; names.push(n); } });
+    if (!ev) splitNames(r.names).forEach(x => { const n = stName(x); if (n && !seen[norm(n)]) { seen[norm(n)] = 1; names.push([n, x]); } });
     const f = ev ? 'single' : r.stg ? 'semi' : FORMATS.indexOf(r.fmt) >= 0 ? r.fmt : defFmt(names.length);
     return { id: r.id || null, t: timeMin(r.time), d: durOf(r.dur), f, ev, ti: ev ? String(r.names || '').trim() : '',
-      p: names.map(n => [n, withSt ? stOfName(r, n) : 'plan']), g: r.grp || null };
+      p: names.map(([n, x]) => (withSt ? part(n, stOfName(r, n), flagsOfRaw(x)) : [n, 'plan'])), g: r.grp || null };
   }
   const sameLesson = (b, n) => b.t === n.t && !!b.ev === !!n.ev && eq(b.p.map(x => norm(x[0])), n.p.map(x => norm(x[0])));
 
@@ -141,11 +176,17 @@
       return o;
     }
     delete o.ev;
-    const prevRaw = prev && !prev.ev ? splitNames(prev.names) : [];
+    const prevRaw = prev && !prev.ev ? splitNames(prev.names).filter(x => stName(x)) : [];
     const want = l.p.map(x => x[0]);
-    if (!eq(prevRaw.map(stName).filter(Boolean), want)) {
-      o.names = want.map(n => prevRaw.find(raw => stName(raw) === n) || n).join(', ');
-    }
+    // имя уходит как было, пока его флаги не менялись; иначе — имя, чужие
+    // пометки в скобках и флаги из кабинета
+    const wantRaw = l.p.map(x => {
+      const raw = prevRaw.find(r0 => stName(r0) === x[0]);
+      if (!withSt) return raw || x[0];
+      const fl = x[2] || [];
+      return raw && eq(flagsOfRaw(raw), fl) ? raw : withFlags(raw || x[0], x[0], fl);
+    });
+    if (!eq(prevRaw, wantRaw)) o.names = wantRaw.join(', ');
     if (withSt) {
       const sts = l.p.map(x => x[1]);
       if (!eq(want.map(n => stOfName(o, n)), sts)) {
@@ -219,13 +260,93 @@
       if (k.startsWith('d:')) v.forEach(l => fixP(l.p));
       else if (k.startsWith('t:')) v.days.forEach(ls => ls.forEach(l => fixP(l.p)));
       else if (k.startsWith('p:')) v.m = v.m.map(m => (norm(m) === f ? to : m));
+      else if (k.startsWith('$:') && v && norm(v.s) === f) v.s = to;
     });
     if (U['s:' + f]) { const v = U['s:' + f]; delete U['s:' + f]; v.n = to; U['s:' + norm(to)] = v; }
+    if (U['r:' + f]) { U['r:' + norm(to)] = U['r:' + f]; delete U['r:' + f]; }
+  }
+
+  /* ══ деньги: оплаты и ставки в смысле раздела ══ */
+  // число из поля старого: там строки («1500», «1 500», «»); пусто — null
+  function num(v){
+    if (v == null) return null;
+    const s = String(v).replace(/[\s ]/g, '').replace(',', '.');
+    if (!s) return null;
+    const n = Number(s);
+    return isFinite(n) ? n : null;
+  }
+  const isDay = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
+  const clamp = (n, a, b) => Math.max(a, Math.min(b, n));
+  // оплата: l = null — разовая (деньги), иначе абонемент на l занятий
+  function payUnit(o){
+    const l = num(o.l) >= 1 ? clamp(Math.round(num(o.l)), 1, 500) : null;
+    const e = l && isDay(o.e) ? o.e : null;
+    return { s: String(o.s || '').trim(), pa: String(o.pa || '').trim(), d: o.d, a: Math.max(0, Math.round((num(o.a) || 0) * 100) / 100), l,
+      st: l && isDay(o.st) ? o.st : null, e, b: e && o.b === 'date' ? 'date' : null,
+      j: l ? clamp(Math.round(num(o.j) || 0), -500, 500) : 0, ar: o.ar ? (isDay(o.ar) ? o.ar : FIRST_RATE) : null };
+  }
+  // перенос перебора старого (carry/carryTo) — как carryOut/carryIn в index.ts,
+  // только без «не больше перебора»: перебор считается по расписанию, а
+  // переносят его ровно таким, каким он был в момент переноса
+  function carryOutS(p, list){
+    if (!p.closed || !p.carryTo) return 0;
+    const t = list.find(x => x && x.id === p.carryTo);
+    if (!t || norm(t.student) !== norm(p.student) || !t.date || t.date <= p.date) return 0;
+    return Math.max(0, num(p.carry) || 0);
+  }
+  const carryInS = (p, list) => list.reduce((n, q) => n + (q && q !== p && p.id && q.carryTo === p.id && norm(q.student) === norm(p.student) ? carryOutS(q, list) : 0), 0);
+  function oldPayUnit(p, list){
+    return payUnit({ s: p.student, pa: p.parent, d: p.date, a: p.amount, l: p.lessons, st: p.start,
+      e: p.closed && p.closedBy === 'manual' ? p.closed : null, b: p.burn,
+      j: (num(p.adj) || 0) - carryOutS(p, list) + carryInS(p, list), ar: p.arch });
+  }
+  // ставки: v = [[с какого дня | null — «с самого начала», цена], …] по возрастанию;
+  // соседние одинаковые цены склеены, как tidyRates в старом
+  function tidyV(v){
+    const out = [];
+    v.forEach(x => { const last = out[out.length - 1]; if (last && (last[1] === x[1] || last[0] === x[0])) { if (last[0] === x[0]) last[1] = x[1]; return; } out.push([x[0], x[1]]); });
+    return out;
+  }
+  function rateUnit(v, w, m, pm){
+    v = tidyV(v);
+    if (!v.length && !pm) return undefined;
+    return { v, w: v.length && w > 0 ? w : null, m: v.length && m > 0 ? m : null, pm: pm || null };
+  }
+  const modeOk = x => (x === 'pack' || x === 'lesson' ? x : null);
+  function oldRateUnit(s){
+    const hist = (s.rates || []).filter(r => r && isDay(r.until)).sort((a, b) => (a.until < b.until ? -1 : 1));
+    const cur = num(s.price);
+    const v = [];
+    if (hist.length || cur != null) {
+      let from = null;
+      hist.forEach(r => { v.push([from, num(r.price) || 0]); from = r.until; });
+      v.push([from, cur || 0]);
+    }
+    return rateUnit(v, num(s.per), num(s.monthly), modeOk(s.payMode));
   }
 
   /* ══ состояние старого приложения → разделы ══ */
-  function remoteUnits(data, from, base, mark){
+  function remoteUnits(data, from, base, mark, pay){
     const U = {};
+    if (pay) {
+      ((data && data.students) || []).forEach(s => {
+        const n = String((s && s.name) || '').trim();
+        const u = n && oldRateUnit(s);
+        if (u) U['r:' + norm(n)] = u;
+      });
+      Object.keys((data && data.schedule) || {}).forEach(d => {
+        const t = data.schedule[d] && data.schedule[d].total;
+        if (d >= from && isDay(d) && t != null && t !== '' && num(t) != null) U['x:' + d] = Math.max(0, Math.round(num(t) * 100) / 100);
+      });
+      // оплата без ученика или даты — недописанная строка таблицы старого, её не сводим
+      const list = (data && data.payments) || [], seen = {};
+      list.forEach(p => {
+        if (!p || !String(p.student || '').trim() || !isDay(p.date)) return;
+        if (!p.id || seen[p.id]) { p.id = rid('p'); mark(); }
+        seen[p.id] = 1;
+        U['$:' + p.id] = oldPayUnit(p, list);
+      });
+    }
     const sch = (data && data.schedule) || {};
     Object.keys(sch).forEach(day => {
       if (day < from || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
@@ -261,10 +382,52 @@
     for (let i = 0; i < ids.length; i += 100) out = out.concat(await run(need().from(table).select(cols).in(key, ids.slice(i, i + 100))) || []);
     return out;
   }
+  async function pageAll(make){
+    let out = [];
+    for (let a = 0; ; a += 1000) {
+      const part = await run(make().range(a, a + 999)) || [];
+      out = out.concat(part);
+      if (part.length < 1000) return out;
+    }
+  }
+  const missing = e => !!(window.Payments && window.Payments.missing(e));
+  // оплаты, ставки, способ оплаты и флаги. Файл cabinet-payments.sql не
+  // выполнен — таблиц нет: тогда денежные разделы не сводятся вовсе (payOn)
+  async function loadPay(c){
+    try {
+      const pays = await pageAll(() => c.from('payments').select(PAYCOLS).order('paid_on', { ascending: true }));
+      const rates = await pageAll(() => c.from('student_rates').select(RATECOLS).order('valid_from', { ascending: true }));
+      const modes = await pageAll(() => c.from('students').select('id, pay_mode').order('id', { ascending: true }));
+      const ratesBy = {}, modeBy = {};
+      rates.forEach(r => { (ratesBy[r.student_id] = ratesBy[r.student_id] || []).push(r); });
+      modes.forEach(m => { modeBy[m.id] = modeOk(m.pay_mode); });
+      let settings = null;
+      try { settings = await C.getSettings(); } catch (e) { settings = null; }
+      // ручной итог дня — таблица В4(б) (cabinet-stats.sql); нет таблицы — не сводим
+      let totals = null;
+      try { totals = await pageAll(() => c.from('day_totals').select('id, day, amount').order('day', { ascending: true })); }
+      catch (e) { if (!missing(e)) throw e; }
+      return { pays, ratesBy, modeBy, settings: settings || {}, totals };
+    } catch (e) {
+      if (missing(e)) return null;
+      throw e;
+    }
+  }
+  function setFlags(settings){
+    FL = { byId: {}, byName: {}, list: [] };
+    const fl = (settings && settings.pay && Array.isArray(settings.pay.flags)) ? settings.pay.flags : [];
+    fl.forEach(f => {
+      const n = String((f && f.name) || '').trim();
+      if (!f || !f.id || !n || FL.byName[norm(n)]) return;
+      FL.byId[f.id] = n; FL.byName[norm(n)] = f.id; FL.list.push({ name: n, free: !!f.free });
+    });
+  }
   async function loadCab(from){
     const c = need();
     const students = await run(c.from('students').select(SCOLS)) || [];
     students.forEach(s => { s._orig = { name: s.name, ext_name: s.ext_name || null, archived_at: s.archived_at || null }; });
+    const pay = await loadPay(c);
+    setFlags(pay && pay.settings);
     // PostgREST отдаёт не больше 1000 строк за раз — листаем
     let lessons = [];
     for (let a = 0; ; a += 1000) {
@@ -272,7 +435,7 @@
       lessons = lessons.concat(part);
       if (part.length < 1000) break;
     }
-    const ppl = await peopleOf('lesson_students', 'lesson_id', lessons.map(l => l.id), PCOLS);
+    const ppl = await peopleOf('lesson_students', 'lesson_id', lessons.map(l => l.id), PCOLS + (pay ? ', flags' : ''));
     const pBy = {};
     ppl.forEach(p => { (pBy[p.lesson_id] = pBy[p.lesson_id] || []).push(p); });
     lessons.forEach(l => { l.people = (pBy[l.id] || []).sort((a, b) => a.pos - b.pos); });
@@ -285,7 +448,7 @@
     slots.forEach(s => { s.people = sp.filter(p => p.slot_id === s.id).sort((a, b) => a.pos - b.pos); });
     tpls.forEach(t => { t.slots = slots.filter(s => s.template_id === t.id); });
     const sync = await run(c.from('ext_sync').select('rev, base, synced_at').eq('source', SOURCE).maybeSingle());
-    const cab = { students, lessons, groups, tpls, sync, newExt: [] };
+    const cab = { students, lessons, groups, tpls, sync, newExt: [], pay, payOn: !!pay };
     reindex(cab);
     return cab;
   }
@@ -305,7 +468,7 @@
     if (!obj.ext_id) { obj.ext_id = rid(prefix); cab.newExt.push({ table, id: obj.id, ext_id: obj.ext_id }); }
     return obj.ext_id;
   }
-  function cabUnits(cab, from, base){
+  function cabUnits(cab, from, base, pay){
     const U = {};
     const gExt = {};
     cab.groups.forEach(g => { if (!g.archived_at) gExt[g.id] = ensureExt(cab, g, 'student_groups', 'g'); });
@@ -313,7 +476,8 @@
     const toN = (l, withSt) => ({
       id: l.ext_id, t: l.start_min == null ? null : l.start_min, d: durOf(l.dur_min), f: l.is_event ? 'single' : (FORMATS.indexOf(l.format) >= 0 ? l.format : 'single'),
       ev: !!l.is_event, ti: l.is_event ? String(l.title || '').trim() : '',
-      p: l.is_event ? [] : (l.people || []).map(p => [pName(p), withSt ? (ST.indexOf(p.status) >= 0 ? p.status : 'plan') : 'plan']).filter(x => x[0]),
+      p: l.is_event ? [] : (l.people || []).map(p => (withSt ? part(pName(p), ST.indexOf(p.status) >= 0 ? p.status : 'plan', flagNames((p.flags || []).map(id => FL.byId[id])))
+        : [pName(p), 'plan'])).filter(x => x[0]),
       g: (l.group_id && gExt[l.group_id]) || null,
     });
     cab.lessons.forEach(l => {
@@ -344,7 +508,40 @@
       if (g.archived_at) return;
       U['p:' + g.ext_id] = { n: String(g.name || ''), f: g.format, d: g.dur_min || null, m: g.members.map(id => (cab.byId[id] || {}).name).filter(Boolean) };
     });
+    if (pay) payUnits(cab, U, base, from);
     return U;
+  }
+  const localDay = ts => ymd(new Date(ts));
+  function cabRateUnit(cab, s, b){
+    const rows = (cab.pay.ratesBy[s.id] || []).slice().sort((x, y) => (x.valid_from < y.valid_from ? -1 : 1));
+    const pm = cab.pay.modeBy[s.id] || null;
+    // ставок в кабинете нет — старое не стираем: ученика могли только что
+    // завести, а «удалить все ставки» — не способ сказать «цены нет»
+    if (!rows.length) return b ? rateUnit(b.v, b.w, b.m, pm) : rateUnit([], null, null, pm);
+    // «раз в неделю» и ручное «в месяц» — у последней ставки (как в В4(б))
+    const lr = rows[rows.length - 1], n = v => (v == null ? null : Number(v));
+    return rateUnit(rows.map((r, i) => [i ? r.valid_from : null, Number(r.price)]), n(lr.per_week), n(lr.monthly), pm);
+  }
+  function payUnits(cab, U, base, from){
+    if (cab.pay.totals) cab.pay.totals.forEach(t => { if (t.day >= from) U['x:' + t.day] = Number(t.amount); });
+    else Object.keys(base).forEach(k => { if (k.startsWith('x:')) U[k] = base[k]; });
+    cab.students.forEach(s => {
+      const k = 'r:' + norm(s.name);
+      if (!U['s:' + norm(s.name)]) return;
+      const u = cabRateUnit(cab, s, base[k]);
+      if (u) U[k] = u;
+    });
+    // ученики старого, которых нет в кабинете, — их ставки как в базе
+    Object.keys(base).forEach(k => { if (k.startsWith('r:') && !(k in U) && !cab.students.some(s => norm(s.name) === k.slice(2))) U[k] = copy(base[k]); });
+    cab.pay.pays.forEach(x => {
+      // разовые кабинета в старое не уходят (шапка файла); из старого — только с ext_id
+      if (x.kind === 'single' && (!x.ext_id || x.lesson_student_id)) return;
+      const name = x.student_id ? (cab.byId[x.student_id] || {}).name : x.guest_name;
+      if (!name || !isDay(x.paid_on)) return;
+      const ext = ensureExt(cab, x, 'payments', 'p');
+      U['$:' + ext] = payUnit({ s: name, pa: x.payer, d: x.paid_on, a: x.amount, l: x.kind === 'pack' ? x.lessons : null, st: x.start_on, e: x.end_on,
+        b: x.burn, j: x.adjust, ar: x.archived_at ? localDay(x.archived_at) : null });
+    });
   }
 
   /* ══ сведение ══ */
@@ -365,10 +562,22 @@
   /* ══ запись в старое ══ */
   function applyToRaw(raw, M, RN){
     raw.schedule = raw.schedule || {};
-    const changed = keysOf(M, RN).filter(k => !eq(M[k], RN[k]));
+    // ученики раньше ставок и оплат: новому ученику ставку некуда записать
+    const ORD = k => (k.startsWith('s:') ? 0 : k.startsWith('r:') ? 1 : k.startsWith('$:') ? 2 : k.startsWith('x:') ? 4 : 3);
+    const changed = keysOf(M, RN).filter(k => !eq(M[k], RN[k])).sort((a, b) => ORD(a) - ORD(b));
+    const touched = {};
     changed.forEach(k => {
       const m = M[k];
-      if (k.startsWith('d:')) {
+      if (k.startsWith('r:')) rateToRaw(raw, k.slice(2), m);
+      else if (k.startsWith('$:')) payToRaw(raw, k.slice(2), m, touched);
+      else if (k.startsWith('x:')) {
+        // после дней: день без занятий и без итога старое не хранит
+        const day = k.slice(2), rec = raw.schedule[day];
+        if (m == null) { if (rec) { rec.total = null; if (!(rec.rows || []).length) delete raw.schedule[day]; } }
+        else if (!rec) raw.schedule[day] = { rows: [], total: m };
+        else if (num(rec.total) !== m || rec.total === '') rec.total = m;
+      }
+      else if (k.startsWith('d:')) {
         const day = k.slice(2), rec = raw.schedule[day];
         const rows = buildRows(m || [], rec && rec.rows, true);
         if (!rows.length && !(rec && rec.total != null)) delete raw.schedule[day];
@@ -398,7 +607,79 @@
       raw.pairs = Object.keys(M).filter(k => k.startsWith('p:')).map(k => ({ id: k.slice(2), name: M[k].n, fmt: M[k].f, dur: M[k].d, members: M[k].m.slice() }))
         .sort((a, b) => (order.indexOf(a.id) + 1 || 1e9) - (order.indexOf(b.id) + 1 || 1e9));
     }
+    if (Object.keys(touched).length) tidyPays(raw.payments, touched);
+    // правка adj — последней: она зависит от переносов, которые tidyPays мог снять
+    const list = raw.payments || [];
+    Object.keys(M).filter(k => k.startsWith('$:')).forEach(k => {
+      const p = list.find(x => x && x.id === k.slice(2));
+      if (!p) return;
+      const want = M[k].j + carryOutS(p, list) - carryInS(p, list);
+      if ((num(p.adj) || 0) !== want) { if (want) p.adj = want; else delete p.adj; }
+    });
     return raw;
+  }
+  function rateToRaw(raw, key, m){
+    const s = (raw.students || []).find(x => x && norm(x.name) === key);
+    if (!s) return;
+    if (!m || !m.v.length) { s.price = ''; delete s.rates; }
+    else {
+      const last = m.v[m.v.length - 1];
+      if (num(s.price) !== last[1]) s.price = String(last[1]);
+      const hist = m.v.slice(0, -1).map((x, i) => ({ until: m.v[i + 1][0], price: String(x[1]) }));
+      if (hist.length) s.rates = hist; else delete s.rates;
+      // «раз в неделю» старому нужен всегда — пустое из кабинета его не стирает;
+      // «в месяц» пустое = считать само (null), как в старом
+      if (m.w != null && num(s.per) !== m.w) s.per = String(m.w);
+      if (num(s.monthly) !== m.m) s.monthly = m.m;
+    }
+    // «как платит»: старое поле только хранит
+    if (m && m.pm) s.payMode = m.pm; else delete s.payMode;
+  }
+  function payToRaw(raw, id, m, touched){
+    const list = raw.payments = raw.payments || [];
+    const i = list.findIndex(p => p && p.id === id);
+    if (i >= 0) touched[norm(list[i].student)] = 1;
+    if (!m) { if (i >= 0) list.splice(i, 1); return; }
+    let p = i >= 0 ? list[i] : null;
+    // новая — как «+ оплата» старого: в начало таблицы
+    if (!p) { p = { id, student: m.s, parent: '', date: m.d, amount: '', lessons: '', remind: '', done: false }; list.unshift(p); }
+    p.student = m.s; p.parent = m.pa; p.date = m.d;
+    if (num(p.amount) !== m.a) p.amount = String(m.a);
+    const l = num(p.lessons) >= 1 ? Math.round(num(p.lessons)) : null;
+    if (l !== m.l) p.lessons = m.l ? String(m.l) : '';
+    if (m.st) p.start = m.st; else delete p.start;
+    const manual = !!(p.closed && p.closedBy === 'manual');
+    if (m.e) {
+      if (!(manual && p.closed === m.e)) { CLOSE_KEYS.forEach(f => delete p[f]); delete p.keepOpen; p.closed = m.e; p.closedBy = 'manual'; }
+    } else if (manual) CLOSE_KEYS.forEach(f => delete p[f]);
+    if (m.b) p.burn = m.b; else delete p.burn;
+    if (m.ar) p.arch = m.ar; else delete p.arch;
+    touched[norm(m.s)] = 1;
+  }
+  // как syncPays старого: у ученика действует один абонемент — все, кроме
+  // самого нового, закрыты «автоматически». Точный день закрытия старое
+  // поправит само (redatePays при открытии оплат); здесь — накануне начала
+  // следующей. Без этого прошлый абонемент считал бы и занятия нового
+  function tidyPays(list, names){
+    Object.keys(names).forEach(nk => {
+      const ps = list.filter(q => q && isDay(q.date) && norm(q.student) === nk).sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+      ps.forEach(q => {
+        const n = ps.find(x => x.date > q.date) || null;
+        if (q.closed && q.closedBy === 'auto') {
+          if (!n) CLOSE_KEYS.forEach(f => delete q[f]);
+          else if (q.closedFor !== n.id) { q.closedFor = n.id; q.closed = addDays(n.start || n.date, -1); }
+        } else if (!q.closed && n && q.keepOpen !== n.id) {
+          q.closed = addDays(n.start || n.date, -1); q.closedBy = 'auto'; q.closedFor = n.id;
+        }
+      });
+    });
+    // перенос «в никуда» старое превращает обратно в долг; итог правки
+    // сохранит проход по adj в applyToRaw
+    list.forEach(q => {
+      if (!q || !q.carryTo) return;
+      const t = list.find(x => x && x.id === q.carryTo);
+      if (!q.closed || !t || norm(t.student) !== norm(q.student) || !t.date || t.date <= q.date) { delete q.carry; delete q.carryTo; }
+    });
   }
 
   /* ══ запись в кабинет ══ */
@@ -426,15 +707,20 @@
       } else if (!m && s && s.ext_name && !s.archived_at) s.archived_at = new Date().toISOString();
     });
     find = res();
-    const person = (name, status, pos) => {
+    const person = (name, status, pos, fl) => {
       const s = find(name);
-      return s ? { student_id: s.id, guest_name: null, status, pos } : { student_id: null, guest_name: name.slice(0, 80), status, pos };
+      const o = s ? { student_id: s.id, guest_name: null, status, pos } : { student_id: null, guest_name: name.slice(0, 80), status, pos };
+      if (cab.payOn) o.flags = (fl || []).map(n => FL.byName[norm(n)]).filter(Boolean);
+      return o;
     };
     const want = list => {
       const seen = {}, out = [];
-      list.forEach((x, i) => { const p = person(x[0], x[1], i); const key = p.student_id ? 's' + p.student_id : 'g' + norm(p.guest_name); if (!seen[key]) { seen[key] = 1; out.push(p); } });
+      list.forEach((x, i) => { const p = person(x[0], x[1], i, x[2]); const key = p.student_id ? 's' + p.student_id : 'g' + norm(p.guest_name); if (!seen[key]) { seen[key] = 1; out.push(p); } });
       return out;
     };
+    // флаги участника: известные — как в разделе, неизвестные id (флаг удалён
+    // из настроек) не трогаем
+    const flagsFor = (have, wantIds) => (have || []).filter(id => !FL.byId[id]).concat(wantIds);
     const pkey = p => (p.student_id ? 's' + p.student_id : 'g' + norm(p.guest_name));
 
     // пары и группы — до дней: занятие ссылается на пару
@@ -530,8 +816,12 @@
         for (const p of L.people) if (!wk[pkey(p)]) await run(c.from('lesson_students').delete().eq('id', p.id));
         for (const p of ppl) {
           const e = have[pkey(p)];
-          if (!e) await run(c.from('lesson_students').insert(Object.assign({ lesson_id: L.id }, p)));
-          else if (e.status !== p.status || e.pos !== p.pos) await run(c.from('lesson_students').update({ status: p.status, pos: p.pos }).eq('id', e.id));
+          if (!e) { await run(c.from('lesson_students').insert(Object.assign({ lesson_id: L.id }, p))); continue; }
+          const up = {};
+          if (e.status !== p.status) up.status = p.status;
+          if (e.pos !== p.pos) up.pos = p.pos;
+          if (cab.payOn) { const nf = flagsFor(e.flags, p.flags); if (!eq(nf.slice().sort(), (e.flags || []).slice().sort())) up.flags = nf; }
+          if (Object.keys(up).length) await run(c.from('lesson_students').update(up).eq('id', e.id));
         }
       }
     }
@@ -550,7 +840,79 @@
       part.forEach(x => { const lid = idBy[x.f.ext_id]; if (lid) x.people.forEach(p => ppl.push(Object.assign({ lesson_id: lid }, p))); });
       for (let j = 0; j < ppl.length; j += 500) await run(c.from('lesson_students').insert(ppl.slice(j, j + 500)));
     }
+    if (cab.payOn && await payToCab(cab, M, K, find, diff)) { changed = true; cab.payChanged = true; }
     return changed;
+  }
+
+  // ставки, «как платит» и оплаты — после учеников (новых заводим выше)
+  async function payToCab(cab, M, K, find, diff){
+    const c = need();
+    let changed = false;
+    for (const k of keysOf(M, K).filter(k => k.startsWith('r:') && !eq(M[k], K[k]))) {
+      const m = M[k], s = find(k.slice(2));
+      if (!s || !m) continue;              // ученика нет в кабинете — ставку негде хранить
+      changed = true;
+      if ((cab.pay.modeBy[s.id] || null) !== m.pm) { await run(c.from('students').update({ pay_mode: m.pm }).eq('id', s.id)); cab.pay.modeBy[s.id] = m.pm; }
+      await ratesToCab(cab, s, m);
+    }
+    if (cab.pay.totals) {
+      for (const k of keysOf(M, K).filter(k => k.startsWith('x:') && !eq(M[k], K[k]))) {
+        const day = k.slice(2), has = cab.pay.totals.find(t => t.day === day);
+        changed = true;
+        if (M[k] == null) { if (has) await run(c.from('day_totals').delete().eq('id', has.id)); }
+        else if (has) await run(c.from('day_totals').update({ amount: M[k] }).eq('id', has.id));
+        else await run(c.from('day_totals').insert({ day, amount: M[k] }));
+      }
+    }
+    const byExt = {};
+    cab.pay.pays.forEach(x => { if (x.ext_id) byExt[x.ext_id] = x; });
+    for (const k of keysOf(M, K).filter(k => k.startsWith('$:') && !eq(M[k], K[k]))) {
+      const m = M[k], ext = k.slice(2), x = byExt[ext];
+      changed = true;
+      if (!m) { if (x) await run(c.from('payments').delete().eq('id', x.id)); continue; }
+      const f = payFields(m, x, find);
+      if (!x) await run(c.from('payments').insert(Object.assign(f, { ext_id: ext })));
+      else { const dd = diff(x, f); if (dd) await run(c.from('payments').update(dd).eq('id', x.id)); }
+    }
+    return changed;
+  }
+  function payFields(m, x, find){
+    const s = find(m.s), pack = m.l != null;
+    const start = pack ? m.st : null;
+    let end = pack ? m.e : null;
+    if (start && end && end < start) end = start;        // в базе check (end_on >= start_on)
+    const keepTs = x && x.archived_at && localDay(x.archived_at) === m.ar;
+    return {
+      student_id: s ? s.id : null, guest_name: s ? null : m.s.slice(0, 80), kind: pack ? 'pack' : 'single',
+      paid_on: m.d, amount: m.a, lessons: pack ? m.l : null, burn: pack ? (m.b === 'date' && end ? 'date' : 'count') : null,
+      start_on: start, end_on: end, adjust: pack ? m.j : 0, payer: m.pa ? m.pa.slice(0, 80) : null,
+      archived_at: m.ar ? (keepTs ? x.archived_at : new Date(m.ar + 'T12:00:00').toISOString()) : null,
+    };
+  }
+  // ставки кабинета по разделу: строку узнаём по дате начала; у первой
+  // («с самого начала») оставляем дату кабинета, если она раньше второй
+  async function ratesToCab(cab, s, m){
+    const c = need();
+    const rows = (cab.pay.ratesBy[s.id] || []).slice().sort((x, y) => (x.valid_from < y.valid_from ? -1 : 1));
+    if (!m.v.length) { for (const r of rows) await run(c.from('student_rates').delete().eq('id', r.id)); return; }
+    const want = m.v.map((x, i) => ({ from: x[0], price: x[1] }));
+    want[0].from = rows[0] && (!want[1] || rows[0].valid_from < want[1].from) ? rows[0].valid_from : FIRST_RATE;
+    const keep = {}, ups = [], ins = [];
+    want.forEach((w, i) => {
+      const last = i === want.length - 1;
+      const extra = last ? Object.assign({ monthly: m.m }, m.w != null ? { per_week: m.w } : {}) : {};
+      const r = rows.find(x => x.valid_from === w.from && !keep[x.id]);
+      if (!r) { ins.push(Object.assign({ student_id: s.id, valid_from: w.from, price: w.price }, extra)); return; }
+      keep[r.id] = 1;
+      const up = {};
+      if (Number(r.price) !== w.price) up.price = w.price;
+      Object.keys(extra).forEach(f => { if ((r[f] == null ? null : Number(r[f])) !== extra[f]) up[f] = extra[f]; });
+      if (Object.keys(up).length) ups.push([r.id, up]);
+    });
+    // сначала лишние (unique student_id + valid_from), потом правки и новые
+    for (const r of rows) if (!keep[r.id]) await run(c.from('student_rates').delete().eq('id', r.id));
+    for (const [id, up] of ups) await run(c.from('student_rates').update(up).eq('id', id));
+    if (ins.length) await run(c.from('student_rates').insert(ins));
   }
 
   // имена, привязки и архив учеников — одной записью на ученика в конце:
@@ -613,6 +975,7 @@
   let opts = {};
   let running = null, again = 0;     // 0 — не нужно, 1 — авто, 2 — по кнопке
   const answers = {};          // ответы на конфликты: повтор после 409 не спрашивает заново
+  let payDeclined = false;     // импорт оплат отложен («Позже») — до перезагрузки страницы сами не спрашиваем
 
   async function cycle(manual){
     const cfg = readCfg();
@@ -625,7 +988,14 @@
     if (first && !manual) { setS({ status: 'wait_import' }); return; }
     const saved = first ? {} : ((cab.sync.base && cab.sync.base.u) || {});
     Object.keys(saved).forEach(k => { if (k.startsWith('d:') && k.slice(2) < from) delete saved[k]; });
-    let extra = null;
+    // оплаты сводятся с В4(в): у базы, сохранённой раньше, их разделов нет —
+    // первый раз оплаты импортируем с предпросмотром, как расписание
+    const savedPay = !first && !!(cab.sync.base && cab.sync.base.pay);
+    let payOn = cab.payOn && (first || savedPay || manual || !payDeclined);
+    // таблиц оплат нет — их разделы базы не трогаем и сохраняем как были
+    const keepPay = {};
+    if (!cab.payOn) Object.keys(saved).forEach(k => { if (PAYK(k)) { keepPay[k] = saved[k]; delete saved[k]; } });
+    let extra = null, payAsked = false;
     for (let attempt = 0; attempt < 4; attempt++) {
       const rem = await remote(cfg, 'GET');
       // KV старого приложения отдаёт кэш до 30 с — старее нашей записи не берём
@@ -634,7 +1004,7 @@
       const B = copy(saved);
       let rawDirty = false;
       const mark = () => { rawDirty = true; };
-      let RN = remoteUnits(raw, from, B, mark);
+      let RN = remoteUnits(raw, from, B, mark, payOn);
       // переименовали в старом: из базы ушло одно имя и пришло одно новое — тот же ученик
       const gone = Object.keys(B).filter(k => k.startsWith('s:') && !RN[k]);
       const came = Object.keys(RN).filter(k => k.startsWith('s:') && !B[k]);
@@ -651,13 +1021,26 @@
           renameRaw(raw, s.ext_name, s.name); renameUnits(B, s.ext_name, s.name); renamed = true;
         }
       });
-      if (renamed) { rawDirty = true; RN = remoteUnits(raw, from, B, mark); }
-      const K = cabUnits(cab, from, B);
+      if (renamed) { rawDirty = true; RN = remoteUnits(raw, from, B, mark, payOn); }
+      const K = cabUnits(cab, from, B, payOn);
       const mg = merge(B, K, RN);
       const M = mg.M;
+      // оплату удалили в одном месте — спрашиваем, а не удаляем молча
+      Object.keys(B).forEach(k => {
+        if (k.startsWith('$:') && M[k] === undefined && (K[k] !== undefined || RN[k] !== undefined) && !mg.conflicts.some(x => x.k === k)) mg.conflicts.push({ k, mine: K[k], theirs: RN[k], del: true });
+      });
       if (first && !extra) {
-        extra = await preview(cab, raw, RN, K, mg, from);
+        extra = await preview(cab, raw, RN, K, mg, from, payOn);
         if (!extra) { setS({ status: 'wait_import', busy: false }); return; }
+      }
+      if (payOn && !first && !savedPay && !payAsked) {
+        payAsked = true;
+        if (!(await payPreview(cab, RN, K, mg))) {
+          // «Позже»: расписание сводим как раньше, оплаты — нет
+          payDeclined = true; payOn = false;
+          [M, K, RN].forEach(U => Object.keys(U).forEach(k => { if (PAYK(k)) delete U[k]; }));
+          mg.conflicts = mg.conflicts.filter(x => !PAYK(x.k));
+        }
       }
       for (const cf of mg.conflicts) {
         const key = cf.k + '|' + JSON.stringify(cf.mine) + '|' + JSON.stringify(cf.theirs);
@@ -675,6 +1058,8 @@
           if (ls.length) hist[day] = ls;
         });
       }
+      // флаги преподавателя — старому, чтобы «(пробное)» считал так же (README Worker)
+      if (payOn && (FL.list.length || raw.payFlags) && !eq(raw.payFlags || [], FL.list)) { raw.payFlags = copy(FL.list); rawDirty = true; }
       let rev = rem.rev || 0;
       const toRemote = keysOf(M, RN).filter(k => !eq(M[k], RN[k]));
       if (toRemote.length || rawDirty) {
@@ -687,10 +1072,14 @@
       const b = await commitStudents(cab, M);
       const base = {};
       Object.keys(M).forEach(k => { if (!k.startsWith('d:') || k.slice(2) >= from) base[k] = M[k]; });
-      await saveBase(rev, base);
+      Object.assign(base, keepPay);
+      await saveBase(rev, base, payOn || savedPay);
       const unknown = unknownNames(cab, M);
-      setS({ status: 'ok', at: new Date().toISOString(), unknown, busy: false, lastMine: toRemote.length, lastTheirs: keysOf(M, K).filter(k => !eq(M[k], K[k])).length });
+      setS({ status: payOn || !cab.payOn || savedPay ? 'ok' : 'wait_pay', at: new Date().toISOString(), unknown, busy: false, lastMine: toRemote.length, lastTheirs: keysOf(M, K).filter(k => !eq(M[k], K[k])).length });
       if ((a || b) && opts.onChanged) opts.onChanged();
+      // открыта вкладка «Оплаты» — перечитать (пришли оплаты или ставки из старого)
+      const ph = document.getElementById('payHost');
+      if (cab.payChanged && window.CabinetPayments && ph && ph.offsetParent) window.CabinetPayments.reload();
       return;
     }
     throw new SyncError('Старое приложение всё время меняется — попробуем позже', 'busy');
@@ -704,9 +1093,10 @@
     }
     return out;
   }
-  async function saveBase(rev, units){
+  async function saveBase(rev, units, pay){
     const u = await C.currentUser();
-    await run(need().from('ext_sync').upsert({ owner: u && u.id, source: SOURCE, rev, base: { v: 1, u: units }, synced_at: new Date().toISOString() }, { onConflict: 'owner,source' }));
+    const base = Object.assign({ v: 1, u: units }, pay ? { pay: 1 } : {});
+    await run(need().from('ext_sync').upsert({ owner: u && u.id, source: SOURCE, rev, base, synced_at: new Date().toISOString() }, { onConflict: 'owner,source' }));
   }
   function skipped(){ try { return JSON.parse(localStorage.getItem(LS_SKIP) || '[]'); } catch (e) { return []; } }
   // имена из старого без ученика в кабинете: ученики списка старого и гости в строках
@@ -716,6 +1106,7 @@
     Object.keys(M).forEach(k => {
       if (k.startsWith('s:') && !M[k].a) add(M[k].n);
       else if (k.startsWith('d:')) M[k].forEach(l => l.p.forEach(x => add(x[0])));
+      else if (k.startsWith('$:')) add(M[k].s);
     });
     return Object.values(out).sort((a, b) => a.localeCompare(b, 'ru'));
   }
@@ -753,16 +1144,29 @@
     if (k.startsWith('t:')) return '<b>' + esc(v.n) + '</b>' + v.days.map((ls, i) => (ls.length ? '<div class="sy-dim">' + ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'][i] + '</div>' + lines(ls) : '')).join('');
     if (k.startsWith('s:')) return esc(v.n) + (v.a ? ' (в архиве)' : '');
     if (k.startsWith('p:')) return esc(v.n || 'без названия') + ': ' + esc(v.m.join(', '));
+    if (k.startsWith('$:')) return '<div>' + esc(payLine(v)) + '</div>';
+    if (k.startsWith('x:')) return esc(rub(v));
+    if (k.startsWith('r:')) return (v.v.length ? v.v.map((x, i) => '<div>' + (i ? 'с ' + esc(dmy(x[0])) : 'сначала') + ': ' + esc(rub(x[1])) + '</div>').join('') : '<i>ставки нет</i>') +
+      (v.pm ? '<div class="sy-dim">' + (v.pm === 'pack' ? 'платит абонементом' : 'платит за каждое занятие') + '</div>' : '');
     return esc(String(v));
   }
+  const dmy = s => { const [y, m, d] = String(s).split('-'); return d + '.' + m + '.' + y; };
+  const rub = n => String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0') + '\u00a0₽';
+  const payLine = v => dmy(v.d) + ' · ' + v.s + ' · ' + rub(v.a) + ' · ' + (v.l ? 'абонемент на ' + v.l + ' зан.' : 'разовая') +
+    (v.st ? ' · с ' + dmy(v.st) : '') + (v.e ? ' · по ' + dmy(v.e) + (v.b ? ' (срок)' : '') : '') + (v.j ? ' · правка ' + (v.j > 0 ? '+' : '') + v.j : '') +
+    (v.pa ? ' · платил: ' + v.pa : '') + (v.ar ? ' · в архиве' : '');
   function unitTitle(k, cf){
     if (k.startsWith('d:')) return 'День ' + dayTitle(k.slice(2));
     if (k.startsWith('t:')) return 'Шаблон недели «' + ((cf.mine || cf.theirs || {}).n || '') + '»';
     if (k.startsWith('s:')) return 'Ученик ' + ((cf.mine || cf.theirs || {}).n || '');
     if (k.startsWith('p:')) return 'Пара или группа';
+    if (k.startsWith('$:')) return 'Оплату (' + ((cf.mine || cf.theirs || {}).s || '') + ')';
+    if (k.startsWith('r:')) return 'Ставку ученика';
+    if (k.startsWith('x:')) return 'Ручной итог дня ' + dayTitle(k.slice(2));
     return 'Активный шаблон';
   }
   function askConflict(cf){
+    if (cf.del) return askDelete(cf);
     return new Promise(resolve => {
       const o = modal('<h3>Правили в обоих местах</h3>' +
         '<p class="sy-dim">' + esc(unitTitle(cf.k, cf)) + ' изменили и в кабинете, и в старом приложении. Какой вариант оставить? Второй пропадёт в обоих местах.</p>' +
@@ -772,7 +1176,52 @@
       o.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => { o.remove(); resolve(b.dataset.pick); }));
     });
   }
-  function preview(cab, raw, RN, K, mg, from){
+  // оплату удалили в одном месте: удалить и во втором или вернуть
+  function askDelete(cf){
+    const inCab = cf.mine === undefined, v = cf.mine || cf.theirs;
+    return new Promise(resolve => {
+      const o = modal('<h3>Оплату удалили ' + (inCab ? 'в кабинете' : 'в старом приложении') + '</h3>' +
+        '<div class="sy-var">' + esc(payLine(v)) + '</div>' +
+        '<p class="sy-dim">Удалить её и ' + (inCab ? 'в старом приложении' : 'в кабинете') + '?</p>' +
+        '<div class="sy-btns"><button class="btn" data-pick="del">Удалить и там</button><button class="btn quiet" data-pick="keep">Вернуть оплату</button></div>');
+      o.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => {
+        o.remove();
+        // del — сторона, где удалили; keep — сторона, где оплата осталась
+        resolve(b.dataset.pick === 'del' ? (inCab ? 'mine' : 'theirs') : (inCab ? 'theirs' : 'mine'));
+      }));
+    });
+  }
+  function payCounts(cab, RN, K, mg){
+    const find = resolver(cab);
+    const pays = Object.keys(RN).filter(k => k.startsWith('$:') && !eq(RN[k], K[k]) && K[k] === undefined).map(k => RN[k]);
+    const sum = pays.reduce((n, p) => n + p.a, 0);
+    const rates = Object.keys(RN).filter(k => k.startsWith('r:') && K[k] === undefined).length;
+    const totals = Object.keys(RN).filter(k => k.startsWith('x:') && K[k] === undefined).length;
+    const guests = {};
+    pays.forEach(p => { if (!find(p.s)) guests[norm(p.s)] = p.s; });
+    const toOld = Object.keys(K).filter(k => PAYK(k) && !eq(K[k], RN[k]) && !mg.conflicts.some(x => x.k === k)).length;
+    const both = mg.conflicts.filter(x => PAYK(x.k)).length;
+    return { n: pays.length, sum, rates, totals, guests: Object.values(guests), toOld, both };
+  }
+  function payText(pc){
+    return '<p>Оплаты из старого приложения: <b>' + pc.n + '</b>' + (pc.n ? ' на ' + esc(rub(pc.sum)) : '') + '. Ставки учеников: <b>' + pc.rates + '</b>.' +
+      (pc.totals ? ' Ручных итогов дня: <b>' + pc.totals + '</b>.' : '') + '</p>' +
+      (pc.guests.length ? '<p>Оплаты учеников, которых нет в кабинете, придут на имя (как гости): ' + pc.guests.map(esc).join(', ') + '.</p>' : '') +
+      (pc.toOld ? '<p>Из кабинета уйдёт в старое приложение: ' + pc.toOld + ' (оплаты, ставки).</p>' : '') +
+      (pc.both ? '<p>Есть и тут и там, по-разному: ' + pc.both + ' — спросим по каждому.</p>' : '') +
+      '<p class="sy-dim">Остаток и долг кабинет считает по тем же правилам, что старое приложение (Настройки → Оплаты). Разовые оплаты кабинета в старое не уходят.</p>';
+  }
+  function payPreview(cab, RN, K, mg){
+    const pc = payCounts(cab, RN, K, mg);
+    return new Promise(resolve => {
+      const o = modal('<h3>Оплаты: первая синхронизация со старым приложением</h3>' + payText(pc) +
+        '<p class="sy-dim">Перед импортом сохраните копию в старом приложении («Сохранить файл»).</p>' +
+        '<div class="sy-btns"><button class="btn" id="syPayGo">Импортировать оплаты</button><button class="btn quiet" id="syPayNo">Позже</button></div>');
+      o.querySelector('#syPayGo').addEventListener('click', () => { o.remove(); resolve(true); });
+      o.querySelector('#syPayNo').addEventListener('click', () => { o.remove(); resolve(false); });
+    });
+  }
+  function preview(cab, raw, RN, K, mg, from, payOn){
     const find = resolver(cab);
     const dayKeys = Object.keys(RN).filter(k => k.startsWith('d:'));
     const nLessons = dayKeys.reduce((n, k) => n + RN[k].length, 0);
@@ -796,6 +1245,7 @@
         (Object.keys(guests).length ? '<p>Только в строках расписания, останутся гостями (завести можно потом): ' + Object.values(guests).map(esc).join(', ') + '.</p>' : '') +
         (toOld.length ? '<p>Из кабинета уйдёт в старое приложение: ' + toOld.length + ' ' + 'разделов (дни, ученики, шаблоны).</p>' : '') +
         (mg.conflicts.length ? '<p>Есть и тут и там, по-разному: ' + mg.conflicts.length + ' — спросим по каждому.</p>' : '') +
+        (payOn ? payText(payCounts(cab, RN, K, mg)) : '') +
         '<p class="sy-dim">Перед импортом сохраните копию в старом приложении («Сохранить файл»).</p>' +
         '<div class="sy-btns"><button class="btn" id="syGo">Импортировать</button><button class="btn quiet" id="syNo">Отмена</button></div>');
       o.querySelector('#syGo').addEventListener('click', () => {
@@ -813,8 +1263,10 @@
     const c = need();
     const s = await run(c.from('students').insert({ name: name.slice(0, 80), ext_name: name.slice(0, 80) }).select(SCOLS).single());
     // гостей с этим именем — в ученика: занятия и слоты шаблонов
-    for (const t of ['lesson_students', 'template_slot_students']) {
-      const rows = await run(c.from(t).select('id').eq('guest_name', name)) || [];
+    for (const t of ['lesson_students', 'template_slot_students', 'payments']) {
+      let rows;
+      try { rows = await run(c.from(t).select('id').eq('guest_name', name)) || []; }
+      catch (e) { if (t === 'payments' && missing(e)) continue; throw e; }
       for (const r of rows) await run(c.from(t).update({ student_id: s.id, guest_name: null }).eq('id', r.id));
     }
     S.unknown = S.unknown.filter(n => norm(n) !== norm(name));
@@ -853,7 +1305,10 @@
     opts = o || {};
     wrap(SC, ['addLesson', 'updateLesson', 'deleteLesson', 'addPeople', 'setStatus', 'removePerson', 'addGroup', 'updateGroup', 'setGroupMembers', 'deleteGroup',
       'addTemplate', 'renameTemplate', 'deleteTemplate', 'setActiveTemplate', 'addSlot', 'updateSlot', 'deleteSlot', 'addSlotPeople', 'removeSlotPerson', 'setSlotPeople', 'duplicateTemplate']);
-    wrap(C, ['addStudent', 'updateStudent', 'setArchived']);
+    wrap(C, ['addStudent', 'updateStudent', 'setArchived', 'saveSettings']);
+    // оплаты, ставки, способ оплаты, флаги участника (В4(в))
+    wrap(window.Payments, ['addPayment', 'updatePayment', 'deletePayment', 'setRate', 'deleteRate', 'setMode', 'setRateExtra', 'setDayTotal']);
+    wrap(SC, ['setPart']);
     clearInterval(timer);
     timer = setInterval(() => { if (document.visibilityState === 'visible' && readCfg()) sync(false); }, EVERY_MS);
     document.addEventListener('visibilitychange', () => {
@@ -884,5 +1339,5 @@
   window.ScheduleSync = { init, sync: () => sync(true), syncAuto: () => sync(false), configure, config, state: S, onChange: f => { listeners.push(f); return () => { const i = listeners.indexOf(f); if (i >= 0) listeners.splice(i, 1); }; },
     adopt, skipName,
     // для тестов: чистые функции сведения
-    _t: { rowNorm, rowFrom, buildRows, rowsToN, merge, remoteUnits, renameRaw } };
+    _t: { rowNorm, rowFrom, buildRows, rowsToN, merge, remoteUnits, renameRaw, oldPayUnit, oldRateUnit, payToRaw, tidyPays, applyToRaw } };
 })();

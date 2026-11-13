@@ -24,6 +24,19 @@
    Занятия, которым абонемента не хватило, и разовые оплаты сводятся в
    баланс в рублях по ставке на дату занятия. «Оплатил» у занятия — разовая
    оплата со ссылкой на участие: это занятие закрыто, в баланс не идёт.
+
+   Те же цифры, что в старом приложении расписания (В4(в), синхронизация
+   schedule-sync.js), — правила по умолчанию (pay.outside = 'free'):
+     - начало абонемента без своей даты — день оплаты, но не раньше дня
+       после ручного конца прошлого («Абонемент истёк»);
+     - у следующего абонемента своё начало — прошлый на нём обрывается
+       (в старом его закрывает следующая оплата накануне своего старта);
+     - занятие абонементного ученика вне окон всех абонементов (до первой
+       оплаты, после ручного конца) долгом не считается — в старом оно ни
+       в один абонемент не попадает; внутри окна сверх оплаченного — долг;
+     - ученик без единой оплаты и без явного «за каждое занятие» долгов не
+       имеет (в старом без оплат долга нет вовсе).
+   pay.outside = 'debt' — строгий учёт: всё неоплаченное — долг.
    ========================================================== */
 (function(){
   'use strict';
@@ -59,7 +72,7 @@
     { id: 'practice', name: 'тренировочное', free: true },
   ];
   const REASONS = ['болезнь', 'предупредил заранее', 'не пришёл', 'семейные обстоятельства'];
-  const PAY_DEFAULTS = { skipRule: 'free', reason: 'болезнь', remindLeft: 1, remindDays: 3, flags: [], monthMode: 'x4' };
+  const PAY_DEFAULTS = { skipRule: 'free', outside: 'free', reason: 'болезнь', remindLeft: 1, remindDays: 3, flags: [], monthMode: 'x4' };
   function paySettings(s){
     const raw = (s && s.pay) || {};
     return Object.assign({}, PAY_DEFAULTS, raw, { flags: Array.isArray(raw.flags) ? raw.flags : [] });
@@ -106,12 +119,26 @@
     const rates = d.rates || [], pays = (d.payments || []).slice();
     const linked = {};
     pays.forEach(x => { if (x.kind === 'single' && x.lesson_student_id) linked[x.lesson_student_id] = x; });
+    const byCreated = (a, b) => (String(a.pay.created_at || '') < String(b.pay.created_at || '') ? -1 : 1);
     const packs = pays.filter(x => x.kind === 'pack')
-      .map(x => ({ pay: x, start: x.start_on || x.paid_on, end: x.end_on || null, cap: Number(x.lessons) || 0, used: Number(x.adjust) || 0, proj: 0, items: [], until: null }))
-      .sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : String(a.pay.created_at || '') < String(b.pay.created_at || '') ? -1 : 1));
+      .map(x => ({ pay: x, start: x.start_on || x.paid_on, end: x.end_on || null, cut: null, cap: Number(x.lessons) || 0, used: Number(x.adjust) || 0, proj: 0, items: [], until: null }))
+      .sort((a, b) => (a.pay.paid_on < b.pay.paid_on ? -1 : a.pay.paid_on > b.pay.paid_on ? 1 : byCreated(a, b)));
+    // соседи по дате оплаты — как «прошлый / следующий» в старом приложении
+    packs.forEach((k, i) => {
+      const pv = packs[i - 1], nx = packs[i + 1];
+      if (!k.pay.start_on && pv && pv.end && addDays(pv.end, 1) > k.start) k.start = addDays(pv.end, 1);
+      if (!k.end && nx && nx.pay.start_on) k.cut = addDays(nx.pay.start_on, -1);
+    });
+    packs.sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : byCreated(a, b)));
     const parts = (d.parts || []).filter(x => x.l && !x.l.is_event)
       .sort((a, b) => (a.l.day < b.l.day ? -1 : a.l.day > b.l.day ? 1 : (a.l.start_min || 0) - (b.l.start_min || 0)));
-    const fits = (k, day, used) => k.start <= day && (!k.end || day <= k.end) && used < k.cap;
+    const lastDay = k => k.end || k.cut;
+    const fits = (k, day, used) => k.start <= day && (!lastDay(k) || day <= lastDay(k)) && used < k.cap;
+    const inWindow = day => packs.some(k => k.start <= day && (!lastDay(k) || day <= lastDay(k)));
+    const mode = modeOf(d.student, pays);
+    // «вне учёта»: как в старом приложении (см. шапку файла)
+    const explicitLesson = !!(d.student && d.student.pay_mode === 'lesson');
+    const untracked = day => ps.outside !== 'debt' && (mode === 'pack' ? !inWindow(day) : !explicitLesson && !pays.length);
     const rows = [];
     let moneyIn = 0, cost = 0, noRate = 0, unpaidN = 0, singlePaid = 0;
     parts.forEach(x => {
@@ -131,6 +158,7 @@
         else {
           const k = packs.find(k2 => fits(k2, x.l.day, k2.used));
           if (k) { k.used++; row.pack = k; row.n = k.used; k.items.push(row); if (k.used === k.cap) k.until = x.l.day; }
+          else if (untracked(x.l.day)) row.outside = mode === 'pack' ? 'вне абонемента' : 'оплат ещё нет';
           else { row.debt = true; unpaidN++; if (row.price == null) noRate++; else cost += row.price; }
         }
       }
@@ -141,7 +169,8 @@
     packs.forEach(k => {
       k.left = Math.max(0, k.cap - k.used);
       k.expired = !!(k.end && now > k.end);
-      k.closed = k.expired || k.left <= 0;
+      // оборван началом следующего — в него больше ничего не попадёт
+      k.closed = k.expired || k.left <= 0 || !!(k.cut && now > k.cut);
       k.burned = k.expired ? k.left : 0;
     });
     const active = packs.filter(k => !k.closed);
@@ -149,7 +178,6 @@
     const lastPack = packs.length ? packs[packs.length - 1] : null;
     const balance = moneyIn - cost;
     const debt = Math.max(0, -balance);
-    const mode = modeOf(d.student, pays);
     // напоминание — только преподавателю, в кабинете (решение Даниила 13.11)
     let remind = null;
     if (current) {
@@ -179,6 +207,7 @@
       if (!r.b.pay) { text = what + ' — не оплачивается' + (r.b.why && r.b.why.indexOf(ST_WORD[p.status]) !== 0 ? ' (' + r.b.why + ')' : ''); cls = 'free'; }
       else if (r.single) text = what + ' — оплачено за занятие, ' + money(r.single.amount);
       else if (r.pack) { text = what + ' — абонемент от ' + dm(r.pack.pay.paid_on) + ': ' + r.n + '-е из ' + r.pack.cap; right = 'осталось ' + Math.max(0, r.pack.cap - r.n); }
+      else if (r.outside) { text = what + ' — ' + r.outside + ', долгом не считается'; cls = 'free'; }
       else { text = what + ' — без оплаты: ' + (r.price == null ? 'ставка не задана' : money(r.price)); cls = 'debt'; r.money = -(r.price || 0); }
       lines.push({ day: r.day, ord: 2, sign, cls, text, right, money: r.money, lsId: p.id });
     });
