@@ -107,7 +107,7 @@
 
   /* ── состояние ── */
   let api = null, host = null;
-  const st = { week: null, lessons: [], students: [], byId: {}, view: null, loadTok: 0, err: '' };
+  const st = { week: null, lessons: [], students: [], byId: {}, view: null, loadTok: 0, err: '', loading: false };
   let modal = null;           // открытая карточка занятия
 
   function readView(){
@@ -143,6 +143,10 @@
   async function load(){
     const tok = ++st.loadTok;
     st.err = '';
+    // пока неделя грузится, любая перерисовка (пришли настройки, щелчок в
+    // соседней вкладке) показывает «Загружаем», а не пустую неделю из
+    // старого или пустого st.lessons — иначе на миг «пропадали» занятия
+    st.loading = true;
     render(true);
     try {
       const [students, lessons] = await Promise.all([api.students(), SC.listRange(st.week, addDays(st.week, 6))]);
@@ -154,6 +158,7 @@
       st.err = e.message || String(e);
       st.lessons = [];
     }
+    st.loading = false;
     render();
   }
   function setStudents(list){
@@ -661,6 +666,7 @@
   // после ответа
   let quickBusy = null, pending = false;
   function render(loading){
+    loading = loading || st.loading;
     if (quickBusy && !loading) { pending = true; return; }
     pending = false;
     if (!host || !st.week) return;

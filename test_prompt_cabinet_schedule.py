@@ -232,8 +232,24 @@ def handle_db(route, request):
         route.fulfill(status=204, headers=CORS)
 
 
+# «сегодня» в браузере — среда 18.11.2026, 12:00 по местному времени, часы
+# идут дальше. Без этого «Сегодня», подсветка дня и неделя по умолчанию
+# зависели бы от дня запуска теста
+FIXED_NOW_JS = r"""
+(() => {
+  const R = Date, OFF = new R(2026, 10, 18, 12, 0, 0).getTime() - R.now();
+  class D extends R {
+    constructor(...a){ if (a.length) super(...a); else super(R.now() + OFF); }
+    static now(){ return R.now() + OFF; }
+  }
+  window.Date = D;
+})();
+"""
+
+
 def new_context(browser, **kw):
     ctx = browser.new_context(**kw)
+    ctx.add_init_script(FIXED_NOW_JS)
     ctx.route("https://**/*", lambda r: r.abort())
     ctx.route("https://fakesb.test/db", handle_db)
     ctx.route("**/supabase-js.umd.js", lambda r: r.fulfill(status=200, content_type="application/javascript", body=FAKE_SB_JS))
@@ -457,8 +473,9 @@ def main():
         page.click("#scToday")
         page.wait_for_function("() => location.hash === '#/schedule'")
         page.wait_for_selector("#scToday[aria-current]")
-        check("F3 «Сегодня» — текущая неделя", page.evaluate("() => { const d = new Date(), p = n => (n < 10 ? '0' : '') + n;"
-                                     " return Schedule._st.week === Schedule.mondayOf(d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate())); }"))
+        page.wait_for_selector(".sc-day.today")
+        check("F3 «Сегодня» — неделя 16–22 ноября, подсвечена среда 18-го",
+              page.evaluate("() => Schedule._st.week") == WEEK and page.get_attribute(".sc-day.today", "data-day") == "2026-11-18")
         open_schedule(page)
         page.click(f".sc-day[data-day='2026-11-17'] .sc-time >> text=12:00 – 13:00")
         page.wait_for_selector("#edDel")
