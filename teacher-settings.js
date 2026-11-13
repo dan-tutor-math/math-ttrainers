@@ -19,18 +19,24 @@
      formatLabels — свои названия форматов занятия { single, pair, group, semi }
                    (как stgLabel старого приложения: «полупараллелку» кто-то
                    зовёт «параллелью»). Пустое — общее название (В1а)
+     pay         — оплаты (В4а): { skipRule 'free'|'charge' — оплачивается ли
+                   прогул по умолчанию; reason — причина пропуска по
+                   умолчанию; remindLeft — напомнить, когда осталось ≤ N
+                   занятий; remindDays — за сколько дней до конца срока;
+                   flags [{id, name, free}] — свои флаги преподавателя }
    ========================================================== */
 (function(){
   const LS_KEY = 'teacher:settings:v1';
   const FORMAT_LABELS = { single: 'Индивидуальное', pair: 'Пара', group: 'Группа', semi: 'Полупараллелка' };
   const DEFAULTS = { sessionBind: 'browser', labels: 'show', labelDates: true, labelCount: true, lessonMin: 60,
-                     formatLabels: Object.assign({}, FORMAT_LABELS) };
+                     formatLabels: Object.assign({}, FORMAT_LABELS),
+                     pay: { skipRule: 'free', reason: 'болезнь', remindLeft: 1, remindDays: 3, flags: [] } };
   const listeners = [];
   let cur = null;
 
   // чужие и испорченные значения отбрасываем: настройку правят руками в базе
   function normalize(raw){
-    const o = Object.assign({}, DEFAULTS);
+    const o = Object.assign({}, DEFAULTS, { pay: normalizePay(null) });
     if (!raw || typeof raw !== 'object') return o;
     if (raw.sessionBind === 'tab' || raw.sessionBind === 'browser') o.sessionBind = raw.sessionBind;
     if (['show', 'off', 'hide_solved'].indexOf(raw.labels) >= 0) o.labels = raw.labels;
@@ -45,6 +51,29 @@
       Object.keys(FORMAT_LABELS).forEach(k => {
         const v = typeof raw.formatLabels[k] === 'string' ? raw.formatLabels[k].trim().slice(0, 30) : '';
         if (v) o.formatLabels[k] = v;
+      });
+    }
+    o.pay = normalizePay(raw.pay);
+    return o;
+  }
+  // флаги правят руками на странице — id латиницей, имя до 30 знаков, не больше 20
+  function normalizePay(raw){
+    const d = DEFAULTS.pay, o = Object.assign({}, d, { flags: [] });
+    if (!raw || typeof raw !== 'object') return o;
+    if (raw.skipRule === 'free' || raw.skipRule === 'charge') o.skipRule = raw.skipRule;
+    if (typeof raw.reason === 'string') o.reason = raw.reason.trim().slice(0, 60);
+    const n = Math.round(Number(raw.remindLeft));
+    if (raw.remindLeft !== '' && raw.remindLeft != null && n >= 0 && n <= 20) o.remindLeft = n;
+    const dd = Math.round(Number(raw.remindDays));
+    if (raw.remindDays !== '' && raw.remindDays != null && dd >= 0 && dd <= 60) o.remindDays = dd;
+    if (Array.isArray(raw.flags)) {
+      const seen = new Set();
+      raw.flags.forEach(f => {
+        if (!f || typeof f !== 'object' || o.flags.length >= 20) return;
+        const id = String(f.id || ''), name = String(f.name || '').trim().slice(0, 30);
+        if (!/^[a-z0-9_-]{1,24}$/.test(id) || !name || seen.has(id)) return;
+        seen.add(id);
+        o.flags.push({ id, name, free: !!f.free });
       });
     }
     return o;

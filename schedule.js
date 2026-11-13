@@ -108,7 +108,10 @@
   /* ── состояние ── */
   let api = null, host = null;
   const st = { week: null, lessons: [], students: [], byId: {}, view: null, loadTok: 0, err: '', loading: false,
-               mode: 'week', groups: [], tpls: [], tplId: null };   // mode: week | tpl | groups (В1б)
+               mode: 'week', groups: [], tpls: [], tplId: null,    // mode: week | tpl | groups (В1б)
+               // оплаты недели (В4а, payments.js): способ оплаты учеников,
+               // ставки, «оплатил» по id участия; armed — «снять оплату?»
+               pay: { modes: {}, rates: {}, linked: {} }, armed: null };
   let modal = null;           // открытая карточка занятия
 
   function readView(){
@@ -154,6 +157,8 @@
       if (tok !== st.loadTok) return;
       setStudents(students);
       st.lessons = lessons;
+      st.pay = await payInfo(lessons);
+      if (tok !== st.loadTok) return;
       st.groups = groups;
       st.tpls = tpls;
       if (!st.tpls.some(t => t.id === st.tplId)) st.tplId = (st.tpls.find(t => t.is_active) || st.tpls[0] || {}).id || null;
@@ -165,6 +170,17 @@
     st.loading = false;
     render();
   }
+  // Сведения об оплате не должны ломать расписание: нет payments.js, файл
+  // cabinet-payments.sql не выполнен или сеть отказала — просто без них
+  async function payInfo(lessons){
+    const P = window.Payments, empty = { modes: {}, rates: {}, linked: {} };
+    if (!P || (SC.hasPayCols && !SC.hasPayCols())) return empty;
+    const ids = [];
+    lessons.forEach(l => l.people.forEach(p => { if (p.student_id) ids.push(p.student_id); }));
+    try { return await P.weekInfo(ids); } catch (e) { return empty; }
+  }
+  const paySet = () => (window.Payments ? window.Payments.paySettings(settings()) : { flags: [], skipRule: 'free', reason: '' });
+  const billOf = (p, l) => (window.Payments ? window.Payments.billOf(p, l, paySet()) : { pay: false });
   function setStudents(list){
     st.students = list || [];
     st.byId = {};
@@ -190,6 +206,150 @@
     render();
     try { await SC.setStatus(p.id, p.status); }
     catch (e) { p.status = old; api.toast('Не сохранилось: ' + e.message); render(); }
+    paintPayCard();
+  }
+
+  /* ══ оплаты на занятии (В4а) ══
+     Решения Даниила 13.11 (payments-audit.md, раздел 5): пропуск по
+     умолчанию не оплачивается (как перенос), причина — по умолчанию из
+     настроек; маленькая необязательная карточка пропуска открывается по
+     подписи у имени, а не сама — отметку ставят быстро и подряд. Отмена по
+     вине преподавателя не считается, рядом — «назначить отработку».
+     «Оплатил» — у учеников, которые платят за каждое занятие */
+  async function setPart(l, p, patch){
+    const old = {};
+    Object.keys(patch).forEach(k => { old[k] = p[k]; });
+    Object.assign(p, patch);
+    render(); paintPayCard();
+    try { const fresh = await SC.setPart(p.id, patch); Object.assign(p, fresh); }
+    catch (e) { Object.assign(p, old); api.toast('Не сохранилось: ' + e.message); }
+    render(); paintPayCard();
+  }
+  const isAbsent = p => p.status === 'skip' || p.status === 'move' || !!p.by_teacher;
+  function whyText(p, l){
+    const b = billOf(p, l), ps = paySet();
+    if (p.by_teacher) return 'по моей вине';
+    const r = p.reason || ps.reason;
+    return (r ? r + ' · ' : '') + (b.pay ? 'оплачивается' : 'без оплаты');
+  }
+  function flagsHtml(p){
+    const ps = paySet();
+    const names = (p.flags || []).map(id => ps.flags.find(f => f.id === id)).filter(Boolean).map(f => f.name);
+    return (names.length ? '<span class="sc-flag" title="Флаги занятия">(' + esc(names.join(', ')) + ')</span>' : '') +
+      (p.makeup ? '<span class="sc-mk" title="Отработка пропущенного занятия">отработка</span>' : '');
+  }
+  function paidBtn(p, l){
+    if (!p.student_id || st.pay.modes[p.student_id] !== 'lesson' || !billOf(p, l).pay) return '';
+    const on = !!st.pay.linked[p.id], armed = st.armed === p.id;
+    return '<button type="button" class="sc-paid' + (on ? ' on' : '') + '" data-paid="' + esc(p.id) + '" title="' +
+      (on ? 'Оплачено за это занятие. Нажмите дважды, чтобы снять' : 'Ученик платит за каждое занятие: отметить «оплатил»') + '">' +
+      (armed ? 'снять?' : on ? '₽ ✓' : '₽ оплатил') + '</button>';
+  }
+  async function togglePaid(l, p){
+    const P = window.Payments, cur = st.pay.linked[p.id];
+    if (!P) return;
+    if (cur) {
+      // второе нажатие — подтверждение: оплату жалко снять случайно
+      if (st.armed !== p.id) { st.armed = p.id; render(); return; }
+      st.armed = null;
+      delete st.pay.linked[p.id];
+      render(); paintPanel();
+      try { await P.deletePayment(cur.id); api.toast('Оплата снята'); }
+      catch (e) { st.pay.linked[p.id] = cur; api.toast('Не сохранилось: ' + e.message); }
+      render(); paintPanel();
+      return;
+    }
+    const price = P.rateOn(st.pay.rates[p.student_id], l.day, l.format);
+    if (price == null) { api.toast('Сначала задайте ставку ученика во вкладке «Оплаты»'); return; }
+    st.pay.linked[p.id] = { id: null, amount: price };
+    render(); paintPanel();
+    try {
+      st.pay.linked[p.id] = await P.addPayment({ student_id: p.student_id, kind: 'single', paid_on: today(), amount: price, lesson_student_id: p.id });
+      api.toast('Оплачено: ' + P.money(price));
+    } catch (e) { delete st.pay.linked[p.id]; api.toast('Не сохранилось: ' + e.message); }
+    render(); paintPanel();
+  }
+
+  // карточка пропуска: одна на страницу, висит до ×, Esc или щелчка мимо
+  let payCard = null;     // { el, lessonId, pid, onKey, onDown, custom }
+  function closePayCard(){
+    if (!payCard) return;
+    payCard.el.remove();
+    document.removeEventListener('keydown', payCard.onKey);
+    document.removeEventListener('pointerdown', payCard.onDown, true);
+    payCard = null;
+  }
+  function openPayCard(l, p){
+    closePayCard();
+    const el = document.createElement('div');
+    el.className = 'pay-card';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-label', 'Пропуск занятия');
+    document.body.appendChild(el);
+    const onKey = e => { if (e.key === 'Escape') closePayCard(); };
+    const onDown = e => { if (!el.contains(e.target) && !e.target.closest('.sc-why, #spWhy')) closePayCard(); };
+    document.addEventListener('keydown', onKey);
+    document.addEventListener('pointerdown', onDown, true);
+    payCard = { el, lessonId: l.id, pid: p.id, onKey, onDown, custom: false };
+    el.addEventListener('click', onPayCardClick);
+    el.addEventListener('change', e => {
+      if (e.target.id !== 'pcCustom') return;
+      const c = curCard();
+      if (c) setPart(c.l, c.p, { reason: e.target.value.trim() === paySet().reason ? null : e.target.value.trim() });
+    });
+    paintPayCard();
+  }
+  function curCard(){
+    if (!payCard) return null;
+    const l = findLesson(payCard.lessonId), p = l && l.people.find(x => x.id === payCard.pid);
+    return l && p ? { l, p } : null;
+  }
+  function paintPayCard(){
+    if (!payCard) return;
+    const c = curCard();
+    if (!c || (!isAbsent(c.p) && c.p.status !== 'done')) { closePayCard(); return; }
+    const { l, p } = c, ps = paySet(), b = billOf(p, l), P = window.Payments;
+    const reasons = (P ? P.REASONS : []).slice();
+    const cur = p.reason || ps.reason;
+    if (cur && reasons.indexOf(cur) < 0) reasons.unshift(cur);
+    const ruleSkip = ps.skipRule === 'charge' ? 'оплачивается' : 'не оплачивается';
+    payCard.el.innerHTML =
+      '<div class="sc-ed-head"><b>' + ST_SIGN[p.status] + ' ' + esc(ST_NAME[p.status]) + ' · ' + esc(personName(p)) + '</b><button type="button" class="sc-x" aria-label="Закрыть">×</button></div>' +
+      '<div class="hint">' + esc(dayText(l.day) + ', ' + timeText(l)) + (p.status === 'skip' ? ' · по правилу прогул ' + ruleSkip : p.status === 'move' ? ' · перенос не оплачивается' : '') + '</div>' +
+      '<div class="seg" id="pcBill"><button type="button" data-bill="free" class="' + (!b.pay ? 'on' : '') + '">Не оплачивается</button>' +
+        '<button type="button" data-bill="charge" class="' + (b.pay ? 'on' : '') + '">Оплачивается</button></div>' +
+      (isAbsent(p) ? '<div class="label" style="margin-top:8px">Причина</div><div class="pc-reasons" id="pcReasons">' +
+        reasons.map(r => '<button type="button" data-reason="' + esc(r) + '" class="' + (r === cur && !p.by_teacher ? 'on' : '') + '">' + esc(r) + '</button>').join('') +
+        '<button type="button" data-own="1">своя…</button></div>' +
+        (payCard.custom ? '<input class="field" id="pcCustom" maxlength="200" placeholder="своя причина" style="margin-top:6px" value="' + esc(p.reason || '') + '">' : '') +
+        '<div class="pc-row"><button type="button" class="btn quiet small" id="pcTeacher" aria-pressed="' + (p.by_teacher ? 'true' : 'false') + '">' + (p.by_teacher ? '✓ ' : '') + 'По моей вине</button>' +
+          (p.by_teacher ? '<button type="button" class="btn small" id="pcMakeup" title="Создать занятие в другой день с пометкой «отработка». В статистике ученика отработки считаются отдельно">Назначить отработку</button>' : '') +
+        '</div>' + (p.by_teacher ? '<div class="hint">Отмена по вине преподавателя не считается.</div>' : '') : '');
+    if (payCard.custom) { const i = payCard.el.querySelector('#pcCustom'); if (i && document.activeElement !== i) i.focus(); }
+  }
+  function onPayCardClick(e){
+    const t = e.target.closest('button');
+    const c = curCard();
+    if (!t || !c) return;
+    const { l, p } = c, ps = paySet();
+    if (t.classList.contains('sc-x')) { closePayCard(); return; }
+    if (t.dataset.bill) {
+      // по правилу — без исключения (null): сменят правило — занятие пойдёт за ним
+      const want = t.dataset.bill === 'charge';
+      const byRule = p.status === 'done' ? true : p.status === 'skip' ? ps.skipRule === 'charge' : false;
+      setPart(l, p, { bill: want === byRule ? null : t.dataset.bill, by_teacher: want ? false : p.by_teacher });
+    } else if (t.dataset.reason) {
+      payCard.custom = false;
+      setPart(l, p, { reason: t.dataset.reason === ps.reason ? null : t.dataset.reason, by_teacher: false });
+    } else if (t.dataset.own) { payCard.custom = true; paintPayCard(); }
+    else if (t.id === 'pcTeacher') setPart(l, p, { by_teacher: !p.by_teacher, bill: null });
+    else if (t.id === 'pcMakeup') { closePayCard(); assignMakeup(l, p); }
+  }
+  // отработка — обычное занятие в другой день, помеченное «отработка» со
+  // ссылкой на пропуск: так её можно посчитать в статистике ученика
+  function assignMakeup(l, p){
+    const day = addDays(l.day < today() ? today() : l.day, 1);
+    openNew(day, null, { names: p.student_id ? personName(p) : '', makeup: { sid: p.student_id, forId: p.id } });
   }
 
   /* ── незнакомые имена: спросить, а не заводить молча ──
@@ -271,11 +431,13 @@
     return { start, dur: Math.max(5, dur), people, format: grp ? grp.format : defaultFormat(people.length), group_id: grp ? grp.id : null };
   }
   // новое занятие из текста: день известен, время — из текста или подсказки
-  async function createFromText(day, text, box, hint){
+  async function createFromText(day, text, box, hint, makeup){
     const r = await resolveEntry(text, box, hint);
     if (!r.people) return r;
     try {
-      const l = await SC.addLesson({ day, start_min: r.start, dur_min: r.dur, format: r.format, group_id: r.group_id }, r.people);
+      // отработка (В4а): у её ученика сразу пометка и ссылка на пропуск
+      const people = makeup ? r.people.map(p => (p.student_id && p.student_id === makeup.sid ? Object.assign({}, p, { makeup: true, makeup_for: makeup.forId }) : p)) : r.people;
+      const l = await SC.addLesson({ day, start_min: r.start, dur_min: r.dur, format: r.format, group_id: r.group_id }, people);
       if (l.day >= st.week && l.day <= addDays(st.week, 6)) st.lessons.push(l);
       render();
       return { lesson: l };
@@ -316,8 +478,9 @@
       '<span class="sc-p st-' + p.status + (p.student_id ? '' : ' guest') + '">' +
         (mini ? '<b class="sc-sg">' + (p.status === 'plan' ? '' : ST_SIGN[p.status]) + '</b>'
               : '<button type="button" class="sc-st st-' + p.status + '" data-pid="' + esc(p.id) + '" title="' + esc(ST_NAME[p.status]) + ' — нажмите, чтобы сменить" aria-label="Статус: ' + esc(ST_NAME[p.status]) + '">' + ST_SIGN[p.status] + '</button>') +
-        '<span class="nm">' + esc(personName(p)) + '</span>' +
+        '<span class="nm">' + esc(personName(p)) + '</span>' + flagsHtml(p) +
         (p.student_id ? '' : '<span class="sc-guest" title="Гость — без карточки ученика">гость</span>') +
+        (mini ? '' : (isAbsent(p) && window.Payments ? '<button type="button" class="sc-why" data-why="' + esc(p.id) + '" title="Пропуск: оплачивается ли и причина — нажмите, чтобы сменить">' + esc(whyText(p, l)) + '</button>' : '') + paidBtn(p, l)) +
       '</span>').join('');
   }
   function fmtSelect(l){
@@ -380,6 +543,13 @@
       const l = findLesson(b.closest('[data-id]').dataset.id);
       const p = l && l.people.find(x => x.id === b.dataset.pid);
       if (p) cycleStatus(l, p);
+    }));
+    host.querySelectorAll('.sc-why[data-why], .sc-paid[data-paid]').forEach(b => b.addEventListener('click', e => {
+      e.stopPropagation();
+      const l = findLesson(b.closest('[data-id]').dataset.id);
+      const p = l && l.people.find(x => x.id === (b.dataset.why || b.dataset.paid));
+      if (!p) return;
+      if (b.dataset.why) openPayCard(l, p); else togglePaid(l, p);
     }));
     host.querySelectorAll('select.sc-fmt').forEach(s => s.addEventListener('change', () => {
       const l = findLesson(s.dataset.id);
@@ -559,17 +729,19 @@
   function readTime(v){ const m = String(v || '').match(/^(\d{1,2}):(\d{2})$/); return m ? parseHM(m[1], m[2]) : null; }
 
   // новое занятие: день и время уже есть (клик по сетке или «+»)
-  function openNew(day, start){
-    const m = modalShell('Новое занятие');
+  function openNew(day, start, opts){
+    opts = opts || {};
+    const m = modalShell(opts.makeup ? 'Отработка' : 'Новое занятие');
     const dur = durFor([]);
     m.sheet.innerHTML =
-      '<div class="sc-ed-head"><b>Новое занятие</b><button type="button" class="sc-x" aria-label="Закрыть">×</button></div>' +
+      '<div class="sc-ed-head"><b>' + (opts.makeup ? 'Отработка' : 'Новое занятие') + '</b><button type="button" class="sc-x" aria-label="Закрыть">×</button></div>' +
+      (opts.makeup ? '<div class="hint">Обычное занятие с пометкой «отработка» — выберите день и время.</div>' : '') +
       '<div class="sc-ed-grid">' +
         '<label><span class="label">День</span><input class="field" type="date" id="edDay" value="' + day + '"></label>' +
         '<label><span class="label">С</span><input class="field" type="time" step="900" id="edStart" value="' + timeVal(start) + '"></label>' +
         '<label><span class="label">До</span><input class="field" type="time" step="900" id="edEnd" value="' + (start == null ? '' : timeVal(Math.min(1440, start + dur))) + '"></label>' +
       '</div>' +
-      '<form id="edNewForm" class="sc-addrow"><input class="field" id="edNames" maxlength="300" placeholder="Маша, Петя" aria-label="Ученики через запятую" autocomplete="off">' +
+      '<form id="edNewForm" class="sc-addrow"><input class="field" id="edNames" maxlength="300" placeholder="Маша, Петя" aria-label="Ученики через запятую" autocomplete="off" value="' + esc(opts.names || '') + '">' +
         '<button class="btn" type="submit" id="edCreate">Создать</button></form>' +
       '<div class="hint">Имена через запятую. Двое — «пара», трое и больше — «группа»; формат можно сменить потом.</div>' +
       '<div class="form-msg" id="edMsg"></div><div class="sc-resolve" id="edResolve"></div>';
@@ -589,13 +761,13 @@
       const hint = { start: s, dur: s != null && en != null && en > s && endTouched ? en - s : null };
       const btn = m.sheet.querySelector('#edCreate');
       btn.disabled = true;
-      const r = await createFromText(dayV, m.sheet.querySelector('#edNames').value, m.sheet.querySelector('#edResolve'), hint);
+      const r = await createFromText(dayV, m.sheet.querySelector('#edNames').value, m.sheet.querySelector('#edResolve'), hint, opts.makeup);
       if (!modal || modal !== m) return;
       btn.disabled = false;
-      if (r.lesson) { closeModal(); api.toast('Занятие добавлено'); }
+      if (r.lesson) { closeModal(); api.toast(opts.makeup ? 'Отработка назначена' : 'Занятие добавлено'); }
       else if (r.msg) m.sheet.querySelector('#edMsg').textContent = r.msg;
     });
-    setTimeout(() => { const n = m.sheet.querySelector('#edNames'); if (n) n.focus(); }, 0);
+    setTimeout(() => { const n = m.sheet.querySelector(opts.makeup ? '#edStart' : '#edNames'); if (n) n.focus(); }, 0);
   }
 
   function openEditor(l){
@@ -727,6 +899,12 @@
     const SM = window.StudentMemory;
     if (SM && SM.onChange) panel.off = SM.onChange(() => paintPanel());
     el.addEventListener('click', onPanelClick);
+    // «Отработка» — галочка, а не кнопка: своё событие change
+    el.addEventListener('change', e => {
+      if (e.target.id !== 'spMakeup' || !panel) return;
+      const l = findLesson(panel.lessonId), p = l && l.people.find(x => x.student_id === panel.sid);
+      if (p) setPart(l, p, { makeup: e.target.checked }).then(paintPanel);
+    });
     paintPanel();
   }
   function onPanelClick(e){
@@ -737,6 +915,7 @@
     if (t.classList.contains('sc-x')) closePanel();
     else if (t.dataset.pick) { panel.sid = t.dataset.pick; paintPanel(); }
     else if (t.id === 'spEdit') openEditor(l);
+    else if (t.id === 'spWhy' || t.id === 'spPaid' || t.dataset.flag) onPanelPay(t, l);
     else if (t.id === 'spSession') toggleSession(l);
   }
   async function toggleSession(l){
@@ -788,9 +967,49 @@
       h += '<div class="hint" style="margin:10px 0">Здесь нет ученика с карточкой — сессию и доску открыть не к кому.</div>';
     }
     if (guests.length) h += '<div class="hint">Гость без карточки: ' + esc(guests.map(personName).join(', ')) + '</div>';
+    if (s) h += panelPayHtml(l, l.people.find(p => p.student_id === s.id), s);
     h += '<div class="sc-sp-foot"><button type="button" class="btn quiet small" id="spEdit">Править занятие</button></div>';
     panel.el.innerHTML = h;
     panel.el.scrollTop = keepScroll;
+  }
+
+  /* ── оплата в боковой панели: отметки участия и остаток ученика ── */
+  const sumCache = {};      // sid → { tok, text } — итог ученика на эту загрузку недели
+  function panelPayHtml(l, p, s){
+    const P = window.Payments;
+    if (!P || !p || l.is_event || (SC.hasPayCols && !SC.hasPayCols())) return '';
+    const ps = paySet();
+    let h = '<div class="sp-pay" id="spPay"><div class="label">Оплата</div>';
+    const sm = sumCache[s.id];
+    if (!sm || sm.tok !== st.loadTok) {
+      sumCache[s.id] = { tok: st.loadTok, text: '…' };
+      P.loadStudent(s).then(d => {
+        const c = P.calc(Object.assign({}, d, { settings: settings() }));
+        const k = c.current;
+        sumCache[s.id].text = (c.mode === 'pack' ? (k ? 'Абонемент: осталось ' + k.left + ' из ' + k.cap + (k.pay.burn === 'date' ? ' · до ' + P.dm(k.end) : k.until ? ' · до ' + P.dm(k.until) : '') : 'Абонемента нет') : 'Платит за занятие') +
+          (c.debt > 0 ? ' · долг ' + P.money(c.debt) : '');
+        paintPanel();
+      }, () => { sumCache[s.id].text = ''; paintPanel(); });
+    }
+    const text = sumCache[s.id].text;
+    h += '<div><a href="#/payments/' + esc(s.id) + '" id="spSum">' + esc(text || 'Оплаты ученика') + '</a></div>';
+    h += paidBtn(p, l).replace('class="sc-paid', 'id="spPaid" class="sc-paid');
+    if (isAbsent(p)) h += '<button type="button" class="btn quiet small" id="spWhy">' + esc(ST_NAME[p.status] + ': ' + whyText(p, l)) + '</button>';
+    if (ps.flags.length) h += '<div class="sp-flags" role="group" aria-label="Флаги">' + ps.flags.map(f =>
+      '<button type="button" data-flag="' + esc(f.id) + '" class="' + ((p.flags || []).indexOf(f.id) >= 0 ? 'on' : '') + '" title="' + (f.free ? 'делает занятие бесплатным' : 'пометка') + '">' + esc(f.name) + '</button>').join('') + '</div>';
+    h += '<label class="chk" style="margin:0"><input type="checkbox" id="spMakeup"' + (p.makeup ? ' checked' : '') + '> Отработка</label>';
+    return h + '</div>';
+  }
+  function onPanelPay(t, l){
+    const p = l.people.find(x => x.student_id === panel.sid);
+    if (!p) return;
+    if (t.id === 'spWhy') openPayCard(l, p);
+    else if (t.id === 'spPaid') togglePaid(l, p);
+    else if (t.dataset.flag) {
+      const fl = (p.flags || []).slice(), i = fl.indexOf(t.dataset.flag);
+      if (i >= 0) fl.splice(i, 1); else fl.push(t.dataset.flag);
+      setPart(l, p, { flags: fl }).then(paintPanel);
+    }
   }
 
   /* ── отрисовка ── */
