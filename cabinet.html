@@ -51,6 +51,21 @@ textarea.field{min-height:90px;resize:vertical;}
 .boards-box{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto;padding:6px 2px;}
 .boards-box label{display:flex;align-items:center;gap:8px;font-size:14.5px;cursor:pointer;}
 .hint{font-size:13px;color:var(--muted-2);line-height:1.45;}
+.memory{border:1px solid var(--glass-border);border-radius:14px;padding:14px 16px;background:var(--card);margin-bottom:12px;}
+.mhead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:8px;}
+.mhead>b{margin-right:auto;font-size:15px;}
+.mfilt{font-size:13.5px;color:var(--muted-3);display:flex;gap:6px;align-items:center;cursor:pointer;}
+.mgrp{margin-top:12px;}
+.mgh{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding-bottom:4px;border-bottom:1px solid var(--glass-border);}
+.mgh>b{font-size:13.5px;}
+.mgh .btn{margin-left:auto;}
+.mrow{display:flex;align-items:center;gap:10px;padding:7px 0;font-size:14px;border-bottom:1px solid var(--glass-border);}
+.mrow:last-child{border-bottom:none;}
+.mmain{flex:1;min-width:0;}
+.mid{font-weight:700;margin-right:4px;}
+.mev{color:var(--muted-3);}
+.mconf{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;margin:8px 0;border-radius:12px;border:1.5px solid var(--glass-border);font-size:14px;}
+.mconf span{flex:1;min-width:200px;}
 .slot{border:1.5px dashed var(--glass-border);border-radius:14px;padding:16px;color:var(--muted-2);font-size:14px;margin-bottom:12px;}
 .slot b{display:block;color:var(--muted-3);margin-bottom:3px;}
 .row-btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
@@ -177,6 +192,7 @@ textarea.field{min-height:90px;resize:vertical;}
 <script src="schedule-tpl.js"></script>
 <script src="schedule.js"></script>
 <script src="student-memory.js" data-picker></script>
+<script src="cabinet-log.js"></script>
 <script>
 (function(){
 'use strict';
@@ -305,6 +321,7 @@ async function openCard(id){
   } catch (e) { box.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; return; }
   renderCard(s, boards);
 }
+let memOff = null;   // отписка «Памяти заданий» предыдущей карточки
 function renderCard(s, boards){
   const box = $('cardBox');
   const def = TS.get().lessonMin;
@@ -341,9 +358,11 @@ function renderCard(s, boards){
     '<div class="row-btns" style="margin:4px 0 6px"><button class="btn" id="cSave">Сохранить</button>' +
       '<button class="btn danger" id="cArch">' + (s.archived_at ? 'Вернуть из архива' : 'В архив') + '</button>' +
       '<span class="save-note" id="cMsg" role="status"></span></div>' +
-    '<div class="slot" style="margin-top:16px"><b>Память заданий</b>Что выдавали в ДЗ, выводили на доску и решали — появится здесь.</div>' +
+    '<div id="memBox" style="margin-top:16px"></div>' +
     '<div class="slot"><b>Занятия</b>Ближайшее и последние занятия из расписания — появятся здесь.</div>';
   bindSessionBtn(s);
+  if (memOff) memOff();
+  memOff = window.CabinetLog ? window.CabinetLog.mount($('memBox'), s) : null;
   $('cSave').addEventListener('click', () => saveCard(s));
   $('cArch').addEventListener('click', () => archiveCard(s, boards));
 }
