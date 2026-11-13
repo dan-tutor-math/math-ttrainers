@@ -387,7 +387,7 @@
     }));
     host.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => {
       const l = findLesson(b.dataset.open);
-      if (l) openEditor(l);
+      if (l) openPanel(l);
     }));
   }
 
@@ -517,7 +517,7 @@
           plate.removeEventListener('pointermove', move);
           plate.removeEventListener('pointerup', up);
           plate.removeEventListener('pointercancel', up);
-          if (!moved) { openEditor(l); return; }
+          if (!moved) { openPanel(l); return; }
           if (resize) { if (newDur !== l.dur_min) patchLesson(l, { dur_min: newDur }); else render(); return; }
           const patch = {};
           if (dMin) patch.start_min = l.start_min + dMin;
@@ -530,7 +530,7 @@
       });
       col.addEventListener('keydown', e => {
         const plate = e.target.closest('.sc-plate');
-        if (plate && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); const l = findLesson(plate.dataset.id); if (l) openEditor(l); }
+        if (plate && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); const l = findLesson(plate.dataset.id); if (l) openPanel(l); }
       });
     });
     bindCommon();
@@ -694,6 +694,105 @@
     }));
   }
 
+
+  /* ── боковая панель занятия (В2) ──
+     Щелчок по занятию открывает краткую карточку ученика и три действия:
+     «Открыть карточку», «Открыть доску», «Начать сессию». Правка занятия
+     (время, формат, состав) — по кнопке «Править занятие», как раньше.
+     В паре и группе сверху — выбор ученика, действия относятся к нему.
+     Панель не закрывает расписание (без затемнения): при разборе занятий
+     удобно видеть соседние. Сессия начинается с lessonId — события журнала
+     этой сессии помечаются занятием (StudentMemory.start, Б1). */
+  const EXAM_SHORT = { oge: 'ОГЭ, математика', ege_prof: 'ЕГЭ, профиль', ege_base: 'ЕГЭ, база', rus_oge: 'ОГЭ, русский' };
+  let panel = null;           // { el, lessonId, sid, onKey, off }
+  function closePanel(){
+    if (!panel) return;
+    panel.el.remove();
+    document.removeEventListener('keydown', panel.onKey);
+    if (panel.off) panel.off();
+    panel = null;
+  }
+  function openPanel(l, sid){
+    const people = l.people.filter(p => p.student_id);
+    const first = sid || (people[0] && people[0].student_id) || null;
+    if (panel && panel.lessonId === l.id && !sid) { paintPanel(); return; }
+    closePanel();
+    const el = document.createElement('aside');
+    el.className = 'sc-side panel';
+    el.setAttribute('aria-label', 'Занятие');
+    document.body.appendChild(el);
+    const onKey = e => { if (e.key === 'Escape' && !modal) closePanel(); };
+    document.addEventListener('keydown', onKey);
+    panel = { el, lessonId: l.id, sid: first, onKey, off: null };
+    const SM = window.StudentMemory;
+    if (SM && SM.onChange) panel.off = SM.onChange(() => paintPanel());
+    el.addEventListener('click', onPanelClick);
+    paintPanel();
+  }
+  function onPanelClick(e){
+    const t = e.target.closest('button, a');
+    if (!t || !panel) return;
+    const l = findLesson(panel.lessonId);
+    if (!l) return;
+    if (t.classList.contains('sc-x')) closePanel();
+    else if (t.dataset.pick) { panel.sid = t.dataset.pick; paintPanel(); }
+    else if (t.id === 'spEdit') openEditor(l);
+    else if (t.id === 'spSession') toggleSession(l);
+  }
+  async function toggleSession(l){
+    const SM = window.StudentMemory, s = st.byId[panel.sid];
+    if (!SM || !s) return;
+    const cur = SM.current();
+    if (cur && cur.id === String(s.id) && cur.lessonId === l.id) { SM.end(); return; }
+    const btn = panel.el.querySelector('#spSession');
+    if (btn) btn.disabled = true;
+    try { await SM.start({ id: s.id, name: s.name }, { lessonId: l.id }); }
+    catch (er) { api.toast('Сессия не началась: ' + (er.message || er)); }
+    paintPanel();
+  }
+  function paintPanel(){
+    if (!panel) return;
+    const l = findLesson(panel.lessonId);
+    if (!l) { closePanel(); return; }
+    const people = l.people.filter(p => p.student_id && st.byId[p.student_id]);
+    const guests = l.people.filter(p => !p.student_id);
+    if (!people.some(p => p.student_id === panel.sid)) panel.sid = people[0] ? people[0].student_id : null;
+    const s = panel.sid ? st.byId[panel.sid] : null;
+    const SM = window.StudentMemory, cur = SM && SM.current ? SM.current() : null;
+    const mine = !!(s && cur && cur.id === String(s.id) && cur.lessonId === l.id);
+    const keepScroll = panel.el.scrollTop;
+    let h = '<div class="sc-ed-head"><b>' + esc(dayText(l.day)) + ', ' + esc(timeText(l)) + '</b><button type="button" class="sc-x" aria-label="Закрыть">×</button></div>' +
+      '<div class="hint">' + esc(l.is_event ? 'событие' : fmtLabel(l.format)) + '</div>';
+    if (l.is_event) h += '<div class="sc-sp-name">' + esc(l.title || 'Событие') + '</div>';
+    if (people.length > 1) {
+      h += '<div class="seg sc-sp-pick" role="group" aria-label="Ученик">' + people.map(p =>
+        '<button type="button" data-pick="' + esc(p.student_id) + '" class="' + (p.student_id === panel.sid ? 'on' : '') + '">' + esc(personName(p)) + '</button>').join('') + '</div>';
+    }
+    if (s) {
+      const meta = [s.grade ? s.grade + ' класс' : '', s.exam ? (EXAM_SHORT[s.exam] || s.exam) : ''].filter(Boolean).join(' · ');
+      const board = l.board_id || ((s.boards || [])[0] || null);
+      const boardWhere = l.board_id ? 'доска занятия' : 'доска ученика';
+      h += '<div class="sc-sp-card"><div class="sc-sp-name">' + esc(s.name) + (s.archived_at ? ' <span class="badge">архив</span>' : '') + '</div>' +
+        (meta ? '<div class="hint">' + esc(meta) + '</div>' : '') +
+        (s.note ? '<div class="sc-sp-note">' + esc(String(s.note).slice(0, 300)) + (String(s.note).length > 300 ? '…' : '') + '</div>' : '') + '</div>' +
+        '<div class="sc-sp-btns">' +
+          '<a class="btn quiet" id="spCard" href="#/students/' + esc(s.id) + '">Открыть карточку</a>' +
+          (board ? '<a class="btn quiet" id="spBoard" target="_blank" rel="noopener" href="boards.html#board=' + encodeURIComponent(board) + '" title="' + esc(boardWhere) + '">Открыть доску</a>'
+                 : '<button type="button" class="btn quiet" id="spBoard" disabled title="Ни к занятию, ни к ученику доска не привязана">Открыть доску</button>') +
+          '<button type="button" class="btn" id="spSession"' + (s.archived_at ? ' disabled title="Ученик в архиве"' : '') + '>' + (mine ? 'Закончить сессию' : 'Начать сессию') + '</button>' +
+        '</div>' +
+        '<div class="hint" id="spHint">' + (mine ? 'Идёт сессия с этим учеником' + (cur.paused ? ' (пауза)' : '') + ': задания запишутся на это занятие.'
+          : cur ? 'Сейчас идёт сессия с учеником «' + esc(cur.name) + '» — она сменится.' : 'Задания сессии запишутся на это занятие.') +
+          (board ? ' Доска: ' + esc(boardWhere) + '.' : '') + '</div>';
+    } else if (!l.is_event) {
+      h += '<div class="hint" style="margin:10px 0">Здесь нет ученика с карточкой — сессию и доску открыть не к кому.</div>';
+    }
+    if (guests.length) h += '<div class="hint">Гость без карточки: ' + esc(guests.map(personName).join(', ')) + '</div>';
+    h += '<div class="sc-sp-foot"><button type="button" class="btn quiet small" id="spEdit">Править занятие</button></div>';
+    panel.el.innerHTML = h;
+    panel.el.scrollTop = keepScroll;
+  }
+
   /* ── отрисовка ── */
   // пока в форме быстрого ввода висит вопрос о незнакомом имени, полная
   // перерисовка снесла бы его кнопки (их ждёт промис resolveNames). Поэтому
@@ -719,7 +818,7 @@
     else body = st.view === 'grid' ? gridHtml() : listHtml();
     host.innerHTML = headHtml() + '<div class="sc-body sc-v-' + st.view + '" id="scBody">' + body + '</div>';
     host.querySelectorAll('.sc-views button').forEach(b => b.addEventListener('click', () => setView(b.dataset.v)));
-    host.querySelectorAll('.sc-modes button').forEach(b => b.addEventListener('click', () => { st.mode = b.dataset.mode; closeModal(); render(); }));
+    host.querySelectorAll('.sc-modes button').forEach(b => b.addEventListener('click', () => { st.mode = b.dataset.mode; closeModal(); closePanel(); render(); }));
     const retry = host.querySelector('#scRetry');
     if (retry) retry.addEventListener('click', load);
     if (loading || st.err) return;
@@ -740,6 +839,7 @@
       });
     }
     paintEditor();
+    paintPanel();
   }
 
   // шаблоны, пары и группы живут в schedule-tpl.js; общие приёмы он берёт отсюда
@@ -759,8 +859,9 @@
     if (mon === st.week && st.lessons && !st.err && host.querySelector('.sc-body')) { render(); return Promise.resolve(); }
     st.week = mon;
     closeModal();
+    closePanel();
     return load();
   }
 
-  window.Schedule = { init, show, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), setMode: m => { st.mode = m; render(); } };
+  window.Schedule = { init, show, hide: closePanel, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), setMode: m => { st.mode = m; render(); } };
 })();

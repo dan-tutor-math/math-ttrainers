@@ -55,9 +55,11 @@
   const THROTTLE_MS = 10 * 60 * 1000;           // одно событие по заданию — не чаще раза в 10 минут
   const LOG_KEEP_MS = 3 * 24 * 3600 * 1000;     // копии журналов других учеников — 3 дня
   const QUEUE_MAX = 5000;
-  // столбца lesson_id в student_task_log пока нет (cabinet-schema.sql, А3):
-  // занятие хранится в очереди, а на сервер уйдёт, когда В2 добавит столбец
-  const SEND_LESSON_ID = false;
+  // lesson_id в student_task_log есть (cabinet-schema.sql, А3, внешний ключ на
+  // lessons, on delete set null): событие сессии, начатой из занятия расписания
+  // (В2), уходит на сервер вместе с занятием. Флаг оставлен выключателем: если
+  // на каком-то стенде схема без столбца, достаточно поставить false
+  const SEND_LESSON_ID = true;
   const EV = { hw: 'h', board: 'b', ok: 'o', bad: 'x' };
   const EV_BACK = { h: 'hw', b: 'board', o: 'ok', x: 'bad' };
   const SOURCES = ['trainer', 'board', 'work'];
@@ -421,7 +423,7 @@
     if (!c) throw new Error('Нет подключения к серверу');
     const out = [];
     for (let from = 0; ; from += 1000){
-      const res = await c.from('student_task_log').select('id, task_key, event, source, src_ref, at')
+      const res = await c.from('student_task_log').select('id, task_key, event, source, src_ref, at, lesson_id')
         .eq('student_id', String(studentId)).order('at', { ascending: true }).range(from, from + 999);
       if (res.error) throw new Error(errText(res.error) || 'Ошибка сервера');
       out.push.apply(out, res.data || []);

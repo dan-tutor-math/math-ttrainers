@@ -183,3 +183,16 @@
 .sc-grp-top .field{width:auto;}
 .sc-grp-top .grp-dur{width:80px;}
 .sc-grp-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;}
+
+/* ── В2: боковая панель занятия ── */
+.sc-side{position:fixed;top:12px;right:12px;bottom:12px;width:320px;max-width:calc(100vw - 24px);z-index:45;overflow:auto;background:var(--card);box-shadow:0 10px 40px rgba(10,14,30,.25);}
+.sc-sp-card{margin:12px 0;padding:10px 12px;border-radius:12px;border:1px solid var(--glass-border);}
+.sc-sp-name{font-weight:700;font-size:16px;}
+.sc-sp-note{margin-top:6px;font-size:13.5px;color:var(--muted-3);white-space:pre-wrap;}
+.sc-sp-pick{margin:10px 0 0;}
+.sc-sp-btns{display:flex;flex-direction:column;gap:8px;margin:0 0 10px;}
+.sc-sp-btns .btn{text-align:center;text-decoration:none;}
+.sc-sp-foot{margin-top:14px;}
+@media (max-width:620px){
+  .sc-side{top:auto;left:0;right:0;bottom:0;width:auto;max-width:none;max-height:70vh;border-radius:20px 20px 0 0;}
+}

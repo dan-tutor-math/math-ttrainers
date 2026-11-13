@@ -66,6 +66,12 @@ textarea.field{min-height:90px;resize:vertical;}
 .mev{color:var(--muted-3);}
 .mconf{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;margin:8px 0;border-radius:12px;border:1.5px solid var(--glass-border);font-size:14px;}
 .mconf span{flex:1;min-width:200px;}
+.les{border-bottom:1px solid var(--glass-border);padding:6px 0;}
+.les:last-child{border-bottom:none;}
+.les-h{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:14.5px;}
+.les-t{color:var(--pencil);text-decoration:none;margin-right:auto;}
+.les-t:hover{text-decoration:underline;}
+.les-body{margin:4px 0 4px 12px;}
 .slot{border:1.5px dashed var(--glass-border);border-radius:14px;padding:16px;color:var(--muted-2);font-size:14px;margin-bottom:12px;}
 .slot b{display:block;color:var(--muted-3);margin-bottom:3px;}
 .row-btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
@@ -267,6 +273,8 @@ async function route(){
   document.querySelector('.wrap').classList.toggle('sc-wide', t === 'schedule');
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === t));
   ['tabStudents', 'tabCard', 'tabSchedule', 'tabSettings'].forEach(x => { $(x).hidden = true; });
+  // боковая панель занятия висит поверх страницы — с вкладки «Расписание» её уносим
+  if (t !== 'schedule' && window.Schedule && Schedule.hide) Schedule.hide();
   if (t === 'students' && id){ $('tabCard').hidden = false; await openCard(id); }
   else if (t === 'students'){ $('tabStudents').hidden = false; await renderList(); }
   else if (t === 'schedule'){ $('tabSchedule').hidden = false; await Schedule.show(id); }
@@ -359,10 +367,15 @@ function renderCard(s, boards){
       '<button class="btn danger" id="cArch">' + (s.archived_at ? 'Вернуть из архива' : 'В архив') + '</button>' +
       '<span class="save-note" id="cMsg" role="status"></span></div>' +
     '<div id="memBox" style="margin-top:16px"></div>' +
-    '<div class="slot"><b>Занятия</b>Ближайшее и последние занятия из расписания — появятся здесь.</div>';
+    '<div id="lesBox"></div>';
   bindSessionBtn(s);
   if (memOff) memOff();
   memOff = window.CabinetLog ? window.CabinetLog.mount($('memBox'), s) : null;
+  // «Занятия» (В2): ближайшее, последние и «что решали»; снимается вместе с журналом
+  if (window.CabinetLog && window.CabinetLog.mountLessons) {
+    const offMem = memOff, offLes = window.CabinetLog.mountLessons($('lesBox'), s);
+    memOff = () => { if (offMem) offMem(); offLes(); };
+  }
   $('cSave').addEventListener('click', () => saveCard(s));
   $('cArch').addEventListener('click', () => archiveCard(s, boards));
 }

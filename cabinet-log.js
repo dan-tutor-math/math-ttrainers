@@ -168,5 +168,96 @@
     return function(){ dead = true; if (off) off(); };
   }
 
-  window.CabinetLog = { mount, parseKey };
+  /* ── «Занятия» в карточке ученика (В2) ──
+     CabinetLog.mountLessons(box, student) → «снять».
+     Ближайшее занятие и последние; у каждого начавшегося раскрывается
+     «что решали» — строки журнала с lesson_id этого занятия (их пишет
+     сессия, начатая из занятия в расписании).
+     Почему «начавшееся», а не «закончившееся»: сессия идёт прямо на
+     занятии, и пока оно не кончилось, смотреть «что решали» уже нужно.
+     Журнал берём с сервера целиком (fetchLog): сжатая копия StudentMemory
+     занятие не хранит. */
+  const DAYS = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
+  const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+  const ST_SIGN = { plan: '○', done: '✓', skip: '✕', move: '↷' };
+  const ST_NAME = { plan: 'запланировано', done: 'проведено', skip: 'пропуск', move: 'перенос' };
+  const pad2 = n => (n < 10 ? '0' : '') + n;
+  const hm = m => pad2(Math.floor(m / 60)) + ':' + pad2(m % 60);
+  function dayText(day){
+    const [y, m, d] = day.split('-').map(Number);
+    return DAYS[new Date(y, m - 1, d).getDay()] + ', ' + d + ' ' + MONTHS[m - 1];
+  }
+  function timeText(l){ return l.start_min == null ? 'без времени' : hm(l.start_min) + ' – ' + hm(Math.min(1440, l.start_min + l.dur_min)); }
+  function startedAlready(l, now){
+    const t = now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-' + pad2(now.getDate());
+    if (l.day !== t) return l.day < t;
+    return l.start_min != null && l.start_min <= now.getHours() * 60 + now.getMinutes();
+  }
+  const EV_TEXT = { hw: 'выдано в ДЗ', board: 'на доске', ok: 'решено верно', bad: 'решено неверно' };
+  function keyText(k){
+    const p = parseKey(k);
+    if (p.type === 'fipi') return 'ФИПИ · ' + (EXAM_NAMES[p.exam] || p.exam) + ' · ' + p.id;
+    if (p.type === 'gen') return pageName(p.page) + ' · ' + p.kind;
+    return p.key;
+  }
+  function logLine(r){
+    const d = new Date(r.at);
+    return '<div class="mrow"><span class="mmain"><span class="mid">' + esc(keyText(r.task_key)) + '</span> <span class="mev">— ' +
+      esc(EV_TEXT[r.event] || r.event) + ', ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes()) + '</span></span></div>';
+  }
+
+  function mountLessons(box, student){
+    const SM = window.StudentMemory, SC = window.ScheduleCloud;
+    let dead = false, lessons = null, log = null, logErr = '', err = '';
+    const open = new Set();
+    function row(l, isPast){
+      const my = l.my || {};
+      const rows = (log || []).filter(r => r.lesson_id === l.id);
+      let h = '<div class="les" data-lesson="' + esc(l.id) + '"><div class="les-h">' +
+        '<a class="les-t" href="#/schedule/' + esc(l.day) + '" title="Открыть неделю в расписании"><b>' + esc(dayText(l.day)) + '</b> · ' + esc(timeText(l)) + '</a>' +
+        '<span class="hint">' + esc(ST_SIGN[my.status] || '') + ' ' + esc(ST_NAME[my.status] || '') + '</span>';
+      if (isPast || rows.length) {
+        h += '<button type="button" class="btn quiet small les-tg" data-tg="' + esc(l.id) + '" aria-expanded="' + (open.has(l.id) ? 'true' : 'false') + '">' +
+          'Что решали' + (log ? ': ' + rows.length : '') + '</button>';
+      }
+      h += '</div>';
+      if (open.has(l.id)) {
+        h += '<div class="les-body">' + (logErr ? '<div class="hint">' + esc(logErr) + '</div>'
+          : !log ? '<div class="hint">Загружаем…</div>'
+          : rows.length ? rows.map(logLine).join('') : '<div class="hint">На этом занятии ничего не записано — сессия из занятия не начиналась.</div>') + '</div>';
+      }
+      return h + '</div>';
+    }
+    function render(){
+      if (dead) return;
+      let h = '<div class="memory"><div class="mhead"><b>Занятия</b></div>';
+      if (err) h += '<div class="hint">' + esc(err) + '</div>';
+      else if (!lessons) h += '<div class="hint">Загружаем…</div>';
+      else if (!lessons.length) h += '<div class="hint">Занятий с этим учеником в расписании пока нет.</div>';
+      else {
+        const now = new Date();
+        const past = lessons.filter(l => startedAlready(l, now)).reverse().slice(0, 10);
+        const next = lessons.filter(l => !startedAlready(l, now))[0];
+        h += '<div class="label">Ближайшее</div>' + (next ? row(next, false) : '<div class="hint">Не запланировано.</div>');
+        h += '<div class="label" style="margin-top:10px">Последние</div>' + (past.length ? past.map(l => row(l, true)).join('') : '<div class="hint">Прошедших занятий нет.</div>');
+      }
+      box.innerHTML = h + '</div>';
+    }
+    box.addEventListener('click', ev => {
+      const t = ev.target.closest('[data-tg]');
+      if (!t) return;
+      const id = t.dataset.tg;
+      if (open.has(id)) open.delete(id); else open.add(id);
+      render();
+    });
+    render();
+    if (!SC) { err = 'Расписание не подключено'; render(); return function(){ dead = true; }; }
+    SC.listForStudent(student.id).then(ls => { lessons = ls; render(); }, e => { err = 'Занятия не загрузились: ' + (e && e.message || e); render(); });
+    if (SM && SM.fetchLog) SM.fetchLog(student.id).then(rows => { log = rows; render(); }, e => { logErr = 'Журнал не загрузился: ' + (e && e.message || e); render(); });
+    else logErr = 'Журнал недоступен';
+    return function(){ dead = true; };
+  }
+
+  window.CabinetLog = { mount, mountLessons, parseKey };
+
 })();

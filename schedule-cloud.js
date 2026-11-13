@@ -80,6 +80,26 @@
     return (lessons || []).map(l => Object.assign({}, l, { people: (by[l.id] || []).sort((a, b) => a.pos - b.pos) }));
   }
 
+  /* ── занятия одного ученика (В2: карточка ученика) ──
+     Все занятия, где он участник, по возрастанию дня. В каждом `my` — его
+     строка участия (статус), `people` — только она: остальных для карточки
+     не нужно. Идём через lesson_students: по ним выбирается «моё», а занятия
+     добираем пачками — длинный in() не влезает в адрес запроса */
+  async function listForStudent(studentId){
+    const c = need();
+    const mine = await run(c.from('lesson_students').select(LS_COLS).eq('student_id', String(studentId)));
+    const byLesson = {};
+    (mine || []).forEach(p => { byLesson[p.lesson_id] = p; });
+    const ids = Object.keys(byLesson);
+    let out = [];
+    for (let i = 0; i < ids.length; i += 100) {
+      const part = await run(c.from('lessons').select(LESSON_COLS).in('id', ids.slice(i, i + 100)));
+      out = out.concat(part || []);
+    }
+    out.forEach(l => { l.my = byLesson[l.id]; l.people = [l.my]; });
+    return out.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : (a.start_min == null ? -1 : a.start_min) - (b.start_min == null ? -1 : b.start_min)));
+  }
+
   /* ── занятие ── */
   // f — поля занятия, people — [{student_id} | {guest_name}]. Участники не
   // встали — занятие удаляем: пустая плашка без объяснения хуже ошибки
@@ -258,7 +278,7 @@
     return nt;
   }
 
-  window.ScheduleCloud = { FORMATS, STATUSES, GROUP_FORMATS, listRange, addLesson, updateLesson, deleteLesson, addPeople, setStatus, removePerson,
+  window.ScheduleCloud = { FORMATS, STATUSES, GROUP_FORMATS, listRange, listForStudent, addLesson, updateLesson, deleteLesson, addPeople, setStatus, removePerson,
     listGroups, addGroup, updateGroup, setGroupMembers, deleteGroup,
     listTemplates, addTemplate, renameTemplate, deleteTemplate, setActiveTemplate, addSlot, updateSlot, deleteSlot, addSlotPeople, removeSlotPerson, setSlotPeople, duplicateTemplate };
 })();

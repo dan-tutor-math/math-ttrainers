@@ -429,6 +429,8 @@ def main():
         # карточка занятия: клик по плашке, смена формата
         pm = page.locator(f".sc-plate[data-id='{mid}']").bounding_box()
         page.mouse.click(pm["x"] + 20, pm["y"] + 30)
+        page.wait_for_selector(".sc-side #spEdit")      # В2: щелчок открывает боковую панель, правка — по кнопке
+        page.click("#spEdit")
         page.wait_for_selector(".sc-modal #edFmt button")
         check("D9 карточка: ученики со статусами", page.locator(".sc-edp").count() == 2 and "проведено" in page.inner_text(".sc-edpeople"))
         page.click("#edFmt button[data-v=group]")
@@ -478,6 +480,8 @@ def main():
               page.evaluate("() => Schedule._st.week") == WEEK and page.get_attribute(".sc-day.today", "data-day") == "2026-11-18")
         open_schedule(page)
         page.click(f".sc-day[data-day='2026-11-17'] .sc-time >> text=12:00 – 13:00")
+        page.wait_for_selector("#spEdit")
+        page.click("#spEdit")
         page.wait_for_selector("#edDel")
         page.click("#edDel")
         check("F4 удаление спрашивает подтверждение", page.inner_text("#edDel") == "Точно удалить?" and len(lessons()) == 4)
