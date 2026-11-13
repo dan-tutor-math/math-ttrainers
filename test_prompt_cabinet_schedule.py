@@ -323,6 +323,8 @@ def main():
         L = lessons()
         ok = len(L) == 1 and (L[0]["day"], L[0]["start_min"], L[0]["dur_min"], L[0]["format"]) == (WEEK, 900, 90, "pair")
         check("B3 занятие: пн 15:00, 90 мин (своя у Маши), пара", ok, str(L))
+        # участники пишутся вторым запросом после занятия — ждём и их, иначе тест гоняется с записью
+        if L: wait_db(lambda: len(people(L[0]["id"])) == 2, "участники в базе")
         P = people(L[0]["id"]) if L else []
         check("B4 участники — ссылки на учеников", [p["student_id"] for p in P] == ["st-masha", "st-petya"], str(P))
         page.wait_for_selector(f"{mon} .sc-row")
