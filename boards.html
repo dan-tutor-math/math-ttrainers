@@ -1943,6 +1943,7 @@ function resolveBasketTexInHtml(html){
     </div>
     <div class="bd-trainers-list" id="bdTrainersList">
       <input type="text" class="bd-trainers-search" id="bdTrainersSearch" placeholder="Поиск тренажёра…">
+      <button type="button" class="bd-tire-add" id="bdAddTire3D">3D-модель шины</button>
       <div class="bd-trainers-groups" id="bdTrainersGroups"></div>
     </div>
     <div class="bd-trainers-frame-wrap" id="bdTrainersFrameWrap">
@@ -2211,5 +2212,8 @@ window.__boardViewer = /[?&]s=[^&#]/.test(location.search);</script>
      нового списка): учитель показывает открытую доску, ученик смотрит -->
 <script src="session-share.js"></script>
 <script src="board-stage.js"></script>
+<link rel="stylesheet" href="board-tire3d.css">
+<script src="tire-math.js"></script>
+<script src="board-tire3d.js"></script>
 </body>
 </html>
