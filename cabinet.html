@@ -185,6 +185,22 @@ textarea.field{min-height:90px;resize:vertical;}
         </div>
         <div class="save-note" id="saveNote" role="status"></div>
       </div>
+      <!-- В5: личная функция Даниила — свёрнута, в общем интерфейсе не мешает -->
+      <details class="panel" id="syncBox" style="margin-top:14px">
+        <summary><b>Синхронизация со старым приложением расписания</b></summary>
+        <div class="hint" style="margin-top:8px">Расписание, ученики, шаблоны недели, пары и группы — в обе стороны. Оплаты пока не переносятся. Код хранится только в этом браузере и на сервер Mathh не уходит.</div>
+        <div class="grid2" style="margin-top:8px">
+          <label><span class="label">Адрес старого приложения</span><input class="field" id="syUrl" placeholder="https://….workers.dev" autocomplete="off"></label>
+          <label><span class="label">Код доступа</span><input class="field" id="syCode" type="password" autocomplete="off" placeholder="как в старом приложении"></label>
+        </div>
+        <div class="row-btns" style="margin-top:8px">
+          <button type="button" class="btn" id="sySave">Сохранить и синхронизировать</button>
+          <button type="button" class="btn quiet" id="syNow">Синхронизировать сейчас</button>
+          <button type="button" class="btn quiet" id="syOff">Отключить</button>
+        </div>
+        <div class="save-note" id="syState" role="status"></div>
+        <div id="syUnknown"></div>
+      </details>
     </section>
   </div>
 </div>
@@ -199,6 +215,7 @@ textarea.field{min-height:90px;resize:vertical;}
 <script src="schedule.js"></script>
 <script src="student-memory.js" data-picker></script>
 <script src="cabinet-log.js"></script>
+<script src="schedule-sync.js"></script>
 <script>
 (function(){
 'use strict';
@@ -242,6 +259,7 @@ async function boot(){
   });
   route();
   TS.load();
+  if (user) SY.syncAuto();
 }
 function renderAcct(){
   const a = $('acct');
@@ -503,6 +521,49 @@ Schedule.init({
   weekHref: mon => '#/schedule' + (mon ? '/' + mon : ''),
   toast,
 });
+
+/* ── синхронизация со старым приложением (schedule-sync.js, В5) ── */
+const SY = window.ScheduleSync;
+SY.init({
+  // пришли правки из старого: сбросить кэш учеников и перерисовать открытое
+  onChanged: () => {
+    students = null;
+    const t = location.hash.replace(/^#\/?/, '').split('/')[0];
+    if (t === 'schedule') Schedule.reload();
+    else if (t === 'students' || !t) route();
+  },
+});
+const SY_TEXT = { off: 'Не настроено', idle: 'Ждёт синхронизации', wait_import: 'Ждёт первого импорта: нажмите «Синхронизировать сейчас»', stale: 'Старое приложение отдаёт устаревшие данные — повторим позже' };
+function paintSync(){
+  const st = SY.state, cfg = SY.config();
+  if (document.activeElement !== $('syUrl')) $('syUrl').value = cfg.url;
+  $('syCode').placeholder = cfg.hasCode ? 'сохранён в этом браузере' : 'как в старом приложении';
+  let t = st.busy ? 'Синхронизация…' : st.status === 'error' ? 'Ошибка: ' + st.error
+    : st.status === 'ok' ? 'Синхронизировано ' + new Date(st.at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }) : (SY_TEXT[st.status] || '');
+  $('syState').textContent = t;
+  $('syUnknown').innerHTML = st.unknown.length ? '<div class="hint" style="margin-top:8px">Имена из старого приложения без ученика в кабинете (сейчас — гости):</div>' +
+    st.unknown.map(n => '<div class="row-btns sy-unk" data-name="' + esc(n) + '" style="margin-top:6px;align-items:center"><b>' + esc(n) + '</b>' +
+      '<button type="button" class="btn small" data-act="adopt">Завести ученика</button><button type="button" class="btn quiet small" data-act="skip">Оставить гостем</button></div>').join('') : '';
+}
+SY.onChange(paintSync);
+$('sySave').addEventListener('click', () => {
+  const url = $('syUrl').value.trim(), code = $('syCode').value;
+  if (!url || (!code && !SY.config().hasCode)) { $('syState').textContent = 'Впишите адрес и код'; return; }
+  SY.configure(url, code || null);
+  $('syCode').value = '';
+  SY.sync();
+});
+$('syNow').addEventListener('click', () => SY.sync());
+$('syOff').addEventListener('click', () => { SY.configure(null, null); $('syUrl').value = ''; $('syCode').value = ''; });
+$('syUnknown').addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const name = b.closest('.sy-unk').dataset.name;
+  b.disabled = true;
+  try { if (b.dataset.act === 'adopt') { await SY.adopt(name); toast('Ученик заведён: ' + name); } else SY.skipName(name); }
+  catch (err) { toast(err.message); b.disabled = false; }
+});
+paintSync();
 
 window.__cabinet = { get students(){ return students; } };
 boot();
