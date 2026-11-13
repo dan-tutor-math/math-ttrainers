@@ -162,6 +162,7 @@ textarea.field{min-height:90px;resize:vertical;}
 <script src="supabase-js.umd.js"></script>
 <script src="cabinet-cloud.js"></script>
 <script src="teacher-settings.js"></script>
+<script src="student-memory.js" data-picker></script>
 <script>
 (function(){
 'use strict';
@@ -302,8 +303,8 @@ function renderCard(s, boards){
       '<h2 id="cName">' + esc(s.name) + '</h2>' +
       (s.archived_at ? '<span class="badge">архив</span>' : '') + '</div>' +
     '<div class="row-btns" style="margin-bottom:14px">' +
-      '<button class="btn" id="cSession" disabled title="Заработает в следующем обновлении">Начать сессию</button>' +
-      '<span class="hint">Ученик получит память заданий и подписи — скоро.</span></div>' +
+      '<button class="btn" id="cSession"' + (s.archived_at ? ' disabled title="Ученик в архиве"' : '') + '>Начать сессию</button>' +
+      '<span class="hint" id="cSessionHint">Задания, выданные и решённые в сессии, запомнятся за учеником.</span></div>' +
     '<div class="fld"><label class="label" for="cName_in">Имя</label><input class="field" id="cName_in" maxlength="80" value="' + esc(s.name) + '"></div>' +
     '<div class="grid2">' +
       '<div class="fld"><label class="label" for="cGrade">Класс</label><input class="field" id="cGrade" maxlength="20" list="gradeList" value="' + esc(s.grade || '') + '" placeholder="например, 9">' +
@@ -326,8 +327,35 @@ function renderCard(s, boards){
       '<span class="save-note" id="cMsg" role="status"></span></div>' +
     '<div class="slot" style="margin-top:16px"><b>Память заданий</b>Что выдавали в ДЗ, выводили на доску и решали — появится здесь.</div>' +
     '<div class="slot"><b>Занятия</b>Ближайшее и последние занятия из расписания — появятся здесь.</div>';
+  bindSessionBtn(s);
   $('cSave').addEventListener('click', () => saveCard(s));
   $('cArch').addEventListener('click', () => archiveCard(s, boards));
+}
+/* «Начать сессию» (Б1): ученик сессии и его журнал — student-memory.js.
+   Кнопка сама становится «Закончить сессию», если этот ученик уже текущий —
+   в том числе когда сессию начали или закончили в соседней вкладке */
+function bindSessionBtn(s){
+  const SM = window.StudentMemory, btn = $('cSession');
+  if (!SM || !btn) return;
+  let off = null;
+  const paint = () => {
+    // карточку перерисовали — старая подписка больше не нужна
+    if (!document.body.contains(btn)) { if (off) off(); return; }
+    const cur = SM.current();
+    const mine = !!(cur && cur.id === String(s.id));
+    btn.textContent = mine ? 'Закончить сессию' : 'Начать сессию';
+    $('cSessionHint').textContent = mine ? 'Идёт сессия с этим учеником' + (cur.paused ? ' (пауза)' : '') + '.'
+      : (cur ? 'Сейчас идёт сессия с учеником «' + cur.name + '» — она сменится.' : 'Задания, выданные и решённые в сессии, запомнятся за учеником.');
+  };
+  btn.addEventListener('click', async () => {
+    const cur = SM.current();
+    if (cur && cur.id === String(s.id)) { SM.end(); return; }
+    btn.disabled = true;
+    try { await SM.start({ id: s.id, name: $('cName').textContent || s.name }); }
+    finally { btn.disabled = !!s.archived_at; paint(); }
+  });
+  off = SM.onChange(paint);
+  paint();
 }
 async function saveCard(s){
   const name = $('cName_in').value.trim();

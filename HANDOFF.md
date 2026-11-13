@@ -671,6 +671,18 @@
   lessonMin). Правда на сервере, копия в localStorage `teacher:settings:v1`;
   `get()` читает копию синхронно, `load()` тянет сервер, `set(patch)` пишет в обе.
   Подключать на страницах, которым нужны настройки (Б1 и далее). Тест `test_prompt_cabinet_page.py`
+- `student-memory.js` — `window.StudentMemory` (Б1): ученик сессии, журнал памяти заданий
+  (student_task_log), очередь записи, плашка «Сессия: имя · пауза · закончить» слева внизу.
+  API: current/start/end/pause, record(key, hw|board|ok|bad, {source, srcRef, lessonId}),
+  summary(key), kindSummary(prefix), keys(), forget(keys, {prefix}), fetchLog, listStudents,
+  onChange. Привязка по TeacherSettings.sessionBind: «вкладка» — sessionStorage
+  `studentMem:tab` рядом с `tsTab:code`, «браузер» — localStorage `studentMem:browser`.
+  Копия журнала — `studentMem:log:<id>`, очередь — `studentMem:queue:v1` (отправляет
+  любая страница с Supabase и входом), отвергнутое навсегда — `studentMem:dead:v1`.
+  У follower (роль вкладки, ?s=, сцена) молчит. Выбор ученика — главная и кабинет
+  (`data-picker`), только вошедшему. Подключён перед `</body>` на главной, досках,
+  boards-panel, работах, кабинете и страницах тренажёров (копии ege_prof — sync_ege_pages.py).
+  Тест `test_prompt_b1_student_memory.py`
 - `works.css` — общий вид обеих страниц: оформление тренажёров, не досок
 - `video-player.js` — свой плеер HLS (`window.VideoPlayer`): окно поверх
   страницы, hls.js 1.5.20 с cdnjs (с integrity) грузится при первом
@@ -7160,6 +7172,13 @@ Realtime в работах не нужен. Из песочницы до Supabas
 
 - (10.11.2026) Порядок слоёв карточек в облаке: подъём пишется числом `zr` в самом объекте (обычная правка: pushUndo → rv → запись и рассылка), а не перестановкой массива — `board_objects` читаются по `obj_id`. `applyLayerOrder` (`boards-core.js`, `window.boardsApplyLayerOrder`) переставляет объекты с `zr` между их же местами по возрастанию `zr`, остальные стоят на месте; зовётся в `boards-cloud.js` после `acceptRemoteObject`, загрузки/слияния и `applyOwnDiff`. Закрывающим карточкам без `zr` при подъёме тоже ставится `zr` (разовая запись); если среди них чужая (`mayTouch`) — порядок меняется только на своём экране без записи. Новый путь, добавляющий чужие объекты в `board.objects`, обязан звать `boardsApplyLayerOrder`. Тест — раздел «общая доска» в `test_prompt_overlap_inputs.py`; живой realtime — проверять руками
 - (13.11.2026) Кабинет: капсула `.lg-side` на главной теперь из четырёх кнопок — тесты, считающие кнопки капсулы по числу и по классам (`test_prompt_glass_menu.py`, `test_prompt114_phone_glass_theme.py`), надо править при каждой новой кнопке. Бейдж «архив» набран через `text-transform:uppercase`: `inner_text` в playwright вернёт «АРХИВ», сравнивать через `.lower()`. Привязка досок хранится у ученика (`students.boards`, id текстом): id удалённой доски из карточки молча не теряем — показываем «доска не найдена» и оставляем в связи
+- (13.11.2026) Тесты с заглушкой Supabase через `route` (sync playwright): ждать только
+  `page.wait_for_timeout`, не `time.sleep` — пока Python спит, маршруты не обслуживаются и
+  запросы к «базе» висят (так выглядело «очередь не уходит»). `rus_oge.html` без `?all=1`
+  уводит на главную — для проверок «страница без Supabase» брать `neg_pos.html`.
+  Память ученика (`student-memory.js`): новая вкладка «＋ Новая сессия» получает копию
+  sessionStorage вместе с учеником — отличаем по списку `tsSessions:v1` (старый код ещё
+  в списке → им живёт соседняя вкладка, эта без ученика; кода нет → та же вкладка сменила код)
 
 ## 9. Тесты
 
@@ -9827,3 +9846,4 @@ Safari, с видеозвонками в нём бывают сюрпризы. �
   «Следующий номер» через №17. Тесты `test_prompt_soc_oge.py`, `test_prompt_soc_oge_long.py`
 
 - (13.11.2026) Кабинет, А4: `cabinet.html`, `cabinet-cloud.js`, `teacher-settings.js`, кнопка «Кабинет» в капсуле главной (четвёртым элементом, перед «Панелью для доски»), значок `cabinet`. Ученики: список, добавить, карточка (имя, класс, экзамен, своя длительность, заметка, доски, архив), места под «Память заданий» и «Занятия», «Начать сессию» пока выключена (Б1). Настройки на сервере + копия. Тесты `test_prompt_cabinet_page.py` (28), поправлены `test_prompt_glass_menu.py`, `test_prompt114_phone_glass_theme.py` (капсула из четырёх). Разделы 3, 8
+- (13.11.2026) Кабинет, Б1: `student-memory.js` (сессия с учеником по настройке вкладка/браузер, журнал при старте + сжатая копия, очередь с повтором и «раз в 10 минут», сводки, «забыть», плашка и выбор ученика на главной и в кабинете, у follower молчит), «Начать сессию» в карточке кабинета; скрипт подключён на 42 страницах. `lesson_id` пока не отправляется (столбца нет, В2). Тест `test_prompt_b1_student_memory.py` (36). Разделы 3, 8
