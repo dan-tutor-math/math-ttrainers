@@ -146,6 +146,7 @@ body.bp-desktop .bp-frame-resize{display:block;}
 <script src="supabase-js.umd.js"></script>
 <script src="lazy-libs.js" data-preload="html2canvas"></script>
 <script src="subjects-catalog.js"></script>
+<script src="task-key.js"></script>
 <script src="trainer-tasks.js"></script>
 <script src="trainer-capture.js"></script>
 <script src="board-link.js"></script>
@@ -389,7 +390,9 @@ body.bp-desktop .bp-frame-resize{display:block;}
   // обычного ноутбука
   function snapScale(){ const b = client.state().board; return (b && b.scale) || 2; }
   function payloadOf(it){
-    return { img: it.dataUrl, task: it.task, gen: it.gen, card: it.shot.card, css: it.shot.css, sol: it.shot.sol, cw: it.cw };
+    // tkey — ключ задания для журнала кабинета (Б3): событие «на доске»
+    // пишет сама доска, у которой идёт сессия с учеником
+    return { img: it.dataUrl, task: it.task, gen: it.gen, card: it.shot.card, css: it.shot.css, sol: it.shot.sol, cw: it.cw, tkey: it.shot.tkey || undefined };
   }
   function reportSends(sends, n){
     const s = client.state();

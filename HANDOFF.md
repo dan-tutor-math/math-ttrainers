@@ -684,6 +684,7 @@
   boards-panel, работах, кабинете и страницах тренажёров (копии ege_prof — sync_ege_pages.py).
   Тест `test_prompt_b1_student_memory.py`
   Б2: `StudentMemory.recordTask(задание, {clean, mode, page})` — запись из страниц тренажёров: ключ строит `TaskKey.fromTask`, событие `ok` (с первого раза) или `bad` (после ошибки/подсказки). Зовут `finishTask(true)` в oge1_5/6/7/9/15_18/19, `finish` в rus_oge, `saveResult` в rus_oge01/13 (оценка по критериям), `runCheck` и самооценка доказательства в ege_prof (копии — sync_ege_pages.py). Страницы подключают `task-key.js` перед `student-memory.js`. Тест `test_prompt_b2_trainer_events.py`
+- `board-memory.js` — `window.BoardMemory` (Б3 кабинета), только на boards.html после student-memory.js: `taskAdded(obj)` (зовёт `insertTaskImage`) → событие board, `taskChecked(obj, prev)` (зовут `commitTaskState` и `boardsApplyTaskLive`) → ok/bad; ключ — `obj.tkey`, иначе `TaskKey.fromRecipe(obj.gen)`. Подпись `#bdTrainersMem` над «Добавить на доску» — у текущего задания кадра (только с сессией, не follower, `labels` ≠ off). Кнопка «Начать сессию» на своей открытой доске — через `StudentMemory.setPickerContext`. В доску и сессию ничего не пишет. Тест `test_prompt_b3_board_memory.py`
 - `works.css` — общий вид обеих страниц: оформление тренажёров, не досок
 - `video-player.js` — свой плеер HLS (`window.VideoPlayer`): окно поверх
   страницы, hls.js 1.5.20 с cdnjs (с integrity) грузится при первом
@@ -7183,6 +7184,7 @@ Realtime в работах не нужен. Из песочницы до Supabas
   в списке → им живёт соседняя вкладка, эта без ученика; кода нет → та же вкладка сменила код)
 - (13.11.2026, А1 кабинета) Ключ задания: номер ФИПИ в страницах ОГЭ лежит в `curTask.fipi` (идёт в снимок и в рецепт доски), в ЕГЭ-копиях — внутри pid `<n>.fipi.<НОМЕР>`, у русского — id задания (снимка и рецепта нет). В режимах «вперемешку» тип выпавшего задания лежит в `curTask.genKind` (ставит `newTask` в oge1_5/6/7/9/15_18) — по нему gen-ключ; у русского рецепта gen нет нарочно (включил бы «ещё такое же»), ключ лежит отдельным полем `tkey` у объекта доски и блока работы (`trainerTaskKey` в trainer-tasks.js). Подробно — `../claude-notes/task-key-audit.md`
 - (13.11.2026, Б2 кабинета) Запись из тренажёра — только в «свежем» решении (`finishTask(true)`), не при восстановлении состояния: `finishTask(false)` и приём снимка от собеседника пишут то же самое, и событие задвоилось бы. «Вперемешку» (random) в ОГЭ не вызывает `recordSolve` — запись стоит отдельно в `finishTask` и берёт `genKind`. Тест на странице с приглашением `?s=` не может кликать (оверлей `#tsInvite` перехватывает клики) — проверять вызов `recordTask` напрямую. Playwright для Python — в `~/.venvs/trainers/bin/python`, системный python3 его не видит
+- (13.11.2026, Б3 кабинета) Событие с доски пишется ученику СЕССИИ, не владельцу доски, и только у того, у кого сессия: ученик на общей доске проверяет ответ у себя, а событие пишет вкладка преподавателя из `boardsApplyTaskLive` (новая попытка — больше `tries`; повтор того же состояния не событие). Телефон-панель до Б3 теряла `tkey` в `payloadOf`/`boardLinkPayload` — ключ шёл только из gen, у русского его не было. В тесте два раза подряд «Добавить» из ОГЭ №6 p1 дают ОДНО задание ФИПИ — ok по нему второй раз за 10 минут StudentMemory отсекает
 
 
 ## 9. Тесты
@@ -9804,6 +9806,7 @@ Safari, с видеозвонками в нём бывают сюрпризы. �
 ---
 
 - (13.11.2026, Claude Code, Б2 плана кабинета) Запись событий из тренажёров: `StudentMemory.recordTask` + вызовы в страницах ОГЭ (oge1_5/6/7/9/15_18/19), русском (rus_oge, rus_oge01, rus_oge13) и ege_prof с копиями; `task-key.js` подключён на этих страницах. oge8 и oge14 (есть `FipiMix.markDone`, но не в таблице аудита А1) не подключались. Тест `test_prompt_b2_trainer_events.py`. Ветка claude/trainer-events-889cda, не в main. Совместный режим перепроверить руками: ученик не должен видеть плашку, а в снимок сессии ничего нового не уходит
+- (13.11.2026, Claude Code, Б3 плана кабинета) Память ученика на доске: `board-memory.js` — событие board из `insertTaskImage` (все пути: панель, телефон-панель, «ещё такое же», вручную), ok/bad из `commitTaskState` и `boardsApplyTaskLive` (ученик проверил на общей доске), подпись у текущего задания в панели тренажёров, кнопка «Начать сессию» на своей доске (привязанный в students.boards ученик — сразу, `StudentMemory.setPickerContext`). Телефон-панель шлёт `tkey` (task-key.js подключён в boards-panel.html). Формат доски не менялся. Тест `test_prompt_b3_board_memory.py` (25). Ветка claude/board-memory-812e31, не в main. Совместный режим на доске перепроверить руками
 
 ## 12. С чего начать новой сессии
 

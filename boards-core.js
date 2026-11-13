@@ -7989,6 +7989,9 @@ async function insertTaskImage(dataUrl, task, gen, beside, shot, cw, place){
   obj.addedAt = Date.now();
   pushUndo();
   B.objects.push(obj);
+  // Б3 кабинета: событие «на доске» ученику текущей сессии (board-memory.js);
+  // в объект доски о памяти ничего не пишется
+  if (window.BoardMemory) window.BoardMemory.taskAdded(obj);
   revealWorldRect({ x: pt.x, y: pt.y, w: sz.w, h: sz.h });
   return obj;
 }
@@ -8134,7 +8137,9 @@ function boardLinkPayload(p){
   if (css && !(css.w > 0 && css.h > 0)) return null;
   return { img: p.img, task: obj(p.task), gen: obj(p.gen),
     cw: (typeof p.cw === 'number' && p.cw > 0) ? p.cw : null,
-    shot: { card: obj(p.card), css, sol: obj(p.sol) } };
+    shot: { card: obj(p.card), css, sol: obj(p.sol),
+      // ключ задания для журнала кабинета (А1/Б3); кривой — просто без ключа
+      tkey: (typeof p.tkey === 'string' && /^[a-z0-9_]+:[^\s]{1,190}$/.test(p.tkey)) ? p.tkey : undefined } };
 }
 async function boardLinkInsert(p, dev){
   const it = boardLinkPayload(p);
@@ -9088,10 +9093,13 @@ function taskFlash(id, text){
 function commitTaskState(obj, st){
   const rec = taskEls.get(obj.id);
   if (rec) rec.msg.classList.remove('show');
+  const prev = obj.task.st || null;
   pushUndo();
   obj.task.st = st;
   saveDB();
   scheduleRedraw();
+  // Б3 кабинета: итог проверки — в память ученика сессии (board-memory.js)
+  if (window.BoardMemory) window.BoardMemory.taskChecked(obj, prev);
 }
 
 function taskCheck(id){
@@ -9218,8 +9226,12 @@ window.boardsApplyTaskLive = function(p){
   if (obj.task && 'st' in p){
     const was = JSON.stringify(obj.task.st || null), now = JSON.stringify(p.st || null);
     if (was !== now){
+      const prevSt = obj.task.st || null;
       if (p.st) obj.task.st = p.st; else delete obj.task.st;
       changed = true;
+      // Б3: ученик проверил ответ со своего устройства — сессия идёт здесь,
+      // у преподавателя. У ученика сессии нет, record там ничего не пишет
+      if (p.st && window.BoardMemory) window.BoardMemory.taskChecked(obj, prevSt);
     }
   }
   if (obj.sol && 'sol' in p && !!obj.sol.open !== !!p.sol){ obj.sol.open = !!p.sol; changed = true; }

@@ -20,6 +20,8 @@
      onChange(fn)               — подписка: сессия, пауза, журнал; возвращает отписку
      flush()                    — отправить очередь сейчас
      isFollower()               — вкладка ученика в совместной сессии
+     setPickerContext(fn)       — Б3: кнопка выбора ученика по контексту страницы
+                                  (доска: fn() → {boards:[id…]} или null)
 
    Почему так устроено:
    - Привязка — настройка преподавателя (TeacherSettings, sessionBind).
@@ -513,9 +515,37 @@
     const c = client();
     if (!c) throw new Error('Нет подключения к серверу');
     if (!(await signedIn(c))) { const e = new Error('Нужен вход'); e.code = 'auth'; throw e; }
-    const r = await c.from('students').select('id, name, archived_at').order('name', { ascending: true });
+    const r = await c.from('students').select('id, name, boards, archived_at').order('name', { ascending: true });
     if (r.error) throw new Error(errText(r.error));
-    return (r.data || []).filter(s => !s.archived_at).map(s => ({ id: String(s.id), name: s.name }));
+    const list = (r.data || []).filter(s => !s.archived_at)
+      .map(s => ({ id: String(s.id), name: s.name, boards: Array.isArray(s.boards) ? s.boards.map(String) : [] }));
+    studentsCache = list;
+    return list;
+  }
+
+  /* ── выбор ученика на странице с контекстом (Б3: доска) ──
+     Страница отдаёт функцию: null — кнопки здесь нет (список досок, чужая
+     доска), { boards: [id…] } — кнопка есть, и если одна из досок привязана к
+     ученику в кабинете (students.boards), он предлагается сразу. Сама
+     страница сессию не начинает: открытие доски ничего не переключает */
+  let pickCtx = null, studentsCache = null, studentsLoading = false, studentsTried = 0;
+  function setPickerContext(fn){
+    pickCtx = typeof fn === 'function' ? fn : null;
+    barSig = null;
+    renderBar();
+  }
+  function ctxNow(){ try { return pickCtx ? pickCtx() : null; } catch (e) { return null; } }
+  function boundStudent(ctx){
+    if (!ctx || !ctx.boards || !ctx.boards.length || !studentsCache) return null;
+    const hit = studentsCache.filter(s => s.boards.some(b => ctx.boards.indexOf(b) >= 0));
+    // доска у двух учеников (группа) — не угадываем, выбор из списка
+    return hit.length === 1 ? hit[0] : null;
+  }
+  function ensureStudents(){
+    // плашка перерисовывается раз в 2 с — без связи не долбим сервер
+    if (studentsCache || studentsLoading || !authed || Date.now() - studentsTried < 60000) return;
+    studentsLoading = true; studentsTried = Date.now();
+    listStudents().catch(() => {}).then(() => { studentsLoading = false; barSig = null; renderBar(); });
   }
 
   /* ── плашка «Сессия: имя · пауза · закончить» ──
@@ -527,6 +557,7 @@
   let authed = false;
   function wantsPicker(){
     if (!authed) return false;
+    if (pickCtx) return !!ctxNow();
     if (SCRIPT && SCRIPT.hasAttribute('data-picker')) return true;
     return /(^|\/)(index\.html)?$/.test(location.pathname);
   }
@@ -564,7 +595,9 @@
     if (!IN_TOP || !document.body) return;
     const s = isFollower() ? null : current();
     const picker = !s && wantsPicker() && !isFollower();
-    const sig = s ? 'S|' + s.id + '|' + s.name + '|' + s.paused : (picker ? 'P' : '');
+    let bound = null;
+    if (picker && pickCtx){ ensureStudents(); bound = boundStudent(ctxNow()); }
+    const sig = s ? 'S|' + s.id + '|' + s.name + '|' + s.paused : (picker ? 'P|' + (bound ? bound.id + '|' + bound.name : '') : '');
     if (sig === barSig) return;
     barSig = sig; menuOpen = false;
     if (!sig){ if (bar) { bar.remove(); bar = null; } return; }
@@ -576,7 +609,10 @@
         '<button type="button" data-sm="pause">' + (s.paused ? 'продолжить' : 'пауза') + '</button>' +
         '<span class="sm-dot">·</span><button type="button" data-sm="end">закончить</button>';
     } else {
-      bar.innerHTML = '<button type="button" data-sm="pick">Начать сессию с учеником</button>';
+      bar.innerHTML = bound
+        ? '<button type="button" data-sm="start" data-id="' + esc(bound.id) + '" data-name="' + esc(bound.name) + '">Начать сессию: <b>' + esc(bound.name) + '</b></button>' +
+          '<span class="sm-dot">·</span><button type="button" data-sm="pick" title="Выбрать другого ученика">другой</button>'
+        : '<button type="button" data-sm="pick">Начать сессию с учеником</button>';
     }
   }
   async function openMenu(){
@@ -645,7 +681,7 @@
 
   window.StudentMemory = {
     current, start, end, pause, record, recordTask, summary, kindSummary, keys, logState, forget, fetchLog, loadLog,
-    listStudents, onChange, flush, isFollower, bindMode,
+    listStudents, onChange, flush, isFollower, bindMode, setPickerContext,
     queue: () => readQueue().slice(), deadLetters: () => parse(lsGet(LS_DEAD), []),
     THROTTLE_MS,
   };
