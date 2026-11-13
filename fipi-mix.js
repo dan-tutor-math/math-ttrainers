@@ -68,7 +68,10 @@
     list = list || [];
     if (f.fipi && list.length) {
       const r = rec(page, mode);
-      const avail = list.filter(x => r.done.indexOf(x.fipi) < 0);
+      const open = list.filter(x => r.done.indexOf(x.fipi) < 0);
+      // кабинет (Б4): в сессии в положении «скрывать решённые» пропускаем задания,
+      // которые у ученика уже были (task-captions.js; вне сессии skipFipi всегда false)
+      const avail = open.filter(x => !skipSeen(page, x.fipi));
       // Тупик с единственным заданием: у вида, где ФИПИ один (многоэтажная дробь
       // в №6) или остался один нерешённый, ⟳ отдавал бы его снова и снова, пока
       // не решат, — «примеры не обновляются». Если это же задание уже на экране,
@@ -81,6 +84,13 @@
         return t;
       }
       if (avail.length) return withFipi(pick(avail));
+      // нерешённые остались, но все уже были у ученика: наши задания без плашки
+      // «все решены» (она была бы неправдой), а при «только ФИПИ» — пустого экрана
+      // не бывает, берём из пропущенных
+      if (open.length) {
+        if (f.own) { const t = ownGen(); t.basedOnFipi = true; return t; }
+        return withFipi(pick(open));
+      }
       if (!f.own) {
         // «только ФИПИ» и всё решено: второй круг — пустого экрана не бывает
         const t = withFipi(pick(list));
@@ -96,6 +106,9 @@
     const t = ownGen();
     if (list.length) t.basedOnFipi = true;
     return t;
+  }
+  function skipSeen(page, fipi) {
+    try { return !!(window.TaskCaptions && TaskCaptions.skipFipi(page, fipi)); } catch (e) { return false; }
   }
   function withFipi(item) { const t = item.make(); t.fipi = item.fipi; return t; }
   function commit(page, mode, task, list) {
@@ -119,6 +132,11 @@
     delete shownFipi[page + ':' + mode];
     const f = filter(), n = list.length;
     if (!f.fipi && hasOwn) return 'на основе ФИПИ';
+    // кабинет (Б4): «скрывать решённые» — считаем, сколько заданий ФИПИ у ученика ещё не было
+    if (window.TaskCaptions && TaskCaptions.mode() === 'hide_solved') {
+      const left = list.filter(x => !skipSeen(page, x.fipi)).length;
+      return (f.own && hasOwn ? `${n}+ ${plural(n)}` : `${n} ${plural(n)} ФИПИ`) + ` · осталось ${left} из ${n}`;
+    }
     const d = rec(page, mode).done.filter(id => list.some(x => x.fipi === id)).length;
     const base = f.own && hasOwn ? `${n}+ ${plural(n)}` : `${n} ${plural(n)} ФИПИ`;
     return d ? `${base} · ФИПИ решено ${d} из ${n}` : base;
@@ -164,6 +182,14 @@
     host.classList.add('fm-bar');
     host.innerHTML = `<button type="button" class="fm-btn" aria-haspopup="true" title="Какие задания показывать">${ICON}Задания</button>`;
     const btn = host.querySelector('.fm-btn');
+    // кабинет (Б4): переключатель подписей слева от фильтра, только у преподавателя в сессии;
+    // смена положения или сессии перерисовывает список (счётчик «осталось N из M»)
+    if (window.TaskCaptions) {
+      const tg = document.createElement('span');
+      host.insertBefore(tg, btn);
+      TaskCaptions.mountToggle(tg);
+      TaskCaptions.onChange(() => { if (host.isConnected && onChange) onChange(filter()); });
+    }
     let pop = null;
     const mark = () => { const f = filter(); btn.classList.toggle('on', !(f.fipi && f.own)); };
     const close = () => { if (pop) { pop.remove(); pop = null; document.removeEventListener('click', outside, true); } };

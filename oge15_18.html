@@ -688,6 +688,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="keypad.js"></script>
 <script src="exam-nav.js"></script>
 <script src="trainer-multi.js"></script>
+<script src="task-captions.js"></script>
 <script src="fipi-mix.js"></script>
 <script src="oge15_18-kinds.js"></script>
 <script src="oge15_18-fipi-bank.js"></script>
@@ -1386,6 +1387,7 @@ function renderCurrentTask() {
   const src = window.FipiMix ? FipiMix.sourceText(curTask) : '';
   note.textContent = src + (curTask.unchecked ? ' (ответ ещё не сверен с сайтом ФИПИ)' : '');
   note.style.display = src ? 'block' : 'none';
+  if (window.TaskCaptions) TaskCaptions.showCurrent(note, curTask, typeof curMode !== 'undefined' ? curMode : null);   // кабинет (Б4): точка «уже было у ученика»
   const notice = document.getElementById('fipiNotice');
   notice.textContent = curTask.fipiNotice || '';
   notice.style.display = curTask.fipiNotice ? 'block' : 'none';

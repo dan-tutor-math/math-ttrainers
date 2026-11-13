@@ -797,6 +797,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="mode-card-keys.js"></script>
 <script src="keypad.js"></script>
 <script src="no-repeat.js"></script>
+<script src="task-captions.js"></script>
 <script src="fipi-mix.js"></script>
 <script src="oge8-fipi-bank.js"></script>
 <script src="hard-toggle.js"></script>
@@ -2212,6 +2213,7 @@ function renderCurrentTask() {
   const src=window.FipiMix ? FipiMix.sourceText(curTask) : '';
   document.getElementById('sourceNote').textContent=src;
   document.getElementById('sourceNote').style.display=src?'block':'none';
+  if (window.TaskCaptions) TaskCaptions.showCurrent(document.getElementById('sourceNote'), curTask, typeof curMode !== 'undefined' ? curMode : null);   // кабинет (Б4): точка «уже было у ученика»
   document.getElementById('fipiNotice').textContent=curTask.fipiNotice||'';
   document.getElementById('fipiNotice').style.display=curTask.fipiNotice?'block':'none';
 
@@ -3219,5 +3221,6 @@ document.querySelectorAll(PANEL_ANIM_SELECTOR).forEach(p=>setupAutoHeightAnimati
 })();
 </script>
 
+<script src="task-key.js"></script>
 <script src="student-memory.js"></script>
 </body></html>

@@ -726,6 +726,7 @@ html[data-theme="dark"][data-subject="soc"] .next-btn{background:#1F7A36;}
        В карточках «+ ещё примеры» скрыт целиком (см. #pickerArea в
        trainer-multi.js) — там сразу показывается само задание -->
   <div id="pickerArea">
+    <div style="text-align:right"><span id="tcBar" style="display:none;margin-bottom:6px"></span></div>
     <div class="group-title" id="pickerTitle"></div>
     <div class="modes" id="protoList"></div>
   </div>
@@ -867,6 +868,7 @@ html[data-theme="dark"][data-subject="soc"] .next-btn{background:#1F7A36;}
 <script src="session-share.js"></script>
 <script src="mode-card-keys.js"></script>
 <script src="keypad.js"></script>
+<script src="task-captions.js"></script>
 <script src="exam-nav.js"></script>
 <script src="lazy-libs.js" data-preload="html2canvas jspdf"></script>
 <script src="lesson-history.js"></script>
@@ -1624,6 +1626,36 @@ function protoPeek(p){
   if (cut < 0) return rich(src);
   return rich(src.slice(0, cut)) + '…';
 }
+/* Кабинет (Б4): подписи «уже было у ученика» в списке, «осталось N из M» и
+   выбор следующего задания в положении «скрывать решённые» (task-captions.js).
+   Вне сессии и у ученика TaskCaptions.active() — false, и всё это молчит */
+function capKey(p){ return window.TaskCaptions ? TaskCaptions.keyOfTask(p) : null; }
+function capSkip(p){ return !!(window.TaskCaptions && TaskCaptions.skip(capKey(p))); }
+function leftLabel(list){
+  if (!window.TaskCaptions || TaskCaptions.mode() !== 'hide_solved') return '';
+  const fp = list.filter(p => (capKey(p) || '').indexOf('fipi:') === 0);
+  return fp.length ? ' · осталось ' + fp.filter(p => !capSkip(p)).length + ' из ' + fp.length : '';
+}
+function captionList(list){
+  if (!window.TaskCaptions) return;
+  TaskCaptions.decorate(els.protoList, card => {
+    if (card.dataset.pid) return [capKey(protoById(S.n, card.dataset.pid))];
+    return list.filter(p => p.group === card.dataset.gid).map(capKey);
+  });
+  TaskCaptions.showCurrent(els.pageSub, null);
+}
+// сосед, который не пропускается; все пропущены — обычный сосед (пустого хода не бывает)
+function freshNeighbour(delta){
+  const list = sibs(S.pid), i = list.findIndex(p => p.id === S.pid);
+  for (let k = 1; k <= list.length; k++){
+    const p = list[(((i + delta * k) % list.length) + list.length) % list.length];
+    if (p.id !== S.pid && !capSkip(p)) return p;
+  }
+  return protoNeighbour(delta);
+}
+function firstFresh(items){
+  return items.find(p => !isSolved(p.id) && !capSkip(p)) || items.find(p => !isSolved(p.id)) || items[0];
+}
 function renderPicker(){
   const t = task(S.n);
   // файл ФИПИ номера ещё в пути — пока рисуем то, что есть, и перерисуем,
@@ -1638,7 +1670,7 @@ function renderPicker(){
   els.pickerTitle.textContent = (groupsOf(S.n).length ? 'Задания ' : 'Прототипы задания ') + numLabel(S.n) + ' · ' + list.length + ' ' +
     plural(list.length, 'штука', 'штуки', 'штук') +
     // строчной делаем только первую букву: «демоверсия ФИПИ 2027», а не «фипи»
-    (srcs.length ? ' · ' + srcs.map(x => x.charAt(0).toLowerCase() + x.slice(1)).join(' и ') : '');
+    (srcs.length ? ' · ' + srcs.map(x => x.charAt(0).toLowerCase() + x.slice(1)).join(' и ') : '') + leftLabel(list);
   if (groupsOf(S.n).length) { renderGroupedPicker(list); return; }
   /* отметку «решено» держим слева, рядом с номером: правый край карточки на
      обычном экране уходит под кнопки темы и подсказок в углу страницы */
@@ -1652,6 +1684,7 @@ function renderPicker(){
     card.onclick = guard('switchTask', () => openTask(S.n, card.dataset.pid));
   });
   splitPicker();
+  captionList(list);
   els.pageTitle.textContent = EXAM.title + ' · ' + numLabel(S.n);
   els.pageSub.textContent = subtitleOf(t);
 }
@@ -1705,10 +1738,11 @@ function renderGroupedPicker(list){
     card.onclick = guard('switchTask', () => {
       if (card.dataset.pid) { openTask(S.n, card.dataset.pid); return; }
       const items = list.filter(p => p.group === card.dataset.gid);
-      openTask(S.n, (items.find(p => !isSolved(p.id)) || items[0]).id);
+      openTask(S.n, firstFresh(items).id);
     });
   });
   splitPicker();
+  captionList(list);
   els.pageTitle.textContent = EXAM.title + ' · ' + numLabel(S.n);
   els.pageSub.textContent = subtitleOf(t);
 }
@@ -1717,6 +1751,15 @@ function showPicker(){
   renderPicker();
   render();
   window.scrollTo(0, 0);
+}
+// кабинет (Б4): переключатель подписей в списке; сессия началась или положение
+// сменилось — список перерисовываем (точки, «осталось N из M»)
+if (window.TaskCaptions) {
+  TaskCaptions.mountToggle(document.getElementById('tcBar'));
+  TaskCaptions.onChange(() => {
+    if (S.screen === 'picker') renderPicker();
+    else if (curProto) TaskCaptions.showCurrent(els.pageSub, curProto);
+  });
 }
 
 const FIELD_HINTS = {
@@ -2031,6 +2074,7 @@ function openTask(n, pid){
   const t = task(n);
   els.pageTitle.textContent = EXAM.title + ' · ' + numLabel(n);
   els.pageSub.textContent = subtitleOf(t);
+  if (window.TaskCaptions) TaskCaptions.showCurrent(els.pageSub, p);
   const idx = protos(n).findIndex(x => x.id === p.id);
   // у прототипа может быть своё название (в ОГЭ, часть 2 — «№0. Задание из
   // демоверсии ОГЭ 2027»), тогда в шапке оно, а не порядковый номер; номер
@@ -2190,7 +2234,7 @@ function typeNeighbour(delta){
   const units = typeUnits();
   const i = units.findIndex(u => u.some(p => p.id === S.pid));
   const u = units[(i + delta + units.length) % units.length];
-  return (u.find(p => !isSolved(p.id)) || u[0]).id;
+  return firstFresh(u).id;
 }
 // сосед по списку прототипов этого номера, по кругу
 function protoNeighbour(delta){
@@ -2370,7 +2414,7 @@ els.tabExam.onclick = () => switchMode('exam');
 els.showSolutionBtn.onclick = guard('showSolution', () => { S.sol = !S.sol; render(); });
 els.nextStepBtn.onclick = guard('showSolution', () => { S.step = Math.min(S.step + 1, (curProto.steps || []).length); render(); });
 els.nextBtn.onclick = guard('switchTask', () => {
-  if (sibs(S.pid).length > 1) openTask(S.n, protoNeighbour(1).id);
+  if (sibs(S.pid).length > 1) openTask(S.n, freshNeighbour(1).id);
   else showPicker();
 });
 els.backBtn.onclick = guard('switchTask', showPicker);
@@ -2380,14 +2424,14 @@ els.extraTaskBtn.onclick = guard('switchTask', () => {
 });
 els.prevTypeBtn.onclick = guard('switchTask', () => openTask(S.n, typeNeighbour(-1)));
 els.nextTypeBtn.onclick = guard('switchTask', () => openTask(S.n, typeNeighbour(1)));
-els.prevProtoBtn.onclick = guard('switchTask', () => openTask(S.n, protoNeighbour(-1).id));
-els.nextProtoBtn.onclick = guard('switchTask', () => openTask(S.n, protoNeighbour(1).id));
+els.prevProtoBtn.onclick = guard('switchTask', () => openTask(S.n, freshNeighbour(-1).id));
+els.nextProtoBtn.onclick = guard('switchTask', () => openTask(S.n, freshNeighbour(1).id));
 // 📥 в шапке — как в ОГЭ №8: всё, что сейчас на экране (основное задание и
 // добавленные карточки); одну карточку кладёт её личная кнопка
 els.refreshBtn.onclick = guard('switchTask', () => {
   const list = sibs(S.pid).filter(p => p.id !== S.pid);
   if (!list.length) return;
-  const fresh = list.filter(p => !isSolved(p.id));
+  const fresh = list.filter(p => !isSolved(p.id) && !capSkip(p));
   const pool = fresh.length ? fresh : list;
   openTask(S.n, pool[Math.floor(Math.random() * pool.length)].id);
 });
