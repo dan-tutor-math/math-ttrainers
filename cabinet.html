@@ -14,6 +14,7 @@
 <link rel="stylesheet" href="onest.css">
 <link rel="stylesheet" href="works.css">
 <link rel="stylesheet" href="schedule.css">
+<link rel="stylesheet" href="payments.css">
 <style>
 /* Кабинет преподавателя (задача А4): ученики, расписание (В1а, schedule.js),
    настройки. Оформление общее с «Работами» (works.css): тот же вход, те же
@@ -87,6 +88,11 @@ textarea.field{min-height:90px;resize:vertical;}
   .grid2{grid-template-columns:1fr;}
   .tabs a{padding:9px 12px;}
 }
+/* четыре вкладки (с «Оплатами», В4а) на телефоне 375 не влезают с обычными
+   отступами — ужимаем, а не прокручиваем страницу вбок */
+@media (max-width:420px){
+  .tabs a{padding:8px 9px;font-size:13.5px;}
+}
 </style>
 </head>
 <body>
@@ -94,7 +100,7 @@ textarea.field{min-height:90px;resize:vertical;}
 <button class="corner-btn right" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
 <div class="wrap">
   <h1>Кабинет</h1>
-  <div class="sub">Ученики, расписание и настройки преподавателя</div>
+  <div class="sub">Ученики, расписание, оплаты и настройки преподавателя</div>
   <div class="acct" id="acct" hidden></div>
 
   <section id="scrLoading" class="empty">Загружаем…</section>
@@ -113,6 +119,7 @@ textarea.field{min-height:90px;resize:vertical;}
     <nav class="tabs" id="tabs" aria-label="Разделы кабинета">
       <a href="#/students" data-tab="students">Ученики</a>
       <a href="#/schedule" data-tab="schedule">Расписание</a>
+      <a href="#/payments" data-tab="payments">Оплаты</a>
       <a href="#/settings" data-tab="settings">Настройки</a>
     </nav>
 
@@ -137,6 +144,10 @@ textarea.field{min-height:90px;resize:vertical;}
 
     <section id="tabSchedule" hidden>
       <div class="panel" id="scHost"></div>
+    </section>
+
+    <section id="tabPayments" hidden>
+      <div class="panel" id="payHost"></div>
     </section>
 
     <section id="tabSettings" hidden>
@@ -183,6 +194,7 @@ textarea.field{min-height:90px;resize:vertical;}
             <label><span class="label">Полупараллелка (двое, преподаватель переходит)</span><input class="field" data-fmt="semi" maxlength="30"></label>
           </div>
         </div>
+        <div class="set-group" id="paySettings"></div>
         <div class="save-note" id="saveNote" role="status"></div>
       </div>
       <!-- В5: личная функция Даниила — свёрнута, в общем интерфейсе не мешает -->
@@ -212,6 +224,8 @@ textarea.field{min-height:90px;resize:vertical;}
 <script src="teacher-settings.js"></script>
 <script src="schedule-cloud.js"></script>
 <script src="schedule-tpl.js"></script>
+<script src="payments.js"></script>
+<script src="cabinet-payments.js"></script>
 <script src="schedule.js"></script>
 <script src="student-memory.js" data-picker></script>
 <script src="cabinet-log.js"></script>
@@ -285,17 +299,18 @@ async function route(){
   renderAcct();
   if (!user){ show('scrAuth'); return; }
   const [tab, id] = location.hash.replace(/^#\/?/, '').split('/');
-  const t = ['students', 'schedule', 'settings'].indexOf(tab) >= 0 ? tab : 'students';
+  const t = ['students', 'schedule', 'payments', 'settings'].indexOf(tab) >= 0 ? tab : 'students';
   show('scrMain');
   // сетке недели нужна ширина: семь колонок дней в 860px не читаются
   document.querySelector('.wrap').classList.toggle('sc-wide', t === 'schedule');
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === t));
-  ['tabStudents', 'tabCard', 'tabSchedule', 'tabSettings'].forEach(x => { $(x).hidden = true; });
+  ['tabStudents', 'tabCard', 'tabSchedule', 'tabPayments', 'tabSettings'].forEach(x => { $(x).hidden = true; });
   // боковая панель занятия висит поверх страницы — с вкладки «Расписание» её уносим
   if (t !== 'schedule' && window.Schedule && Schedule.hide) Schedule.hide();
   if (t === 'students' && id){ $('tabCard').hidden = false; await openCard(id); }
   else if (t === 'students'){ $('tabStudents').hidden = false; await renderList(); }
   else if (t === 'schedule'){ $('tabSchedule').hidden = false; await Schedule.show(id); }
+  else if (t === 'payments'){ $('tabPayments').hidden = false; await CabinetPayments.show($('payHost'), id); }
   else { $('tabSettings').hidden = false; await renderSettings(); }
 }
 
@@ -502,6 +517,9 @@ async function renderSettings(){
       save({ formatLabels: fl });
     }));
     $('setCount').addEventListener('change', e => save({ labelCount: e.target.checked }));
+    // оплаты (В4а): правило прогула, причина, напоминание, свои флаги
+    const payPaint = CabinetPayments.mountSettings($('paySettings'), save);
+    TS.onChange(payPaint);
     $('customMin').addEventListener('change', e => {
       const n = Math.round(Number(e.target.value));
       if (n >= 5 && n <= 720) save({ lessonMin: n }); else $('saveNote').textContent = 'От 5 до 720 минут';
@@ -521,6 +539,11 @@ Schedule.init({
   weekHref: mon => '#/schedule' + (mon ? '/' + mon : ''),
   toast,
 });
+
+/* ── оплаты (cabinet-payments.js, В4а) ── */
+CabinetPayments.init({ students: () => loadStudents(true), settings: () => TS.get(), toast });
+// флаги и правило прогула приходят с сервера позже первой отрисовки — пересчитать
+TS.onChange(() => CabinetPayments.repaint());
 
 /* ── синхронизация со старым приложением (schedule-sync.js, В5) ── */
 const SY = window.ScheduleSync;

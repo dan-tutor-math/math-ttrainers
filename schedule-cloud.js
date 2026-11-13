@@ -18,7 +18,18 @@
 (function(){
   const C = window.CabinetCloud;
   const LESSON_COLS = 'id, day, start_min, dur_min, format, is_event, title, note, board_id, group_id, from_slot, ext_id, updated_at';
-  const LS_COLS = 'id, lesson_id, student_id, guest_name, status, pos';
+  // Поля оплаты участника (cabinet-payments.sql, В4а). Пока Даниил не
+  // выполнил этот файл, их в базе нет — тогда читаем без них (payCols =
+  // false), и расписание работает как раньше, только без отметок оплаты
+  const LS_BASE = 'id, lesson_id, student_id, guest_name, status, pos';
+  const LS_PAY = ', bill, reason, by_teacher, makeup, makeup_for, flags';
+  let payCols = true;
+  const lsCols = () => LS_BASE + (payCols ? LS_PAY : '');
+  const noColumn = e => { const r = (e && e.raw) || e || {}; return r.code === '42703' || /column .* does not exist/i.test(String(r.message || '')); };
+  async function runLS(make){
+    try { return await run(make(lsCols())); }
+    catch (e) { if (payCols && noColumn(e)) { payCols = false; return run(make(lsCols())); } throw e; }
+  }
   const FORMATS = ['single', 'pair', 'group', 'semi'];
   const STATUSES = ['plan', 'done', 'skip', 'move'];
 
@@ -63,8 +74,21 @@
   // ученика молча — schedule-audit.md)
   function cleanPerson(p, lessonId, pos){
     const o = { lesson_id: lessonId, pos: pos || 0, status: STATUSES.indexOf(p.status) >= 0 ? p.status : 'plan' };
+    Object.assign(o, cleanPart(p));
     if (p.student_id) { o.student_id = String(p.student_id); o.guest_name = null; }
     else { o.student_id = null; o.guest_name = String(p.guest_name || '').trim().replace(/\s+/g, ' ').slice(0, 80); }
+    return o;
+  }
+
+  // поля оплаты участника — только заданные
+  function cleanPart(f){
+    const o = {};
+    if ('bill' in f) o.bill = f.bill === 'charge' || f.bill === 'free' ? f.bill : null;
+    if ('reason' in f) o.reason = f.reason == null || String(f.reason).trim() === '' ? null : String(f.reason).trim().slice(0, 200);
+    if ('by_teacher' in f) o.by_teacher = !!f.by_teacher;
+    if ('makeup' in f) o.makeup = !!f.makeup;
+    if ('makeup_for' in f) o.makeup_for = f.makeup_for || null;
+    if ('flags' in f) o.flags = (Array.isArray(f.flags) ? f.flags : []).map(String).slice(0, 10);
     return o;
   }
 
@@ -74,7 +98,7 @@
     const lessons = await run(c.from('lessons').select(LESSON_COLS)
       .gte('day', fromDay).lte('day', toDay).order('day', { ascending: true }).order('start_min', { ascending: true }));
     const ids = (lessons || []).map(l => l.id);
-    const people = ids.length ? await run(c.from('lesson_students').select(LS_COLS).in('lesson_id', ids).order('pos', { ascending: true })) : [];
+    const people = ids.length ? await runLS(cols => c.from('lesson_students').select(cols).in('lesson_id', ids).order('pos', { ascending: true })) : [];
     const by = {};
     (people || []).forEach(p => { (by[p.lesson_id] = by[p.lesson_id] || []).push(p); });
     return (lessons || []).map(l => Object.assign({}, l, { people: (by[l.id] || []).sort((a, b) => a.pos - b.pos) }));
@@ -87,7 +111,7 @@
      добираем пачками — длинный in() не влезает в адрес запроса */
   async function listForStudent(studentId){
     const c = need();
-    const mine = await run(c.from('lesson_students').select(LS_COLS).eq('student_id', String(studentId)));
+    const mine = await runLS(cols => c.from('lesson_students').select(cols).eq('student_id', String(studentId)));
     const byLesson = {};
     (mine || []).forEach(p => { byLesson[p.lesson_id] = p; });
     const ids = Object.keys(byLesson);
@@ -110,7 +134,7 @@
       let rows = [];
       if (people && people.length) {
         try {
-          rows = await run(c.from('lesson_students').insert(people.map((p, i) => cleanPerson(p, l.id, i))).select(LS_COLS));
+          rows = await runLS(cols => c.from('lesson_students').insert(people.map((p, i) => cleanPerson(p, l.id, i))).select(cols));
         } catch (e) {
           try { await run(c.from('lessons').delete().eq('id', l.id)); } catch (e2) {}
           throw e;
@@ -129,12 +153,17 @@
 
   /* ── участники ── */
   function addPeople(lessonId, people, fromPos){
-    return serial(() => run(need().from('lesson_students')
-      .insert(people.map((p, i) => cleanPerson(p, lessonId, (fromPos || 0) + i))).select(LS_COLS)));
+    return serial(() => runLS(cols => need().from('lesson_students')
+      .insert(people.map((p, i) => cleanPerson(p, lessonId, (fromPos || 0) + i))).select(cols)));
   }
   function setStatus(personId, status){
     if (STATUSES.indexOf(status) < 0) status = 'plan';
-    return serial(() => run(need().from('lesson_students').update({ status }).eq('id', personId).select(LS_COLS).single()));
+    return serial(() => runLS(cols => need().from('lesson_students').update({ status }).eq('id', personId).select(cols).single()));
+  }
+  // отметки оплаты участника: оплачивается / причина / по вине преподавателя /
+  // отработка / флаги (В4а)
+  function setPart(personId, patch){
+    return serial(() => runLS(cols => need().from('lesson_students').update(cleanPart(patch)).eq('id', personId).select(cols).single()));
   }
   function removePerson(personId){
     return serial(() => run(need().from('lesson_students').delete().eq('id', personId)));
@@ -278,7 +307,8 @@
     return nt;
   }
 
-  window.ScheduleCloud = { FORMATS, STATUSES, GROUP_FORMATS, listRange, listForStudent, addLesson, updateLesson, deleteLesson, addPeople, setStatus, removePerson,
+  window.ScheduleCloud = { FORMATS, STATUSES, GROUP_FORMATS, listRange, listForStudent, addLesson, updateLesson, deleteLesson, addPeople, setStatus, setPart, removePerson,
+    hasPayCols: () => payCols,
     listGroups, addGroup, updateGroup, setGroupMembers, deleteGroup,
     listTemplates, addTemplate, renameTemplate, deleteTemplate, setActiveTemplate, addSlot, updateSlot, deleteSlot, addSlotPeople, removeSlotPerson, setSlotPeople, duplicateTemplate };
 })();
