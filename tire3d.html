@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#EEF1F7">
+<title>3D-модель шины — ОГЭ №1–5</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<script>try{document.documentElement.dataset.theme=localStorage.getItem('theme')||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');if(new URLSearchParams(location.search).get('embed')==='1')document.documentElement.classList.add('embedded')}catch(e){}</script>
+<link rel="stylesheet" href="onest.css">
+<link rel="stylesheet" href="katex-0.18.5.css">
+<link rel="stylesheet" href="liquid-glass.css">
+<link rel="stylesheet" href="tire3d.css">
+<script src="tire-math.js" defer></script>
+<script src="katex-0.18.5.js" defer></script>
+<script src="lazy-libs.js" defer></script>
+<script src="supabase-config.js" defer></script>
+<script src="supabase-js.umd.js" defer></script>
+<script src="session-share.js" defer></script>
+<script src="tire3d.js" defer></script>
+<script src="tire3d-session.js" defer></script>
+</head>
+<body>
+<header class="page-header">
+  <a href="index.html" id="homeLink">← К тренажёрам</a>
+  <h1>3D-модель шины</h1>
+  <div class="header-actions"><button id="addBoard" type="button">Добавить на доску</button><button id="themeToggle" type="button" aria-label="Сменить тему">Тема</button></div>
+</header>
+<main>
+  <nav class="scenes" aria-label="Что изучаем">
+    <button data-scene="width">B · Ширина</button><button data-scene="side">H · Боковина</button><button data-scene="rim">d · Диск</button><button data-scene="diam">D · Колесо</button><button data-scene="run">Пробег за оборот</button><button data-scene="compare">Сравнить две шины</button>
+    <label class="all-dimensions-control"><input id="allDimensions" type="checkbox"> Все размеры</label>
+  </nav>
+  <div class="presentation-controls">
+    <div class="presentation-modes" role="group" aria-label="Режим показа">
+      <button type="button" data-mode="reference" aria-pressed="true">Справка</button>
+      <button type="button" data-mode="interactive" aria-pressed="false">Интерактив</button>
+    </div>
+    <button type="button" id="solutionToggle" aria-controls="tireLesson" aria-expanded="false" hidden>Показать решение</button>
+  </div>
+  <div class="workspace">
+    <section class="model-column" aria-label="Модель и объяснение">
+      <div class="viewport" id="viewport">
+        <div id="modelHost" aria-label="Шина в трёх измерениях. Вращайте перетаскиванием, приближайте колёсиком или двумя пальцами."></div>
+        <svg id="dimensions"></svg>
+        <div class="view-toolbar"><div class="style-switch" role="group" aria-label="Материал"><button data-style="real">Реалистичная</button><button data-style="glass">Стекло</button></div><label class="cut-switch"><input type="checkbox" id="cutToggle"> Разрез</label></div>
+        <div class="view-hint" id="viewHint">Поверните шину · приблизьте колёсиком или щипком</div>
+        <div class="view-actions">
+          <button id="spreadMeasures" type="button" aria-pressed="false" hidden>Разнести мерки</button>
+          <button id="playDemo" type="button" hidden>Размотать нить</button>
+          <button id="resetView" type="button" aria-label="Вернуть камеру к текущему шагу">Вернуть вид</button>
+        </div>
+        <div class="fallback-note" id="fallbackNote" hidden>Плоский чертёж · WebGL недоступен</div>
+      </div>
+      <div class="size-readout" id="sizeReadout" aria-label="Размеры шины в миллиметрах"></div>
+      <section class="lesson" id="tireLesson" aria-live="polite" aria-atomic="true">
+        <div class="lesson-heading"><h2 id="stepTitle"></h2><span id="stepCount"></span></div>
+        <p id="stepText"></p><div id="formulas" class="formulas"></div>
+        <div class="step-nav"><button id="prevStep">← Назад</button><div id="stepDots" aria-label="Шаги"></div><button id="nextStep">Далее →</button></div>
+      </section>
+    </section>
+    <aside class="parameters" aria-label="Маркировка и параметры шины">
+      <h2 id="tireLabel">Маркировка шины</h2>
+      <div class="marking" id="marking"></div>
+      <div class="mark-pills" id="markPills"></div>
+      <div id="radialNote" class="radial-note" hidden><strong>R — радиальная конструкция.</strong> Это буква, а не радиус. Число после R — диаметр диска в дюймах.</div>
+      <fieldset id="firstSliders"><legend>Изменить шину</legend></fieldset>
+      <fieldset id="secondSliders" hidden><legend>Новая шина</legend><div id="secondMark" class="second-mark"></div></fieldset>
+      <p class="scale-note" id="scaleNote">Размеры модели — в миллиметрах. H от края диска до поверхности протектора, как на рисунке ФИПИ.</p>
+    </aside>
+  </div>
+</main>
+<p id="status" class="status" role="status"></p>
+</body>
+</html>
