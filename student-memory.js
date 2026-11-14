@@ -575,10 +575,12 @@
   }
   let bar = null, barSig = null, menuOpen = false;
   // свёрнута ли плашка в точку — выбор преподавателя, общий для всех страниц:
-  // на доске плашка закрывает угол рабочего поля, поэтому её можно убрать
+  // на доске плашка закрывает угол рабочего поля, поэтому её можно убрать.
+  // По умолчанию свёрнута (просьба Даниила 15.11): развёрнута, только если
+  // её развернули сами — тогда в памяти '0'
   const LS_MINI = 'smBarMini:v1';
-  function isMini(){ return lsGet(LS_MINI) === '1'; }
-  function setMini(v){ if (v) lsSet(LS_MINI, '1'); else lsDel(LS_MINI); barSig = null; renderBar(); }
+  function isMini(){ return lsGet(LS_MINI) !== '0'; }
+  function setMini(v){ lsSet(LS_MINI, v ? '1' : '0'); barSig = null; renderBar(); }
   function css(){
     if (document.getElementById('smBarCss')) return;
     const st = document.createElement('style');

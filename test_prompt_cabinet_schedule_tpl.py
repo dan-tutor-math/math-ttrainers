@@ -502,7 +502,8 @@ def main():
               W and (W[0]["format"], W[0]["group_id"], W[0]["dur_min"]) == ("pair", gid, 90), str(W))
         thu = ".sc-day[data-day='2026-11-19']"
         quick(thu, "12:00 Маша Иванова + Петя Сидоров")
-        wait_db(lambda: len(lessons()) == 5, "занятие по названию пары")
+        # участники пишутся вторым запросом — ждём и их, а не только строку занятия
+        wait_db(lambda: len(lessons()) == 5 and any(len(people(l["id"])) == 2 for l in lessons() if l["day"] == "2026-11-19"), "занятие по названию пары")
         T4 = [l for l in lessons() if l["day"] == "2026-11-19"]
         check("F6 название пары в быстром вводе разворачивается в учеников",
               T4 and T4[0]["group_id"] == gid and [p["student_id"] for p in people(T4[0]["id"])] == ["st-masha", "st-petya"], str(T4))

@@ -221,8 +221,12 @@ def handle_db(route, request):
         route.fulfill(status=204, headers=CORS)
 
 
-def new_context(browser, signed_in=True, bind="tab"):
+def new_context(browser, signed_in=True, bind="tab", bar_open=True):
     ctx = browser.new_context(viewport={"width": 1100, "height": 800})
+    # плашка сессии по умолчанию свёрнута в точку (15.11); тесты, которые
+    # щёлкают по её кнопкам, начинают с развёрнутой — как после «развернуть»
+    if bar_open:
+        ctx.add_init_script("try{if(!localStorage.getItem('smBarMini:v1'))localStorage.setItem('smBarMini:v1','0')}catch(e){}")
     ctx.route("https://**/*", lambda r: r.abort())
     ctx.route("https://fakesb.test/db", handle_db)
     ctx.route("**/supabase-js.umd.js", lambda r: r.fulfill(status=200, content_type="application/javascript", body=FAKE_SB_JS))
@@ -445,6 +449,19 @@ def main():
         h.click("#smBar [data-sm=end]")
         ok = wait_until(lambda: "Начать сессию" in bar(h), 4)
         check("F4 «закончить» — снова выбор ученика", ok, bar(h))
+        # ── H0. по умолчанию плашка свёрнута (просьба Даниила 15.11)
+        c0 = new_context(browser, signed_in=True, bind="browser", bar_open=False)
+        h0 = open_page(c0, "index.html", errors)
+        PUMP["page"] = h0
+        ok = wait_until(lambda: h0.locator("#smBar.mini [data-sm=expand]").count() == 1 and bar(h0).strip() == "", 4)
+        check("H0 по умолчанию плашка сессии свёрнута в точку", ok, bar(h0))
+        h0.click("#smBar [data-sm=expand]")
+        ok = wait_until(lambda: "Начать сессию" in bar(h0), 3)
+        h0.reload()
+        ok = ok and wait_until(lambda: "Начать сессию" in bar(h0), 4)
+        check("H0b развернули — после перезагрузки остаётся развёрнутой", ok, bar(h0))
+        c0.close()
+        PUMP["page"] = h
         # ── H. сворачивание плашки в точку
         h.click("#smBar [data-sm=mini]")
         ok = wait_until(lambda: h.locator("#smBar.mini [data-sm=expand]").count() == 1 and bar(h).strip() == "", 3)

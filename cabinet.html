@@ -7,7 +7,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#0B0E1A">
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>Кабинет — Mathh</title>
 <link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/onest-latin.woff2" as="font" type="font/woff2" crossorigin>
@@ -156,7 +156,9 @@ select.cs-in{cursor:pointer;-webkit-appearance:none;appearance:none;}
    плашки, имя прилипает слева */
 @media (max-width:620px){
   .cs-tbl td.cs-nm,.cs-tbl th.cs-nm{position:sticky;left:0;z-index:1;background:var(--card);}
-  .cs-nm{min-width:130px;}
+  /* имя с фамилией должно читаться целиком: «Андрей Ребров», а не «Андрей Р» */
+  .cs-nm{min-width:186px;}
+  .cs-nm .cs-in{font-size:14px;}
   .cs-i{display:none;}
   .cs-total b{font-size:23px;}
 }
@@ -168,6 +170,24 @@ select.cs-in{cursor:pointer;-webkit-appearance:none;appearance:none;}
    отступами — ужимаем, а не прокручиваем страницу вбок */
 @media (max-width:420px){
   .tabs a{padding:8px 9px;font-size:13.5px;}
+}
+/* ── телефон (просьба Даниила 14.11): один масштаб, без пустых полей фона по
+   краям, кнопки ровными рядами. Поля страницы и панели — по 6–8 px, а не
+   16 + 20: на 375 px ширине это треть экрана. Вкладки — пять равных ячеек
+   одной строкой, без прокрутки вбок ── */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
+@media (max-width:620px){
+  body{padding:58px 6px 40px;}
+  h1{font-size:24px;}
+  .sub{font-size:13px;margin:2px 0 8px;}
+  .acct{font-size:13px;gap:8px;margin-bottom:10px;}
+  .acct .btn{padding:5px 10px;}
+  .panel{padding:12px 8px;border-radius:18px;}
+  .tabs{display:grid;grid-template-columns:repeat(5,auto);width:100%;gap:2px;padding:3px;margin-bottom:10px;overflow:hidden;}
+  .tabs a{padding:8px 2px;font-size:12px;text-align:center;white-space:nowrap;}
+}
+@media (max-width:360px){
+  .tabs a{font-size:11px;}
 }
 </style>
 </head>
@@ -299,6 +319,7 @@ select.cs-in{cursor:pointer;-webkit-appearance:none;appearance:none;}
 <script src="cabinet-payments.js"></script>
 <script src="cabinet-stats.js"></script>
 <script src="cabinet-students.js"></script>
+<script src="schedule-insights.js"></script>
 <script src="schedule.js"></script>
 <script src="student-memory.js" data-picker></script>
 <script src="cabinet-log.js"></script>

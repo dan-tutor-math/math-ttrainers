@@ -92,6 +92,8 @@ def main():
     with R.local_server(), sync_playwright() as p:
         browser = p.chromium.launch()
         ctx = browser.new_context()
+        # плашка сессии по умолчанию свёрнута (15.11) — тест щёлкает по её кнопке
+        ctx.add_init_script("try{if(!localStorage.getItem('smBarMini:v1'))localStorage.setItem('smBarMini:v1','0')}catch(e){}")
         ctx.add_init_script(STUB_JS)
         page, errors = R.open_board(ctx)
         page.wait_for_timeout(2600)   # плашка сверяется раз в 2 с, список учеников грузится

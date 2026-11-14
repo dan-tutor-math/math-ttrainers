@@ -132,6 +132,9 @@
       name: p => X.personName(p),
       showEnd: () => X.look().end,
       hoursOpen: wd => !!X.st.expand['tpl:' + wd],
+      hl: () => X.st.hl,
+      pick: s => { X.st.tplPick = s.id; },
+      picked: s => X.st.tplPick === s.id,
       busy: v => X.setBusy(v),
       rerender: () => X.render(),
       toast,
@@ -160,15 +163,64 @@
       '<button type="button" class="btn quiet small" id="tplDup">Дублировать</button>' +
       (t.is_active ? '<span class="sc-act" title="Активный шаблон — тот, что стоит первым в списке вставки">★ активный</span>' : '<button type="button" class="btn quiet small" id="tplAct">Сделать активным</button>') +
       X.weekClearHtml('tpl:') +
-      '<button type="button" class="btn danger small" id="tplDel">Удалить</button></div>' +
-      '<div class="form-msg" id="tplMsg"></div><div class="sc-days sc-tpldays">';
-    const rows = tplRows();
-    for (let i = 1; i <= 7; i++) {
-      const n = slotsOf(String(i)).length;
-      h += '<section class="sc-day" data-wd="' + i + '" data-rw-day="' + i + '"><header class="sc-dh"><b>' + X.DAY_LONG[i - 1].replace(/^./, c => c.toUpperCase()) + '</b>' +
-        '<span>' + (n ? X.plural(n, 'слот', 'слота', 'слотов') : '') + '</span>' + X.dayActions('tpl:' + i) + '</header>' + rows.listHtml(String(i)) + '</section>';
+      '<button type="button" class="btn danger small" id="tplDel">Удалить</button>' +
+      // тот же переключатель «Строки / Неделя», что у занятий: вид общий
+      '<div class="seg sc-views" id="tplViews" role="group" aria-label="Вид шаблона">' +
+        '<button type="button" data-v="list" class="' + (X.view() === 'list' ? 'on' : '') + '">Строки</button>' +
+        '<button type="button" data-v="grid" class="' + (X.view() === 'grid' ? 'on' : '') + '">Неделя</button></div></div>' +
+      '<div class="form-msg" id="tplMsg"></div>';
+    if (X.view() === 'grid') h += '<div class="sc-v-grid sc-tplgrid">' + X.gridHtml(gridSrc()) + '</div>';
+    else {
+      h += '<div class="sc-days sc-tpldays">';
+      const rows = tplRows();
+      for (let i = 1; i <= 7; i++) {
+        const n = slotsOf(String(i)).length;
+        h += '<section class="sc-day" data-wd="' + i + '" data-rw-day="' + i + '"><header class="sc-dh"><b>' + X.DAY_LONG[i - 1].replace(/^./, c => c.toUpperCase()) + '</b>' +
+          '<span>' + (n ? X.plural(n, 'слот', 'слота', 'слотов') : '') + '</span>' + X.dayActions('tpl:' + i) + '</header>' + rows.listHtml(String(i)) + '</section>';
+      }
+      h += '</div>';
     }
-    return h + '</div>' + whoHtml(t);
+    return h + (window.ScheduleInsights ? window.ScheduleInsights.tplBlocksHtml(t.slots) : whoHtml(t));
+  }
+  // сетка «Неделя» для шаблона — общий код schedule.js (gridHtml/bindGrid),
+  // дни без дат, без статусов; щелчок по пустому — новый пустой слот
+  // («свободное окно», как пустая строка шаблона в старом) и его карточка
+  function gridSrc(){
+    return {
+      key: 'tpl', statuses: false,
+      days: () => WD.map(wd => ({ key: wd, title: X.DAY_SHORT[Number(wd) - 1], sub: '', ref: 'tpl:' + wd, today: false, money: null })),
+      items: wd => slotsOf(wd), all: () => (tplCur() || { slots: [] }).slots,
+      find: id => (tplCur() || { slots: [] }).slots.find(s => s.id === id),
+      open: s => openSlot(s), person: null, status: null,
+      create: async (wd, m) => {
+        const t = tplCur();
+        if (!t) return;
+        try {
+          const s = await X.SC.addSlot(t.id, { weekday: Number(wd), start_min: m, dur_min: Math.min(X.durFor([]), 1440 - m), format: 'single' }, []);
+          t.slots.push(s); X.render(); openSlot(s);
+        } catch (e) { toast('Не сохранилось: ' + e.message); }
+      },
+      patch: (s, patch) => patchSlot(s, patch),
+      dayPatch: wd => ({ weekday: Number(wd) }),
+      pick: s => { X.st.tplPick = s.id; },
+      hint: 'Щёлкните по свободному месту — новый слот. Плашку можно перетащить на другой час и день и растянуть за нижний край.',
+    };
+  }
+  // двойной щелчок по ученику в «Кто уже в шаблоне» — вписать в слот,
+  // которого касались последним
+  async function addToSlot(sid){
+    const t = tplCur(), s = t && t.slots.find(x => x.id === X.st.tplPick);
+    const stu = X.st.students.find(x => String(x.id) === String(sid));
+    if (!s || s.is_event || !stu) { toast(s && s.is_event ? 'В событие ученика не вписать' : 'Сначала нажмите на строку в дне'); return; }
+    if (s.people.some(p => String(p.student_id) === String(sid))) { toast(stu.name + ' уже в этой строке'); return; }
+    const oldN = s.people.length;
+    try {
+      const rows = await X.SC.addSlotPeople(s.id, [{ student_id: sid }], s.people.reduce((mx, p) => Math.max(mx, p.pos + 1), 0));
+      s.people = s.people.concat(rows).sort((a, b) => a.pos - b.pos);
+      const f = fmtAfter(s, oldN);
+      if (f) Object.assign(s, await X.SC.updateSlot(s.id, { format: f }));
+    } catch (e) { toast('Не сохранилось: ' + e.message); X.reload(); return; }
+    X.render();
   }
 
   /* ── действия строк шаблона ── */
@@ -325,7 +377,10 @@
         X.render(); toast('Шаблон удалён');
       } catch (e) { del.disabled = false; fail(e); }
     });
-    tplRows().bind(host.querySelector('.sc-tpldays'));
+    host.querySelectorAll('#tplViews button').forEach(b => b.addEventListener('click', () => { tplRows().cancel(); X.setView(b.dataset.v); }));
+    if (X.view() === 'grid') X.bindGrid(gridSrc());
+    else tplRows().bind(host.querySelector('.sc-tpldays'));
+    if (window.ScheduleInsights) window.ScheduleInsights.bind(host, { kind: 'tpl', insert: addToSlot });
   }
 
   /* ── карточка слота ── */

@@ -163,7 +163,8 @@
 
     function personHtml(it, p, multi){
       const st = p.status || 'plan', gone = cfg.statuses && (st === 'skip' || st === 'move');
-      return '<span class="rw-p st-' + st + (p.student_id ? '' : ' guest') + '" data-pid="' + esc(p.id) + '">' +
+      const hl = p.student_id && cfg.hl && String(cfg.hl()) === String(p.student_id);
+      return '<span class="rw-p st-' + st + (p.student_id ? '' : ' guest') + (hl ? ' hl' : '') + '" data-pid="' + esc(p.id) + '"' + (p.student_id ? ' data-sid="' + esc(p.student_id) + '"' : '') + '>' +
         (multi && cfg.statuses ? '<button type="button" class="rw-ic sm st-' + st + '" data-pst="' + esc(p.id) + '" title="' + esc(ST_NAME[st]) + ' — нажмите, чтобы сменить" aria-label="Статус ' + esc(cfg.name(p)) + ': ' + esc(ST_NAME[st]) + '">' + icon(st) + '</button>' : '') +
         '<span class="nm' + (gone ? ' x' : '') + '">' + esc(cfg.name(p)) + '</span>' +
         (p.student_id ? '' : '<span class="rw-guest" title="Гость — без карточки ученика">гость</span>') +
@@ -183,7 +184,7 @@
       else if (it.is_event) names = '<span class="rw-ev">' + esc(it.title || 'событие') + '</span>';
       else if (!it.people.length) names = '<span class="rw-empty">свободно</span>';
       else names = it.people.map(p => personHtml(it, p, multi)).join('');
-      return '<div class="rw-row' + (half ? ' half' : '') + (multi ? ' multi' : '') + (it.is_event ? ' ev' : '') + (cfg.statuses ? ' st-' + st : '') + (e ? ' editing' : '') + '"' +
+      return '<div class="rw-row' + (half ? ' half' : '') + (multi ? ' multi' : '') + (it.is_event ? ' ev' : '') + (cfg.statuses ? ' st-' + st : '') + (e ? ' editing' : '') + (cfg.picked && cfg.picked(it) ? ' picked' : '') + '"' +
           ' data-id="' + esc(it.id) + '" data-day="' + esc(day) + '"' + (it.start_min != null ? ' data-start="' + it.start_min + '"' : '') + '>' +
         '<span class="rw-grip" aria-hidden="true"></span>' +
         (cfg.statuses ? (it.is_event || !it.people.length ? '<span class="rw-ic ph"></span>'
@@ -514,6 +515,9 @@
       if (!row || row.classList.contains('draft') || row.classList.contains('rw-vrow') || t.closest('input')) return;
       const day = row.dataset.day, it = find(day, row.dataset.id);
       if (!it) return;
+      // «куда вписывать» для двойного клика по ученику в «Кто в неделе /
+      // в шаблоне» — последняя строка, которой касались (как в старом)
+      if (cfg.pick) { cfg.pick(it); document.querySelectorAll('.rw-row.picked').forEach(r => { if (r !== row) r.classList.remove('picked'); }); row.classList.add('picked'); }
       const rst = t.closest('[data-rst]'), pst = t.closest('[data-pst]');
       if (rst || pst) {
         e.stopPropagation();

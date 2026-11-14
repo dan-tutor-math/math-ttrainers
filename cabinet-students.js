@@ -149,6 +149,8 @@
   }
   // стрелка «⇩» в шрифте Onest рисуется как «!» — значок коробки архива
   const ARCH_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/></svg>';
+  // значок статистики — svg, а не эмодзи 📊: одинаково на всех системах
+  const STATS_SVG = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 13V8M8 13V3M13 13V6"/></svg>';
   const fmt = n => (n == null ? '' : Math.round(n).toLocaleString('ru-RU'));
   function rowHtml(s, i){
     return '<tr data-sid="' + esc(s.id) + '">' +
@@ -163,6 +165,7 @@
       moneyCells(s) +
       '<td class="cs-act">' +
         (cats().some(c => c.kind === 'list') ? '<button type="button" class="cs-ic" data-act="cats" title="В какие сортировки входит">⋮</button>' : '') +
+        '<button type="button" class="cs-ic" data-act="stats" title="Статистика ученика" aria-label="Статистика ученика">' + STATS_SVG + '</button>' +
         '<a class="cs-ic" href="#/payments/' + esc(s.id) + '" title="Оплаты ученика">₽</a>' +
         '<button type="button" class="cs-ic" data-act="arch" title="В архив">' + ARCH_SVG + '</button></td></tr>';
   }
@@ -439,6 +442,8 @@
           patchCat(it.id, c => { const i = c.members.indexOf(String(s.id)); if (on && i < 0) c.members.push(String(s.id)); if (!on && i >= 0) c.members.splice(i, 1); return c; });
           paintTotals();
         }, '');
+      } else if (b.dataset.act === 'stats') {
+        if (window.CabinetStats) window.CabinetStats.openStudent(s.id);
       } else if (b.dataset.act === 'arch') {
         if (!b.dataset.armed) { b.dataset.armed = '1'; b.textContent = 'В архив?'; b.classList.add('armed'); setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.innerHTML = ARCH_SVG; b.classList.remove('armed'); } }, 3000); return; }
         archive(s, true);

@@ -88,7 +88,7 @@
     data.lessons.forEach(l => { byL[l.id] = l; });
     data.rates.forEach(r => { (rates[r.student_id] = rates[r.student_id] || []).push(r); });
     const want = sid => !o.ids || (sid && o.ids.has(String(sid)));
-    const R = { income: 0, got: 0, lost: 0, expected: 0, noRate: 0, lessons: 0, hours: 0, workDays: 0, manualDays: 0, skips: 0, makeups: 0,
+    const R = { income: 0, got: 0, lost: 0, expected: 0, noRate: 0, lessons: 0, hours: 0, workDays: 0, manualDays: 0, skips: 0, makeups: 0, paid: 0,
       per: {}, dow: DOW.map(() => ({ inc: 0, n: 0 })), months: {}, dayInc: {} };
     const doneL = {}, doneByDay = {};
     const mon = ym => (R.months[ym] = R.months[ym] || { inc: 0, got: 0 });
@@ -108,7 +108,7 @@
       if (p.status === 'move') S.move++;
       if (b.pay) {
         if (pr == null) { R.noRate++; return; }
-        R.income += pr; S.inc += pr;
+        R.income += pr; S.inc += pr; R.paid++;
         R.dayInc[l.day] = (R.dayInc[l.day] || 0) + pr;
         R.dow[weekday(l.day)].inc += pr;
         mon(ymOf(l.day)).inc += pr;
@@ -138,6 +138,11 @@
       if (x.student_id) { const S = R.per[x.student_id] = R.per[x.student_id] || { inc: 0, n: 0, skip: 0, move: 0, makeup: 0, lost: 0 }; S.got = (S.got || 0) + a; }
     });
     R.perHour = R.hours ? R.income / R.hours : 0;
+    // средний чек — доход на одно оплаченное участие (каждый ученик в паре —
+    // отдельное занятие, как в старом); рабочий день — день с доходом
+    R.check = R.paid ? R.income / R.paid : 0;
+    R.incDays = Object.keys(R.dayInc).filter(d => R.dayInc[d] > 0).length;
+    R.perDay = R.incDays ? R.income / R.incDays : 0;
     return R;
   }
 
@@ -222,6 +227,8 @@
       card('stLessons', 'Занятий', String(R.lessons), delta(R.lessons, Rp.lessons) + ' проведено' + (R.makeups ? ' · отработок ' + R.makeups : '')) +
       card('stHours', 'Часов', fmtH(R.hours), delta(R.hours, Rp.hours) + ' ' + (R.workDays ? 'за ' + P().plural(R.workDays, 'рабочий день', 'рабочих дня', 'рабочих дней') : 'по времени занятий')) +
       card('stHour', 'Стоимость часа', P().money(R.perHour), delta(R.perHour, Rp.perHour, true) + ' доход ÷ часы') +
+      card('stCheck', 'Средний чек', P().money(R.check), delta(R.check, Rp.check, true) + ' за занятие') +
+      card('stDays', 'Рабочих дней', String(R.incDays), R.incDays ? 'по ' + P().money(R.perDay) + ' в день' : 'дней с доходом нет') +
       card('stLost', 'Потеряно на пропусках', P().money(R.lost), R.skips ? P().plural(R.skips, 'неоплаченный пропуск', 'неоплаченных пропуска', 'неоплаченных пропусков') : 'пропусков нет', R.lost ? 'warn' : '') +
       '</div>';
     if (R.noRate) h += '<div class="hint st-warn">Без ставки: ' + P().plural(R.noRate, 'занятие', 'занятия', 'занятий') + ' не вошли в доход — задайте ставку на вкладке «Оплаты».</div>';
@@ -373,11 +380,28 @@
           '<label><span class="label">Название</span><input class="field" data-gf="name" maxlength="40" value="' + esc(g.name) + '"></label>' +
           '<label><span class="label">С (необязательно)</span><input class="field" type="date" data-gf="from" value="' + esc(g.from || '') + '"></label>' +
           '<label><span class="label">По (необязательно)</span><input class="field" type="date" data-gf="to" value="' + esc(g.to || '') + '"></label></div>' +
+        '<div class="hint st-gfc" data-gfc>' + esc(groupForecast(g)) + '</div>' +
         '<label class="chk"><input type="checkbox" data-gf="auto"' + (g.auto ? ' checked' : '') + '> Все новые ученики попадают сами</label>' +
         '<div class="st-gmem">' + act.map(s => '<label class="chk"><input type="checkbox" data-gm="' + esc(s.id) + '"' + (inGroup(g, s.id) ? ' checked' : '') + '> ' + esc(s.name) + '</label>').join('') + '</div>' +
         '<div class="row-btns"><button type="button" class="btn quiet small danger" data-gdel>Удалить группу</button></div></div>').join('') +
       '<div class="row-btns" style="margin-top:8px">' + (gs.some(g => /учебн/i.test(g.name)) ? '' : '<button type="button" class="btn quiet small" id="stAddYear" data-y="' + y + '">+ Учебный год</button>') +
         '<button type="button" class="btn quiet small" id="stAddGrp">+ группа</button></div></details>';
+  }
+  // «в месяц» учеников группы и прогноз «≈ N ₽ за период» (как у плитки
+  // группы старого: в месяц × дней периода / 30,4375, до сотни рублей)
+  function groupForecast(g){
+    if (!st.data) return '';
+    const ps = P().paySettings(settings()), per = P().split(st.data, st.students), tpl = activeTpl(), now = P().today();
+    const sum = st.students.filter(s => !s.archived_at && inGroup(g, s.id))
+      .reduce((a, s) => a + (P().monthlyOf({ rates: per[s.id].rates, tpl, sid: s.id, mode: ps.monthMode }).sum || 0), 0);
+    let t = P().money(sum) + ' в месяц';
+    if (g.from && g.to && g.to >= g.from) {
+      const days = P().daysBetween(g.from, g.to) + 1;
+      t += ' · ≈ ' + P().money(Math.round(sum * days / 30.4375 / 100) * 100) + ' за период';
+    } else if (!g.to) t += ' · бессрочно';
+    if (g.from && g.from > now) t += ' · начнётся ' + P().dmy(g.from);
+    else if (g.to && g.to < now) t += ' · завершилась ' + P().dmy(g.to);
+    return t;
   }
   function saveGroups(list){ return ctx.save({ incomeGroups: list }); }
   function patchGroup(id, fn){ saveGroups(groups().map(g => (g.id === id ? fn(Object.assign({}, g, { members: g.members.slice(), out: g.out.slice() })) : g))); }
@@ -394,6 +418,12 @@
       ctx.save({ pay: Object.assign({}, P().paySettings(settings()), { monthMode: b.dataset.v }) });
       render();
     }));
+    // ученик в «По ученикам» — его окно статистики с календарём отметок
+    host.querySelectorAll('#stStudents .st-bar[data-k]').forEach(b => {
+      b.classList.add('st-click'); b.setAttribute('role', 'button'); b.tabIndex = 0;
+      b.addEventListener('click', () => openStudent(b.dataset.k));
+      b.addEventListener('keydown', e => { if (e.key === 'Enter') openStudent(b.dataset.k); });
+    });
     const ts = q('#stTplSel');
     if (ts) ts.addEventListener('change', () => { st.tplId = ts.value; render(); });
     // свёрнутые блоки помнят, открыты ли: перерисовка их не закрывает
@@ -464,8 +494,100 @@
     if (keep && keep.sel) { const n = host.querySelector(keep.sel); if (n) n.focus(); }
   }
 
+  /* ══ окно «Статистика по ученику» (📊 в таблице учеников, щелчок по
+     ученику в «По ученикам»): периоды, карточки и календарь отметок по
+     дням — как окно ученика старого приложения ══ */
+  const SPER = [['month', 'Месяц'], ['q', '3 мес.'], ['half', 'Полгода'], ['year', 'Год']];
+  const so = { sid: null, per: 'month', off: 0, el: null, onKey: null };
+  function closeStudent(){
+    if (!so.el) return;
+    document.removeEventListener('keydown', so.onKey);
+    so.el.remove(); so.el = null; so.sid = null;
+  }
+  async function openStudent(sid){
+    closeStudent();
+    so.sid = String(sid); so.per = 'month'; so.off = 0;
+    const el = document.createElement('div');
+    el.className = 'sc-modal';
+    el.innerHTML = '<div class="sc-sheet panel cst-sheet" role="dialog" aria-modal="true" aria-label="Статистика по ученику"><div class="empty">Загружаем…</div></div>';
+    el.addEventListener('pointerdown', e => { if (e.target === el) closeStudent(); });
+    document.body.appendChild(el);
+    so.el = el;
+    so.onKey = e => { if (e.key === 'Escape') closeStudent(); };
+    document.addEventListener('keydown', so.onKey);
+    // данные статистики — те же, что у вкладки; открыли не со «Статистики» — грузим
+    if (!st.data) {
+      try {
+        const [students, data] = await Promise.all([ctx.students(), P().loadAll()]);
+        st.students = students || []; st.data = data;
+      } catch (e) {
+        if (so.el === el) el.firstChild.innerHTML = '<div class="empty">' + esc(P().missing(e) ? 'Статистике нужны оплаты: выполните файл cabinet-payments.sql в Supabase (SQL Editor).' : e.message) + '</div>';
+        return;
+      }
+    }
+    if (so.el === el) paintStudent();
+  }
+  function studentCal(sid, from, to){
+    // статус ученика по дням: проведено важнее плана, пропуск — отдельно
+    const byL = {}, days = {};
+    st.data.lessons.forEach(l => { byL[l.id] = l; });
+    const rank = { done: 4, skip: 3, move: 2, plan: 1 };
+    st.data.people.forEach(p => {
+      const l = byL[p.lesson_id];
+      if (!l || l.is_event || String(p.student_id) !== sid || l.day < from || l.day > to) return;
+      const cur = days[l.day];
+      if (!cur || rank[p.status] > rank[cur]) days[l.day] = p.status;
+    });
+    const months = [];
+    for (let m = monStart(from); m <= to; m = P().addMonths(m, 1)) months.push(m);
+    const ttl = { done: 'проведено', skip: 'пропуск', move: 'перенос', plan: 'запланировано' };
+    return '<div class="cst-cal" id="cstCal">' + months.map(m => {
+      const first = weekday(m), end = monEnd(m);
+      let cells = '';
+      for (let i = 0; i < first; i++) cells += '<span></span>';
+      for (let d = m; d <= end; d = P().addDays(d, 1)) {
+        const stt = days[d], out = d < from || d > to;
+        cells += '<span class="cst-d' + (stt ? ' st-' + stt : '') + (out ? ' out' : '') + '" data-day="' + d + '"' + (stt ? ' title="' + P().dm(d) + ' — ' + ttl[stt] + '"' : '') + '>' + Number(d.slice(8)) + '</span>';
+      }
+      return '<div class="cst-m"><b>' + MON_FULL[Number(m.slice(5, 7)) - 1] + ' ' + m.slice(0, 4) + '</b><div class="cst-g">' + DOW.map(x => '<i>' + x + '</i>').join('') + cells + '</div></div>';
+    }).join('') + '</div>' +
+      '<div class="cst-leg"><span class="cst-d st-done"></span>проведено <span class="cst-d st-skip"></span>пропуск <span class="cst-d st-move"></span>перенос <span class="cst-d st-plan"></span>запланировано</div>';
+  }
+  function paintStudent(){
+    if (!so.el) return;
+    const s = st.students.find(x => String(x.id) === so.sid);
+    const sheet = so.el.firstChild;
+    if (!s) { sheet.innerHTML = '<div class="empty">Ученик не найден.</div>'; return; }
+    const r = range(so.per, so.off), pr = range(so.per, so.off - 1);
+    const base = { ids: new Set([so.sid]), totals: {}, settings: settings() };
+    const R = compute(st.data, Object.assign({ from: r.from, to: r.to }, base)), Rp = compute(st.data, Object.assign({ from: pr.from, to: pr.to }, base));
+    const x = R.per[so.sid] || { inc: 0, n: 0, skip: 0, move: 0, makeup: 0, lost: 0, got: 0 }, xp = Rp.per[so.sid] || { inc: 0, n: 0, got: 0 };
+    // в календарь — не больше полугода, иначе окно станет бесконечным
+    const calFrom = P().daysBetween(r.from, r.to) > 190 ? P().addMonths(monStart(r.to), -5) : r.from;
+    sheet.innerHTML =
+      '<div class="sc-ed-head"><b>Статистика · <a href="#/students/' + esc(s.id) + '" id="cstName">' + esc(s.name) + '</a></b><button type="button" class="sc-x" aria-label="Закрыть">×</button></div>' +
+      '<div class="seg" id="cstPer">' + SPER.map(p => '<button type="button" data-p="' + p[0] + '" class="' + (so.per === p[0] ? 'on' : '') + '">' + p[1] + '</button>').join('') + '</div>' +
+      '<div class="st-nav"><button type="button" class="btn quiet small sc-arrow" id="cstPrev" aria-label="Раньше">‹</button><span class="st-lab" id="cstLabel">' + esc(r.label) + '</span>' +
+        '<button type="button" class="btn quiet small sc-arrow" id="cstNext" aria-label="Позже"' + (so.off >= 0 ? ' disabled' : '') + '>›</button></div>' +
+      '<div class="st-cards">' +
+        card('cstLessons', 'Занятий', String(x.n), delta(x.n, xp.n) + ' проведено' + (x.makeup ? ' · отработок ' + x.makeup : '')) +
+        card('cstOff', 'Пропуски и переносы', String(x.skip + x.move), (x.skip ? 'пропусков ' + x.skip : '') + (x.skip && x.move ? ' · ' : '') + (x.move ? 'переносов ' + x.move : '') || 'не было') +
+        card('cstInc', 'Доход', P().money(x.inc), delta(x.inc, xp.inc, true) + ' начислено') +
+        card('cstGot', 'Оплачено', P().money(x.got || 0), delta(x.got || 0, xp.got || 0, true) + ' по вкладке «Оплаты»') +
+        (x.lost ? card('cstLost', 'Потеряно на пропусках', P().money(x.lost), 'неоплаченные пропуски', 'warn') : '') +
+      '</div>' + studentCal(so.sid, calFrom, r.to) +
+      '<div class="row-btns sc-ed-foot"><a class="btn quiet" href="#/payments/' + esc(s.id) + '">Оплаты ученика</a><button type="button" class="btn" data-close>Готово</button></div>';
+    const q = sel => sheet.querySelector(sel);
+    q('.sc-x').addEventListener('click', closeStudent);
+    q('[data-close]').addEventListener('click', closeStudent);
+    sheet.querySelectorAll('a').forEach(a => a.addEventListener('click', () => closeStudent()));
+    sheet.querySelectorAll('#cstPer button').forEach(b => b.addEventListener('click', () => { so.per = b.dataset.p; so.off = 0; paintStudent(); }));
+    q('#cstPrev').addEventListener('click', () => { so.off--; paintStudent(); });
+    q('#cstNext').addEventListener('click', () => { so.off = Math.min(0, so.off + 1); paintStudent(); });
+  }
+
   function init(opts){ ctx = opts; }
   function show(box){ host = box; render(); return load(); }
 
-  window.CabinetStats = { init, show, compute, range, scPlan, repaint: () => { if (host && host.offsetParent && st.data) render(); }, reload: () => load(), _st: st };
+  window.CabinetStats = { init, show, compute, range, scPlan, openStudent, closeStudent, groupForecast, repaint: () => { if (host && host.offsetParent && st.data) render(); }, reload: () => load(), _st: st };
 })();
