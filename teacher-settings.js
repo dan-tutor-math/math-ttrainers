@@ -41,7 +41,7 @@
 
   // чужие и испорченные значения отбрасываем: настройку правят руками в базе
   function normalize(raw){
-    const o = Object.assign({}, DEFAULTS, { pay: normalizePay(null), incomeGroups: [] });
+    const o = Object.assign({}, DEFAULTS, { pay: normalizePay(null), incomeGroups: [], studentCats: [] });
     if (!raw || typeof raw !== 'object') return o;
     if (raw.sessionBind === 'tab' || raw.sessionBind === 'browser') o.sessionBind = raw.sessionBind;
     if (['show', 'off', 'hide_solved'].indexOf(raw.labels) >= 0) o.labels = raw.labels;
@@ -60,6 +60,7 @@
     }
     o.pay = normalizePay(raw.pay);
     o.incomeGroups = normalizeGroups(raw.incomeGroups);
+    o.studentCats = normalizeCats(raw.studentCats);
     return o;
   }
   // флаги правят руками на странице — id латиницей, имя до 30 знаков, не больше 20
@@ -97,6 +98,21 @@
       if (!/^[a-z0-9_-]{1,24}$/.test(id) || !name || seen.has(id)) return;
       seen.add(id);
       out.push({ id, name, members: ids(g.members), out: ids(g.out), from: day(g.from), to: day(g.to), auto: !!g.auto });
+    });
+    return out;
+  }
+  // «сортировки» списка учеников (вкладки над таблицей, cabinet-students.js):
+  // свой список (members — id учеников) или отбор по классу / экзамену (v)
+  function normalizeCats(raw){
+    const out = [], seen = new Set();
+    (Array.isArray(raw) ? raw : []).forEach(c => {
+      if (!c || typeof c !== 'object' || out.length >= 30) return;
+      const id = String(c.id || ''), name = String(c.name || '').trim().slice(0, 40);
+      if (!/^[a-z0-9_-]{1,24}$/.test(id) || !name || seen.has(id)) return;
+      seen.add(id);
+      const kind = c.kind === 'grade' || c.kind === 'exam' ? c.kind : 'list';
+      out.push({ id, name, kind, v: kind === 'list' ? '' : String(c.v || '').trim().slice(0, 20),
+        members: Array.isArray(c.members) ? Array.from(new Set(c.members.map(String).filter(x => x && x.length <= 64))).slice(0, 500) : [] });
     });
     return out;
   }

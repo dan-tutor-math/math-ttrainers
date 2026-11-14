@@ -32,16 +32,6 @@
 .tabs a{font-weight:600;font-size:14.5px;color:var(--muted-3);text-decoration:none;padding:9px 18px;border-radius:12px;}
 .tabs a.on{background:var(--ink);color:#fff;}
 
-.add-row{display:flex;gap:8px;margin-bottom:14px;}
-.add-row .field{flex:1;min-width:0;}
-.list-tools{display:flex;justify-content:space-between;align-items:center;margin:0 4px 10px;color:var(--muted-2);font-size:13.5px;}
-.slist{display:flex;flex-direction:column;gap:8px;}
-.srow{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:16px;background:var(--card);border:1px solid var(--glass-border);
-  text-decoration:none;color:var(--pencil);}
-.srow:hover{border-color:var(--ink);}
-.srow .nm{font-weight:700;font-size:16px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.srow .mt{font-size:13px;color:var(--muted-2);}
-.srow.arch{opacity:.6;}
 .badge{font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-2);border:1px solid var(--glass-border);border-radius:8px;padding:2px 7px;}
 
 .card-head{display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
@@ -84,6 +74,92 @@ textarea.field{min-height:90px;resize:vertical;}
 .seg button.on{background:var(--ink);color:#fff;}
 .chk{display:flex;align-items:center;gap:8px;font-size:14.5px;margin-top:8px;cursor:pointer;}
 .save-note{font-size:13px;color:var(--muted-2);min-height:1.2em;}
+/* ── ученики таблицей (cabinet-students.js) — как «Доход / расход» старого
+   приложения: строки на всю ширину, цифры моноширинным, правка в ячейке ── */
+.wrap.cs-wide{max-width:1180px;}
+.cs-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+.cs-head h2{font-size:22px;margin:0;}
+.cs-sub{font-size:15px;font-weight:500;color:var(--muted-2);margin-left:4px;}
+.cs-cats{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
+.cs-chip{font-family:var(--font-ui);font-size:14px;font-weight:600;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);
+  border-radius:11px;padding:7px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+.cs-chip:hover{border-color:var(--ink);}
+.cs-chip.on{background:var(--ok-tint);border-color:var(--ok);color:var(--pencil);}
+.cs-chip .cs-n{font-weight:500;color:var(--muted-2);font-size:12.5px;}
+.cs-pen{font-size:12px;color:var(--muted-2);}
+.cs-plus{padding:7px 11px;}
+.cs-edit{border:1px solid var(--glass-border);background:var(--card);border-radius:16px;padding:14px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px;}
+.cs-erow{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;}
+.cs-erow label{min-width:200px;}
+.cs-erow .seg{margin-top:4px;}
+.cs-emem{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:2px 12px;}
+.cs-emem .chk{margin-top:4px;}
+.cs-box{border:1px solid var(--glass-border);background:var(--card);border-radius:20px;overflow:hidden;}
+.cs-scroll{overflow-x:auto;}
+.cs-tbl{width:100%;border-collapse:collapse;font-size:15px;}
+.cs-tbl th{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);text-align:left;padding:12px 8px 10px;
+  border-bottom:1px solid var(--grid);white-space:nowrap;}
+.cs-tbl td{padding:3px 8px;border-bottom:1px solid var(--grid);vertical-align:middle;}
+.cs-tbl tbody tr:last-child td{border-bottom:none;}
+.cs-tbl tbody tr:hover td{background:var(--hover-1);}
+.cs-tbl .cs-num{text-align:right;}
+.cs-tbl th.cs-num .cs-sort{justify-content:flex-end;width:100%;}
+.cs-i{width:30px;color:var(--muted-2);font-variant-numeric:tabular-nums;text-align:right;}
+.cs-sort{font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;display:inline-flex;}
+.cs-sort.on{color:var(--ink);}
+.cs-in{font-family:var(--font-ui);font-size:15px;color:var(--pencil);background:transparent;border:1px solid transparent;border-radius:9px;padding:7px 8px;width:100%;min-width:0;box-sizing:border-box;}
+.cs-in:hover:not(:disabled){border-color:var(--glass-border);background:var(--glass);}
+.cs-in:focus{outline:none;border-color:var(--ink);background:var(--glass-strong);}
+.cs-in:disabled{opacity:.5;}
+.cs-in::placeholder{color:var(--muted-1);opacity:.75;}
+.cs-in.err{border-color:var(--teacher);}
+.cs-in.saved{border-color:var(--ok);}
+select.cs-in{cursor:pointer;-webkit-appearance:none;appearance:none;}
+.cs-nm{min-width:170px;}
+.cs-nm .cs-in{font-weight:600;}
+.cs-nmw{display:flex;align-items:center;gap:2px;}
+.cs-nmw .cs-open{flex:none;opacity:.55;}
+.cs-tbl tr:hover .cs-open,.cs-open:focus{opacity:1;}
+.cs-gr{width:74px;}
+.cs-ex{min-width:130px;}
+.cs-ni{font-family:var(--font-mono);text-align:right;width:92px;font-variant-numeric:tabular-nums;}
+.cs-mon::placeholder{color:var(--muted-1);opacity:1;}
+.cs-mon.manual{color:var(--warn);background:var(--warn-tint);font-weight:700;}
+.cs-cellbtn{font-family:var(--font-ui);font-size:14px;color:var(--muted-3);background:none;border:1px solid transparent;border-radius:9px;padding:7px 8px;cursor:pointer;
+  text-align:left;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cs-cellbtn:hover{border-color:var(--glass-border);background:var(--glass);}
+.cs-mute{color:var(--muted-1);}
+.cs-act{white-space:nowrap;text-align:right;}
+.cs-ic{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 6px;border-radius:9px;border:1px solid transparent;background:none;
+  color:var(--muted-2);font-size:15px;font-family:var(--font-ui);cursor:pointer;text-decoration:none;box-sizing:border-box;}
+.cs-ic:hover{border-color:var(--glass-border);background:var(--glass);color:var(--ink);}
+.cs-ic.armed{color:var(--teacher);border-color:var(--teacher);font-size:12.5px;}
+.cs-open{color:var(--ink);font-weight:700;font-size:17px;}
+.cs-newrow td{background:var(--hover-1);}
+.cs-foot{display:flex;align-items:center;justify-content:flex-end;gap:16px;padding:12px 16px 14px;border-top:1px solid var(--grid);}
+.cs-ic-big{width:38px;height:38px;font-size:20px;border-color:var(--glass-border);background:var(--glass);}
+.cs-total{display:flex;flex-direction:column;align-items:flex-end;}
+.cs-tl{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);}
+.cs-total b{font-family:var(--font-mono);font-size:28px;color:var(--ok);font-variant-numeric:tabular-nums;}
+.cs-note{margin:10px 4px 0;}
+.cs-arch{margin-top:16px;}
+.cs-arch summary{cursor:pointer;font-size:16px;padding:6px 4px;}
+.cs-arow{display:flex;align-items:center;gap:12px;padding:8px 6px;border-bottom:1px solid var(--grid);flex-wrap:wrap;}
+.cs-arow:last-child{border-bottom:none;}
+.cs-aname{font-weight:600;color:var(--pencil);text-decoration:none;}
+.cs-aname:hover{text-decoration:underline;}
+.cs-arow .btn{margin-left:auto;}
+.cs-menu{position:fixed;z-index:400;min-width:220px;max-width:calc(100vw - 16px);max-height:60vh;overflow:auto;padding:10px 14px 12px;border-radius:16px;
+  background:var(--glass-strong);border:1px solid var(--glass-border);box-shadow:var(--shadow);-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);}
+.cs-mt{font-size:12px;font-weight:700;color:var(--muted-2);margin-bottom:4px;}
+/* телефон: столбцы не сжимаются в кашу — таблица листается вбок внутри
+   плашки, имя прилипает слева */
+@media (max-width:620px){
+  .cs-tbl td.cs-nm,.cs-tbl th.cs-nm{position:sticky;left:0;z-index:1;background:var(--card);}
+  .cs-nm{min-width:130px;}
+  .cs-i{display:none;}
+  .cs-total b{font-size:23px;}
+}
 @media (max-width:620px){
   .grid2{grid-template-columns:1fr;}
   .tabs a{padding:9px 12px;}
@@ -125,18 +201,7 @@ textarea.field{min-height:90px;resize:vertical;}
     </nav>
 
     <section id="tabStudents" hidden>
-      <div class="panel">
-        <div class="add-row">
-          <input class="field" id="newName" maxlength="80" placeholder="Имя нового ученика" aria-label="Имя нового ученика">
-          <button class="btn" id="newGo">Добавить</button>
-        </div>
-        <div class="form-msg" id="newMsg"></div>
-        <div class="list-tools">
-          <span id="listCount"></span>
-          <label class="chk" style="margin:0"><input type="checkbox" id="showArch"> Показать архив</label>
-        </div>
-        <div class="slist" id="studentList"></div>
-      </div>
+      <div class="panel" id="stuHost"></div>
     </section>
 
     <section id="tabCard" hidden>
@@ -233,6 +298,7 @@ textarea.field{min-height:90px;resize:vertical;}
 <script src="payments.js"></script>
 <script src="cabinet-payments.js"></script>
 <script src="cabinet-stats.js"></script>
+<script src="cabinet-students.js"></script>
 <script src="schedule.js"></script>
 <script src="student-memory.js" data-picker></script>
 <script src="cabinet-log.js"></script>
@@ -260,10 +326,6 @@ function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add(
 
 /* ── подписи у значений ── */
 const EXAMS = { '': 'не выбран', oge: 'ОГЭ, математика', ege_prof: 'ЕГЭ, профиль', ege_base: 'ЕГЭ, база', rus_oge: 'ОГЭ, русский' };
-function examLabel(v){ return v ? (EXAMS[v] || v) : ''; }
-function meta(s){
-  return [s.grade ? s.grade + ' класс' : '', examLabel(s.exam)].filter(Boolean).join(' · ');
-}
 
 /* ── вход ── */
 let user = null;
@@ -306,10 +368,13 @@ async function route(){
   renderAcct();
   if (!user){ show('scrAuth'); return; }
   const [tab, id] = location.hash.replace(/^#\/?/, '').split('/');
-  const t = ['students', 'schedule', 'payments', 'stats', 'settings'].indexOf(tab) >= 0 ? tab : 'students';
+  // без вкладки в адресе — «Расписание»: в кабинет заходят прежде всего за ним (просьба Даниила 14.11)
+  const t = ['students', 'schedule', 'payments', 'stats', 'settings'].indexOf(tab) >= 0 ? tab : 'schedule';
   show('scrMain');
   // сетке недели нужна ширина: семь колонок дней в 860px не читаются
   document.querySelector('.wrap').classList.toggle('sc-wide', t === 'schedule');
+  // таблица учеников — девять столбцов, в 860 px не помещается
+  document.querySelector('.wrap').classList.toggle('cs-wide', t === 'students' && !id);
   document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === t));
   ['tabStudents', 'tabCard', 'tabSchedule', 'tabPayments', 'tabStats', 'tabSettings'].forEach(x => { $(x).hidden = true; });
   // боковая панель занятия висит поверх страницы — с вкладки «Расписание» её уносим
@@ -322,42 +387,12 @@ async function route(){
   else { $('tabSettings').hidden = false; await renderSettings(); }
 }
 
-/* ── ученики: список ── */
+/* ── ученики: таблица (cabinet-students.js) ── */
 async function loadStudents(force){
   if (!students || force) students = await C.listStudents();
   return students;
 }
-async function renderList(){
-  const box = $('studentList');
-  try { await loadStudents(true); }
-  catch (e) { box.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; return; }
-  const arch = $('showArch').checked;
-  const rows = students.filter(s => arch || !s.archived_at)
-    .sort((a, b) => !!a.archived_at - !!b.archived_at || a.name.localeCompare(b.name, 'ru'));
-  const active = students.filter(s => !s.archived_at).length;
-  $('listCount').textContent = 'Учеников: ' + active + (students.length > active ? ' (в архиве ' + (students.length - active) + ')' : '');
-  box.innerHTML = rows.length ? rows.map(s =>
-    '<a class="srow' + (s.archived_at ? ' arch' : '') + '" href="#/students/' + esc(s.id) + '" data-id="' + esc(s.id) + '">' +
-      '<span class="nm">' + esc(s.name) + '</span>' +
-      '<span class="mt">' + esc(meta(s)) + '</span>' +
-      (s.archived_at ? '<span class="badge">архив</span>' : '') +
-    '</a>').join('') : '<div class="empty">Учеников пока нет — добавьте первого выше.</div>';
-}
-$('showArch').addEventListener('change', renderList);
-async function addStudent(){
-  const name = $('newName').value.trim();
-  if (!name){ $('newMsg').textContent = 'Напишите имя'; return; }
-  $('newGo').disabled = true; $('newMsg').textContent = '';
-  try {
-    const s = await C.addStudent({ name });
-    $('newName').value = '';
-    students = null;
-    location.hash = '#/students/' + s.id;
-  } catch (e) { $('newMsg').textContent = e.message; }
-  finally { $('newGo').disabled = false; }
-}
-$('newGo').addEventListener('click', addStudent);
-$('newName').addEventListener('keydown', e => { if (e.key === 'Enter') addStudent(); });
+async function renderList(){ await CabinetStudents.show($('stuHost')); }
 
 /* ── ученики: карточка ── */
 async function openCard(id){
@@ -548,6 +583,12 @@ Schedule.init({
   toast,
 });
 
+/* ── ученики таблицей: сортировки и группы дохода — в настройках ── */
+CabinetStudents.init({ students: () => loadStudents(true), settings: () => TS.get(), exams: EXAMS, toast,
+  save: patch => TS.set(patch).catch(e => toast('Не сохранилось на сервере: ' + e.message)),
+  changed: () => { students = null; } });
+TS.onChange(() => CabinetStudents.repaint());
+
 /* ── оплаты (cabinet-payments.js, В4а) ── */
 CabinetPayments.init({ students: () => loadStudents(true), settings: () => TS.get(), toast });
 // флаги и правило прогула приходят с сервера позже первой отрисовки — пересчитать
@@ -565,8 +606,8 @@ SY.init({
   onChanged: () => {
     students = null;
     const t = location.hash.replace(/^#\/?/, '').split('/')[0];
-    if (t === 'schedule') Schedule.reload();
-    else if (t === 'students' || !t) route();
+    if (t === 'schedule' || !t) Schedule.reload();
+    else if (t === 'students') route();
   },
 });
 const SY_TEXT = { off: 'Не настроено', idle: 'Ждёт синхронизации', wait_import: 'Ждёт первого импорта: нажмите «Синхронизировать сейчас»', stale: 'Старое приложение отдаёт устаревшие данные — повторим позже',

@@ -327,6 +327,8 @@
     if (same) return run(need().from('student_rates').update(o).eq('id', same.id).select(RATE_COLS).single());
     return run(need().from('student_rates').insert(Object.assign({ student_id: String(studentId) }, o)).select(RATE_COLS).single());
   }
+  // только ставки — таблице учеников (cabinet-students.js) остальное не нужно
+  const listRates = () => all(() => need().from('student_rates').select(RATE_COLS).order('valid_from', { ascending: true }));
   const deleteRate = id => run(need().from('student_rates').delete().eq('id', id));
   const setMode = (studentId, mode) => run(need().from('students').update({ pay_mode: mode === 'pack' || mode === 'lesson' ? mode : null }).eq('id', String(studentId)).select('id, pay_mode').single());
 
@@ -412,7 +414,7 @@
 
   window.Payments = {
     FLAG_TEMPLATES, REASONS, PAY_DEFAULTS, paySettings, billOf, reasonOf, rateOn, modeOf, calc,
-    loadAll, split, loadStudent, weekInfo, addPayment, updatePayment, deletePayment, setRate, deleteRate, setMode, missing,
+    loadAll, split, loadStudent, weekInfo, listRates, addPayment, updatePayment, deletePayment, setRate, deleteRate, setMode, missing,
     busyHours, curRateRow, tplLoad, monthlyOf, setRateExtra, listDayTotals, setDayTotal,
     money, plural, dm, dmy, today, addDays, addMonths, daysBetween,
   };

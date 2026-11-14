@@ -225,14 +225,22 @@ def main():
         page.wait_for_function("() => document.getElementById('auMsg').textContent.length > 0")
         check("A2 неверный пароль — понятная ошибка", "Не подошли" in page.inner_text("#auMsg"), page.inner_text("#auMsg"))
         login(page)
+        # без вкладки в адресе кабинет открывает «Расписание»
+        page.wait_for_selector("#tabSchedule", state="visible")
+        check("A3a вход в кабинет — сразу «Расписание»", page.locator('#tabs a[data-tab="schedule"].on').count() == 1)
+        page.click('#tabs a[data-tab="students"]')
         page.wait_for_selector("#tabStudents", state="visible")
-        page.wait_for_function("() => document.getElementById('studentList').textContent.trim().length > 0")
+        page.wait_for_function("() => document.getElementById('csBody') && document.getElementById('csBody').textContent.trim().length > 0")
         check("A3 после входа — вкладка «Ученики», список пуст (чужой не виден)",
-              "Учеников пока нет" in page.inner_text("#studentList") and "Чужой" not in page.inner_text("#studentList"))
+              "Учеников пока нет" in page.inner_text("#csBody") and "Чужой" not in page.inner_text("#stuHost"))
 
         # ── B. ученик
-        page.fill("#newName", "Маша Иванова")
-        page.click("#newGo")
+        # таблица учеников (cabinet-students.js): добавили строкой — карточка по «→»
+        page.click("#csAdd")
+        page.fill("#csNew", "Маша Иванова")
+        page.press("#csNew", "Enter")
+        page.wait_for_selector("#csBody .cs-open", timeout=5000)
+        page.click("#csBody .cs-open")
         page.wait_for_selector("#cSave", timeout=5000)
         check("B1 добавили — открылась карточка", page.input_value("#cName_in") == "Маша Иванова")
         check("B2 места «Память заданий» и «Занятия» и кнопка «Начать сессию»",
@@ -253,10 +261,12 @@ def main():
               (row["name"], row["grade"], row["exam"], row["note"], row["dur_min"], row["boards"])
               == ("Мария Иванова", "9", "oge", "Слабо дроби", 90, ["b-2"]), str(row))
         page.click("a:has-text('← Ученики')")
-        page.wait_for_selector(".srow", timeout=5000)
+        page.wait_for_selector("#csBody tr[data-sid]", timeout=5000)
+        r0 = "#csBody tr[data-sid]"
         check("B6 в списке новое имя, класс и экзамен",
-              "Мария Иванова" in page.inner_text(".srow") and "9 класс" in page.inner_text(".srow") and "ОГЭ" in page.inner_text(".srow"))
-        page.click(".srow")
+              page.input_value(r0 + " [data-f=name]") == "Мария Иванова" and page.input_value(r0 + " [data-f=grade]") == "9"
+              and page.input_value(r0 + " [data-f=exam]") == "oge")
+        page.click(r0 + " .cs-open")
         page.wait_for_selector("#cSave")
         check("B7 карточка после возврата показывает сохранённое",
               page.input_value("#cDur") == "90" and page.locator("#cBoards input[value='b-2']").is_checked()
@@ -273,12 +283,12 @@ def main():
         row = [s for s in db()["students"] if s["owner"] == TEACHER["id"]][0]
         check("C1 архив: archived_at записан", bool(row["archived_at"]))
         page.click("a:has-text('← Ученики')")
-        page.wait_for_function("() => document.getElementById('studentList').textContent.indexOf('Учеников пока нет') >= 0")
+        page.wait_for_function("() => document.getElementById('csBody') && document.getElementById('csBody').textContent.indexOf('Учеников пока нет') >= 0")
         check("C2 из списка ушёл", True)
-        page.check("#showArch")
-        page.wait_for_selector(".srow.arch")
-        check("C3 «Показать архив» — виден с пометкой", "архив" in page.inner_text(".srow.arch").lower())
-        page.click(".srow.arch")
+        page.click("#csArch summary")
+        page.wait_for_selector("#csArch .cs-aname", state="visible")
+        check("C3 «Архив» — виден", "Мария Иванова" in page.inner_text("#csArch"))
+        page.click("#csArch .cs-aname")
         page.wait_for_selector("#cArch")
         page.click("#cArch")
         page.wait_for_function("() => document.getElementById('cArch').textContent === 'В архив'", timeout=5000)
@@ -341,7 +351,7 @@ def main():
         check("F2 значок кабинета нарисован", page2.evaluate("() => !!document.getElementById('mi-cabinet')"))
         page2.click(".cabinet-toggle")
         page2.wait_for_url("**/cabinet.html**")
-        check("F3 кнопка ведёт на кабинет", page2.url.endswith("cabinet.html#/students"), page2.url)
+        check("F3 кнопка ведёт на кабинет — в расписание", page2.url.endswith("cabinet.html#/schedule"), page2.url)
 
         # ── G. телефон без прокрутки вбок
         ph = new_context(browser, viewport={"width": 375, "height": 800})
@@ -350,9 +360,10 @@ def main():
         pp.goto(f"{BASE}/cabinet.html")
         pp.wait_for_selector("#scrAuth", state="visible")
         pp.evaluate("() => localStorage.setItem('__fakesb_session', JSON.stringify({user:{id:'%s',email:'t@t'}}))" % TEACHER["id"])
-        pp.reload()
+        pp.goto(f"{BASE}/cabinet.html#/students")
+        pp.reload()                                   # смена одного хеша страницу не перезагружает
         pp.wait_for_selector("#tabs", state="visible")
-        pp.click(".srow")
+        pp.click("#csBody .cs-open")
         pp.wait_for_selector("#cSave")
         check("G1 телефон 375: карточка без прокрутки вбок", pp.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth"))
         check("G2 нет ошибок JavaScript", not errors, "; ".join(errors))
