@@ -130,7 +130,8 @@ def main():
             assert 'Оценка сохранена' in page.locator('.proof-score-saved').inner_text()
         pid=dump['25']['protos'][0]['id']
         page.goto(BASE+f'/soc_ege_long.html?n=25&t={pid}');settle(page)
-        assert page.locator('.proof-draft').input_value()=='Проверочный черновик №25'
+        page.wait_for_function('id=>S.n===25&&S.pid===id&&!__fipiBusy()',arg=pid)
+        assert page.locator('.proof-draft').input_value()=='Проверочный черновик №25',page.evaluate('({pid:S.pid,draft:document.querySelector(".proof-draft").value,saved:localStorage.getItem(DRAFT_PREFIX+S.pid)})')
         assert page.locator('#critBox').is_visible()
         crit=page.locator('#critTable').inner_text()
         assert all(s in crit for s in ('25.1','25.2','25.3','6 баллов','одно предложение','дополнительных'))

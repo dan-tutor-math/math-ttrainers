@@ -4,7 +4,8 @@ window.SOC_EGE_LONG_FIPI.tasks['21'] = {
  "groups": [
   {
    "id": "k2.5",
-   "title": "Институт рынка",
+   "title": "Рынок, спрос и предложение",
+   "kes": "2.5",
    "section": null
   }
  ],
