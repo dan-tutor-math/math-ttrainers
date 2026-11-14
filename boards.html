@@ -94,7 +94,7 @@ input,textarea{-webkit-user-select:text; -moz-user-select:text; user-select:text
 /* ═══════════════ экран 1 — список досок ═══════════════ */
 #screenList{display:flex;min-height:100vh;}
 .bl-sidebar{width:230px;flex:0 0 auto;padding:20px 12px;display:flex;flex-direction:column;gap:14px;}
-.bl-search{display:flex;align-items:center;gap:8px;background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:9px 12px;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);}
+.bl-search{flex:0 1 300px;min-width:180px;display:flex;align-items:center;gap:8px;background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:9px 12px;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);}
 .bl-search svg{width:15px;height:15px;color:var(--muted-2);flex:none;}
 .bl-search input{border:none;background:none;outline:none;font-size:14px;color:var(--pencil);width:100%;}
 .bl-nav{display:flex;flex-direction:column;gap:2px;}
@@ -227,7 +227,7 @@ html[data-theme="dark"] .bl-card-menu:hover{background:rgba(255,255,255,.18);}
 /* панель внизу не должна закрывать последний ряд карточек */
 .bl-main:has(.bl-grid.bl-selecting){padding-bottom:120px;}
 @media (max-width:640px){ .bl-selcount{width:100%;text-align:center;margin:0 0 2px;} .bl-selbar{bottom:12px;width:calc(100vw - 24px);padding:9px 10px;gap:6px;} .bl-selbar .bl-btn{padding:8px 10px;font-size:13px;} .bl-main:has(.bl-grid.bl-selecting){padding-bottom:170px;} }
-@media (max-width:640px){ .bl-sidebar{display:none;} .bl-main{padding:18px 14px 50px;} }
+@media (max-width:640px){ .bl-sidebar{display:none;} .bl-main{padding:18px 14px 50px;} .bl-head .bl-search{flex-basis:100%;} }
 
 /* ═══════════════ экран 2 — сама доска ═══════════════ */
 #screenBoard{display:none;position:fixed;inset:0;overflow:hidden;background:var(--bg);}
@@ -1317,10 +1317,6 @@ function resolveBasketTexInHtml(html){
 <!-- ═══════════════ экран 1: список папок и досок ═══════════════ -->
 <div id="screenList">
   <div class="bl-sidebar">
-    <div class="bl-search">
-      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" fill="none"/><line x1="21" y1="21" x2="16.6" y2="16.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-      <input id="blSearch" placeholder="Поиск по названию">
-    </div>
     <div class="bl-nav" id="blNav"></div>
   </div>
   <div class="bl-main">
@@ -1332,6 +1328,13 @@ function resolveBasketTexInHtml(html){
         К тренажёрам
       </a>
       <div class="bl-title" id="blTitle"></div>
+      <!-- поиск — сразу справа от названия раздела: в боковой колонке его не
+           замечали, а на телефоне колонка скрыта. На узком экране он уходит
+           второй строкой, прямо над переключателем видов -->
+      <div class="bl-search">
+        <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2" fill="none"/><line x1="21" y1="21" x2="16.6" y2="16.6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input id="blSearch" placeholder="Поиск по названию">
+      </div>
     </div>
     <!-- №113: доски и презентации — разные виды списка. По умолчанию только
          доски; презентации в бете, поэтому у них подпись «Бета» -->
