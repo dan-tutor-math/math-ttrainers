@@ -3,7 +3,7 @@
    (oge1_5 … oge19 и oge_part2?n=20…25), ЕГЭ база (ege_base?n=1…21), ЕГЭ
    профиль (ege_prof?n=1…20), ОГЭ английский (eng_oge?n=1, 5, 6, 12, 13, 20,
    29, 35–38 — первый номер набора), ОГЭ русский (rus_oge01, rus_oge?n=2…12,
-   rus_oge13), ОГЭ обществознание (soc_oge?n=1…20; блок
+   rus_oge13), ЕГЭ русский (rus_ege?n=1…26, rus_ege27), ОГЭ обществознание (soc_oge?n=1…20; блок
    «Дополнительно к тексту», ?n=21, вне круга номеров КИМ). Стрелка ведёт на соседний номер того же экзамена;
    на первом номере неактивна левая, на последнем — правая.
 
@@ -88,6 +88,9 @@
     rus_oge: { title: 'ОГЭ русский', list: [{ slug: 'rus_oge01', label: '№1' }]
       .concat(range(2, 12).map(n => ({ slug: 'rus_oge', n: n, label: '№' + n })))
       .concat([{ slug: 'rus_oge13', label: '№13' }]) },
+    // русский ЕГЭ: №1–26 — rus_ege.html (номер в адресе, хук __examNav), №27 — сочинение
+    rus_ege: { title: 'ЕГЭ русский', list: range(1, 26).map(n => ({ slug: 'rus_ege', n: n, label: '№' + n }))
+      .concat([{ slug: 'rus_ege27', label: '№27' }]) },
     // английский ОГЭ: в адресе первый номер набора (eng_oge.html, банк eng-oge-bank.js)
     eng_oge: { title: 'ОГЭ английский', list: [
       [1, '№1–4'], [5, '№5'], [6, '№6–11'], [12, '№12'], [13, '№13–19'], [20, '№20–28'], [29, '№29–34'],
@@ -103,8 +106,8 @@
   const EXAM = panelPositions ? Object.assign({}, EXAMS[examId], {
     list: EXAMS[examId].list.filter(p => panelPositions.has(p.slug + '.html' + (p.n ? '?n=' + p.n : ''))),
   }) : EXAMS[examId];
-  const subjectId = examId === 'rus_oge' ? 'rus' : examId.startsWith('soc_') ? 'soc' : examId === 'eng_oge' ? 'eng' : 'math';
-  const catalogExamId = subjectId === 'math' ? examId : examId === 'soc_ege' ? 'ege' : 'oge';
+  const subjectId = examId.startsWith('rus_') ? 'rus' : examId.startsWith('soc_') ? 'soc' : examId === 'eng_oge' ? 'eng' : 'math';
+  const catalogExamId = subjectId === 'math' ? examId : (examId === 'soc_ege' || examId === 'rus_ege') ? 'ege' : 'oge';
   const assetBase = new URL('.', document.currentScript ? document.currentScript.src : location.href);
 
   // Кадр и основная вкладка делят sessionStorage; подбор для доски не

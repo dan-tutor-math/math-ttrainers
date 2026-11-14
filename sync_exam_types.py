@@ -44,6 +44,11 @@ def collect():
             if filename == 'rus_oge01.html':
                 result[trainers[0]['id']] = []
                 continue
+            # ЕГЭ русский: подтем у номеров нет, сочинение №27 — один тип
+            if filename in ('rus_ege.html', 'rus_ege27.html'):
+                for trainer in trainers:
+                    result[trainer['id']] = []
+                continue
             page.goto(BASE + '/' + trainers[0]['href'])
             if filename == 'rus_oge.html':
                 page.wait_for_function('() => !!window.__rusOge')

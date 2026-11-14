@@ -145,6 +145,27 @@
       cap: page ? 'rus' : null, panel: page, eq: 'краткий ответ', full: 'Русский ОГЭ №' + n + '. ' + t };
   });
 
+  /* Русский язык, ЕГЭ по КИМ 2027 (27 заданий): №1–26 — одна страница rus_ege.html
+     (скелет rus_oge.html, снимок на доску тем же 'rus'), №27 — сочинение на своей
+     странице rus_ege27.html, в панель не идёт. Префикс ruse — id не пересекаются с ОГЭ
+     (прогресс, подборка, доска). Названия совпадают с NUMS в rus_ege.html */
+  const RUS_EGE_TITLES = {
+    1: 'Средства связи: слово на месте пропуска', 2: 'Лексическое значение слова',
+    3: 'Стилистический анализ текста', 4: 'Ударение', 5: 'Паронимы', 6: 'Лексические нормы',
+    7: 'Формы слова', 8: 'Грамматические ошибки', 9: 'Гласные в корне', 10: 'Приставки, ъ и ь',
+    11: 'Суффиксы', 12: 'Окончания глаголов, суффиксы причастий', 13: 'НЕ и НИ',
+    14: 'Слитно, раздельно, через дефис', 15: 'Н и НН', 16: 'Однородные члены и ССП',
+    17: 'Обособленные члены', 18: 'Вводные слова и обращения', 19: 'Сложноподчинённое предложение',
+    20: 'Разные виды связи', 21: 'Пунктуационный анализ', 22: 'Средства выразительности',
+    23: 'Содержание текста', 24: 'Типы речи', 25: 'Лексика текста', 26: 'Связь предложений в тексте',
+    27: 'Сочинение по тексту',
+  };
+  addNumbered('ruse', RUS_EGE_TITLES, (n, t) => {
+    const page = n <= 26;
+    return { href: page ? 'rus_ege.html?n=' + n : 'rus_ege27.html', subject: 'rus',
+      cap: page ? 'rus' : null, panel: page, eq: page ? 'краткий ответ' : 'сочинение', full: 'Русский ЕГЭ №' + n + '. ' + t };
+  });
+
   /* Обществознание, ОГЭ по КИМ 2027 (20 заданий): все номера — soc_oge.html,
      копия страницы ЕГЭ (доска, подборка, сессия). Развёрнутые ответы доска
      проверить не может — они ложатся картинкой. Названия совпадают с TITLES
@@ -220,8 +241,10 @@
       { title: 'Часть 2 — краткий ответ', items: range('rus', 2, 12), continueNum: true },
       { title: 'Часть 3 — сочинение', items: ['rus13'], continueNum: true },
     ] },
-    { subject: 'rus', id: 'ege', title: 'ЕГЭ', groups: [], soon: true,
-      soonText: 'ЕГЭ по русскому готовим следующим — тоже по открытому банку ФИПИ.' },
+    { subject: 'rus', id: 'ege', title: 'ЕГЭ', groups: [
+      { title: 'Часть 1 — краткий ответ', items: range('ruse', 1, 26) },
+      { title: 'Часть 2 — сочинение', items: ['ruse27'], continueNum: true },
+    ] },
     { subject: 'soc', id: 'oge', title: 'ОГЭ', groups: [
       { title: 'Задания 1–17', items: range('soc', 1, 17) },
       { title: 'Задания 18–20 — к тексту', items: range('soc', 18, 20), continueNum: true },
@@ -288,7 +311,7 @@
     panelGroups,
     range,
     titles: { egeProf: EGE_PROF_TITLES, egeBase: EGE_BASE_TITLES, ogePart2: OGE_PART2_TITLES,
-              rusOge: RUS_OGE_TITLES, socOge: SOC_OGE_TITLES, socEge: SOC_EGE_TITLES, engOge: ENG_OGE },
+              rusOge: RUS_OGE_TITLES, rusEge: RUS_EGE_TITLES, socOge: SOC_OGE_TITLES, socEge: SOC_EGE_TITLES, engOge: ENG_OGE },
     subjectOf: id => (T[id] && T[id].subject) || null,
   };
 })();

@@ -49,6 +49,9 @@
     if (s === 'rus1') return 'rus_oge01';
     if (s === 'rus13') return 'rus_oge13';
     if (/^rus\d+$/.test(s)) return 'rus_oge';
+    // русский ЕГЭ: ruse<номер>, №27 — своя страница
+    if (s === 'ruse27') return 'rus_ege27';
+    if (/^ruse\d+$/.test(s)) return 'rus_ege';
     return s;
   }
   function examOf(page) {
@@ -59,6 +62,8 @@
     if (p === 'soc_oge') return 'soc';
     if (p === 'eng_oge') return 'eng';
     if (/^rus_oge/.test(p)) return 'rus';
+    // свой экзамен, а не 'rus': id ОГЭ и ЕГЭ — из разных банков ФИПИ и могут совпасть
+    if (/^rus_ege/.test(p)) return 'ruse';
     if (/^oge/.test(p)) return 'oge';
     return null;
   }
@@ -75,7 +80,7 @@
       if (m) id = m[1];
     }
     // русский и обществознание: id задания и есть номер ФИПИ
-    if (!id && (exam === 'rus' || exam === 'soc') && task.id != null && ID_RE.test(String(task.id))) id = String(task.id);
+    if (!id && (exam === 'rus' || exam === 'ruse' || exam === 'soc') && task.id != null && ID_RE.test(String(task.id))) id = String(task.id);
     if (id) return 'fipi:' + exam + ':' + id;
     // не из банка: вид задания
     let kind = task.genKind || null;
