@@ -34,24 +34,19 @@
   const tplName = t => t.name || 'Без названия';
   const slotTime = s => X.timeText(s);
   const slotPeople = s => (s.is_event ? esc(s.title || 'событие') : s.people.length ? s.people.map(p => esc(X.personName(p))).join(', ') : '<span class="hint">нет учеников</span>');
-  let qOpen = null;             // день недели (1–7), где открыта форма быстрого ввода слота
 
-  /* ── выпадающий список в шапке недели ── */
+  /* ── меню «Шаблон недели» в шапке: своё, стеклянное (не браузерный select) ── */
   function weekMenuHtml(){
-    const ts = X.st.tpls;
-    return '<select class="sc-tplmenu field" id="scTplMenu" aria-label="Шаблон недели" title="Вставить шаблон в эту неделю или открыть шаблоны">' +
-      '<option value="">Шаблон недели</option>' +
-      (ts.length ? '<optgroup label="Вставить в эту неделю">' + ts.map(t => '<option value="ins:' + esc(t.id) + '">' + (t.is_active ? '★ ' : '') + esc(tplName(t)) + '</option>').join('') + '</optgroup>' : '') +
-      '<option value="manage">Управлять шаблонами…</option></select>';
+    return '<button type="button" class="btn quiet small sc-tplbtn" id="scTplMenu" aria-haspopup="menu" title="Вставить шаблон в эту неделю или открыть шаблоны">Шаблон недели <span aria-hidden="true">▾</span></button>';
   }
   function bindWeekMenu(host){
-    const sel = host.querySelector('#scTplMenu');
-    if (!sel) return;
-    sel.addEventListener('change', () => {
-      const v = sel.value;
-      sel.value = '';
-      if (v === 'manage') { X.st.mode = 'tpl'; X.render(); }
-      else if (v.indexOf('ins:') === 0) { const t = X.st.tpls.find(x => x.id === v.slice(4)); if (t) openInsert(t); }
+    const btn = host.querySelector('#scTplMenu');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+      const ts = X.st.tpls;
+      const items = ts.length ? [{ head: 'Вставить в эту неделю' }].concat(ts.map(t => ({ label: (t.is_active ? '★ ' : '') + tplName(t), act: () => openInsert(t) })), [{ sep: true }]) : [];
+      items.push({ label: 'Управлять шаблонами…', act: () => { X.st.mode = 'tpl'; X.render(); } });
+      window.ScheduleRows.openMenu(btn, items);
     });
   }
 
@@ -122,35 +117,150 @@
       (rows.length ? '<div class="sc-who-list">' + rows.map(r => '<span class="sc-chip' + (r[2] ? ' guest' : '') + '">' + esc(r[0]) + ' <b>×' + r[1] + '</b></span>').join('') + '</div>' : '<div class="hint">Пока никого.</div>') +
       (none.length ? '<div class="hint">Не поставлены: ' + none.map(esc).join(', ') + '</div>' : '') + '</details>';
   }
+  const R = () => window.ScheduleRows;
+  const WD = ['1', '2', '3', '4', '5', '6', '7'];
+  const slotsOf = wd => { const t = tplCur(); return t ? t.slots.filter(s => s.weekday === Number(wd)).sort(byTime) : []; };
+  let rowsT = null;
+  // строки шаблона — тот же компонент, что в расписании (правка на месте,
+  // перетаскивание), только без статусов
+  function tplRows(){
+    if (rowsT) return rowsT;
+    rowsT = R().create({
+      statuses: false,
+      itemsOf: slotsOf,
+      days: () => WD,
+      name: p => X.personName(p),
+      showEnd: () => X.look().end,
+      busy: v => X.setBusy(v),
+      rerender: () => X.render(),
+      toast,
+      labels: { open: 'Открыть слот' },
+      act: {
+        status(){},
+        time: (s, m) => patchSlot(s, { start_min: m, dur_min: Math.min(s.dur_min, 1440 - m) }),
+        names: (s, text, box) => saveSlotNames(s, text, box),
+        create: (wd, start, text, box) => createSlot(Number(wd), start, text, box),
+        open: s => openSlot(s),
+        free: s => freeSlot(s),
+        remove: s => removeSlot(s),
+        move: d => moveSlotDrop(d),
+      },
+    });
+    return rowsT;
+  }
   function tplHtml(){
     const st = X.st, t = tplCur();
     if (!t) return '<div class="empty">Шаблонов пока нет. Шаблон — заготовка недели: слоты по дням со временем и учениками; «вставить» создаёт по ним занятия.' +
       '<div style="margin-top:10px"><button type="button" class="btn" id="tplNew">Создать шаблон</button></div></div>';
     let h = '<div class="sc-tplbar">' +
-      '<select class="field" id="tplSel" aria-label="Шаблон">' + st.tpls.map(x => '<option value="' + esc(x.id) + '"' + (x.id === t.id ? ' selected' : '') + '>' + (x.is_active ? '★ ' : '') + esc(tplName(x)) + '</option>').join('') + '</select>' +
+      '<button type="button" class="btn quiet sc-tplpick" id="tplSel" aria-haspopup="menu" aria-label="Шаблон: ' + esc(tplName(t)) + '">' + (t.is_active ? '★ ' : '') + esc(tplName(t)) + ' <span aria-hidden="true">▾</span></button>' +
       '<input class="field" id="tplName" maxlength="80" value="' + esc(t.name) + '" aria-label="Название шаблона" placeholder="Название">' +
       '<button type="button" class="btn quiet small" id="tplNew">Новый</button>' +
       '<button type="button" class="btn quiet small" id="tplDup">Дублировать</button>' +
       (t.is_active ? '<span class="sc-act" title="Активный шаблон — тот, что стоит первым в списке вставки">★ активный</span>' : '<button type="button" class="btn quiet small" id="tplAct">Сделать активным</button>') +
       '<button type="button" class="btn danger small" id="tplDel">Удалить</button></div>' +
-      '<div class="form-msg" id="tplMsg"></div><div class="sc-days">';
+      '<div class="form-msg" id="tplMsg"></div><div class="sc-days sc-tpldays">';
+    const rows = tplRows();
     for (let i = 1; i <= 7; i++) {
-      const ls = t.slots.filter(s => s.weekday === i).sort(byTime);
-      h += '<section class="sc-day" data-wd="' + i + '"><header class="sc-dh"><b>' + X.DAY_SHORT[i - 1] + '</b><span>' + X.DAY_LONG[i - 1] + '</span>' +
-        '<span class="sc-cnt">' + (ls.length ? X.plural(ls.length, 'слот', 'слота', 'слотов') : '') + '</span>' +
-        '<button type="button" class="sc-plus" data-wd="' + i + '" aria-label="Добавить слот: ' + X.DAY_LONG[i - 1] + '" title="Добавить слот">+</button></header>' +
-        '<div class="sc-rows">' + (ls.length ? ls.map(s =>
-          '<div class="sc-row fmt-' + s.format + '" data-slot="' + esc(s.id) + '">' +
-            '<button type="button" class="sc-time" data-open="' + esc(s.id) + '" title="Открыть слот">' + esc(slotTime(s)) + '</button>' +
-            '<div class="sc-people">' + slotPeople(s) + (s.group_id && X.st.groups.some(g => g.id === s.group_id) ? '<span class="sc-guest" title="Устойчивая пара или группа">' + esc(X.fmtLabel(s.format).toLowerCase()) + '</span>' : '') + '</div>' +
-            (s.is_event ? '' : '<select class="sc-fmt fmt-' + s.format + '" data-slot="' + esc(s.id) + '" aria-label="Формат слота" title="' + esc(X.FMT_HINT[s.format]) + '">' +
-              X.SC.FORMATS.map(f => '<option value="' + f + '"' + (f === s.format ? ' selected' : '') + '>' + esc(X.fmtLabel(f)) + '</option>').join('') + '</select>') +
-          '</div>').join('') : '<div class="sc-free">пусто</div>') + '</div>' +
-        '<form class="sc-quick" data-wd="' + i + '" hidden>' +
-          '<input class="field" maxlength="300" placeholder="15:00 Маша, Петя" aria-label="Новый слот: время и имена через запятую" autocomplete="off">' +
-          '<button class="btn small" type="submit">Добавить</button><div class="sc-qmsg form-msg"></div><div class="sc-resolve"></div></form></section>';
+      const n = slotsOf(String(i)).length;
+      h += '<section class="sc-day" data-wd="' + i + '" data-rw-day="' + i + '"><header class="sc-dh"><b>' + X.DAY_LONG[i - 1].replace(/^./, c => c.toUpperCase()) + '</b>' +
+        '<span>' + (n ? X.plural(n, 'слот', 'слота', 'слотов') : '') + '</span></header>' + rows.listHtml(String(i)) + '</section>';
     }
     return h + '</div>' + whoHtml(t);
+  }
+
+  /* ── действия строк шаблона ── */
+  const fmtAfter = (s, oldN) => { const n = s.people.length; return s.format === X.defaultFormat(oldN) && X.defaultFormat(n) !== s.format && n ? X.defaultFormat(n) : null; };
+  async function saveSlotNames(s, text, box){
+    const names = X.parseQuick(text).names, oldN = s.people.length;
+    const keep = [], gone = s.people.slice(), ask = [];
+    names.forEach(n => { const i = gone.findIndex(p => X.norm(X.personName(p)) === X.norm(n)); if (i >= 0) keep.push(gone.splice(i, 1)[0]); else ask.push(n); });
+    let add = [];
+    if (ask.length) { const got = await X.resolveNames(ask, box); if (!got) return; add = got; }
+    add = add.filter((p, i) => p.student_id ? !keep.some(x => x.student_id === p.student_id) && add.findIndex(x => x.student_id === p.student_id) === i : !keep.some(x => x.guest_name === p.guest_name));
+    try {
+      for (const p of gone) await X.SC.removeSlotPerson(p.id);
+      s.people = keep;
+      if (add.length) s.people = s.people.concat(await X.SC.addSlotPeople(s.id, add, s.people.reduce((mx, p) => Math.max(mx, p.pos + 1), 0)));
+      s.people.sort((a, b) => a.pos - b.pos);
+      const f = fmtAfter(s, oldN);
+      if (f) Object.assign(s, await X.SC.updateSlot(s.id, { format: f }));
+    } catch (e) { toast('Не сохранилось: ' + e.message); X.reload(); return; }
+    X.render();
+  }
+  async function createSlot(wd, start, text, box){
+    const t = tplCur();
+    if (!t) return { msg: 'Нет шаблона' };
+    const r = await X.resolveEntry((start != null ? X.hm(start) + ' ' : '') + text, box || document.createElement('div'), null);
+    if (!r.people) return r;
+    try {
+      const s = await X.SC.addSlot(t.id, { weekday: wd, start_min: r.start, dur_min: r.dur, format: r.format, group_id: r.group_id }, r.people);
+      t.slots.push(s);
+      return { item: s };
+    } catch (e) { return { msg: e.message }; }
+  }
+  async function freeSlot(s){
+    const old = s.people.slice();
+    s.people = [];
+    X.render();
+    try { for (const p of old) await X.SC.removeSlotPerson(p.id); } catch (e) { toast('Не сохранилось: ' + e.message); X.reload(); }
+  }
+  async function removeSlot(s){
+    const t = tplCur();
+    t.slots = t.slots.filter(x => x !== s);
+    X.render();
+    try { await X.SC.deleteSlot(s.id); } catch (e) { t.slots.push(s); toast('Не сохранилось: ' + e.message); X.render(); }
+  }
+  // перетаскивание, как в расписании: на слот — слить, на час/день — переехать
+  async function moveSlotDrop(d){
+    const t = tplCur(), s = d.item, p = d.person, to = d.to;
+    if (to.kind === 'row') {
+      const tg = to.item;
+      const moving = p ? [p] : s.people.slice();
+      if (!moving.length || tg.is_event) return;
+      const oldS = s.people.length, oldT = tg.people.length, ops = [];
+      let pos = tg.people.reduce((mx, x) => Math.max(mx, x.pos + 1), 0);
+      moving.forEach(x => {
+        s.people = s.people.filter(y => y !== x);
+        const dup = x.student_id ? tg.people.some(y => y.student_id === x.student_id) : tg.people.some(y => y.guest_name === x.guest_name);
+        if (dup) ops.push(() => X.SC.removeSlotPerson(x.id));
+        else { x.pos = pos++; tg.people.push(x); ops.push(() => X.SC.moveSlotPerson(x.id, tg.id, x.pos)); }
+      });
+      const emptied = !s.people.length && !s.is_event;
+      if (emptied) t.slots = t.slots.filter(y => y !== s);
+      const fT = fmtAfter(tg, oldT), fS = emptied ? null : fmtAfter(s, oldS);
+      if (fT) tg.format = fT;
+      if (fS) s.format = fS;
+      X.render();
+      try {
+        for (const op of ops) await op();
+        if (fT) await X.SC.updateSlot(tg.id, { format: fT });
+        if (fS) await X.SC.updateSlot(s.id, { format: fS });
+        if (emptied) await X.SC.deleteSlot(s.id);
+      } catch (e) { toast('Не сохранилось: ' + e.message); X.reload(); }
+      return;
+    }
+    const wd = Number(to.day), start = to.kind === 'slot' ? to.start : s.start_min;
+    if (!p) {
+      const patch = {};
+      if (wd !== s.weekday) patch.weekday = wd;
+      if (start !== s.start_min) { patch.start_min = start; if (start != null) patch.dur_min = Math.min(s.dur_min, 1440 - start); }
+      if (Object.keys(patch).length) patchSlot(s, patch);
+      return;
+    }
+    const oldS = s.people.length;
+    s.people = s.people.filter(y => y !== p);
+    const fS = fmtAfter(s, oldS);
+    if (fS) s.format = fS;
+    X.render();
+    try {
+      const ns = await X.SC.addSlot(t.id, { weekday: wd, start_min: start, dur_min: start == null ? s.dur_min : Math.min(s.dur_min, 1440 - start), format: 'single' }, []);
+      const moved = await X.SC.moveSlotPerson(p.id, ns.id, 0);
+      ns.people = [Object.assign(p, moved)];
+      t.slots.push(ns);
+      if (fS) await X.SC.updateSlot(s.id, { format: fS });
+    } catch (e) { toast('Не сохранилось: ' + e.message); X.reload(); return; }
+    X.render();
   }
 
   async function patchSlot(s, patch){
@@ -178,7 +288,9 @@
       } catch (e) { fail(e); }
     });
     if (!t) return;
-    host.querySelector('#tplSel').addEventListener('change', e => { st.tplId = e.target.value; qOpen = null; X.render(); });
+    const pick = host.querySelector('#tplSel');
+    pick.addEventListener('click', () => R().openMenu(pick, st.tpls.map(x => ({ label: (x.is_active ? '★ ' : '') + tplName(x), on: x.id === t.id,
+      act: () => { tplRows().cancel(); st.tplId = x.id; X.render(); } })), { checks: true, alignLeft: true }));
     host.querySelector('#tplName').addEventListener('change', async e => {
       const v = e.target.value.trim();
       if (!v) { e.target.value = t.name; return; }
@@ -211,41 +323,7 @@
         X.render(); toast('Шаблон удалён');
       } catch (e) { del.disabled = false; fail(e); }
     });
-    host.querySelectorAll('.sc-plus[data-wd]').forEach(b => b.addEventListener('click', () => {
-      const f = host.querySelector('.sc-quick[data-wd="' + b.dataset.wd + '"]');
-      f.hidden = !f.hidden;
-      qOpen = f.hidden ? null : Number(b.dataset.wd);
-      if (!f.hidden) f.querySelector('input').focus();
-    }));
-    host.querySelectorAll('.sc-quick').forEach(f => f.addEventListener('submit', async e => {
-      e.preventDefault();
-      const inp = f.querySelector('input'), qm = f.querySelector('.sc-qmsg');
-      qm.textContent = '';
-      const wd = Number(f.dataset.wd);
-      const r = await X.resolveEntry(inp.value, f.querySelector('.sc-resolve'), null);
-      if (r.msg) { qm.textContent = r.msg; return; }
-      if (r.cancelled) return;
-      try {
-        const s = await X.SC.addSlot(t.id, { weekday: wd, start_min: r.start, dur_min: r.dur, format: r.format, group_id: r.group_id }, r.people);
-        t.slots.push(s);
-      } catch (er) { qm.textContent = er.message; return; }
-      qOpen = wd;
-      X.render();
-      const nf = host.querySelector('.sc-quick[data-wd="' + wd + '"]');
-      if (nf) nf.querySelector('input').focus();
-    }));
-    host.querySelectorAll('select.sc-fmt[data-slot]').forEach(sel => sel.addEventListener('change', () => {
-      const s = t.slots.find(x => x.id === sel.dataset.slot);
-      if (s) patchSlot(s, { format: sel.value });
-    }));
-    host.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => {
-      const s = t.slots.find(x => x.id === b.dataset.open);
-      if (s) openSlot(s);
-    }));
-    if (qOpen) {
-      const f = host.querySelector('.sc-quick[data-wd="' + qOpen + '"]');
-      if (f) f.hidden = false;
-    }
+    tplRows().bind(host.querySelector('.sc-tpldays'));
   }
 
   /* ── карточка слота ── */

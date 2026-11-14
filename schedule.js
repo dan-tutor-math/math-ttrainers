@@ -31,7 +31,8 @@
   const MONTHS = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
   const ST_SIGN = { plan: '○', done: '✓', skip: '✕', move: '↷' };
   const ST_NAME = { plan: 'запланировано', done: 'проведено', skip: 'пропуск', move: 'перенос' };
-  const ST_NEXT = { plan: 'done', done: 'skip', skip: 'move', move: 'plan' };
+  // порядок нажатий — решение Даниила 14.11: проведено → перенос → отменено
+  const ST_NEXT = { plan: 'done', done: 'move', move: 'skip', skip: 'plan' };
   // что значит формат — в подсказке и легенде: подпись должна быть понятна
   // любому преподавателю, не только Даниилу
   const FMT_HINT = {
@@ -543,7 +544,6 @@
   }
   function headHtml(){
     if (st.mode !== 'week') return modesHtml();
-    const fl = ['single', 'pair', 'group', 'semi'];
     return modesHtml() + '<div class="sc-head">' +
         '<div class="sc-nav">' +
           '<a class="btn quiet small sc-arrow" id="scPrev" href="' + esc(api.weekHref(addDays(st.week, -7))) + '" aria-label="Предыдущая неделя">‹</a>' +
@@ -557,77 +557,182 @@
           '<button type="button" data-v="list" class="' + (st.view === 'list' ? 'on' : '') + '">Строки</button>' +
           '<button type="button" data-v="grid" class="' + (st.view === 'grid' ? 'on' : '') + '">Неделя</button>' +
         '</div>' +
-      '</div>' +
-      '<div class="sc-legend">' + fl.map(f => '<span class="sc-lg fmt-' + f + '" title="' + esc(FMT_HINT[f]) + '"><i></i>' + esc(fmtLabel(f)) + '</span>').join('') +
-        '<span class="sc-lg-st">' + ['done', 'skip', 'move'].map(s => '<b class="st-' + s + '">' + ST_SIGN[s] + '</b> ' + ST_NAME[s]).join(' · ') + '</span></div>';
+        '<button type="button" class="btn quiet small sc-lookbtn" id="scLook" aria-haspopup="menu" title="Как показывать время, пары и группы">Вид <span aria-hidden="true">▾</span></button>' +
+      '</div>';
   }
 
-  /* ── вид «Строки» ── */
-  function peopleHtml(l, mini){
-    if (l.is_event) return '<span class="sc-ev">' + esc(l.title || 'событие') + '</span>';
-    if (!l.people.length) return '<span class="hint">нет учеников</span>';
-    return l.people.map(p =>
-      '<span class="sc-p st-' + p.status + (p.student_id ? '' : ' guest') + '">' +
-        (mini ? '<b class="sc-sg">' + (p.status === 'plan' ? '' : ST_SIGN[p.status]) + '</b>'
-              : '<button type="button" class="sc-st st-' + p.status + '" data-pid="' + esc(p.id) + '" title="' + esc(ST_NAME[p.status]) + ' — нажмите, чтобы сменить" aria-label="Статус: ' + esc(ST_NAME[p.status]) + '">' + ST_SIGN[p.status] + '</button>') +
-        '<span class="nm">' + esc(personName(p)) + '</span>' + flagsHtml(p) +
-        (p.student_id ? '' : '<span class="sc-guest" title="Гость — без карточки ученика">гость</span>') +
-        (mini ? '' : (isAbsent(p) && window.Payments ? '<button type="button" class="sc-why" data-why="' + esc(p.id) + '" title="Пропуск: оплачивается ли и причина — нажмите, чтобы сменить">' + esc(whyText(p, l)) + '</button>' : '') + paidBtn(p, l)) +
-      '</span>').join('');
+  /* ── вид «Строки»: дни карточками, строки — общий компонент schedule-rows.js ──
+     Действия строк — здесь: компонент про базу ничего не знает */
+  const R = window.ScheduleRows;
+  const DAY_TITLE = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
+  const dm = s => { const d = toDate(s); return pad(d.getDate()) + '.' + pad(d.getMonth() + 1); };
+  const weekDays = () => { const a = []; for (let i = 0; i < 7; i++) a.push(addDays(st.week, i)); return a; };
+
+  // статус всей строки (пара, группа) одним нажатием: всем — следующий
+  // после общего; личные статусы при этом сбрасываются (как в старом)
+  async function setAllStatus(l, status){
+    const old = l.people.map(p => p.status);
+    l.people.forEach(p => { p.status = status; });
+    render();
+    try { for (const p of l.people) await SC.setStatus(p.id, status); }
+    catch (e) { l.people.forEach((p, i) => { p.status = old[i]; }); api.toast('Не сохранилось: ' + e.message); render(); }
+    paintPayCard();
   }
-  function fmtSelect(l){
-    return '<select class="sc-fmt fmt-' + l.format + '" data-id="' + esc(l.id) + '" aria-label="Формат занятия" title="' + esc(FMT_HINT[l.format]) + '">' +
-      SC.FORMATS.map(f => '<option value="' + f + '"' + (f === l.format ? ' selected' : '') + '>' + esc(fmtLabel(f)) + '</option>').join('') + '</select>';
+  function rowStatus(l, p){
+    if (p) return cycleStatus(l, p);
+    if (l.people.length === 1) return cycleStatus(l, l.people[0]);
+    return setAllStatus(l, R.NEXT[R.aggStatus(l.people)] || 'done');
   }
+  // формат следует за числом учеников, пока его не выбрали вручную
+  function fmtAfter(l, oldN){
+    const n = l.people.length;
+    return l.format === defaultFormat(oldN) && defaultFormat(n) !== l.format && n ? defaultFormat(n) : null;
+  }
+  // имена правят в строке: «Маша, Петя» → кого убрать, кого добавить
+  async function saveNames(l, text, box){
+    const names = parseQuick(text).names;
+    const oldN = l.people.length;
+    const keep = [], gone = l.people.slice();
+    const fresh = [];
+    names.forEach(n => {
+      const i = gone.findIndex(p => norm(personName(p)) === norm(n));
+      if (i >= 0) keep.push(gone.splice(i, 1)[0]);
+      else {
+        const g = groupByName(n);
+        if (g) g.members.forEach(id => { if (!keep.some(p => p.student_id === id)) { const j = gone.findIndex(p => p.student_id === id); if (j >= 0) keep.push(gone.splice(j, 1)[0]); else fresh.push({ sid: id }); } });
+        else fresh.push({ name: n });
+      }
+    });
+    let add = fresh.filter(f => f.sid).map(f => ({ student_id: f.sid }));
+    const ask = fresh.filter(f => f.name).map(f => f.name);
+    if (ask.length) {
+      const got = await resolveNames(ask, box);
+      if (!got) return;
+      add = add.concat(got);
+    }
+    add = add.filter((p, i) => !p.student_id || (!keep.some(x => x.student_id === p.student_id) && add.findIndex(x => x.student_id === p.student_id) === i));
+    try {
+      for (const p of gone) await SC.removePerson(p.id);
+      l.people = keep;
+      if (add.length) {
+        const rows = await SC.addPeople(l.id, add, l.people.reduce((mx, p) => Math.max(mx, p.pos + 1), 0));
+        l.people = l.people.concat(rows);
+      }
+      l.people.sort((a, b) => a.pos - b.pos);
+      const f = fmtAfter(l, oldN);
+      if (f) Object.assign(l, await SC.updateLesson(l.id, { format: f }));
+    } catch (e) { api.toast('Не сохранилось: ' + e.message); load(); return; }
+    render();
+  }
+  async function freeLesson(l){
+    const old = l.people.slice();
+    l.people = [];
+    render();
+    try { for (const p of old) await SC.removePerson(p.id); }
+    catch (e) { api.toast('Не сохранилось: ' + e.message); load(); }
+  }
+  async function removeLesson(l){
+    st.lessons = st.lessons.filter(x => x !== l);
+    closePanel(); render();
+    try { await SC.deleteLesson(l.id); api.toast('Занятие удалено'); }
+    catch (e) { st.lessons.push(l); api.toast('Не сохранилось: ' + e.message); render(); }
+  }
+  /* перетаскивание (schedule-rows.js): на строку — ученики переезжают и
+     сливаются (тот же ученик второй раз не встаёт); на свободный час или
+     другой день — строка едет туда целиком, а одно имя из пары — отдельным
+     занятием. Строка участия переезжает целиком (movePerson) — статус,
+     оплата и флаги не теряются. Опустевшее занятие удаляем */
+  async function moveDrop(d){
+    const l = d.item, p = d.person, to = d.to;
+    if (to.kind === 'row') {
+      const t = to.item;
+      const moving = p ? [p] : l.people.slice();
+      if (!moving.length || t.is_event) return;
+      const oldL = l.people.length, oldT = t.people.length, ops = [];
+      let pos = t.people.reduce((mx, x) => Math.max(mx, x.pos + 1), 0);
+      moving.forEach(x => {
+        l.people = l.people.filter(y => y !== x);
+        if (x.student_id && t.people.some(y => y.student_id === x.student_id)) ops.push(() => SC.removePerson(x.id));
+        else { x.pos = pos++; t.people.push(x); ops.push(() => SC.movePerson(x.id, t.id, x.pos)); }
+      });
+      const emptied = !l.people.length && !l.is_event;
+      if (emptied) st.lessons = st.lessons.filter(y => y !== l);
+      const fT = fmtAfter(t, oldT), fL = emptied ? null : fmtAfter(l, oldL);
+      if (fT) t.format = fT;
+      if (fL) l.format = fL;
+      render();
+      try {
+        for (const op of ops) await op();
+        if (fT) await SC.updateLesson(t.id, { format: fT });
+        if (fL) await SC.updateLesson(l.id, { format: fL });
+        if (emptied) await SC.deleteLesson(l.id);
+      } catch (e) { api.toast('Не сохранилось: ' + e.message); load(); }
+      return;
+    }
+    const start = to.kind === 'slot' ? to.start : l.start_min;
+    if (!p) {
+      const patch = {};
+      if (to.day !== l.day) patch.day = to.day;
+      if (start !== l.start_min) { patch.start_min = start; if (start != null) patch.dur_min = Math.min(l.dur_min, 1440 - start); }
+      if (Object.keys(patch).length) patchLesson(l, patch);
+      return;
+    }
+    // одно имя из пары — своим занятием в новом месте
+    const oldL = l.people.length;
+    l.people = l.people.filter(y => y !== p);
+    const fL = fmtAfter(l, oldL);
+    if (fL) l.format = fL;
+    render();
+    try {
+      const nl = await SC.addLesson({ day: to.day, start_min: start, dur_min: start == null ? l.dur_min : Math.min(l.dur_min, 1440 - start), format: 'single' }, []);
+      const moved = await SC.movePerson(p.id, nl.id, 0);
+      nl.people = [Object.assign(p, moved)];
+      if (nl.day >= st.week && nl.day <= addDays(st.week, 6)) st.lessons.push(nl);
+      if (fL) await SC.updateLesson(l.id, { format: fL });
+    } catch (e) { api.toast('Не сохранилось: ' + e.message); load(); return; }
+    render();
+  }
+  let rowsBusy = false;
+  const rows = R.create({
+    statuses: true,
+    itemsOf: day => lessonsOf(day),
+    days: weekDays,
+    name: personName,
+    personExtra: (l, p) => flagsHtml(p) + (isAbsent(p) && window.Payments ? '<button type="button" class="sc-why" data-why="' + esc(p.id) + '" title="Пропуск: оплачивается ли и причина — нажмите, чтобы сменить">' + esc(whyText(p, l)) + '</button>' : '') + paidBtn(p, l),
+    showEnd: () => look.end,
+    busy: v => { rowsBusy = v; if (!v && pending) render(); },
+    rerender: () => render(),
+    toast: m => api.toast(m),
+    labels: { open: 'Открыть занятие' },
+    act: {
+      status: (l, p) => rowStatus(l, p),
+      time: (l, m) => patchLesson(l, { start_min: m, dur_min: Math.min(l.dur_min, 1440 - m) }),
+      names: (l, text, box) => saveNames(l, text, box),
+      create: async (day, start, text, box) => {
+        const r = await createFromText(day, (start != null ? hm(start) + ' ' : '') + text, box || document.createElement('div'));
+        return r.lesson ? { item: r.lesson } : r;
+      },
+      open: l => openPanel(l),
+      person: (l, p, el) => openStudentCard(l, p, el),
+      free: l => freeLesson(l),
+      remove: l => removeLesson(l),
+      move: d => moveDrop(d),
+    },
+  });
   function listHtml(){
     let h = '<div class="sc-days">';
-    for (let i = 0; i < 7; i++) {
-      const day = addDays(st.week, i), ls = lessonsOf(day);
-      h += '<section class="sc-day' + (day === today() ? ' today' : '') + '" data-day="' + day + '">' +
-        '<header class="sc-dh"><b>' + DAY_SHORT[i] + '</b><span>' + esc(dayText(day)) + '</span>' +
-          '<span class="sc-cnt">' + (ls.length ? plural(ls.length, 'занятие', 'занятия', 'занятий') : '') + '</span>' +
-          dayMoneyHtml(day, ls.length) +
-          '<button type="button" class="sc-plus" data-day="' + day + '" aria-label="Добавить занятие: ' + DAY_LONG[i] + ', ' + esc(dayText(day)) + '" title="Добавить занятие">+</button></header>' +
-        '<div class="sc-rows">' + (ls.length ? ls.map(l =>
-          '<div class="sc-row fmt-' + l.format + '" data-id="' + esc(l.id) + '">' +
-            '<button type="button" class="sc-time" data-open="' + esc(l.id) + '" title="Открыть занятие">' + esc(timeText(l)) + '</button>' +
-            '<div class="sc-people">' + peopleHtml(l) + '</div>' +
-            (l.is_event ? '' : fmtSelect(l)) +
-          '</div>').join('') : '<div class="sc-free">свободно</div>') + '</div>' +
-        '<form class="sc-quick" data-day="' + day + '" hidden>' +
-          '<input class="field" maxlength="300" placeholder="15:00 Маша, Петя" aria-label="Новое занятие: время и имена через запятую" autocomplete="off">' +
-          '<button class="btn small" type="submit">Добавить</button>' +
-          '<div class="sc-qmsg form-msg"></div><div class="sc-resolve"></div>' +
-        '</form>' +
+    weekDays().forEach((day, i) => {
+      const ls = lessonsOf(day);
+      h += '<section class="sc-day' + (day === today() ? ' today' : '') + '" data-day="' + day + '" data-rw-day="' + day + '">' +
+        '<header class="sc-dh"><b>' + DAY_TITLE[i] + '</b><span>' + dm(day) + (day === today() ? ' · сегодня' : '') + '</span></header>' +
+        rows.listHtml(day) +
+        '<footer class="sc-dfoot"><span>за день</span>' + (dayMoneyHtml(day, ls.length) || '<span class="sc-dzero">—</span>') + '</footer>' +
       '</section>';
-    }
+    });
     return h + '</div>';
   }
   function bindList(){
-    host.querySelectorAll('.sc-plus').forEach(b => b.addEventListener('click', () => {
-      const f = host.querySelector('.sc-quick[data-day="' + b.dataset.day + '"]');
-      f.hidden = !f.hidden;
-      if (!f.hidden) f.querySelector('input').focus();
-    }));
-    host.querySelectorAll('.sc-quick').forEach(f => {
-      // быстрый ввод — Enter и следующая строка: форма остаётся открытой
-      f.addEventListener('submit', async e => {
-        e.preventDefault();
-        const inp = f.querySelector('input'), msg = f.querySelector('.sc-qmsg');
-        msg.textContent = '';
-        quickBusy = f.dataset.day;
-        const r = await createFromText(f.dataset.day, inp.value, f.querySelector('.sc-resolve'));
-        quickBusy = null;
-        render();
-        const nf = host.querySelector('.sc-quick[data-day="' + f.dataset.day + '"]');
-        if (!nf) return;
-        nf.hidden = false;
-        const ni = nf.querySelector('input');
-        if (r.lesson) { ni.value = ''; }
-        else { ni.value = inp.value; if (r.msg) nf.querySelector('.sc-qmsg').textContent = r.msg; }
-        ni.focus();
-      });
-    });
+    rows.bind(host.querySelector('.sc-days'));
     bindCommon();
   }
   function bindCommon(){
@@ -655,7 +760,15 @@
     }));
   }
 
-  /* ── вид «Неделя»: сетка часов ── */
+  /* ── вид «Неделя»: сетка часов (редизайн 14.11, макеты — cabinet-redesign.md) ──
+     Цвет плашки — статус занятия (как в «Учительской»), формат цветом не
+     показываем: полупараллелку видно по наложению, пару и группу — по
+     именам. Занятия внахлёст — стопкой одной ширины, вправо сдвинуто
+     только начатое в :30. В первой строке плашки — только статус, время и
+     стрелка; имена никогда не встают на строку времени. Высоту часа и
+     ширину дня тянут за линию часа и край дня, как в таблицах */
+  const SH = 16;                           // сдвиг получасовой плашки при наложении, px
+  const pxm = () => look.hh / 60;          // пикселей на минуту
   function hoursRange(){
     let a = 8 * 60, b = 21 * 60;
     st.lessons.forEach(l => {
@@ -665,90 +778,164 @@
     });
     return [Math.max(0, a), Math.min(1440, b)];
   }
-  // пересекающиеся занятия одного дня — рядом, каждое в свою колонку
-  function layoutDay(ls){
-    const timed = ls.filter(l => l.start_min != null).sort((a, b) => a.start_min - b.start_min || b.dur_min - a.dur_min);
-    const out = new Map();
-    let cluster = [], cEnd = -1;
-    const flush = () => {
-      const cols = [];
-      cluster.forEach(l => {
-        let k = cols.findIndex(end => end <= l.start_min);
-        if (k < 0) { k = cols.length; cols.push(0); }
-        cols[k] = l.start_min + l.dur_min;
-        out.set(l, { col: k });
-      });
-      cluster.forEach(l => { out.get(l).n = cols.length; });
-      cluster = []; cEnd = -1;
-    };
-    timed.forEach(l => {
-      if (cluster.length && l.start_min >= cEnd) flush();
-      cluster.push(l);
-      cEnd = Math.max(cEnd, l.start_min + l.dur_min);
-    });
-    if (cluster.length) flush();
-    return out;
+  const initials = n => String(n || '?').split(/\s+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  function gTime(l){ return hm(l.start_min) + (look.end ? '–' + hm(Math.min(1440, l.start_min + l.dur_min)) : ''); }
+  function nameSpan(l, p){
+    const gone = p.status === 'skip' || p.status === 'move';
+    return '<span class="sc-n' + (gone ? ' x' : '') + '" data-p="' + esc(l.id) + '|' + esc(p.id) + '">' + esc(personName(p)) + '</span>';
   }
-  function plateHtml(l, pos, a){
-    const top = (l.start_min - a) * PX, hgt = Math.max(STEP, l.dur_min) * PX;
-    const w = 100 / pos.n;
-    return '<div class="sc-plate fmt-' + l.format + (l.dur_min <= 30 ? ' short' : '') + '" data-id="' + esc(l.id) + '" ' +
-        'style="top:' + top + 'px;height:' + hgt + 'px;left:calc(' + (w * pos.col) + '% + 2px);width:calc(' + w + '% - 4px)" ' +
+  const ic = (s, attr) => attr ? '<button type="button" class="rw-ic st-' + s + '" ' + attr + ' aria-label="Статус: ' + esc(R.ST_NAME[s]) + '">' + R.icon(s) + '</button>'
+    : '<span class="rw-ic sm st-' + s + '">' + R.icon(s) + '</span>';
+  // тело плашки: у одного ученика — имя; у пары и группы — вид из меню «Вид»
+  function plateBody(l, hgt, open){
+    if (l.is_event) return '<div class="sc-pl1"><span class="sc-ev">' + esc(l.title || 'событие') + '</span></div>';
+    const ps = l.people;
+    if (!ps.length) return '<div class="sc-pl1 hint">свободно</div>';
+    if (open) return '<div class="sc-plist">' + ps.map(p => '<div class="sc-prow">' + ic(p.status, 'data-pst="' + esc(p.id) + '"') + nameSpan(l, p) + '</div>').join('') + '</div>';
+    if (ps.length === 1) return '<div class="sc-pl1">' + nameSpan(l, ps[0]) + '</div>';
+    if (look.grp === 'ini') return '<div class="sc-pini">' + ps.map(p => '<span class="st-' + p.status + '" data-p="' + esc(l.id) + '|' + esc(p.id) + '" title="' + esc(personName(p)) + '">' + esc(initials(personName(p))) + '</span>').join('') + '</div>';
+    if (look.grp === 'cnt') return '<div class="sc-picons">' + ps.map(p => '<span title="' + esc(personName(p)) + '">' + ic(p.status) + '</span>').join('') + '</div>';
+    if (look.grp === 'col') return ps.map(p => '<div class="sc-prow">' + ic(p.status) + nameSpan(l, p) + '</div>').join('');
+    const lines = Math.max(1, Math.floor((hgt - 34) / 20));
+    return '<div class="sc-pwrap" style="max-height:' + lines * 20 + 'px">' + ps.map(p => '<span class="sc-pi">' + ic(p.status) + nameSpan(l, p) + '</span>').join('') + '</div>';
+  }
+  function plateHtml(l, geo, a, H){
+    const top = (l.start_min - a) * pxm() + 2;
+    let hgt = Math.max(STEP, l.dur_min) * pxm() - 4;
+    const multi = l.people.length > 1, open = st.openPlate === l.id && multi;
+    if (!open && multi && look.grp === 'col') hgt = Math.max(hgt, 32 + l.people.length * 22);
+    const agg = l.is_event || !l.people.length ? 'plan' : R.aggStatus(l.people);
+    const came = l.people.filter(p => p.status === 'done').length;
+    let pos;
+    if (open) {
+      const need = 38 + l.people.length * 24;
+      pos = (top + need > H ? 'bottom:' + Math.max(2, H - top - hgt) + 'px' : 'top:' + top + 'px') + ';min-height:' + hgt + 'px;left:4px;right:4px';
+    } else pos = 'top:' + top + 'px;height:' + hgt + 'px;' + (geo.lone ? 'left:4px;right:4px' : 'left:' + (4 + (geo.half ? SH : 0)) + 'px;width:calc(100% - ' + (8 + SH) + 'px)');
+    return '<div class="sc-plate st-' + agg + (open ? ' open' : '') + (l.is_event ? ' ev' : '') + '" data-id="' + esc(l.id) + '" style="' + pos + ';z-index:' + (open ? 30 : 1 + geo.z) + '" ' +
         'role="button" tabindex="0" aria-label="' + esc(timeText(l) + ', ' + (l.is_event ? l.title : l.people.map(personName).join(', '))) + '">' +
-        '<div class="sc-pt">' + esc(timeText(l)) + '</div>' +
-        '<div class="sc-pn">' + peopleHtml(l, true) + '</div>' +
-        (l.format !== 'single' && !l.is_event ? '<div class="sc-pf" title="' + esc(FMT_HINT[l.format]) + '">' + esc(fmtLabel(l.format)) + '</div>' : '') +
-        '<div class="sc-rz" title="Потяните, чтобы изменить длительность" aria-hidden="true"></div>' +
+        '<div class="sc-ph">' + (l.is_event || !l.people.length ? '' : ic(agg, 'data-rst title="' + esc(multi ? 'Статус всем' : 'Статус') + ' — нажмите, чтобы сменить"')) +
+          '<span class="sc-pt">' + esc(gTime(l)) + '</span>' +
+          (multi && look.grp === 'cnt' && !open ? '<span class="sc-pc">' + came + ' из ' + l.people.length + '</span>' : '') +
+          (multi ? '<button type="button" class="sc-pexp" data-exp aria-label="' + (open ? 'Свернуть' : 'Показать всех') + '" aria-expanded="' + open + '">' + (open ? '⌃' : '⌄') + '</button>' : '') +
+        '</div>' + plateBody(l, hgt, open) +
+        (open ? '' : '<div class="sc-rz" title="Потяните, чтобы изменить длительность" aria-hidden="true"></div>') +
       '</div>';
   }
+  // раскладка дня: одиночное — во всю ширину; в наложении — одна ширина,
+  // начатое в половину часа сдвинуто вправо; позже начатое — сверху
+  function layoutDay(ls){
+    const out = new Map();
+    R.clusters(ls.filter(l => l.start_min != null)).forEach(cl => cl.forEach((l, i) => out.set(l, { lone: cl.length === 1, half: l.start_min % 60 !== 0, z: i })));
+    return out;
+  }
+  function colTemplate(){ return '52px repeat(7,' + (look.cw ? look.cw + 'px' : 'minmax(116px,1fr)') + ')'; }
   function gridHtml(){
     const [a, b] = hoursRange();
-    const H = (b - a) * PX;
+    const H = (b - a) * pxm();
     let head = '<div class="sc-gcorner"></div>', cols = '';
-    for (let i = 0; i < 7; i++) {
-      const day = addDays(st.week, i), ls = lessonsOf(day);
+    weekDays().forEach((day, i) => {
+      const ls = lessonsOf(day);
       const untimed = ls.filter(l => l.start_min == null);
-      head += '<div class="sc-gday' + (day === today() ? ' today' : '') + '"><b>' + DAY_SHORT[i] + '</b> ' + esc(dayText(day)) +
-        '<button type="button" class="sc-plus" data-newday="' + day + '" aria-label="Добавить занятие: ' + DAY_LONG[i] + ', ' + esc(dayText(day)) + '" title="Добавить занятие">+</button>' +
+      head += '<div class="sc-gday' + (day === today() ? ' today' : '') + '"><b>' + DAY_SHORT[i] + '</b> <span>' + dm(day) + '</span>' +
         '<div class="sc-gmoney">' + dayMoneyHtml(day, ls.length) + '</div>' +
-        (untimed.length ? '<div class="sc-untimed">' + untimed.map(l => '<button type="button" class="sc-ut fmt-' + l.format + '" data-open="' + esc(l.id) + '">' + esc(l.people.map(personName).join(', ') || l.title || 'без времени') + '</button>').join('') + '</div>' : '') +
+        (untimed.length ? '<div class="sc-untimed">' + untimed.map(l => '<button type="button" class="sc-ut" data-open="' + esc(l.id) + '">' + esc(l.people.map(personName).join(' ') || l.title || 'без времени') + '</button>').join('') + '</div>' : '') +
         '</div>';
       const pos = layoutDay(ls);
-      cols += '<div class="sc-col' + (day === today() ? ' today' : '') + '" data-day="' + day + '" style="height:' + H + 'px">' +
-        ls.filter(l => l.start_min != null).map(l => plateHtml(l, pos.get(l), a)).join('') + '</div>';
-    }
+      cols += '<div class="sc-col' + (day === today() ? ' today' : '') + '" data-day="' + day + '" data-ci="' + i + '" style="height:' + H + 'px;background-size:100% ' + look.hh + 'px">' +
+        '<div class="sc-hv" aria-hidden="true"></div><div class="sc-gl" aria-hidden="true"></div><div class="sc-gv" aria-hidden="true"></div>' +
+        ls.filter(l => l.start_min != null).map(l => plateHtml(l, pos.get(l), a, H)).join('') + '</div>';
+    });
     let hours = '';
-    for (let m = a; m < b; m += 60) hours += '<div class="sc-hr" style="top:' + (m - a) * PX + 'px">' + hm(m) + '</div>';
-    return '<div class="sc-gwrap"><div class="sc-grid" data-a="' + a + '" data-b="' + b + '">' +
+    for (let m = a; m < b; m += 60) hours += '<div class="sc-hr" style="top:' + (m - a) * pxm() + 'px">' + hm(m) + '</div>';
+    return '<div class="sc-gwrap"><div class="sc-grid" data-a="' + a + '" data-b="' + b + '" style="--cols:' + colTemplate() + '">' +
       '<div class="sc-ghead">' + head + '</div>' +
       '<div class="sc-gbody"><div class="sc-hours" style="height:' + H + 'px">' + hours + '</div>' + cols + '</div>' +
-      '</div></div><div class="hint sc-ghint">Щёлкните по свободному месту — новое занятие. Плашку можно перетащить и растянуть за нижний край (шаг 15 минут).</div>';
+      '</div></div><div class="hint sc-ghint">Щёлкните по свободному месту — новое занятие. Плашку можно перетащить и растянуть за нижний край; высоту часа и ширину дня — потянуть за линию часа и край дня.</div>';
+  }
+  const NEAR = 4;
+  // что под курсором в колонке: линия часа, правый край или ничего
+  function edgeAt(col, e){
+    const r = col.getBoundingClientRect(), y = e.clientY - r.top, x = e.clientX - r.left;
+    if (r.width - x <= NEAR + 2 && y > 14 && y < r.height - 14) return { t: 'c', ci: Number(col.dataset.ci) };
+    const k = Math.round(y / look.hh);
+    if (k >= 1 && Math.abs(y - k * look.hh) <= NEAR) return { t: 'r', k };
+    return null;
+  }
+  function showEdge(hit){
+    host.querySelectorAll('.sc-gl, .sc-gv').forEach(x => { x.style.display = 'none'; });
+    const g = host.querySelector('.sc-grid');
+    if (!g) return;
+    g.classList.toggle('rs', !!hit && hit.t === 'r');
+    g.classList.toggle('cs', !!hit && hit.t === 'c');
+    if (!hit) return;
+    if (hit.t === 'r') host.querySelectorAll('.sc-gl').forEach(x => { x.style.top = hit.k * look.hh + 'px'; x.style.display = 'block'; });
+    else { const c = host.querySelector('.sc-col[data-ci="' + hit.ci + '"] .sc-gv'); if (c) c.style.display = 'block'; }
+  }
+  // тянем линию часа или край дня: на каждом шаге — перерисовка сетки
+  function startEdgeDrag(e, hit, col){
+    e.preventDefault();
+    const y0 = e.clientY, x0 = e.clientX, hh0 = look.hh, cw0 = look.cw || col.getBoundingClientRect().width;
+    const move = ev => {
+      if (hit.t === 'r') look.hh = Math.round(Math.max(40, Math.min(200, hh0 + (ev.clientY - y0) / hit.k)));
+      else look.cw = Math.round(Math.max(96, Math.min(420, cw0 + (ev.clientX - x0) / (hit.ci + 1))));
+      render();
+      showEdge(hit);
+    };
+    const up = () => {
+      document.removeEventListener('pointermove', move, true);
+      document.removeEventListener('pointerup', up, true);
+      document.removeEventListener('pointercancel', up, true);
+      saveLook();
+      showEdge(null);
+    };
+    document.addEventListener('pointermove', move, true);
+    document.addEventListener('pointerup', up, true);
+    document.addEventListener('pointercancel', up, true);
   }
   function bindGrid(){
     const grid = host.querySelector('.sc-grid');
     const a = Number(grid.dataset.a), b = Number(grid.dataset.b);
     const cols = Array.from(host.querySelectorAll('.sc-col'));
     const snap = m => Math.round(m / STEP) * STEP;
-    host.querySelectorAll('[data-newday]').forEach(btn => btn.addEventListener('click', () => openNew(btn.dataset.newday, null)));
     cols.forEach(col => {
+      const hv = col.querySelector('.sc-hv');
+      col.addEventListener('pointermove', e => {
+        if (e.buttons) return;
+        const hit = edgeAt(col, e);
+        showEdge(hit);
+        if (hit || e.target.closest('.sc-plate')) { hv.style.display = 'none'; return; }
+        // свободное место: мягко подсветить получас под курсором
+        const r = col.getBoundingClientRect();
+        const k = Math.floor((e.clientY - r.top) / (look.hh / 2));
+        const m = a + k * 30;
+        if (m < a || m >= b) { hv.style.display = 'none'; return; }
+        hv.style.top = (k * look.hh / 2 + 2) + 'px';
+        hv.style.height = (look.hh / 2 - 4) + 'px';
+        hv.textContent = '+ ' + hm(m);
+        hv.style.display = 'flex';
+      });
+      col.addEventListener('pointerleave', () => { hv.style.display = 'none'; if (!document.querySelector('.sc-grid.rs:active, .sc-grid.cs:active')) showEdge(null); });
       col.addEventListener('pointerdown', e => {
         if (e.button !== 0) return;
+        const hit = edgeAt(col, e);
+        if (hit && !e.target.closest('button, .sc-n, [data-p]')) { startEdgeDrag(e, hit, col); return; }
         const plate = e.target.closest('.sc-plate');
         const r0 = col.getBoundingClientRect();
         if (!plate) {
-          // пустое место: новое занятие с начала четверти часа под курсором
+          // пустое место: новое занятие с начала получаса под курсором
           const y0 = e.clientY;
           const off = () => { col.removeEventListener('pointerup', up); col.removeEventListener('pointercancel', off); };
           const up = ev => {
             off();
             if (Math.abs(ev.clientY - y0) > 6) return;      // это была прокрутка
-            const m = Math.floor(((ev.clientY - r0.top) / PX + a) / STEP) * STEP;
+            const m = a + Math.floor((ev.clientY - r0.top) / (look.hh / 2)) * 30;
             openNew(col.dataset.day, Math.max(a, Math.min(b - STEP, m)));
           };
           col.addEventListener('pointerup', up);
           col.addEventListener('pointercancel', off);
           return;
         }
+        if (e.target.closest('button') || plate.classList.contains('open')) return;   // у кнопок — свои щелчки
         const l = findLesson(plate.dataset.id);
         if (!l) return;
         e.preventDefault();
@@ -759,30 +946,35 @@
         let moved = false, dMin = 0, dCol = 0, newDur = l.dur_min;
         try { plate.setPointerCapture(e.pointerId); } catch (er) {}
         const label = plate.querySelector('.sc-pt');
+        const P = pxm();
         const move = ev => {
           const dy = ev.clientY - y0, dx = ev.clientX - x0;
           if (!moved && Math.abs(dy) < 4 && Math.abs(dx) < 4) return;
           moved = true;
           plate.classList.add('drag');
           if (resize) {
-            newDur = Math.max(STEP, Math.min(1440 - l.start_min, l.dur_min + snap(dy / PX)));
-            plate.style.height = newDur * PX + 'px';
-            label.textContent = hm(l.start_min) + ' – ' + hm(l.start_min + newDur);
+            newDur = Math.max(STEP, Math.min(1440 - l.start_min, l.dur_min + snap(dy / P)));
+            plate.style.height = newDur * P - 4 + 'px';
+            label.textContent = hm(l.start_min) + '–' + hm(l.start_min + newDur);
           } else {
-            dMin = Math.max(-l.start_min, Math.min(1440 - l.dur_min - l.start_min, snap(dy / PX)));
-            // колонка под курсором (дни недели)
+            dMin = Math.max(-l.start_min, Math.min(1440 - l.dur_min - l.start_min, snap(dy / P)));
             let k = rects.findIndex(r => ev.clientX >= r.left && ev.clientX < r.right);
             if (k < 0) k = ev.clientX < rects[0].left ? 0 : rects.length - 1;
             dCol = k - ci;
-            plate.style.transform = 'translate(' + (rects[k].left - rects[ci].left) + 'px,' + dMin * PX + 'px)';
-            label.textContent = hm(l.start_min + dMin) + ' – ' + hm(l.start_min + dMin + l.dur_min);
+            plate.style.transform = 'translate(' + (rects[k].left - rects[ci].left) + 'px,' + dMin * P + 'px)';
+            label.textContent = hm(l.start_min + dMin) + '–' + hm(l.start_min + dMin + l.dur_min);
           }
         };
         const up = () => {
           plate.removeEventListener('pointermove', move);
           plate.removeEventListener('pointerup', up);
           plate.removeEventListener('pointercancel', up);
-          if (!moved) { openPanel(l); return; }
+          if (!moved) {
+            // щелчок без сдвига: по имени — карточка ученика, иначе — панель занятия
+            const n = e.target.closest('[data-p]'), p = n && l.people.find(x => x.id === n.dataset.p.split('|')[1]);
+            if (p) openStudentCard(l, p, n); else openPanel(l);
+            return;
+          }
           if (resize) { if (newDur !== l.dur_min) patchLesson(l, { dur_min: newDur }); else render(); return; }
           const patch = {};
           if (dMin) patch.start_min = l.start_min + dMin;
@@ -793,12 +985,123 @@
         plate.addEventListener('pointerup', up);
         plate.addEventListener('pointercancel', up);
       });
+      col.addEventListener('click', e => {
+        const plate = e.target.closest('.sc-plate');
+        const l = plate && findLesson(plate.dataset.id);
+        if (!l) return;
+        const rst = e.target.closest('[data-rst]'), pst = e.target.closest('[data-pst]');
+        if (rst || pst) { e.stopPropagation(); rowStatus(l, pst ? l.people.find(p => p.id === pst.dataset.pst) : null); return; }
+        if (e.target.closest('[data-exp]')) { e.stopPropagation(); st.openPlate = st.openPlate === l.id ? null : l.id; render(); return; }
+        // в раскрытом списке перетаскивания нет — имя открывает карточку здесь
+        const n = plate.classList.contains('open') && e.target.closest('[data-p]');
+        if (n) { e.stopPropagation(); const p = l.people.find(x => x.id === n.dataset.p.split('|')[1]); if (p) openStudentCard(l, p, n); }
+      });
       col.addEventListener('keydown', e => {
         const plate = e.target.closest('.sc-plate');
-        if (plate && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); const l = findLesson(plate.dataset.id); if (l) openPanel(l); }
+        if (plate && e.target === plate && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); const l = findLesson(plate.dataset.id); if (l) openPanel(l); }
       });
     });
     bindCommon();
+  }
+
+  /* ── карточка ученика по щелчку на имя (как в «Учительской») ──
+     Коротко и рядом с именем: время и статус, тариф, оплата; подробное —
+     «Открыть занятие» (боковая панель) */
+  let sCard = null;
+  function closeStudentCard(){
+    if (!sCard) return;
+    sCard.el.remove();
+    document.removeEventListener('pointerdown', sCard.onDown, true);
+    document.removeEventListener('keydown', sCard.onKey);
+    sCard = null;
+  }
+  function openStudentCard(l, p, anchor){
+    closeStudentCard();
+    const el = document.createElement('div');
+    el.className = 'sc-scard';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-label', 'Ученик на занятии');
+    document.body.appendChild(el);
+    const onDown = e => { if (!el.contains(e.target) && !e.target.closest('[data-p], .rw-p .nm') && !e.target.closest('.pay-card')) closeStudentCard(); };
+    const onKey = e => { if (e.key === 'Escape') closeStudentCard(); };
+    document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('keydown', onKey);
+    sCard = { el, lid: l.id, pid: p.id, onDown, onKey, anchor };
+    el.addEventListener('click', e => {
+      const c = curSCard(), t = e.target.closest('button, a');
+      if (!c || !t) return;
+      if (t.dataset.x != null) closeStudentCard();
+      else if (t.dataset.set) { const old = c.p.status; c.p.status = t.dataset.set; render(); SC.setStatus(c.p.id, c.p.status).catch(er => { c.p.status = old; api.toast('Не сохранилось: ' + er.message); render(); }); }
+      else if (t.dataset.paidc != null) togglePaid(c.l, c.p);
+      else if (t.dataset.whyc != null) openPayCard(c.l, c.p);
+      else if (t.dataset.openl != null) { closeStudentCard(); openPanel(c.l, c.p.student_id); }
+      else if (t.tagName === 'A') closeStudentCard();
+    });
+    paintStudentCard();
+  }
+  function curSCard(){
+    if (!sCard) return null;
+    const l = findLesson(sCard.lid), p = l && l.people.find(x => x.id === sCard.pid);
+    return l && p ? { l, p } : null;
+  }
+  function paintStudentCard(){
+    if (!sCard) return;
+    const c = curSCard();
+    if (!c) { closeStudentCard(); return; }
+    const { l, p } = c, P = window.Payments;
+    const gone = p.status === 'skip' || p.status === 'move';
+    const price = P && p.student_id ? P.rateOn(st.pay.rates[p.student_id], l.day, l.format) : null;
+    const paid = paidBtn(p, l);
+    sCard.el.innerHTML =
+      '<div class="sc-sc-top">' + ic(p.status) + '<span class="' + (gone ? 'x' : '') + '">' + esc(timeText(l).replace(' – ', '–')) + '</span><span>' + esc(R.ST_NAME[p.status]) + '</span>' +
+        '<button type="button" class="sc-sc-x" data-x aria-label="Закрыть">×</button></div>' +
+      '<div class="sc-sc-who"><div class="sc-av">' + esc(initials(personName(p))) + '</div><div><div class="sc-sc-name">' + esc(personName(p)) + '</div>' +
+        '<div class="hint">' + (p.student_id ? (price != null ? 'По тарифу: ' + esc(P.money(price)) : 'Ставка не задана') : 'Гость без карточки') + '</div></div>' +
+        (p.student_id ? '<a class="btn quiet small" href="#/payments/' + esc(p.student_id) + '">К оплатам</a>' : '') + '</div>' +
+      '<div class="seg sc-sc-st" role="group" aria-label="Статус">' + ['plan', 'done', 'move', 'skip'].map(s =>
+        '<button type="button" data-set="' + s + '" class="' + (p.status === s ? 'on' : '') + '">' + esc(({ plan: 'План', done: 'Проведено', move: 'Перенос', skip: 'Отменено' })[s]) + '</button>').join('') + '</div>' +
+      (paid ? '<div class="sc-sc-pay">' + paid.replace('class="sc-paid', 'data-paidc class="sc-paid') + '</div>' : '') +
+      (isAbsent(p) && P ? '<button type="button" class="btn quiet small sc-sc-why" data-whyc>' + esc(whyText(p, l)) + '</button>' : '') +
+      '<div class="sc-sc-foot"><button type="button" class="btn quiet small" data-openl>Открыть занятие</button></div>';
+    const r = sCard.anchor.isConnected ? sCard.anchor.getBoundingClientRect() : null;
+    if (r) {
+      const w = sCard.el.offsetWidth, h = sCard.el.offsetHeight;
+      let x = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)), y = r.bottom + 6;
+      if (y + h > window.innerHeight - 8) y = Math.max(8, r.top - h - 6);
+      sCard.el.style.left = x + 'px'; sCard.el.style.top = y + 'px';
+    }
+  }
+
+  /* ── меню «Вид»: время и вид пар/групп, с живым примером плашки ── */
+  const LOOK_KEY = 'cabinet:schedule:look';
+  // час 80px: при наложении через полчаса имя нижней плашки ещё видно
+  const look = { end: false, grp: 'names', hh: 80, cw: null };
+  try { Object.assign(look, JSON.parse(localStorage.getItem(LOOK_KEY) || '{}')); } catch (e) {}
+  function saveLook(){ try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (e) {} }
+  function lookPreview(end, grp){
+    const ps = [['Маша', 'done'], ['Петя', 'done'], ['Аня', 'plan']];
+    const body = grp === 'ini' ? '<div class="sc-pini">' + ps.map(p => '<span class="st-' + p[1] + '">' + p[0][0] + '</span>').join('') + '</div>'
+      : grp === 'cnt' ? '<div class="sc-picons">' + ps.map(p => ic(p[1])).join('') + '</div>'
+      : grp === 'col' ? ps.map(p => '<div class="sc-prow">' + ic(p[1]) + '<span class="sc-n">' + p[0] + '</span></div>').join('')
+      : grp ? '<div class="sc-pwrap">' + ps.map(p => '<span class="sc-pi">' + ic(p[1]) + '<span class="sc-n">' + p[0] + '</span></span>').join('') + '</div>'
+      : '<div class="sc-pl1"><span class="sc-n">Маша</span></div>';
+    return '<span class="sc-lookpv"><span class="sc-plate demo st-plan"><span class="sc-ph">' + ic(grp ? 'plan' : 'done') + '<span class="sc-pt">' + (end ? '15:00–16:00' : '15:00') + '</span>' +
+      (grp === 'cnt' ? '<span class="sc-pc">2 из 3</span>' : '') + '</span>' + body + '</span></span>';
+  }
+  function lookItems(){
+    const it = (label, on, pv, fn) => ({ html: '<span class="gm-l">' + esc(label) + '</span>' + pv, on, keep: true, act: () => { fn(); saveLook(); render(); return { items: lookItems() }; } });
+    return [
+      { head: 'Время занятия' },
+      it('Только начало', !look.end, lookPreview(false, null), () => { look.end = false; }),
+      it('Начало и конец', look.end, lookPreview(true, null), () => { look.end = true; }),
+      { head: 'Пары и группы в «Неделе»' },
+      it('Имена', look.grp === 'names', lookPreview(false, 'names'), () => { look.grp = 'names'; }),
+      it('Инициалы', look.grp === 'ini', lookPreview(false, 'ini'), () => { look.grp = 'ini'; }),
+      it('Число', look.grp === 'cnt', lookPreview(false, 'cnt'), () => { look.grp = 'cnt'; }),
+      it('Столбиком', look.grp === 'col', lookPreview(false, 'col'), () => { look.grp = 'col'; }),
+      { sep: true },
+      { label: 'Сбросить высоту часа и ширину дня', act: () => { look.hh = 80; look.cw = null; saveLook(); render(); } },
+    ];
   }
 
   /* ── карточка занятия (общая для обоих видов) ── */
@@ -942,7 +1245,7 @@
     q('#edFmt').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { if (b.dataset.v !== l.format) patchLesson(l, { format: b.dataset.v }); }));
     q('#edPeople').innerHTML = l.people.length ? l.people.map(p =>
       '<div class="sc-edp st-' + p.status + '" data-id="' + esc(l.id) + '">' +
-        '<button type="button" class="sc-st st-' + p.status + '" data-pid="' + esc(p.id) + '" title="' + esc(ST_NAME[p.status]) + ' — нажмите, чтобы сменить">' + ST_SIGN[p.status] + '</button>' +
+        '<button type="button" class="sc-st rw-ic st-' + p.status + '" data-pid="' + esc(p.id) + '" title="' + esc(ST_NAME[p.status]) + ' — нажмите, чтобы сменить">' + R.icon(p.status) + '</button>' +
         '<span class="nm">' + esc(personName(p)) + (p.student_id ? '' : ' <span class="sc-guest">гость</span>') + '</span>' +
         '<span class="hint">' + esc(ST_NAME[p.status]) + '</span>' +
         '<button type="button" class="sc-rm" data-rm="' + esc(p.id) + '" aria-label="Убрать с занятия: ' + esc(personName(p)) + '" title="Убрать с занятия">×</button>' +
@@ -1112,17 +1415,12 @@
   // перерисовка снесла бы его кнопки (их ждёт промис resolveNames). Поэтому
   // в это время render() только помечает «надо», а рисует обработчик формы
   // после ответа
-  let quickBusy = null, pending = false;
+  let pending = false;
   function render(loading){
     loading = loading || st.loading;
-    if (quickBusy && !loading) { pending = true; return; }
+    if (rowsBusy && !loading) { pending = true; return; }
     pending = false;
     if (!host || !st.week) return;
-    // открытая форма быстрого ввода переживает перерисовку вместе с текстом
-    const keep = {};
-    host.querySelectorAll('.sc-quick').forEach(f => {
-      if (!f.hidden) keep[f.dataset.day] = { v: f.querySelector('input').value, focus: document.activeElement === f.querySelector('input'), };
-    });
     const gw = host.querySelector('.sc-gwrap');
     const scroll = gw ? [gw.scrollLeft, gw.scrollTop] : null;
     let body;
@@ -1131,8 +1429,10 @@
     else if (st.mode !== 'week') body = TPL().paneHtml();
     else body = st.view === 'grid' ? gridHtml() : listHtml();
     host.innerHTML = headHtml() + '<div class="sc-body sc-v-' + st.view + '" id="scBody">' + body + '</div>';
-    host.querySelectorAll('.sc-views button').forEach(b => b.addEventListener('click', () => setView(b.dataset.v)));
-    host.querySelectorAll('.sc-modes button').forEach(b => b.addEventListener('click', () => { st.mode = b.dataset.mode; closeModal(); closePanel(); render(); }));
+    host.querySelectorAll('.sc-views button').forEach(b => b.addEventListener('click', () => { rows.cancel(); setView(b.dataset.v); }));
+    host.querySelectorAll('.sc-modes button').forEach(b => b.addEventListener('click', () => { rows.cancel(); st.mode = b.dataset.mode; closeModal(); closePanel(); closeStudentCard(); render(); }));
+    const lookBtn = host.querySelector('#scLook');
+    if (lookBtn) lookBtn.addEventListener('click', () => R.openMenu(lookBtn, lookItems(), { checks: true, cls: 'gm-look' }));
     const retry = host.querySelector('#scRetry');
     if (retry) retry.addEventListener('click', load);
     if (loading || st.err) return;
@@ -1142,18 +1442,10 @@
       bindGrid();
       const ngw = host.querySelector('.sc-gwrap');
       if (scroll && ngw) { ngw.scrollLeft = scroll[0]; ngw.scrollTop = scroll[1]; }
-    } else {
-      bindList();
-      Object.keys(keep).forEach(day => {
-        const f = host.querySelector('.sc-quick[data-day="' + day + '"]');
-        if (!f) return;
-        f.hidden = false;
-        f.querySelector('input').value = keep[day].v;
-        if (keep[day].focus) f.querySelector('input').focus();
-      });
-    }
+    } else bindList();
     paintEditor();
     paintPanel();
+    paintStudentCard();
   }
 
   // шаблоны, пары и группы живут в schedule-tpl.js; общие приёмы он берёт отсюда
@@ -1162,7 +1454,7 @@
     api = opts;
     TPL().attach({ st, SC, api: () => api, esc, pad, hm, addDays, toDate, mondayOf, DAY_SHORT, DAY_LONG, FMT_HINT, fmtLabel, plural, rangeText, dayText,
       timeText, timeVal, readTime, parseQuick, norm, resolveNames, resolveEntry, activeStudents, personName, durFor, defaultFormat, groupOf,
-      modalShell, closeModal, getModal: () => modal, render, reload: () => load() });
+      modalShell, closeModal, getModal: () => modal, render, reload: () => load(), look: () => look, setBusy: v => { rowsBusy = v; if (!v && pending) render(); } });
     host = opts.host;
     st.view = readView();
     if (api.settingsChanged) api.settingsChanged(() => { if (st.week) render(); });
@@ -1173,10 +1465,13 @@
     if (mon === st.week && st.lessons && !st.err && host.querySelector('.sc-body')) { render(); return Promise.resolve(); }
     st.week = mon;
     st.dtOpen = null;
+    st.openPlate = null;
+    rows.cancel();
     closeModal();
     closePanel();
+    closeStudentCard();
     return load();
   }
 
-  window.Schedule = { init, show, hide: closePanel, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), setMode: m => { st.mode = m; render(); } };
+  window.Schedule = { init, show, hide: () => { closePanel(); closeStudentCard(); R.closeMenu(); }, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), setMode: m => { st.mode = m; render(); } };
 })();

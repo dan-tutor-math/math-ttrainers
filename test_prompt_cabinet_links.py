@@ -99,6 +99,17 @@ def seed():
     return d
 
 
+
+def open_lesson(p, lid):
+    # «Строки» (редизайн 14.11): панель занятия — из меню «⋯» строки
+    sel = f'.rw-row[data-id="{lid}"]'
+    if p.locator(".sc-side").count():                 # открытая панель закрывает правый край строк
+        p.keyboard.press("Escape")
+        p.wait_for_selector(".sc-side", state="detached")
+    p.hover(sel)
+    p.click(sel + " .rw-more")
+    p.click(".gm-menu.on .gm-item:has-text('Открыть занятие')")
+
 def main():
     errors = []
     STATE["db"] = json.dumps(seed())
@@ -136,8 +147,8 @@ def main():
         p.goto(f"{BASE}/cabinet.html#/schedule/2026-11-16")
         p.evaluate("() => localStorage.setItem('cabinet:schedule:view', 'list')")
         p.reload()
-        p.wait_for_selector(".sc-time", timeout=10000)
-        p.click(f'.sc-row[data-id="{L_YDAY}"] .sc-time')
+        p.wait_for_selector(".rw-time", timeout=10000)
+        open_lesson(p, L_YDAY)
         p.wait_for_selector(".sc-side")
         check("B1 панель открылась, в паре есть выбор ученика",
               p.locator(".sc-sp-pick button").count() == 2 and "Ваня" in p.inner_text(".sc-sp-card"), p.inner_text(".sc-side"))
@@ -151,10 +162,10 @@ def main():
         p.keyboard.press("Escape")
         check("B7 Esc закрывает панель", p.locator(".sc-side").count() == 0)
 
-        p.click(f'.sc-row[data-id="{L_BOARD}"] .sc-time')
+        open_lesson(p, L_BOARD)
         p.wait_for_selector(".sc-side")
         check("B8 у занятия своя доска — она важнее доски ученика", p.get_attribute("#spBoard", "href") == "boards.html#board=bd-lesson")
-        p.click(f'.sc-row[data-id="{L_GUEST}"] .sc-time')
+        open_lesson(p, L_GUEST)
         p.wait_for_selector(".sc-side")
         check("B9 только гость: сессии нет, гость назван", p.locator("#spSession").count() == 0 and "Гость Гошин" in p.inner_text(".sc-side"))
         p.click("#spEdit")
@@ -163,7 +174,7 @@ def main():
         p.click(".sc-modal .sc-x")
 
         # ── C. сессия из занятия ──
-        p.click(f'.sc-row[data-id="{L_NOON}"] .sc-time')
+        open_lesson(p, L_NOON)
         p.wait_for_selector("#spSession")
         check("C1 кнопка «Начать сессию»", p.inner_text("#spSession") == "Начать сессию")
         p.click("#spSession")
@@ -186,7 +197,7 @@ def main():
 
         # из занятия пары — именно выбранный ученик
         p.keyboard.press("Escape")
-        p.click(f'.sc-row[data-id="{L_YDAY}"] .sc-time')
+        open_lesson(p, L_YDAY)
         p.wait_for_selector(".sc-sp-pick")
         p.click(f'.sc-sp-pick button[data-pick="{PETYA}"]')
         p.click("#spSession")
@@ -207,8 +218,8 @@ def main():
 
         # панель уходит со вкладки «Расписание»
         p.goto(f"{BASE}/cabinet.html#/schedule/2026-11-16")
-        p.wait_for_selector(".sc-time")
-        p.click(f'.sc-row[data-id="{L_NEXT}"] .sc-time') if p.locator(f'.sc-row[data-id="{L_NEXT}"] .sc-time').count() else p.click(f'.sc-row[data-id="{L_YDAY}"] .sc-time')
+        p.wait_for_selector(".rw-time")
+        open_lesson(p, L_NEXT) if p.locator(f'.rw-row[data-id="{L_NEXT}"]').count() else open_lesson(p, L_YDAY)
         p.wait_for_selector(".sc-side")
         p.evaluate("() => { location.hash = '#/settings'; }")
         p.wait_for_function("() => !document.querySelector('.sc-side')", timeout=3000)

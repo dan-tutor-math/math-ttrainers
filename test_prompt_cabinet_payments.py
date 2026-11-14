@@ -149,6 +149,17 @@ def wait_db(page, fn, timeout=6000):
     return fn(db())
 
 
+
+def open_lesson(p, lid):
+    # «Строки» (редизайн 14.11): панель занятия — из меню «⋯» строки
+    sel = f'.rw-row[data-id="{lid}"]'
+    if p.locator(".sc-side").count():                 # открытая панель закрывает правый край строк
+        p.keyboard.press("Escape")
+        p.wait_for_selector(".sc-side", state="detached")
+    p.hover(sel)
+    p.click(sel + " .rw-more")
+    p.click(".gm-menu.on .gm-item:has-text('Открыть занятие')")
+
 def main():
     errors = []
     STATE["db"] = json.dumps(seed())
@@ -228,10 +239,10 @@ def main():
         p.goto(f"{BASE}/cabinet.html#/schedule/2026-11-16")
         p.evaluate("() => localStorage.setItem('cabinet:schedule:view', 'list')")
         p.reload()
-        p.wait_for_selector(".sc-row", timeout=10000)
+        p.wait_for_selector(".rw-row", timeout=10000)
         p.wait_for_selector('.sc-paid[data-paid="p17"]', timeout=6000)
         check("F1 у Вани (абонемент) кнопки «оплатил» нет", p.locator('.sc-paid[data-paid="v17"]').count() == 0)
-        check("F2 флаг «(пробное)» у Пети 16.11", "(пробное)" in p.inner_text('.sc-row[data-id="L16"]'))
+        check("F2 флаг «(пробное)» у Пети 16.11", "(пробное)" in p.inner_text('.rw-row[data-id="L16"]'))
         check("F3 на пробном (бесплатном) «оплатил» нет", p.locator('.sc-paid[data-paid="p16"]').count() == 0)
         p.click('.sc-paid[data-paid="p17"]')
         ok = wait_db(p, lambda d: any(x.get("lesson_student_id") == "p17" for x in d["payments"]))
@@ -244,9 +255,11 @@ def main():
         check("F6 второй — оплата снята", wait_db(p, lambda d: not any(x.get("lesson_student_id") == "p17" for x in d["payments"])))
 
         # ── G. прогул и карточка ──
-        st_btn = '.sc-row[data-id="L18"] .sc-st[data-pid="v18"]'
+        st_btn = '.rw-row[data-id="L18"] [data-rst]'
         p.click(st_btn)
-        p.wait_for_function("() => document.querySelector('%s').textContent === '✓'" % st_btn)
+        p.wait_for_function("() => document.querySelector('%s').classList.contains('st-done')" % st_btn)
+        p.click(st_btn)                                   # проведено → перенос → отменено (порядок Даниила 14.11)
+        p.wait_for_function("() => document.querySelector('%s').classList.contains('st-move')" % st_btn)
         p.click(st_btn)
         check("G1 прогул в базе", wait_db(p, lambda d: next(x for x in d["lesson_students"] if x["id"] == "v18")["status"] == "skip"))
         p.wait_for_selector('.sc-why[data-why="v18"]')
@@ -277,7 +290,7 @@ def main():
         check("G11 у имени пометка «отработка»", "отработка" in p.inner_text(".sc-mk"))
 
         # ── H. боковая панель ──
-        p.click('.sc-row[data-id="L17"] .sc-time')
+        open_lesson(p, "L17")
         p.wait_for_selector(".sc-sp-pick")
         p.click(f'.sc-sp-pick button[data-pick="{PETYA}"]')
         p.wait_for_selector("#spPay")
@@ -318,9 +331,9 @@ def main():
         q.goto(f"{BASE}/cabinet.html#/schedule/2026-11-16")
         q.evaluate("() => localStorage.setItem('cabinet:schedule:view', 'list')")
         q.reload()
-        q.wait_for_selector(".sc-row", timeout=10000)
-        check("J1 расписание без новых столбцов работает", q.locator(".sc-row").count() == 4 and q.locator(".sc-paid").count() == 0, q.inner_text("#scHost")[:300])
-        q.click('.sc-row[data-id="L18"] .sc-st')
+        q.wait_for_selector(".rw-row", timeout=10000)
+        check("J1 расписание без новых столбцов работает", q.locator(".rw-row").count() == 4 and q.locator(".sc-paid").count() == 0, q.inner_text("#scHost")[:300])
+        q.click('.rw-row[data-id="L18"] [data-rst]')
         check("J2 отметка ставится", wait_db(q, lambda d: next(x for x in d["lesson_students"] if x["id"] == "v18")["status"] == "done"))
         q.goto(f"{BASE}/cabinet.html#/payments")
         q.wait_for_function("() => /cabinet-payments\\.sql/.test(document.querySelector('#payHost').innerText)", timeout=8000)

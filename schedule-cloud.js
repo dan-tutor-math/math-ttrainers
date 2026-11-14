@@ -168,6 +168,11 @@
   function removePerson(personId){
     return serial(() => run(need().from('lesson_students').delete().eq('id', personId)));
   }
+  // перенос участника в другое занятие одной правкой (перетаскивание в
+  // «Строках»): строка участия та же — статус, оплата и флаги едут с ним
+  function movePerson(personId, toLessonId, pos){
+    return serial(() => runLS(cols => need().from('lesson_students').update({ lesson_id: toLessonId, pos: pos || 0 }).eq('id', personId).select(cols).single()));
+  }
 
   /* ══ В1б: устойчивые пары и группы ══
      student_groups + student_group_members. В группе только ученики из
@@ -289,6 +294,9 @@
     return serial(() => run(need().from('template_slot_students').insert(people.map((p, i) => slotPerson(p, slotId, (fromPos || 0) + i))).select(SP_COLS)));
   }
   function removeSlotPerson(id){ return serial(() => run(need().from('template_slot_students').delete().eq('id', id))); }
+  function moveSlotPerson(id, toSlotId, pos){
+    return serial(() => run(need().from('template_slot_students').update({ slot_id: toSlotId, pos: pos || 0 }).eq('id', id).select(SP_COLS).single()));
+  }
   // состав слота целиком (правка пары разносится по слотам, где она стоит)
   function setSlotPeople(slotId, people){
     return serial(async () => {
@@ -307,8 +315,8 @@
     return nt;
   }
 
-  window.ScheduleCloud = { FORMATS, STATUSES, GROUP_FORMATS, listRange, listForStudent, addLesson, updateLesson, deleteLesson, addPeople, setStatus, setPart, removePerson,
+  window.ScheduleCloud = { FORMATS, STATUSES, GROUP_FORMATS, listRange, listForStudent, addLesson, updateLesson, deleteLesson, addPeople, setStatus, setPart, removePerson, movePerson,
     hasPayCols: () => payCols,
     listGroups, addGroup, updateGroup, setGroupMembers, deleteGroup,
-    listTemplates, addTemplate, renameTemplate, deleteTemplate, setActiveTemplate, addSlot, updateSlot, deleteSlot, addSlotPeople, removeSlotPerson, setSlotPeople, duplicateTemplate };
+    listTemplates, addTemplate, renameTemplate, deleteTemplate, setActiveTemplate, addSlot, updateSlot, deleteSlot, addSlotPeople, removeSlotPerson, moveSlotPerson, setSlotPeople, duplicateTemplate };
 })();

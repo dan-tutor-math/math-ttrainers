@@ -312,89 +312,137 @@ def main():
                                                Schedule.matchName('Петр', L).map(s => s.id), Schedule.matchName('Вася', L).length]; }""")
         check("A6 поиск ученика: полное имя, неоднозначно, ё/е, нет", mt == [1, 2, [3], 0], str(mt))
 
-        # ── B. «Строки» и быстрый ввод
-        check("B1 семь дней, вид «Строки»", page.locator(".sc-day").count() == 7 and page.is_visible(".sc-views button.on[data-v=list]"))
+        # ── B. «Строки»: дни карточками, строка добавляется и правится на месте
+        check("B1 семь дней карточками, вид «Строки»", page.locator(".sc-day").count() == 7 and page.is_visible(".sc-views button.on[data-v=list]"))
         check("B2 шапка недели", "16 – 22 ноября 2026" in page.inner_text("#scRange"), page.inner_text("#scRange"))
         mon = f".sc-day[data-day='{WEEK}']"
-        page.click(f"{mon} .sc-plus")
-        page.fill(f"{mon} .sc-quick input", "15:00 Маша, Петя")
-        page.press(f"{mon} .sc-quick input", "Enter")
+        tue = ".sc-day[data-day='2026-11-17']"
+        focused = lambda cls: page.wait_for_function(f"() => document.activeElement && document.activeElement.classList.contains('{cls}')", timeout=4000)
+        check("B2a постоянных полей ввода нет", page.locator(".sc-days input").count() == 0)
+        page.click(f".rw-add[data-add='{WEEK}']")
+        focused("rw-in-time")
+        page.keyboard.type("1500")
+        page.keyboard.press("Enter")
+        focused("rw-in-names")
+        page.keyboard.type("Маша, Петя")
+        page.keyboard.press("Enter")
         wait_db(lambda: len(lessons()) == 1, "занятие в базе")
         L = lessons()
         ok = len(L) == 1 and (L[0]["day"], L[0]["start_min"], L[0]["dur_min"], L[0]["format"]) == (WEEK, 900, 90, "pair")
-        check("B3 занятие: пн 15:00, 90 мин (своя у Маши), пара", ok, str(L))
-        # участники пишутся вторым запросом после занятия — ждём и их, иначе тест гоняется с записью
+        check("B3 «1500» → 15:00, 90 мин (своя у Маши), пара", ok, str(L))
         if L: wait_db(lambda: len(people(L[0]["id"])) == 2, "участники в базе")
         P = people(L[0]["id"]) if L else []
         check("B4 участники — ссылки на учеников", [p["student_id"] for p in P] == ["st-masha", "st-petya"], str(P))
-        page.wait_for_selector(f"{mon} .sc-row")
-        check("B5 строка «15:00 – 16:30 Маша Иванова Петя Сидоров»",
-              page.inner_text(f"{mon} .sc-time") == "15:00 – 16:30" and "Петя Сидоров" in page.inner_text(f"{mon} .sc-row"),
-              page.inner_text(f"{mon} .sc-row"))
-        check("B6 форма быстрого ввода осталась открытой и пустой",
-              page.is_visible(f"{mon} .sc-quick input") and page.input_value(f"{mon} .sc-quick input") == "")
+        mid = L[0]["id"]
+        row = lambda day, lid: f".sc-day[data-day='{day}'] .rw-row[data-id='{lid}']"
+        page.wait_for_selector(row(WEEK, mid))
+        check("B5 строка «15:00», имена столбиком (пара)",
+              page.inner_text(row(WEEK, mid) + " .rw-time") == "15:00" and page.locator(row(WEEK, mid) + " .rw-p").count() == 2
+              and "multi" in page.get_attribute(row(WEEK, mid), "class"), page.inner_text(row(WEEK, mid)))
+        focused("rw-in-names")
+        check("B6 Enter — новая строка ниже, время после занятия (16:30)",
+              page.input_value(f"{mon} .rw-row.draft .rw-in-time") == "16:30" and page.input_value(f"{mon} .rw-row.draft .rw-in-names") == "")
+        page.keyboard.press("Escape")
+        page.wait_for_selector(f"{mon} .rw-row.draft", state="detached")
 
-        tue = ".sc-day[data-day='2026-11-17']"
-        page.click(f"{tue} .sc-plus")
-        page.fill(f"{tue} .sc-quick input", "10:30-11:15 Петя, Вася")
-        page.press(f"{tue} .sc-quick input", "Enter")
+        page.click(".rw-add[data-add='2026-11-17']")
+        focused("rw-in-time")
+        page.keyboard.press("Enter")                      # без времени — сразу к именам, время можно написать в строке
+        focused("rw-in-names")
+        page.keyboard.type("10:30-11:15 Петя, Вася")
+        page.keyboard.press("Enter")
         page.wait_for_selector(f"{tue} .sc-ask")
-        check("B7 незнакомое имя — вопрос, ничего не создано молча",
+        check("B7 незнакомое имя — вопрос под строкой, ничего не создано молча",
               "Вася" in page.inner_text(f"{tue} .sc-ask") and len(lessons()) == 1 and len(db()["students"]) == 4)
         page.click(f"{tue} .sc-ask button[data-act=guest]")
         wait_db(lambda: len(lessons()) == 2, "второе занятие")
         L2 = [l for l in lessons() if l["day"] == "2026-11-17"]
-        P2 = people(L2[0]["id"]) if L2 else []
+        tid = L2[0]["id"] if L2 else None
+        wait_db(lambda: len(people(tid)) == 2, "участники второго")
+        P2 = people(tid) if L2 else []
         check("B8 гость: guest_name, ученик не заведён, 10:30–11:15",
               L2 and (L2[0]["start_min"], L2[0]["dur_min"]) == (630, 45) and [p.get("guest_name") for p in P2] == [None, "Вася"]
               and len(db()["students"]) == 4, str(L2) + str(P2))
-        page.wait_for_selector(f"{tue} .sc-row .sc-guest")
-        page.fill(f"{tue} .sc-quick input", "12 Коля")
-        page.press(f"{tue} .sc-quick input", "Enter")
+        page.wait_for_selector(f"{tue} .rw-row.draft .rw-in-names")
+        focused("rw-in-names")
+        page.keyboard.press("ArrowLeft")                  # ← в пустом имени — к времени
+        focused("rw-in-time")
+        page.fill(f"{tue} .rw-row.draft .rw-in-time", "12")
+        page.keyboard.press("Enter")
+        focused("rw-in-names")
+        page.keyboard.type("Коля")
+        page.keyboard.press("Enter")
         page.wait_for_selector(f"{tue} .sc-ask button[data-act=create]")
         page.click(f"{tue} .sc-ask button[data-act=create]")
         wait_db(lambda: len(lessons()) == 3, "третье занятие")
         kolya = [s for s in db()["students"] if s["name"] == "Коля"]
         L3 = [l for l in lessons() if l["start_min"] == 720]
-        check("B9 «Завести ученика»: Коля в учениках, занятие 12:00 на 60 мин, индивидуальное",
+        if L3: wait_db(lambda: len(people(L3[0]["id"])) == 1, "участник третьего")
+        check("B9 «12» → 12:00, «Завести ученика»: Коля, 60 мин, индивидуальное",
               len(kolya) == 1 and L3 and (L3[0]["dur_min"], L3[0]["format"]) == (60, "single")
               and people(L3[0]["id"])[0]["student_id"] == kolya[0]["id"], str(L3))
-        page.wait_for_function(f"() => document.querySelectorAll(\"{tue} .sc-row\").length === 2")
-        check("B10 во вторнике 12:00 раньше… нет: 10:30 раньше 12:00",
-              page.locator(f"{tue} .sc-time").all_inner_texts() == ["10:30 – 11:15", "12:00 – 13:00"],
-              str(page.locator(f"{tue} .sc-time").all_inner_texts()))
+        kid = L3[0]["id"] if L3 else None
+        page.keyboard.press("Escape")
+        page.wait_for_function(f"() => document.querySelectorAll(\"{tue} .rw-row:not(.draft)\").length === 2")
+        check("B10 во вторнике 10:30 раньше 12:00",
+              page.locator(f"{tue} .rw-time").all_inner_texts() == ["10:30", "12:00"], str(page.locator(f"{tue} .rw-time").all_inner_texts()))
 
-        # ── C. статус и формат
-        masha_btn = f"{mon} .sc-p:has-text('Маша Иванова') .sc-st"
-        page.click(masha_btn)
-        mid = L[0]["id"]
+        # ── C. статусы и правка на месте
+        masha_st = f"{row(WEEK, mid)} .rw-p:has-text('Маша Иванова') [data-pst]"
+        petya_st = f"{row(WEEK, mid)} .rw-p:has-text('Петя Сидоров') [data-pst]"
+        page.click(masha_st)
         wait_db(lambda: people(mid)[0]["status"] == "done", "статус done")
-        check("C1 одно нажатие — ✓ проведено (в базе)", people(mid)[0]["status"] == "done" and page.inner_text(masha_btn) == "✓")
-        petya_btn = f"{mon} .sc-p:has-text('Петя Сидоров') .sc-st"
-        page.click(petya_btn)
-        page.click(petya_btn)
+        check("C1 одно нажатие — проведено (в базе, значок-галочка)",
+              people(mid)[0]["status"] == "done" and "st-done" in page.get_attribute(masha_st, "class"))
+        page.click(petya_st)
+        page.click(petya_st)
+        wait_db(lambda: people(mid)[1]["status"] == "move", "статус move")
+        check("C2 второе нажатие — перенос (порядок Даниила: проведено → перенос → отменено)", people(mid)[1]["status"] == "move")
+        page.click(petya_st)
         wait_db(lambda: people(mid)[1]["status"] == "skip", "статус skip")
-        check("C2 два нажатия — ✕ пропуск, у каждого свой статус",
-              (people(mid)[0]["status"], people(mid)[1]["status"]) == ("done", "skip") and page.inner_text(petya_btn) == "✕")
-        tid = L2[0]["id"]
-        page.select_option(f"{tue} select.sc-fmt[data-id='{tid}']", "semi")
-        wait_db(lambda: [l for l in lessons() if l["id"] == tid][0]["format"] == "semi", "формат semi")
-        check("C3 формат сменён на полупараллелку (в базе, обводка пунктиром)",
-              [l for l in lessons() if l["id"] == tid][0]["format"] == "semi"
-              and "fmt-semi" in page.get_attribute(f"{tue} .sc-row[data-id='{tid}']", "class"))
+        check("C3 третье — отменено, у каждого свой статус; имя зачёркнуто",
+              (people(mid)[0]["status"], people(mid)[1]["status"]) == ("done", "skip")
+              and page.locator(f"{row(WEEK, mid)} .rw-p:has-text('Петя Сидоров') .nm.x").count() == 1)
+        page.click(f"{row('2026-11-17', tid)} [data-rst]")
+        wait_db(lambda: [p["status"] for p in people(tid)] == ["done", "done"], "статус всем")
+        check("C4 статус всей строки одним нажатием (пара — обоим)", [p["status"] for p in people(tid)] == ["done", "done"])
+        page.click(f"{row('2026-11-17', kid)} .rw-time")
+        focused("rw-in-time")
+        page.fill(f"{row('2026-11-17', kid)} .rw-in-time", "1315")
+        page.keyboard.press("Enter")
+        wait_db(lambda: [l for l in lessons() if l["id"] == kid][0]["start_min"] == 795, "время 13:15")
+        check("C5 время правится на месте: «1315» → 13:15", [l for l in lessons() if l["id"] == kid][0]["start_min"] == 795)
+        focused("rw-in-names")                            # Enter во времени — к именам той же строки
+        page.fill(f"{row('2026-11-17', kid)} .rw-in-names", "Коля, Петя")
+        page.keyboard.press("Enter")
+        wait_db(lambda: len(people(kid)) == 2, "Петя добавлен")
+        wait_db(lambda: [l for l in lessons() if l["id"] == kid][0]["format"] == "pair", "формат pair")
+        check("C6 имена правятся на месте: «Коля, Петя» — Петя добавлен, формат «пара»",
+              [p["student_id"] for p in people(kid)] == [kolya[0]["id"], "st-petya"] and [l for l in lessons() if l["id"] == kid][0]["format"] == "pair")
+        page.keyboard.press("Escape")
+        page.click(f"{row('2026-11-17', kid)} .rw-names")
+        page.fill(f"{row('2026-11-17', kid)} .rw-in-names", "Коля")
+        page.keyboard.press("Tab")
+        page.mouse.click(5, 5)
+        wait_db(lambda: len(people(kid)) == 1, "Петя убран")
+        check("C7 убрать имя из строки — участник удалён", [p["student_id"] for p in people(kid)] == [kolya[0]["id"]])
 
         # ── D. «Неделя»
         page.click(".sc-views button[data-v=grid]")
         page.wait_for_selector(".sc-grid")
+        PXM = 80 / 60
         check("D1 сетка: 7 колонок, 3 плашки", page.locator(".sc-col").count() == 7 and page.locator(".sc-plate").count() == 3)
         h = page.eval_on_selector(f".sc-plate[data-id='{mid}']", "e => e.getBoundingClientRect().height")
-        check("D2 плашка 90 минут выше плашки 45 минут вдвое",
-              abs(h - 2 * page.eval_on_selector(f".sc-plate[data-id='{tid}']", "e => e.getBoundingClientRect().height")) < 2, str(h))
-        check("D3 подпись формата на плашке: «Пара», «Полупараллелка»",
-              "Пара" in page.inner_text(f".sc-plate[data-id='{mid}'] .sc-pf") and "Полупараллелка" in page.inner_text(f".sc-plate[data-id='{tid}'] .sc-pf"))
+        h2 = page.eval_on_selector(f".sc-plate[data-id='{tid}']", "e => e.getBoundingClientRect().height")
+        check("D2 высота по длительности (90 и 45 минут, час = 80px)", abs((h - h2) - 45 * PXM) < 2, f"{h} {h2}")
+        check("D3 цвет плашки — статус: оба проведены — зелёная; имена не на строке времени",
+              "st-done" in page.get_attribute(f".sc-plate[data-id='{tid}']", "class")
+              and "Петя" not in page.inner_text(f".sc-plate[data-id='{tid}'] .sc-ph"))
         a = int(page.get_attribute(".sc-grid", "data-a"))
         wed = page.locator(".sc-col[data-day='2026-11-18']").bounding_box()
-        page.mouse.click(wed["x"] + wed["width"] / 2, wed["y"] + (17 * 60 - a) + 5)
+        page.mouse.move(wed["x"] + wed["width"] / 2, wed["y"] + (17 * 60 - a) * PXM + 12)
+        check("D3a наведение на пустое — подсветка получаса «+ 17:00»", page.inner_text(".sc-col[data-day='2026-11-18'] .sc-hv") == "+ 17:00")
+        page.mouse.click(wed["x"] + wed["width"] / 2, wed["y"] + (17 * 60 - a) * PXM + 12)
         page.wait_for_selector(".sc-modal #edNames")
         check("D4 клик по пустому окну ср 17:00 — новое занятие с 17:00 до 18:00",
               (page.input_value("#edDay"), page.input_value("#edStart"), page.input_value("#edEnd")) == ("2026-11-18", "17:00", "18:00"),
@@ -407,11 +455,11 @@ def main():
         page.wait_for_selector(".sc-modal", state="detached")
         wid = W[0]["id"]
         pl = page.locator(f".sc-plate[data-id='{wid}']").bounding_box()
-        colw = wed["width"]
-        page.mouse.move(pl["x"] + pl["width"] / 2, pl["y"] + 20)
+        colw = wed["width"] + 8
+        page.mouse.move(pl["x"] + pl["width"] / 2, pl["y"] + 30)
         page.mouse.down()
-        page.mouse.move(pl["x"] + pl["width"] / 2 + colw * 0.5, pl["y"] + 30, steps=4)
-        page.mouse.move(pl["x"] + pl["width"] / 2 + colw, pl["y"] + 20 + 37, steps=6)   # +37px → шаг 15: +30 минут
+        page.mouse.move(pl["x"] + pl["width"] / 2 + colw * 0.5, pl["y"] + 40, steps=4)
+        page.mouse.move(pl["x"] + pl["width"] / 2 + colw, pl["y"] + 30 + 34, steps=6)   # +34px → шаг 15: +30 минут
         page.mouse.up()
         wait_db(lambda: [l for l in lessons() if l["id"] == wid][0]["day"] == "2026-11-19", "перенос на четверг")
         W = [l for l in lessons() if l["id"] == wid][0]
@@ -421,59 +469,104 @@ def main():
         page.mouse.move(rz["x"] + rz["width"] / 2, rz["y"] + rz["height"] / 2)
         page.mouse.down()
         page.mouse.move(rz["x"] + rz["width"] / 2, rz["y"] + 20, steps=3)
-        page.mouse.move(rz["x"] + rz["width"] / 2, rz["y"] + 4 + 47, steps=5)            # +47px → +45 минут
+        page.mouse.move(rz["x"] + rz["width"] / 2, rz["y"] + 4 + 60, steps=5)            # +60px → +45 минут
         page.mouse.up()
         wait_db(lambda: [l for l in lessons() if l["id"] == wid][0]["dur_min"] == 105, "растягивание")
         W = [l for l in lessons() if l["id"] == wid][0]
-        check("D7 растянули до 105 минут (17:30 – 19:15)", (W["start_min"], W["dur_min"]) == (1050, 105), str(W))
-        page.wait_for_function(f"() => document.querySelector(\".sc-plate[data-id='{wid}'] .sc-pt\").textContent === '17:30 – 19:15'")
-        check("D8 подпись плашки «17:30 – 19:15»", True)
-        # карточка занятия: клик по плашке, смена формата
+        check("D7 растянули до 105 минут", (W["start_min"], W["dur_min"]) == (1050, 105), str(W))
+        page.wait_for_function(f"() => document.querySelector(\".sc-plate[data-id='{wid}'] .sc-pt\").textContent === '17:30'")
+        check("D8 на плашке — только начало «17:30» (по умолчанию)", True)
         pm = page.locator(f".sc-plate[data-id='{mid}']").bounding_box()
-        page.mouse.click(pm["x"] + 20, pm["y"] + 30)
-        page.wait_for_selector(".sc-side #spEdit")      # В2: щелчок открывает боковую панель, правка — по кнопке
+        page.mouse.click(pm["x"] + pm["width"] - 20, pm["y"] + pm["height"] - 14)
+        page.wait_for_selector(".sc-side #spEdit")
         page.click("#spEdit")
         page.wait_for_selector(".sc-modal #edFmt button")
         check("D9 карточка: ученики со статусами", page.locator(".sc-edp").count() == 2 and "проведено" in page.inner_text(".sc-edpeople"))
         page.click("#edFmt button[data-v=group]")
         wait_db(lambda: [l for l in lessons() if l["id"] == mid][0]["format"] == "group", "формат group")
-        check("D10 формат из карточки — «Группа» (в базе и на плашке)",
-              "Группа" in page.inner_text(f".sc-plate[data-id='{mid}'] .sc-pf"))
+        check("D10 формат из карточки — «Группа» в базе", [l for l in lessons() if l["id"] == mid][0]["format"] == "group")
         page.click("#edFmt button[data-v=pair]")
         wait_db(lambda: [l for l in lessons() if l["id"] == mid][0]["format"] == "pair", "формат pair")
         page.keyboard.press("Escape")
         page.wait_for_selector(".sc-modal", state="detached")
+        page.keyboard.press("Escape")
+        page.wait_for_selector(".sc-side", state="detached")
         check("D11 свободные окна видны: в субботу плашек нет", page.locator(".sc-col[data-day='2026-11-21'] .sc-plate").count() == 0)
+        # имя → карточка ученика
+        page.click(f".sc-plate[data-id='{mid}'] [data-p$='|{P[1]['id']}']")
+        page.wait_for_selector(".sc-scard")
+        check("D12 щелчок по имени — карточка ученика: имя, статус, «К оплатам»",
+              "Петя Сидоров" in page.inner_text(".sc-scard") and page.locator(".sc-scard [data-set=skip].on").count() == 1
+              and page.locator(".sc-scard a[href='#/payments/st-petya']").count() == 1)
+        page.click(".sc-scard [data-set=move]")
+        wait_db(lambda: people(mid)[1]["status"] == "move", "статус из карточки")
+        page.click(".sc-scard [data-set=skip]")
+        wait_db(lambda: people(mid)[1]["status"] == "skip", "статус из карточки обратно")
+        check("D13 статус из карточки ученика пишется в базу", people(mid)[1]["status"] == "skip")
+        page.keyboard.press("Escape")
+        page.wait_for_selector(".sc-scard", state="detached")
+        page.click(f".sc-plate[data-id='{mid}'] [data-exp]")
+        page.wait_for_selector(f".sc-plate.open[data-id='{mid}'] .sc-plist")
+        check("D14 стрелка раскрывает пару: список всех со своими статусами",
+              page.locator(f".sc-plate[data-id='{mid}'] .sc-plist .sc-prow").count() == 2 and page.locator(f".sc-plate[data-id='{mid}'] [data-pst]").count() == 2)
+        page.click(f".sc-plate[data-id='{mid}'] [data-exp]")
+        page.wait_for_selector(f".sc-plate.open[data-id='{mid}']", state="detached")
+        # меню «Вид»
+        page.click("#scLook")
+        page.wait_for_selector(".gm-menu.on")
+        check("D15 «Вид» — своё меню с примерами плашек (не select)",
+              page.locator(".gm-menu .sc-lookpv").count() >= 6 and page.locator("select").count() == 0)
+        page.click(".gm-menu .gm-item:has-text('Начало и конец')")
+        page.wait_for_function(f"() => document.querySelector(\".sc-plate[data-id='{wid}'] .sc-pt\").textContent === '17:30–19:15'")
+        page.click(".gm-menu .gm-item:has-text('Число')")
+        page.wait_for_selector(f".sc-plate[data-id='{mid}'] .sc-pc")
+        check("D16 «Начало и конец» и «Число»: 17:30–19:15, «1 из 2»",
+              page.inner_text(f".sc-plate[data-id='{mid}'] .sc-pc") == "1 из 2")
+        page.click(".gm-menu .gm-item:has-text('Только начало')")
+        page.click(".gm-menu .gm-item:has-text('Имена')")
+        page.keyboard.press("Escape")
+        page.wait_for_selector(".gm-menu", state="detached")
+        check("D17 вид запомнился на устройстве", page.evaluate("() => JSON.parse(localStorage.getItem('cabinet:schedule:look')).grp") == "names")
+        # высота часа — за линию часа, как в таблице
+        sat = page.locator(".sc-col[data-day='2026-11-21']").bounding_box()
+        y_line = sat["y"] + 1 + 2 * 80
+        page.mouse.move(sat["x"] + 40, y_line)
+        check("D18 у линии часа курсор «↕»", page.evaluate("() => document.querySelector('.sc-grid').classList.contains('rs')"))
+        page.mouse.down()
+        page.mouse.move(sat["x"] + 40, y_line + 20, steps=3)
+        page.mouse.move(sat["x"] + 40, y_line + 40, steps=3)
+        page.mouse.up()
+        hh2 = page.evaluate("() => JSON.parse(localStorage.getItem('cabinet:schedule:look')).hh")
+        check("D19 потянули линию 2-го часа на 40px — час стал 100px", hh2 == 100, str(hh2))
+        page.click("#scLook")
+        page.click(".gm-menu .gm-item:has-text('Сбросить')")
+        page.wait_for_selector(".gm-menu", state="detached")
+        check("D20 сброс высоты часа", page.evaluate("() => JSON.parse(localStorage.getItem('cabinet:schedule:look')).hh") == 80)
 
         # ── E. перезагрузка
         page.reload()
         page.wait_for_selector(".sc-grid", timeout=5000)
         check("E1 вид «Неделя» запомнился", page.is_visible(".sc-views button.on[data-v=grid]"))
-        check("E2 после перезагрузки 4 плашки, четверг 17:30 – 19:15",
+        check("E2 после перезагрузки 4 плашки, четверг 17:30",
               page.locator(".sc-plate").count() == 4
-              and page.inner_text(f".sc-col[data-day='2026-11-19'] .sc-plate[data-id='{wid}'] .sc-pt") == "17:30 – 19:15")
+              and page.inner_text(f".sc-col[data-day='2026-11-19'] .sc-plate[data-id='{wid}'] .sc-pt") == "17:30")
         hh = page.eval_on_selector(f".sc-plate[data-id='{wid}']", "e => e.getBoundingClientRect().height")
-        check("E3 высота плашки = 105 минут", abs(hh - 105) < 2, str(hh))
-        check("E4 подписи форматов после перезагрузки",
-              "Пара" in page.inner_text(f".sc-plate[data-id='{mid}']") and "Полупараллелка" in page.inner_text(f".sc-plate[data-id='{tid}']"))
+        check("E3 высота плашки = 105 минут", abs(hh - (105 * PXM - 4)) < 2, str(hh))
         page.click(".sc-views button[data-v=list]")
         page.wait_for_selector(".sc-days")
-        check("E5 «Строки» после перезагрузки: статусы ✓ и ✕",
-              page.inner_text(masha_btn) == "✓" and page.inner_text(petya_btn) == "✕")
-        check("E6 гость и формат на месте",
-              page.locator(f"{tue} .sc-guest").count() == 1
-              and page.eval_on_selector(f"{tue} select.sc-fmt[data-id='{tid}']", "s => s.value") == "semi")
-        check("E7 четверг: «17:30 – 19:15 Петя Сидоров»",
-              page.inner_text(".sc-day[data-day='2026-11-19'] .sc-time") == "17:30 – 19:15")
+        check("E5 «Строки» после перезагрузки: статусы на месте",
+              "st-done" in page.get_attribute(masha_st, "class") and "st-skip" in page.get_attribute(petya_st, "class"))
+        check("E6 гость на месте", page.locator(f"{tue} .rw-guest").count() == 1)
+        check("E7 четверг: «17:30»", page.inner_text(".sc-day[data-day='2026-11-19'] .rw-time") == "17:30")
 
         # ── F. неделя, удаление, названия форматов
         page.click("#scNext")
         page.wait_for_function("() => document.getElementById('scRange').textContent.indexOf('23 – 29 ноября') >= 0")
         page.wait_for_selector(".sc-days")
-        check("F1 › — следующая неделя пустая", page.locator(".sc-row").count() == 0 and "/schedule/2026-11-23" in page.url)
+        check("F1 › — следующая неделя пустая", page.locator(".rw-row").count() == 0 and "/schedule/2026-11-23" in page.url)
         page.click("#scPrev")
-        page.wait_for_selector(".sc-row")
-        check("F2 ‹ — назад, занятия на месте", page.locator(".sc-row").count() == 4)
+        page.wait_for_selector(".rw-row")
+        check("F2 ‹ — назад, занятия на месте", page.locator(".rw-row").count() == 4)
         page.click("#scToday")
         page.wait_for_function("() => location.hash === '#/schedule'")
         page.wait_for_selector("#scToday[aria-current]")
@@ -481,13 +574,13 @@ def main():
         check("F3 «Сегодня» — неделя 16–22 ноября, подсвечена среда 18-го",
               page.evaluate("() => Schedule._st.week") == WEEK and page.get_attribute(".sc-day.today", "data-day") == "2026-11-18")
         open_schedule(page)
-        page.click(f".sc-day[data-day='2026-11-17'] .sc-time >> text=12:00 – 13:00")
-        page.wait_for_selector("#spEdit")
-        page.click("#spEdit")
-        page.wait_for_selector("#edDel")
-        page.click("#edDel")
-        check("F4 удаление спрашивает подтверждение", page.inner_text("#edDel") == "Точно удалить?" and len(lessons()) == 4)
-        page.click("#edDel")
+        page.hover(row('2026-11-17', kid))
+        page.click(f"{row('2026-11-17', kid)} .rw-more")
+        page.wait_for_selector(".gm-menu.on")
+        page.click(".gm-menu .gm-item:has-text('Удалить строку')")
+        page.wait_for_selector(".gm-menu .gm-item:has-text('Точно удалить?')")
+        check("F4 удаление строки спрашивает подтверждение", len(lessons()) == 4)
+        page.click(".gm-menu .gm-item:has-text('Точно удалить?')")
         wait_db(lambda: len(lessons()) == 3, "удаление")
         check("F5 занятие удалено вместе с участниками",
               len(lessons()) == 3 and not [p for p in db()["lesson_students"] if p["lesson_id"] not in {l["id"] for l in lessons()}])
@@ -497,20 +590,99 @@ def main():
         page.dispatch_event("#fmtNames input[data-fmt=semi]", "change")
         wait_db(lambda: db()["teacher_settings"][0]["settings"]["formatLabels"]["semi"] == "Параллель", "название формата")
         open_schedule(page)
-        check("F6 своё название формата в расписании",
-              "Параллель" in page.eval_on_selector(f"{tue} select.sc-fmt[data-id='{tid}']", "s => s.options[s.selectedIndex].text"))
+        page.hover(row('2026-11-17', tid))
+        page.click(f"{row('2026-11-17', tid)} .rw-more")
+        page.click(".gm-menu .gm-item:has-text('Открыть занятие')")
+        page.wait_for_selector("#spEdit")
+        page.click("#spEdit")
+        page.wait_for_selector("#edFmt button")
+        check("F6 своё название формата в карточке занятия", "Параллель" in page.inner_text("#edFmt"))
+        page.keyboard.press("Escape")
+        page.wait_for_selector(".sc-modal", state="detached")
+        page.keyboard.press("Escape")
+        page.wait_for_selector(".sc-side", state="detached")
 
-        # ── G. телефон
-        ph = new_context(browser, viewport={"width": 375, "height": 800})
+        # ── H. перетаскивание строк мышью
+        def drag_to(src, target_sel, wait_slot=False):
+            b = page.locator(src).bounding_box()
+            page.mouse.move(b["x"] + b["width"] * 0.6, b["y"] + b["height"] / 2)
+            page.mouse.down()
+            page.mouse.move(b["x"] + b["width"] * 0.6 + 10, b["y"] + b["height"] / 2 + 10, steps=3)
+            if wait_slot:
+                page.wait_for_selector(target_sel)
+            t = page.locator(target_sel).bounding_box()
+            page.mouse.move(t["x"] + t["width"] / 2, t["y"] + t["height"] / 2, steps=8)
+            page.mouse.up()
+        drag_to(f"{row('2026-11-17', tid)} .rw-p:has-text('Вася')", row('2026-11-19', wid))
+        wait_db(lambda: len(people(wid)) == 2, "Вася переехал")
+        wait_db(lambda: [l for l in lessons() if l["id"] == tid][0]["format"] == "single", "формат вт — индивидуальное")
+        vasya = [p for p in people(wid) if p.get("guest_name") == "Вася"]
+        check("H1 одно имя из пары — на строку другого дня: ученик переехал со статусом, пара стала индивидуальным",
+              vasya and vasya[0]["status"] == "done" and len(people(tid)) == 1
+              and [l for l in lessons() if l["id"] == tid][0]["format"] == "single", str(people(wid)))
+        page.wait_for_selector(f"{row('2026-11-19', wid)}.multi")
+        drag_to(row('2026-11-19', wid) + " .rw-time", ".rw-slot[data-day='2026-11-20'][data-start='600']", wait_slot=True)
+        wait_db(lambda: [l for l in lessons() if l["id"] == wid][0]["day"] == "2026-11-20", "строка на пятницу 10:00")
+        W = [l for l in lessons() if l["id"] == wid][0]
+        check("H2 строку — на свободный час другого дня: пт 10:00", (W["day"], W["start_min"]) == ("2026-11-20", 600), str(W))
+        page.wait_for_selector(row('2026-11-20', wid))
+        drag_to(row(WEEK, mid) + " .rw-time", row('2026-11-20', wid))
+        wait_db(lambda: not [l for l in lessons() if l["id"] == mid], "пн слилось в пт")
+        names_w = sorted([p.get("student_id") or p.get("guest_name") for p in people(wid)])
+        check("H3 строку на строку — ученики слились (Петя второй раз не встал), опустевшее занятие удалено, формат «группа»",
+              names_w == sorted(["st-petya", "Вася", "st-masha"]) and [l for l in lessons() if l["id"] == wid][0]["format"] == "group", str(names_w))
+        masha_row = [p for p in people(wid) if p.get("student_id") == "st-masha"]
+        check("H4 статус Маши переехал вместе с ней", masha_row and masha_row[0]["status"] == "done")
+        # накладка по времени — одна рамка, получасовая строка сдвинута
+        sat = ".sc-day[data-day='2026-11-21']"
+        page.click(".rw-add[data-add='2026-11-21']")
+        focused("rw-in-time")
+        page.keyboard.type("1600")
+        page.keyboard.press("Enter")
+        page.keyboard.type("Маша")
+        page.keyboard.press("Enter")
+        wait_db(lambda: len([l for l in lessons() if l["day"] == "2026-11-21"]) == 1, "сб 16:00")
+        focused("rw-in-names")
+        page.fill(f"{sat} .rw-row.draft .rw-in-time", "1630")
+        page.focus(f"{sat} .rw-row.draft .rw-in-names")
+        page.keyboard.type("Петя")
+        page.keyboard.press("Enter")
+        wait_db(lambda: len([l for l in lessons() if l["day"] == "2026-11-21"]) == 2, "сб 16:30")
+        page.keyboard.press("Escape")
+        page.wait_for_selector(f"{sat} .rw-frame .rw-row.half")
+        check("H5 занятия внахлёст (16:00 и 16:30) — одна рамка без подписи, 16:30 сдвинута вправо",
+              page.locator(f"{sat} .rw-frame .rw-row").count() == 2 and "полупараллел" not in page.inner_text(f"{sat} .rw-frame").lower())
+
+        # ── G. телефон: долгое нажатие пальцем
+        ph = new_context(browser, viewport={"width": 375, "height": 800}, has_touch=True, is_mobile=True)
         pp = ph.new_page()
+        PAGE["p"] = pp
         pp.on("pageerror", lambda e: errors.append("phone: " + str(e)))
         signed_in(pp)
         open_schedule(pp)
-        check("G1 телефон: по умолчанию «Строки»", pp.is_visible(".sc-views button.on[data-v=list]") and pp.locator(".sc-row").count() == 3)
+        n_rows = len(lessons())
+        check("G1 телефон: по умолчанию «Строки», дни в одну колонку", pp.is_visible(".sc-views button.on[data-v=list]") and pp.locator(".rw-row").count() == n_rows)
         check("G2 телефон 375: без прокрутки вбок", pp.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth"))
+        cdp = ph.new_cdp_session(pp)
+        src = row('2026-11-17', tid) + " .rw-time"
+        pp.eval_on_selector(src, "e => e.scrollIntoView({ block: 'center' })")
+        b = pp.locator(src).bounding_box()
+        x, y = b["x"] + b["width"] / 2, b["y"] + b["height"] / 2
+        cdp.send("Input.dispatchTouchEvent", {"type": "touchStart", "touchPoints": [{"x": x, "y": y}]})
+        pp.wait_for_timeout(650)                          # долгое нажатие
+        cdp.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [{"x": x, "y": y + 6}]})
+        pp.wait_for_selector(".rw-slot[data-day='2026-11-17'][data-start='900']", timeout=3000)
+        t = pp.locator(".rw-slot[data-day='2026-11-17'][data-start='900']").bounding_box()
+        for i in range(1, 9):
+            cdp.send("Input.dispatchTouchEvent", {"type": "touchMove", "touchPoints": [{"x": x + (t["x"] + 30 - x) * i / 8, "y": y + (t["y"] + t["height"] / 2 - y) * i / 8}]})
+            pp.wait_for_timeout(30)
+        cdp.send("Input.dispatchTouchEvent", {"type": "touchEnd", "touchPoints": []})
+        wait_db(lambda: [l for l in lessons() if l["id"] == tid][0]["start_min"] == 900, "перенос пальцем")
+        check("G3 палец: долгое нажатие и перетаскивание на свободный час — вт 15:00",
+              [l for l in lessons() if l["id"] == tid][0]["start_min"] == 900)
         pp.click(".sc-views button[data-v=grid]")
         pp.wait_for_selector(".sc-grid")
-        check("G3 телефон, «Неделя»: сетка листается внутри, страница — нет",
+        check("G3a телефон, «Неделя»: сетка листается внутри, страница — нет",
               pp.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth"))
         check("G4 нет ошибок JavaScript", not errors, "; ".join(errors))
         browser.close()

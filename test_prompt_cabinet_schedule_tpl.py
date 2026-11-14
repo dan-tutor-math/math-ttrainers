@@ -336,8 +336,17 @@ def main():
         open_schedule(page)
         mode = lambda m: page.click(f".sc-modes button[data-mode={m}]")
 
+        # новая строка в дне: «+ строка» → время пустое → всё одной строкой в имени
+        def quick(card, text):
+            page.click(f"{card} .rw-add")
+            page.wait_for_selector(f"{card} .rw-row.draft .rw-in-names")
+            page.fill(f"{card} .rw-row.draft .rw-in-time", "")
+            page.focus(f"{card} .rw-row.draft .rw-in-names")
+            page.keyboard.type(text)
+            page.keyboard.press("Enter")
+
         # ── A. пара заводится один раз
-        check("A0 в шапке недели — список «Шаблон недели»", page.is_visible("#scTplMenu"))
+        check("A0 в шапке недели — меню «Шаблон недели» (своё, не select)", page.is_visible("button#scTplMenu"))
         mode("groups")
         page.fill("#grpNames", "Маша")
         page.press("#grpNames", "Enter")
@@ -372,9 +381,7 @@ def main():
         wait_db(lambda: tbl("week_templates")[0]["name"] == "Осенний", "переименование")
         check("B2 переименован", tbl("week_templates")[0]["name"] == "Осенний")
         mon = ".sc-day[data-wd='1']"
-        page.click(f"{mon} .sc-plus")
-        page.fill(f"{mon} .sc-quick input", "15:00 Маша, Петя")
-        page.press(f"{mon} .sc-quick input", "Enter")
+        quick(mon, "15:00 Маша, Петя")
         wait_db(lambda: len(tbl("template_slots")) == 1, "слот пн")
         S = tbl("template_slots")
         s_mon = S[0] if S else {}
@@ -382,22 +389,20 @@ def main():
               (s_mon.get("weekday"), s_mon.get("start_min"), s_mon.get("dur_min"), s_mon.get("format"), s_mon.get("group_id")) == (1, 900, 90, "pair", gid), str(S))
         wait_db(lambda: len(slot_people(s_mon.get("id"))) == 2, "участники слота")
         check("B4 участники слота — Маша и Петя", slot_people(s_mon["id"]) == ["st-masha", "st-petya"])
-        page.wait_for_selector(f"{mon} .sc-row")
-        check("B5 строка слота: время и оба имени", page.inner_text(f"{mon} .sc-time") == "15:00 – 16:30" and "Петя Сидоров" in page.inner_text(f"{mon} .sc-row"))
+        page.wait_for_selector(f"{mon} .rw-row:not(.draft)")
+        check("B5 строка слота: время и оба имени столбиком", page.inner_text(f"{mon} .rw-time") == "15:00" and "Петя Сидоров" in page.inner_text(f"{mon} .rw-row:not(.draft)")
+              and page.locator(f"{mon} .rw-row:not(.draft) .rw-p").count() == 2)
         tue = ".sc-day[data-wd='2']"
-        page.click(f"{tue} .sc-plus")
-        page.fill(f"{tue} .sc-quick input", "10:30 Вася")
-        page.press(f"{tue} .sc-quick input", "Enter")
+        quick(tue, "10:30 Вася")
         wait_db(lambda: len(tbl("template_slots")) == 2, "слот вт")
         fri = ".sc-day[data-wd='5']"
-        page.click(f"{fri} .sc-plus")
-        page.fill(f"{fri} .sc-quick input", "18:00 Маша")
-        page.press(f"{fri} .sc-quick input", "Enter")
+        quick(fri, "18:00 Маша")
         wait_db(lambda: len(tbl("template_slots")) == 3, "слот пт")
         S = {(x["weekday"], x["start_min"]): x for x in tbl("template_slots")}
         check("B6 слоты вт 10:30 (60 мин, индивидуальное) и пт 18:00",
               (2, 630) in S and (5, 1080) in S and S[(2, 630)]["format"] == "single" and S[(2, 630)]["dur_min"] == 60 and S[(2, 630)]["group_id"] is None, str(S))
-        page.wait_for_function("() => document.querySelectorAll('.sc-row').length === 3")
+        page.keyboard.press("Escape")
+        page.wait_for_function("() => document.querySelectorAll('.rw-row:not(.draft)').length === 3")
         page.click("#tplWho summary")
         who = " ".join(page.inner_text("#tplWho").split())
         check("B7 «кто в шаблоне»: Маша ×2, Петя ×1, Вася ×1", "Маша Иванова ×2" in who and "Петя Сидоров ×1" in who and "Вася Козлов ×1" in who, who)
@@ -423,7 +428,8 @@ def main():
         # ── D. вставка в неделю
         mode("week")
         page.wait_for_selector(".sc-days")
-        page.select_option("#scTplMenu", f"ins:{tid}")
+        page.click("#scTplMenu")
+        page.click(".gm-menu.on .gm-item:has-text('Осенний')")
         page.wait_for_selector(".sc-ins")
         rows = page.locator(".sc-ins-row")
         check("D1 окно вставки: 3 слота, один занят (вт 10:45)",
@@ -440,7 +446,8 @@ def main():
         wait_db(lambda: len(people(mon_l[0]["id"])) == 2, "ученики занятия")
         check("D5 ученики занятия — Маша и Петя", [p["student_id"] for p in people(mon_l[0]["id"])] == ["st-masha", "st-petya"])
         check("D6 во вторнике по-прежнему одно занятие (seed)", len([l for l in L if l["day"] == "2026-11-17"]) == 1)
-        page.select_option("#scTplMenu", f"ins:{tid}")
+        page.click("#scTplMenu")
+        page.click(".gm-menu.on .gm-item:has-text('Осенний')")
         page.wait_for_selector(".sc-ins")
         check("D7 повторная вставка: всё занято, «Только свободные» нет",
               page.locator(".sc-ins-row.busy").count() == 3 and page.locator("#insFree").count() == 0 and page.locator("#insAll").count() == 1)
@@ -451,19 +458,18 @@ def main():
         # ── E. после перезагрузки — оба вида
         open_schedule(page)
         mon_d = ".sc-day[data-day='2026-11-16']"
-        check("E1 «Строки»: пн 15:00 – 16:30, Маша и Петя, формат «Пара»",
-              page.inner_text(f"{mon_d} .sc-time") == "15:00 – 16:30" and "Маша Иванова" in page.inner_text(f"{mon_d} .sc-row") and "Петя Сидоров" in page.inner_text(f"{mon_d} .sc-row")
-              and page.eval_on_selector(f"{mon_d} select.sc-fmt", "s => s.value") == "pair")
-        check("E2 «Строки»: пт 18:00 – 19:30 Маша (у неё своя длительность 90), индивидуальное",
-              page.inner_text(".sc-day[data-day='2026-11-20'] .sc-time") == "18:00 – 19:30" and page.eval_on_selector(".sc-day[data-day='2026-11-20'] select.sc-fmt", "s => s.value") == "single")
+        check("E1 «Строки»: пн 15:00, Маша и Петя столбиком",
+              page.inner_text(f"{mon_d} .rw-time") == "15:00" and "Маша Иванова" in page.inner_text(f"{mon_d} .rw-row") and "Петя Сидоров" in page.inner_text(f"{mon_d} .rw-row")
+              and "multi" in page.get_attribute(f"{mon_d} .rw-row", "class"))
+        check("E2 «Строки»: пт 18:00 Маша", page.inner_text(".sc-day[data-day='2026-11-20'] .rw-time") == "18:00")
         page.click(".sc-views button[data-v=grid]")
         page.wait_for_selector(".sc-grid")
         mid = mon_l[0]["id"]
-        check("E3 «Неделя»: 3 плашки, у пары подпись «Пара» и оба имени",
-              page.locator(".sc-plate").count() == 3 and "Пара" in page.inner_text(f".sc-plate[data-id='{mid}'] .sc-pf")
+        check("E3 «Неделя»: 3 плашки, у пары оба имени",
+              page.locator(".sc-plate").count() == 3
               and "Петя Сидоров" in page.inner_text(f".sc-plate[data-id='{mid}']") and "Маша Иванова" in page.inner_text(f".sc-plate[data-id='{mid}']"))
         h = page.eval_on_selector(f".sc-plate[data-id='{mid}']", "e => e.getBoundingClientRect().height")
-        check("E4 высота плашки пары = 90 минут", abs(h - 90) < 2, str(h))
+        check("E4 высота плашки пары = 90 минут (час 80px)", abs(h - (90 * 80 / 60 - 4)) < 2, str(h))
         page.click(".sc-views button[data-v=list]")
         page.wait_for_selector(".sc-days")
 
@@ -489,17 +495,13 @@ def main():
         mode("week")
         page.wait_for_selector(".sc-days")
         wed = ".sc-day[data-day='2026-11-18']"
-        page.click(f"{wed} .sc-plus")
-        page.fill(f"{wed} .sc-quick input", "16:00 Петя, Маша")
-        page.press(f"{wed} .sc-quick input", "Enter")
+        quick(wed, "16:00 Петя, Маша")
         wait_db(lambda: len(lessons()) == 4, "занятие по именам пары")
         W = [l for l in lessons() if l["day"] == "2026-11-18"]
         check("F5 те же имена в быстром вводе → занятие сразу «пара» с group_id и длительностью 90",
               W and (W[0]["format"], W[0]["group_id"], W[0]["dur_min"]) == ("pair", gid, 90), str(W))
         thu = ".sc-day[data-day='2026-11-19']"
-        page.click(f"{thu} .sc-plus")
-        page.fill(f"{thu} .sc-quick input", "12:00 Маша Иванова + Петя Сидоров")
-        page.press(f"{thu} .sc-quick input", "Enter")
+        quick(thu, "12:00 Маша Иванова + Петя Сидоров")
         wait_db(lambda: len(lessons()) == 5, "занятие по названию пары")
         T4 = [l for l in lessons() if l["day"] == "2026-11-19"]
         check("F6 название пары в быстром вводе разворачивается в учеников",
@@ -516,13 +518,36 @@ def main():
         mode("week")
         page.wait_for_selector(".sc-days")
         fr = ".sc-day[data-day='2026-11-21']"
-        page.click(f"{fr} .sc-plus")
-        page.fill(f"{fr} .sc-quick input", "20:00 Маша, Петя")
-        page.press(f"{fr} .sc-quick input", "Enter")
+        quick(fr, "20:00 Маша, Петя")
         wait_db(lambda: len(lessons()) == 6, "занятие после разъединения")
         SA = [l for l in lessons() if l["day"] == "2026-11-21"]
         check("F9 после «Разъединить» те же имена — пара по числу учеников, но без ссылки на группу",
               SA and (SA[0]["format"], SA[0]["group_id"]) == ("pair", None), str(SA))
+
+        # ── F10. шаблон: тот же компонент строк — перетаскивание слота мышью
+        mode("tpl")
+        page.wait_for_selector(".sc-tpldays")
+        tue_t = ".sc-day[data-wd='2']"
+        src = page.locator(f"{tue_t} .rw-row .rw-time").bounding_box()
+        page.mouse.move(src["x"] + 10, src["y"] + 8)
+        page.mouse.down()
+        page.mouse.move(src["x"] + 20, src["y"] + 20, steps=3)
+        page.wait_for_selector(".rw-slot[data-day='4'][data-start='600']")
+        t = page.locator(".rw-slot[data-day='4'][data-start='600']").bounding_box()
+        page.mouse.move(t["x"] + t["width"] / 2, t["y"] + t["height"] / 2, steps=8)
+        page.mouse.up()
+        wait_db(lambda: [x for x in tbl("template_slots") if x["weekday"] == 4], "слот на четверг")
+        TH = [x for x in tbl("template_slots") if x["weekday"] == 4]
+        check("F10 слот шаблона перетащили на четверг 10:00", TH and TH[0]["start_min"] == 600, str(TH))
+        page.click(f"{mon} .rw-time")
+        page.fill(f"{mon} .rw-in-time", "1430")
+        page.keyboard.press("Escape")
+        page.click(f"{mon} .rw-time")
+        page.fill(f"{mon} .rw-in-time", "1430")
+        page.keyboard.press("Enter")
+        wait_db(lambda: [x for x in tbl("template_slots") if x["id"] == s_mon["id"]][0]["start_min"] == 870, "время слота")
+        check("F11 время слота правится на месте: «1430» → 14:30", [x for x in tbl("template_slots") if x["id"] == s_mon["id"]][0]["start_min"] == 870)
+        page.keyboard.press("Escape")
 
         # ── G. телефон и ошибки
         ph = new_context(browser, viewport={"width": 375, "height": 800})
