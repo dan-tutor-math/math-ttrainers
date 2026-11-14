@@ -28,6 +28,8 @@
     { id: 'rus',  title: 'Русский',        color: '#9E2A47' },
     { id: 'soc',  title: 'Обществознание', color: '#17694F' },
     { id: 'eng',  title: 'Английский',     color: '#5B3596' },
+    { id: 'phys', title: 'Физика',         color: '#A3480F' },
+    { id: 'inf',  title: 'Информатика',    color: '#0B6577' },
   ];
 
   /* ───────── реестр тренажёров ─────────
@@ -218,6 +220,29 @@
       eq, panel: eq !== 'аудио', full: 'Английский ОГЭ ' + label + '. ' + title };
   });
 
+  /* Физика и информатика, ОГЭ по КИМ 2027: краткие ответы из банка ФИПИ —
+     phys_oge.html (№1–16) и inf_oge.html (№1–10), копии страницы ЕГЭ.
+     Названия совпадают с titles в tools/oge_fipi_export.py. Развёрнутые номера
+     (физика №17–22, информатика №13–16) и информатика №11–12 (поиск в архиве) — позже */
+  const PHYS_OGE_TITLES = {
+    1: 'Физические понятия и величины', 2: 'Устройства и приборы', 3: 'Распознавание явлений',
+    4: 'Текст с пропусками', 5: 'Объяснение явлений', 6: 'Механика: кинематика и силы',
+    7: 'Механика: законы и энергия', 8: 'Тепловые явления', 9: 'Электричество и магнетизм',
+    10: 'Оптика и волны', 11: 'Атом и ядро', 12: 'Изменение величин: механика и тепло',
+    13: 'Изменение величин: электричество и ядро', 14: 'Графики и таблицы',
+    15: 'Измерения и опыты', 16: 'Анализ опытов',
+  };
+  addNumbered('phys', PHYS_OGE_TITLES, (n, t) => ({ href: 'phys_oge.html?n=' + n, subject: 'phys', cap: 'ege',
+    eq: 'краткий ответ', full: 'Физика ОГЭ №' + n + '. ' + t }));
+  const INF_OGE_TITLES = {
+    1: 'Объём текста в кодировке', 2: 'Расшифровка сообщения', 3: 'Истинность высказывания',
+    4: 'Кратчайший путь', 5: 'Алгоритм для исполнителя', 6: 'Программа и запуски',
+    7: 'Адрес файла в Интернете', 8: 'Запросы к поисковой системе', 9: 'Число путей в графе',
+    10: 'Системы счисления',
+  };
+  addNumbered('inf', INF_OGE_TITLES, (n, t) => ({ href: 'inf_oge.html?n=' + n, subject: 'inf', cap: 'ege',
+    eq: 'краткий ответ', full: 'Информатика ОГЭ №' + n + '. ' + t }));
+
   /* ───────── экзамены ─────────
      Вкладки «Экзамены» на главной и разделы панели досок строятся отсюда.
      id — id подвкладки на главной (сохранённая вкладка помнит его, не менять);
@@ -261,6 +286,12 @@
       { title: 'Устная часть', items: ['eng36', 'eng37', 'eng38'] },
     ] },
     { subject: 'eng', id: 'ege', title: 'ЕГЭ', groups: [], soon: true },
+    { subject: 'phys', id: 'oge', title: 'ОГЭ', groups: [
+      { title: 'Краткий ответ', items: range('phys', 1, 16) },
+    ] },
+    { subject: 'inf', id: 'oge', title: 'ОГЭ', groups: [
+      { title: 'Краткий ответ', items: range('inf', 1, 10) },
+    ] },
   ];
 
   /* Разделы панели, которых нет среди экзаменов. «Основа» — без повторов
@@ -311,7 +342,8 @@
     panelGroups,
     range,
     titles: { egeProf: EGE_PROF_TITLES, egeBase: EGE_BASE_TITLES, ogePart2: OGE_PART2_TITLES,
-              rusOge: RUS_OGE_TITLES, rusEge: RUS_EGE_TITLES, socOge: SOC_OGE_TITLES, socEge: SOC_EGE_TITLES, engOge: ENG_OGE },
+              rusOge: RUS_OGE_TITLES, rusEge: RUS_EGE_TITLES, socOge: SOC_OGE_TITLES, socEge: SOC_EGE_TITLES, engOge: ENG_OGE,
+              physOge: PHYS_OGE_TITLES, infOge: INF_OGE_TITLES },
     subjectOf: id => (T[id] && T[id].subject) || null,
   };
 })();

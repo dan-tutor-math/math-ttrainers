@@ -33,6 +33,9 @@ TARGETS = [
     ('soc_oge.html', [('ЕГЭ профиль', 'ОГЭ обществознание'), ('ege-prof-', 'soc-oge-')]),
     ('soc_ege.html', [('ЕГЭ профиль', 'ЕГЭ обществознание'), ('ege-prof-', 'soc-ege-')]),
     ('soc_ege_long.html', [('ЕГЭ профиль', 'ЕГЭ обществознание'), ('ege-prof-', 'soc-ege-long-')]),
+    # физика и информатика ОГЭ: банк ФИПИ, сборка — tools/oge_fipi_export.py
+    ('phys_oge.html', [('ЕГЭ профиль', 'ОГЭ физика'), ('ege-prof-', 'phys-oge-')]),
+    ('inf_oge.html', [('ЕГЭ профиль', 'ОГЭ информатика'), ('ege-prof-', 'inf-oge-')]),
 ]
 
 

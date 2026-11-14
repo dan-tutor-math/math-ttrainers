@@ -90,3 +90,11 @@ html[data-theme="dark"] #examJumpMenu .exam-jump-subject[aria-pressed="true"]{co
  #examJumpMenu .exam-jump-close,#examJumpMenu .exam-jump-exam,.exam-nav-h1 .exam-nav-btn{min-width:var(--ej-touch-size,44px);min-height:var(--ej-touch-size,44px)}
 }
 @media(prefers-reduced-motion:no-preference){#examJumpMenu:not([hidden]){animation:examJumpOpen .18s cubic-bezier(.16,1,.3,1)}@keyframes examJumpOpen{from{opacity:.7;translate:0 -5px}to{opacity:1;translate:0 0}}}
+
+/* физика и информатика ОГЭ: цвета предметов как на главной */
+html[data-exam-subject="phys"],#examJumpMenu[data-subject="phys"]{--ej-ink:#a3480f;--ej-soft:rgba(163,72,15,.08);--ej-dot:#c8621f}
+html[data-exam-subject="inf"],#examJumpMenu[data-subject="inf"]{--ej-ink:#0b6577;--ej-soft:rgba(11,101,119,.08);--ej-dot:#1592a5}
+html[data-theme="dark"][data-exam-subject="phys"],html[data-theme="dark"] #examJumpMenu[data-subject="phys"]{--ej-ink:#e58c52;--ej-soft:rgba(229,140,82,.10)}
+html[data-theme="dark"][data-exam-subject="inf"],html[data-theme="dark"] #examJumpMenu[data-subject="inf"]{--ej-ink:#4db8c8;--ej-soft:rgba(77,184,200,.10)}
+.exam-jump-subject[data-subject-id="phys"]{--subject-dot:#c8621f}
+.exam-jump-subject[data-subject-id="inf"]{--subject-dot:#1592a5}

@@ -82,6 +82,8 @@
     ege_base: { title: 'ЕГЭ база', list: range(1, 21).map(n => ({ slug: 'ege_base', n: n, label: '№' + n })) },
     ege_prof: { title: 'ЕГЭ профиль', list: range(1, 20).map(n => ({ slug: 'ege_prof', n: n, label: '№' + n })) },
     soc_oge: { title: 'ОГЭ обществознание', list: range(1, 20).map(n => ({ slug: 'soc_oge', n: n, label: '№' + n })) },
+    phys_oge: { title: 'ОГЭ физика', list: range(1, 16).map(n => ({ slug: 'phys_oge', n: n, label: '№' + n })) },
+    inf_oge: { title: 'ОГЭ информатика', list: range(1, 10).map(n => ({ slug: 'inf_oge', n: n, label: '№' + n })) },
     soc_ege: { title: 'ЕГЭ обществознание', list: range(1, 25).map(n => ({ slug: n<=16 ? 'soc_ege' : 'soc_ege_long', n: n, label: '№' + n })) },
     // русский ОГЭ: №1 и №13 — свои страницы (изложение, сочинение), №2–12 — одна
     // страница rus_oge.html, номер в адресе, меняется без перезагрузки (хук __examNav)
@@ -106,7 +108,8 @@
   const EXAM = panelPositions ? Object.assign({}, EXAMS[examId], {
     list: EXAMS[examId].list.filter(p => panelPositions.has(p.slug + '.html' + (p.n ? '?n=' + p.n : ''))),
   }) : EXAMS[examId];
-  const subjectId = examId.startsWith('rus_') ? 'rus' : examId.startsWith('soc_') ? 'soc' : examId === 'eng_oge' ? 'eng' : 'math';
+  const subjectId = examId.startsWith('rus_') ? 'rus' : examId.startsWith('soc_') ? 'soc' : examId === 'eng_oge' ? 'eng'
+    : examId === 'phys_oge' ? 'phys' : examId === 'inf_oge' ? 'inf' : 'math';
   const catalogExamId = subjectId === 'math' ? examId : (examId === 'soc_ege' || examId === 'rus_ege') ? 'ege' : 'oge';
   const assetBase = new URL('.', document.currentScript ? document.currentScript.src : location.href);
 

@@ -21,7 +21,7 @@
    ========================================================== */
 (function(){
   'use strict';
-  const EXAM_NAMES = { oge: 'ОГЭ, математика', ege: 'ЕГЭ, профиль', egeb: 'ЕГЭ, база', soc: 'Обществознание ОГЭ', eng: 'Английский ОГЭ', rus: 'Русский язык ОГЭ' };
+  const EXAM_NAMES = { oge: 'ОГЭ, математика', ege: 'ЕГЭ, профиль', egeb: 'ЕГЭ, база', soc: 'Обществознание ОГЭ', eng: 'Английский ОГЭ', rus: 'Русский язык ОГЭ', phys: 'Физика ОГЭ', inf: 'Информатика ОГЭ' };
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
   function fmt(t){
@@ -35,7 +35,7 @@
   }
   // «oge9» → «№9», «ege_prof» → «ege_prof»: человеческое имя, когда оно очевидно
   function pageName(p){
-    const m = /^(oge|ege|egeb|soc|eng|rus)(\d+)$/.exec(p);
+    const m = /^(oge|ege|egeb|soc|eng|rus|phys|inf)(\d+)$/.exec(p);
     return m ? '№' + m[2] + ' (' + (EXAM_NAMES[m[1]] || m[1]) + ')' : p;
   }
   function parseKey(k){

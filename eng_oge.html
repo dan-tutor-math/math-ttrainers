@@ -497,19 +497,28 @@ html[data-no-add-rail] #addRail{display:none!important}
    Цвет — зелёный обществознания с главной. Светлый акцент тёмной темы даёт с белым
    текстом меньше 4,5:1, поэтому залитые кнопки в тёмной теме красятся отдельно */
 html[data-subject="soc"]{--ink:#17694F;--ink-active:#10523D;--hl-10:rgba(23,105,79,.10);--hl-35:rgba(23,105,79,.35);--blob-1:rgba(36,137,106,.16)}
+html[data-subject="phys"]{--ink:#A3480F;--ink-active:#843A0C;--hl-10:rgba(163,72,15,.10);--hl-35:rgba(163,72,15,.35);--blob-1:rgba(200,98,31,.16)}
+html[data-subject="inf"]{--ink:#0B6577;--ink-active:#08505E;--hl-10:rgba(11,101,119,.10);--hl-35:rgba(11,101,119,.35);--blob-1:rgba(21,146,165,.16)}
 /* Счётчик и его стрелки держим вместе, как в русском; справа нет колонки «+». */
-html[data-subject="soc"]:not([data-focus="on"]) .sub{max-height:none;}
-html[data-subject="soc"] .task-head{padding-right:0;}
-html[data-subject="soc"] .corner{margin-left:auto;justify-content:flex-end;}
-html[data-subject="soc"] .task-pagination{display:flex;align-items:center;gap:8px;}
-html[data-subject="soc"] .task-pagination .task-title{white-space:nowrap;}
-html[data-subject="soc"] .nav-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 12px;min-width:40px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s,border-color .15s;}
-html[data-subject="soc"] .nav-btn:hover{border-color:var(--ink);}
-html[data-subject="soc"] .nav-btn:active{transform:scale(.96);}
-html[data-subject="soc"] .nav-btn:focus-visible{outline:3px solid var(--ink);outline-offset:2px;}
+html:is([data-subject="soc"],[data-subject="phys"],[data-subject="inf"]):not([data-focus="on"]) .sub{max-height:none;}
+html:is([data-subject="soc"],[data-subject="phys"],[data-subject="inf"]) .task-head{padding-right:0;}
+html:is([data-subject="soc"],[data-subject="phys"],[data-subject="inf"]) .corner{margin-left:auto;justify-content:flex-end;}
+html:is([data-subject="soc"],[data-subject="phys"],[data-subject="inf"]) .task-pagination{display:flex;align-items:center;gap:8px;}
+html:is([data-subject="soc"],[data-subject="phys"],[data-subject="inf"]) .task-pagination .task-title{white-space:nowrap;}
+html:is([data-subject="soc"],[data-subject="phys"],[data-subject="inf"]) .nav-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 12px;min-width:40px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s,border-color .15s;}
+html:is([data-subject="soc"],[data-subject="phys"],[data-subject="inf"]) .nav-btn:hover{border-color:var(--ink);}
+html:is([data-subject="soc"],[data-subject="phys"],[data-subject="inf"]) .nav-btn:active{transform:scale(.96);}
+html:is([data-subject="soc"],[data-subject="phys"],[data-subject="inf"]) .nav-btn:focus-visible{outline:3px solid var(--ink);outline-offset:2px;}
 html[data-theme="dark"][data-subject="soc"]{--ink:#2F8F70;--ink-active:#3FA584;--hl-10:rgba(58,158,126,.16);--hl-35:rgba(58,158,126,.5);--blob-1:rgba(58,158,126,.22)}
 html[data-theme="dark"][data-subject="soc"] .submode-tab.active,html[data-theme="dark"][data-subject="soc"] .check-btn,html[data-theme="dark"][data-subject="soc"] .yn-btn.sel,html[data-theme="dark"][data-subject="soc"] .proof-score-btn.active,html[data-theme="dark"][data-subject="soc"] .board-visibility-toggle.active{background:#1E7A5C;border-color:#1E7A5C;}
 html[data-theme="dark"][data-subject="soc"] .next-btn{background:#1F7A36;}
+html[data-theme="dark"][data-subject="phys"]{--ink:#D9773A;--ink-active:#E58C52;--hl-10:rgba(217,119,58,.16);--hl-35:rgba(217,119,58,.5);--blob-1:rgba(217,119,58,.22)}
+html[data-theme="dark"][data-subject="phys"] :is(.submode-tab.active,.check-btn,.yn-btn.sel,.proof-score-btn.active,.board-visibility-toggle.active){background:#A3480F;border-color:#A3480F;}
+html[data-theme="dark"][data-subject="inf"]{--ink:#2FA3B5;--ink-active:#4DB8C8;--hl-10:rgba(47,163,181,.16);--hl-35:rgba(47,163,181,.5);--blob-1:rgba(47,163,181,.22)}
+html[data-theme="dark"][data-subject="inf"] :is(.submode-tab.active,.check-btn,.yn-btn.sel,.proof-score-btn.active,.board-visibility-toggle.active){background:#0B6577;border-color:#0B6577;}
+/* таблицы данных физики и информатики (сетка ставится при сборке, класс grid) */
+.soc-text table.grid{border-collapse:collapse;margin:8px 0;}
+.soc-text table.grid td,.soc-text table.grid th{border:1px solid var(--glass-border);padding:4px 10px;text-align:center;}
 .soc-text p{margin:0 0 6px;}
 .soc-text table{border-collapse:collapse;width:100%;margin:6px 0;}
 .soc-text td{padding:3px 6px;vertical-align:top;overflow-wrap:anywhere;hyphens:auto;}
@@ -1097,6 +1106,9 @@ if (EXAM.backLabel) document.getElementById('backBtn').textContent = EXAM.backLa
    - noAddRail — без колонки «+» (несколько заданий рядом): наборы английского
      длинные, рядом они не помещаются */
 if (EXAM.subject) document.documentElement.setAttribute('data-subject', EXAM.subject);
+/* физика и информатика устроены как обществознание: банк ФИПИ по темам КЭС, выбор
+   нажатием на вариант, компактные стрелки заданий рядом со счётчиком */
+const SOC_LIKE = ['soc', 'phys', 'inf'].indexOf(EXAM.subject) >= 0;
 if (EXAM.noKeypad) document.documentElement.setAttribute('data-no-keypad', '');
 if (EXAM.noAddRail) document.documentElement.setAttribute('data-no-add-rail', '');
 /* Обществознание ОГЭ (soc_oge.html):
@@ -1396,7 +1408,7 @@ const els = {};
  'solAnswer','critBox','critSummary','critTable','nextBtn','tabLearn','tabPractice','tabExam',
  'basketAddBtn','refreshBtn','stSolved','stErrors','stStreak','proofScore','extraTaskBtn'].forEach(id => { els[id] = document.getElementById(id); });
 
-if (EXAM.subject === 'soc') {
+if (SOC_LIKE) {
   // Переносим существующие кнопки, чтобы обработчики и переходы внутри типа остались общими.
   const pagination = document.createElement('div');
   pagination.className = 'task-pagination';
@@ -1787,7 +1799,7 @@ function fieldHint(f){
 function partOf(n){ return (task(n) || {}).part || 1; }
 function subtitleOf(t){
   // Список типов тоже обновляет подзаголовок при открытом задании — сохраняем здесь его название.
-  const grp = EXAM.subject === 'soc' && S.screen === 'task' && curProto && curProto.group
+  const grp = SOC_LIKE && S.screen === 'task' && curProto && curProto.group
     ? groupById(S.n, curProto.group) : null;
   return t.title + (EXAM.showPart ? ' · часть ' + t.part : '') + ' · ' +
     t.points + ' ' + plural(t.points, 'балл', 'балла', 'баллов') +
@@ -2080,7 +2092,7 @@ function openTask(n, pid){
   // демоверсии ОГЭ 2027»), тогда в шапке оно, а не порядковый номер; номер
   // задания и так стоит в заголовке страницы
   const grp = p.group ? groupById(n, p.group) : null;
-  if (EXAM.subject === 'soc') {
+  if (SOC_LIKE) {
     const sl = sibs(p.id);
     els.taskTitle.textContent = 'задание ' + (sl.findIndex(x => x.id === p.id) + 1) + ' из ' + sl.length;
   } else if (grp) {
@@ -2136,11 +2148,11 @@ function render(){
   els.prevProtoBtn.style.display = many ? 'inline-flex' : 'none';
   els.nextProtoBtn.style.display = many ? 'inline-flex' : 'none';
   const inGroup = !!curProto.group;
-  els.prevProtoBtn.textContent = EXAM.subject === 'soc' ? '◀' : (inGroup ? '◀ Предыдущее задание' : '◀ Предыдущий прототип');
-  els.nextProtoBtn.textContent = EXAM.subject === 'soc' ? '▶' : (inGroup ? 'Следующее задание ▶' : 'Следующий прототип ▶');
+  els.prevProtoBtn.textContent = SOC_LIKE ? '◀' : (inGroup ? '◀ Предыдущее задание' : '◀ Предыдущий прототип');
+  els.nextProtoBtn.textContent = SOC_LIKE ? '▶' : (inGroup ? 'Следующее задание ▶' : 'Следующий прототип ▶');
   els.prevProtoBtn.title = inGroup ? 'Предыдущее задание этого вида' : 'Предыдущий прототип';
   els.nextProtoBtn.title = inGroup ? 'Следующее задание этого вида' : 'Следующий прототип';
-  if (EXAM.subject === 'soc') {
+  if (SOC_LIKE) {
     els.prevProtoBtn.setAttribute('aria-label', 'Предыдущее задание');
     els.nextProtoBtn.setAttribute('aria-label', 'Следующее задание');
   }
