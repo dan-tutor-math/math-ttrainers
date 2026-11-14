@@ -574,6 +574,11 @@
     if (authed !== was) renderBar();
   }
   let bar = null, barSig = null, menuOpen = false;
+  // свёрнута ли плашка в точку — выбор преподавателя, общий для всех страниц:
+  // на доске плашка закрывает угол рабочего поля, поэтому её можно убрать
+  const LS_MINI = 'smBarMini:v1';
+  function isMini(){ return lsGet(LS_MINI) === '1'; }
+  function setMini(v){ if (v) lsSet(LS_MINI, '1'); else lsDel(LS_MINI); barSig = null; renderBar(); }
   function css(){
     if (document.getElementById('smBarCss')) return;
     const st = document.createElement('style');
@@ -593,6 +598,17 @@
       'border-radius:12px;padding:6px;box-shadow:0 8px 28px rgba(0,0,0,.3)}' +
       '#smMenu button{display:block;width:100%;text-align:left;border-radius:8px}' +
       '#smMenu .sm-note{padding:6px 9px;opacity:.75}#smMenu a{color:#9cc7ff}' +
+      '#smBar .sm-hide{padding:5px 8px;opacity:.65;margin-left:2px}#smBar .sm-hide:hover{opacity:1}' +
+      // свёрнутая плашка — чёрная точка; идёт сессия — внутри мигает зелёная,
+      // на паузе зелёная горит ровно, без сессии точка пустая
+      '#smBar.mini{padding:0;background:transparent;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}' +
+      '#smBar.mini button.sm-pip{width:22px;height:22px;padding:0;border-radius:50%;background:#16171d;' +
+      'box-shadow:0 2px 8px rgba(0,0,0,.3),inset 0 0 0 1.5px rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center}' +
+      '#smBar.mini button.sm-pip:hover{background:#2a2c36}' +
+      '#smBar .sm-pip i{width:10px;height:10px;border-radius:50%;background:#2fd36b;box-shadow:0 0 6px #2fd36b}' +
+      '#smBar .sm-pip i.on{animation:smBlink 1.2s ease-in-out infinite}' +
+      '@keyframes smBlink{0%,100%{opacity:1}50%{opacity:.15}}' +
+      '@media (prefers-reduced-motion:reduce){#smBar .sm-pip i.on{animation:none}}' +
       '@media print{#smBar{display:none}}';
     (document.head || document.documentElement).appendChild(st);
   }
@@ -603,22 +619,31 @@
     const picker = !s && wantsPicker() && !isFollower();
     let bound = null;
     if (picker && pickCtx){ ensureStudents(); bound = boundStudent(ctxNow()); }
-    const sig = s ? 'S|' + s.id + '|' + s.name + '|' + s.paused : (picker ? 'P|' + (bound ? bound.id + '|' + bound.name : '') : '');
+    const mini = isMini();
+    let sig = s ? 'S|' + s.id + '|' + s.name + '|' + s.paused : (picker ? 'P|' + (bound ? bound.id + '|' + bound.name : '') : '');
+    if (sig) sig += '|' + (mini ? 'm' : '');
     if (sig === barSig) return;
     barSig = sig; menuOpen = false;
     if (!sig){ if (bar) { bar.remove(); bar = null; } return; }
     css();
     if (!bar){ bar = document.createElement('div'); bar.id = 'smBar'; bar.setAttribute('role', 'status'); document.body.appendChild(bar); }
     bar.classList.toggle('paused', !!(s && s.paused));
-    if (s){
+    bar.classList.toggle('mini', mini);
+    const HIDE = '<button type="button" class="sm-hide" data-sm="mini" title="Свернуть в точку" aria-label="Свернуть">–</button>';
+    if (mini){
+      const t = s ? 'Сессия: ' + (s.name || 'ученик') + (s.paused ? ' (на паузе)' : '') + ' — развернуть' : 'Начать сессию с учеником — развернуть';
+      bar.innerHTML = '<button type="button" class="sm-pip" data-sm="expand" title="' + esc(t) + '" aria-label="' + esc(t) + '">' +
+        (s ? '<i class="' + (s.paused ? '' : 'on') + '"></i>' : '') + '</button>';
+    } else if (s){
       bar.innerHTML = '<span class="sm-name">Сессия: <b>' + esc(s.name || 'ученик') + '</b>' + (s.paused ? ' · на паузе' : '') + '</span>' +
         '<button type="button" data-sm="pause">' + (s.paused ? 'продолжить' : 'пауза') + '</button>' +
-        '<span class="sm-dot">·</span><button type="button" data-sm="end">закончить</button>';
+        '<span class="sm-dot">·</span><button type="button" data-sm="end">закончить</button>' + HIDE;
     } else {
       bar.innerHTML = bound
         ? '<button type="button" data-sm="start" data-id="' + esc(bound.id) + '" data-name="' + esc(bound.name) + '">Начать сессию: <b>' + esc(bound.name) + '</b></button>' +
           '<span class="sm-dot">·</span><button type="button" data-sm="pick" title="Выбрать другого ученика">другой</button>'
         : '<button type="button" data-sm="pick">Начать сессию с учеником</button>';
+      bar.insertAdjacentHTML('beforeend', HIDE);
     }
   }
   async function openMenu(){
@@ -649,11 +674,14 @@
     if (a === 'pause') pause();
     else if (a === 'end') end();
     else if (a === 'pick') openMenu();
+    else if (a === 'mini') setMini(true);
+    else if (a === 'expand') setMini(false);
     else if (a === 'start') start({ id: b.getAttribute('data-id'), name: b.getAttribute('data-name') });
   });
 
   /* ── события браузера ── */
   window.addEventListener('storage', e => {
+    if (e.key === LS_MINI) { barSig = null; renderBar(); return; }
     if (e.key === LS_BROWSER || e.key === SETTINGS_KEY || e.key === 'tsSessions:v1') emit(false);
     else if (e.key && e.key.indexOf(LS_LOG) === 0) emit(true);
     else if (e.key === LS_QUEUE && e.newValue) scheduleFlush(300);
