@@ -97,7 +97,7 @@ def run():
         side = page.evaluate("""() => { const s=document.querySelector('.lg-side'); const r=s.getBoundingClientRect();
             return {n:s.querySelectorAll(':scope > a, :scope > button').length, mi:s.querySelectorAll('svg.mi').length,
                     left:r.left, top:r.top, emoji:/[\\u{1F300}-\\u{1FAFF}]/u.test(s.textContent)} }""")
-        check(side["n"] == 3 and side["mi"] == 3, f"слева капсула из трёх кнопок со значками-SVG ({side})")
+        check(side["n"] == 4 and side["mi"] == 4, f"слева капсула из четырёх кнопок со значками-SVG ({side})")
         check(side["left"] == 16 and side["top"] == 16, "капсула в левом верхнем углу")
         # значки контурные: залитая папка закрашена примерно на 63% площади,
         # контурная — на 25%
@@ -136,7 +136,7 @@ def run():
         page.mouse.move(640, 500)
         top = "[...document.querySelectorAll('.lg-side .lg-tip')].map(e=>[e.textContent, +getComputedStyle(e).opacity])"
         tips0 = page.evaluate(top)
-        check([t[0] for t in tips0] == ["Доски", "Работы", "Панель для доски"] and all(t[1] == 0 for t in tips0),
+        check([t[0] for t in tips0] == ["Доски", "Работы", "Кабинет", "Панель для доски"] and all(t[1] == 0 for t in tips0),
               f"у левой капсулы есть названия, спрятанные до наведения ({tips0})")
         page.hover(".works-toggle"); page.wait_for_timeout(400)
         tips1 = page.evaluate(top)

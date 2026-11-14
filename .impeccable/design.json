@@ -1,0 +1,496 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-10T22:28:48Z",
+  "title": "Design System: 3D-модель шины",
+  "extensions": {
+    "colorMeta": {
+      "ink-light": {
+        "role": "primary",
+        "displayName": "Синие чернила, светлая тема",
+        "tonalRamp": [
+          "oklch(from rgb(0 76 153) 15% c h)",
+          "oklch(from rgb(0 76 153) 26% c h)",
+          "oklch(from rgb(0 76 153) 38% c h)",
+          "oklch(from rgb(0 76 153) 49% c h)",
+          "oklch(from rgb(0 76 153) 61% c h)",
+          "oklch(from rgb(0 76 153) 72% c h)",
+          "oklch(from rgb(0 76 153) 84% c h)",
+          "oklch(from rgb(0 76 153) 95% c h)"
+        ]
+      },
+      "ink-dark": {
+        "role": "primary",
+        "displayName": "Синие чернила, тёмная тема",
+        "tonalRamp": [
+          "oklch(from rgb(120 168 239) 15% c h)",
+          "oklch(from rgb(120 168 239) 26% c h)",
+          "oklch(from rgb(120 168 239) 38% c h)",
+          "oklch(from rgb(120 168 239) 49% c h)",
+          "oklch(from rgb(120 168 239) 61% c h)",
+          "oklch(from rgb(120 168 239) 72% c h)",
+          "oklch(from rgb(120 168 239) 84% c h)",
+          "oklch(from rgb(120 168 239) 95% c h)"
+        ]
+      },
+      "dimension-width": {
+        "role": "secondary",
+        "displayName": "Синий B",
+        "tonalRamp": [
+          "oklch(from rgb(42 93 191) 15% c h)",
+          "oklch(from rgb(42 93 191) 26% c h)",
+          "oklch(from rgb(42 93 191) 38% c h)",
+          "oklch(from rgb(42 93 191) 49% c h)",
+          "oklch(from rgb(42 93 191) 61% c h)",
+          "oklch(from rgb(42 93 191) 72% c h)",
+          "oklch(from rgb(42 93 191) 84% c h)",
+          "oklch(from rgb(42 93 191) 95% c h)"
+        ]
+      },
+      "dimension-sidewall": {
+        "role": "secondary",
+        "displayName": "Оранжевый H",
+        "tonalRamp": [
+          "oklch(from rgb(212 95 35) 15% c h)",
+          "oklch(from rgb(212 95 35) 26% c h)",
+          "oklch(from rgb(212 95 35) 38% c h)",
+          "oklch(from rgb(212 95 35) 49% c h)",
+          "oklch(from rgb(212 95 35) 61% c h)",
+          "oklch(from rgb(212 95 35) 72% c h)",
+          "oklch(from rgb(212 95 35) 84% c h)",
+          "oklch(from rgb(212 95 35) 95% c h)"
+        ]
+      },
+      "dimension-rim": {
+        "role": "secondary",
+        "displayName": "Зелёный d",
+        "tonalRamp": [
+          "oklch(from rgb(80 155 76) 15% c h)",
+          "oklch(from rgb(80 155 76) 26% c h)",
+          "oklch(from rgb(80 155 76) 38% c h)",
+          "oklch(from rgb(80 155 76) 49% c h)",
+          "oklch(from rgb(80 155 76) 61% c h)",
+          "oklch(from rgb(80 155 76) 72% c h)",
+          "oklch(from rgb(80 155 76) 84% c h)",
+          "oklch(from rgb(80 155 76) 95% c h)"
+        ]
+      },
+      "dimension-diameter": {
+        "role": "secondary",
+        "displayName": "Фиолетовый D",
+        "tonalRamp": [
+          "oklch(from rgb(125 92 218) 15% c h)",
+          "oklch(from rgb(125 92 218) 26% c h)",
+          "oklch(from rgb(125 92 218) 38% c h)",
+          "oklch(from rgb(125 92 218) 49% c h)",
+          "oklch(from rgb(125 92 218) 61% c h)",
+          "oklch(from rgb(125 92 218) 72% c h)",
+          "oklch(from rgb(125 92 218) 84% c h)",
+          "oklch(from rgb(125 92 218) 95% c h)"
+        ]
+      },
+      "radial-mark": {
+        "role": "neutral",
+        "displayName": "Серый R",
+        "tonalRamp": [
+          "oklch(from rgb(162 162 160) 15% c h)",
+          "oklch(from rgb(162 162 160) 26% c h)",
+          "oklch(from rgb(162 162 160) 38% c h)",
+          "oklch(from rgb(162 162 160) 49% c h)",
+          "oklch(from rgb(162 162 160) 61% c h)",
+          "oklch(from rgb(162 162 160) 72% c h)",
+          "oklch(from rgb(162 162 160) 84% c h)",
+          "oklch(from rgb(162 162 160) 95% c h)"
+        ]
+      },
+      "radial-backing": {
+        "role": "neutral",
+        "displayName": "Тёмная подложка R",
+        "tonalRamp": [
+          "oklch(from rgb(38 52 73) 15% c h)",
+          "oklch(from rgb(38 52 73) 26% c h)",
+          "oklch(from rgb(38 52 73) 38% c h)",
+          "oklch(from rgb(38 52 73) 49% c h)",
+          "oklch(from rgb(38 52 73) 61% c h)",
+          "oklch(from rgb(38 52 73) 72% c h)",
+          "oklch(from rgb(38 52 73) 84% c h)",
+          "oklch(from rgb(38 52 73) 95% c h)"
+        ]
+      },
+      "background-light": {
+        "role": "neutral",
+        "displayName": "Светлый фон",
+        "tonalRamp": [
+          "oklch(from rgb(238 241 247) 15% c h)",
+          "oklch(from rgb(238 241 247) 26% c h)",
+          "oklch(from rgb(238 241 247) 38% c h)",
+          "oklch(from rgb(238 241 247) 49% c h)",
+          "oklch(from rgb(238 241 247) 61% c h)",
+          "oklch(from rgb(238 241 247) 72% c h)",
+          "oklch(from rgb(238 241 247) 84% c h)",
+          "oklch(from rgb(238 241 247) 95% c h)"
+        ]
+      },
+      "background-dark": {
+        "role": "neutral",
+        "displayName": "Тёмный фон",
+        "tonalRamp": [
+          "oklch(from rgb(11 14 26) 15% c h)",
+          "oklch(from rgb(11 14 26) 26% c h)",
+          "oklch(from rgb(11 14 26) 38% c h)",
+          "oklch(from rgb(11 14 26) 49% c h)",
+          "oklch(from rgb(11 14 26) 61% c h)",
+          "oklch(from rgb(11 14 26) 72% c h)",
+          "oklch(from rgb(11 14 26) 84% c h)",
+          "oklch(from rgb(11 14 26) 95% c h)"
+        ]
+      },
+      "paper-light": {
+        "role": "neutral",
+        "displayName": "Светлая бумага",
+        "tonalRamp": [
+          "oklch(from rgb(255 255 255) 15% c h)",
+          "oklch(from rgb(255 255 255) 26% c h)",
+          "oklch(from rgb(255 255 255) 38% c h)",
+          "oklch(from rgb(255 255 255) 49% c h)",
+          "oklch(from rgb(255 255 255) 61% c h)",
+          "oklch(from rgb(255 255 255) 72% c h)",
+          "oklch(from rgb(255 255 255) 84% c h)",
+          "oklch(from rgb(255 255 255) 95% c h)"
+        ]
+      },
+      "paper-dark": {
+        "role": "neutral",
+        "displayName": "Тёмная бумага",
+        "tonalRamp": [
+          "oklch(from rgb(24 31 49) 15% c h)",
+          "oklch(from rgb(24 31 49) 26% c h)",
+          "oklch(from rgb(24 31 49) 38% c h)",
+          "oklch(from rgb(24 31 49) 49% c h)",
+          "oklch(from rgb(24 31 49) 61% c h)",
+          "oklch(from rgb(24 31 49) 72% c h)",
+          "oklch(from rgb(24 31 49) 84% c h)",
+          "oklch(from rgb(24 31 49) 95% c h)"
+        ]
+      },
+      "text-light": {
+        "role": "neutral",
+        "displayName": "Основной текст светлой темы",
+        "tonalRamp": [
+          "oklch(from rgb(32 37 52) 15% c h)",
+          "oklch(from rgb(32 37 52) 26% c h)",
+          "oklch(from rgb(32 37 52) 38% c h)",
+          "oklch(from rgb(32 37 52) 49% c h)",
+          "oklch(from rgb(32 37 52) 61% c h)",
+          "oklch(from rgb(32 37 52) 72% c h)",
+          "oklch(from rgb(32 37 52) 84% c h)",
+          "oklch(from rgb(32 37 52) 95% c h)"
+        ]
+      },
+      "text-dark": {
+        "role": "neutral",
+        "displayName": "Основной текст тёмной темы",
+        "tonalRamp": [
+          "oklch(from rgb(242 243 245) 15% c h)",
+          "oklch(from rgb(242 243 245) 26% c h)",
+          "oklch(from rgb(242 243 245) 38% c h)",
+          "oklch(from rgb(242 243 245) 49% c h)",
+          "oklch(from rgb(242 243 245) 61% c h)",
+          "oklch(from rgb(242 243 245) 72% c h)",
+          "oklch(from rgb(242 243 245) 84% c h)",
+          "oklch(from rgb(242 243 245) 95% c h)"
+        ]
+      },
+      "muted-light": {
+        "role": "neutral",
+        "displayName": "Подписи светлой темы",
+        "tonalRamp": [
+          "oklch(from rgb(93 101 118) 15% c h)",
+          "oklch(from rgb(93 101 118) 26% c h)",
+          "oklch(from rgb(93 101 118) 38% c h)",
+          "oklch(from rgb(93 101 118) 49% c h)",
+          "oklch(from rgb(93 101 118) 61% c h)",
+          "oklch(from rgb(93 101 118) 72% c h)",
+          "oklch(from rgb(93 101 118) 84% c h)",
+          "oklch(from rgb(93 101 118) 95% c h)"
+        ]
+      },
+      "muted-dark": {
+        "role": "neutral",
+        "displayName": "Подписи тёмной темы",
+        "tonalRamp": [
+          "oklch(from rgb(182 191 209) 15% c h)",
+          "oklch(from rgb(182 191 209) 26% c h)",
+          "oklch(from rgb(182 191 209) 38% c h)",
+          "oklch(from rgb(182 191 209) 49% c h)",
+          "oklch(from rgb(182 191 209) 61% c h)",
+          "oklch(from rgb(182 191 209) 72% c h)",
+          "oklch(from rgb(182 191 209) 84% c h)",
+          "oklch(from rgb(182 191 209) 95% c h)"
+        ]
+      },
+      "line-light": {
+        "role": "neutral",
+        "displayName": "Линии светлой темы",
+        "tonalRamp": [
+          "oklch(from rgb(217 223 233) 15% c h)",
+          "oklch(from rgb(217 223 233) 26% c h)",
+          "oklch(from rgb(217 223 233) 38% c h)",
+          "oklch(from rgb(217 223 233) 49% c h)",
+          "oklch(from rgb(217 223 233) 61% c h)",
+          "oklch(from rgb(217 223 233) 72% c h)",
+          "oklch(from rgb(217 223 233) 84% c h)",
+          "oklch(from rgb(217 223 233) 95% c h)"
+        ]
+      },
+      "line-dark": {
+        "role": "neutral",
+        "displayName": "Линии тёмной темы",
+        "tonalRamp": [
+          "oklch(from rgb(52 65 88) 15% c h)",
+          "oklch(from rgb(52 65 88) 26% c h)",
+          "oklch(from rgb(52 65 88) 38% c h)",
+          "oklch(from rgb(52 65 88) 49% c h)",
+          "oklch(from rgb(52 65 88) 61% c h)",
+          "oklch(from rgb(52 65 88) 72% c h)",
+          "oklch(from rgb(52 65 88) 84% c h)",
+          "oklch(from rgb(52 65 88) 95% c h)"
+        ]
+      },
+      "stage-light": {
+        "role": "neutral",
+        "displayName": "Светлая сцена",
+        "tonalRamp": [
+          "oklch(from rgb(228 234 242) 15% c h)",
+          "oklch(from rgb(228 234 242) 26% c h)",
+          "oklch(from rgb(228 234 242) 38% c h)",
+          "oklch(from rgb(228 234 242) 49% c h)",
+          "oklch(from rgb(228 234 242) 61% c h)",
+          "oklch(from rgb(228 234 242) 72% c h)",
+          "oklch(from rgb(228 234 242) 84% c h)",
+          "oklch(from rgb(228 234 242) 95% c h)"
+        ]
+      },
+      "stage-dark": {
+        "role": "neutral",
+        "displayName": "Тёмная сцена",
+        "tonalRamp": [
+          "oklch(from rgb(20 29 46) 15% c h)",
+          "oklch(from rgb(20 29 46) 26% c h)",
+          "oklch(from rgb(20 29 46) 38% c h)",
+          "oklch(from rgb(20 29 46) 49% c h)",
+          "oklch(from rgb(20 29 46) 61% c h)",
+          "oklch(from rgb(20 29 46) 72% c h)",
+          "oklch(from rgb(20 29 46) 84% c h)",
+          "oklch(from rgb(20 29 46) 95% c h)"
+        ]
+      },
+      "glass-light": {
+        "role": "neutral",
+        "displayName": "Светлое стекло",
+        "tonalRamp": [
+          "oklch(from rgb(255 255 255) 15% c h / .76)",
+          "oklch(from rgb(255 255 255) 26% c h / .76)",
+          "oklch(from rgb(255 255 255) 38% c h / .76)",
+          "oklch(from rgb(255 255 255) 49% c h / .76)",
+          "oklch(from rgb(255 255 255) 61% c h / .76)",
+          "oklch(from rgb(255 255 255) 72% c h / .76)",
+          "oklch(from rgb(255 255 255) 84% c h / .76)",
+          "oklch(from rgb(255 255 255) 95% c h / .76)"
+        ]
+      },
+      "glass-dark": {
+        "role": "neutral",
+        "displayName": "Тёмное стекло",
+        "tonalRamp": [
+          "oklch(from rgb(34 43 65) 15% c h / .8)",
+          "oklch(from rgb(34 43 65) 26% c h / .8)",
+          "oklch(from rgb(34 43 65) 38% c h / .8)",
+          "oklch(from rgb(34 43 65) 49% c h / .8)",
+          "oklch(from rgb(34 43 65) 61% c h / .8)",
+          "oklch(from rgb(34 43 65) 72% c h / .8)",
+          "oklch(from rgb(34 43 65) 84% c h / .8)",
+          "oklch(from rgb(34 43 65) 95% c h / .8)"
+        ]
+      },
+      "glass-border-light": {
+        "role": "neutral",
+        "displayName": "Кромка светлого стекла",
+        "tonalRamp": [
+          "oklch(from rgb(255 255 255) 15% c h / .9)",
+          "oklch(from rgb(255 255 255) 26% c h / .9)",
+          "oklch(from rgb(255 255 255) 38% c h / .9)",
+          "oklch(from rgb(255 255 255) 49% c h / .9)",
+          "oklch(from rgb(255 255 255) 61% c h / .9)",
+          "oklch(from rgb(255 255 255) 72% c h / .9)",
+          "oklch(from rgb(255 255 255) 84% c h / .9)",
+          "oklch(from rgb(255 255 255) 95% c h / .9)"
+        ]
+      },
+      "glass-border-dark": {
+        "role": "neutral",
+        "displayName": "Кромка тёмного стекла",
+        "tonalRamp": [
+          "oklch(from rgb(255 255 255) 15% c h / .13)",
+          "oklch(from rgb(255 255 255) 26% c h / .13)",
+          "oklch(from rgb(255 255 255) 38% c h / .13)",
+          "oklch(from rgb(255 255 255) 49% c h / .13)",
+          "oklch(from rgb(255 255 255) 61% c h / .13)",
+          "oklch(from rgb(255 255 255) 72% c h / .13)",
+          "oklch(from rgb(255 255 255) 84% c h / .13)",
+          "oklch(from rgb(255 255 255) 95% c h / .13)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Маркировка",
+        "purpose": "Крупная интерактивная расшифровка маркировки шины."
+      },
+      "readout-symbol": {
+        "displayName": "Буква размера",
+        "purpose": "Сопоставляет число со стрелкой на модели."
+      },
+      "arrow-symbol": {
+        "displayName": "Буква стрелки",
+        "purpose": "Обозначает величину на модели."
+      }
+    },
+    "shadows": [
+      {
+        "name": "material-switch-light",
+        "value": "0 8px 26px rgba(34,52,80,.07)",
+        "purpose": "Отделяет переключатель материала от светлой сцены."
+      },
+      {
+        "name": "material-switch-dark",
+        "value": "0 8px 30px rgba(0,0,0,.2)",
+        "purpose": "Отделяет переключатель материала от тёмной сцены."
+      },
+      {
+        "name": "material-selected",
+        "value": "0 2px 6px #18234015",
+        "purpose": "Приподнимает подложку выбранного материала."
+      },
+      {
+        "name": "board-control",
+        "value": "0 3px 12px #10203020",
+        "purpose": "Отделяет кнопку от изображения объекта на доске."
+      }
+    ],
+    "motion": [
+      {
+        "name": "scene-camera",
+        "value": "600ms",
+        "purpose": "Переход камеры к сцене. При системном снижении движения камера переходит сразу."
+      },
+      {
+        "name": "wheel-roll",
+        "value": "2200ms",
+        "purpose": "Показ пробега колеса за оборот. При системном снижении движения сразу виден итог."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact-columns",
+        "value": "900px"
+      },
+      {
+        "name": "single-column",
+        "value": "680px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Кнопка шага",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Сплошная кнопка пошаговой навигации.",
+      "html": "<div class=\"ds-example\"><button class=\"ds-button\" type=\"button\">Далее →</button></div>",
+      "css": ".ds-example{--ds-bg:var(--bg,#EEF1F7);--ds-pencil:var(--pencil,#202534);--ds-ink:var(--ink,#004C99);--ds-paper:var(--paper,#fff);--ds-muted:var(--muted,#5d6576);--ds-glass-strong:var(--glass-strong,rgba(255,255,255,.76));--ds-glass-border:var(--glass-border,rgba(255,255,255,.9));--ds-shadow:var(--shadow,0 8px 26px rgba(34,52,80,.07));--ds-line:var(--line,#d9dfe9);--ds-stage:var(--stage,#e4eaf2);--ds-font-ui:var(--font-ui,'Onest',system-ui,sans-serif);font:15px/1.55 var(--ds-font-ui);color:var(--ds-pencil);color-scheme:light}.ds-example[data-theme=dark]{--ds-bg:var(--bg,#0B0E1A);--ds-pencil:var(--pencil,#F2F3F5);--ds-ink:var(--ink,#78a8ef);--ds-paper:var(--paper,#181f31);--ds-muted:var(--muted,#b6bfd1);--ds-glass-strong:var(--glass-strong,rgba(34,43,65,.8));--ds-glass-border:var(--glass-border,rgba(255,255,255,.13));--ds-shadow:var(--shadow,0 8px 30px rgba(0,0,0,.2));--ds-line:var(--line,#344158);--ds-stage:var(--stage,#141d2e);color-scheme:dark}.ds-button{font:inherit;border:1px solid var(--ds-line);border-radius:11px;padding:9px 13px;background:var(--ds-paper);color:var(--ds-pencil);cursor:pointer;min-height:42px}.ds-button:disabled{opacity:.4;cursor:default}.ds-button:focus-visible{outline:3px solid var(--ds-ink);outline-offset:3px}.ds-button[aria-pressed=true]{background:var(--ds-ink);color:var(--ds-paper);border-color:var(--ds-ink)}@media(hover:hover){.ds-button:not(:disabled):hover{filter:brightness(.97)}.ds-example[data-theme=dark] .ds-button:not(:disabled):hover{filter:brightness(1.15)}}.ds-button{font-size:13px;min-width:100px}"
+    },
+    {
+      "name": "Выбранная сцена",
+      "kind": "nav",
+      "refersTo": "button-active",
+      "description": "Акцент темы отмечает текущую сцену.",
+      "html": "<nav class=\"ds-example\" aria-label=\"Что изучаем\"><button class=\"ds-button\" type=\"button\" aria-pressed=\"true\">H · Боковина</button></nav>",
+      "css": ".ds-example{--ds-bg:var(--bg,#EEF1F7);--ds-pencil:var(--pencil,#202534);--ds-ink:var(--ink,#004C99);--ds-paper:var(--paper,#fff);--ds-muted:var(--muted,#5d6576);--ds-glass-strong:var(--glass-strong,rgba(255,255,255,.76));--ds-glass-border:var(--glass-border,rgba(255,255,255,.9));--ds-shadow:var(--shadow,0 8px 26px rgba(34,52,80,.07));--ds-line:var(--line,#d9dfe9);--ds-stage:var(--stage,#e4eaf2);--ds-font-ui:var(--font-ui,'Onest',system-ui,sans-serif);font:15px/1.55 var(--ds-font-ui);color:var(--ds-pencil);color-scheme:light}.ds-example[data-theme=dark]{--ds-bg:var(--bg,#0B0E1A);--ds-pencil:var(--pencil,#F2F3F5);--ds-ink:var(--ink,#78a8ef);--ds-paper:var(--paper,#181f31);--ds-muted:var(--muted,#b6bfd1);--ds-glass-strong:var(--glass-strong,rgba(34,43,65,.8));--ds-glass-border:var(--glass-border,rgba(255,255,255,.13));--ds-shadow:var(--shadow,0 8px 30px rgba(0,0,0,.2));--ds-line:var(--line,#344158);--ds-stage:var(--stage,#141d2e);color-scheme:dark}.ds-button{font:inherit;border:1px solid var(--ds-line);border-radius:11px;padding:9px 13px;background:var(--ds-paper);color:var(--ds-pencil);cursor:pointer;min-height:42px}.ds-button:disabled{opacity:.4;cursor:default}.ds-button:focus-visible{outline:3px solid var(--ds-ink);outline-offset:3px}.ds-button[aria-pressed=true]{background:var(--ds-ink);color:var(--ds-paper);border-color:var(--ds-ink)}@media(hover:hover){.ds-button:not(:disabled):hover{filter:brightness(.97)}.ds-example[data-theme=dark] .ds-button:not(:disabled):hover{filter:brightness(1.15)}}"
+    },
+    {
+      "name": "Материал",
+      "kind": "button",
+      "refersTo": "material-switch",
+      "description": "Переключатель с полупрозрачным фоном над моделью.",
+      "html": "<div class=\"ds-example\"><div class=\"ds-switch\" role=\"group\" aria-label=\"Материал\"><button class=\"ds-button\" type=\"button\" aria-pressed=\"true\">Реалистичная</button><button class=\"ds-button\" type=\"button\" aria-pressed=\"false\">Стекло</button></div></div>",
+      "css": ".ds-example{--ds-bg:var(--bg,#EEF1F7);--ds-pencil:var(--pencil,#202534);--ds-ink:var(--ink,#004C99);--ds-paper:var(--paper,#fff);--ds-muted:var(--muted,#5d6576);--ds-glass-strong:var(--glass-strong,rgba(255,255,255,.76));--ds-glass-border:var(--glass-border,rgba(255,255,255,.9));--ds-shadow:var(--shadow,0 8px 26px rgba(34,52,80,.07));--ds-line:var(--line,#d9dfe9);--ds-stage:var(--stage,#e4eaf2);--ds-font-ui:var(--font-ui,'Onest',system-ui,sans-serif);font:15px/1.55 var(--ds-font-ui);color:var(--ds-pencil);color-scheme:light}.ds-example[data-theme=dark]{--ds-bg:var(--bg,#0B0E1A);--ds-pencil:var(--pencil,#F2F3F5);--ds-ink:var(--ink,#78a8ef);--ds-paper:var(--paper,#181f31);--ds-muted:var(--muted,#b6bfd1);--ds-glass-strong:var(--glass-strong,rgba(34,43,65,.8));--ds-glass-border:var(--glass-border,rgba(255,255,255,.13));--ds-shadow:var(--shadow,0 8px 30px rgba(0,0,0,.2));--ds-line:var(--line,#344158);--ds-stage:var(--stage,#141d2e);color-scheme:dark}.ds-button{font:inherit;border:1px solid var(--ds-line);border-radius:11px;padding:9px 13px;background:var(--ds-paper);color:var(--ds-pencil);cursor:pointer;min-height:42px}.ds-button:disabled{opacity:.4;cursor:default}.ds-button:focus-visible{outline:3px solid var(--ds-ink);outline-offset:3px}.ds-button[aria-pressed=true]{background:var(--ds-ink);color:var(--ds-paper);border-color:var(--ds-ink)}@media(hover:hover){.ds-button:not(:disabled):hover{filter:brightness(.97)}.ds-example[data-theme=dark] .ds-button:not(:disabled):hover{filter:brightness(1.15)}}.ds-switch{display:flex;background:var(--ds-glass-strong);padding:3px;border:1px solid var(--ds-glass-border);border-radius:13px;box-shadow:var(--ds-shadow);width:max-content}.ds-switch .ds-button{border:0;min-height:36px;padding:6px 12px;font-size:12px;background:transparent}.ds-switch .ds-button[aria-pressed=true]{background:var(--ds-paper);color:var(--ds-pencil);box-shadow:0 2px 6px #18234015}@media(prefers-reduced-transparency:reduce){.ds-switch{background:var(--ds-paper)}}"
+    },
+    {
+      "name": "Разрез",
+      "kind": "input",
+      "refersTo": "cut-control",
+      "description": "Независимый флажок над моделью.",
+      "html": "<div class=\"ds-example\"><label class=\"ds-cut\"><input type=\"checkbox\"> Разрез</label></div>",
+      "css": ".ds-example{--ds-bg:var(--bg,#EEF1F7);--ds-pencil:var(--pencil,#202534);--ds-ink:var(--ink,#004C99);--ds-paper:var(--paper,#fff);--ds-muted:var(--muted,#5d6576);--ds-glass-strong:var(--glass-strong,rgba(255,255,255,.76));--ds-glass-border:var(--glass-border,rgba(255,255,255,.9));--ds-shadow:var(--shadow,0 8px 26px rgba(34,52,80,.07));--ds-line:var(--line,#d9dfe9);--ds-stage:var(--stage,#e4eaf2);--ds-font-ui:var(--font-ui,'Onest',system-ui,sans-serif);font:15px/1.55 var(--ds-font-ui);color:var(--ds-pencil);color-scheme:light}.ds-example[data-theme=dark]{--ds-bg:var(--bg,#0B0E1A);--ds-pencil:var(--pencil,#F2F3F5);--ds-ink:var(--ink,#78a8ef);--ds-paper:var(--paper,#181f31);--ds-muted:var(--muted,#b6bfd1);--ds-glass-strong:var(--glass-strong,rgba(34,43,65,.8));--ds-glass-border:var(--glass-border,rgba(255,255,255,.13));--ds-shadow:var(--shadow,0 8px 30px rgba(0,0,0,.2));--ds-line:var(--line,#344158);--ds-stage:var(--stage,#141d2e);color-scheme:dark}.ds-cut{display:flex;align-items:center;gap:6px;background:var(--ds-glass-strong);border:1px solid var(--ds-glass-border);border-radius:10px;padding:8px 11px;font-size:12px;cursor:pointer;width:max-content}.ds-cut input{accent-color:var(--ds-ink)}.ds-cut input:focus-visible{outline:3px solid var(--ds-ink);outline-offset:3px}@media(prefers-reduced-transparency:reduce){.ds-cut{background:var(--ds-paper)}}"
+    },
+    {
+      "name": "Пилюля маркировки",
+      "kind": "chip",
+      "refersTo": "marking-pill",
+      "description": "Тонировка величины и контур выбранного состояния.",
+      "html": "<div class=\"ds-example\"><button class=\"ds-button ds-pill ds-active\" type=\"button\" style=\"--dimension:#D45F23;--tint:#D45F2315\"><b>65</b><span>— высота боковины H — 65 % от ширины</span></button></div>",
+      "css": ".ds-example{--ds-bg:var(--bg,#EEF1F7);--ds-pencil:var(--pencil,#202534);--ds-ink:var(--ink,#004C99);--ds-paper:var(--paper,#fff);--ds-muted:var(--muted,#5d6576);--ds-glass-strong:var(--glass-strong,rgba(255,255,255,.76));--ds-glass-border:var(--glass-border,rgba(255,255,255,.9));--ds-shadow:var(--shadow,0 8px 26px rgba(34,52,80,.07));--ds-line:var(--line,#d9dfe9);--ds-stage:var(--stage,#e4eaf2);--ds-font-ui:var(--font-ui,'Onest',system-ui,sans-serif);font:15px/1.55 var(--ds-font-ui);color:var(--ds-pencil);color-scheme:light}.ds-example[data-theme=dark]{--ds-bg:var(--bg,#0B0E1A);--ds-pencil:var(--pencil,#F2F3F5);--ds-ink:var(--ink,#78a8ef);--ds-paper:var(--paper,#181f31);--ds-muted:var(--muted,#b6bfd1);--ds-glass-strong:var(--glass-strong,rgba(34,43,65,.8));--ds-glass-border:var(--glass-border,rgba(255,255,255,.13));--ds-shadow:var(--shadow,0 8px 30px rgba(0,0,0,.2));--ds-line:var(--line,#344158);--ds-stage:var(--stage,#141d2e);color-scheme:dark}.ds-button{font:inherit;border:1px solid var(--ds-line);border-radius:11px;padding:9px 13px;background:var(--ds-paper);color:var(--ds-pencil);cursor:pointer;min-height:42px}.ds-button:disabled{opacity:.4;cursor:default}.ds-button:focus-visible{outline:3px solid var(--ds-ink);outline-offset:3px}.ds-button[aria-pressed=true]{background:var(--ds-ink);color:var(--ds-paper);border-color:var(--ds-ink)}@media(hover:hover){.ds-button:not(:disabled):hover{filter:brightness(.97)}.ds-example[data-theme=dark] .ds-button:not(:disabled):hover{filter:brightness(1.15)}}.ds-button.ds-pill{text-align:left;display:flex;align-items:baseline;gap:10px;border:0;border-radius:12px;padding:10px 12px;background:var(--tint,var(--ds-paper));font-size:12px;line-height:1.5}.ds-button.ds-pill b{font-size:17px;min-width:30px;color:var(--dimension)}.ds-button.ds-pill.ds-active{box-shadow:inset 0 0 0 1.5px var(--dimension)}"
+    },
+    {
+      "name": "Ползунок ширины",
+      "kind": "input",
+      "refersTo": "width-slider",
+      "description": "Подпись и текущее значение в миллиметрах над дорожкой.",
+      "html": "<div class=\"ds-example\"><label class=\"ds-slider\" style=\"--dimension:#2A5DBF\"><span>B · Ширина</span><output>195 мм</output><input type=\"range\" min=\"125\" max=\"355\" step=\"5\" value=\"195\"></label></div>",
+      "css": ".ds-example{--ds-bg:var(--bg,#EEF1F7);--ds-pencil:var(--pencil,#202534);--ds-ink:var(--ink,#004C99);--ds-paper:var(--paper,#fff);--ds-muted:var(--muted,#5d6576);--ds-glass-strong:var(--glass-strong,rgba(255,255,255,.76));--ds-glass-border:var(--glass-border,rgba(255,255,255,.9));--ds-shadow:var(--shadow,0 8px 26px rgba(34,52,80,.07));--ds-line:var(--line,#d9dfe9);--ds-stage:var(--stage,#e4eaf2);--ds-font-ui:var(--font-ui,'Onest',system-ui,sans-serif);font:15px/1.55 var(--ds-font-ui);color:var(--ds-pencil);color-scheme:light}.ds-example[data-theme=dark]{--ds-bg:var(--bg,#0B0E1A);--ds-pencil:var(--pencil,#F2F3F5);--ds-ink:var(--ink,#78a8ef);--ds-paper:var(--paper,#181f31);--ds-muted:var(--muted,#b6bfd1);--ds-glass-strong:var(--glass-strong,rgba(34,43,65,.8));--ds-glass-border:var(--glass-border,rgba(255,255,255,.13));--ds-shadow:var(--shadow,0 8px 30px rgba(0,0,0,.2));--ds-line:var(--line,#344158);--ds-stage:var(--stage,#141d2e);color-scheme:dark}.ds-slider{display:grid;grid-template-columns:1fr auto;gap:4px;font-size:12px;margin-bottom:12px}.ds-slider output{font-weight:650;font-variant-numeric:tabular-nums}.ds-slider input{grid-column:1/-1;width:100%;margin:3px 0;accent-color:var(--dimension);height:24px}.ds-slider input:focus-visible{outline:3px solid var(--ds-ink);outline-offset:3px}"
+    },
+    {
+      "name": "Размерная стрелка H",
+      "kind": "custom",
+      "refersTo": "stage",
+      "description": "Двунаправленная стрелка и буквенная метка на фоне сцены.",
+      "html": "<div class=\"ds-example\"><div class=\"ds-stage\"><svg viewBox=\"0 0 160 110\" role=\"img\" aria-label=\"H — высота боковины\"><defs><marker id=\"ds-h-arrow\" viewBox=\"0 0 10 10\" refX=\"5\" refY=\"5\" markerWidth=\"5\" markerHeight=\"5\" orient=\"auto-start-reverse\"><path d=\"M0 0 L10 5 L0 10Z\" fill=\"#D45F23\"></path></marker></defs><line x1=\"80\" y1=\"20\" x2=\"80\" y2=\"90\" stroke=\"#D45F23\" stroke-width=\"2.5\" marker-start=\"url(#ds-h-arrow)\" marker-end=\"url(#ds-h-arrow)\"></line><circle cx=\"80\" cy=\"55\" r=\"16\" fill=\"#D45F23\" stroke=\"white\" stroke-width=\"1.5\"></circle><text x=\"80\" y=\"61.5\" fill=\"white\" text-anchor=\"middle\" font-family=\"Onest,sans-serif\" font-size=\"19\" font-weight=\"700\">H</text></svg></div></div>",
+      "css": ".ds-example{--ds-bg:var(--bg,#EEF1F7);--ds-pencil:var(--pencil,#202534);--ds-ink:var(--ink,#004C99);--ds-paper:var(--paper,#fff);--ds-muted:var(--muted,#5d6576);--ds-glass-strong:var(--glass-strong,rgba(255,255,255,.76));--ds-glass-border:var(--glass-border,rgba(255,255,255,.9));--ds-shadow:var(--shadow,0 8px 26px rgba(34,52,80,.07));--ds-line:var(--line,#d9dfe9);--ds-stage:var(--stage,#e4eaf2);--ds-font-ui:var(--font-ui,'Onest',system-ui,sans-serif);font:15px/1.55 var(--ds-font-ui);color:var(--ds-pencil);color-scheme:light}.ds-example[data-theme=dark]{--ds-bg:var(--bg,#0B0E1A);--ds-pencil:var(--pencil,#F2F3F5);--ds-ink:var(--ink,#78a8ef);--ds-paper:var(--paper,#181f31);--ds-muted:var(--muted,#b6bfd1);--ds-glass-strong:var(--glass-strong,rgba(34,43,65,.8));--ds-glass-border:var(--glass-border,rgba(255,255,255,.13));--ds-shadow:var(--shadow,0 8px 30px rgba(0,0,0,.2));--ds-line:var(--line,#344158);--ds-stage:var(--stage,#141d2e);color-scheme:dark}.ds-stage{background:var(--ds-stage);border-radius:22px;overflow:hidden}.ds-stage svg{display:block;width:100%;max-height:110px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Учебная модель",
+    "overview": "Размер читается на колесе, в маркировке и в вычислении. Ученик видит, где лежит отрезок, и может проверить результат по числу с единицей измерения. Такая связка нужна и при самостоятельной работе с телефона, и при показе через видеозвонок.\n\nДокумент описывает экран «3D-модель шины» и его встраивание в доску. Связь с экраном ОГЭ №1–5 подтверждают Onest, светлый и тёмный фон, синий акцент и элементы Liquid Glass. Токены ниже взяты из реализации модели.",
+    "keyCharacteristics": [
+      "Колесо на спокойном фоне с цветными размерными стрелками.",
+      "Постоянная строка размеров и пошаговая запись в KaTeX.",
+      "Плотные рабочие панели с локальной прозрачностью над моделью."
+    ],
+    "rules": [
+      {
+        "name": "The Цвет величины Rule",
+        "body": "Одна и та же буква сохраняет цвет в стрелках, маркировке, ползунках, формуле и строке размеров там, где эта величина представлена. Буква, подпись и единица измерения остаются читаемыми вместе с цветом.",
+        "section": "colors"
+      },
+      {
+        "name": "The Размер всегда виден Rule",
+        "body": "B, H, d и D с числом и «мм» остаются под моделью при любой сцене и любом состоянии стрелок. В сравнении каждая шина получает свою строку.",
+        "section": "typography"
+      },
+      {
+        "name": "The Стекло по месту Rule",
+        "body": "Использовать полупрозрачность для контролов поверх чертежа. Оставлять спокойную сплошную основу под текстом, числами и формулами.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do Сохранять связь букв B, H, d и D с их цветами и держать численные значения с «мм» под моделью.",
+      "Do Показывать H на целой шине и давать ученику включить разрез отдельным флажком.",
+      "Do Сохранять стрелки, параметры и вычисления при переходе к плоскому чертежу."
+    ],
+    "donts": [
+      "Don't Скрывать строку размеров при переключении сцен или стрелок.",
+      "Don't Оформлять R как размерную стрелку."
+    ]
+  }
+}

@@ -2010,6 +2010,9 @@ function newTask() {
   // совпавшее с недавним (целиком или ответом подряд), перегенерируется
   // (no-repeat.js); avoid — заменяемое задание на экране
   curTask = NoRepeat.pick('oge1_5:' + curMode, () => m.gen(), { avoid: [curTask] });
+  // id выпавшего типа: в «вперемешку» curMode остаётся 'random', а ключ задания
+  // для журнала кабинета (task-key.js, gen:<страница>:<вид>) нужен по настоящему типу
+  if (curTask && typeof curTask === 'object' && m && m.id) curTask.genKind = m.id;
   taskAnswered = false;
   optionsLocked = false;
   solutionShown = false;
@@ -2223,6 +2226,8 @@ function finishTask(isFreshSolve) {
   // не зависит от анимации, а быстрый клик "следующий пример" не должен успеть
   // сменить curTask/curProg до того, как этот пример будет учтён
   if (isFreshSolve && curMode !== 'random') recordSolve();
+  // кабинет (Б2): итог в журнал ученика; вне сессии, на паузе и у follower модуль молчит
+  if (isFreshSolve && window.StudentMemory) StudentMemory.recordTask(curTask, { mode: curMode, clean: !hadWrongPick });
 
   els.mainPanel.style.display = 'block';
   els.explainBox.style.display = 'block';
@@ -2724,4 +2729,6 @@ document.getElementById('homeBtn').addEventListener('click', function (e) {
   else go();
 });
 </script>
+<script src="task-key.js"></script>
+<script src="student-memory.js"></script>
 </body></html>

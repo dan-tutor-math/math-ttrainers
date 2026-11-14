@@ -112,7 +112,7 @@ def main():
           side: [...document.querySelectorAll('.lg-side > a, .lg-side > button')].map(e => e.className.split(' ')[0]),
           board: !!document.querySelector('#mi-boards rect') })""")
         check("«Подборка» последней в меню «⋯»", lay["inMenu"] and lay["last"] == "Подборка заданий", str(lay))
-        check("в левой капсуле доски, работы и панель", lay["side"] == ["boards-toggle", "works-toggle", "panel-toggle"], str(lay["side"]))
+        check("в левой капсуле доски, работы, кабинет и панель", lay["side"] == ["boards-toggle", "works-toggle", "cabinet-toggle", "panel-toggle"], str(lay["side"]))
         check("значок «Доски» — школьная доска", lay["board"])
         page.evaluate("window.scrollTo(0, 0)")
         page.click("#lgMenuToggle"); page.wait_for_timeout(300)

@@ -1191,6 +1191,22 @@ function trainerGenInfo(win, tid, href, el){
   }
 }
 
+/* Ключ задания для журнала кабинета (task-key.js, задача А1) — отдельно от
+   рецепта: у русского рецепта нет (генератора нет, «ещё такое же» там
+   бессмысленно), а завести ему gen значило бы включить кнопки «ещё такое же»
+   и «другой вариант» в досках и работах. Поэтому ключ лежит рядом с gen в
+   объекте доски/блока (поле tkey), а потребители gen его не видят. Без
+   task-key.js на странице — null. */
+function trainerTaskKey(win, tid, gen){
+  try {
+    if (!window.TaskKey) return null;
+    if (gen){ const k = TaskKey.fromRecipe(gen); if (k) return k; }
+    const nav = win && win.__examNav;
+    const pid = nav && typeof nav.pid === 'function' ? nav.pid() : null;
+    return pid ? TaskKey.fromTask(tid, { id: pid }) : null;
+  } catch (e){ return null; }
+}
+
 const genFrames = new Map();   // адрес тренажёра → { frame, ready }
 const GEN_FRAMES_MAX = 3;
 function genFrameFor(href, vw){

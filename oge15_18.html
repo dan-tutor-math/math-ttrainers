@@ -688,6 +688,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="keypad.js"></script>
 <script src="exam-nav.js"></script>
 <script src="trainer-multi.js"></script>
+<script src="task-captions.js"></script>
 <script src="fipi-mix.js"></script>
 <script src="oge15_18-kinds.js"></script>
 <script src="oge15_18-fipi-bank.js"></script>
@@ -1386,6 +1387,7 @@ function renderCurrentTask() {
   const src = window.FipiMix ? FipiMix.sourceText(curTask) : '';
   note.textContent = src + (curTask.unchecked ? ' (ответ ещё не сверен с сайтом ФИПИ)' : '');
   note.style.display = src ? 'block' : 'none';
+  if (window.TaskCaptions) TaskCaptions.showCurrent(note, curTask, typeof curMode !== 'undefined' ? curMode : null);   // кабинет (Б4): точка «уже было у ученика»
   const notice = document.getElementById('fipiNotice');
   notice.textContent = curTask.fipiNotice || '';
   notice.style.display = curTask.fipiNotice ? 'block' : 'none';
@@ -1411,6 +1413,9 @@ function newTask() {
   // совпавшее с недавним (целиком или ответом подряд), перегенерируется
   // (no-repeat.js); avoid — заменяемое задание на экране
   curTask = NoRepeat.pick('oge15_18:' + curMode, () => m.gen(), { avoid: [curTask] });
+  // id выпавшего типа: в «вперемешку» curMode остаётся 'random', а ключ задания
+  // для журнала кабинета (task-key.js, gen:<страница>:<вид>) нужен по настоящему типу
+  if (curTask && typeof curTask === 'object' && m && m.id) curTask.genKind = m.id;
   // память «ФИПИ решены / плашка показана» меняется только для выбранного
   // кандидата — NoRepeat зовёт генератор по нескольку раз
   if (window.FipiMix && m.fipiList) FipiMix.commit(FIPI_PAGE, m.id, curTask, m.fipiList);
@@ -1515,6 +1520,8 @@ function finishTask(isFreshSolve) {
   els.mainPanel.classList.add('reveal');
 
   if (isFreshSolve && !isRandomMode(curMode)) recordSolve();
+  // кабинет (Б2): итог в журнал ученика; вне сессии, на паузе и у follower модуль молчит
+  if (isFreshSolve && window.StudentMemory) StudentMemory.recordTask(curTask, { mode: curMode, clean: !hadWrongPick });
 }
 els.nextBtn.onclick = newTask;
 
@@ -1965,4 +1972,6 @@ document.getElementById('homeBtn').addEventListener('click', function (e) {
   else go();
 });
 </script>
+<script src="task-key.js"></script>
+<script src="student-memory.js"></script>
 </body></html>

@@ -104,6 +104,8 @@ async function ttSnapTrainerTasks(win, tid, href, opts){
         // widthFor отдаёт ширину карточки — узлу нужна своя, без полей
         const cw = ttCwForCard(el, opts.widthFor ? opts.widthFor(gen) : null);
         const shot = await captureTaskWithSolution(el, info, cw, trainerSolutionHTML(win, tid, el), opts.scale);
+        const tkey = trainerTaskKey(win, tid, gen);   // ключ для журнала кабинета, см. trainerTaskKey
+        if (tkey) shot.tkey = tkey;
         const task = (info && shot.hot) ? Object.assign({ v: 1 }, info, { hot: shot.hot }) : null;
         await opts.onShot({ dataUrl: shot.dataUrl, task, gen, shot, cw });
         added++;

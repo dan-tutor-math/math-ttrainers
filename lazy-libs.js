@@ -67,7 +67,17 @@
     return pending[name];
   }
 
-  window.MathhLibs = { load };
+  // Модульная 3D-библиотека нужна только открытой модели, а не каждому тренажёру.
+  let threePending;
+  function loadThree() {
+    if (!threePending) threePending = Promise.all([
+      import('./vendor/three-r160/three.module.js'),
+      import('./vendor/three-r160/OrbitControls.js')
+    ]).then(([THREE, controls]) => ({ THREE, OrbitControls: controls.OrbitControls }))
+      .catch(e => { threePending = null; throw e; });
+    return threePending;
+  }
+  window.MathhLibs = { load, loadThree };
 
   const me = document.currentScript;
   const want = ((me && me.getAttribute('data-preload')) || '').split(/\s+/).filter(Boolean);

@@ -62,7 +62,7 @@ html[data-theme="dark"] .lg::before,html[data-theme="dark"] .lg-s::before{
 .lg.lg-glass,.lg-menu-glass.lg{box-shadow:inset 0 1px 0 var(--glass-inset)}
 .lg-capsule > :not(.lg-glass){position:relative;z-index:1}
 
-/* боковая капсула главной: Подборка, Доски, Работы */
+/* боковая капсула главной: Подборка, Доски, Работы, Кабинет, Панель */
 .lg-side{position:fixed;top:16px;left:16px;z-index:200;box-shadow:var(--shadow)}
 
 /* ── меню «⋯» ───────────────────────────────────────────────────────── */
