@@ -786,7 +786,25 @@
      стрелка; имена никогда не встают на строку времени. Высоту часа и
      ширину дня тянут за линию часа и край дня, как в таблицах */
   const SH = 16;                           // сдвиг получасовой плашки при наложении, px
-  const pxm = () => look.hh / 60;          // пикселей на минуту
+  // высота часа: своя (учитель потянул линию) или подобранная так, чтобы
+  // плашки внахлёст не прятали имена друг друга и в каждой было видно имя
+  function autoHH(){
+    let need = 72;
+    const ls = st.lessons.filter(l => l.start_min != null);
+    weekDays().forEach(day => {
+      const d = ls.filter(l => l.day === day).sort((x, y) => x.start_min - y.start_min);
+      d.forEach((l, i) => {
+        need = Math.max(need, 58 * 60 / Math.max(15, l.dur_min));           // шапка и строка имени
+        for (let j = i + 1; j < d.length && d[j].start_min < l.start_min + l.dur_min; j++) {
+          const gap = d[j].start_min - l.start_min;
+          if (gap > 0) need = Math.max(need, 50 * 60 / gap);                  // верхняя плашка не закрывает имя нижней
+        }
+      });
+    });
+    return Math.min(200, Math.ceil(need / 4) * 4);
+  }
+  const HH = () => look.hh || autoHH();
+  const pxm = () => HH() / 60;             // пикселей на минуту
   function hoursRange(){
     let a = 8 * 60, b = 21 * 60;
     st.lessons.forEach(l => {
@@ -860,7 +878,7 @@
         (untimed.length ? '<div class="sc-untimed">' + untimed.map(l => '<button type="button" class="sc-ut" data-open="' + esc(l.id) + '">' + esc(l.people.map(personName).join(' ') || l.title || 'без времени') + '</button>').join('') + '</div>' : '') +
         '</div>';
       const pos = layoutDay(ls);
-      cols += '<div class="sc-col' + (day === today() ? ' today' : '') + '" data-day="' + day + '" data-ci="' + i + '" style="height:' + H + 'px;background-size:100% ' + look.hh + 'px">' +
+      cols += '<div class="sc-col' + (day === today() ? ' today' : '') + '" data-day="' + day + '" data-ci="' + i + '" style="height:' + H + 'px;background-size:100% ' + HH() + 'px">' +
         '<div class="sc-hv" aria-hidden="true"></div><div class="sc-gl" aria-hidden="true"></div><div class="sc-gv" aria-hidden="true"></div>' +
         ls.filter(l => l.start_min != null).map(l => plateHtml(l, pos.get(l), a, H)).join('') + '</div>';
     });
@@ -876,8 +894,8 @@
   function edgeAt(col, e){
     const r = col.getBoundingClientRect(), y = e.clientY - r.top, x = e.clientX - r.left;
     if (r.width - x <= NEAR + 2 && y > 14 && y < r.height - 14) return { t: 'c', ci: Number(col.dataset.ci) };
-    const k = Math.round(y / look.hh);
-    if (k >= 1 && Math.abs(y - k * look.hh) <= NEAR) return { t: 'r', k };
+    const k = Math.round(y / HH());
+    if (k >= 1 && Math.abs(y - k * HH()) <= NEAR) return { t: 'r', k };
     return null;
   }
   function showEdge(hit){
@@ -887,17 +905,25 @@
     g.classList.toggle('rs', !!hit && hit.t === 'r');
     g.classList.toggle('cs', !!hit && hit.t === 'c');
     if (!hit) return;
-    if (hit.t === 'r') host.querySelectorAll('.sc-gl').forEach(x => { x.style.top = hit.k * look.hh + 'px'; x.style.display = 'block'; });
+    if (hit.t === 'r') host.querySelectorAll('.sc-gl').forEach(x => { x.style.top = hit.k * HH() + 'px'; x.style.display = 'block'; });
     else { const c = host.querySelector('.sc-col[data-ci="' + hit.ci + '"] .sc-gv'); if (c) c.style.display = 'block'; }
   }
   // тянем линию часа или край дня: на каждом шаге — перерисовка сетки
   function startEdgeDrag(e, hit, col){
     e.preventDefault();
-    const y0 = e.clientY, x0 = e.clientX, hh0 = look.hh, cw0 = look.cw || col.getBoundingClientRect().width;
+    // как в таблицах: час над линией растёт ровно на сдвиг мыши, а его верх
+    // стоит на месте (прокрутку двигаем на рост часов выше) — линия идёт за курсором
+    const y0 = e.clientY, x0 = e.clientX, hh0 = HH(), cw0 = look.cw || col.getBoundingClientRect().width;
+    const gw0 = host.querySelector('.sc-gwrap'), st0 = gw0 ? gw0.scrollTop : 0, sl0 = gw0 ? gw0.scrollLeft : 0;
     const move = ev => {
-      if (hit.t === 'r') look.hh = Math.round(Math.max(40, Math.min(200, hh0 + (ev.clientY - y0) / hit.k)));
-      else look.cw = Math.round(Math.max(96, Math.min(420, cw0 + (ev.clientX - x0) / (hit.ci + 1))));
+      if (hit.t === 'r') look.hh = Math.round(Math.max(40, Math.min(240, hh0 + (ev.clientY - y0))));
+      else look.cw = Math.round(Math.max(96, Math.min(480, cw0 + (ev.clientX - x0))));
       render();
+      const gw = host.querySelector('.sc-gwrap');
+      if (gw) {
+        if (hit.t === 'r') gw.scrollTop = st0 + (hit.k - 1) * (look.hh - hh0);
+        else gw.scrollLeft = sl0 + hit.ci * (look.cw - cw0);
+      }
       showEdge(hit);
     };
     const up = () => {
@@ -925,11 +951,11 @@
         if (hit || e.target.closest('.sc-plate')) { hv.style.display = 'none'; return; }
         // свободное место: мягко подсветить получас под курсором
         const r = col.getBoundingClientRect();
-        const k = Math.floor((e.clientY - r.top) / (look.hh / 2));
+        const k = Math.floor((e.clientY - r.top) / (HH() / 2));
         const m = a + k * 30;
         if (m < a || m >= b) { hv.style.display = 'none'; return; }
-        hv.style.top = (k * look.hh / 2 + 2) + 'px';
-        hv.style.height = (look.hh / 2 - 4) + 'px';
+        hv.style.top = (k * HH() / 2 + 2) + 'px';
+        hv.style.height = (HH() / 2 - 4) + 'px';
         hv.textContent = '+ ' + hm(m);
         hv.style.display = 'flex';
       });
@@ -947,7 +973,7 @@
           const up = ev => {
             off();
             if (Math.abs(ev.clientY - y0) > 6) return;      // это была прокрутка
-            const m = a + Math.floor((ev.clientY - r0.top) / (look.hh / 2)) * 30;
+            const m = a + Math.floor((ev.clientY - r0.top) / (HH() / 2)) * 30;
             openNew(col.dataset.day, Math.max(a, Math.min(b - STEP, m)));
           };
           col.addEventListener('pointerup', up);
@@ -1023,6 +1049,34 @@
     bindCommon();
   }
 
+  // неделя открывается с самого раннего занятого часа: пустое утро не листаем
+  function gridToFirst(gw){
+    const [a] = hoursRange();
+    const starts = st.lessons.filter(l => l.start_min != null).map(l => l.start_min);
+    gw.scrollTop = starts.length ? Math.max(0, (Math.floor(Math.min.apply(null, starts) / 60) * 60 - a) * pxm()) : 0;
+  }
+  // «Сегодня»: день ярче на миг и сразу в поле зрения (страница листается сама)
+  function goToday(){
+    const flash = el => { if (!el) return; el.classList.remove('sc-flash'); void el.offsetWidth; el.classList.add('sc-flash'); };
+    if (st.view === 'grid') {
+      const gw = host.querySelector('.sc-gwrap'), col = host.querySelector('.sc-col.today');
+      if (gw && col) {
+        gw.scrollTo({ left: Math.max(0, col.offsetLeft - 70), behavior: 'smooth' });
+        const ls = lessonsOf(today()).filter(l => l.start_min != null);
+        if (ls.length) { const [a] = hoursRange(); gw.scrollTo({ top: Math.max(0, (Math.floor(ls[0].start_min / 60) * 60 - a) * pxm()), behavior: 'smooth' }); }
+        flash(col); flash(host.querySelector('.sc-gday.today'));
+      }
+      const r = (gw || host).getBoundingClientRect();
+      if (r.top < 0 || r.top > window.innerHeight * 0.5) window.scrollTo({ top: window.scrollY + r.top - 80, behavior: 'smooth' });
+      return;
+    }
+    const card = host.querySelector('.sc-day.today');
+    if (!card) return;
+    const r = card.getBoundingClientRect();
+    window.scrollTo({ top: Math.max(0, window.scrollY + r.top - 90), behavior: 'smooth' });
+    flash(card);
+  }
+
   /* ── карточка ученика по щелчку на имя (как в «Учительской») ──
      Коротко и рядом с именем: время и статус, тариф, оплата; подробное —
      «Открыть занятие» (боковая панель) */
@@ -1093,8 +1147,9 @@
 
   /* ── меню «Вид»: время и вид пар/групп, с живым примером плашки ── */
   const LOOK_KEY = 'cabinet:schedule:look';
-  // час 80px: при наложении через полчаса имя нижней плашки ещё видно
-  const look = { end: false, grp: 'names', hh: 80, cw: null };
+  // hh: null — высота часа подбирается сама (autoHH), число — своя, потянутая
+  // учителем, и она запоминается на этом устройстве
+  const look = { end: false, grp: 'names', hh: null, cw: null };
   try { Object.assign(look, JSON.parse(localStorage.getItem(LOOK_KEY) || '{}')); } catch (e) {}
   function saveLook(){ try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (e) {} }
   function lookPreview(end, grp){
@@ -1119,7 +1174,7 @@
       it('Число', look.grp === 'cnt', lookPreview(false, 'cnt'), () => { look.grp = 'cnt'; }),
       it('Столбиком', look.grp === 'col', lookPreview(false, 'col'), () => { look.grp = 'col'; }),
       { sep: true },
-      { label: 'Сбросить высоту часа и ширину дня', act: () => { look.hh = 80; look.cw = null; saveLook(); render(); } },
+      { label: 'Масштаб по умолчанию', hint: 'все плашки без наезда имён', act: () => { look.hh = null; look.cw = null; saveLook(); render(); } },
     ];
   }
 
@@ -1649,6 +1704,13 @@
     else if (st.mode !== 'week') body = TPL().paneHtml();
     else body = st.view === 'grid' ? gridHtml() : listHtml();
     host.innerHTML = headHtml() + '<div class="sc-body sc-v-' + st.view + '" id="scBody">' + body + '</div>';
+    const tb = host.querySelector('#scToday');
+    // уже на этой неделе — адрес не меняется, перерисовываем сами (одна
+    // перерисовка: вторая сняла бы вспышку дня)
+    if (tb) tb.addEventListener('click', e => {
+      st.goToday = true;
+      if (mondayOf(today()) === st.week) { e.preventDefault(); if (location.hash !== tb.getAttribute('href')) history.replaceState(null, '', tb.getAttribute('href')); render(); }
+    });
     host.querySelectorAll('.sc-views button').forEach(b => b.addEventListener('click', () => { rows.cancel(); setView(b.dataset.v); }));
     host.querySelectorAll('.sc-modes button').forEach(b => b.addEventListener('click', () => { rows.cancel(); st.mode = b.dataset.mode; closeModal(); closePanel(); closeStudentCard(); render(); }));
     const lookBtn = host.querySelector('#scLook');
@@ -1663,8 +1725,11 @@
     if (st.view === 'grid') {
       bindGrid();
       const ngw = host.querySelector('.sc-gwrap');
-      if (scroll && ngw) { ngw.scrollLeft = scroll[0]; ngw.scrollTop = scroll[1]; }
-    } else bindList();
+      if (scroll && ngw && st.gridAt === st.week) { ngw.scrollLeft = scroll[0]; ngw.scrollTop = scroll[1]; }
+      else if (ngw) gridToFirst(ngw);
+      st.gridAt = st.week;
+    } else { bindList(); st.gridAt = null; }
+    if (st.goToday) { st.goToday = false; goToday(); }
     paintEditor();
     paintPanel();
     paintStudentCard();

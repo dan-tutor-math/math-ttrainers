@@ -361,3 +361,21 @@ button.rw-ic:hover{filter:brightness(1.08);border-color:var(--ink);}
 .rw-vrow{border:1px dashed var(--glass-border);margin:1px 0;}
 .rw-vrow .rw-time{color:var(--muted-2);cursor:pointer;}
 .rw-vrow:hover{border-color:color-mix(in srgb,var(--ink) 45%,transparent);background:none;}
+/* «Сегодня» заметнее: день — чуть подсвеченное стекло с синей каймой;
+   по кнопке «Сегодня» — мягкая вспышка, чтобы глаз сразу нашёл день */
+.sc-day.today{background:color-mix(in srgb,var(--ink) 6%,var(--glass));
+  box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--ink) 55%,transparent),var(--shadow);}
+.sc-day.today .sc-dh b,.sc-day.today .sc-dh span{color:var(--ink);}
+.sc-col.today{background-color:color-mix(in srgb,var(--ink) 9%,var(--card) 45%);border-color:color-mix(in srgb,var(--ink) 35%,transparent);}
+.sc-gday.today b{background:var(--ink);color:#fff;border-radius:8px;padding:1px 7px;}
+@keyframes sc-flash{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ink) 55%,transparent);}100%{box-shadow:0 0 0 14px transparent;}}
+.sc-flash{animation:sc-flash 1s ease-out 2;}
+@media (prefers-reduced-motion:reduce){ .sc-flash{animation:none;} }
+/* тонкие ползунки прокрутки в цветах темы (в тёмной теме белые системные резали глаз) */
+.sc-gwrap,.gm-menu,.sc-side,.sc-sheet{scrollbar-width:thin;scrollbar-color:color-mix(in srgb,var(--muted-1) 45%,transparent) transparent;}
+.sc-gwrap::-webkit-scrollbar,.gm-menu::-webkit-scrollbar,.sc-side::-webkit-scrollbar,.sc-sheet::-webkit-scrollbar{width:8px;height:8px;}
+.sc-gwrap::-webkit-scrollbar-track,.gm-menu::-webkit-scrollbar-track,.sc-side::-webkit-scrollbar-track,.sc-sheet::-webkit-scrollbar-track{background:transparent;}
+.sc-gwrap::-webkit-scrollbar-corner{background:transparent;}
+.sc-gwrap::-webkit-scrollbar-thumb,.gm-menu::-webkit-scrollbar-thumb,.sc-side::-webkit-scrollbar-thumb,.sc-sheet::-webkit-scrollbar-thumb{
+  background:color-mix(in srgb,var(--muted-1) 40%,transparent);border-radius:8px;border:2px solid transparent;background-clip:padding-box;}
+.sc-gwrap::-webkit-scrollbar-thumb:hover{background-color:color-mix(in srgb,var(--ink) 55%,transparent);}

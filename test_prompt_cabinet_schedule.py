@@ -430,11 +430,13 @@ def main():
         # ── D. «Неделя»
         page.click(".sc-views button[data-v=grid]")
         page.wait_for_selector(".sc-grid")
-        PXM = 80 / 60
+        HH0 = page.evaluate("() => { const c = document.querySelector('.sc-col'); return parseFloat(getComputedStyle(c).backgroundSize.split(' ')[1]); }")
+        PXM = HH0 / 60
         check("D1 сетка: 7 колонок, 3 плашки", page.locator(".sc-col").count() == 7 and page.locator(".sc-plate").count() == 3)
         h = page.eval_on_selector(f".sc-plate[data-id='{mid}']", "e => e.getBoundingClientRect().height")
         h2 = page.eval_on_selector(f".sc-plate[data-id='{tid}']", "e => e.getBoundingClientRect().height")
-        check("D2 высота по длительности (90 и 45 минут, час = 80px)", abs((h - h2) - 45 * PXM) < 2, f"{h} {h2}")
+        check("D2 высота по длительности (90 и 45 минут)", abs((h - h2) - 45 * PXM) < 2, f"{h} {h2}")
+        check("D2a масштаб по умолчанию: в плашке 45 минут видно имя (час ≥ 77px)", HH0 >= 77, str(HH0))
         check("D3 цвет плашки — статус: оба проведены — зелёная; имена не на строке времени",
               "st-done" in page.get_attribute(f".sc-plate[data-id='{tid}']", "class")
               and "Петя" not in page.inner_text(f".sc-plate[data-id='{tid}'] .sc-ph"))
@@ -529,7 +531,7 @@ def main():
         check("D17 вид запомнился на устройстве", page.evaluate("() => JSON.parse(localStorage.getItem('cabinet:schedule:look')).grp") == "names")
         # высота часа — за линию часа, как в таблице
         sat = page.locator(".sc-col[data-day='2026-11-21']").bounding_box()
-        y_line = sat["y"] + 1 + 2 * 80
+        y_line = sat["y"] + 1 + 2 * HH0
         page.mouse.move(sat["x"] + 40, y_line)
         check("D18 у линии часа курсор «↕»", page.evaluate("() => document.querySelector('.sc-grid').classList.contains('rs')"))
         page.mouse.down()
@@ -537,11 +539,11 @@ def main():
         page.mouse.move(sat["x"] + 40, y_line + 40, steps=3)
         page.mouse.up()
         hh2 = page.evaluate("() => JSON.parse(localStorage.getItem('cabinet:schedule:look')).hh")
-        check("D19 потянули линию 2-го часа на 40px — час стал 100px", hh2 == 100, str(hh2))
+        check("D19 как в таблице: линию 2-го часа потянули на 40px — час вырос на 40px", hh2 == HH0 + 40, str(hh2))
         page.click("#scLook")
-        page.click(".gm-menu .gm-item:has-text('Сбросить')")
+        page.click(".gm-menu .gm-item:has-text('Масштаб по умолчанию')")
         page.wait_for_selector(".gm-menu", state="detached")
-        check("D20 сброс высоты часа", page.evaluate("() => JSON.parse(localStorage.getItem('cabinet:schedule:look')).hh") == 80)
+        check("D20 масштаб по умолчанию — подбирается сам", page.evaluate("() => JSON.parse(localStorage.getItem('cabinet:schedule:look')).hh") is None)
 
         # ── E. перезагрузка
         page.reload()
@@ -663,6 +665,11 @@ def main():
         n_rows = len(lessons())
         check("G1 телефон: по умолчанию «Строки», дни в одну колонку", pp.is_visible(".sc-views button.on[data-v=list]") and pp.locator(".rw-row").count() == n_rows)
         check("G2 телефон 375: без прокрутки вбок", pp.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth"))
+        pp.evaluate("() => window.scrollTo(0, 0)")
+        pp.click("#scToday")
+        pp.wait_for_selector(".sc-day.today.sc-flash")
+        pp.wait_for_function("() => { const r = document.querySelector('.sc-day.today').getBoundingClientRect(); return r.top >= 0 && r.top < 300; }", timeout=4000)
+        check("G2a «Сегодня» на телефоне: страница сама долистала до среды, день вспыхнул", True)
         cdp = ph.new_cdp_session(pp)
         src = row('2026-11-17', tid) + " .rw-time"
         pp.eval_on_selector(src, "e => e.scrollIntoView({ block: 'center' })")
@@ -684,6 +691,9 @@ def main():
         pp.wait_for_selector(".sc-grid")
         check("G3a телефон, «Неделя»: сетка листается внутри, страница — нет",
               pp.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth"))
+        first = pp.evaluate("""() => { const gw = document.querySelector('.sc-gwrap'), ps = Array.from(document.querySelectorAll('.sc-plate'));
+                                      const top = Math.min.apply(null, ps.map(p => p.offsetTop)); return [top - gw.scrollTop, gw.scrollTop]; }""")
+        check("G3b «Неделя» открылась с самого раннего занятого часа (пустое утро пролистано)", first[1] > 0 and 0 <= first[0] < 90, str(first))
         check("G4 нет ошибок JavaScript", not errors, "; ".join(errors))
         browser.close()
 
