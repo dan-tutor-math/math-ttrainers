@@ -196,3 +196,32 @@
 @media (max-width:620px){
   .sc-side{top:auto;left:0;right:0;bottom:0;width:auto;max-width:none;max-height:70vh;border-radius:20px 20px 0 0;}
 }
+
+/* ── действия дня: ⧉ ↓ ◆ ▤ ✕ (schedule.js, dayActions), плашка буфера, пустые окна ── */
+.sc-dacts{display:inline-flex;gap:3px;align-self:center;flex:none;}
+.sc-da{width:28px;height:28px;border-radius:9px;border:1px solid transparent;background:none;color:var(--muted-3);
+  font:600 15px/1 var(--font-ui);cursor:pointer;padding:0;transition:background .15s, color .15s, border-color .15s;}
+.sc-da:hover:not(:disabled){background:var(--glass-strong);border-color:var(--glass-border);color:var(--ink);}
+.sc-da.on{background:var(--glass-strong);border-color:var(--ink);color:var(--ink);}
+.sc-da:disabled{opacity:.3;cursor:default;}
+.sc-da[data-dact="clear"]:hover:not(:disabled){color:var(--teacher);}
+.sc-gday .sc-dacts{display:flex;gap:1px;margin-top:4px;}
+.sc-gday .sc-da{width:22px;height:22px;font-size:12.5px;border-radius:7px;}
+.sc-wclear:disabled{opacity:.4;cursor:default;}
+.sc-vrow{background:none;border:1px dashed var(--glass-border);align-items:center;}
+.sc-vrow .sc-time{color:var(--muted-2);}
+.sc-vrow:hover{border-color:var(--ink);}
+.sc-vfree{font-size:13px;color:var(--muted-1);}
+.sc-clip{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);z-index:40;display:flex;align-items:center;gap:12px;
+  padding:10px 12px 10px 16px;margin:0;max-width:calc(100vw - 32px);font-size:14px;border-radius:18px;}
+.sc-clip span{min-width:0;}
+.sc-ask-text{font-size:15px;line-height:1.45;margin-bottom:14px;}
+.sc-ask-warn{color:var(--teacher);font-size:13.5px;}
+.sc-ask-btns{justify-content:flex-end;flex-wrap:wrap;gap:8px;}
+.sc-edkind{margin:0 0 12px;}
+.sc-edtitle{width:100%;margin-bottom:6px;}
+@media (max-width:620px){
+  .sc-dh{flex-wrap:wrap;}
+  .sc-dh .sc-dacts{order:5;flex-basis:100%;justify-content:flex-end;}
+  .sc-clip{bottom:10px;font-size:13px;}
+}
