@@ -202,23 +202,41 @@
         '<span class="rw-more ph"></span></div><div class="rw-resolve" data-for="new"></div>' +
         (ed.msg ? '<div class="rw-msg">' + esc(ed.msg) + '</div>' : '');
     }
-    // строки дня: пересекающиеся — в одной рамке, новая строка — по времени
+    // строки дня: пересекающиеся — в одной рамке, новая строка — по времени.
+    // «▤ все часы» (cfg.hoursOpen): пустые окна на каждый свободный час —
+    // только на экране, в базу не пишутся; щелчок — новая строка с этим временем
+    const VH = [9, 21];
+    function freeOf(items, h){ return !items.some(x => x.start_min != null && x.start_min < h + 60 && h < x.start_min + x.dur_min); }
     C.listHtml = function(day){
       const items = itemsOf(day);
-      let h = '<div class="rw-list" data-day="' + esc(day) + '">';
-      const draftAt = ed && ed.day === day && ed.id === 'new' ? (parseTime(ed.time) == null ? Infinity : parseTime(ed.time)) : null;
-      let drafted = draftAt == null;
+      const ent = [];             // { k: ключ порядка, html }
       clusters(items).forEach(cl => {
-        const first = cl[0];
-        if (!drafted && first.start_min != null && draftAt < first.start_min && !(ed.after && cl.some(x => String(x.id) === String(ed.after)))) { h += draftHtml(day); drafted = true; }
-        h += cl.length > 1 ? '<div class="rw-frame" data-start="' + first.start_min + '">' + cl.map(it => rowHtml(day, it, true)).join('') + '</div>'
-          : rowHtml(day, first, false);
-        if (!drafted && ed.after && cl.some(x => String(x.id) === String(ed.after))) { h += draftHtml(day); drafted = true; }
+        const first = cl[0], k = first.start_min == null ? -1 : first.start_min;
+        ent.push({ k, ids: cl.map(x => String(x.id)), html: cl.length > 1 ? '<div class="rw-frame" data-start="' + first.start_min + '">' + cl.map(it => rowHtml(day, it, true)).join('') + '</div>'
+          : rowHtml(day, first, false) });
       });
-      if (!drafted) h += draftHtml(day);
-      if (!items.length && !(ed && ed.day === day && ed.id === 'new')) h += '<div class="rw-free">свободно</div>';
+      const draft = ed && ed.day === day && ed.id === 'new';
+      const dStart = draft ? parseTime(ed.time) : null;
+      if (cfg.hoursOpen && cfg.hoursOpen(day)) {
+        for (let h = VH[0] * 60; h <= VH[1] * 60; h += 60) {
+          if (!freeOf(items, h) || (draft && dStart === h)) continue;
+          ent.push({ k: h + 0.1, html: '<div class="rw-row rw-vrow" data-day="' + esc(day) + '" data-vstart="' + h + '" data-start="' + h + '">' +
+            '<span class="rw-grip ph" aria-hidden="true"></span>' + (cfg.statuses ? '<span class="rw-ic ph"></span>' : '') +
+            '<button type="button" class="rw-time" data-vnew="' + h + '" title="Свободное окно — нажмите, чтобы вписать занятие">' + hm(h) + '</button>' +
+            '<span class="rw-empty">свободно</span></div>' });
+        }
+      }
+      if (draft) {
+        const after = ed.after && ent.find(e => e.ids && e.ids.indexOf(String(ed.after)) >= 0);
+        ent.push({ k: after ? after.k + 0.5 : (dStart == null ? Infinity : dStart + 0.2), html: draftHtml(day) });
+      }
+      ent.sort((x, y) => x.k - y.k);
+      let h = '<div class="rw-list" data-day="' + esc(day) + '">' + ent.map(e => e.html).join('');
+      if (!items.length && !draft && !(cfg.hoursOpen && cfg.hoursOpen(day))) h += '<div class="rw-free">свободно</div>';
       return h + '<button type="button" class="rw-add" data-add="' + esc(day) + '">+ строка</button></div>';
     };
+    // начать новую строку с готовым временем и текстом (▤, «◆ событие»)
+    C.startNew = (day, start, names) => startEdit(day, 'new', 'names', { time: start == null ? '' : hm(start), names: names || '', caret: null });
 
     /* ── правка на месте ── */
     function startEdit(day, id, field, extra){
@@ -332,6 +350,7 @@
     function showSlots(){
       C.root.querySelectorAll('.rw-list').forEach(list => {
         const day = list.dataset.day;
+        if (list.querySelector('.rw-vrow')) return;          // часы уже развёрнуты — окна и есть цели
         freeHours(day, { id: drag.item.id, whole: !drag.person }).forEach(m => {
           const s = document.createElement('div');
           s.className = 'rw-slot';
@@ -347,9 +366,9 @@
     function dropTarget(x, y){
       const el = document.elementFromPoint(x, y);
       if (!el || !C.root.contains(el)) return null;
-      const slot = el.closest('.rw-slot');
+      const slot = el.closest('.rw-slot, .rw-vrow');
       if (slot) return { el: slot, to: { kind: 'slot', day: slot.dataset.day, start: Number(slot.dataset.start) } };
-      const row = el.closest('.rw-row:not(.draft)');
+      const row = el.closest('.rw-row:not(.draft):not(.rw-vrow)');
       if (row) {
         const it = find(row.dataset.day, row.dataset.id);
         if (it && !(String(it.id) === String(drag.item.id) && drag.day === row.dataset.day)) return { el: row, to: { kind: 'row', day: row.dataset.day, item: it } };
@@ -435,7 +454,7 @@
     function onDown(e){
       if (e.button !== 0 || drag || ed) return;
       const row = e.target.closest('.rw-row');
-      if (!row || row.classList.contains('draft')) return;
+      if (!row || row.classList.contains('draft') || row.classList.contains('rw-vrow')) return;
       if (e.target.closest('input, a, .rw-ic, .rw-more, .sc-why, .sc-paid')) return;
       const it = find(row.dataset.day, row.dataset.id);
       if (!it) return;
@@ -487,10 +506,12 @@
     function onClick(e){
       if (Date.now() < suppressClick) { e.stopPropagation(); e.preventDefault(); return; }
       const t = e.target;
+      const vn = t.closest('[data-vnew]');
+      if (vn) { e.stopPropagation(); if (ed) commit(null); C.startNew(vn.closest('.rw-row').dataset.day, Number(vn.dataset.vnew), ''); return; }
       const add = t.closest('[data-add]');
       if (add) { e.stopPropagation(); if (ed) commit(null); startDraft(add.dataset.add); return; }
       const row = t.closest('.rw-row');
-      if (!row || row.classList.contains('draft') || t.closest('input')) return;
+      if (!row || row.classList.contains('draft') || row.classList.contains('rw-vrow') || t.closest('input')) return;
       const day = row.dataset.day, it = find(day, row.dataset.id);
       if (!it) return;
       const rst = t.closest('[data-rst]'), pst = t.closest('[data-pst]');

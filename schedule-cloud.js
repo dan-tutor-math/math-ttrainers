@@ -315,7 +315,88 @@
     return nt;
   }
 
+  /* ══ пакетные вставка и удаление (буфер дня, очистить день / неделю) ══
+     Вставка дня — два запроса на всё (занятия, потом участники), удаление —
+     один запрос на сотню id. По одному запросу на занятие вставка дня из
+     10 строк шла бы секунды, а обрыв посередине оставлял бы полдня.
+
+     id занятиям и слотам даёт клиент: так участников можно привязать к
+     своему занятию без надежды на порядок строк в ответе сервера (PostgREST
+     его не обещает). Участники не встали — убираем вставленные занятия:
+     полдня пустых плашек хуже ошибки */
+  function newId(){
+    const cr = window.crypto;
+    if (cr && cr.randomUUID) return cr.randomUUID();
+    const b = new Uint8Array(16);
+    if (cr && cr.getRandomValues) cr.getRandomValues(b); else for (let i = 0; i < 16; i++) b[i] = Math.floor(Math.random() * 256);
+    b[6] = (b[6] & 15) | 64; b[8] = (b[8] & 63) | 128;
+    const h = Array.from(b, x => (x < 16 ? '0' : '') + x.toString(16)).join('');
+    return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
+  }
+  const chunks = (a, n) => { const out = []; for (let i = 0; i < a.length; i += n) out.push(a.slice(i, i + n)); return out; };
+  // list — [{ f: поля занятия, people: [{student_id} | {guest_name}] }]
+  function addLessons(list){
+    return serial(async () => {
+      if (!list.length) return [];
+      const c = need();
+      const rows = list.map(it => Object.assign(cleanLesson(it.f), { id: newId() }));
+      const ls = await run(c.from('lessons').insert(rows).select(LESSON_COLS));
+      const ppl = [];
+      list.forEach((it, i) => (it.people || []).forEach((p, k) => ppl.push(cleanPerson(p, rows[i].id, k))));
+      let prs = [];
+      if (ppl.length) {
+        try { prs = await runLS(cols => c.from('lesson_students').insert(ppl).select(cols)); }
+        catch (e) {
+          try { await run(c.from('lessons').delete().in('id', rows.map(r => r.id))); } catch (e2) {}
+          throw e;
+        }
+      }
+      const by = {};
+      (prs || []).forEach(p => { (by[p.lesson_id] = by[p.lesson_id] || []).push(p); });
+      const got = {};
+      (ls || []).forEach(l => { got[l.id] = l; });
+      return rows.map(r => Object.assign({}, got[r.id] || r, { people: (by[r.id] || []).sort((a, b) => a.pos - b.pos) }));
+    });
+  }
+  // участники уходят каскадом, как у deleteLesson
+  function deleteLessons(ids){
+    return serial(async () => {
+      const c = need();
+      for (const part of chunks(ids, 100)) await run(c.from('lessons').delete().in('id', part));
+    });
+  }
+  // list — [{ f: поля слота (weekday, start_min…), people }]
+  function addSlots(tplId, list){
+    return serial(async () => {
+      if (!list.length) return [];
+      const c = need();
+      const rows = list.map(it => Object.assign(cleanSlot(it.f), { id: newId(), template_id: tplId }));
+      const ss = await run(c.from('template_slots').insert(rows).select(SLOT_COLS));
+      const ppl = [];
+      list.forEach((it, i) => (it.people || []).forEach((p, k) => ppl.push(slotPerson(p, rows[i].id, k))));
+      let prs = [];
+      if (ppl.length) {
+        try { prs = await run(c.from('template_slot_students').insert(ppl).select(SP_COLS)); }
+        catch (e) {
+          try { await run(c.from('template_slots').delete().in('id', rows.map(r => r.id))); } catch (e2) {}
+          throw e;
+        }
+      }
+      const by = {}, got = {};
+      (prs || []).forEach(p => { (by[p.slot_id] = by[p.slot_id] || []).push(p); });
+      (ss || []).forEach(s => { got[s.id] = s; });
+      return rows.map(r => Object.assign({}, got[r.id] || r, { people: (by[r.id] || []).sort((a, b) => a.pos - b.pos) }));
+    });
+  }
+  function deleteSlots(ids){
+    return serial(async () => {
+      const c = need();
+      for (const part of chunks(ids, 100)) await run(c.from('template_slots').delete().in('id', part));
+    });
+  }
+
   window.ScheduleCloud = { FORMATS, STATUSES, GROUP_FORMATS, listRange, listForStudent, addLesson, updateLesson, deleteLesson, addPeople, setStatus, setPart, removePerson, movePerson,
+    addLessons, deleteLessons, addSlots, deleteSlots,
     hasPayCols: () => payCols,
     listGroups, addGroup, updateGroup, setGroupMembers, deleteGroup,
     listTemplates, addTemplate, renameTemplate, deleteTemplate, setActiveTemplate, addSlot, updateSlot, deleteSlot, addSlotPeople, removeSlotPerson, moveSlotPerson, setSlotPeople, duplicateTemplate };

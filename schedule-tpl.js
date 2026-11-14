@@ -131,6 +131,7 @@
       days: () => WD,
       name: p => X.personName(p),
       showEnd: () => X.look().end,
+      hoursOpen: wd => !!X.st.expand['tpl:' + wd],
       busy: v => X.setBusy(v),
       rerender: () => X.render(),
       toast,
@@ -158,13 +159,14 @@
       '<button type="button" class="btn quiet small" id="tplNew">Новый</button>' +
       '<button type="button" class="btn quiet small" id="tplDup">Дублировать</button>' +
       (t.is_active ? '<span class="sc-act" title="Активный шаблон — тот, что стоит первым в списке вставки">★ активный</span>' : '<button type="button" class="btn quiet small" id="tplAct">Сделать активным</button>') +
+      X.weekClearHtml('tpl:') +
       '<button type="button" class="btn danger small" id="tplDel">Удалить</button></div>' +
       '<div class="form-msg" id="tplMsg"></div><div class="sc-days sc-tpldays">';
     const rows = tplRows();
     for (let i = 1; i <= 7; i++) {
       const n = slotsOf(String(i)).length;
       h += '<section class="sc-day" data-wd="' + i + '" data-rw-day="' + i + '"><header class="sc-dh"><b>' + X.DAY_LONG[i - 1].replace(/^./, c => c.toUpperCase()) + '</b>' +
-        '<span>' + (n ? X.plural(n, 'слот', 'слота', 'слотов') : '') + '</span></header>' + rows.listHtml(String(i)) + '</section>';
+        '<span>' + (n ? X.plural(n, 'слот', 'слота', 'слотов') : '') + '</span>' + X.dayActions('tpl:' + i) + '</header>' + rows.listHtml(String(i)) + '</section>';
     }
     return h + '</div>' + whoHtml(t);
   }
@@ -194,7 +196,7 @@
     const r = await X.resolveEntry((start != null ? X.hm(start) + ' ' : '') + text, box || document.createElement('div'), null);
     if (!r.people) return r;
     try {
-      const s = await X.SC.addSlot(t.id, { weekday: wd, start_min: r.start, dur_min: r.dur, format: r.format, group_id: r.group_id }, r.people);
+      const s = await X.SC.addSlot(t.id, { weekday: wd, start_min: r.start, dur_min: r.dur, format: r.format, group_id: r.group_id, is_event: !!r.is_event, title: r.title || '' }, r.people);
       t.slots.push(s);
       return { item: s };
     } catch (e) { return { msg: e.message }; }
@@ -338,10 +340,13 @@
         '<label><span class="label">С</span><input class="field" type="time" step="900" id="slStart"></label>' +
         '<label><span class="label">До</span><input class="field" type="time" step="900" id="slEnd"></label>' +
       '</div>' +
-      '<div class="label">Формат</div><div class="seg sc-edfmt" id="slFmt"></div><div class="hint" id="slHint"></div>' +
-      '<div class="label" style="margin-top:12px">Ученики</div><div class="sc-edpeople" id="slPeople"></div>' +
-      '<form id="slAddForm" class="sc-addrow"><input class="field" id="slAdd" maxlength="300" placeholder="Добавить: Маша, Петя" aria-label="Добавить учеников" autocomplete="off">' +
-        '<button class="btn quiet" type="submit">Добавить</button></form>' +
+      (s.is_event
+        ? '<label><span class="label">Название</span><input class="field sc-edtitle" id="slTitle" maxlength="200" placeholder="Созвон, врач, вебинар…"></label>' +
+          '<div class="hint">Событие не считается занятием: не доход и не часы.</div>'
+        : '<div class="label">Формат</div><div class="seg sc-edfmt" id="slFmt"></div><div class="hint" id="slHint"></div>' +
+          '<div class="label" style="margin-top:12px">Ученики</div><div class="sc-edpeople" id="slPeople"></div>' +
+          '<form id="slAddForm" class="sc-addrow"><input class="field" id="slAdd" maxlength="300" placeholder="Добавить: Маша, Петя" aria-label="Добавить учеников" autocomplete="off">' +
+            '<button class="btn quiet" type="submit">Добавить</button></form>') +
       '<div class="form-msg" id="slMsg"></div><div class="sc-resolve" id="slResolve"></div>' +
       '<div class="row-btns sc-ed-foot"><button type="button" class="btn danger" id="slDel">Удалить слот</button><button type="button" class="btn" id="slDone">Готово</button></div>';
     const q = sel => m.sheet.querySelector(sel);
@@ -359,7 +364,12 @@
       q('#slMsg').textContent = '';
       patchSlot(s, { dur_min: v - s.start_min }).then(paint);
     });
-    q('#slAddForm').addEventListener('submit', async e => {
+    if (s.is_event) q('#slTitle').addEventListener('change', e => {
+      const v = e.target.value.trim().replace(/\s+/g, ' ');
+      if (!v) { e.target.value = s.title; return; }
+      if (v !== s.title) patchSlot(s, { title: v }).then(paint);
+    });
+    if (!s.is_event) q('#slAddForm').addEventListener('submit', async e => {
       e.preventDefault();
       const names = X.parseQuick(q('#slAdd').value).names;
       if (!names.length) return;
@@ -387,6 +397,7 @@
       setv('#slDay', String(s.weekday));
       setv('#slStart', X.timeVal(s.start_min));
       setv('#slEnd', s.start_min == null ? '' : X.timeVal(Math.min(1440, s.start_min + s.dur_min)));
+      if (s.is_event) { setv('#slTitle', s.title || ''); return; }
       q('#slFmt').innerHTML = X.SC.FORMATS.map(f => '<button type="button" data-v="' + f + '" class="' + (f === s.format ? 'on' : '') + '" title="' + esc(X.FMT_HINT[f]) + '">' + esc(X.fmtLabel(f)) + '</button>').join('');
       const g = s.group_id && X.st.groups.find(x => x.id === s.group_id);
       q('#slHint').innerHTML = esc(X.fmtLabel(s.format) + ' — ' + X.FMT_HINT[s.format]) +
@@ -521,8 +532,39 @@
     });
   }
 
+  /* ── дни шаблона для действий дня (буфер, очистить, все часы, событие) ──
+     Сами кнопки и вопросы — в schedule.js (dayActions): они общие с днями
+     расписания, отсюда только чтение и запись слотов текущего шаблона */
+  const dayKind = {
+    items: wd => { const t = tplCur(); return t ? t.slots.filter(s => s.weekday === Number(wd)).sort(byTime) : []; },
+    all: () => { const t = tplCur(); return t ? t.slots.slice() : []; },
+    name: () => { const t = tplCur(); return t ? tplName(t) : ''; },
+    label: wd => X.DAY_LONG[Number(wd) - 1] + ' шаблона «' + (tplCur() ? tplName(tplCur()) : '') + '»',
+    noun: n => X.plural(n, 'слот', 'слота', 'слотов'),
+    start: id => { const t = tplCur(), s = t && t.slots.find(x => x.id === id); return s ? s.start_min : null; },
+    async remove(list){
+      const t = tplCur(), ids = new Set(list.map(s => s.id));
+      await X.SC.deleteSlots(Array.from(ids));
+      if (t) t.slots = t.slots.filter(s => !ids.has(s.id));
+    },
+    async insert(wd, items){
+      const t = tplCur();
+      if (!t) return 0;
+      const ss = await X.SC.addSlots(t.id, items.map(it => ({ f: Object.assign({}, it, { weekday: Number(wd) }), people: it.people })));
+      t.slots = t.slots.concat(ss);
+      return ss.length;
+    },
+    // быстрый ввод слота с готовым началом строки: «10:00 », «◆ »
+    openQuick(wd, text){
+      const q = String(text || '').match(/^(\d{1,2}:\d{2})\s*(.*)$/);
+      tplRows().startNew(String(Number(wd)), q ? R().parseTime(q[1]) : null, q ? q[2] : String(text || ''));
+      return true;
+    },
+    newEvent(wd){ dayKind.openQuick(wd, '◆ '); },
+  };
+
   function paneHtml(){ return X.st.mode === 'groups' ? groupsHtml() : tplHtml(); }
   function bindPane(host){ if (X.st.mode === 'groups') bindGroups(host); else bindTpl(host); }
 
-  window.ScheduleTpl = { attach, weekMenuHtml, bindWeekMenu, paneHtml, bindPane, openInsert };
+  window.ScheduleTpl = { attach, weekMenuHtml, bindWeekMenu, paneHtml, bindPane, openInsert, dayKind };
 })();

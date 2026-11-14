@@ -423,8 +423,25 @@
   const groupByName = n => liveGroups().find(g => norm(g.name) === norm(n));
   const groupOf = ids => (ids.length >= 2 ? liveGroups().find(g => sameSet(g.members, ids)) : null) || null;
 
-  // текст строки → { start, dur, people, format, group_id } | { msg } | { cancelled }
+  // событие в быстром вводе: «15:00 ◆ врач», «◆ вебинар», «12-13 событие: созвон»
+  // (знак ◆ или «!» или слово «событие»). Событие — не урок: без учеников,
+  // не доход и не часы (is_event, title)
+  function parseEvent(text){
+    const m = String(text || '').trim().match(/^((?:\d{1,2}(?:[:.]\d{2})?(?:\s*[-–—]\s*\d{1,2}(?:[:.]\d{2})?)?)\s*,?\s*)?(?:◆|!|событие(?=[\s:]|$)\s*:?)\s*(.*)$/i);
+    if (!m) return null;
+    const q = parseQuick(m[1] || '');
+    return { start: q.start, end: q.end, title: m[2].trim().replace(/\s+/g, ' ').slice(0, 200) };
+  }
+  // текст строки → { start, dur, people, format, group_id[, is_event, title] } | { msg } | { cancelled }
   async function resolveEntry(text, box, hint){
+    const ev = parseEvent(text);
+    if (ev) {
+      if (!ev.title) return { msg: 'Напишите, что за событие: «15:00 ◆ врач»' };
+      const start = ev.start != null ? ev.start : (hint && hint.start != null ? hint.start : null);
+      let dur = ev.end != null && ev.start != null ? ev.end - ev.start : (hint && hint.dur) || durFor([]);
+      if (start != null) dur = Math.min(dur, 1440 - start);
+      return { start, dur: Math.max(5, dur), people: [], format: 'single', group_id: null, is_event: true, title: ev.title };
+    }
     const q = parseQuick(text);
     if (!q.names.length) return { msg: 'Напишите имя: «15:00 Маша, Петя»' };
     const named = [], rest = [];
@@ -449,7 +466,7 @@
     try {
       // отработка (В4а): у её ученика сразу пометка и ссылка на пропуск
       const people = makeup ? r.people.map(p => (p.student_id && p.student_id === makeup.sid ? Object.assign({}, p, { makeup: true, makeup_for: makeup.forId }) : p)) : r.people;
-      const l = await SC.addLesson({ day, start_min: r.start, dur_min: r.dur, format: r.format, group_id: r.group_id }, people);
+      const l = await SC.addLesson({ day, start_min: r.start, dur_min: r.dur, format: r.format, group_id: r.group_id, is_event: !!r.is_event, title: r.title || '' }, people);
       if (l.day >= st.week && l.day <= addDays(st.week, 6)) st.lessons.push(l);
       render();
       return { lesson: l };
@@ -552,7 +569,7 @@
           '<a class="btn quiet small sc-arrow" id="scNext" href="' + esc(api.weekHref(addDays(st.week, 7))) + '" aria-label="Следующая неделя">›</a>' +
           '<a class="btn quiet small" id="scToday" href="' + esc(api.weekHref(null)) + '"' + (mondayOf(today()) === st.week ? ' aria-current="true"' : '') + '>Сегодня</a>' +
         '</div>' +
-        TPL().weekMenuHtml() +
+        TPL().weekMenuHtml() + weekClearHtml('week:') +
         '<div class="seg sc-views" role="group" aria-label="Вид расписания">' +
           '<button type="button" data-v="list" class="' + (st.view === 'list' ? 'on' : '') + '">Строки</button>' +
           '<button type="button" data-v="grid" class="' + (st.view === 'grid' ? 'on' : '') + '">Неделя</button>' +
@@ -700,6 +717,7 @@
     name: personName,
     personExtra: (l, p) => flagsHtml(p) + (isAbsent(p) && window.Payments ? '<button type="button" class="sc-why" data-why="' + esc(p.id) + '" title="Пропуск: оплачивается ли и причина — нажмите, чтобы сменить">' + esc(whyText(p, l)) + '</button>' : '') + paidBtn(p, l),
     showEnd: () => look.end,
+    hoursOpen: day => !!st.expand['week:' + day],
     busy: v => { rowsBusy = v; if (!v && pending) render(); },
     rerender: () => render(),
     toast: m => api.toast(m),
@@ -724,7 +742,7 @@
     weekDays().forEach((day, i) => {
       const ls = lessonsOf(day);
       h += '<section class="sc-day' + (day === today() ? ' today' : '') + '" data-day="' + day + '" data-rw-day="' + day + '">' +
-        '<header class="sc-dh"><b>' + DAY_TITLE[i] + '</b><span>' + dm(day) + (day === today() ? ' · сегодня' : '') + '</span></header>' +
+        '<header class="sc-dh"><b>' + DAY_TITLE[i] + '</b><span>' + dm(day) + (day === today() ? ' · сегодня' : '') + '</span>' + dayActions('week:' + day) + '</header>' +
         rows.listHtml(day) +
         '<footer class="sc-dfoot"><span>за день</span>' + (dayMoneyHtml(day, ls.length) || '<span class="sc-dzero">—</span>') + '</footer>' +
       '</section>';
@@ -838,6 +856,7 @@
       const untimed = ls.filter(l => l.start_min == null);
       head += '<div class="sc-gday' + (day === today() ? ' today' : '') + '"><b>' + DAY_SHORT[i] + '</b> <span>' + dm(day) + '</span>' +
         '<div class="sc-gmoney">' + dayMoneyHtml(day, ls.length) + '</div>' +
+        dayActions('week:' + day, true) +
         (untimed.length ? '<div class="sc-untimed">' + untimed.map(l => '<button type="button" class="sc-ut" data-open="' + esc(l.id) + '">' + esc(l.people.map(personName).join(' ') || l.title || 'без времени') + '</button>').join('') + '</div>' : '') +
         '</div>';
       const pos = layoutDay(ls);
@@ -1133,7 +1152,8 @@
     const dur = durFor([]);
     m.sheet.innerHTML =
       '<div class="sc-ed-head"><b>' + (opts.makeup ? 'Отработка' : 'Новое занятие') + '</b><button type="button" class="sc-x" aria-label="Закрыть">×</button></div>' +
-      (opts.makeup ? '<div class="hint">Обычное занятие с пометкой «отработка» — выберите день и время.</div>' : '') +
+      (opts.makeup ? '<div class="hint">Обычное занятие с пометкой «отработка» — выберите день и время.</div>'
+        : '<div class="seg sc-edkind" id="edKind" role="group" aria-label="Что добавить"><button type="button" data-k="lesson">Занятие</button><button type="button" data-k="event">◆ Событие</button></div>') +
       '<div class="sc-ed-grid">' +
         '<label><span class="label">День</span><input class="field" type="date" id="edDay" value="' + day + '"></label>' +
         '<label><span class="label">С</span><input class="field" type="time" step="900" id="edStart" value="' + timeVal(start) + '"></label>' +
@@ -1141,9 +1161,21 @@
       '</div>' +
       '<form id="edNewForm" class="sc-addrow"><input class="field" id="edNames" maxlength="300" placeholder="Маша, Петя" aria-label="Ученики через запятую" autocomplete="off" value="' + esc(opts.names || '') + '">' +
         '<button class="btn" type="submit" id="edCreate">Создать</button></form>' +
-      '<div class="hint">Имена через запятую. Двое — «пара», трое и больше — «группа»; формат можно сменить потом.</div>' +
+      '<div class="hint" id="edNewHint"></div>' +
       '<div class="form-msg" id="edMsg"></div><div class="sc-resolve" id="edResolve"></div>';
     m.sheet.querySelector('.sc-x').addEventListener('click', closeModal);
+    // событие (созвон, врач, вебинар) — не урок: вместо имён название
+    let isEvent = !!opts.event && !opts.makeup;
+    const paintKind = () => {
+      m.sheet.querySelectorAll('#edKind button').forEach(b => b.classList.toggle('on', (b.dataset.k === 'event') === isEvent));
+      const n = m.sheet.querySelector('#edNames');
+      n.placeholder = isEvent ? 'Созвон, врач, вебинар…' : 'Маша, Петя';
+      n.setAttribute('aria-label', isEvent ? 'Название события' : 'Ученики через запятую');
+      m.sheet.querySelector('#edNewHint').textContent = isEvent ? 'Событие не считается занятием: не доход и не часы.'
+        : 'Имена через запятую. Двое — «пара», трое и больше — «группа»; формат можно сменить потом.';
+    };
+    m.sheet.querySelectorAll('#edKind button').forEach(b => b.addEventListener('click', () => { isEvent = b.dataset.k === 'event'; paintKind(); m.sheet.querySelector('#edNames').focus(); }));
+    paintKind();
     // длительность по умолчанию держим, пока преподаватель не тронул «До»
     let endTouched = false;
     m.sheet.querySelector('#edEnd').addEventListener('input', () => { endTouched = true; });
@@ -1159,31 +1191,36 @@
       const hint = { start: s, dur: s != null && en != null && en > s && endTouched ? en - s : null };
       const btn = m.sheet.querySelector('#edCreate');
       btn.disabled = true;
-      const r = await createFromText(dayV, m.sheet.querySelector('#edNames').value, m.sheet.querySelector('#edResolve'), hint, opts.makeup);
+      const raw = m.sheet.querySelector('#edNames').value;
+      if (isEvent && !raw.trim()) { m.sheet.querySelector('#edMsg').textContent = 'Напишите, что за событие'; btn.disabled = false; return; }
+      const r = await createFromText(dayV, isEvent ? '◆ ' + raw : raw, m.sheet.querySelector('#edResolve'), hint, opts.makeup);
       if (!modal || modal !== m) return;
       btn.disabled = false;
-      if (r.lesson) { closeModal(); api.toast(opts.makeup ? 'Отработка назначена' : 'Занятие добавлено'); }
+      if (r.lesson) { closeModal(); api.toast(opts.makeup ? 'Отработка назначена' : isEvent ? 'Событие добавлено' : 'Занятие добавлено'); }
       else if (r.msg) m.sheet.querySelector('#edMsg').textContent = r.msg;
     });
     setTimeout(() => { const n = m.sheet.querySelector(opts.makeup ? '#edStart' : '#edNames'); if (n) n.focus(); }, 0);
   }
 
   function openEditor(l){
-    const m = modalShell('Занятие');
+    const m = modalShell(l.is_event ? 'Событие' : 'Занятие');
     m.lessonId = l.id;
     m.sheet.innerHTML =
-      '<div class="sc-ed-head"><b>Занятие</b><button type="button" class="sc-x" aria-label="Закрыть">×</button></div>' +
+      '<div class="sc-ed-head"><b>' + (l.is_event ? '◆ Событие' : 'Занятие') + '</b><button type="button" class="sc-x" aria-label="Закрыть">×</button></div>' +
       '<div class="sc-ed-grid">' +
         '<label><span class="label">День</span><input class="field" type="date" id="edDay"></label>' +
         '<label><span class="label">С</span><input class="field" type="time" step="900" id="edStart"></label>' +
         '<label><span class="label">До</span><input class="field" type="time" step="900" id="edEnd"></label>' +
       '</div>' +
-      '<div class="label">Формат</div><div class="seg sc-edfmt" id="edFmt"></div><div class="hint" id="edFmtHint"></div>' +
-      '<div class="label" style="margin-top:12px">Ученики</div><div class="sc-edpeople" id="edPeople"></div>' +
-      '<form id="edAddForm" class="sc-addrow"><input class="field" id="edAdd" maxlength="300" placeholder="Добавить: Маша, Петя" aria-label="Добавить учеников" autocomplete="off">' +
-        '<button class="btn quiet" type="submit">Добавить</button></form>' +
+      (l.is_event
+        ? '<label><span class="label">Название</span><input class="field sc-edtitle" id="edTitle" maxlength="200" placeholder="Созвон, врач, вебинар…"></label>' +
+          '<div class="hint">Событие не считается занятием: не доход и не часы.</div>'
+        : '<div class="label">Формат</div><div class="seg sc-edfmt" id="edFmt"></div><div class="hint" id="edFmtHint"></div>' +
+          '<div class="label" style="margin-top:12px">Ученики</div><div class="sc-edpeople" id="edPeople"></div>' +
+          '<form id="edAddForm" class="sc-addrow"><input class="field" id="edAdd" maxlength="300" placeholder="Добавить: Маша, Петя" aria-label="Добавить учеников" autocomplete="off">' +
+            '<button class="btn quiet" type="submit">Добавить</button></form>') +
       '<div class="form-msg" id="edMsg"></div><div class="sc-resolve" id="edResolve"></div>' +
-      '<div class="row-btns sc-ed-foot"><button type="button" class="btn danger" id="edDel">Удалить занятие</button>' +
+      '<div class="row-btns sc-ed-foot"><button type="button" class="btn danger" id="edDel">' + (l.is_event ? 'Удалить событие' : 'Удалить занятие') + '</button>' +
         '<button type="button" class="btn" id="edDone">Готово</button></div>';
     const q = s => m.sheet.querySelector(s);
     q('.sc-x').addEventListener('click', closeModal);
@@ -1201,7 +1238,12 @@
       q('#edMsg').textContent = '';
       patchLesson(l, { dur_min: en - l.start_min });
     });
-    q('#edAddForm').addEventListener('submit', async e => {
+    if (l.is_event) q('#edTitle').addEventListener('change', e => {
+      const v = e.target.value.trim().replace(/\s+/g, ' ');
+      if (!v) { e.target.value = l.title; return; }
+      if (v !== l.title) patchLesson(l, { title: v });
+    });
+    if (!l.is_event) q('#edAddForm').addEventListener('submit', async e => {
       e.preventDefault();
       const names = parseQuick(q('#edAdd').value).names;
       if (!names.length) return;
@@ -1225,7 +1267,7 @@
       try {
         await SC.deleteLesson(l.id);
         st.lessons = st.lessons.filter(x => x !== l);
-        closeModal(); render(); api.toast('Занятие удалено');
+        closeModal(); render(); api.toast(l.is_event ? 'Событие удалено' : 'Занятие удалено');
       } catch (er) { q('#edMsg').textContent = er.message; q('#edDel').disabled = false; }
     });
     paintEditor();
@@ -1240,6 +1282,7 @@
     setv('#edDay', l.day);
     setv('#edStart', timeVal(l.start_min));
     setv('#edEnd', l.start_min == null ? '' : timeVal(Math.min(1440, l.start_min + l.dur_min)));
+    if (l.is_event) { setv('#edTitle', l.title || ''); return; }
     q('#edFmt').innerHTML = SC.FORMATS.map(f => '<button type="button" data-v="' + f + '" class="' + (f === l.format ? 'on' : '') + '" title="' + esc(FMT_HINT[f]) + '">' + esc(fmtLabel(f)) + '</button>').join('');
     q('#edFmtHint').textContent = fmtLabel(l.format) + ' — ' + FMT_HINT[l.format];
     q('#edFmt').querySelectorAll('button').forEach(b => b.addEventListener('click', () => { if (b.dataset.v !== l.format) patchLesson(l, { format: b.dataset.v }); }));
@@ -1410,6 +1453,183 @@
     }
   }
 
+  /* ══ действия дня: ⧉ скопировать, ↓ вставить, ✕ очистить, ▤ все часы, ◆ событие ══
+     Отдельными функциями, а не внутри listHtml: разметку строк дня
+     переделывает редизайн (schedule-rows.js), и шапка дня берёт кнопки
+     одной строкой — dayActions(ref) в html и bindDayActions(host) после
+     отрисовки. ref — «week:ГГГГ-ММ-ДД» (день расписания) или «tpl:1…7»
+     (день текущего шаблона); как читать и писать дни шаблона, знает
+     schedule-tpl.js (ScheduleTpl.dayKind).
+
+     Буфер дня общий для расписания и шаблона и живёт в localStorage: день
+     копируют в одной вкладке, вставляют в другой (так было в старом
+     приложении). Копируется состав, время, формат, событие — без статусов
+     и оплат: вставленный день — новый, отметки у него свои */
+  const CLIP_KEY = 'cabinet:schedule:dayclip';
+  const HOURS_FROM = 9, HOURS_TO = 21;          // «развернуть все часы» — как в старом
+  st.expand = {};                               // ref → развёрнут (только на экране, в базу не пишется)
+  let dayBusy = false;
+  function clipRead(){
+    try { const c = JSON.parse(localStorage.getItem(CLIP_KEY) || 'null'); return c && Array.isArray(c.items) ? c : null; } catch (e) { return null; }
+  }
+  function clipWrite(c){ try { if (c) localStorage.setItem(CLIP_KEY, JSON.stringify(c)); else localStorage.removeItem(CLIP_KEY); } catch (e) {} }
+  const itemOf = x => ({ start_min: x.start_min, dur_min: x.dur_min, format: x.format, is_event: !!x.is_event, title: x.title || '', note: x.note || '',
+    group_id: x.group_id || null, people: x.is_event ? [] : x.people.map(p => (p.student_id ? { student_id: p.student_id } : { guest_name: p.guest_name })) });
+  const weekKind = {
+    items: day => lessonsOf(day),
+    label: day => DAY_SHORT[weekday(day)] + ', ' + dayText(day),
+    noun: n => plural(n, 'занятие', 'занятия', 'занятий'),
+    start: id => { const l = findLesson(id); return l ? l.start_min : null; },
+    async remove(list){
+      const ids = new Set(list.map(l => l.id));
+      await SC.deleteLessons(Array.from(ids));
+      st.lessons = st.lessons.filter(l => !ids.has(l.id));
+    },
+    async insert(day, items){
+      const ls = await SC.addLessons(items.map(it => ({ f: Object.assign({ day }, it), people: it.people })));
+      st.lessons = st.lessons.concat(ls);
+      return ls.length;
+    },
+    // новая строка с готовым началом: «10:00 » из ▤ или «◆ »
+    openQuick(day, text){
+      const q = String(text || '').match(/^(\d{1,2}:\d{2})\s*(.*)$/);
+      rows.startNew(day, q ? R.parseTime(q[1]) : null, q ? q[2] : String(text || ''));
+      return true;
+    },
+    newEvent(day){ openNew(day, null, { event: true }); },
+  };
+  const kindOf = ref => { const k = ref.slice(0, ref.indexOf(':')); return k === 'tpl' ? TPL().dayKind : weekKind; };
+  const keyOf = ref => ref.slice(ref.indexOf(':') + 1);
+  const marked = list => list.some(x => (x.people || []).some(p => p.status && p.status !== 'plan'));
+
+  function dayActions(ref, compact){
+    const K = kindOf(ref), key = keyOf(ref), n = K.items(key).length, clip = clipRead();
+    const b = (act, sign, title, dis, on) => '<button type="button" class="sc-da' + (on ? ' on' : '') + '" data-dact="' + act + '" data-ref="' + esc(ref) + '"' +
+      (dis || dayBusy ? ' disabled' : '') + ' title="' + esc(title) + '" aria-label="' + esc(title) + '">' + sign + '</button>';
+    return '<span class="sc-dacts">' +
+      b('copy', '⧉', n ? 'Скопировать день (' + K.noun(n) + ')' : 'Скопировать день — в нём пусто', !n) +
+      b('paste', '↓', clip ? 'Вставить скопированный день: ' + clip.label : 'Вставить день — сначала скопируйте день кнопкой ⧉', !clip) +
+      b('event', '◆', 'Добавить событие — не занятие: не доход и не часы') +
+      (compact ? '' : b('hours', '▤', st.expand[ref] ? 'Свернуть пустые часы' : 'Развернуть все часы ' + HOURS_FROM + '–' + HOURS_TO, false, st.expand[ref])) +
+      b('clear', '✕', n ? 'Очистить день' : 'Очистить день — в нём пусто', !n) +
+      '</span>';
+  }
+  // «очистить неделю» (ref «week:» — неделя расписания, «tpl:» — весь шаблон)
+  function weekClearHtml(ref){
+    const all = ref === 'tpl:' ? TPL().dayKind.all() : st.lessons;
+    return '<button type="button" class="btn quiet small sc-wclear" data-wclear="' + esc(ref) + '"' + (all.length && !dayBusy ? '' : ' disabled') +
+      ' title="' + (ref === 'tpl:' ? 'Удалить все слоты шаблона' : 'Удалить все занятия этой недели') + '">✕ ' + (ref === 'tpl:' ? 'Очистить шаблон' : 'Очистить неделю') + '</button>';
+  }
+
+  // своё стеклянное окно вопроса вместо confirm(): ответ — value кнопки или null
+  function askSheet(title, text, buttons){
+    return new Promise(resolve => {
+      const m = modalShell(title);
+      let done = false;
+      const fin = v => { if (done) return; done = true; if (modal === m) closeModal(); resolve(v); };
+      m.sheet.innerHTML = '<div class="sc-ed-head"><b>' + esc(title) + '</b><button type="button" class="sc-x" aria-label="Закрыть">×</button></div>' +
+        '<div class="sc-ask-text">' + text + '</div>' +
+        '<div class="row-btns sc-ask-btns">' + buttons.map((x, i) => '<button type="button" class="btn' + (x.cls ? ' ' + x.cls : '') + '" data-i="' + i + '">' + esc(x.label) + '</button>').join('') + '</div>';
+      m.sheet.querySelector('.sc-x').addEventListener('click', () => fin(null));
+      m.sheet.querySelectorAll('[data-i]').forEach(x => x.addEventListener('click', () => fin(buttons[Number(x.dataset.i)].value)));
+      // окно закрыли мимо кнопок (Esc, щелчок по фону) — это «нет»
+      const obs = new MutationObserver(() => { if (!m.el.isConnected) { obs.disconnect(); fin(null); } });
+      obs.observe(document.body, { childList: true });
+      setTimeout(() => { const last = m.sheet.querySelector('[data-i]:last-child'); if (last) last.focus(); }, 0);
+    });
+  }
+  const lossNote = list => (marked(list) ? '<br><span class="sc-ask-warn">У части уже есть отметки (проведено, пропуск) — они пропадут вместе с занятиями.</span>' : '');
+
+  async function busyRun(fn){
+    if (dayBusy) return;
+    dayBusy = true; render();
+    try { await fn(); }
+    // часть могла лечь — правду знает только база, перечитываем неделю и шаблоны
+    catch (e) { api.toast('Не сохранилось: ' + (e.message || e)); load(); }
+    finally { dayBusy = false; render(); }
+  }
+
+  function copyDay(ref){
+    const K = kindOf(ref), key = keyOf(ref), list = K.items(key);
+    if (!list.length) return;
+    clipWrite({ from: ref.slice(0, ref.indexOf(':')), label: K.label(key), items: list.map(itemOf), at: Date.now() });
+    render();
+  }
+  async function pasteDay(ref){
+    const clip = clipRead();
+    if (!clip || !clip.items.length) return;
+    const K = kindOf(ref), key = keyOf(ref), old = K.items(key);
+    let mode = 'add';
+    if (old.length) {
+      mode = await askSheet('Вставить день',
+        'В «' + esc(K.label(key)) + '» уже ' + esc(K.noun(old.length)) + '. Заменить ' + (old.length === 1 ? 'его' : 'их') + ' скопированным днём «' + esc(clip.label) + '» (' + esc(K.noun(clip.items.length)) + ')?' + lossNote(old),
+        [{ label: 'Отмена', cls: 'quiet', value: null }, { label: 'Добавить к ним', cls: 'quiet', value: 'add' }, { label: 'Заменить ' + K.noun(old.length), cls: 'danger', value: 'replace' }]);
+      if (!mode) return;
+    }
+    await busyRun(async () => {
+      // сначала удаляем, потом вставляем: при «заменить» с пересечением по
+      // времени иначе на миг стояли бы оба занятия
+      if (mode === 'replace') await K.remove(old);
+      const n = await K.insert(key, clip.items);
+      api.toast('Вставлено: ' + K.noun(n));
+    });
+  }
+  async function clearDay(ref){
+    const K = kindOf(ref), key = keyOf(ref), list = K.items(key);
+    if (!list.length) return;
+    const ok = await askSheet('Очистить день', 'Удалить ' + esc(K.noun(list.length)) + ' — «' + esc(K.label(key)) + '»? Отменить это нельзя.' + lossNote(list),
+      [{ label: 'Отмена', cls: 'quiet', value: null }, { label: 'Удалить ' + K.noun(list.length), cls: 'danger', value: true }]);
+    if (!ok) return;
+    await busyRun(async () => { await K.remove(list); api.toast('День очищен'); });
+  }
+  async function clearWeek(ref){
+    const tpl = ref === 'tpl:', K = tpl ? TPL().dayKind : weekKind;
+    const list = tpl ? K.all() : st.lessons.slice();
+    if (!list.length) return;
+    const where = tpl ? 'из шаблона «' + esc(K.name()) + '»' : 'с недели ' + esc(rangeText(st.week));
+    const ok = await askSheet(tpl ? 'Очистить шаблон' : 'Очистить неделю', 'Удалить ' + esc(K.noun(list.length)) + ' ' + where + '? Отменить это нельзя.' + lossNote(list),
+      [{ label: 'Отмена', cls: 'quiet', value: null }, { label: 'Удалить ' + K.noun(list.length), cls: 'danger', value: true }]);
+    if (!ok) return;
+    await busyRun(async () => { await K.remove(list); api.toast(tpl ? 'Шаблон очищен' : 'Неделя очищена'); });
+  }
+
+  function bindDayActions(root){
+    root.querySelectorAll('[data-dact]').forEach(b => b.addEventListener('click', e => {
+      e.stopPropagation();
+      const ref = b.dataset.ref, K = kindOf(ref), key = keyOf(ref);
+      const a = b.dataset.dact;
+      if (a === 'copy') copyDay(ref);
+      else if (a === 'paste') pasteDay(ref);
+      else if (a === 'clear') clearDay(ref);
+      else if (a === 'hours') { st.expand[ref] = !st.expand[ref]; render(); }
+      else if (a === 'event') K.newEvent(key);
+    }));
+    root.querySelectorAll('[data-wclear]').forEach(b => b.addEventListener('click', () => clearWeek(b.dataset.wclear)));
+  }
+
+  // ▤ виртуальные пустые окна рисует schedule-rows.js (cfg.hoursOpen):
+  // строка на каждый свободный час 9–21, в базу ничего не пишется
+
+  // плашка буфера: внизу экрана, вне разметки дней — переживает любой вид
+  function paintClip(){
+    let el = document.getElementById('scClip');
+    const clip = clipRead();
+    const visible = clip && host && host.isConnected && host.offsetParent !== null && (st.mode === 'week' || st.mode === 'tpl');
+    if (!visible) { if (el) el.remove(); return; }
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'scClip';
+      el.className = 'sc-clip panel';
+      el.setAttribute('role', 'status');
+      document.body.appendChild(el);
+    }
+    el.innerHTML = '<span>Скопирован день <b>' + esc(clip.label) + '</b> · ' + esc(plural(clip.items.length, 'строка', 'строки', 'строк')) + ' — жмите ↓ у нужного дня</span>' +
+      '<button type="button" class="btn quiet small" id="scClipX">Отменить</button>';
+    el.querySelector('#scClipX').addEventListener('click', () => { clipWrite(null); render(); });
+  }
+  // день скопировали в другой вкладке — у кнопок ↓ и на плашке сразу видно
+  window.addEventListener('storage', e => { if (e.key === CLIP_KEY && host && st.week) render(); });
+
   /* ── отрисовка ── */
   // пока в форме быстрого ввода висит вопрос о незнакомом имени, полная
   // перерисовка снесла бы его кнопки (их ждёт промис resolveNames). Поэтому
@@ -1435,7 +1655,9 @@
     if (lookBtn) lookBtn.addEventListener('click', () => R.openMenu(lookBtn, lookItems(), { checks: true, cls: 'gm-look' }));
     const retry = host.querySelector('#scRetry');
     if (retry) retry.addEventListener('click', load);
+    paintClip();
     if (loading || st.err) return;
+    bindDayActions(host);
     if (st.mode !== 'week') { TPL().bindPane(host); return; }
     TPL().bindWeekMenu(host);
     if (st.view === 'grid') {
@@ -1454,7 +1676,8 @@
     api = opts;
     TPL().attach({ st, SC, api: () => api, esc, pad, hm, addDays, toDate, mondayOf, DAY_SHORT, DAY_LONG, FMT_HINT, fmtLabel, plural, rangeText, dayText,
       timeText, timeVal, readTime, parseQuick, norm, resolveNames, resolveEntry, activeStudents, personName, durFor, defaultFormat, groupOf,
-      modalShell, closeModal, getModal: () => modal, render, reload: () => load(), look: () => look, setBusy: v => { rowsBusy = v; if (!v && pending) render(); } });
+      modalShell, closeModal, getModal: () => modal, render, reload: () => load(), look: () => look, setBusy: v => { rowsBusy = v; if (!v && pending) render(); },
+      dayActions, weekClearHtml, itemOf });
     host = opts.host;
     st.view = readView();
     if (api.settingsChanged) api.settingsChanged(() => { if (st.week) render(); });
@@ -1473,5 +1696,5 @@
     return load();
   }
 
-  window.Schedule = { init, show, hide: () => { closePanel(); closeStudentCard(); R.closeMenu(); }, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), setMode: m => { st.mode = m; render(); } };
+  window.Schedule = { init, show, hide: () => { closePanel(); closeStudentCard(); R.closeMenu(); const c = document.getElementById('scClip'); if (c) c.remove(); }, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), setMode: m => { st.mode = m; render(); } };
 })();
