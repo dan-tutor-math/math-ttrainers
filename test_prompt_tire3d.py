@@ -482,7 +482,8 @@ def test_links(browser):
     page.goto(BASE+'/index.html')
     page.wait_for_timeout(200)
     # Вкладка ОГЭ может быть не выбрана: проверяем построение той же строки каталога.
-    check('ссылка на главной у №1–5',page.evaluate('itemHTML(TRAINERS.oge1_5,0,0).includes("tire3d.html")'))
+    # 3D-шина живёт внутри №1–5 → «Шины» (кнопка в теории), на главной ссылки нет.
+    check('на главной нет отдельной ссылки на 3D-шину',page.evaluate('!itemHTML(TRAINERS.oge1_5,0,0).includes("tire3d.html")'))
     check('интеграция ссылок без ошибок JS',not errors);ctx.close()
 
 
