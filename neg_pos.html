@@ -8,6 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0B0E1A">
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<script src="bg-style.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Тренажёр: положительные и отрицательные числа</title>
 <link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
@@ -60,10 +61,7 @@ body{
   background:
     radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
     radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
-    linear-gradient(var(--grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
     var(--bg);
-  background-size:auto,auto,24px 24px,24px 24px,auto;
   font-family:var(--font-ui);color:var(--pencil);min-height:100vh;padding:18px 12px 60px;
 }
 .home-btn,.theme-toggle{position:fixed;top:16px;width:40px;height:40px;border-radius:14px;border:1px solid var(--glass-border);background:var(--glass-strong);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);color:var(--ink);cursor:pointer;display:flex;align-items:center;justify-content:center;text-decoration:none;z-index:50}

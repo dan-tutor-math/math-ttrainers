@@ -8,6 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0B0E1A">
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<script src="bg-style.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Тренажёр: сложение в столбик</title>
 <link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
@@ -89,10 +90,7 @@ body{
   background:
     radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
     radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
-    linear-gradient(var(--grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
     var(--bg);
-  background-size:auto,auto,24px 24px,24px 24px,auto;
   font-family:var(--font-ui);
   color:var(--pencil);
   min-height:100vh;
@@ -148,8 +146,6 @@ h1{
 .sheet{
   position:relative;
   background:
-    linear-gradient(var(--grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
     var(--paper);
   background-size:var(--cell) var(--cell);
   border:1px solid var(--glass-border);

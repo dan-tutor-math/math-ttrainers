@@ -8,6 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0B0E1A">
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<script src="bg-style.js"></script>
 <!-- предмет ставим на <html> до первого кадра, как тему: от него зависит цвет
      всей страницы, и без этого русский на мгновение мигал бы синим -->
 <script>(function(){var s='math';try{var q=new URLSearchParams(location.search).get('subject');s=q||localStorage.getItem('ogeNav:subject')||'math';}catch(e){}if(!/^(math|rus|soc|eng|phys|inf)$/.test(s))s='math';document.documentElement.setAttribute('data-subject',s);})();</script>
@@ -119,8 +120,6 @@ body{
   background:
     radial-gradient(circle at 6% -8%, var(--blob-1) 0%, transparent 40%),
     radial-gradient(circle at 102% 8%, var(--blob-2) 0%, transparent 38%),
-    linear-gradient(var(--grid) 1px, transparent 1px),
-    linear-gradient(90deg, var(--grid) 1px, transparent 1px),
     var(--bg);
   /* цветные пятна — в коробке постоянной высоты, а не во всю страницу:
      «circle at 6% -8%» считает центр и радиус от высоты body, и на длинном
@@ -128,8 +127,9 @@ body{
      страницы темнел. 1460px — высота страницы на «Экзамены → ОГЭ», под её
      оттенок и подогнано; ниже коробки пятна уже прозрачные, повтор не нужен.
      Не background-attachment:fixed — на iPhone он молча становится scroll */
-  background-size:100% 1460px,100% 1460px,24px 24px,24px 24px,auto;
-  background-repeat:no-repeat,no-repeat,repeat,repeat,repeat;
+  /* слои фона собирает bg-style.js; тут — только размер и повтор пятен */
+  --bgp-blob-size:100% 1460px;
+  --bgp-blob-repeat:no-repeat;
   font-family:var(--font-ui);
   color:var(--pencil);
   min-height:100vh;
@@ -472,6 +472,21 @@ body .ts-share-pop{top:16px;right:calc(16px + var(--lg-menu-w, 48px) + 12px);max
     fx.el.setAttribute('aria-label', fxLabel(m)); fx.el.setAttribute('aria-pressed', m === 'full' ? 'true' : 'false'); }
   fxSync(MathhGlass.mode());
   MathhGlass.onChange(fxSync);
+
+  // фон страницы (bg-style.js): по кругу — по предмету, чистый, клетка,
+  // крупная клетка, точки, линейка. Выбор общий для главной и тренажёров
+  function bgLabel(){
+    var id = MathhBg.get();
+    var p = MathhBg.presets.filter(function(x){ return x.id === id; })[0];
+    return 'Фон: ' + p.title.toLowerCase();
+  }
+  var bgBtn = menu.add({ id: 'bgToggle', icon: 'board', label: bgLabel(), keepOpen: true,
+    onClick: function(){
+      var ids = MathhBg.presets.map(function(x){ return x.id; });
+      MathhBg.set(ids[(ids.indexOf(MathhBg.get()) + 1) % ids.length]);
+    } });
+  function bgSync(){ bgBtn.setLabel(bgLabel()); bgBtn.el.setAttribute('aria-label', bgLabel()); bgBtn.setActive(MathhBg.get() !== 'auto'); }
+  MathhBg.onChange(bgSync);
 
   var resetBtn = document.getElementById('resetProgressBtn');
   resetBtn.innerHTML = MathhIcons.html('reset');
