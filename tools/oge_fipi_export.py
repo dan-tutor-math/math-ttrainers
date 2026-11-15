@@ -163,7 +163,7 @@ def field_for(cfg, n, t, ok, key):
     return {'id': 'a', 'label': 'Ответ:', 'type': 'plain', 'value': ok}
 
 
-def prototype(cfg, src, n, t, ver, key):
+def prototype(cfg, src, n, t, ver, key, sol=None):
     ok = str(ver.get('ok') or '')
     if not ok or ver.get('guid') != t['guid']:
         raise ValueError(t['id'] + ': нет принятого ФИПИ ключа')
@@ -182,9 +182,33 @@ def prototype(cfg, src, n, t, ver, key):
             raise ValueError(t['id'] + ': потеряно место рисунка ' + path)
     f = field_for(cfg, n, t, ok, key)
     shown = html.escape(ok.replace('.', ','))
-    return {'id': t['id'], 'fipi': t['id'], 'ok': 1, 'h': int(t.get('conf27') == 'heur'),
-            'text': '<div class="soc-text">' + body + '</div>', 'peek': peek(body), 'fields': [f],
-            'steps': ['Ответ, принятый открытым банком ФИПИ: <b>' + shown + '</b>.'], 'answerTex': shown}
+    p = {'id': t['id'], 'fipi': t['id'], 'ok': 1, 'h': int(t.get('conf27') == 'heur'),
+         'text': '<div class="soc-text">' + body + '</div>', 'peek': peek(body), 'fields': [f],
+         'steps': ['Ответ, принятый открытым банком ФИПИ: <b>' + shown + '</b>.'], 'answerTex': shown}
+    if sol:
+        # разбор есть — он заменяет строку-заглушку с одним ключом; «Идея» идёт отдельным полем,
+        # страница показывает её над шагами
+        p['steps'] = list(sol['steps'])
+        if sol.get('hint'):
+            p['hint'] = sol['hint']
+    return p
+
+
+def solutions(src, cfg, n):
+    """Разборы номера из fipi-pilot/sol/<банк>/<номер>.json (их проверяет sol/sol_check.py).
+
+    Файла нет — номер остаётся с заглушкой. Файл есть — разбор обязан быть у каждого
+    задания номера: молча выложить половину номера с разбором, половину без — хуже, чем упасть."""
+    path = src.parent / 'sol' / cfg['pref'] / ('%d.json' % n)
+    if not path.exists():
+        return None
+    out = {}
+    for tid, s in json.loads(path.read_text(encoding='utf-8')).items():
+        s = {'steps': s} if isinstance(s, list) else s
+        if not s.get('steps') or not all(isinstance(x, str) and x.strip() for x in s['steps']):
+            raise ValueError('%s: пустой разбор в %s' % (tid, path.name))
+        out[tid] = s
+    return out
 
 
 def groups_for(cfg, ts):
@@ -255,7 +279,12 @@ def build(cfg, src):
         if not ts:
             raise ValueError('пустой номер %d' % n)
         sections, groups, pick = groups_for(cfg, ts)
-        protos = [dict(prototype(cfg, src, n, t, verify[t['id']], keys.get(t['id'], {})), group=pick[t['id']]) for t in ts]
+        sols = solutions(src, cfg, n)
+        if sols is not None:
+            lost = [t['id'] for t in ts if t['id'] not in sols]
+            if lost:
+                raise ValueError('№%d: нет разбора у %d заданий: %s' % (n, len(lost), ', '.join(lost[:8])))
+        protos = [dict(prototype(cfg, src, n, t, verify[t['id']], keys.get(t['id'], {}), (sols or {}).get(t['id'])), group=pick[t['id']]) for t in ts]
         rank = {g['id']: i for i, g in enumerate(groups)}
         protos.sort(key=lambda p: (rank[p['group']], p['id']))
         for p in protos:
