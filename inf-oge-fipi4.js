@@ -1061,6 +1061,27 @@ window.INF_OGE_FIPI.tasks['4'] = {
    "group": "k2.11"
   },
   {
+   "id": "8323C8",
+   "fipi": "8323C8",
+   "ok": 1,
+   "h": 0,
+   "text": "<div class=\"soc-text\"><p>Между населёнными пунктами A, B, C, D, E, F построены дороги, протяжённость которых (в километрах) приведена в таблице.</p> <table class=\"grid\"> <tr> <td>  </td> <td> <p>A</p> </td> <td> <p>B</p> </td> <td> <p>C</p> </td> <td> <p>D</p> </td> <td> <p>E</p> </td> <td> <p>F</p> </td> </tr> <tr> <td> <p>A</p> </td> <td>  </td> <td> <p>3</p> </td> <td> <p>4</p> </td> <td>  </td> <td>  </td> <td> <p>15</p> </td> </tr> <tr> <td> <p>B</p> </td> <td> <p>3</p> </td> <td>  </td> <td> <p>2</p> </td> <td>  </td> <td>  </td> <td>  </td> </tr> <tr> <td> <p>C</p> </td> <td> <p>4</p> </td> <td> <p>2</p> </td> <td>  </td> <td> <p>1</p> </td> <td>  </td> <td>  </td> </tr> <tr> <td> <p>D</p> </td> <td>  </td> <td>  </td> <td> <p>1</p> </td> <td>  </td> <td> <p>2</p> </td> <td> <p>6</p> </td> </tr> <tr> <td> <p>E</p> </td> <td>  </td> <td>  </td> <td>  </td> <td> <p>2</p> </td> <td>  </td> <td> <p>2</p> </td> </tr> <tr> <td> <p>F</p> </td> <td> <p>15</p> </td> <td>  </td> <td>  </td> <td> <p>6</p> </td> <td> <p>2</p> </td> <td>  </td> </tr> </table>  <p>Определите длину кратчайшего пути между пунктами A и F, <b>не</b> проходящего через пункт B. Передвигаться можно только по дорогам, указанным <br> в таблице. Каждый пункт можно посетить только один раз.</p></div>",
+   "peek": "Между населёнными пунктами A, B, C, D, E, F построены дороги, протяжённость которых (в километрах) приведена в таблице. A B C D E F A 3 4 15 B 3 2 C 4…",
+   "fields": [
+    {
+     "id": "a",
+     "label": "Ответ:",
+     "type": "plain",
+     "value": "9"
+    }
+   ],
+   "steps": [
+    "Ответ, принятый открытым банком ФИПИ: <b>9</b>."
+   ],
+   "answerTex": "9",
+   "group": "k2.11"
+  },
+  {
    "id": "8B45B8",
    "fipi": "8B45B8",
    "ok": 1,
