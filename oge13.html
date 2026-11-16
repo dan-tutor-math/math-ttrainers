@@ -610,6 +610,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="session-share.js"></script>
 <script src="mode-card-keys.js"></script>
 <script src="exam-spec.js"></script>
+<script src="variant-set.js"></script>
 <script src="exam-nav.js"></script>
 <script src="trainer-multi.js"></script>
 <script>
@@ -1608,6 +1609,12 @@ window.__trainerCatalog = {
     return Promise.resolve(ALL_MODES.filter(m => !m.demo).map(m => ({
       id: m.id, title: m.title, section: null, fipi: [], hasGen: true,
     })));
+  },
+  /* что сейчас на экране: { n, proto, pos, fipi } или null на экране выбора. Только читает (кнопка «＋ В вариант», exam-nav.js) */
+  current(){
+    if (!curMode || !curTask || els.taskArea.style.display === 'none') return null;
+    const m = ALL_MODES.find(x => x.id === curMode && !x.demo);
+    return m ? { n: null, proto: curMode, pos: null, fipi: null } : null;
   },
   openAt(protoId, pos){
     const m = ALL_MODES.find(x => x.id === protoId && !x.demo);

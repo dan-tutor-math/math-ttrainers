@@ -635,6 +635,241 @@
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-focus'] });
   }
 
+  /* ── «＋ В вариант» (этап 6 конструктора вариантов) ──
+     Кнопка справа от стрелок: кладёт в Набор (variant-set.js) строку-рецепт —
+     «это задание» / «этот прототип ×N» / «весь номер». Что сейчас на экране,
+     говорит каталог тренажёра (__trainerCatalog.current()); сама кнопка
+     ничего не пишет в тренажёр и ничего не шлёт в совместную сессию.
+     Видна только вошедшему учителю: ученику в сессии, панели доски и кадру
+     ученика она не нужна, а без входа Набор некому собирать */
+  const VB_MAX = 30;
+  let vbBtn = null, vbPop = null, vbBadge = null, vbMsg = null, vbBody = null;
+  let vbH1 = null;
+  let vbAuth = false, vbCountN = 3, vbSb = null;
+  function vbClient() {
+    if (vbSb) return vbSb;
+    try { if (window.CabinetCloud && window.CabinetCloud.client && window.CabinetCloud.client()) return (vbSb = window.CabinetCloud.client()); } catch (e) {}
+    const cfg = window.SUPABASE_CONFIG || {};
+    if (!cfg.url || !cfg.anonKey || !window.supabase || !window.supabase.createClient) return null;
+    try { vbSb = (window.rtGuard || (c => c))(window.supabase.createClient(cfg.url, cfg.anonKey)); } catch (e) { vbSb = null; }
+    return vbSb;
+  }
+  async function vbRefreshAuth() {
+    const c = vbClient();
+    let ok = false;
+    if (c) { try { const r = await c.auth.getSession(); ok = !!(r && r.data && r.data.session); } catch (e) {} }
+    vbAuth = ok;
+    vbSync();
+  }
+  function vbFollower() {
+    try { if (window.StudentMemory && window.StudentMemory.isFollower) return !!window.StudentMemory.isFollower(); } catch (e) {}
+    const ts = TS();
+    try { if (ts && ts.getCode && ts.getCode() && ts.isLeader && !ts.isLeader()) return true; } catch (e) {}
+    if (ssGet('tsTab:role') === 'follower' || params.get('s')) return true;
+    return window.name === 'tsStageFrame';
+  }
+  const vbReady = () => !!(window.VariantSet && window.ExamSpec && window.__trainerCatalog);
+  const vbShown = () => !panelFrameId && vbReady() && vbAuth && !vbFollower();
+  function vbCur() {
+    try { return window.__trainerCatalog && window.__trainerCatalog.current ? window.__trainerCatalog.current() : null; } catch (e) { return null; }
+  }
+  function vbSpec() { return window.ExamSpec ? window.ExamSpec.find(slug, curN()) : null; }
+  function vbRow(kind, cur, n) {
+    const sp = vbSpec();
+    if (!sp) return null;
+    const title = EXAMS[sp.exam] ? EXAMS[sp.exam].title : sp.exam;
+    const from = title + ' ' + sp.label;
+    const row = { exam: sp.exam, slug: sp.slug, n: sp.n == null ? null : sp.n, tid: null, href: sp.slug + '.html' + (sp.n != null ? '?n=' + sp.n : ''),
+      proto: null, pos: null, fipi: null, count: 1, source: 'order', from: from };
+    if (kind === 'task') {
+      row.proto = cur.proto; row.pos = cur.pos; row.fipi = cur.fipi;
+      row.from = from + ', ФИПИ ' + cur.fipi;
+    } else if (kind === 'proto') {
+      row.proto = cur.proto; row.count = n;
+      row.from = from + ', прототип ' + cur.proto;
+    }
+    return row;
+  }
+  // та же строка (номер, прототип, место) уже в Наборе — прибавляем количество
+  function vbAdd(kind, n) {
+    const cur = vbCur();
+    if ((kind === 'task' && !(cur && cur.fipi)) || (kind === 'proto' && !(cur && cur.proto))) return null;
+    const row = vbRow(kind, cur, n);
+    if (!row) return null;
+    const same = window.VariantSet.all().find(x => x.exam === row.exam && x.slug === row.slug && (x.n == null ? null : x.n) === row.n
+      && (x.proto || null) === row.proto && (x.pos == null ? null : x.pos) === row.pos && (x.fipi || null) === row.fipi);
+    if (same) {
+      const total = Math.min(VB_MAX, (same.count || 1) + row.count);
+      window.VariantSet.update(same.id, { count: total });
+      return 'уже в наборе, теперь ×' + total;
+    }
+    window.VariantSet.add(row);
+    return 'добавлено в набор' + (row.count > 1 ? ' ×' + row.count : '');
+  }
+  function vbSync() {
+    if (!vbBtn) return;
+    const show = vbShown();
+    if (show && !vbBtn.isConnected && vbH1) vbH1.appendChild(vbBtn);
+    if (!show && vbBtn.isConnected) vbBtn.remove();
+    vbBtn.hidden = !show;
+    if (!show && vbPop && !vbPop.hidden) vbClose();
+    if (!show) return;
+    const c = window.VariantSet.count();
+    vbBadge.textContent = c ? String(c) : '';
+    vbBadge.hidden = !c;
+    const label = 'В вариант' + (c ? ': в наборе ' + c : '');
+    vbBtn.title = label + '. Shift — сразу «Это задание»';
+    vbBtn.setAttribute('aria-label', label);
+    if (vbPop && !vbPop.hidden) vbRender(true);
+  }
+  function vbPosition() {
+    if (!vbPop || vbPop.hidden) return;
+    const r = vbBtn.getBoundingClientRect(), w = Math.min(320, innerWidth - 24);
+    vbPop.style.width = w + 'px';
+    vbPop.style.left = Math.max(12, Math.min(innerWidth - w - 12, r.right - w)) + 'px';
+    vbPop.style.top = Math.min(innerHeight - 80, r.bottom + 8) + 'px';
+  }
+  function vbClose(focus) {
+    if (!vbPop || vbPop.hidden) return;
+    vbPop.hidden = true;
+    vbBtn.setAttribute('aria-expanded', 'false');
+    if (focus) vbBtn.focus();
+  }
+  function vbRender() {
+    const cur = vbCur(), count = window.VariantSet.count();
+    vbBody.textContent = '';
+    const doAdd = (kind, n) => () => {
+      const msg = vbAdd(kind, n);
+      vbRender();
+      vbMsg.textContent = msg || 'Сейчас на экране нет такого задания';
+    };
+    const row = (label, hint, ok, extra, action) => {
+      const line = el('div', 'vb-row');
+      const b = el('button', 'vb-add');
+      b.type = 'button';
+      b.disabled = !ok;
+      b.append(el('span', 'vb-t', label), el('span', 'vb-h', hint));
+      if (action) b.addEventListener('click', action);
+      line.appendChild(b);
+      if (extra) line.appendChild(extra);
+      return line;
+    };
+    vbBody.appendChild(row('Это задание',
+      cur && cur.fipi ? 'ФИПИ ' + cur.fipi : (cur ? 'у этого задания нет номера ФИПИ' : 'сначала откройте задание'),
+      !!(cur && cur.fipi), null, doAdd('task', 1)));
+    const step = el('div', 'vb-step');
+    const minus = el('button', 'vb-sb', '−'), plus = el('button', 'vb-sb', '+'), val = el('span', 'vb-n', '×' + vbCountN);
+    minus.type = plus.type = 'button';
+    minus.id = 'vbMinus'; plus.id = 'vbPlus'; val.id = 'vbCountVal';
+    minus.setAttribute('aria-label', 'Меньше'); plus.setAttribute('aria-label', 'Больше');
+    minus.disabled = vbCountN <= 1; plus.disabled = vbCountN >= VB_MAX;
+    minus.addEventListener('click', () => { vbCountN = Math.max(1, vbCountN - 1); vbRender(); });
+    plus.addEventListener('click', () => { vbCountN = Math.min(VB_MAX, vbCountN + 1); vbRender(); });
+    step.append(minus, val, plus);
+    const protoRow = row('Этот прототип ×' + vbCountN, cur && cur.proto ? 'ещё ' + vbCountN + ' из его банка' : 'сначала откройте задание',
+      !!(cur && cur.proto), step, doAdd('proto', vbCountN));
+    protoRow.firstChild.id = 'vbAddProto';
+    vbBody.appendChild(protoRow);
+    vbBody.firstChild.firstChild.id = 'vbAddTask';
+    const all = row('Весь номер ×1', 'один прототип с заданиями ФИПИ', true, null, doAdd('all', 1));
+    all.firstChild.id = 'vbAddAll';
+    vbBody.appendChild(all);
+    const foot = el('div', 'vb-foot');
+    const go = el('a', 'vb-go', 'Собрать работу →');
+    go.id = 'vbGo';
+    go.href = 'works.html#/build';
+    const cnt = el('span', 'vb-cnt', 'В наборе: ' + count);
+    cnt.id = 'vbCount';
+    foot.append(go, cnt);
+    vbBody.appendChild(foot);
+  }
+  function vbOpen() {
+    vbMsg.textContent = '';
+    vbPop.hidden = false;
+    vbBtn.setAttribute('aria-expanded', 'true');
+    vbRender();
+    vbPosition();
+  }
+  function mountVariant(h1) {
+    const style = document.createElement('style');
+    style.id = 'examVariantStyle';
+    style.textContent = VB_CSS;
+    document.head.appendChild(style);
+    vbBtn = el('button', 'exam-nav-btn exam-vb-btn');
+    vbBtn.type = 'button';
+    vbBtn.id = 'examVariantBtn';
+    vbBtn.setAttribute('aria-haspopup', 'true');
+    vbBtn.setAttribute('aria-expanded', 'false');
+    vbBadge = el('span', 'vb-badge'); vbBadge.hidden = true;
+    vbBtn.append(el('span', 'vb-plus', '＋'), el('span', 'vb-label', 'В вариант'), vbBadge);
+    vbH1 = h1;   // в заголовок кнопка встаёт, только когда видна (vbSync): остальным он остаётся как был
+    vbPop = el('div', 'exam-vb-pop');
+    vbPop.id = 'examVariantPop';
+    vbPop.hidden = true;
+    vbPop.setAttribute('role', 'dialog');
+    vbPop.setAttribute('aria-label', 'Добавить в вариант');
+    vbMsg = el('div', 'vb-msg');
+    vbMsg.id = 'vbMsg';
+    vbMsg.setAttribute('aria-live', 'polite');
+    vbBody = el('div', 'vb-body');
+    vbPop.append(vbBody, vbMsg);
+    document.body.appendChild(vbPop);
+    vbBtn.addEventListener('click', event => {
+      if (event.shiftKey) {
+        const msg = vbAdd('task', 1);
+        vbOpen();
+        vbMsg.textContent = msg || 'Сейчас на экране нет задания с номером ФИПИ';
+        return;
+      }
+      if (vbPop.hidden) vbOpen(); else vbClose();
+    });
+    document.addEventListener('click', event => {
+      if (vbPop.hidden) return;
+      const path = event.composedPath();
+      if (!path.includes(vbPop) && !path.includes(vbBtn)) vbClose();
+    });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') vbClose(true); });
+    window.addEventListener('resize', vbPosition);
+    window.addEventListener('variantset:change', vbSync);
+    window.addEventListener('focus', vbRefreshAuth);
+    setInterval(vbRefreshAuth, 20000);
+    vbRefreshAuth();
+  }
+
+  const VB_CSS = `
+.exam-vb-btn{position:relative;width:auto;min-width:34px;padding:0 12px;border-radius:17px;gap:5px}
+.exam-vb-btn[hidden]{display:none}
+.exam-vb-btn .vb-plus{font-size:15px}
+.exam-vb-btn .vb-badge{position:absolute;top:-6px;right:-6px;min-width:17px;height:17px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:var(--ink);color:var(--bg,#fff);font-size:10px;line-height:17px;text-align:center;font-weight:700}
+.exam-vb-btn .vb-badge[hidden]{display:none}
+@media (max-width:640px){
+  .exam-vb-btn{width:30px;min-width:30px;padding:0;border-radius:50%}
+  .exam-vb-btn .vb-label{display:none}
+}
+@media (max-width:360px){.exam-vb-btn{width:28px;min-width:28px}}
+.exam-vb-pop{position:fixed;z-index:1100;box-sizing:border-box;padding:12px;border:1px solid var(--glass-border);border-radius:20px;background:#fafbfe;color:var(--pencil,#1d1d1f);font-family:var(--font-ui,system-ui,sans-serif);font-size:14px;line-height:1.35;box-shadow:inset 0 1px 0 var(--glass-inset),0 20px 48px rgba(20,30,60,.16);pointer-events:auto;text-align:left;letter-spacing:0;font-weight:400}
+.exam-vb-pop[hidden]{display:none}
+html[data-theme="dark"] .exam-vb-pop{background:#1e2540;box-shadow:inset 0 1px 0 var(--glass-inset),0 20px 48px rgba(0,0,0,.5)}
+.exam-vb-pop *{box-sizing:border-box}
+.exam-vb-pop button{font:inherit;cursor:pointer;touch-action:manipulation;color:inherit}
+.vb-row{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.vb-add{flex:1;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:1px;min-height:44px;padding:7px 12px;border:1px solid var(--glass-border);border-radius:12px;background:transparent;text-align:left}
+.vb-add:hover:not(:disabled){border-color:var(--ink)}
+.vb-add:disabled{opacity:.45;cursor:default}
+.vb-t{font-weight:650}
+.vb-h{font-size:12px;opacity:.7;overflow-wrap:anywhere}
+.vb-step{display:flex;align-items:center;gap:4px;flex:none}
+.vb-sb{width:32px;height:32px;padding:0;border:1px solid var(--glass-border);border-radius:50%;background:transparent}
+.vb-sb:disabled{opacity:.35;cursor:default}
+.vb-n{min-width:34px;text-align:center;font-weight:650}
+.vb-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;padding-top:10px;border-top:1px solid var(--glass-border)}
+.vb-go{font-weight:700;color:var(--ink);text-decoration:none}
+.vb-go:hover{text-decoration:underline}
+.vb-cnt{font-size:12px;opacity:.7}
+.vb-msg{margin-top:6px;font-size:12.5px;font-weight:600}
+.vb-msg:empty{display:none}
+`;
+
   /* ── кнопки ── */
   const CSS = `
 h1.exam-nav-h1{display:flex;align-items:center;justify-content:center;gap:12px;max-height:150px;}
@@ -716,6 +951,7 @@ h1.exam-nav-h1 .exam-nav-text{min-width:0;}
     h1.appendChild(prevBtn);
     h1.appendChild(text);
     h1.appendChild(nextBtn);
+    mountVariant(h1);
     mountJumpMenu();
     render();
   }
@@ -783,7 +1019,7 @@ h1.exam-nav-h1 .exam-nav-text{min-width:0;}
     // а прототип — открыт и тут же закрыт возвратом к списку: стрелки и
     // память догоняют таймером, тем же шагом, что и таймер сессии (300 мс) —
     // быстрее человек не успеет открыть прототип и уйти с него
-    setInterval(() => { render(); record(); }, 300);
+    setInterval(() => { render(); record(); vbSync(); }, 300);
     window.addEventListener('pagehide', record);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);

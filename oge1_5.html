@@ -782,6 +782,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="mode-card-keys.js"></script>
 <script src="keypad.js"></script>
 <script src="exam-spec.js"></script>
+<script src="variant-set.js"></script>
 <script src="exam-nav.js"></script>
 <script src="oge1_5-fipi-bank.js"></script>
 <script src="trainer-multi.js"></script>
@@ -2024,6 +2025,15 @@ window.__trainerCatalog = {
       fipi: catalogBank(p).map(t => t.fipi),
       hasGen: p.set ? (!p.set.fipi || p.set.id === 'tire_fipi') : true,
     })));
+  },
+  /* что сейчас на экране: { n, proto, pos, fipi } или null на экране выбора. Только читает (кнопка «＋ В вариант», exam-nav.js) */
+  current(){
+    if (!curMode || !curTask || els.taskArea.style.display === 'none') return null;
+    const p = catalogProtos().find(x => x.id === curMode);
+    if (!p) return null;
+    const fipi = curTask.fipi || null;
+    const i = fipi ? catalogBank(p).findIndex(t => t.fipi === fipi) : -1;
+    return { n: null, proto: curMode, pos: i >= 0 ? i : null, fipi: fipi };
   },
   openAt(protoId, pos){
     const p = catalogProtos().find(x => x.id === protoId);
