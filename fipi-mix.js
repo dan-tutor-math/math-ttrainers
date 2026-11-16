@@ -111,6 +111,17 @@
     try { return !!(window.TaskCaptions && TaskCaptions.skipFipi(page, fipi)); } catch (e) { return false; }
   }
   function withFipi(item) { const t = item.make(); t.fipi = item.fipi; return t; }
+  // задача по её месту в банке — для конструктора работ, порядок как в файле
+  // банка. Память не трогает: учитель собирает работу, а не решает задачи
+  function at(list, pos, ownGen) {
+    list = list || [];
+    if (pos < 0) return null;
+    if (pos < list.length) return withFipi(list[pos]);
+    if (!ownGen) return null;
+    const t = ownGen();
+    if (list.length) t.basedOnFipi = true;
+    return t;
+  }
   function commit(page, mode, task, list) {
     if (!task) return;
     // запоминаем только задание ФИПИ: пока идут наши, оно остаётся «показанным»,
@@ -220,5 +231,5 @@
     };
     mark();
   }
-  window.FipiMix = { filter, next, commit, markDone, countLabel, sourceText, mountFilter, injectCss };
+  window.FipiMix = { filter, next, at, commit, markDone, countLabel, sourceText, mountFilter, injectCss };
 })();
