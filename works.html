@@ -121,6 +121,9 @@ body.editing .corner-btn{position:absolute;}
 .ti-btns .rm{color:var(--teacher);}
 .ti-up{font-size:12px;color:var(--warn);}
 .ti-gen{font-size:12.5px;color:var(--muted-2);margin-top:6px;}
+/* откуда задание группы: «наше, на основе ФИПИ», «было в …» — только подсказка */
+.ti-src{font-size:12.5px;color:var(--muted-2);margin-top:6px;display:flex;flex-wrap:wrap;gap:4px 10px;}
+.ti-src .was{color:var(--warn,#b7791f);}
 .ti-gen.fail{color:var(--teacher);}
 .ti-gen.same{color:var(--warn);}
 .ti-ph{height:90px;display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-size:13.5px;}
@@ -417,7 +420,8 @@ html.rv-on{overflow:hidden;}
       <label>По сколько <input type="number" id="bdEach" min="1" max="30" value="1" title="Сколько заданий брать по каждой строке Набора — применяется ко всем строкам"></label>
       <label>Источник <select id="bdSource"><option value="order">по порядку</option><option value="random">вразнобой</option></select></label>
       <label>С какого номера банка <input type="number" id="bdStart" min="1" value="1"></label>
-      <label>Вариантов <input type="number" id="bdVars" min="1" max="10" value="1" title="Пока это копии через «+ Новый вариант»: те же задания с другими числами"></label>
+      <label>Вариантов <input type="number" id="bdVars" min="1" max="10" value="1" title="Вариант 2 берёт следующие места банка за вариантом 1, вариант 3 — за вариантом 2: задания в вариантах не повторяются"></label>
+      <label id="bdForBox" hidden>Для ученика <select id="bdFor"><option value="">— без ученика —</option></select></label>
     </div>
     <div class="bd">
       <div class="panel" id="bdSetBox">
@@ -644,9 +648,12 @@ async function openList(){
       + '<div class="wm">Заданий: ' + n + (nv ? ' · видео: ' + nv : '') + (vs.length > 1 ? ' · вариантов: ' + vs.length : '') + ' · ' + (w.settings && w.settings.feedback === 'end' ? 'результат в конце' : 'результат сразу')
       + '<br>Начали: ' + atts.length + ' · сдали: ' + fin + ' · создана ' + esc(fmtDate(w.created_at)) + '</div>'
       + '<div class="wb"><button class="btn small" data-a="res">Результаты</button><button class="btn quiet small" data-a="edit">Изменить</button>'
-      + (v ? '<button class="btn quiet small" data-a="copy">' + (vs.length > 1 ? 'Ссылки' : 'Ссылка') + '</button>' : '') + '<button class="btn danger small" data-a="del">Удалить</button></div>';
+      + (v ? '<button class="btn quiet small" data-a="copy">' + (vs.length > 1 ? 'Ссылки' : 'Ссылка') + '</button>' : '')
+      + (v && (v.blocks || []).some(isTask) ? '<button class="btn quiet small" data-a="next" title="Копия работы: группы заданий — на следующие места банка, остальные задания те же">Следующая работа</button>' : '')
+      + '<button class="btn danger small" data-a="del">Удалить</button></div>';
     el.querySelector('[data-a="res"]').addEventListener('click', () => go('#/results/' + w.id));
     el.querySelector('[data-a="edit"]').addEventListener('click', () => go('#/edit/' + w.id));
+    const nx = el.querySelector('[data-a="next"]'); if (nx) nx.addEventListener('click', () => nextWork(w.id));
     // несколько вариантов — все ссылки сразу, по строке на вариант: так их
     // удобно вставить в чат группы и раздать
     if (v) el.querySelector('[data-a="copy"]').addEventListener('click', () => copyText(vs.length > 1
@@ -706,6 +713,7 @@ async function openEditor(id){
   $('wkKindName').value = E.settings.kindName || '';
   renderSettings(); renderVariants(); renderTasks(); renderLink(); renderMem();
   $('wkSaved').textContent = E.id ? 'Сохранено' : '';
+  loadWas();
   if (!$('catList').childElementCount) renderCatalog('');
 }
 function renderSettings(){
@@ -779,8 +787,10 @@ function newVariant(){
   // номер — следующий за наибольшим: номера не переиспользуются, пока
   // вариант не удалён, — по ним ученики и учитель узнают варианты
   const num = Math.max(...E.variants.map(v => v.num)) + 1;
-  E.variants.push({ id: null, num, code: null, blocks: [] });
+  const v = { id: null, num, code: null, blocks: [] };
+  E.variants.push(v);
   E.cur = E.variants.length - 1;
+  syncVariant(v);
   markDirty(); renderVariants(); renderTasks(); renderLink();
 }
 $('varDel').addEventListener('click', () => {
@@ -799,10 +809,32 @@ function syncVariant(v){
   if (v === E.variants[0]) return;
   const master = E.variants[0].blocks;
   const bySrc = new Map(v.blocks.map(b => [b.src, b]));
+  const plans = new Map();   // series.key → места всех вариантов
   v.blocks = master.map(m => {
     const have = bySrc.get(m.id);
     // видео во всех вариантах одно и то же — других чисел у него нет
     if (isVideo(m)) return Object.assign(have || { id: 'v' + ttUid(), src: m.id }, videoFields(m));
+    // задание группы: место банка по плану вариантов (variantPlan). Задание,
+    // созданное до этапа 7 старым путём (без series), не трогаем — иначе
+    // открытие старой работы молча меняло бы уже выданные варианты
+    if (m.series && !(have && !have.series)){
+      const key = m.series.key;
+      if (!plans.has(key)) plans.set(key, variantPlan(key));
+      const row = plans.get(key).get(v), i = seriesBlocks(key).indexOf(m);
+      const want = row && row[i];
+      if (want){
+        if (have && have.series.key === key && have.series.proto === m.series.proto && have.series.pos === want.pos){
+          have.mode = m.mode || 'exam'; have.name = m.name; return have;
+        }
+        const b = have || { id: 't' + ttUid(), src: m.id, type: 'task' };
+        Object.assign(b, { mode: m.mode || 'exam', name: m.name, tid: m.tid });
+        b.series = Object.assign({}, m.series, { pos: want.pos, fipi: null });
+        delete b.series.pinned;
+        if (want.repeat) b.series.repeat = true; else delete b.series.repeat;
+        seriesQueue(b, seriesBase(seriesInfo(seriesBlocks(key))), want.pos);
+        return b;
+      }
+    }
     if (have){ have.mode = m.mode || 'exam'; have.name = m.name; return have; }
     const b = { id: 't' + ttUid(), src: m.id, type: 'task', mode: m.mode || 'exam', name: m.name, tid: m.tid, _gen: 'wait' };
     return b;
@@ -865,7 +897,7 @@ function taskRow(b, i, tasks, isMaster, num, inSeries){
     const busy = b._gen === 'busy' || b._gen === 'wait';
     // в группе: ◀ ▶ и номер — место в банке прототипа; ⟳ — случайное свободное место
     const posUi = inSeries ? '<div class="ti-pos"><div class="ti-btns"><button data-a="pp" title="Предыдущее задание банка">◀</button></div>'
-      + '<input type="number" min="1" max="' + b.series.total + '" value="' + (b.series.pos + 1) + '" title="Номер задания в банке прототипа" aria-label="Номер в банке">'
+      + '<input type="number" min="1"' + (b.series.hasGen ? '' : ' max="' + b.series.total + '"') + ' value="' + (b.series.pos + 1) + '" title="Номер задания в банке прототипа' + (b.series.hasGen ? ' (за концом банка — наши задания на основе ФИПИ)' : '') + '" aria-label="Номер в банке">'
       + '<span>из ' + b.series.total + '</span><div class="ti-btns"><button data-a="np" title="Следующее задание банка">▶</button></div></div>' : '';
     const btns = '<button data-a="rr" class="rr' + (busy ? ' busy' : '') + '" title="' + (inSeries ? 'Другое задание банка этого прототипа' : 'Другие числа — задание того же типа и уровня') + '">⟳</button>'
       + (isMaster ? (inSeries ? '' : '<button data-a="up" title="Выше">↑</button><button data-a="down" title="Ниже">↓</button>') + '<button data-a="rm" class="rm" title="Убрать из работы (из всех вариантов)">✕</button>' : '');
@@ -875,6 +907,7 @@ function taskRow(b, i, tasks, isMaster, num, inSeries){
     else if (b.same) note = '<div class="ti-gen same">У этого задания других чисел нет (одно задание или один прототип) — оно такое же, как в варианте 1</div>';
     else if (b._up && !inSeries) note = '<div class="ti-up">Картинка ещё загружается…</div>';
     if (b.theory) note = '<div class="ti-theory">📘 с теорией к заданию</div>' + note;
+    if (b.series && !busy) note += seriesSrcNote(b, inSeries);
     el.innerHTML = '<div class="ti-num">' + num + '</div><div><div class="ti-img">' + (im.url ? '<img alt="Задание ' + num + '">' : '<div class="ti-ph">' + (busy ? 'Создаётся…' : 'Нет картинки') + '</div>') + '</div>'
       + '<div class="ti-row"><span class="ti-name">' + esc(b.name || trainerName(b.tid)) + '</span>' + modeUi + posUi
       + '<div class="ti-btns">' + btns + '</div></div>' + note + '</div>';
@@ -891,7 +924,7 @@ function taskRow(b, i, tasks, isMaster, num, inSeries){
     rr.addEventListener('click', () => reroll(b));
     if (inSeries){
       const pp = el.querySelector('[data-a="pp"]'), np = el.querySelector('[data-a="np"]'), inp = el.querySelector('.ti-pos input');
-      pp.disabled = !isMaster || b.series.pos <= 0; np.disabled = !isMaster || b.series.pos + 1 >= b.series.total; inp.disabled = !isMaster;
+      pp.disabled = !isMaster || b.series.pos <= 0; np.disabled = !isMaster || !seriesValid(b.series, b.series.pos + 1); inp.disabled = !isMaster;
       pp.addEventListener('click', () => seriesSetOne(b, b.series.pos - 1));
       np.addEventListener('click', () => seriesSetOne(b, b.series.pos + 1));
       inp.addEventListener('change', () => seriesSetOne(b, Math.round(Number(inp.value)) - 1));
@@ -959,6 +992,7 @@ async function save(){
       variants: E.variants.map(v => ({ id: v.id, num: v.num, code: v.code, blocks: v.blocks.map(cleanBlock) })) });
     const isNew = !E.id;
     E.id = r.id; E.deleted = []; E.dirty = false;
+    buildWas();
     r.variants.forEach((x, i) => { if (E.variants[i]) Object.assign(E.variants[i], { id: x.id, code: x.code }); });
     $('wkSaved').textContent = 'Сохранено ' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     $('edHead').textContent = 'Работа';
@@ -1508,6 +1542,8 @@ function reroll(b){
   // задание группы ⟳ берёт другое место банка своего прототипа, а не
   // «следующий прототип номера» (тот увёл бы задание из группы)
   if (b.series && E.variants[0].blocks.indexOf(b) >= 0){ seriesShuffleOne(b); return; }
+  // в варианте 2+ — свободное место банка, которого нет ни в одном варианте
+  if (b.series && b.src){ variantShuffleOne(b); return; }
   const m = masterOf(b);
   const recipe = b.gen || (m && m.gen);
   markDirty();
@@ -1551,9 +1587,10 @@ async function uploadPending(){
    Задание по месту открывает каталог тренажёра (__trainerCatalog.openAt) в
    невидимом кадре genFrameFor. Путь сделан здесь, а не в genNewTaskInFrame
    (trainer-tasks.js): тот же рецепт там читают доски для «ещё такое же», и с
-   gen.at они открывали бы то же задание вместо нового. «Новый вариант» и
-   варианты 2+ по-прежнему идут старым путём (genNewTaskInFrame не знает at) —
-   «вариант берёт следующие» — отдельный этап.
+   gen.at они открывали бы то же задание вместо нового. Варианты 2+ (этап 7)
+   берут места по плану variantPlan: вариант k — места образца + (k − 1) · N.
+   За концом банка у прототипа с генератором (hasGen, каталоги ОГЭ ч. 1)
+   openAt отдаёт наше задание «на основе ФИПИ» — такие места разрешены.
    Очередь: задания одного тренажёра идут подряд (genFrames держит три кадра,
    вперемешку они перезагружались бы по кругу). Снимки кэшируются по
    tid|proto|pos — «◀ Предыдущие» возвращаются без кадра. Картинки группы
@@ -1687,11 +1724,18 @@ async function addSeries(o){
   // каталог ЕГЭ-семейства отдаёт tasks, каталог ОГЭ ч. 1 — только fipi (порядок тот же)
   const total = (u.tasks || u.fipi || []).length;
   const count = Math.max(1, Math.min(COUNT_MAX, Math.round(Number(o.count) || 3)));
+  const hasGen = !!u.hasGen;
+  // места, которые пропускаем (ученик уже решал, «Для ученика» на экране сборки)
+  const skip = new Set((o.skipPos || []).filter(p => p >= 0 && p < total));
   let poss;
-  if (o.source === 'random') poss = shufflePick([...Array(total).keys()], count);
-  else {
+  if (Array.isArray(o.poss)) poss = o.poss.filter(p => p >= 0 && (p < total || hasGen));
+  else if (o.source === 'random'){
+    poss = shufflePick([...Array(total).keys()].filter(p => !skip.has(p)), count);
+    // банк кончился — добиваем нашими заданиями (за концом банка)
+    for (let p = total; hasGen && poss.length < count; p++) poss.push(p);
+  } else {
     const start = Math.max(0, Math.round(Number(o.startPos) || 0));
-    poss = [...Array(count).keys()].map(i => start + i).filter(p => p < total);
+    poss = rowPositions(total, hasGen, start, count, skip).poss;
   }
   if (!poss.length){ toast('В банке этого прототипа нет заданий с №' + ((o.startPos || 0) + 1)); return null; }
   const exam = EXAM_NAMES[o.exam] || o.exam || '';
@@ -1699,13 +1743,28 @@ async function addSeries(o){
   const key = 's' + ttUid();
   const base = { tid, href, proto: u.id, n, vw: o.vw || null };
   const fresh = poss.map(pos => ({ id: 't' + ttUid(), type: 'task', mode: o.mode || 'exam', name: trainerName(tid), tid,
-    series: { key, title, pos, fipi: u.fipi[pos] || null, total, proto: u.id, n, href, src: o.source === 'random' ? 'random' : 'order', hasGen: !!u.hasGen } }));
+    series: { key, title, pos, fipi: (u.fipi || [])[pos] || null, total, proto: u.id, n, href, src: o.source === 'random' ? 'random' : 'order', hasGen } }));
+  if (skip.size) seriesSkip.set(key, skip);
   if (addPos === 'start') E.variants[0].blocks.unshift(...fresh); else E.variants[0].blocks.push(...fresh);
   fresh.forEach(b => seriesQueue(b, base, b.series.pos));
   markDirty(); renderVariants(); renderTasks();
   if (poss.length < count) toast('В банке прототипа «' + plainTitle(u.title) + '» с этого места только ' + poss.length + ' — добавлено ' + poss.length, 6000);
   return key;
 }
+// места строки по порядку: с start, мимо пропускаемых (skip); за концом банка —
+// наш генератор, если он у прототипа есть, иначе на конце банка стоп
+function rowPositions(total, hasGen, start, count, skip){
+  const poss = []; let skipped = 0;
+  for (let p = start; poss.length < count; p++){
+    if (p >= total && !hasGen) break;
+    if (p < total && skip && skip.has(p)){ skipped++; continue; }
+    poss.push(p);
+  }
+  return { poss, skipped };
+}
+// место годится: в банке или за его концом, если есть наш генератор
+const seriesValid = (s, p) => p >= 0 && (p < s.total || !!s.hasGen);
+const seriesSkip = new Map();   // series.key → места, пропущенные при сборке (решённые учеником)
 function shufflePick(arr, k){
   const a = arr.slice();
   for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
@@ -1724,6 +1783,7 @@ function seriesSetPositions(key, poss, why){
     seriesQueue(b, base, poss[i]);
   });
   if (poss.length < sb.length) toast((why || 'В банке прототипа больше нет заданий') + ' — в группе осталось ' + poss.length, 6000);
+  resyncVariants();
   markDirty(); renderVariants(); renderTasks();
 }
 // «Следующие N ▶» — от самого большого номера в группе (даже если одно задание правили руками)
@@ -1731,8 +1791,8 @@ function seriesNext(key){
   const sb = seriesBlocks(key); if (!sb.length) return;
   const info = seriesInfo(sb), N = sb.length;
   const from = Math.max(...sb.map(b => b.series.pos)) + 1;
-  if (from >= info.total){ toast('Дальше в банке этого прототипа заданий нет (' + info.total + ' из ' + info.total + ')'); return; }
-  const poss = [...Array(N).keys()].map(i => from + i).filter(p => p < info.total);
+  if (!seriesValid(info, from)){ toast('Дальше в банке этого прототипа заданий нет (' + info.total + ' из ' + info.total + ')'); return; }
+  const poss = [...Array(N).keys()].map(i => from + i).filter(p => seriesValid(info, p));
   seriesSetPositions(key, poss, 'В банке дальше только ' + poss.length);
 }
 function seriesPrev(key){
@@ -1747,7 +1807,9 @@ function seriesShuffle(key){
   const sb = seriesBlocks(key); if (!sb.length) return;
   const info = seriesInfo(sb), N = sb.length, cur = new Set(sb.map(b => b.series.pos));
   const all = [...Array(info.total).keys()];
-  const other = all.filter(p => !cur.has(p));
+  let other = all.filter(p => !cur.has(p));
+  // банк меньше группы — с генератором добиваем местами за концом банка
+  if (info.hasGen && other.length < N) other = other.concat([...Array(N).keys()].map(i => Math.max(info.total - 1, ...cur) + 1 + i));
   const poss = other.length >= N ? shufflePick(other, N) : shufflePick(other, other.length).concat(shufflePick([...cur], N - other.length)).sort((a, b) => a - b);
   sb.forEach(b => { b.series = Object.assign({}, b.series, { src: 'random' }); });
   seriesSetPositions(key, poss);
@@ -1757,6 +1819,7 @@ function seriesShuffleOne(b){
   const sb = seriesBlocks(b.series.key), info = seriesInfo(sb);
   const used = new Set(sb.map(x => x.series.pos));
   const free = [...Array(info.total).keys()].filter(p => !used.has(p));
+  if (!free.length && info.hasGen) free.push(Math.max(info.total - 1, ...used) + 1);
   if (!free.length){ toast('Других заданий в банке этого прототипа нет'); return; }
   seriesSetOne(b, free[Math.floor(Math.random() * free.length)]);
 }
@@ -1765,23 +1828,25 @@ function seriesMore(key){
   const sb = seriesBlocks(key); if (!sb.length) return;
   const info = seriesInfo(sb);
   const pos = Math.max(...sb.map(b => b.series.pos)) + 1;
-  if (pos >= info.total){ toast('Дальше в банке этого прототипа заданий нет'); return; }
+  if (!seriesValid(info, pos)){ toast('Дальше в банке этого прототипа заданий нет'); return; }
   const last = sb[sb.length - 1], list = E.variants[0].blocks;
   const b = { id: 't' + ttUid(), type: 'task', mode: last.mode || 'exam', name: last.name, tid: last.tid,
     series: Object.assign({}, last.series, { pos, fipi: null }) };
   list.splice(list.indexOf(last) + 1, 0, b);
   seriesQueue(b, seriesBase(info), pos);
+  resyncVariants();
   markDirty(); renderVariants(); renderTasks();
 }
 // одно задание группы — на место pos (◀ ▶ и ввод номера). Номер уже есть в
 // группе — предупреждаем, но ставим: учитель мог хотеть именно так
 function seriesSetOne(b, pos){
   const sb = seriesBlocks(b.series.key), info = seriesInfo(sb);
-  if (!(pos >= 0 && pos < info.total)){ toast('В банке этого прототипа номера с 1 по ' + info.total); renderTasks(); return; }
+  if (!seriesValid(info, pos)){ toast(info.hasGen ? 'Номер — с 1' : 'В банке этого прототипа номера с 1 по ' + info.total); renderTasks(); return; }
   if (pos === b.series.pos) return;
   if (sb.some(x => x !== b && x.series.pos === pos)) toast('Задание №' + (pos + 1) + ' уже есть в этой группе — будет повтор', 5000);
   b.series = Object.assign({}, b.series, { pos, fipi: null });
   seriesQueue(b, seriesBase(info), pos);
+  resyncVariants();
   markDirty(); renderTasks();
 }
 function seriesMove(key, dir){
@@ -1811,11 +1876,15 @@ function seriesRemove(key){
 }
 // подпись мест: «ФИПИ 4–6 из 10», вразнобой — «ФИПИ 2, 5, 9 из 10»
 function seriesPosText(sb){
-  const ps = sb.map(b => b.series.pos).slice().sort((a, b) => a - b);
-  const total = sb[0].series.total;
+  return posLabel(sb.map(b => b.series.pos), sb[0].series.total);
+}
+// места за концом банка — наши задания на основе ФИПИ: «ФИПИ 9–10 из 10 + наших на основе ФИПИ: 1»
+function posLabel(list, total){
+  const ps = list.filter(p => p < total).sort((a, b) => a - b), own = list.length - ps.length;
   const run = ps.every((p, i) => i === 0 || p === ps[i - 1] + 1);
   const nums = ps.length === 1 ? String(ps[0] + 1) : run ? (ps[0] + 1) + '–' + (ps[ps.length - 1] + 1) : ps.map(p => p + 1).join(', ');
-  return 'ФИПИ ' + nums + ' из ' + total;
+  const fipi = ps.length ? 'ФИПИ ' + nums + ' из ' + total : '';
+  return own ? (fipi ? fipi + ' + ' : '') + 'наших на основе ФИПИ: ' + own : fipi;
 }
 function seriesHead(sb, isMaster, gi, groupsTotal){
   const head = document.createElement('div');
@@ -1846,6 +1915,158 @@ function seriesHead(sb, isMaster, gi, groupsTotal){
     q('rm').addEventListener('click', () => seriesRemove(info.key));
   }
   return head;
+}
+
+/* ── варианты без повторов (этап 7) ──
+   Вариант с номером k берёт для группы места образца + (k − 1) · N (N — размер
+   группы): вариант 1 — ФИПИ 1–3, вариант 2 — 4–6. Место занято другим
+   вариантом этой работы или вне банка — следующее свободное место банка, потом
+   свободное с начала банка; банк кончился — у прототипа с генератором места за
+   концом (наше задание на основе ФИПИ), без генератора — повтор места образца
+   (подписан). Номер варианта, а не его порядок: удалили вариант 2 — вариант 3
+   остаётся на своих местах. Место, поставленное ⟳ в варианте (series.pinned),
+   закреплено и занято для остальных. План считается заново при каждой сверке
+   с образцом — сдвинули группу образца («Следующие N») — варианты едут за ней. */
+// места образца сменились — варианты 2+ сразу едут за ним (иначе до «Сохранить»
+// или до открытия их вкладки они стояли бы на старых местах и могли совпасть с образцом)
+function resyncVariants(){ E.variants.slice(1).forEach(syncVariant); }
+function variantPlan(key){
+  const out = new Map();
+  const sb = seriesBlocks(key); if (!sb.length) return out;
+  const info = seriesInfo(sb), N = sb.length;
+  const skip = seriesSkip.get(key) || new Set();
+  const ok = p => seriesValid(info, p) && !skip.has(p);
+  const P = sb.map(b => b.series.pos);
+  const used = new Set(P);
+  // «Следующая работа»: места до floor уже были в прошлой работе — по кругу к ним не возвращаемся
+  const floor = Math.max(0, ...sb.map(b => b.series.floor || 0));
+  const m0 = E.variants[0].num;
+  const others = E.variants.slice(1).sort((a, b) => a.num - b.num);
+  const pinnedOf = v => new Map(v.blocks.filter(b => b.series && b.series.key === key && b.series.pinned && b.series.proto === info.proto).map(b => [b.src, b.series.pos]));
+  const pins = new Map(others.map(v => [v, pinnedOf(v)]));
+  pins.forEach(m => m.forEach(p => used.add(p)));
+  others.forEach(v => {
+    const k = v.num - m0, pin = pins.get(v);
+    out.set(v, sb.map((m, i) => {
+      if (pin.has(m.id)) return { pos: pin.get(m.id) };
+      const want = P[i] + k * N;
+      const free = q => ok(q) && !used.has(q);
+      let pos = null;
+      if (want < info.total && free(want)) pos = want;
+      for (let q = want + 1; pos == null && q < info.total; q++) if (free(q)) pos = q;
+      for (let q = floor; pos == null && q < Math.min(want, info.total); q++) if (free(q)) pos = q;
+      if (pos == null && info.hasGen){
+        // за концом банка: сначала само желаемое место, потом первое свободное
+        if (want >= info.total && free(want)) pos = want;
+        for (let q = info.total; pos == null; q++) if (free(q)) pos = q;
+      }
+      if (pos == null) return { pos: P[i], repeat: true };
+      used.add(pos);
+      return { pos };
+    }));
+  });
+  return out;
+}
+// ⟳ у задания группы в варианте 2+ — свободное место, которого нет ни в одном варианте
+function variantShuffleOne(b){
+  const m = masterOf(b);
+  if (!m || !m.series){ toast('Задание варианта потеряло связь с образцом'); return; }
+  const key = m.series.key, sb = seriesBlocks(key), info = seriesInfo(sb);
+  const skip = seriesSkip.get(key) || new Set();
+  const used = new Set([].concat(...E.variants.map(v => v.blocks)).filter(x => x.series && x.series.key === key).map(x => x.series.pos));
+  const free = [...Array(info.total).keys()].filter(p => !used.has(p) && !skip.has(p));
+  if (!free.length && info.hasGen) free.push(Math.max(info.total - 1, ...used) + 1);
+  if (!free.length){ toast('Свободных заданий в банке этого прототипа нет — все уже стоят в вариантах'); return; }
+  const pos = free[Math.floor(Math.random() * free.length)];
+  b.series = Object.assign({}, b.series, { pos, fipi: null, pinned: true });
+  delete b.series.repeat;
+  seriesQueue(b, seriesBase(info), pos);
+  markDirty(); renderTasks();
+}
+// подпись под заданием группы: откуда оно и было ли уже в другой работе
+function seriesSrcNote(b, inSeries){
+  const s = b.series, out = [];
+  if (!inSeries && s.pos < s.total) out.push('ФИПИ ' + (s.pos + 1) + ' из ' + s.total);
+  if (s.pos >= s.total) out.push('наше, на основе ФИПИ');
+  if (s.repeat) out.push('банк кончился — как в варианте 1');
+  const was = wasNote(b);
+  if (was) out.push('<span class="was" title="Номер ФИПИ уже стоит в другой вашей работе — подсказка, ничего не меняется">' + esc(was) + '</span>');
+  return out.length ? '<div class="ti-src">' + out.map(x => x[0] === '<' ? x : '<span>' + esc(x) + '</span>').join('') + '</div>' : '';
+}
+
+/* ── «уже было»: номер ФИПИ задания группы стоит в другой работе учителя ──
+   Источник — свои работы (C.listWorks отдаёт blocks всех вариантов): один
+   запрос при открытии редактора, не на каждое задание. Ключ — экзамен и номер
+   ФИПИ (номера банков разных экзаменов могут совпасть). Только подсказка. */
+let wasList = null, wasMap = new Map(), wasReq = 0;
+const wasKey = (tid, fipi) => { let ex = null; try { ex = window.TaskKey ? TaskKey.examOf(tid) : null; } catch (e) {} return (ex || tid) + ':' + fipi; };
+const ddmm = s => { try { return new Date(s).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }); } catch (e) { return ''; } };
+async function loadWas(){
+  const my = ++wasReq;
+  let list = null;
+  try { list = await C.listWorks(); } catch (e) { list = null; }
+  if (my !== wasReq) return;
+  wasList = list;
+  buildWas();
+  if (!$('scrEdit').hidden) renderTasks();
+}
+function buildWas(){
+  wasMap = new Map();
+  (wasList || []).forEach(w => {
+    if (E.id && w.id === E.id) return;
+    (w.work_variants || []).forEach(v => (v.blocks || []).forEach(b => {
+      const f = (b.series && b.series.fipi) || (b.gen && b.gen.at && b.gen.at.fipi);
+      if (!f) return;
+      const k = wasKey(b.tid, f), prev = wasMap.get(k);
+      // несколько работ — подписываем самой свежей
+      if (!prev || String(w.created_at || '') > String(prev.at || '')) wasMap.set(k, { title: w.title || 'Без названия', at: w.created_at });
+    }));
+  });
+}
+function wasNote(b){
+  if (!b.series || !b.series.fipi) return '';
+  const x = wasMap.get(wasKey(b.tid, b.series.fipi));
+  return x ? 'было в «' + x.title + '»' + (x.at ? ' от ' + ddmm(x.at) : '') : '';
+}
+
+/* ── «Следующая работа» — копия работы с группами на следующих местах банка ──
+   Новая несохранённая работа «… (следующая)»: каждая группа образца сдвинута
+   как «Следующие N» — от самого большого места группы во всех вариантах
+   исходной работы (иначе вариант 1 новой работы повторил бы вариант 2 старой).
+   Задания не из групп — те же. Варианты 2+ пересчитываются по плану мест. */
+async function nextWork(id){
+  history.replaceState(null, '', '#/new');
+  await openEditor(id);
+  if (E.id !== id) return;
+  const all = () => [].concat(...E.variants.map(v => v.blocks));
+  const keys = [...new Set(E.blocks.filter(b => b.series).map(b => b.series.key))];
+  const maxes = new Map(keys.map(k => [k, Math.max(...all().filter(b => b.series && b.series.key === k).map(b => b.series.pos))]));
+  E.id = null; E.deleted = []; E.attempts = 0; E.cur = 0;
+  E.variants.forEach(v => { v.id = null; v.code = null; });
+  // задания групп в вариантах 2+ встанут заново по плану; одиночные — те же
+  E.variants.slice(1).forEach(v => { v.blocks = v.blocks.filter(b => { const m = masterOf(b); return !(m && m.series); }); });
+  const short = [];
+  keys.forEach(key => {
+    const sb = seriesBlocks(key), info = seriesInfo(sb), N = sb.length;
+    const poss = [];
+    for (let p = maxes.get(key) + 1; poss.length < N && seriesValid(info, p); p++) poss.push(p);
+    // банк кончился совсем — группу оставляем как была, иначе работа потеряла бы номер
+    if (!poss.length){ short.push(info.title + ': банк кончился, задания те же'); return; }
+    if (poss.length < N) short.push(info.title + ': в банке дальше только ' + poss.length);
+    const list = E.variants[0].blocks;
+    sb.forEach((b, i) => {
+      if (i >= poss.length){ list.splice(list.indexOf(b), 1); return; }
+      b.series = Object.assign({}, b.series, { pos: poss[i], fipi: null, floor: poss[0] });
+      seriesQueue(b, seriesBase(info), poss[i]);
+    });
+  });
+  resyncVariants();
+  E.title = (E.title || 'Работа') + ' (следующая)';
+  $('wkTitle').value = E.title;
+  $('edHead').textContent = 'Новая работа';
+  $('edWarn').hidden = true;
+  markDirty(); buildWas(); renderVariants(); renderTasks(); renderLink();
+  toast(short.length ? 'Следующая работа: ' + short.join('; ') : 'Следующая работа: группы — на следующих местах банка. Проверьте и сохраните', 6000);
 }
 
 /* ── журнал ученика (Б5 кабинета) ──
@@ -2360,11 +2581,15 @@ $('rsClose').addEventListener('click', async () => {
    текстом из catalog-index.json: кадры тренажёров здесь не грузятся, иначе
    «Полный вариант» ОГЭ открывал бы два десятка страниц ради подписей.
    «Собрать» зовёт addSeries по строкам — каждая строка становится группой.
-   Номер без каталога (oge8, oge12, русский) и номер, где в банке ФИПИ пусто
-   (oge10, 11, 13: только наш генератор), в этой версии не собираются —
-   предпросмотр говорит это прямо, а не молча теряет строку. */
+   Номер без каталога (oge8, oge12, русский) не собирается — предпросмотр
+   говорит это прямо, а не молча теряет строку. Номер, где в банке ФИПИ пусто
+   (oge10, 11, 13), собирается нашим генератором (этап 7): за концом банка
+   openAt каталогов ОГЭ ч. 1 отдаёт наше задание на основе ФИПИ.
+   «Для ученика» (этап 7): журнал ученика (StudentMemory.fetchLog) грузится
+   один раз при выборе; места с заданиями ФИПИ, ключ которых fipi:<экзамен>:<номер>
+   есть в журнале, при сборке пропускаются. */
 const VS = window.VariantSet;
-const BD = { target: null, gridOpen: false, busy: false };   // target: null — новая работа, 'cur' — открытая в редакторе
+const BD = { target: null, gridOpen: false, busy: false, student: '', solved: null };   // solved — ключи журнала выбранного ученика   // target: null — новая работа, 'cur' — открытая в редакторе
 let catIndexP = null;
 function catIndex(){
   if (!catIndexP){
@@ -2404,16 +2629,24 @@ function planRow(r){
   if (!cat || !cat.protos || !cat.protos.length)
     return { ok: false, text: name + ' — у номера нет каталога: случайное по типу добавьте из тренажёра в редакторе работы', why: 'nocat' };
   const protos = cat.protos;
-  if (!protos.some(p => (p.fipi || []).length))
-    return { ok: false, text: name + ' — банка ФИПИ нет, только наш генератор: в этой версии не собирается', why: 'gen' };
-  // «весь номер» — первый прототип с заданиями ФИПИ (у ЕГЭ первым идёт «Прототипы» — сборник без номеров)
-  const proto = r.proto ? protos.find(p => p.id === r.proto) : (protos.find(realFipi) || protos.find(p => (p.fipi || []).length));
+  if (!protos.some(p => (p.fipi || []).length || p.hasGen))
+    return { ok: false, text: name + ' — банка ФИПИ нет и генератора тоже: не собирается', why: 'gen' };
+  // «весь номер» — первый прототип с заданиями ФИПИ (у ЕГЭ первым идёт «Прототипы» — сборник без номеров);
+  // банка нет вовсе (oge10, 11, 13) — первый прототип с нашим генератором
+  const proto = r.proto ? protos.find(p => p.id === r.proto) : (protos.find(realFipi) || protos.find(p => (p.fipi || []).length) || protos.find(p => p.hasGen));
   if (!proto) return { ok: false, text: name + ' — прототипа «' + r.proto + '» в каталоге больше нет', why: 'proto' };
   const total = (proto.fipi || []).length;
   const tr = trainerOf(r.slug, r.n);
   if (!tr) return { ok: false, text: name + ' — тренажёр номера не найден', why: 'trainer' };
   const title = plainTitle(proto.title);
-  if (!total) return { ok: false, text: name + ' · ' + title + ' — в банке прототипа нет заданий ФИПИ, в этой версии не собирается', why: 'gen' };
+  const hasGen = !!proto.hasGen;
+  if (!total && !hasGen) return { ok: false, text: name + ' · ' + title + ' — в банке прототипа нет заданий ФИПИ, не собирается', why: 'gen' };
+  // решённые выбранным учеником места — пропускаем
+  const skip = new Set();
+  if (BD.solved){
+    const ex = window.TaskKey ? TaskKey.examOf(r.slug) : null;
+    if (ex) (proto.fipi || []).forEach((f, i) => { if (f && BD.solved.has('fipi:' + ex + ':' + f)) skip.add(i); });
+  }
   // конкретное задание («это задание» с тренажёра) — место ищем по номеру ФИПИ:
   // банк перевыгрузят, порядок сменится, а номер ФИПИ останется тем же
   const byFipi = r.fipi ? (proto.fipi || []).indexOf(r.fipi) : -1;
@@ -2421,21 +2654,29 @@ function planRow(r){
   const random = $('bdSource').value === 'random' && pinned == null;
   const start = pinned != null ? pinned : Math.max(0, (Math.round(Number($('bdStart').value)) || 1) - 1);
   const count = Math.max(1, Math.min(COUNT_MAX, r.count || 1));
-  let text, warn = '', got;
+  let text, warn = '', got, poss = null, skipped = 0;
   if (random){
-    got = Math.min(count, total);
-    text = 'ФИПИ вразнобой, ' + got + ' из ' + total;
-    if (got < count) warn = 'банк кончится: в прототипе всего ' + total;
+    const pool = total - skip.size;
+    got = hasGen ? count : Math.min(count, pool);
+    const own = Math.max(0, count - pool);
+    text = total ? 'ФИПИ вразнобой, ' + Math.min(count, pool) + ' из ' + total + (hasGen && own ? ' + наших на основе ФИПИ: ' + own : '') : 'наших на основе ФИПИ: ' + got;
+    if (total && pool < count) warn = hasGen ? 'банк кончится: ФИПИ только ' + pool + ', дальше — наши, на основе ФИПИ' : 'банк кончится: в прототипе всего ' + pool;
+    skipped = skip.size;
   } else {
-    if (start >= total) return { ok: false, text: name + ' · ' + title + ' — в банке ' + total + ' заданий, с №' + (start + 1) + ' брать нечего', why: 'end' };
-    got = Math.min(count, total - start);
-    text = 'ФИПИ ' + (got > 1 ? (start + 1) + '–' + (start + got) : String(start + 1)) + ' из ' + total;
-    if (got < count) warn = 'банк кончится: с №' + (start + 1) + ' только ' + got + ' из ' + count;
+    if (start >= total && !hasGen) return { ok: false, text: name + ' · ' + title + ' — в банке ' + total + ' заданий, с №' + (start + 1) + ' брать нечего', why: 'end' };
+    const rp = rowPositions(total, hasGen, start, count, skip);
+    poss = rp.poss; skipped = rp.skipped; got = poss.length;
+    if (!got) return { ok: false, text: name + ' · ' + title + ' — с №' + (start + 1) + ' всё уже решено учеником', why: 'end' };
+    text = posLabel(poss, total);
+    const fipiN = poss.filter(p => p < total).length;
+    if (total && fipiN < count) warn = hasGen ? 'банк кончится: ФИПИ только ' + fipiN + ' из ' + count + ', дальше — наши, на основе ФИПИ'
+      : 'банк кончится: с №' + (start + 1) + ' только ' + got + ' из ' + count;
   }
+  if (skipped) text += ' · пропущено ' + skipped + ' решённых';
   // addSeries дописывает « №n» сам; у страниц ОГЭ ч. 1 номера в адресе нет — подпись целиком
   const exArg = r.n == null ? name : (EXAM_NAMES[r.exam] ? r.exam : ((examsSpec()[r.exam] || {}).title || r.exam));
   return { ok: true, got, text: name + ' · ' + title + ' · ' + text, warn,
-    args: { tid: r.tid || tr.tid, href: r.href || tr.href, exam: exArg, n: r.n, proto: proto.id, count, source: random ? 'random' : 'order', startPos: start } };
+    args: { tid: r.tid || tr.tid, href: r.href || tr.href, exam: exArg, n: r.n, proto: proto.id, count, source: random ? 'random' : 'order', startPos: start, poss, skipPos: [...skip] } };
 }
 
 // строки в порядке дерева (экзамен → номер по первому появлению) — в этом же порядке встают группы
@@ -2469,7 +2710,35 @@ async function openBuild(target){
   if (first && examsSpec()[first.exam]) $('bdExam').value = first.exam;
   BD.gridOpen = false;
   renderBuild();
+  fillBuildStudents();
 }
+// «Для ученика» — только вошедшему учителю с кабинетом (список учеников из StudentMemory)
+async function fillBuildStudents(){
+  const sel = $('bdFor');
+  if (!window.StudentMemory){ $('bdForBox').hidden = true; return; }
+  const list = await loadStudents();
+  $('bdForBox').hidden = !list.length;
+  sel.innerHTML = '<option value="">— без ученика —</option>' + list.map(s => '<option value="' + esc(s.id) + '">' + esc(s.name) + '</option>').join('');
+  sel.value = list.some(s => s.id === BD.student) ? BD.student : '';
+  if (sel.value !== BD.student) setBuildStudent(sel.value);
+}
+async function setBuildStudent(id){
+  BD.student = id || ''; BD.solved = null;
+  renderBuildPreview();
+  if (!id) return;
+  $('bdGoNote').textContent = 'Загружаем, что ученик уже решал…';
+  let keys = new Set();
+  try {
+    const rows = await StudentMemory.fetchLog(id);
+    rows.forEach(r => { if (r.task_key) keys.add(r.task_key); });
+  } catch (e) { toast('Журнал ученика не загрузился: ' + e.message, 6000); }
+  // ещё не отправленное из очереди этого браузера — в локальной копии журнала
+  try { (StudentMemory.keys({ studentId: id }) || []).forEach(k => keys.add(k)); } catch (e) {}
+  if (BD.student !== id) return;
+  BD.solved = keys;
+  renderBuildPreview();
+}
+$('bdFor').addEventListener('change', () => setBuildStudent($('bdFor').value));
 function renderBuild(){
   if ($('scrBuild').hidden) return;
   const rows = VS.all();
@@ -2616,6 +2885,8 @@ async function buildGo(){
       // копии варианта берут рецепт образца — ждём, пока задания групп снимутся
       while (gens.size) await Promise.all([...gens.values()]).catch(() => {});
       for (let i = 1; i < nv; i++) newVariant();
+      // группы вариантов 2+ — по плану мест (variantPlan): без повторов между вариантами
+      E.variants.forEach(syncVariant);
       E.cur = 0; renderVariants(); renderTasks(); renderLink();
     }
     toastAction('Собрано групп: ' + made + (left.length ? '. В наборе осталось несобранных строк: ' + left.length : '. Набор очищен'), 'Вернуть набор', () => { VS.replace(saved); toast('Набор возвращён'); }, 10000);
