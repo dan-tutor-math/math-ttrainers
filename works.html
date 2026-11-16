@@ -1606,7 +1606,8 @@ async function addSeries(o){
   const units = await catalogOf(href, n);
   const u = units.find(x => x.id === o.proto);
   if (!u) throw new Error('addSeries: прототипа ' + o.proto + ' нет в каталоге');
-  const total = u.tasks.length;
+  // каталог ЕГЭ-семейства отдаёт tasks, каталог ОГЭ ч. 1 — только fipi (порядок тот же)
+  const total = (u.tasks || u.fipi || []).length;
   const count = Math.max(1, Math.min(COUNT_MAX, Math.round(Number(o.count) || 3)));
   let poss;
   if (o.source === 'random') poss = shufflePick([...Array(total).keys()], count);
