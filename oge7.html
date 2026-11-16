@@ -2149,9 +2149,47 @@ if (FIPI_BANK && window.FipiMix) {
     m.fipiList = list.map(t => ({ fipi: t.fipi, make: () => Object.assign(
       FIPI_BUILD[m.id](...t.args), t.checked ? {} : { unchecked: true }) }));
     const own = m.gen;
+    m.ownGen = own;   // m.gen ниже заменяется на случайный выбор, а каталогу нужен сам генератор
     m.gen = () => FipiMix.next(FIPI_PAGE, m.id, m.fipiList, own);
   });
 }
+/* Каталог для конструктора работ: список прототипов и задача по её месту в
+   банке. Экран задания включаем напрямую (как startMode, но без loadProg,
+   saveProg, NoRepeat и FipiMix.commit): иначе в браузер учителя записались бы
+   прогресс и память «ФИПИ решены» */
+window.__trainerCatalog = {
+  list(){
+    return Promise.resolve(MODES.filter(m => !m.demo).map(m => ({
+      id: m.id,
+      title: m.title,
+      section: null,
+      fipi: (m.fipiList || []).map(f => f.fipi),
+      hasGen: true,
+    })));
+  },
+  openAt(protoId, pos){
+    const m = MODES.find(x => x.id === protoId && !x.demo);
+    if (!m) return { ok: false, reason: 'unknown' };
+    const task = window.FipiMix.at(m.fipiList, pos, m.ownGen || m.gen);
+    if (!task) return { ok: false, reason: 'end' };
+    curMode = protoId;
+    curProg = freshProg();
+    curTask = task;
+    stepIdx = 0;
+    optionsLocked = false;
+    hadWrongPick = false;
+    taskAnswered = false;
+    stepsDone = false;
+    els.picker.style.display = 'none';
+    els.taskArea.style.display = 'block';
+    els.taskTitle.textContent = m.title;
+    els.stepInput.disabled = false;
+    els.stepGo.disabled = false;
+    els.mixedFill._fracChain = false;
+    renderCurrentTask();
+    return { ok: true, fipi: task.fipi || null, pos, total: (m.fipiList || []).length };
+  },
+};
 // тип задания ФИПИ — по его номеру, а не по curMode: в «вперемешку» и у
 // карточек «+» тип у каждого задания свой
 function fipiModeOf(task){

@@ -1599,6 +1599,38 @@ function renderCurrentTask() {
   syncSolutionUI();
 }
 
+/* Каталог для конструктора работ: список прототипов и задача по её месту.
+   Банка ФИПИ на странице нет — любое место отдаёт наш генератор. Экран задания
+   включаем напрямую (как newTask, но без NoRepeat и saveProg): иначе в браузер
+   учителя записались бы прогресс и память «недавних заданий» */
+window.__trainerCatalog = {
+  list(){
+    return Promise.resolve(ALL_MODES.filter(m => !m.demo).map(m => ({
+      id: m.id, title: m.title, section: null, fipi: [], hasGen: true,
+    })));
+  },
+  openAt(protoId, pos){
+    const m = ALL_MODES.find(x => x.id === protoId && !x.demo);
+    if (!m) return { ok: false, reason: 'unknown' };
+    if (pos < 0) return { ok: false, reason: 'end' };
+    curMode = protoId;
+    curSubMode = 'exam';
+    solShown = false;
+    syncTabs();
+    curProg = freshProg();
+    curTask = m.gen();
+    taskAnswered = false;
+    optionsLocked = false;
+    hadWrongPick = false;
+    els.picker.style.display = 'none';
+    els.taskArea.style.display = 'block';
+    els.comingSoonPanel.style.display = 'none';
+    els.taskTitle.textContent = m.title;
+    renderCurrentTask();
+    return { ok: true, fipi: null, pos, total: 0 };
+  },
+};
+
 function newTask() {
   const m = curMode === 'random' ? pick(RANDOM_MODES) : ALL_MODES.find(x => x.id === curMode);
   // Промпт №18 нового списка: без повторов — тот же генератор, но задание,

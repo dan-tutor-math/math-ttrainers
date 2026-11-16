@@ -976,6 +976,7 @@ if (FIPI_BANK && window.FipiMix && GK) {
     // пропадает в снимке сессии, и задание у ученика «не совпадало» бы с учительским
     m.fipiList = list.map(t => ({ fipi: t.fipi, make: () => Object.assign(geomTask(m.kind, t.a, t.img), t.checked ? {} : { unchecked: true }) }));
     const own = m.gen;
+    m.ownGen = own;   // m.gen ниже заменяется на случайный выбор, а каталогу нужен сам генератор
     m.gen = () => FipiMix.next(FIPI_PAGE, m.id, m.fipiList, own);
   }));
 }
@@ -992,6 +993,40 @@ if(FIPI18_BANK && window.FipiMix){
  });
 }
 const ALL_MODES = GROUPS.flatMap(g => g.modes);
+/* Каталог для конструктора работ: список прототипов и задача по её месту в
+   банке. Экран задания включаем напрямую: openTask и newTask записали бы
+   прогресс и память «ФИПИ решены» в браузер учителя */
+window.__trainerCatalog = {
+  list(){
+    return Promise.resolve(ALL_MODES.filter(m => !m.demo).map(m => ({
+      id: m.id,
+      title: m.title,
+      section: null,
+      fipi: (m.fipiList || []).map(f => f.fipi),
+      hasGen: true,
+    })));
+  },
+  openAt(protoId, pos){
+    const m = ALL_MODES.find(x => x.id === protoId && !x.demo);
+    if (!m) return { ok: false, reason: 'unknown' };
+    const task = window.FipiMix.at(m.fipiList, pos, m.ownGen || m.gen);
+    if (!task) return { ok: false, reason: 'end' };
+    curMode = protoId;
+    curSubMode = 'exam';
+    solShown = false;
+    curProg = freshProg();
+    curTask = task;
+    taskAnswered = false;
+    hadWrongPick = false;
+    els.picker.style.display = 'none';
+    els.taskArea.style.display = 'block';
+    els.comingSoonPanel.style.display = 'none';
+    els.taskTitle.textContent = m.title;
+    syncTabs();
+    renderCurrentTask();
+    return { ok: true, fipi: task.fipi || null, pos, total: (m.fipiList || []).length };
+  },
+};
 // «Случайно» берёт только генераторы: нулевой тип из демоверсии — всегда одно
 // и то же задание, в случайной подборке оно выпадало бы снова и снова
 const RANDOM_MODES = ALL_MODES.filter(m => !m.demo);

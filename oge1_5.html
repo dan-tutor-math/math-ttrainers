@@ -1351,8 +1351,13 @@ function plotFipiTask(plot, n){
     const v = plotVarOf(plot).v;
     if (pool.some(x => x.v === v)) pool = pool.filter(x => x.v === v);
   }
-  const t = pick(pool);
-  const ctx = vs && away ? `<div class="fipi-plot-text fipi-ctx">${vs.find(x => x.v === t.v).theory}</div>` : '';
+  return plotTaskOf(plot, pick(pool), away);
+}
+// задание сюжета из банка по записи t; withCtx — текст с планом кладём в условие
+// (там, где над заданием нет теории: карточка «+», «Случайно», конструктор работ)
+function plotTaskOf(plot, t, withCtx){
+  const vs = plotVars(plot);
+  const ctx = vs && withCtx ? `<div class="fipi-plot-text fipi-ctx">${vs.find(x => x.v === t.v).theory}</div>` : '';
   const ans = fmtNum(t.ans);
   const last = t.sol[t.sol.length - 1] || '';
   return Object.assign({
@@ -1983,6 +1988,86 @@ function renderCurrentTask(){
 
   syncKeypadVisibility();
 }
+
+/* Каталог для конструктора работ: прототип — одно задание темы (Шины 1–5,
+   «Шины · ФИПИ» 1–5, сюжеты ФИПИ 1–5), место — по порядку банка. Условие у
+   задания самодостаточно (текст с планом — внутри, как в кадре карточки «+»),
+   поэтому теории и навигации по теме нет. Экран задания включаем напрямую:
+   openTask и newTask записали бы прогресс, ink и память текстов в браузер учителя.
+   У сюжетов ФИПИ своего генератора нет — за концом банка ответ 'end' */
+function catalogProtos(){
+  const out = [];
+  GROUPS.forEach(g => g.modes.forEach(m => {
+    if (m.demo) return;
+    const list = m.kind === 'taskset' ? m.tasks.filter(t => t.gen).map(t => ({ task: t, set: m })) : [{ task: m, set: null }];
+    list.forEach(({ task, set }, i) => out.push({ id: task.id, set, task, idx: i }));
+  }));
+  return out;
+}
+function catalogBank(p){
+  if (!p.set || !p.set.fipi || !FIPI15) return [];
+  const vis = t => t.checked || FIPI15_ALL;
+  if (p.set.id === 'tire_fipi') return FIPI15.tasks.filter(t => t.plot === 'tire' && t.kind === TIRE_KINDS[p.idx] && vis(t));
+  const n = Number((p.id.match(/_t(\d+)$/) || [])[1]);
+  return FIPI15.tasks.filter(t => t.plot === p.set.id.replace(/_fipi$/, '') && t.n === n && vis(t));
+}
+function catalogTask(p, t){
+  if (p.set.id === 'tire_fipi') return tireFipiTaskOf(TIRE_FIPI.find(v => v.v === t.v), t);
+  return plotTaskOf(p.set.id.replace(/_fipi$/, ''), t, true);
+}
+window.__trainerCatalog = {
+  list(){
+    return Promise.resolve(catalogProtos().map(p => ({
+      id: p.id,
+      title: p.set ? p.set.title + ' — ' + p.task.title : p.task.title,
+      section: null,
+      fipi: catalogBank(p).map(t => t.fipi),
+      hasGen: p.set ? (!p.set.fipi || p.set.id === 'tire_fipi') : true,
+    })));
+  },
+  openAt(protoId, pos){
+    const p = catalogProtos().find(x => x.id === protoId);
+    if (!p) return { ok: false, reason: 'unknown' };
+    if (pos < 0) return { ok: false, reason: 'end' };
+    const bank = catalogBank(p);
+    let task;
+    if (pos < bank.length) task = catalogTask(p, bank[pos]);
+    else {
+      // свой генератор: у «Шин · ФИПИ» — то же задание наших «Шин»
+      const own = p.set && p.set.fipi
+        ? (p.set.id === 'tire_fipi' ? TIRE1_TASKS[p.idx].gen : null)
+        : p.task.gen;
+      if (!own) return { ok: false, reason: 'end', total: bank.length };
+      task = own();
+      if (bank.length) task.basedOnFipi = true;
+    }
+    curMode = protoId;   // не setCurMode: тот сохранил бы лист заметок в localStorage
+    curTasksetRef = null;
+    curTasksetTheory = null;
+    curSubMode = 'exam';
+    curProg = freshProg();
+    curTask = task;
+    taskAnswered = false;
+    optionsLocked = false;
+    solutionShown = false;
+    hadWrongPick = false;
+    els.picker.style.display = 'none';
+    els.taskArea.style.display = 'block';
+    els.taskTitle.textContent = p.set ? p.set.title + ' — ' + p.task.title : p.task.title;
+    els.theoryBlock.style.display = 'none';
+    els.newTireBtn.style.display = 'none';
+    els.theoryBasketAddBtn.style.display = 'none';
+    els.tabLearn.classList.remove('active');
+    els.tabPractice.classList.remove('active');
+    els.tabExam.classList.add('active');
+    els.comingSoonPanel.style.display = 'none';
+    els.refreshBtn.style.display = 'inline-flex';
+    updateTasksetNav();
+    updateTypeNav();
+    renderCurrentTask();
+    return { ok: true, fipi: task.fipi || null, pos, total: bank.length };
+  },
+};
 
 function newTask() {
   const tasksetDef = curTasksetRef ? curTasksetRef.tasks.find(t => t.id === curMode) : null;
