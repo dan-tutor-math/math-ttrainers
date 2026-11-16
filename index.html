@@ -1286,7 +1286,10 @@ function curNav(){ return SUBJECTS.find(s => s.id === curSubject).nav; }
 // не трогает тему оформления и то, какая вкладка была открыта в этом меню.
 document.getElementById('resetProgressBtn').onclick = () => {
   let keys = [];
-  try { keys = Object.keys(localStorage).filter(k => k.startsWith('ogeProg:')); } catch(e){}
+  // fipiMix:done:<страница> — решённые задания ФИПИ из fipi-mix.js (№6–9, №15–18,
+  // подпись «ФИПИ решено N из M»): живут вне ogeProg:, и без них сброс их не видел.
+  // fipiMix:filter не трогаем — это выбор «ФИПИ / наши», настройка, а не прогресс
+  try { keys = Object.keys(localStorage).filter(k => k.startsWith('ogeProg:') || k.startsWith('fipiMix:done:')); } catch(e){}
   if (keys.length === 0) { alert('Прогресс уже пуст — сбрасывать нечего.'); return; }
   const ok = confirm(
     `Стереть весь сохранённый прогресс, медали и историю по всем тренажёрам (${keys.length} записей)?\n` +
