@@ -3329,6 +3329,9 @@ let selectMode = 'rect';
 try { if (localStorage.getItem('boardsSelectMode') === 'lasso') selectMode = 'lasso'; } catch (e) {}
 let lassoPts = null;        // путь лассо в мировых координатах, пока его ведут
 let lassoBase = null;       // что было выделено до обводки с ⌘/Ctrl — к нему и добавляем
+// «Выделение»: нажали на невыделенный объект — пошла рамка/лассо, но если
+// отпустят почти на месте, это щелчок, и выделяется этот объект: {id, sx, sy}
+let selectClickHit = null;
 let marqueeBase = null;     // то же для рамки
 
 let draft = null;           // {type, pts:[...]} — для line/ellipse/quad/angle
@@ -6147,6 +6150,7 @@ function toggleInSelection(obj){
   scheduleRedraw();
 }
 function startSelectGesture(pt, base){
+  selectClickHit = null;
   if (selectMode === 'lasso'){ dragMode = 'lasso'; lassoPts = [pt]; lassoBase = base; }
   else { dragMode = 'marquee'; marqueeStart = pt; marqueeCur = pt; marqueeBase = base; }
   updateContextMenu();
@@ -6385,8 +6389,18 @@ canvas.addEventListener('pointerdown', (e) => {
       return;
     }
     // групповое выделение (рамкой или через «Объединить в группу») — клик по
-    // любому из его участников двигает всю группу разом
-    if (multiSelectIds.length){
+    // любому из его участников двигает всю группу разом.
+    // Верхний объект под курсором: если это невыделенный объект поверх
+    // выделенного (штрих на картинке), тащить выделенное нельзя — щелчок
+    // выделит этот штрих, протяжка начнёт обводку
+    let clickHit = null;
+    const HC = sceneHitCandidates(pt, 8/cam.zoom);
+    for (let i=HC.length-1;i>=0;i--){
+      if (hitTestObject(HC[i], pt, 8/cam.zoom)){ clickHit = HC[i]; break; }
+    }
+    const selNow = currentSelectionIds();
+    const topIsOther = !!(clickHit && !selNow.includes(clickHit.id));
+    if (multiSelectIds.length && !topIsOther){
       for (const gid of multiSelectIds){
         const gobj = B.objects.find(o=>o.id===gid);
         if (gobj && hitTestObject(gobj, pt, 8/cam.zoom)){
@@ -6404,37 +6418,24 @@ canvas.addEventListener('pointerdown', (e) => {
       if (obj){
         const role = hitTestHandles(obj, pt);
         if (role){ pushUndo({ ids: [obj.id] }); dragMode='handle'; dragHandleRole=role; dragObjId=obj.id; return; }
-      }
-    }
-    const HC = sceneHitCandidates(pt, 8/cam.zoom);
-    for (let i=HC.length-1;i>=0;i--){
-      if (hitTestObject(HC[i], pt, 8/cam.zoom)){
-        const obj = HC[i];
-        if (obj.groupId){
-          // объект — часть сохранённой группы: выделяем и двигаем всех её участников разом
-          const members = B.objects.filter(o=>o.groupId===obj.groupId).map(o=>o.id);
-          selectedId = null; multiSelectIds = members;
-          pushUndo({ ids: members });
-          dragMode='multimove'; dragGroupIds = members; dragStart = pt;
-          dragOrigMap = {};
-          dragGroupIds.forEach(id => { const o=B.objects.find(x=>x.id===id); if (o) dragOrigMap[id]=clonePts(o); });
-          updateContextMenu();
-          scheduleRedraw();
+        // уже выделенный объект тащится за тело
+        if (!topIsOther && hitTestObject(obj, pt, 8/cam.zoom)){
+          pushUndo({ ids: [obj.id] });
+          dragMode='move'; dragObjId=obj.id; dragStart=pt; dragOrig=clonePts(obj);
+          updateContextMenu(); scheduleRedraw();
           return;
         }
-        selectedId = obj.id; multiSelectIds = [];
-        pushUndo({ ids: [obj.id] });
-        dragMode='move'; dragObjId=selectedId; dragStart=pt; dragOrig=clonePts(obj);
-        updateContextMenu();
-        scheduleRedraw();
-        return;
       }
     }
-    // ничего не задели — начинаем рамку выделения (marquee): все объекты,
-    // хоть частично попавшие в неё, будут выделены при отпускании ЛКМ
-    // (или лассо — в его режиме)
+    // Невыделенный объект под курсором НЕ хватается: нажатие на нём
+    // начинает рамку/лассо, как на пустом месте. Иначе на доске, где поверх
+    // картинки лежат штрихи, обвести нужное было нельзя — жест цеплял
+    // картинку и тащил её. Простой щелчок без протяжки выделяет верхний
+    // объект под курсором (см. selectClickHit в pointerup); тащить можно
+    // только уже выделенное
     selectedId = null; multiSelectIds = [];
     startSelectGesture(pt, []);
+    selectClickHit = clickHit ? { id: clickHit.id, sx: e.clientX, sy: e.clientY } : null;
     return;
   }
 
@@ -6497,6 +6498,10 @@ canvas.addEventListener('pointermove', (e) => {
     if (eraseGesture) eraseGestureStep(eraseGesture.last, pt);
     return;
   }
+  // увели указатель от точки нажатия — это уже обводка, а не щелчок, даже
+  // если петля вернулась к началу
+  if (selectClickHit && (dragMode === 'marquee' || dragMode === 'lasso')
+      && Math.hypot(e.clientX - selectClickHit.sx, e.clientY - selectClickHit.sy) >= 5) selectClickHit = null;
   if (dragMode === 'marquee'){ marqueeCur = pt; requestFrame(); return; }
   if (dragMode === 'lasso'){
     // точку пути берём не на каждое событие, а через 3 экранных пикселя:
@@ -6581,6 +6586,20 @@ canvas.addEventListener('pointerup', (e) => {
   if (dragMode === 'handle' && /^(se|sw|ne|nw)$/.test(dragHandleRole || '')) noteTaskScale(taskObjById(dragObjId));
   if (dragMode === 'move' || dragMode === 'handle' || dragMode === 'multimove'){ saveDB(); }
   if (dragMode === 'pan') updateCursor(); // вернуть «раскрытую руку» или курсор текущего инструмента
+  // щелчок (без протяжки) по объекту в «Выделении» — выделить его, а не
+  // обводить: рамка нулевого размера взяла бы всех, чья рамка-bbox тут лежит
+  if ((dragMode === 'marquee' || dragMode === 'lasso') && selectClickHit){
+    const h = selectClickHit; selectClickHit = null;
+    const obj = B.objects.find(o => o.id === h.id);
+    if (obj){
+      const ids = obj.groupId ? B.objects.filter(o => o.groupId === obj.groupId).map(o => o.id) : [obj.id];
+      setSelectionIds(ids);
+      marqueeStart = null; marqueeCur = null; marqueeBase = null; lassoPts = null; lassoBase = null;
+      dragMode = null;
+      updateContextMenu();
+      scheduleRedraw();
+    }
+  }
   if (dragMode === 'marquee'){
     const x0=Math.min(marqueeStart.x,marqueeCur.x), x1=Math.max(marqueeStart.x,marqueeCur.x);
     const y0=Math.min(marqueeStart.y,marqueeCur.y), y1=Math.max(marqueeStart.y,marqueeCur.y);

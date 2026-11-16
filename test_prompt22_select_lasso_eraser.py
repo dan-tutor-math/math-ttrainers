@@ -404,6 +404,42 @@ def run():
         check("G. жест с паузой: в базе то же, что на экране", loc == db)
         tp.close()
 
+        # ═══ J. нажатие на невыделенный объект не хватает его ═══
+        png = ("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGA"
+               "hKmMIQAAAABJRU5ErkJggg==")
+        img = {"id": "IM", "type": "image", "src": png, "points": [{"x": 50, "y": 50}], "w": 600, "h": 400,
+               "natW": 1, "natH": 1}
+        page = open_board(browser, "T", [img, hline("P1", 150, 250, 200), hline("P2", 350, 450, 200)], cloud=False)
+        page.on("pageerror", lambda e: errors.append(str(e)))
+        pick(page, "select")
+        page.click('[data-sel-mode="lasso"]')
+        img_xy = lambda: page.evaluate("() => { const p = getCurrentBoard().objects.find(o => o.id === 'IM').points[0]; return [p.x, p.y]; }")
+        # лассо, начатое на картинке, обводит штрихи поверх неё
+        drag_path(page, [(120, 160), (280, 160), (280, 240), (120, 240), (120, 162)])
+        check("J. лассо с началом на картинке выделило штрих поверх, картинку не сдвинуло",
+              sel(page) == ["P1"] and img_xy() == [50, 50], f"{sel(page)} {img_xy()}")
+        click_world(page, 700, 600)
+        # протяжка по невыделенной картинке — не таскает её
+        drag_path(page, [(500, 350), (560, 380)])
+        check("J. протяжка по невыделенной картинке её не двигает", img_xy() == [50, 50], str(img_xy()))
+        # то же в режиме рамки: рамка, начатая на картинке, выделяет штрих
+        page.click('[data-sel-mode="rect"]')
+        click_world(page, 700, 600)
+        drag_path(page, [(330, 180), (470, 220)])
+        check("J. рамка с началом на картинке выделила штрих поверх", "P2" in sel(page) and img_xy() == [50, 50],
+              f"{sel(page)} {img_xy()}")
+        click_world(page, 700, 600)
+        # щелчок выделяет, после этого протяжка тащит
+        click_world(page, 500, 350)
+        check("J. щелчок по картинке выделяет её", sel(page) == ["IM"], str(sel(page)))
+        drag_path(page, [(500, 350), (560, 380)])
+        check("J. выделенная картинка тащится", img_xy() == [110, 80], str(img_xy()))
+        # картинка выделена, щелчок по штриху поверх неё — выделяет штрих, картинка стоит
+        click_world(page, 200, 200)
+        check("J. щелчок по штриху поверх выделенной картинки выделяет штрих",
+              sel(page) == ["P1"] and img_xy() == [110, 80], f"{sel(page)} {img_xy()}")
+        page.close()
+
         # ═══ H. заметки справочной панели ═══
         page = open_board(browser, "T", [], cloud=False)
         page.on("pageerror", lambda e: errors.append(str(e)))
