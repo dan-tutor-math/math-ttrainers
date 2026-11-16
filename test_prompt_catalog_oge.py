@@ -14,7 +14,7 @@ import test_prompt84_deck_slides as T
 
 T.PORT = 9132
 T.BASE = f"http://127.0.0.1:{T.PORT}"
-PAGES = ["oge6", "oge7", "oge9", "oge10", "oge11", "oge13", "oge14", "oge15_18", "oge19"]
+PAGES = ["oge1_5", "oge6", "oge7", "oge9", "oge10", "oge11", "oge13", "oge14", "oge15_18", "oge19"]
 # ключи совместной сессии страница заводит сама по таймеру, к каталогу они не относятся
 STORE = """() => JSON.stringify(Object.keys(localStorage).sort()
   .filter(k => !k.startsWith('trainerSession') && !k.startsWith('tsSessions'))
@@ -41,7 +41,8 @@ def run_page(browser, slug, errors):
     check(not any("demo" in x["id"] for x in lst), slug + ": без демоверсии")
     first = lst[0]
     banked = [x for x in lst if x["fipi"]]
-    protos = [first] + ([max(banked, key=lambda x: len(x["fipi"]))] if banked else [])
+    # со страницы, где банк разбит на много прототипов (№1–5), берём все — сюжеты строятся по-разному
+    protos = [first] + (banked if slug == "oge1_5" else [max(banked, key=lambda x: len(x["fipi"]))] if banked else [])
 
     before = page.evaluate(STORE)
     for proto in protos:
@@ -53,10 +54,14 @@ def run_page(browser, slug, errors):
             check(page.evaluate("() => (curTask && curTask.fipi) || null") == want,
                   f"{slug}: {proto['id']} на экране задача места {pos}")
             check(page.is_visible("#questionPanel"), f"{slug}: {proto['id']} экран задания открыт")
-        if proto["fipi"]:
+        if proto["fipi"] and proto["hasGen"]:
             r = page.evaluate("([id, pos]) => __trainerCatalog.openAt(id, pos)", [proto["id"], len(proto["fipi"])])
             check(r["ok"] and r["fipi"] is None, f"{slug}: {proto['id']} за концом банка — наш генератор", str(r))
             check(page.evaluate("() => curTask.basedOnFipi === true"), f"{slug}: подпись «на основе ФИПИ»")
+        elif proto["fipi"]:
+            # у сюжетов ФИПИ №1–5 своего генератора нет: за концом банка — end
+            r = page.evaluate("([id, pos]) => __trainerCatalog.openAt(id, pos)", [proto["id"], len(proto["fipi"])])
+            check(not r["ok"] and r["reason"] == "end", f"{slug}: {proto['id']} за концом банка без генератора — end", str(r))
     r = page.evaluate("() => __trainerCatalog.openAt('нет-такого', 0)")
     check(not r["ok"] and r["reason"] == "unknown", slug + ": неизвестный прототип", str(r))
     check(page.evaluate(STORE) == before, slug + ": браузер учителя не изменён")
