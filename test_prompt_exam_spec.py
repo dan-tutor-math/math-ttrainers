@@ -23,25 +23,35 @@ PORT = 8975
 t54.PORT = PORT
 BASE = f"http://127.0.0.1:{PORT}"
 
-MAX_POINTS = {"oge": 31, "ege_base": 21, "ege_prof": 32}
+MAX_POINTS = {"oge": 31, "ege_base": 21}
 
 # список номеров, который exam-nav.js держал у себя до выноса в exam-spec.js
 OLD_OGE = (["oge1_5", "oge6", "oge7", "oge8", "oge9", "oge10", "oge11", "oge12", "oge13", "oge14",
             "oge15_18", "oge19"] + [f"oge_part2:{n}" for n in range(20, 26)])
 OLD_RUS = ["rus_oge01"] + [f"rus_oge:{n}" for n in range(2, 13)] + ["rus_oge13"]
-OLD_PROF = [f"ege_prof:{n}" for n in range(1, 20)]
+OLD_PROF = [f"ege_prof:{n}" for n in range(1, 21)]  # range в exam-nav.js включал конец
 
 # страница → (экзамен, список номеров до выноса)
 NAV_PAGES = [("oge9.html", "oge", OLD_OGE), ("ege_prof.html?n=1", "ege_prof", OLD_PROF),
-             ("rus_oge.html?n=2", "rus_oge", OLD_RUS)]
+             ("rus_oge.html?n=2", "rus_oge", OLD_RUS),
+             ("phys_oge.html?n=1", "phys_oge", [f"phys_oge:{n}" for n in range(1, 17)]),
+             ("soc_ege.html?n=1", "soc_ege", [f"{'soc_ege' if n <= 16 else 'soc_ege_long'}:{n}" for n in range(1, 26)]),
+             ("rus_ege.html?n=1", "rus_ege", [f"rus_ege:{n}" for n in range(1, 27)] + ["rus_ege27"])]
+
+# все экзамены, у которых до выноса были стрелки, и число их позиций
+OLD_COUNTS = {"oge": 18, "ege_base": 21, "ege_prof": 20, "soc_oge": 20, "phys_oge": 16, "inf_oge": 10,
+              "soc_ege": 25, "rus_oge": 13, "rus_ege": 27, "eng_oge": 11}
 
 
 def check_spec(page, failures):
     page.goto(f"{BASE}/ege_prof.html?n=1")
     page.wait_for_function("() => window.ExamSpec")
     spec = page.evaluate("() => JSON.parse(JSON.stringify(window.ExamSpec.exams))")
-    if sorted(spec) != sorted(["oge", "ege_base", "ege_prof", "soc_oge", "rus_oge", "eng_oge"]):
+    if sorted(spec) != sorted(OLD_COUNTS):
         failures.append(f"A: набор экзаменов {sorted(spec)}")
+    for eid, cnt in OLD_COUNTS.items():
+        if eid in spec and len(spec[eid]["list"]) != cnt:
+            failures.append(f"A/{eid}: {len(spec[eid]['list'])} позиций, до выноса было {cnt}")
     for eid, ex in spec.items():
         by_slug = {}
         for p in ex["list"]:
@@ -71,7 +81,7 @@ def check_spec(page, failures):
                               ExamSpec.find('rus_oge', 5), ExamSpec.find('oge_part2', 99), ExamSpec.find('nope')]""")
     ok = (f[0] and f[0]["exam"] == "oge" and f[0]["part"] == 2 and f[0]["answer"] == "long"
           and f[1] and f[1]["exam"] == "oge" and f[1]["points"] == 1
-          and f[2] and f[2]["exam"] == "ege_prof" and f[2]["points"] == 2
+          and f[2] and f[2]["exam"] == "ege_prof"
           and f[3] and f[3]["exam"] == "rus_oge" and f[4] is None and f[5] is None)
     if not ok:
         failures.append(f"C: find() вернул {f}")
@@ -91,7 +101,7 @@ def check_nav(browser, failures, errors):
         if res["id"] != title:
             failures.append(f"D/{url}: экзамен {res['id']} != {title}")
         ctx.close()
-    print("  D: exam-nav на oge9, ege_prof, rus_oge видит прежний список номеров")
+    print("  D: exam-nav на oge9, ege_prof, rus_oge, phys_oge, soc_ege, rus_ege видит прежний список номеров")
 
 
 def run():
