@@ -9,7 +9,7 @@
 индекс не разошёлся с тем, что реально отдаёт страница). Страницы без каталога пропускаются
 с пометкой в выводе — скрипт перезапускают после слияния этапа 2.
 
-Формат: { "<slug>|<n>": { "title": "...", "protos": [ { "id", "title", "fipi": [...], "hasGen" } ] } }
+Формат (у страниц ОГЭ ч. 1 без номера в адресе n пустой: "oge9|"): { "<slug>|<n>": { "title": "...", "protos": [ { "id", "title", "fipi": [...], "hasGen" } ] } }
 Порядок fipi — как в банке (тот же, что у openAt). Больше 300 КБ — делим по экзаменам:
 catalog-index-oge.json, catalog-index-ege.json (общий файл тогда удаляется).
 --check — ничего не писать, вернуть 1, если файлы на диске отстали от страниц."""
@@ -21,11 +21,21 @@ PORT = 9140
 LIMIT = 300 * 1024
 # страницы, где каталог есть или появится на этапе 2 (демоверсии и работы не нужны)
 PAGES = ['ege_prof', 'ege_base', 'soc_ege', 'soc_ege_long', 'soc_oge', 'eng_oge', 'phys_oge',
-         'inf_oge', 'oge_part2', 'oge1_5', 'oge7', 'oge10', 'oge11', 'oge13', 'oge14', 'oge19']
+         'inf_oge', 'oge_part2', 'oge1_5', 'oge6', 'oge7', 'oge9', 'oge10', 'oge11', 'oge13', 'oge14',
+         'oge15_18', 'oge19']
 
 # в странице: все номера банка с названием и список прототипов из каталога
 JS = """async () => {
   const out = {};
+  // страницы ЕГЭ-семейства держат несколько номеров (NUMS, номер в адресе);
+  // у страниц ОГЭ ч. 1 номер один на страницу — ключ «slug|» с пустым n
+  if (typeof NUMS === 'undefined') {
+    const slug = location.pathname.split('/').pop().replace(/\\.html?$/, '');
+    const sp = window.ExamSpec && ExamSpec.find(slug);
+    const protos = await __trainerCatalog.list();
+    out[''] = { title: (sp ? 'ОГЭ ' + sp.label : document.title), label: (sp ? sp.label : slug), protos };
+    return out;
+  }
   for (const n of NUMS) {
     const protos = await __trainerCatalog.list(n);
     const t = (typeof task === 'function' && task(n)) || {};
