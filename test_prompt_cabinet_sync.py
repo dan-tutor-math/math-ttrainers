@@ -159,6 +159,9 @@ def row(day, rid):
 
 
 def run_sync(p):
+    # идущая синхронизация (автозапуск через 1,5 с после открытия) вернула бы
+    # свой promise — и тест проверял бы раньше, чем дошла его правка
+    p.wait_for_function("() => !ScheduleSync.state.busy", timeout=15000)
     p.evaluate("() => { window.__syncDone = false; ScheduleSync.sync().then(() => { window.__syncDone = true; }); }")
 
 
@@ -195,7 +198,8 @@ def main():
         txt = p.inner_text(".sy-modal")
         check("A1 предпросмотр: занятия окна и шаблон", "Занятия: 6" in txt and "Шаблонов недели: 1" in txt, txt)
         check("A2 Ваня и Петя совпали по имени", "Ваня" in txt.split("свяжем по имени")[1].split("\n")[0] and "Петя" in txt.split("свяжем по имени")[1].split("\n")[0], txt)
-        check("A3 Маша — новая, отмечена «завести»", p.is_checked('.sy-modal [data-new="Маша"]'))
+        # 16.11: старое — источник правды, его учеников заводим всех (без галочек)
+        check("A3 Маша — новая, в списке «заведём»", p.locator('.sy-modal [data-new="Маша"]').count() == 1)
         check("A4 Гоша — только в строках, останется гостем", "останутся гостями" in txt and "Гоша" in txt.split("останутся гостями")[1], txt)
         check("A5 прошлые занятия — галочка", p.is_checked("#syHist") and "прошлые занятия: 1" in txt, txt)
         check("A6 до подтверждения ничего не записано", not [x for x in db().get("lessons", [])] and LOG["put"] == 0)

@@ -51,9 +51,22 @@
    браузера и уходит только в заголовке x-code к адресу старого приложения.
    В Supabase (teacher_settings, ext_sync) его нет и быть не должно.
 
-   Ученики: имя в строке старого ↔ students.ext_name. Незнакомое имя — гость
-   (guest_name) и предложение завести ученика; молча не заводим. Переименовали
-   ученика в кабинете (name ≠ ext_name) — переименовываем и в старом: в строках,
+   Ученики (16.11, «ученики не совпадают»): источник правды — список учеников
+   старого. Каждому ученику старого кабинет выдаёт постоянный id (поле id у
+   ученика в старом, старое приложение его просто хранит), раздел ученика —
+   s:<id старого>, а связь id старого → students.id лежит в базе сведения
+   (ext_sync.base.link). По имени ученика узнаём только один раз — при первой
+   привязке, и только если совпадение одно; дальше переименование, архив и
+   «Вернуть» в любом месте идут по id и не плодят новых записей. Раньше раздел
+   был s:<имя>: переименование в старом вместе с любой другой правкой учеников
+   отправляло ученика кабинета в архив, а новое имя — в «завести ученика» (дубль).
+   Ученики старого (и архивные — сразу в архив) заводятся в кабинете сами; если
+   в кабинете есть похожий непривязанный ученик («Андрей» ~ «Андрей Ребенков»),
+   не заводим, а показываем пару — решает преподаватель (связать / завести).
+   Похожие ученики внутри кабинета — список пар, слияние только по кнопке.
+   Имя в строке расписания старого → ученик старого → по связи ученик кабинета.
+   Незнакомое имя только в строках — гость и предложение завести ученика.
+   Переименовали ученика в кабинете — переименовываем и в старом: в строках,
    шаблонах, оплатах, как «Переименовать везде» старого приложения.
    ========================================================== */
 (function(){
@@ -354,8 +367,9 @@
       if (ls.length) U['d:' + day] = ls;
     });
     ((data && data.students) || []).forEach(s => {
+      // id ученикам старого выдаёт bindStudents до этого места
       const n = String((s && s.name) || '').trim();
-      if (n) U['s:' + norm(n)] = { n, a: !!s.arch };
+      if (n && s.id) U['s:' + s.id] = { n, a: !!s.arch };
     });
     ((data && data.templates) || []).forEach(t => {
       if (!t || !t.id) return;
@@ -448,7 +462,9 @@
     slots.forEach(s => { s.people = sp.filter(p => p.slot_id === s.id).sort((a, b) => a.pos - b.pos); });
     tpls.forEach(t => { t.slots = slots.filter(s => s.template_id === t.id); });
     const sync = await run(c.from('ext_sync').select('rev, base, synced_at').eq('source', SOURCE).maybeSingle());
-    const cab = { students, lessons, groups, tpls, sync, newExt: [], pay, payOn: !!pay };
+    const bb = (sync && sync.base) || {};
+    const cab = { students, lessons, groups, tpls, sync, newExt: [], pay, payOn: !!pay,
+      link: Object.assign({}, bb.link || {}), sep: Object.assign({}, bb.sep || {}), hold: {}, create: [], pend: [] };
     reindex(cab);
     return cab;
   }
@@ -456,12 +472,118 @@
     cab.byId = {};
     cab.students.forEach(s => { cab.byId[s.id] = s; });
   }
-  // имя из строки старого → ученик: сперва привязка ext_name, потом имя
-  function resolver(cab){
-    const ext = {}, nm = {};
-    cab.students.forEach(s => { if (s.ext_name) ext[norm(s.ext_name)] = s; });
-    cab.students.forEach(s => { if (!nm[norm(s.name)]) nm[norm(s.name)] = s; });
-    return name => ext[norm(name)] || nm[norm(name)] || null;
+  // имя из строки старого → ученик кабинета: сперва ученик старого с этим
+  // именем и его связь по id (U — разделы, где есть s:<id>), потом ext_name,
+  // потом имя. При одинаковых именах берём того, кто не в архиве: в строки
+  // расписания пишут действующих учеников
+  function resolver(cab, U){
+    const byOld = {}, ext = {}, nm = {};
+    const put = (o, k, s) => { if (!o[k] || (o[k].archived_at && !s.archived_at)) o[k] = s; };
+    if (U && cab.link) Object.keys(U).forEach(k => {
+      if (!k.startsWith('s:') || !U[k]) return;
+      const s = cab.byId[cab.link[k.slice(2)]];
+      if (s) put(byOld, norm(U[k].n), s);
+    });
+    cab.students.forEach(s => { if (s.ext_name) put(ext, norm(s.ext_name), s); });
+    cab.students.forEach(s => put(nm, norm(s.name), s));
+    return name => byOld[norm(name)] || ext[norm(name)] || nm[norm(name)] || null;
+  }
+
+  /* ══ ученики: постоянный id старого ↔ ученик кабинета ══ */
+  const SID = () => rid('u');
+  const sameN = (a, b) => !!norm(a) && norm(a) === norm(b);
+  // «похожие» имена: первое слово то же, остальные слова одного — начала слов
+  // другого («Андрей» ~ «Андрей Ребенков», «Илья Гр» ~ «Илья Грачков»).
+  // Цифры в конце не в счёт: «Даша2» ~ «Даша» — тоже повод спросить
+  function similar(a, b){
+    const w = s => norm(s).replace(/[^a-zа-я0-9 ]/g, ' ').replace(/\d+$/, '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+    const x = w(a), y = w(b);
+    if (!x.length || !y.length || x[0] !== y[0]) return false;
+    const [s, l] = x.length <= y.length ? [x, y] : [y, x];
+    return s.every((v, i) => l[i].startsWith(v));
+  }
+  // решения преподавателя из окна «похожие ученики» — до следующей удачной синхронизации
+  const decide = { link: {}, sep: {} };
+
+  // До сведения: id каждому ученику старого, перевод базы на s:<id>, привязка
+  // новых учеников старого к кабинету и переименования по связи.
+  // Возвращает { create: [id старого], pend: [{id, n, a, cands}], renamed }.
+  function bindStudents(cab, raw, B, mark, legacy){
+    const list = raw.students = Array.isArray(raw.students) ? raw.students : [];
+    const seen = {};
+    list.forEach(s => {
+      if (!s || typeof s !== 'object') return;
+      if (!s.id || typeof s.id !== 'string' || seen[s.id]) { s.id = SID(); mark(); }
+      seen[s.id] = 1;
+      // раньше кабинет писал arch: true, а старое ждёт дату («в архиве с …»
+      // падало на true.split) — чиним
+      if (s.arch === true) { s.arch = today(); mark(); }
+    });
+    // база до 16.11: разделы учеников по имени — переводим на id
+    if (legacy) Object.keys(B).forEach(k => {
+      if (!k.startsWith('s:')) return;
+      const v = B[k]; delete B[k];
+      const o = v && list.find(s => s && s.id && sameN(s.name, v.n));
+      if (o && !B['s:' + o.id]) B['s:' + o.id] = v;
+    });
+    const L = cab.link;
+    Object.keys(L).forEach(id => { if (!cab.byId[L[id]]) delete L[id]; });   // ученика кабинета удалили
+    Object.keys(decide.link).forEach(id => {
+      const to = decide.link[id];
+      if (!cab.byId[to]) return;
+      Object.keys(L).forEach(x => { if (L[x] === to) delete L[x]; });
+      L[id] = to;
+    });
+    Object.keys(decide.sep).forEach(id => { cab.sep[id] = 1; });
+    const linked = () => { const m = {}; Object.keys(L).forEach(id => { m[L[id]] = id; }); return m; };
+    let of = linked();
+    const create = [], pend = [];
+    // «потерянные» ученики кабинета: были привязаны по имени (ext_name), а в
+    // старом такого имени больше нет — скорее всего, переименован до перехода
+    // на id. Кандидат для ученика старого, если тот стоит в тех же строках
+    // расписания (занятие кабинета с тем же ext_id)
+    const oldNames = {};
+    list.forEach(o => { if (o && o.name) oldNames[norm(o.name)] = 1; });
+    const rowNames = {}, hits = {};
+    Object.values(raw.schedule || {}).forEach(d => (d && d.rows || []).forEach(r => { if (r && r.id && !r.ev) rowNames[r.id] = splitNames(r.names).map(x => norm(stName(x))); }));
+    cab.lessons.forEach(l => {
+      const ns = l.ext_id && rowNames[l.ext_id];
+      if (ns) (l.people || []).forEach(p => {
+        const s = p.student_id && cab.byId[p.student_id];
+        if (s && s.ext_name && !oldNames[norm(s.ext_name)]) ns.forEach(n => { (hits[s.id] = hits[s.id] || {})[n] = 1; });
+      });
+    });
+    // сперва действующие: одноимённый архивный не должен забрать связь
+    const order = list.filter(s => s && s.id && String(s.name || '').trim()).sort((a, b) => (!!a.arch) - (!!b.arch));
+    order.forEach(o => {
+      if (L[o.id]) return;
+      const n = String(o.name).trim();
+      const free = cab.students.filter(s => !of[s.id]);
+      let c = free.filter(s => s.ext_name && sameN(s.ext_name, n));
+      if (!c.length) c = free.filter(s => sameN(s.name, n));
+      if (c.length > 1) { const act = c.filter(s => !s.archived_at); if (act.length === 1) c = act; }
+      if (c.length === 1) { L[o.id] = c[0].id; of = linked(); return; }
+      if (!c.length && !cab.sep[o.id]) c = free.filter(s => similar(s.name, n) || (s.ext_name && similar(s.ext_name, n)) || (hits[s.id] && hits[s.id][norm(n)]));
+      if (c.length) { pend.push({ id: o.id, n, a: !!o.arch, cands: c.map(s => ({ id: s.id, n: s.name, a: !!s.archived_at })) }); return; }
+      create.push(o.id);
+    });
+    // имена связанных: правил один — берём его, оба или непонятно кто — старое
+    let renamed = false;
+    list.forEach(o => {
+      const s = o && cab.byId[L[o.id]], on = o && String(o.name || '').trim();
+      if (!s || !on || s.name === on) return;
+      // связали руками («это один ученик») — имя из старого, без вопросов
+      const anchor = decide.link[o.id] ? null : (B['s:' + o.id] && B['s:' + o.id].n) || s.ext_name || null;
+      if (anchor && sameN(on, anchor) && !sameN(s.name, anchor) && !list.some(x => x !== o && x && sameN(x.name, s.name))) {
+        renameRaw(raw, on, s.name); renameUnits(B, on, s.name);
+        if (B['s:' + o.id]) B['s:' + o.id].n = s.name;
+        renamed = true;
+      } else {
+        renameUnits(B, s.name, on);
+        s.name = on;
+      }
+    });
+    return { create, pend, renamed };
   }
   const represented = l => !!l.is_event || (l.people || []).length > 0;
   function ensureExt(cab, obj, table, prefix){
@@ -486,10 +608,19 @@
       (U['d:' + l.day] = U['d:' + l.day] || []).push(toN(l, true));
     });
     Object.keys(U).forEach(k => sortN(U[k]));
+    const of = {};
+    Object.keys(cab.link).forEach(id => { of[cab.link[id]] = id; });
     cab.students.forEach(s => {
+      let id = of[s.id];
+      if (!id) {
+        // не привязан: архивный в старое не уходит, а «похожий» ждёт решения
+        // преподавателя — иначе в старом появится второй такой же ученик
+        if (s.archived_at || cab.hold[s.id]) return;
+        id = SID(); cab.link[id] = s.id; of[s.id] = id;     // ученик, заведённый в кабинете, — в старое
+      }
       // привязанный ученик в архиве, которого нет в базе (его удалили в старом), — не возвращаем туда
-      if (s.archived_at && (!s.ext_name || !base['s:' + norm(s.name)])) return;
-      U['s:' + norm(s.name)] = { n: s.name, a: !!s.archived_at };
+      if (s.archived_at && !base['s:' + id]) return;
+      U['s:' + id] = { n: s.name, a: !!s.archived_at };
     });
     // кабинет учеников не удаляет: имена базы, которых он не знает, — как в базе
     Object.keys(base).forEach(k => { if (k.startsWith('s:') && !(k in U)) U[k] = copy(base[k]); });
@@ -526,8 +657,8 @@
     if (cab.pay.totals) cab.pay.totals.forEach(t => { if (t.day >= from) U['x:' + t.day] = Number(t.amount); });
     else Object.keys(base).forEach(k => { if (k.startsWith('x:')) U[k] = base[k]; });
     cab.students.forEach(s => {
-      const k = 'r:' + norm(s.name);
-      if (!U['s:' + norm(s.name)]) return;
+      const k = 'r:' + norm(s.name), id = Object.keys(cab.link).find(x => cab.link[x] === s.id);
+      if (!id || !U['s:' + id]) return;
       const u = cabRateUnit(cab, s, base[k]);
       if (u) U[k] = u;
     });
@@ -583,13 +714,16 @@
         if (!rows.length && !(rec && rec.total != null)) delete raw.schedule[day];
         else raw.schedule[day] = Object.assign({ total: null }, rec || {}, { rows });
       } else if (k.startsWith('s:')) {
+        // ученик старого — по id, не по имени: «Вернуть» и переименование
+        // меняют ту же запись, новую не заводят
         const list = raw.students = raw.students || [];
-        const i = list.findIndex(s => norm(s && s.name) === k.slice(2));
+        const id = k.slice(2), i = list.findIndex(s => s && s.id === id);
         if (!m) { if (i >= 0) list.splice(i, 1); return; }
         // новый ученик — как «+ ученик» старого приложения
-        const s = i >= 0 ? list[i] : (list.push({ name: m.n, tag: 'уч. год', price: '', per: '2', monthly: null }), list[list.length - 1]);
+        const s = i >= 0 ? list[i] : (list.push({ id, name: m.n, tag: 'уч. год', price: '', per: '2', monthly: null }), list[list.length - 1]);
         s.name = m.n;
-        if (m.a) s.arch = true; else delete s.arch;
+        // архив в старом — дата («в архиве с …»), «Вернуть» там ставит null
+        if (m.a) { if (!s.arch || s.arch === true) s.arch = today(); } else if (s.arch) s.arch = null;
       } else if (k.startsWith('t:')) {
         const list = raw.templates = raw.templates || [];
         const id = k.slice(2), i = list.findIndex(t => t && t.id === id);
@@ -688,23 +822,32 @@
     // ext_id, выданные кабинетом своим занятиям, слотам, шаблонам, парам
     for (const x of cab.newExt) await run(c.from(x.table).update({ ext_id: x.ext_id }).eq('id', x.id));
     cab.newExt = [];
-    // отмеченные в предпросмотре импорта — заводим учениками
-    for (const name of (extra && extra.create) || []) {
-      const s = await run(c.from('students').insert({ name, ext_name: name }).select(SCOLS).single());
-      s._orig = { name: s.name, ext_name: s.ext_name, archived_at: null };
+    // ученики старого без пары в кабинете — заводим (при импорте — только
+    // отмеченные в предпросмотре); архивные — сразу в архив. ext_name ставит
+    // commitStudents: уникальный индекс, а старый дубль мог его держать
+    const fresh = [];
+    const want0 = extra && extra.create ? extra.create : cab.create;
+    for (const id of want0) {
+      const m = M['s:' + id];
+      if (!m || cab.link[id]) continue;
+      const s = await run(c.from('students').insert({ name: m.n.slice(0, 80), archived_at: m.a ? new Date().toISOString() : null }).select(SCOLS).single());
+      s._orig = { name: s.name, ext_name: null, archived_at: s.archived_at || null };
       cab.students.push(s);
+      cab.link[id] = s.id;
+      fresh.push(s);
     }
+    cab.fresh = fresh;
     reindex(cab);
-    let changed = false;
-    const res = () => resolver(cab);
+    let changed = fresh.length > 0;
+    const res = () => resolver(cab, M);
     let find = res();
-    // ученики: переименование и архив из старого
+    // ученики: переименование, архив и «Вернуть» из старого — по связи id
     keysOf(M, K).filter(k => k.startsWith('s:') && !eq(M[k], K[k])).forEach(k => {
-      const m = M[k], s = find(k.slice(2));
+      const m = M[k], s = cab.byId[cab.link[k.slice(2)]];
       if (m && s) {
-        if (s.name !== m.n) { s.name = m.n; s.ext_name = m.n; }
+        if (s.name !== m.n) s.name = m.n;
         if (!!s.archived_at !== m.a) s.archived_at = m.a ? new Date().toISOString() : null;
-      } else if (!m && s && s.ext_name && !s.archived_at) s.archived_at = new Date().toISOString();
+      } else if (!m && s && !s.archived_at) s.archived_at = new Date().toISOString();   // удалили в старом — в архив, не удаляем
     });
     find = res();
     const person = (name, status, pos, fl) => {
@@ -841,6 +984,16 @@
       for (let j = 0; j < ppl.length; j += 500) await run(c.from('lesson_students').insert(ppl.slice(j, j + 500)));
     }
     if (cab.payOn && await payToCab(cab, M, K, find, diff)) { changed = true; cab.payChanged = true; }
+    // гости с именем только что заведённого ученика — в ученика (как «Завести
+    // ученика»): занятия, слоты шаблонов, оплаты. После дней — их правки выше
+    // уже ставят ученика, здесь остаются дни, которые не менялись
+    // то же для новой связи (привязали по имени или «это один ученик»): гость с
+    // именем ученика в строках, которые не менялись, так гостем бы и остался
+    const was = (cab.sync && cab.sync.base && cab.sync.base.link) || {};
+    for (const id of Object.keys(cab.link)) {
+      const s = cab.byId[cab.link[id]], m = M['s:' + id];
+      if (s && m && was[id] !== s.id) await guestsTo(s, m.n);
+    }
     return changed;
   }
 
@@ -848,7 +1001,10 @@
   async function payToCab(cab, M, K, find, diff){
     const c = need();
     let changed = false;
-    for (const k of keysOf(M, K).filter(k => k.startsWith('r:') && !eq(M[k], K[k]))) {
+    // у нового ученика ставка из старого могла совпасть с базой — всё равно пишем
+    const fresh = {};
+    (cab.fresh || []).forEach(s => { fresh['r:' + norm(s.name)] = 1; });
+    for (const k of keysOf(M, K).filter(k => k.startsWith('r:') && (!eq(M[k], K[k]) || fresh[k]))) {
       const m = M[k], s = find(k.slice(2));
       if (!s || !m) continue;              // ученика нет в кабинете — ставку негде хранить
       changed = true;
@@ -922,8 +1078,10 @@
     const taken = {};
     cab.students.forEach(s => { if (s.ext_name) taken[norm(s.ext_name)] = (taken[norm(s.ext_name)] || 0) + 1; });
     let changed = false;
+    const of = {};
+    Object.keys(cab.link).forEach(id => { if (M['s:' + id]) of[cab.link[id]] = id; });
     for (const s of cab.students) {
-      if (M['s:' + norm(s.name)] && s.ext_name !== s.name) {
+      if (of[s.id] && s.ext_name !== s.name) {
         const was = s.ext_name ? norm(s.ext_name) : null;
         if (was !== norm(s.name) && taken[norm(s.name)]) continue;      // имя уже привязано к другому
         if (was) taken[was]--;
@@ -968,7 +1126,7 @@
   }
 
   /* ══ один проход ══ */
-  const S = { status: 'off', at: null, error: '', unknown: [], busy: false, lastMine: 0, lastTheirs: 0 };
+  const S = { status: 'off', at: null, error: '', unknown: [], pairs: [], dups: [], oldDups: [], orphans: [], busy: false, lastMine: 0, lastTheirs: 0 };
   const listeners = [];
   const emit = () => listeners.slice().forEach(f => { try { f(S); } catch (e) {} });
   function setS(patch){ Object.assign(S, patch); emit(); }
@@ -987,6 +1145,8 @@
     const first = !cab.sync;
     if (first && !manual) { setS({ status: 'wait_import' }); return; }
     const saved = first ? {} : ((cab.sync.base && cab.sync.base.u) || {});
+    // база до 16.11 (v 1): разделы учеников по имени — переведём на id
+    const legacy = !first && !((cab.sync.base && cab.sync.base.v) >= 2);
     Object.keys(saved).forEach(k => { if (k.startsWith('d:') && k.slice(2) < from) delete saved[k]; });
     // оплаты сводятся с В4(в): у базы, сохранённой раньше, их разделов нет —
     // первый раз оплаты импортируем с предпросмотром, как расписание
@@ -1004,24 +1164,35 @@
       const B = copy(saved);
       let rawDirty = false;
       const mark = () => { rawDirty = true; };
-      let RN = remoteUnits(raw, from, B, mark, payOn);
-      // переименовали в старом: из базы ушло одно имя и пришло одно новое — тот же ученик
-      const gone = Object.keys(B).filter(k => k.startsWith('s:') && !RN[k]);
-      const came = Object.keys(RN).filter(k => k.startsWith('s:') && !B[k]);
-      if (gone.length === 1 && came.length === 1) {
-        const s = cab.students.find(x => x.ext_name && norm(x.ext_name) === gone[0].slice(2));
-        if (s) { renameUnits(B, B[gone[0]].n, RN[came[0]].n); s.name = s.ext_name = RN[came[0]].n; }
-      }
-      // привязка по имени: ученик кабинета без ext_name и такой же в старом
-      cab.students.forEach(s => { if (!s.ext_name && RN['s:' + norm(s.name)] && !cab.students.some(o => o.ext_name && norm(o.ext_name) === norm(s.name))) s.ext_name = RN['s:' + norm(s.name)].n; });
-      // переименовали в кабинете: name ≠ ext_name — правим старое везде
-      let renamed = false;
-      cab.students.forEach(s => {
-        if (s.ext_name && s.ext_name !== s.name && (RN['s:' + norm(s.ext_name)] || B['s:' + norm(s.ext_name)])) {
-          renameRaw(raw, s.ext_name, s.name); renameUnits(B, s.ext_name, s.name); renamed = true;
-        }
-      });
-      if (renamed) { rawDirty = true; RN = remoteUnits(raw, from, B, mark, payOn); }
+      let RN;
+      // ученики: id старого, привязка, переименования — по id (bindStudents)
+      cab.link = Object.assign({}, (cab.sync && cab.sync.base && cab.sync.base.link) || {});
+      cab.students.forEach(s => { if (s._orig) s.name = s._orig.name; });
+      const legacyNames = {};
+      if (legacy) Object.keys(B).forEach(k => { if (k.startsWith('s:')) legacyNames[k.slice(2)] = 1; });
+      const bs = bindStudents(cab, raw, B, mark, legacy);
+      cab.create = bs.create; cab.pend = bs.pend; cab.hold = {};
+      bs.pend.forEach(x => x.cands.forEach(c => { cab.hold[c.id] = 1; }));
+      // непривязанный ученик кабинета с именем, как у ученика старого, — это
+      // дубль, а не новый ученик: в старое его не отправляем (покажем в «похожих»)
+      { const of = {}; Object.keys(cab.link).forEach(id => { of[cab.link[id]] = 1; });
+        const names = raw.students.filter(o => o && o.id).map(o => o.name);
+        cab.students.forEach(s => { if (!of[s.id] && names.some(n => sameN(n, s.name) || similar(n, s.name))) cab.hold[s.id] = 1; });
+        // был в списке старого (раздел базы до перехода на id), а теперь там его
+        // нет и связь не нашлась — не заводим там заново, держим до решения
+        // (base.hold). Ученик из гостя («Завести ученика») сюда не попадает:
+        // его, как и раньше, отправляем в список старого
+        cab.orphanIds = {};
+        cab.students.forEach(s => {
+          if (of[s.id]) return;
+          const was = (legacy && s.ext_name && legacyNames[norm(s.ext_name)]) || (cab.sync && cab.sync.base && (cab.sync.base.hold || []).indexOf(s.id) >= 0);
+          if (was) { cab.orphanIds[s.id] = 1; cab.hold[s.id] = 1; }
+        });
+        const inPairs = {};
+        bs.pend.forEach(x => x.cands.forEach(c => { inPairs[c.id] = 1; }));
+        cab.orphans = cab.students.filter(s => cab.orphanIds[s.id] && !s.archived_at && !inPairs[s.id]).map(s => s.name); }
+      if (bs.renamed) rawDirty = true;
+      RN = remoteUnits(raw, from, B, mark, payOn);
       const K = cabUnits(cab, from, B, payOn);
       const mg = merge(B, K, RN);
       const M = mg.M;
@@ -1043,6 +1214,8 @@
         }
       }
       for (const cf of mg.conflicts) {
+        // ученика (имя, архив) правили и тут и там — источник правды старое, не спрашиваем
+        if (cf.k.startsWith('s:')) { if (cf.theirs === undefined) delete M[cf.k]; else M[cf.k] = copy(cf.theirs); continue; }
         const key = cf.k + '|' + JSON.stringify(cf.mine) + '|' + JSON.stringify(cf.theirs);
         if (!answers[key]) answers[key] = await askConflict(cf, cab);
         const v = answers[key] === 'mine' ? cf.mine : cf.theirs;
@@ -1073,8 +1246,14 @@
       const base = {};
       Object.keys(M).forEach(k => { if (!k.startsWith('d:') || k.slice(2) >= from) base[k] = M[k]; });
       Object.assign(base, keepPay);
-      await saveBase(rev, base, payOn || savedPay);
+      await saveBase(rev, base, payOn || savedPay, cab);
+      Object.keys(decide.link).forEach(k => delete decide.link[k]);
+      Object.keys(decide.sep).forEach(k => delete decide.sep[k]);
       const unknown = unknownNames(cab, M);
+      S.pairs = cab.pend.map(x => Object.assign({}, x));
+      S.dups = findDups(cab, M);
+      S.oldDups = oldDupNames(M);
+      S.orphans = cab.orphans || [];
       setS({ status: payOn || !cab.payOn || savedPay ? 'ok' : 'wait_pay', at: new Date().toISOString(), unknown, busy: false, lastMine: toRemote.length, lastTheirs: keysOf(M, K).filter(k => !eq(M[k], K[k])).length });
       if ((a || b) && opts.onChanged) opts.onChanged();
       // открыта вкладка «Оплаты» — перечитать (пришли оплаты или ставки из старого)
@@ -1093,19 +1272,26 @@
     }
     return out;
   }
-  async function saveBase(rev, units, pay){
+  async function saveBase(rev, units, pay, cab){
     const u = await C.currentUser();
-    const base = Object.assign({ v: 1, u: units }, pay ? { pay: 1 } : {});
+    // v 2: разделы учеников по id старого; link — id старого → students.id,
+    // sep — «это разные ученики, заводить отдельно» (решение из списка похожих)
+    const link = {};
+    Object.keys(cab.link).forEach(id => { if (units['s:' + id] && cab.byId[cab.link[id]]) link[id] = cab.link[id]; });
+    const hold = Object.keys(cab.orphanIds || {}).filter(id => cab.byId[id] && !Object.values(link).includes(id));
+    const base = Object.assign({ v: 2, u: units, link, sep: cab.sep, hold }, pay ? { pay: 1 } : {});
     await run(need().from('ext_sync').upsert({ owner: u && u.id, source: SOURCE, rev, base, synced_at: new Date().toISOString() }, { onConflict: 'owner,source' }));
   }
   function skipped(){ try { return JSON.parse(localStorage.getItem(LS_SKIP) || '[]'); } catch (e) { return []; } }
   // имена из старого без ученика в кабинете: ученики списка старого и гости в строках
   function unknownNames(cab, M){
-    const find = resolver(cab), out = {}, skip = skipped().map(norm);
-    const add = n => { const k = norm(n); if (n && !find(n) && skip.indexOf(k) < 0 && !out[k]) out[k] = n; };
+    const find = resolver(cab, M), out = {}, skip = skipped().map(norm);
+    // ученики списка старого заводятся сами или ждут решения в «похожих» — здесь только гости строк и оплат
+    const pend = {};
+    (cab.pend || []).forEach(x => { pend[norm(x.n)] = 1; });
+    const add = n => { const k = norm(n); if (n && !find(n) && !pend[k] && skip.indexOf(k) < 0 && !out[k]) out[k] = n; };
     Object.keys(M).forEach(k => {
-      if (k.startsWith('s:') && !M[k].a) add(M[k].n);
-      else if (k.startsWith('d:')) M[k].forEach(l => l.p.forEach(x => add(x[0])));
+      if (k.startsWith('d:')) M[k].forEach(l => l.p.forEach(x => add(x[0])));
       else if (k.startsWith('$:')) add(M[k].s);
     });
     return Object.values(out).sort((a, b) => a.localeCompare(b, 'ru'));
@@ -1192,7 +1378,7 @@
     });
   }
   function payCounts(cab, RN, K, mg){
-    const find = resolver(cab);
+    const find = resolver(cab, RN);
     const pays = Object.keys(RN).filter(k => k.startsWith('$:') && !eq(RN[k], K[k]) && K[k] === undefined).map(k => RN[k]);
     const sum = pays.reduce((n, p) => n + p.a, 0);
     const rates = Object.keys(RN).filter(k => k.startsWith('r:') && K[k] === undefined).length;
@@ -1222,13 +1408,17 @@
     });
   }
   function preview(cab, raw, RN, K, mg, from, payOn){
-    const find = resolver(cab);
+    const find = resolver(cab, RN);
     const dayKeys = Object.keys(RN).filter(k => k.startsWith('d:'));
     const nLessons = dayKeys.reduce((n, k) => n + RN[k].length, 0);
     const past = Object.keys(raw.schedule || {}).filter(d => d < from && (raw.schedule[d].rows || []).some(isLessonRow));
     const nPast = past.reduce((n, d) => n + raw.schedule[d].rows.filter(isLessonRow).length, 0);
     const studs = Object.keys(RN).filter(k => k.startsWith('s:')).map(k => RN[k]);
-    const matched = studs.filter(s => find(s.n)), fresh = studs.filter(s => !find(s.n));
+    // старое — источник правды: заводим всех его учеников (архивных — в архив);
+    // «похожих» не заводим, пока преподаватель не решит (список в настройках)
+    const matched = Object.keys(RN).filter(k => k.startsWith('s:') && cab.link[k.slice(2)]).map(k => RN[k]);
+    const fresh = cab.create.map(id => RN['s:' + id]).filter(Boolean);
+    const pend = cab.pend || [];
     const inList = {};
     studs.forEach(s => { inList[norm(s.n)] = 1; });
     const guests = {};
@@ -1240,8 +1430,9 @@
         '<p>Занятия: <b>' + nLessons + '</b> в ' + dayKeys.length + ' днях, с ' + esc(dayTitle(from)) + ' и дальше. Шаблонов недели: <b>' + tpls + '</b>.</p>' +
         (nPast ? '<label class="sy-chk"><input type="checkbox" id="syHist" checked> Перенести и прошлые занятия: ' + nPast + ' (до ' + esc(dayTitle(from)) + '). Их дальше не сводим.</label>' : '') +
         (matched.length ? '<p>Уже есть в кабинете — свяжем по имени: ' + matched.map(s => '<b>' + esc(s.n) + '</b>').join(', ') + '.</p>' : '') +
-        (fresh.length ? '<p>Ученики старого приложения, которых нет в кабинете. Отмеченных заведём:</p><div class="sy-list">' +
-          fresh.map(s => '<label class="sy-chk"><input type="checkbox" data-new="' + esc(s.n) + '"' + (s.a ? '' : ' checked') + '> ' + esc(s.n) + (s.a ? ' <span class="sy-dim">(в архиве)</span>' : '') + '</label>').join('') + '</div>' : '') +
+        (fresh.length ? '<p>Ученики старого приложения, которых нет в кабинете, — заведём (архивных сразу в архив):</p><div class="sy-list">' +
+          fresh.map(s => '<div class="sy-chk" data-new="' + esc(s.n) + '">' + esc(s.n) + (s.a ? ' <span class="sy-dim">(в архиве)</span>' : '') + '</div>').join('') + '</div>' : '') +
+        (pend.length ? '<p>Похожи на учеников кабинета — не заводим, решите в настройках («Похожие ученики»): ' + pend.map(x => '<b>' + esc(x.n) + '</b> ~ ' + x.cands.map(c => esc(c.n)).join(' / ')).join('; ') + '.</p>' : '') +
         (Object.keys(guests).length ? '<p>Только в строках расписания, останутся гостями (завести можно потом): ' + Object.values(guests).map(esc).join(', ') + '.</p>' : '') +
         (toOld.length ? '<p>Из кабинета уйдёт в старое приложение: ' + toOld.length + ' ' + 'разделов (дни, ученики, шаблоны).</p>' : '') +
         (mg.conflicts.length ? '<p>Есть и тут и там, по-разному: ' + mg.conflicts.length + ' — спросим по каждому.</p>' : '') +
@@ -1249,26 +1440,143 @@
         '<p class="sy-dim">Перед импортом сохраните копию в старом приложении («Сохранить файл»).</p>' +
         '<div class="sy-btns"><button class="btn" id="syGo">Импортировать</button><button class="btn quiet" id="syNo">Отмена</button></div>');
       o.querySelector('#syGo').addEventListener('click', () => {
-        const create = Array.from(o.querySelectorAll('[data-new]:checked')).map(x => x.dataset.new);
         const h = o.querySelector('#syHist');
         o.remove();
-        resolve({ create, history: !!(h && h.checked) });
+        resolve({ history: !!(h && h.checked) });
       });
       o.querySelector('#syNo').addEventListener('click', () => { o.remove(); resolve(null); });
     });
   }
 
+  // гостей с этим именем — в ученика: занятия, слоты шаблонов, оплаты.
+  // Гость, который уже стоит в том же занятии рядом с учеником, остаётся гостем
+  // (unique lesson_id + student_id) — его покажет список похожих
+  async function guestsTo(s, name){
+    const c = need();
+    for (const t of ['lesson_students', 'template_slot_students', 'payments']) {
+      let rows;
+      const own = t === 'lesson_students' ? 'lesson_id' : t === 'template_slot_students' ? 'slot_id' : null;
+      try { rows = await run(c.from(t).select('id' + (own ? ', ' + own : '')).eq('guest_name', name)) || []; }
+      catch (e) { if (t === 'payments' && missing(e)) continue; throw e; }
+      if (!rows.length) continue;
+      let busy = {};
+      if (own) (await run(c.from(t).select(own).eq('student_id', s.id)) || []).forEach(r => { busy[r[own]] = 1; });
+      for (const r of rows) if (!own || !busy[r[own]]) await run(c.from(t).update({ student_id: s.id, guest_name: null }).eq('id', r.id));
+    }
+  }
+
+  /* ══ похожие ученики: только список и действия по кнопке ══ */
+  const LS_NOTDUP = 'cabinet:sync:notdup';
+  const notDup = () => { try { return JSON.parse(localStorage.getItem(LS_NOTDUP) || '[]'); } catch (e) { return []; } };
+  const pairKey = (a, b) => [a, b].sort().join('|');
+  // пары учеников кабинета с одинаковыми или похожими именами. Пара, где оба
+  // привязаны к разным живым ученикам старого, — не дубль: в источнике правды
+  // это два человека («Даша» и «Даша2»)
+  function findDups(cab, M){
+    const of = {}, out = [], skip = notDup();
+    Object.keys(cab.link).forEach(id => { if (M['s:' + id]) of[cab.link[id]] = id; });
+    const st = cab.students.slice().sort((a, b) => (!!a.archived_at) - (!!b.archived_at) || String(a.name).localeCompare(String(b.name), 'ru'));
+    for (let i = 0; i < st.length; i++) for (let j = i + 1; j < st.length; j++) {
+      const a = st[i], b = st[j];
+      if (!(sameN(a.name, b.name) || similar(a.name, b.name))) continue;
+      if (of[a.id] && of[b.id]) continue;
+      if (skip.indexOf(pairKey(a.id, b.id)) >= 0) continue;
+      // оставить: привязанного к старому, потом действующего (st уже так отсортирован)
+      const [keep, drop] = !of[a.id] && of[b.id] ? [b, a] : [a, b];
+      out.push({ keep: { id: keep.id, n: keep.name, a: !!keep.archived_at, old: !!of[keep.id] }, drop: { id: drop.id, n: drop.name, a: !!drop.archived_at, old: !!of[drop.id] } });
+    }
+    return out;
+  }
+  // одинаковые имена в самом старом: строки расписания там связаны с учеником
+  // только по имени — поправить можно только там
+  function oldDupNames(M){
+    const cnt = {}, name = {};
+    Object.keys(M).forEach(k => { if (k.startsWith('s:') && M[k]) { const n = norm(M[k].n); cnt[n] = (cnt[n] || 0) + 1; name[n] = M[k].n; } });
+    return Object.keys(cnt).filter(n => cnt[n] > 1).map(n => name[n]);
+  }
+  // «это один ученик»: ученик старого id ↔ ученик кабинета; имя возьмём из старого
+  function linkPair(oldId, cabId){ decide.link[oldId] = cabId; S.pairs = (S.pairs || []).filter(x => x.id !== oldId); emit(); return sync(true); }
+  // «разные»: ученика старого заводим отдельно
+  function separate(oldId){ decide.sep[oldId] = 1; S.pairs = (S.pairs || []).filter(x => x.id !== oldId); emit(); return sync(true); }
+  function notDuplicate(a, b){
+    const list = notDup(), k = pairKey(a, b);
+    if (list.indexOf(k) < 0) list.push(k);
+    try { localStorage.setItem(LS_NOTDUP, JSON.stringify(list)); } catch (e) {}
+    S.dups = (S.dups || []).filter(x => pairKey(x.keep.id, x.drop.id) !== k);
+    emit();
+  }
+  // слить drop в keep — только по подтверждению преподавателя. Ничего не
+  // удаляем: занятия, слоты, оплаты, ставки, группы и журнал переносим, а drop
+  // уходит в архив без привязки. Строку, которая у keep уже есть (то же
+  // занятие, та же дата ставки), оставляем у drop — и сообщаем, сколько таких
+  async function mergeStudents(keepId, dropId){
+    const c = need();
+    const rows = await run(c.from('students').select('*').in('id', [keepId, dropId])) || [];
+    const keep = rows.find(x => x.id === keepId), drop = rows.find(x => x.id === dropId);
+    if (!keep || !drop) throw new Error('Ученик не найден');
+    const sy = await run(c.from('ext_sync').select('base').eq('source', SOURCE).maybeSingle());
+    const link = (sy && sy.base && sy.base.link) || {}, u = (sy && sy.base && sy.base.u) || {};
+    const kOld = Object.keys(link).find(id => link[id] === keepId && u['s:' + id]);
+    const dOld = Object.keys(link).find(id => link[id] === dropId && u['s:' + id]);
+    if (kOld && dOld) throw new Error('Оба ученика есть в старом приложении — сначала уберите лишнего там');
+    let left = 0;
+    const move = async (table, own) => {
+      let list;
+      try { list = await run(c.from(table).select('id' + (own ? ', ' + own : '')).eq('student_id', dropId)) || []; }
+      catch (e) { if (missing(e)) return; throw e; }
+      let busy = {};
+      if (own) (await run(c.from(table).select(own).eq('student_id', keepId)) || []).forEach(r => { busy[r[own]] = 1; });
+      for (const r of list) {
+        if (own && busy[r[own]]) { left++; continue; }
+        await run(c.from(table).update({ student_id: keepId }).eq('id', r.id));
+      }
+    };
+    await move('lesson_students', 'lesson_id');
+    await move('template_slot_students', 'slot_id');
+    await move('payments', null);
+    await move('student_rates', 'valid_from');
+    await move('student_task_log', null);
+    // группы: первичный ключ (group_id, student_id), id у строки нет
+    const gm = await run(c.from('student_group_members').select('group_id').eq('student_id', dropId)) || [];
+    const gk = {};
+    (await run(c.from('student_group_members').select('group_id').eq('student_id', keepId)) || []).forEach(r => { gk[r.group_id] = 1; });
+    for (const r of gm) {
+      if (gk[r.group_id]) { left++; continue; }
+      await run(c.from('student_group_members').update({ student_id: keepId }).eq('group_id', r.group_id).eq('student_id', dropId));
+    }
+    // пустые поля карточки — из второго, заполненные не трогаем
+    const fill = {};
+    ['grade', 'exam', 'note', 'account_email', 'dur_min', 'pay_mode'].forEach(f => {
+      if ((keep[f] == null || keep[f] === '') && drop[f] != null && drop[f] !== '') fill[f] = drop[f];
+    });
+    const kb = Array.isArray(keep.boards) ? keep.boards : [], db = Array.isArray(drop.boards) ? drop.boards : [];
+    if (db.some(b => kb.indexOf(b) < 0)) fill.boards = kb.concat(db.filter(b => kb.indexOf(b) < 0));
+    if (Object.keys(fill).length) await run(c.from('students').update(fill).eq('id', keepId));
+    await run(c.from('students').update({ ext_name: null, archived_at: drop.archived_at || new Date().toISOString() }).eq('id', dropId));
+    // связь со старым переходит к оставшемуся
+    if (dOld) decide.link[dOld] = keepId;
+    notDuplicate(keepId, dropId);          // слитая пара в списке похожих больше не нужна
+    if (opts.onChanged) opts.onChanged();
+    if (readCfg()) await sync(true);
+    return { left };
+  }
+
   /* ══ «завести ученика» из незнакомого имени ══ */
   async function adopt(name){
     const c = need();
-    const s = await run(c.from('students').insert({ name: name.slice(0, 80), ext_name: name.slice(0, 80) }).select(SCOLS).single());
-    // гостей с этим именем — в ученика: занятия и слоты шаблонов
-    for (const t of ['lesson_students', 'template_slot_students', 'payments']) {
-      let rows;
-      try { rows = await run(c.from(t).select('id').eq('guest_name', name)) || []; }
-      catch (e) { if (t === 'payments' && missing(e)) continue; throw e; }
-      for (const r of rows) await run(c.from(t).update({ student_id: s.id, guest_name: null }).eq('id', r.id));
+    // ученик с таким именем уже есть — второго не заводим, только переводим гостей
+    const have = await run(c.from('students').select(SCOLS)) || [];
+    const same = have.filter(x => sameN(x.name, name) || sameN(x.ext_name, name));
+    if (same.length) {
+      const s0 = same.find(x => !x.archived_at) || same[0];
+      await guestsTo(s0, name);
+      S.unknown = S.unknown.filter(n => norm(n) !== norm(name));
+      emit();
+      if (opts.onChanged) opts.onChanged();
+      return s0;
     }
+    const s = await run(c.from('students').insert({ name: name.slice(0, 80), ext_name: name.slice(0, 80) }).select(SCOLS).single());
+    await guestsTo(s, name);
     S.unknown = S.unknown.filter(n => norm(n) !== norm(name));
     emit();
     if (opts.onChanged) opts.onChanged();
@@ -1337,7 +1645,7 @@
   document.head.appendChild(css);
 
   window.ScheduleSync = { init, sync: () => sync(true), syncAuto: () => sync(false), configure, config, state: S, onChange: f => { listeners.push(f); return () => { const i = listeners.indexOf(f); if (i >= 0) listeners.splice(i, 1); }; },
-    adopt, skipName,
+    adopt, skipName, linkPair, separate, notDuplicate, mergeStudents,
     // для тестов: чистые функции сведения
-    _t: { rowNorm, rowFrom, buildRows, rowsToN, merge, remoteUnits, renameRaw, oldPayUnit, oldRateUnit, payToRaw, tidyPays, applyToRaw } };
+    _t: { similar, rowNorm, rowFrom, buildRows, rowsToN, merge, remoteUnits, renameRaw, oldPayUnit, oldRateUnit, payToRaw, tidyPays, applyToRaw } };
 })();

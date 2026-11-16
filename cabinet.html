@@ -302,6 +302,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
         </div>
         <div class="save-note" id="syState" role="status"></div>
         <div id="syUnknown"></div>
+        <div id="syPairs"></div>
       </details>
     </section>
   </div>
@@ -648,6 +649,24 @@ function paintSync(){
   $('syUnknown').innerHTML = st.unknown.length ? '<div class="hint" style="margin-top:8px">Имена из старого приложения без ученика в кабинете (сейчас — гости):</div>' +
     st.unknown.map(n => '<div class="row-btns sy-unk" data-name="' + esc(n) + '" style="margin-top:6px;align-items:center"><b>' + esc(n) + '</b>' +
       '<button type="button" class="btn small" data-act="adopt">Завести ученика</button><button type="button" class="btn quiet small" data-act="skip">Оставить гостем</button></div>').join('') : '';
+  // похожие ученики: решает преподаватель, сами не связываем и не сливаем
+  const nm = x => '<b>' + esc(x.n) + '</b>' + (x.a ? ' <span class="hint">(архив)</span>' : '');
+  $('syPairs').innerHTML =
+    (st.pairs.length ? '<div class="hint" style="margin-top:12px">Ученики старого приложения, похожие на учеников кабинета, — пока не заведены:</div>' +
+      st.pairs.map(x => x.cands.map(c => '<div class="row-btns sy-pair" data-old="' + esc(x.id) + '" data-cab="' + esc(c.id) + '" style="margin-top:6px;align-items:center">' +
+        nm(x) + ' <span class="hint">в старом</span> ~ ' + nm(c) + ' <span class="hint">в кабинете</span>' +
+        '<button type="button" class="btn small" data-act="link">Это один ученик</button>' +
+        '<button type="button" class="btn quiet small" data-act="sep">Разные — завести</button></div>').join('')).join('') : '') +
+    (st.dups.length ? '<div class="hint" style="margin-top:12px">Похоже на дубли в кабинете. Слияние — только по кнопке: занятия, оплаты, ставки и журнал перейдут к первому, второй уйдёт в архив:</div>' +
+      st.dups.map(x => '<div class="row-btns sy-dup" data-keep="' + esc(x.keep.id) + '" data-drop="' + esc(x.drop.id) + '" style="margin-top:6px;align-items:center">' +
+        nm(x.keep) + ' ← ' + nm(x.drop) +
+        '<button type="button" class="btn small" data-act="merge">Слить</button>' +
+        '<button type="button" class="btn quiet small" data-act="swap">Оставить второго</button>' +
+        '<button type="button" class="btn quiet small" data-act="notdup">Не дубль</button></div>').join('') : '') +
+    (st.oldDups.length ? '<div class="hint" style="margin-top:12px">В старом приложении одинаковые имена — расписание там различает учеников только по имени, переименуйте одного: ' +
+      st.oldDups.map(esc).join(', ') + '</div>' : '') +
+    (st.orphans.length ? '<div class="hint" style="margin-top:12px">Были связаны со старым приложением, а там их сейчас нет (удалили или переименовали). В старое заново не отправляем: ' +
+      st.orphans.map(esc).join(', ') + '</div>' : '');
 }
 SY.onChange(paintSync);
 $('sySave').addEventListener('click', () => {
@@ -666,6 +685,26 @@ $('syUnknown').addEventListener('click', async e => {
   b.disabled = true;
   try { if (b.dataset.act === 'adopt') { await SY.adopt(name); toast('Ученик заведён: ' + name); } else SY.skipName(name); }
   catch (err) { toast(err.message); b.disabled = false; }
+});
+$('syPairs').addEventListener('click', async e => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const row = b.closest('.sy-pair, .sy-dup');
+  const name = x => row.querySelectorAll('b')[x].textContent;
+  try {
+    if (b.dataset.act === 'link') { b.disabled = true; await SY.linkPair(row.dataset.old, row.dataset.cab); toast('Связано'); }
+    else if (b.dataset.act === 'sep') { b.disabled = true; await SY.separate(row.dataset.old); toast('Заведён отдельно'); }
+    else if (b.dataset.act === 'notdup') SY.notDuplicate(row.dataset.keep, row.dataset.drop);
+    else {
+      const swap = b.dataset.act === 'swap';
+      const keep = swap ? row.dataset.drop : row.dataset.keep, drop = swap ? row.dataset.keep : row.dataset.drop;
+      const kn = name(swap ? 1 : 0), dn = name(swap ? 0 : 1);
+      if (!confirm('Слить «' + dn + '» в «' + kn + '»?\nЗанятия, оплаты, ставки, группы и журнал перейдут к «' + kn + '», «' + dn + '» уйдёт в архив. Обратно само не разделится.')) return;
+      b.disabled = true;
+      const r = await SY.mergeStudents(keep, drop);
+      toast('Слито' + (r.left ? ': ' + r.left + ' строк уже были у «' + kn + '» — остались у «' + dn + '» в архиве' : ''));
+    }
+  } catch (err) { toast(err.message); b.disabled = false; }
 });
 paintSync();
 
