@@ -126,6 +126,19 @@ body.editing .corner-btn{position:absolute;}
 .ti-ph{height:90px;display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-size:13.5px;}
 .ti-mode{font-size:12px;font-weight:700;padding:3px 9px;border-radius:9px;background:var(--hl-10);color:var(--ink);}
 .ti-mode.exam{background:var(--warn-tint);color:var(--warn);}
+/* группа заданий одного прототипа (поле series у блока): рамка вокруг строк, заголовок с кнопками */
+.tg{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:18px;border:1.5px dashed var(--glass-border);background:var(--glass);}
+.tg-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.tg-title{font-size:14px;font-weight:700;color:var(--ink);flex:1 1 220px;}
+.tg-title .tg-pos{font-weight:600;color:var(--muted-2);}
+.tg-btns{display:flex;gap:4px;flex-wrap:wrap;}
+.tg-btns button{height:30px;padding:0 10px;border-radius:10px;border:1px solid var(--glass-border);background:var(--glass-strong);color:var(--pencil);cursor:pointer;font-family:var(--font-ui);font-weight:600;font-size:13px;}
+.tg-btns button.sq{width:30px;padding:0;font-size:15px;}
+.tg-btns button:hover:not(:disabled){border-color:var(--ink);}
+.tg-btns button:disabled{opacity:.35;cursor:default;}
+.tg-btns .rm{color:var(--teacher);}
+.ti-pos{display:flex;align-items:center;gap:4px;font-size:12.5px;color:var(--muted-2);}
+.ti-pos input{width:46px;height:30px;border-radius:9px;border:1px solid var(--glass-border);background:var(--glass-strong);color:var(--ink);text-align:center;font:inherit;font-weight:700;}
 .ti-btns .rr{font-size:16px;}
 .ti-btns .rr.busy{animation:wkSpin 1s linear infinite;}
 @keyframes wkSpin{to{transform:rotate(360deg)}}
@@ -740,9 +753,30 @@ function renderTasks(){
   }
   box.innerHTML = '';
   let tn = 0;   // номера — только у заданий: у ученика видео тоже без номера
+  // единицы листа: группа (подряд блоки одного series.key) или одна строка —
+  // ↑ ↓ у группы двигают её через соседнюю единицу целиком
+  const units = [];
   tasks.forEach((b, i) => {
-    if (isVideo(b)){ box.appendChild(videoRow(b, i, tasks, isMaster)); return; }
-    const num = ++tn;
+    const key = isMaster && b.series ? b.series.key : null;
+    const last = units[units.length - 1];
+    if (key && last && last.key === key) last.items.push(i);
+    else units.push({ key, items: [i] });
+  });
+  units.forEach((u, gi) => {
+    if (!u.key){
+      const i = u.items[0], b = tasks[i];
+      box.appendChild(isVideo(b) ? videoRow(b, i, tasks, isMaster) : taskRow(b, i, tasks, isMaster, ++tn, false));
+      return;
+    }
+    const g = document.createElement('div');
+    g.className = 'tg'; g.dataset.key = u.key;
+    const sb = u.items.map(i => tasks[i]);
+    g.appendChild(seriesHead(sb, isMaster, gi, units.length));
+    u.items.forEach(i => g.appendChild(taskRow(tasks[i], i, tasks, isMaster, ++tn, true)));
+    box.appendChild(g);
+  });
+}
+function taskRow(b, i, tasks, isMaster, num, inSeries){
     const im = (b.img || {})[curTheme()] || (b.img || {}).light || {};
     const el = document.createElement('div');
     el.className = 'ti'; el.dataset.id = b.id;
@@ -751,16 +785,20 @@ function renderTasks(){
       ? '<div class="seg tiny"><button data-m="train" title="В работе у задания будет кнопка с подсказками и решением в тренажёре">Тренировка</button><button data-m="exam" title="Только поле для ответа">Экзамен</button></div>'
       : '<span class="ti-mode' + (mode === 'exam' ? ' exam' : '') + '">' + (mode === 'exam' ? 'Экзамен' : 'Тренировка') + '</span>';
     const busy = b._gen === 'busy' || b._gen === 'wait';
-    const btns = '<button data-a="rr" class="rr' + (busy ? ' busy' : '') + '" title="Другие числа — задание того же типа и уровня">⟳</button>'
-      + (isMaster ? '<button data-a="up" title="Выше">↑</button><button data-a="down" title="Ниже">↓</button><button data-a="rm" class="rm" title="Убрать из работы (из всех вариантов)">✕</button>' : '');
+    // в группе: ◀ ▶ и номер — место в банке прототипа; ⟳ — случайное свободное место
+    const posUi = inSeries ? '<div class="ti-pos"><div class="ti-btns"><button data-a="pp" title="Предыдущее задание банка">◀</button></div>'
+      + '<input type="number" min="1" max="' + b.series.total + '" value="' + (b.series.pos + 1) + '" title="Номер задания в банке прототипа" aria-label="Номер в банке">'
+      + '<span>из ' + b.series.total + '</span><div class="ti-btns"><button data-a="np" title="Следующее задание банка">▶</button></div></div>' : '';
+    const btns = '<button data-a="rr" class="rr' + (busy ? ' busy' : '') + '" title="' + (inSeries ? 'Другое задание банка этого прототипа' : 'Другие числа — задание того же типа и уровня') + '">⟳</button>'
+      + (isMaster ? (inSeries ? '' : '<button data-a="up" title="Выше">↑</button><button data-a="down" title="Ниже">↓</button>') + '<button data-a="rm" class="rm" title="Убрать из работы (из всех вариантов)">✕</button>' : '');
     let note = '';
     if (busy) note = '<div class="ti-gen">Создаётся задание…</div>';
-    else if (b._gen === 'fail') note = '<div class="ti-gen fail">Не получилось создать задание — нажмите ⟳</div>';
+    else if (b._gen === 'fail') note = '<div class="ti-gen fail">Не получилось создать задание' + (inSeries && b._why ? ': ' + esc(b._why) : '') + ' — нажмите ⟳</div>';
     else if (b.same) note = '<div class="ti-gen same">У этого задания других чисел нет (одно задание или один прототип) — оно такое же, как в варианте 1</div>';
-    else if (b._up) note = '<div class="ti-up">Картинка ещё загружается…</div>';
+    else if (b._up && !inSeries) note = '<div class="ti-up">Картинка ещё загружается…</div>';
     if (b.theory) note = '<div class="ti-theory">📘 с теорией к заданию</div>' + note;
     el.innerHTML = '<div class="ti-num">' + num + '</div><div><div class="ti-img">' + (im.url ? '<img alt="Задание ' + num + '">' : '<div class="ti-ph">' + (busy ? 'Создаётся…' : 'Нет картинки') + '</div>') + '</div>'
-      + '<div class="ti-row"><span class="ti-name">' + esc(b.name || trainerName(b.tid)) + '</span>' + modeUi
+      + '<div class="ti-row"><span class="ti-name">' + esc(b.name || trainerName(b.tid)) + '</span>' + modeUi + posUi
       + '<div class="ti-btns">' + btns + '</div></div>' + note + '</div>';
     const img = el.querySelector('img'); if (img) img.src = im.url;
     // Б5: «уже было у ученика» — точка после названия (только в сессии, по переключателю)
@@ -773,15 +811,23 @@ function renderTasks(){
     const rr = el.querySelector('[data-a="rr"]');
     rr.disabled = busy;
     rr.addEventListener('click', () => reroll(b));
+    if (inSeries){
+      const pp = el.querySelector('[data-a="pp"]'), np = el.querySelector('[data-a="np"]'), inp = el.querySelector('.ti-pos input');
+      pp.disabled = !isMaster || b.series.pos <= 0; np.disabled = !isMaster || b.series.pos + 1 >= b.series.total; inp.disabled = !isMaster;
+      pp.addEventListener('click', () => seriesSetOne(b, b.series.pos - 1));
+      np.addEventListener('click', () => seriesSetOne(b, b.series.pos + 1));
+      inp.addEventListener('change', () => seriesSetOne(b, Math.round(Number(inp.value)) - 1));
+    }
     if (isMaster){
-      const up = el.querySelector('[data-a="up"]'), down = el.querySelector('[data-a="down"]');
-      up.disabled = i === 0; down.disabled = i === tasks.length - 1;
-      up.addEventListener('click', () => { [tasks[i - 1], tasks[i]] = [tasks[i], tasks[i - 1]]; markDirty(); renderTasks(); });
-      down.addEventListener('click', () => { [tasks[i + 1], tasks[i]] = [tasks[i], tasks[i + 1]]; markDirty(); renderTasks(); });
+      if (!inSeries){
+        const up = el.querySelector('[data-a="up"]'), down = el.querySelector('[data-a="down"]');
+        up.disabled = i === 0; down.disabled = i === tasks.length - 1;
+        up.addEventListener('click', () => moveUnit(tasks, i, 1, -1));
+        down.addEventListener('click', () => moveUnit(tasks, i, 1, 1));
+      }
       el.querySelector('[data-a="rm"]').addEventListener('click', () => { tasks.splice(i, 1); markDirty(); renderTasks(); renderVariants(); });
     }
-    box.appendChild(el);
-  });
+    return el;
 }
 // строка видео в листе работы: обложка (по ней — посмотреть), отрывок, ↑ ↓ ✕
 function videoRow(b, i, list, isMaster){
@@ -800,8 +846,8 @@ function videoRow(b, i, list, isMaster){
   if (isMaster){
     const up = el.querySelector('[data-a="up"]'), down = el.querySelector('[data-a="down"]');
     up.disabled = i === 0; down.disabled = i === list.length - 1;
-    up.addEventListener('click', () => { [list[i - 1], list[i]] = [list[i], list[i - 1]]; markDirty(); renderTasks(); });
-    down.addEventListener('click', () => { [list[i + 1], list[i]] = [list[i], list[i + 1]]; markDirty(); renderTasks(); });
+    up.addEventListener('click', () => moveUnit(list, i, 1, -1));
+    down.addEventListener('click', () => moveUnit(list, i, 1, 1));
     el.querySelector('[data-a="rm"]').addEventListener('click', () => { list.splice(i, 1); markDirty(); renderTasks(); renderVariants(); });
   }
   return el;
@@ -1298,6 +1344,17 @@ function regenFrom(g){
     const frame = await genFrameFor(g.href, g.vw);
     const win = frame.contentWindow;
     await genNewTaskInFrame(win, g);
+    return await shootFrameTask(win, g.tid, g.href);
+  };
+  const p = genQ.then(run, run);
+  genQ = p.catch(() => {});
+  return p;
+}
+// снимок задания, которое сейчас открыто в невидимом кадре (общий для «другие
+// числа» и «задание по месту» групп)
+async function shootFrameTask(win, tid, href){
+  {
+    const g = { tid, href };
     const nodes = collectTrainerCaptureNodes(win.document, g.tid);
     const thNode = nodes.find(n => n.el.id === 'theoryContent') || null;
     const main = nodes.filter(n => n !== thNode && !(n.el.closest && n.el.closest('.added-task-card')));
@@ -1316,10 +1373,7 @@ function regenFrom(g){
       if (theory) parts.theory = theory;
       return parts;
     } finally { if (restore) restore(); }
-  };
-  const p = genQ.then(run, run);
-  genQ = p.catch(() => {});
-  return p;
+  }
 }
 const sameTask = (a, b) => !!a && !!b && JSON.stringify(a.task) === JSON.stringify(b.task) && JSON.stringify(a.exact || null) === JSON.stringify(b.exact || null);
 const gens = new Map();   // id задания → идущее создание (сохранение их ждёт)
@@ -1360,12 +1414,22 @@ function regenInto(b, recipe, compareWith){
 function fillBlock(b){
   const m = masterOf(b);
   if (!m){ b._gen = 'fail'; return; }
+  // задание группы в образце ещё снимается — рецепта у него пока нет, ждём
+  if (!m.gen && gens.has(m.id)){
+    b._gen = 'busy';
+    const p = gens.get(m.id).then(() => { gens.delete(b.id); return regenInto(b, m.gen, m); });
+    gens.set(b.id, p);
+    return;
+  }
   regenInto(b, m.gen, m);
 }
 // ⟳ — другие числа: в варианте — по своему рецепту (у ЕГЭ — следующий
 // прототип за своим), в образце — так же; номер задания (id) прежний
 function reroll(b){
   if (gens.has(b.id)) return;
+  // задание группы ⟳ берёт другое место банка своего прототипа, а не
+  // «следующий прототип номера» (тот увёл бы задание из группы)
+  if (b.series && E.variants[0].blocks.indexOf(b) >= 0){ seriesShuffleOne(b); return; }
   const m = masterOf(b);
   const recipe = b.gen || (m && m.gen);
   markDirty();
@@ -1398,6 +1462,311 @@ function uploadBlock(b){
 async function uploadPending(){
   const left = [].concat(...E.variants.map(v => v.blocks)).filter(b => b._up);
   for (const b of left) await uploadBlock(b);
+}
+
+/* ── группы заданий по прототипу (этап 1.3 задачи 1, этап 4 конструктора) ──
+   Группа — подряд идущие задания образца с одним series.key. У задания
+   series: { key, title, pos, fipi, total, ... } — место в банке прототипа
+   (pos с нуля, в подписи с единицы) и номер ФИПИ; рецепт gen.at = { proto,
+   pos, fipi, n } говорит, как открыть именно это задание. Страница ученика
+   поле series не читает (cleanBlock убирает только поля с «_»).
+   Задание по месту открывает каталог тренажёра (__trainerCatalog.openAt) в
+   невидимом кадре genFrameFor. Путь сделан здесь, а не в genNewTaskInFrame
+   (trainer-tasks.js): тот же рецепт там читают доски для «ещё такое же», и с
+   gen.at они открывали бы то же задание вместо нового. «Новый вариант» и
+   варианты 2+ по-прежнему идут старым путём (genNewTaskInFrame не знает at) —
+   «вариант берёт следующие» — отдельный этап.
+   Очередь: задания одного тренажёра идут подряд (genFrames держит три кадра,
+   вперемешку они перезагружались бы по кругу). Снимки кэшируются по
+   tid|proto|pos — «◀ Предыдущие» возвращаются без кадра. Картинки группы
+   грузятся в хранилище только при «Сохранить» (uploadPending): при листании
+   иначе копились бы ненужные файлы. */
+const EXAM_NAMES = { oge: 'ОГЭ', ege: 'ЕГЭ', ege_prof: 'ЕГЭ', ege_base: 'ЕГЭ база', egeb: 'ЕГЭ база' };
+const seriesCache = new Map();   // tid|proto|pos → { parts, res }
+const seriesJobs = [];           // { b, tid, href, at, vw, done, fail }
+let seriesBusy = false, seriesLastHref = null;
+const seriesTok = new Map();     // id задания → номер последней постановки в очередь
+const seriesKeyOf = (tid, proto, pos) => tid + '|' + proto + '|' + pos;
+// заголовок прототипа приходит вёрсткой KaTeX — в подпись берём TeX, а не MathML с html подряд
+function plainTitle(html){
+  const d = document.createElement('div');
+  d.innerHTML = String(html || '');
+  d.querySelectorAll('.katex').forEach(k => {
+    const a = k.querySelector('annotation');
+    k.replaceWith(document.createTextNode(a ? a.textContent : k.textContent));
+  });
+  return d.textContent.replace(/\s+/g, ' ').trim();
+}
+// каталог прототипов тренажёра — из невидимого кадра, один раз на tid|n
+const catalogCache = new Map();
+function catalogOf(href, n){
+  const k = href + '|' + n;
+  if (!catalogCache.has(k)){
+    const p = (async () => {
+      const frame = await genFrameFor(href, null);
+      const cat = frame.contentWindow.__trainerCatalog;
+      if (!cat) throw new Error('у этого тренажёра нет каталога прототипов');
+      return await cat.list(n);
+    })();
+    catalogCache.set(k, p);
+    p.catch(() => catalogCache.delete(k));
+  }
+  return catalogCache.get(k);
+}
+function seriesQueue(b, base, pos){
+  const at = { proto: base.proto, pos, n: base.n };
+  b._gen = 'busy';
+  // задание переставили, пока снималось прежнее место, — прежний снимок в блок не кладём
+  const tok = (seriesTok.get(b.id) || 0) + 1;
+  seriesTok.set(b.id, tok);
+  const p = new Promise((done, fail) => seriesJobs.push({ b, tok, tid: base.tid, href: base.href, at, vw: base.vw || null, done, fail }));
+  const run = p.then(() => {}, err => {
+    console.error('[работы] задание группы не создалось', err);
+    if (seriesTok.get(b.id) === tok){ b._gen = 'fail'; b._why = err && err.message; }
+  }).finally(() => {
+    if (gens.get(b.id) === run) gens.delete(b.id);
+    if (!$('scrEdit').hidden) renderTasks();
+  });
+  gens.set(b.id, run);   // сохранение ждёт и эти задания
+  seriesPump();
+  return run;
+}
+async function seriesPump(){
+  if (seriesBusy) return;
+  seriesBusy = true;
+  try {
+    while (seriesJobs.length){
+      // сначала — задания того же тренажёра, что и предыдущее: кадр уже загружен
+      let i = seriesJobs.findIndex(j => j.href === seriesLastHref);
+      if (i < 0) i = 0;
+      const job = seriesJobs.splice(i, 1)[0];
+      seriesLastHref = job.href;
+      try { job.done(await seriesRun(job)); } catch (e) { job.fail(e); }
+    }
+  } finally { seriesBusy = false; }
+}
+async function seriesRun(job){
+  const { b, tid, href, at } = job;
+  if (seriesTok.get(b.id) !== job.tok) return;   // уже поставлено другое место
+  const ck = seriesKeyOf(tid, at.proto, at.pos);
+  let hit = seriesCache.get(ck);
+  if (!hit){
+    // через общую очередь невидимых кадров: «другие числа» могут идти в тот же кадр
+    const run = async () => {
+      const frame = await genFrameFor(href, job.vw);
+      const win = frame.contentWindow;
+      const cat = win.__trainerCatalog;
+      if (!cat || typeof cat.openAt !== 'function') throw new Error('у этого тренажёра нет каталога прототипов');
+      const res = await cat.openAt(at.proto, at.pos, at.n);
+      if (!res || !res.ok) throw new Error(res && res.reason === 'end' ? 'в банке прототипа нет задания №' + (at.pos + 1) : 'прототип не найден');
+      if (typeof win.render === 'function') try { win.render(); } catch (e) {}
+      await sleep(300);
+      return { parts: await shootFrameTask(win, tid, href), res };
+    };
+    const p = genQ.then(run, run);
+    genQ = p.catch(() => {});
+    hit = await p;
+    seriesCache.set(ck, hit);
+  }
+  if (seriesTok.get(b.id) === job.tok) applySeriesParts(b, hit, at);
+}
+// снимок → в блок: id, вариант-образец, режим, имя и группа остаются свои
+function applySeriesParts(b, hit, at){
+  const { parts, res } = hit;
+  uploads.delete(b.id);
+  const keep = { id: b.id, src: b.src, type: 'task', mode: b.mode, name: b.name, series: b.series };
+  Object.keys(b).forEach(k => delete b[k]);
+  // картинки — общие с кэшем: загрузил один блок — у кэша тоже уже адрес, не data:
+  const img = parts.img, theory = parts.theory;
+  const copy = JSON.parse(JSON.stringify(Object.assign({}, parts, { img: null, theory: null })));
+  Object.assign(b, copy, keep, { img });
+  if (theory) b.theory = theory; else delete b.theory;
+  b._up = Object.values(img || {}).some(x => x && /^data:/.test(x.url)) || !!(theory && Object.values(theory.img || {}).some(x => x && /^data:/.test(x.url)));
+  if (!b._up) delete b._up;
+  const fipi = res.fipi || null;
+  if (b.gen) b.gen.at = { proto: at.proto, pos: at.pos, fipi, n: at.n };
+  b.series = Object.assign({}, b.series, { pos: at.pos, fipi, total: res.total });
+}
+// подряд идущие блоки одной группы в образце
+function seriesBlocks(key){ return E.variants[0].blocks.filter(x => x.series && x.series.key === key); }
+function seriesInfo(sb){
+  const s = sb[0].series;
+  return { key: s.key, title: s.title, total: s.total, proto: s.proto, n: s.n, tid: sb[0].tid, href: s.href, vw: s.vw || null, hasGen: !!s.hasGen };
+}
+const seriesBase = info => ({ tid: info.tid, href: info.href, proto: info.proto, n: info.n, vw: info.vw });
+/* window.__works.addSeries — внутренний вход для этапа 5 (панель «Собрать по
+   прототипам»). source: 'order' — ФИПИ по порядку с startPos (с нуля),
+   'random' — вразнобой. Группа встаёт в образец (куда «Добавить» — вверх или
+   вниз), задания сразу видны с «Создаётся задание…» и заполняются очередью. */
+async function addSeries(o){
+  o = o || {};
+  const tid = o.tid, n = o.n != null ? Number(o.n) : null;
+  const href = o.href || (TRAINERS_PANEL_GROUPS.flatMap(g => g.items).find(it => it.id === tid) || {}).href;
+  if (!tid || !href || o.proto == null) throw new Error('addSeries: нужны tid, href и proto');
+  const units = await catalogOf(href, n);
+  const u = units.find(x => x.id === o.proto);
+  if (!u) throw new Error('addSeries: прототипа ' + o.proto + ' нет в каталоге');
+  const total = u.tasks.length;
+  const count = Math.max(1, Math.min(COUNT_MAX, Math.round(Number(o.count) || 3)));
+  let poss;
+  if (o.source === 'random') poss = shufflePick([...Array(total).keys()], count);
+  else {
+    const start = Math.max(0, Math.round(Number(o.startPos) || 0));
+    poss = [...Array(count).keys()].map(i => start + i).filter(p => p < total);
+  }
+  if (!poss.length){ toast('В банке этого прототипа нет заданий с №' + ((o.startPos || 0) + 1)); return null; }
+  const exam = EXAM_NAMES[o.exam] || o.exam || '';
+  const title = [exam && n != null ? exam + ' №' + n : (exam || trainerName(tid)), plainTitle(u.title)].filter(Boolean).join(' · ');
+  const key = 's' + ttUid();
+  const base = { tid, href, proto: u.id, n, vw: o.vw || null };
+  const fresh = poss.map(pos => ({ id: 't' + ttUid(), type: 'task', mode: o.mode || 'exam', name: trainerName(tid), tid,
+    series: { key, title, pos, fipi: u.fipi[pos] || null, total, proto: u.id, n, href, src: o.source === 'random' ? 'random' : 'order', hasGen: !!u.hasGen } }));
+  if (addPos === 'start') E.variants[0].blocks.unshift(...fresh); else E.variants[0].blocks.push(...fresh);
+  fresh.forEach(b => seriesQueue(b, base, b.series.pos));
+  markDirty(); renderVariants(); renderTasks();
+  if (poss.length < count) toast('В банке прототипа «' + plainTitle(u.title) + '» с этого места только ' + poss.length + ' — добавлено ' + poss.length, 6000);
+  return key;
+}
+function shufflePick(arr, k){
+  const a = arr.slice();
+  for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a.slice(0, k).sort((x, y) => x - y);
+}
+// новые места для всех заданий группы (по порядку блоков); мест меньше,
+// чем заданий, — лишние задания уходят, группа честно становится меньше
+function seriesSetPositions(key, poss, why){
+  const sb = seriesBlocks(key);
+  if (!sb.length || !poss.length) return;
+  const info = seriesInfo(sb), base = seriesBase(info);
+  const list = E.variants[0].blocks;
+  sb.forEach((b, i) => {
+    if (i >= poss.length){ list.splice(list.indexOf(b), 1); return; }
+    b.series = Object.assign({}, b.series, { pos: poss[i], fipi: null });
+    seriesQueue(b, base, poss[i]);
+  });
+  if (poss.length < sb.length) toast((why || 'В банке прототипа больше нет заданий') + ' — в группе осталось ' + poss.length, 6000);
+  markDirty(); renderVariants(); renderTasks();
+}
+// «Следующие N ▶» — от самого большого номера в группе (даже если одно задание правили руками)
+function seriesNext(key){
+  const sb = seriesBlocks(key); if (!sb.length) return;
+  const info = seriesInfo(sb), N = sb.length;
+  const from = Math.max(...sb.map(b => b.series.pos)) + 1;
+  if (from >= info.total){ toast('Дальше в банке этого прототипа заданий нет (' + info.total + ' из ' + info.total + ')'); return; }
+  const poss = [...Array(N).keys()].map(i => from + i).filter(p => p < info.total);
+  seriesSetPositions(key, poss, 'В банке дальше только ' + poss.length);
+}
+function seriesPrev(key){
+  const sb = seriesBlocks(key); if (!sb.length) return;
+  const N = sb.length, to = Math.min(...sb.map(b => b.series.pos));
+  if (to <= 0){ toast('Это начало банка'); return; }
+  const from = Math.max(0, to - N);
+  seriesSetPositions(key, [...Array(to - from).keys()].map(i => from + i), 'До начала банка только ' + (to - from));
+}
+// «⟳ Вразнобой» — другие места банка, по возможности не те, что сейчас
+function seriesShuffle(key){
+  const sb = seriesBlocks(key); if (!sb.length) return;
+  const info = seriesInfo(sb), N = sb.length, cur = new Set(sb.map(b => b.series.pos));
+  const all = [...Array(info.total).keys()];
+  const other = all.filter(p => !cur.has(p));
+  const poss = other.length >= N ? shufflePick(other, N) : shufflePick(other, other.length).concat(shufflePick([...cur], N - other.length)).sort((a, b) => a - b);
+  sb.forEach(b => { b.series = Object.assign({}, b.series, { src: 'random' }); });
+  seriesSetPositions(key, poss);
+}
+// ⟳ у одного задания группы — случайное свободное место
+function seriesShuffleOne(b){
+  const sb = seriesBlocks(b.series.key), info = seriesInfo(sb);
+  const used = new Set(sb.map(x => x.series.pos));
+  const free = [...Array(info.total).keys()].filter(p => !used.has(p));
+  if (!free.length){ toast('Других заданий в банке этого прототипа нет'); return; }
+  seriesSetOne(b, free[Math.floor(Math.random() * free.length)]);
+}
+// «+ ещё» — одно задание за самым большим номером, в конец группы
+function seriesMore(key){
+  const sb = seriesBlocks(key); if (!sb.length) return;
+  const info = seriesInfo(sb);
+  const pos = Math.max(...sb.map(b => b.series.pos)) + 1;
+  if (pos >= info.total){ toast('Дальше в банке этого прототипа заданий нет'); return; }
+  const last = sb[sb.length - 1], list = E.variants[0].blocks;
+  const b = { id: 't' + ttUid(), type: 'task', mode: last.mode || 'exam', name: last.name, tid: last.tid,
+    series: Object.assign({}, last.series, { pos, fipi: null }) };
+  list.splice(list.indexOf(last) + 1, 0, b);
+  seriesQueue(b, seriesBase(info), pos);
+  markDirty(); renderVariants(); renderTasks();
+}
+// одно задание группы — на место pos (◀ ▶ и ввод номера). Номер уже есть в
+// группе — предупреждаем, но ставим: учитель мог хотеть именно так
+function seriesSetOne(b, pos){
+  const sb = seriesBlocks(b.series.key), info = seriesInfo(sb);
+  if (!(pos >= 0 && pos < info.total)){ toast('В банке этого прототипа номера с 1 по ' + info.total); renderTasks(); return; }
+  if (pos === b.series.pos) return;
+  if (sb.some(x => x !== b && x.series.pos === pos)) toast('Задание №' + (pos + 1) + ' уже есть в этой группе — будет повтор', 5000);
+  b.series = Object.assign({}, b.series, { pos, fipi: null });
+  seriesQueue(b, seriesBase(info), pos);
+  markDirty(); renderTasks();
+}
+function seriesMove(key, dir){
+  const list = E.variants[0].blocks;
+  const sb = seriesBlocks(key); if (!sb.length) return;
+  moveUnit(list, list.indexOf(sb[0]), sb.length, dir);
+}
+// сдвиг куска [s, s+len) через соседнюю единицу листа: группа соседа целиком,
+// иначе одна строка — так группа никогда не разрывается чужой строкой
+function moveUnit(list, s, len, dir){
+  const unitLen = j => list[j] && list[j].series ? list.filter(x => x.series && x.series.key === list[j].series.key).length : 1;
+  if (dir < 0){
+    if (s === 0) return;
+    const pl = unitLen(s - 1);
+    list.splice(s - pl, 0, ...list.splice(s, len));
+  } else {
+    if (s + len >= list.length) return;
+    const nl = unitLen(s + len);
+    list.splice(s + nl, 0, ...list.splice(s, len));
+  }
+  markDirty(); renderTasks();
+}
+function seriesRemove(key){
+  const list = E.variants[0].blocks;
+  E.variants[0].blocks = list.filter(b => !(b.series && b.series.key === key));
+  markDirty(); renderTasks(); renderVariants();
+}
+// подпись мест: «ФИПИ 4–6 из 10», вразнобой — «ФИПИ 2, 5, 9 из 10»
+function seriesPosText(sb){
+  const ps = sb.map(b => b.series.pos).slice().sort((a, b) => a - b);
+  const total = sb[0].series.total;
+  const run = ps.every((p, i) => i === 0 || p === ps[i - 1] + 1);
+  const nums = ps.length === 1 ? String(ps[0] + 1) : run ? (ps[0] + 1) + '–' + (ps[ps.length - 1] + 1) : ps.map(p => p + 1).join(', ');
+  return 'ФИПИ ' + nums + ' из ' + total;
+}
+function seriesHead(sb, isMaster, gi, groupsTotal){
+  const head = document.createElement('div');
+  head.className = 'tg-head';
+  const N = sb.length, info = seriesInfo(sb);
+  const minP = Math.min(...sb.map(b => b.series.pos)), maxP = Math.max(...sb.map(b => b.series.pos));
+  head.innerHTML = '<div class="tg-title">' + esc(info.title) + ' · <span class="tg-pos">' + esc(seriesPosText(sb)) + '</span></div>'
+    + (isMaster ? '<div class="tg-btns">'
+      + '<button data-g="prev" title="Предыдущие задания банка">◀ Предыдущие ' + N + '</button>'
+      + '<button data-g="next" title="Следующие задания банка — от самого большого номера в группе">Следующие ' + N + ' ▶</button>'
+      + '<button data-g="mix" title="Другие задания банка вразнобой">⟳ Вразнобой</button>'
+      + '<button data-g="more" title="Ещё одно задание — следующее по банку">+ ещё</button>'
+      + '<button data-g="up" class="sq" title="Группу выше">↑</button><button data-g="down" class="sq" title="Группу ниже">↓</button>'
+      + '<button data-g="rm" class="sq rm" title="Убрать группу из работы">✕</button></div>' : '');
+  if (isMaster){
+    const q = s => head.querySelector('[data-g="' + s + '"]');
+    q('prev').disabled = minP <= 0;
+    q('next').disabled = maxP + 1 >= info.total;
+    q('more').disabled = maxP + 1 >= info.total;
+    q('mix').disabled = info.total <= 1;
+    q('up').disabled = gi === 0; q('down').disabled = gi === groupsTotal - 1;
+    q('prev').addEventListener('click', () => seriesPrev(info.key));
+    q('next').addEventListener('click', () => seriesNext(info.key));
+    q('mix').addEventListener('click', () => seriesShuffle(info.key));
+    q('more').addEventListener('click', () => seriesMore(info.key));
+    q('up').addEventListener('click', () => seriesMove(info.key, -1));
+    q('down').addEventListener('click', () => seriesMove(info.key, 1));
+    q('rm').addEventListener('click', () => seriesRemove(info.key));
+  }
+  return head;
 }
 
 /* ── журнал ученика (Б5 кабинета) ──
@@ -1906,7 +2275,7 @@ $('rsClose').addEventListener('click', async () => {
   catch (e) { toast(e.message); }
 });
 
-window.__works = { E, addFromFrame, openTrainer, openVideos, addVideo, save, route, gens, canon, openResults, openReview, closeReview };   // для тестов и отладки из консоли
+window.__works = { E, renderTasks, addSeries, seriesNext, seriesPrev, seriesShuffle, seriesMore, seriesSetOne, seriesMove, seriesRemove, addFromFrame, openTrainer, openVideos, addVideo, save, route, gens, canon, openResults, openReview, closeReview };   // для тестов и отладки из консоли
 boot();
 })();
 </script>
