@@ -9866,6 +9866,8 @@ Safari, с видеозвонками в нём бывают сюрпризы. �
 
 - (16.11.2026, Claude, ветка claude/vb-4) Конструктор вариантов, этап 4 (задача 1, этап 1.3): группы заданий по прототипу в works.html. Поле блока series {key, title, pos, fipi, total, proto, n, href, src, hasGen}, рецепт gen.at {proto, pos, fipi, n}; задание по месту — __trainerCatalog.openAt в невидимом кадре (seriesRun в works.html, не в genNewTaskInFrame: тот же рецепт читают доски). Группа в листе: «◀ Предыдущие N», «Следующие N ▶» (от самого большого номера), «⟳ Вразнобой», «+ ещё», ↑↓ группой, ✕; у задания ◀ ▶ и номер (занятый — предупреждение). window.__works.addSeries({tid, href, exam, n, proto, count, source, startPos}) — вход для этапа 5. Очередь по тренажёрам, кэш tid|proto|pos, картинки — только при сохранении. Тест test_prompt_works_series.py
 
+- (16.11.2026, Claude, ветка claude/vb-5) Конструктор вариантов, этап 5: Набор window.VariantSet (variant-set.js — localStorage, ключ по совместной сессии, событие variantset:change и между вкладками) и экран «Собрать вариант» в works.html (#/build, #/edit/<id>?build=1, #/new?build=1): дерево Набора экзамен → номер → прототип, сетка номеров из ExamSpec и «Полный вариант», предпросмотр текстом из catalog-index.json (planRow), «Собрать» → addSeries по строкам, «Вернуть набор» 10 с. Номера без каталога (oge8, oge12, русский) и без банка ФИПИ (oge10, 11, 13) пропускаются с пометкой. «Весь номер» — первый прототип с заданиями ФИПИ (у ЕГЭ первым идёт «Прототипы» без номеров). Тест test_prompt_variant_build.py
+
 ## 12. С чего начать новой сессии
 
 - Прочитать этот файл

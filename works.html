@@ -241,6 +241,42 @@ html.rv-on{overflow:hidden;}
   .ed{grid-template-columns:1fr;}
   .ed-left{position:relative;top:0;height:78vh;}
 }
+/* ── «Собрать вариант» (#/build, этап 5 конструктора вариантов) ──
+   Слева Набор деревом экзамен → номер → прототип, справа предпросмотр
+   текстом из catalog-index.json (без кадров: кадры — только при «Собрать») */
+.bd{display:grid;grid-template-columns:minmax(340px,1fr) minmax(320px,1fr);gap:14px;align-items:start;}
+.bd .panel{margin:0;min-width:0;}   /* иначе длинные названия прототипов в select распирают колонку на телефоне */
+.bd-top{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;margin-bottom:12px;}
+.bd-top label{display:flex;align-items:center;gap:6px;font-size:14px;color:var(--muted-2);}
+.bd-top input[type=number]{width:62px;height:32px;border-radius:10px;border:1px solid var(--glass-border);background:var(--glass-strong);color:var(--ink);text-align:center;font:inherit;font-weight:700;}
+.bd-top select,.bd-exam{font-family:var(--font-ui);font-size:14px;color:var(--pencil);background:var(--glass);border:1px solid var(--glass-border);border-radius:11px;padding:6px 9px;}
+.bd-h{font-weight:700;font-size:16px;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.bd-h span{flex:1;}
+.bd-ex{font-size:12px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted-2);margin:12px 4px 6px;}
+.bd-num{border-radius:14px;border:1px solid var(--glass-border);background:var(--glass);padding:8px;margin-bottom:8px;}
+.bd-num-t{font-weight:700;font-size:14.5px;margin:0 2px 6px;}
+.bd-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:6px;border-radius:11px;background:var(--card);border:1px solid var(--glass-border);margin-top:6px;cursor:grab;}
+.bd-row.drag{opacity:.45;}
+.bd-row.over{outline:2px dashed var(--ink);}
+.bd-row select{flex:1 1 160px;min-width:0;width:100%;max-width:100%;font-family:var(--font-ui);font-size:13.5px;color:var(--pencil);background:var(--glass);border:1px solid var(--glass-border);border-radius:10px;padding:5px 7px;}
+.bd-row .grip{color:var(--muted-2);user-select:none;}
+.bd-step{display:flex;align-items:center;border-radius:10px;border:1px solid var(--glass-border);background:var(--glass);}
+.bd-step button,.bd-row .x{width:30px;height:30px;border:0;background:none;color:var(--pencil);cursor:pointer;font-size:15px;}
+.bd-step b{min-width:30px;text-align:center;font-size:14px;}
+.bd-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:6px;}
+.bd-cell{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:11px;background:var(--card);border:1px solid var(--glass-border);font-size:14px;}
+.bd-cell input[type=number]{width:44px;height:28px;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass-strong);color:var(--ink);text-align:center;font:inherit;}
+.bd-cell span{flex:1;}
+.bd-pv{display:flex;flex-direction:column;gap:6px;font-size:14px;line-height:1.4;}
+.bd-pv .pl{padding:7px 9px;border-radius:10px;background:var(--card);border:1px solid var(--glass-border);}
+.bd-pv .pl.skip{opacity:.7;border-style:dashed;}
+.bd-pv .warn{color:var(--warn);font-size:13px;}
+.bd-go{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;}
+.toast.act.show{pointer-events:auto;}   /* тост с кнопкой «Вернуть набор» — кнопку надо нажимать */
+.toast button{margin-left:10px;color:#fff;border-color:rgba(255,255,255,.35);background:rgba(255,255,255,.12);}
+@media (max-width:760px){
+  .bd{grid-template-columns:1fr;}
+}
 </style>
 </head>
 <body>
@@ -264,7 +300,7 @@ html.rv-on{overflow:hidden;}
   </section>
 
   <section id="scrList" hidden>
-    <div class="list-head"><button class="btn" id="newWork">+ Новая работа</button></div>
+    <div class="list-head"><button class="btn" id="newWork">+ Новая работа</button><button class="btn quiet" id="buildOpen" style="margin-left:8px">Собрать вариант</button></div>
     <div class="wlist" id="workList"></div>
   </section>
 
@@ -272,6 +308,7 @@ html.rv-on{overflow:hidden;}
     <div class="ed-top">
       <button class="btn quiet small" id="edBack">← Все работы</button>
       <h2 id="edHead">Новая работа</h2>
+      <button class="btn quiet small" id="edBuild" title="Набрать номера и прототипы экзамена и дописать их группами в эту работу">Собрать вариант</button>
     </div>
     <div class="ed">
       <div class="ed-left panel">
@@ -371,6 +408,34 @@ html.rv-on{overflow:hidden;}
     </div>
   </section>
 
+  <section id="scrBuild" hidden>
+    <div class="ed-top">
+      <button class="btn quiet small" id="bdBack">← Назад</button>
+      <h2 id="bdHead">Собрать вариант</h2>
+    </div>
+    <div class="panel bd-top" id="bdTop">
+      <label>По сколько <input type="number" id="bdEach" min="1" max="30" value="1" title="Сколько заданий брать по каждой строке Набора — применяется ко всем строкам"></label>
+      <label>Источник <select id="bdSource"><option value="order">по порядку</option><option value="random">вразнобой</option></select></label>
+      <label>С какого номера банка <input type="number" id="bdStart" min="1" value="1"></label>
+      <label>Вариантов <input type="number" id="bdVars" min="1" max="10" value="1" title="Пока это копии через «+ Новый вариант»: те же задания с другими числами"></label>
+    </div>
+    <div class="bd">
+      <div class="panel" id="bdSetBox">
+        <div class="bd-h"><span>Набор</span><button class="btn quiet small" id="bdGridToggle" hidden>+ номера</button><button class="btn quiet small" id="bdClear" hidden>Очистить</button></div>
+        <div id="bdTree"></div>
+        <div id="bdGridBox">
+          <div class="bd-h"><select class="bd-exam" id="bdExam"></select><button class="btn quiet small" id="bdFull">Полный вариант</button></div>
+          <div class="bd-grid" id="bdGrid"></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="bd-h"><span>Что получится</span></div>
+        <div class="bd-pv" id="bdPreview"></div>
+        <div class="bd-go"><button class="btn" id="bdGo">Собрать</button><span class="auth-note" id="bdGoNote"></span></div>
+      </div>
+    </div>
+  </section>
+
   <section id="scrResults" hidden>
     <div class="res-head">
       <button class="btn quiet small" id="rsBack">← Все работы</button>
@@ -413,6 +478,8 @@ html.rv-on{overflow:hidden;}
 <script src="subjects-catalog.js"></script>
 <script src="task-key.js"></script>
 <script src="trainer-tasks.js"></script>
+<script src="exam-spec.js"></script>
+<script src="variant-set.js"></script>
 <script src="video-links.js"></script>
 <script src="video-player.js"></script>
 <script src="works-cloud.js"></script>
@@ -434,14 +501,14 @@ applyTheme(curTheme(), false);
 themeBtn.addEventListener('click', () => { applyTheme(curTheme() === 'dark' ? 'light' : 'dark', true); if (!$('scrEdit').hidden) renderTasks(); });
 
 function toast(msg, ms){
-  const t = $('toast'); t.textContent = msg; t.classList.add('show');
+  const t = $('toast'); t.textContent = msg; t.classList.remove('act'); t.classList.add('show');
   clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms || 2800);
 }
 function show(id){
   // кнопка «назад» в браузере уводит с результатов, а просмотр лежит поверх страницы
   closeReview();
-  ['scrLoading', 'scrAuth', 'scrList', 'scrEdit', 'scrResults'].forEach(s => { $(s).hidden = s !== id; });
-  document.body.classList.toggle('editing', id === 'scrEdit');
+  ['scrLoading', 'scrAuth', 'scrList', 'scrEdit', 'scrResults', 'scrBuild'].forEach(s => { $(s).hidden = s !== id; });
+  document.body.classList.toggle('editing', id === 'scrEdit' || id === 'scrBuild');
   const titled = id === 'scrList' || id === 'scrAuth' || id === 'scrLoading';
   $('pageTitle').hidden = !titled; $('pageSub').hidden = !titled;
 }
@@ -527,13 +594,24 @@ async function route(){
   renderAcct();
   if (!user){ show('scrAuth'); return; }
   const h = location.hash.replace(/^#\/?/, '');
-  const [what, id] = h.split('/');
+  // ?build=1 — «Собрать вариант» поверх открытой работы (#/edit/<id>?build=1, #/new?build=1)
+  const [path, qs] = h.split('?');
+  const [what, id] = path.split('/');
+  const build = /(^|&)build=1(&|$)/.test(qs || '');
   if (E.dirty && !(what === 'edit' && id === E.id) && what !== 'new'){
     if (!confirm('В работе есть несохранённые изменения. Уйти без сохранения?')){
       history.replaceState(null, '', E.id ? '#/edit/' + E.id : '#/new');
       return;
     }
     E.dirty = false;
+  }
+  if (what === 'build') return openBuild(null);
+  if (what === 'new' && build) return openBuild('cur');
+  if (what === 'edit' && id && build){
+    // работа уже открыта (пришли из редактора) — не перечитываем: несохранённые правки остались бы за бортом
+    if (E.id !== id) await openEditor(id);
+    if (E.id !== id) return;
+    return openBuild('cur');
   }
   if (what === 'new') return openEditor(null);
   if (what === 'edit' && id) return openEditor(id);
@@ -2276,7 +2354,306 @@ $('rsClose').addEventListener('click', async () => {
   catch (e) { toast(e.message); }
 });
 
-window.__works = { E, renderTasks, addSeries, seriesNext, seriesPrev, seriesShuffle, seriesMore, seriesSetOne, seriesMove, seriesRemove, addFromFrame, openTrainer, openVideos, addVideo, save, route, gens, canon, openResults, openReview, closeReview };   // для тестов и отладки из консоли
+/* ── «Собрать вариант» (#/build и #/edit/<id>?build=1) — этап 5 конструктора ──
+   Набор (variant-set.js) — строки-рецепты «номер / прототип / по сколько».
+   Экран показывает его деревом экзамен → номер → прототип и предпросмотр
+   текстом из catalog-index.json: кадры тренажёров здесь не грузятся, иначе
+   «Полный вариант» ОГЭ открывал бы два десятка страниц ради подписей.
+   «Собрать» зовёт addSeries по строкам — каждая строка становится группой.
+   Номер без каталога (oge8, oge12, русский) и номер, где в банке ФИПИ пусто
+   (oge10, 11, 13: только наш генератор), в этой версии не собираются —
+   предпросмотр говорит это прямо, а не молча теряет строку. */
+const VS = window.VariantSet;
+const BD = { target: null, gridOpen: false, busy: false };   // target: null — новая работа, 'cur' — открытая в редакторе
+let catIndexP = null;
+function catIndex(){
+  if (!catIndexP){
+    catIndexP = fetch('catalog-index.json', { cache: 'no-cache' }).then(r => { if (!r.ok) throw new Error('catalog-index.json: ' + r.status); return r.json(); });
+    catIndexP.catch(() => { catIndexP = null; });
+  }
+  return catIndexP;
+}
+let catIdx = null;
+const examsSpec = () => (window.ExamSpec && ExamSpec.exams) || {};
+function specOf(r){
+  const ex = examsSpec()[r.exam];
+  return ex ? ex.list.find(p => p.slug === r.slug && (p.n == null ? r.n == null : p.n === r.n)) || null : null;
+}
+// тренажёр номера — по адресу страницы из ExamSpec (slug.html, номер в ?n=)
+function trainerOf(slug, n){
+  const href = slug + '.html' + (n != null ? '?n=' + n : '');
+  const items = TRAINERS_PANEL_GROUPS.flatMap(g => g.items);
+  const it = items.find(x => x.href === href) || items.find(x => x.href === slug + '.html');
+  if (it) return { tid: it.id, href: it.href };
+  const T = (window.MathhCatalog && MathhCatalog.trainers) || {};
+  const id = Object.keys(T).find(k => T[k].href === href);
+  return id ? { tid: id, href } : null;
+}
+// «ОГЭ №9», «ЕГЭ №12», «ОГЭ обществознание №5» — как в заголовке группы у addSeries
+function numName(r){
+  const ex = examsSpec()[r.exam];
+  const sp = specOf(r);
+  const head = EXAM_NAMES[r.exam] || (ex ? ex.title : r.exam);
+  return head + ' ' + (sp ? sp.label : (r.n != null ? '№' + r.n : r.slug));
+}
+const realFipi = p => (p.fipi || []).some(Boolean);
+// что выйдет из строки: { ok, text, warn, args } — общий расчёт для предпросмотра и «Собрать»
+function planRow(r){
+  const name = numName(r);
+  const cat = catIdx && catIdx[r.slug + '|' + (r.n == null ? '' : r.n)];
+  if (!cat || !cat.protos || !cat.protos.length)
+    return { ok: false, text: name + ' — у номера нет каталога: случайное по типу добавьте из тренажёра в редакторе работы', why: 'nocat' };
+  const protos = cat.protos;
+  if (!protos.some(p => (p.fipi || []).length))
+    return { ok: false, text: name + ' — банка ФИПИ нет, только наш генератор: в этой версии не собирается', why: 'gen' };
+  // «весь номер» — первый прототип с заданиями ФИПИ (у ЕГЭ первым идёт «Прототипы» — сборник без номеров)
+  const proto = r.proto ? protos.find(p => p.id === r.proto) : (protos.find(realFipi) || protos.find(p => (p.fipi || []).length));
+  if (!proto) return { ok: false, text: name + ' — прототипа «' + r.proto + '» в каталоге больше нет', why: 'proto' };
+  const total = (proto.fipi || []).length;
+  const tr = trainerOf(r.slug, r.n);
+  if (!tr) return { ok: false, text: name + ' — тренажёр номера не найден', why: 'trainer' };
+  const title = plainTitle(proto.title);
+  if (!total) return { ok: false, text: name + ' · ' + title + ' — в банке прототипа нет заданий ФИПИ, в этой версии не собирается', why: 'gen' };
+  const random = $('bdSource').value === 'random' && r.pos == null;
+  const start = r.pos != null ? r.pos : Math.max(0, (Math.round(Number($('bdStart').value)) || 1) - 1);
+  const count = Math.max(1, Math.min(COUNT_MAX, r.count || 1));
+  let text, warn = '', got;
+  if (random){
+    got = Math.min(count, total);
+    text = 'ФИПИ вразнобой, ' + got + ' из ' + total;
+    if (got < count) warn = 'банк кончится: в прототипе всего ' + total;
+  } else {
+    if (start >= total) return { ok: false, text: name + ' · ' + title + ' — в банке ' + total + ' заданий, с №' + (start + 1) + ' брать нечего', why: 'end' };
+    got = Math.min(count, total - start);
+    text = 'ФИПИ ' + (got > 1 ? (start + 1) + '–' + (start + got) : String(start + 1)) + ' из ' + total;
+    if (got < count) warn = 'банк кончится: с №' + (start + 1) + ' только ' + got + ' из ' + count;
+  }
+  // addSeries дописывает « №n» сам; у страниц ОГЭ ч. 1 номера в адресе нет — подпись целиком
+  const exArg = r.n == null ? name : (EXAM_NAMES[r.exam] ? r.exam : ((examsSpec()[r.exam] || {}).title || r.exam));
+  return { ok: true, got, text: name + ' · ' + title + ' · ' + text, warn,
+    args: { tid: r.tid || tr.tid, href: r.href || tr.href, exam: exArg, n: r.n, proto: proto.id, count, source: random ? 'random' : 'order', startPos: start } };
+}
+
+// строки в порядке дерева (экзамен → номер по первому появлению) — в этом же порядке встают группы
+function treeOf(rows){
+  const exams = [];
+  rows.forEach(r => {
+    let ex = exams.find(e => e.exam === r.exam);
+    if (!ex){ ex = { exam: r.exam, nums: [] }; exams.push(ex); }
+    const k = r.slug + '|' + (r.n == null ? '' : r.n);
+    let nm = ex.nums.find(x => x.key === k);
+    if (!nm){ nm = { key: k, rows: [] }; ex.nums.push(nm); }
+    nm.rows.push(r);
+  });
+  return exams;
+}
+const orderedRows = () => [].concat(...treeOf(VS.all()).map(e => [].concat(...e.nums.map(n => n.rows))));
+
+async function openBuild(target){
+  BD.target = target;
+  show('scrLoading');
+  try { catIdx = await catIndex(); }
+  catch (e) { catIdx = {}; toast('Не загрузился каталог прототипов: ' + e.message, 6000); }
+  show('scrBuild');
+  $('bdHead').textContent = target === 'cur' ? 'Собрать вариант в «' + (E.title || 'работу') + '»' : 'Собрать вариант';
+  $('bdGo').textContent = target === 'cur' ? 'Дописать в работу' : 'Собрать';
+  if (!$('bdExam').childElementCount){
+    const ex = examsSpec();
+    $('bdExam').innerHTML = Object.keys(ex).map(k => '<option value="' + esc(k) + '">' + esc(ex[k].title) + '</option>').join('');
+  }
+  const first = VS.all()[0];
+  if (first && examsSpec()[first.exam]) $('bdExam').value = first.exam;
+  BD.gridOpen = false;
+  renderBuild();
+}
+function renderBuild(){
+  if ($('scrBuild').hidden) return;
+  const rows = VS.all();
+  $('bdGridBox').hidden = rows.length > 0 && !BD.gridOpen;
+  $('bdGridToggle').hidden = !rows.length;
+  $('bdGridToggle').textContent = BD.gridOpen ? 'Скрыть номера' : '+ номера';
+  $('bdClear').hidden = !rows.length;
+  renderBuildTree(rows); renderBuildGrid(rows); renderBuildPreview();
+}
+function renderBuildTree(rows){
+  const box = $('bdTree');
+  if (!rows.length){ box.innerHTML = '<div class="auth-note" style="margin-bottom:10px">Набор пуст. Отметьте номера экзамена ниже или нажмите «Полный вариант». С тренажёров номера и прототипы сюда тоже можно отправлять.</div>'; return; }
+  box.innerHTML = '';
+  treeOf(rows).forEach(ex => {
+    const h = document.createElement('div'); h.className = 'bd-ex';
+    h.textContent = (examsSpec()[ex.exam] || {}).title || ex.exam;
+    box.appendChild(h);
+    ex.nums.forEach(nm => {
+      const nb = document.createElement('div'); nb.className = 'bd-num'; nb.draggable = true;
+      nb.dataset.key = ex.exam + '#' + nm.key;
+      const r0 = nm.rows[0];
+      const cat = catIdx && catIdx[nm.key];
+      const t = document.createElement('div'); t.className = 'bd-num-t'; t.textContent = '⠿ ' + numName(r0);
+      nb.appendChild(t);
+      nm.rows.forEach(r => {
+        const row = document.createElement('div'); row.className = 'bd-row'; row.draggable = true; row.dataset.id = r.id;
+        let protoHtml;
+        if (cat && cat.protos && cat.protos.length){
+          protoHtml = '<select data-r="proto" aria-label="Прототип"><option value="">Весь номер (первый прототип)</option>'
+            + cat.protos.map(p => '<option value="' + esc(p.id) + '"' + (p.id === r.proto ? ' selected' : '') + '>' + esc(plainTitle(p.title)) + ' · ' + (p.fipi || []).length + '</option>').join('') + '</select>';
+        } else protoHtml = '<span class="auth-note" style="flex:1">без каталога</span>';
+        row.innerHTML = '<span class="grip">⠿</span>' + protoHtml
+          + (r.pos != null ? '<span class="auth-note">с №' + (r.pos + 1) + '</span>' : '')
+          + '<span class="bd-step"><button data-r="minus" aria-label="Меньше">−</button><b>×' + (r.count || 1) + '</b><button data-r="plus" aria-label="Больше">+</button></span>'
+          + '<button class="x" data-r="del" title="Убрать из набора" aria-label="Убрать">✕</button>';
+        const sel = row.querySelector('select');
+        if (sel) sel.addEventListener('change', () => VS.update(r.id, { proto: sel.value || null, pos: null, fipi: null }));
+        row.querySelector('[data-r="minus"]').addEventListener('click', () => VS.update(r.id, { count: Math.max(1, (r.count || 1) - 1) }));
+        row.querySelector('[data-r="plus"]').addEventListener('click', () => VS.update(r.id, { count: Math.min(COUNT_MAX, (r.count || 1) + 1) }));
+        row.querySelector('[data-r="del"]').addEventListener('click', () => VS.remove(r.id));
+        bdDrag(row, { type: 'row', id: r.id });
+        nb.appendChild(row);
+      });
+      bdDrag(nb, { type: 'num', ids: nm.rows.map(r => r.id) });
+      box.appendChild(nb);
+    });
+  });
+}
+// перетаскивание: строку — перед строкой, номер целиком — перед другим номером
+let bdDragged = null;
+function bdDrag(el, what){
+  el.addEventListener('dragstart', e => { e.stopPropagation(); bdDragged = what; el.classList.add('drag'); try { e.dataTransfer.setData('text/plain', 'x'); e.dataTransfer.effectAllowed = 'move'; } catch (x) {} });
+  el.addEventListener('dragend', () => { el.classList.remove('drag'); bdDragged = null; document.querySelectorAll('#bdTree .over').forEach(x => x.classList.remove('over')); });
+  el.addEventListener('dragover', e => { if (!bdDragged) return; e.preventDefault(); e.stopPropagation(); el.classList.add('over'); });
+  el.addEventListener('dragleave', () => el.classList.remove('over'));
+  el.addEventListener('drop', e => {
+    e.preventDefault(); e.stopPropagation(); el.classList.remove('over');
+    const d = bdDragged; bdDragged = null;
+    if (d) bdDrop(d, what);
+  });
+}
+function bdDrop(d, target){
+  const order = orderedRows().map(r => r.id);
+  const moving = d.type === 'row' ? [d.id] : d.ids;
+  const beforeId = target.type === 'row' ? target.id : target.ids[0];
+  if (moving.includes(beforeId)) return;
+  const rest = order.filter(id => !moving.includes(id));
+  rest.splice(rest.indexOf(beforeId), 0, ...moving);
+  const all = VS.all(), byId = new Map(all.map(r => [r.id, r]));
+  // строка, перенесённая к чужому номеру, остаётся своим номером: в дереве она встанет к своим
+  VS.replace(rest.map(id => byId.get(id)));
+}
+function renderBuildGrid(rows){
+  const exam = $('bdExam').value;
+  const ex = examsSpec()[exam];
+  const box = $('bdGrid');
+  box.innerHTML = '';
+  if (!ex) return;
+  ex.list.forEach(p => {
+    const n = p.n == null ? null : p.n;
+    const mine = rows.filter(r => r.exam === exam && r.slug === p.slug && r.n === n);
+    const cell = document.createElement('label'); cell.className = 'bd-cell';
+    cell.dataset.slug = p.slug; if (n != null) cell.dataset.n = String(n);
+    const cnt = mine.length ? (mine[0].count || 1) : (Number($('bdEach').value) || 1);
+    cell.innerHTML = '<input type="checkbox"' + (mine.length ? ' checked' : '') + '><span>' + esc(p.label) + '</span>×<input type="number" min="1" max="' + COUNT_MAX + '" value="' + cnt + '" aria-label="Сколько заданий">';
+    const [cb, num] = cell.querySelectorAll('input');
+    cb.addEventListener('change', () => {
+      if (cb.checked) VS.add({ exam, slug: p.slug, n, count: Number(num.value) || 1, source: $('bdSource').value });
+      else mine.forEach(r => VS.remove(r.id));
+    });
+    num.addEventListener('click', e => e.preventDefault());   // клик по числу не переключает галочку
+    num.addEventListener('change', () => { const c = Math.max(1, Math.min(COUNT_MAX, Math.round(Number(num.value)) || 1)); mine.forEach(r => VS.update(r.id, { count: c })); });
+    box.appendChild(cell);
+  });
+}
+function renderBuildPreview(){
+  const box = $('bdPreview');
+  const rows = orderedRows();
+  if (!rows.length){ box.innerHTML = '<div class="auth-note">Здесь появится, какие группы заданий соберутся.</div>'; $('bdGo').disabled = true; $('bdGoNote').textContent = ''; return; }
+  let ok = 0, tasks = 0, skip = 0;
+  box.innerHTML = rows.map(r => {
+    const pl = planRow(r);
+    if (pl.ok){ ok++; tasks += pl.got; } else skip++;
+    return '<div class="pl' + (pl.ok ? '' : ' skip') + '" data-id="' + esc(r.id) + '" data-ok="' + (pl.ok ? 1 : 0) + '">' + esc(pl.text)
+      + (pl.warn ? '<div class="warn">⚠ ' + esc(pl.warn) + '</div>' : '') + '</div>';
+  }).join('');
+  const nv = Math.max(1, Math.round(Number($('bdVars').value)) || 1);
+  $('bdGo').disabled = !ok || BD.busy;
+  $('bdGoNote').textContent = ok ? 'Групп: ' + ok + ', заданий: ' + tasks + (nv > 1 ? ', вариантов: ' + nv : '') + (skip ? ' · пропущено строк: ' + skip : '') : 'Собирать нечего';
+}
+async function buildGo(){
+  if (BD.busy) return;
+  const rows = orderedRows();
+  const plans = rows.map(planRow).filter(p => p.ok);
+  if (!plans.length){ toast('В наборе нет номеров, которые можно собрать'); return; }
+  BD.busy = true; $('bdGo').disabled = true;
+  const nv = Math.max(1, Math.min(10, Math.round(Number($('bdVars').value)) || 1));
+  const saved = VS.all();
+  try {
+    if (BD.target === 'cur'){
+      history.replaceState(null, '', E.id ? '#/edit/' + E.id : '#/new');
+      show('scrEdit');
+    } else {
+      history.replaceState(null, '', '#/new');
+      await openEditor(null);
+      const ex = examsSpec()[rows[0].exam];
+      E.title = 'Вариант' + (ex ? ' ' + ex.title : '');
+      $('wkTitle').value = E.title;
+    }
+    VS.clear();
+    // группы встают по порядку набора — в конец листа, как бы ни стояло «↑ ↓»
+    const keepPos = addPos; addPos = 'end';
+    let made = 0;
+    try {
+      for (const pl of plans){
+        try { if (await addSeries(pl.args)) made++; }
+        catch (e) { console.error('[работы] группа не собралась', e); toast(e.message, 6000); }
+      }
+    } finally { addPos = keepPos; }
+    if (nv > 1){
+      // копии варианта берут рецепт образца — ждём, пока задания групп снимутся
+      while (gens.size) await Promise.all([...gens.values()]).catch(() => {});
+      for (let i = 1; i < nv; i++) newVariant();
+      E.cur = 0; renderVariants(); renderTasks(); renderLink();
+    }
+    toastAction('Собрано групп: ' + made + '. Набор очищен', 'Вернуть набор', () => { VS.replace(saved); toast('Набор возвращён'); }, 10000);
+  } finally { BD.busy = false; }
+}
+// тост с кнопкой (у обычного toast() только текст)
+function toastAction(msg, label, fn, ms){
+  const t = $('toast');
+  t.textContent = msg;
+  const b = document.createElement('button'); b.className = 'btn quiet small'; b.id = 'toastAct'; b.textContent = label;
+  b.addEventListener('click', () => { t.classList.remove('show'); fn(); });
+  t.appendChild(b);
+  t.classList.add('show', 'act');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('show'), ms || 10000);
+}
+$('buildOpen').addEventListener('click', () => go('#/build'));
+$('edBuild').addEventListener('click', () => go(E.id ? '#/edit/' + E.id + '?build=1' : '#/new?build=1'));
+$('bdBack').addEventListener('click', () => {
+  if (BD.target === 'cur'){ history.replaceState(null, '', E.id ? '#/edit/' + E.id : '#/new'); show('scrEdit'); renderTasks(); }
+  else go('#/');
+});
+$('bdGo').addEventListener('click', buildGo);
+$('bdClear').addEventListener('click', () => { const saved = VS.all(); VS.clear(); toastAction('Набор очищен', 'Вернуть', () => VS.replace(saved), 10000); });
+$('bdGridToggle').addEventListener('click', () => { BD.gridOpen = !BD.gridOpen; renderBuild(); });
+$('bdExam').addEventListener('change', () => renderBuild());
+$('bdFull').addEventListener('click', () => {
+  const exam = $('bdExam').value, ex = examsSpec()[exam];
+  if (!ex) return;
+  const have = VS.all();
+  const each = Math.max(1, Number($('bdEach').value) || 1);
+  ex.list.forEach(p => {
+    const n = p.n == null ? null : p.n;
+    if (!have.some(r => r.exam === exam && r.slug === p.slug && r.n === n)) VS.add({ exam, slug: p.slug, n, count: each, source: $('bdSource').value });
+  });
+  BD.gridOpen = false; renderBuild();
+});
+$('bdEach').addEventListener('change', () => {
+  const c = Math.max(1, Math.min(COUNT_MAX, Math.round(Number($('bdEach').value)) || 1));
+  $('bdEach').value = c;
+  VS.all().forEach(r => VS.update(r.id, { count: c }));
+});
+['bdSource', 'bdStart', 'bdVars'].forEach(id => $(id).addEventListener('input', renderBuildPreview));
+window.addEventListener('variantset:change', () => renderBuild());
+
+window.__works = { E, renderTasks, addSeries, openBuild, renderBuild, planRow, buildGo, seriesNext, seriesPrev, seriesShuffle, seriesMore, seriesSetOne, seriesMove, seriesRemove, addFromFrame, openTrainer, openVideos, addVideo, save, route, gens, canon, openResults, openReview, closeReview };   // для тестов и отладки из консоли
 boot();
 })();
 </script>
