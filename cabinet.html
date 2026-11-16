@@ -361,16 +361,19 @@ async function boot(){
     if (!!u !== !!user){ user = u; route(); }
     user = u;
   });
-  route();
+  // синхронизация со старым приложением читает всё расписание (около
+  // десяти запросов) — при открытии она отнимала сеть у недели и потом
+  // перегружала её второй раз. Теперь — после того как неделя загрузилась
+  const first = route();
   TS.load();
-  if (user) SY.syncAuto();
+  if (user) Promise.resolve(first).catch(() => {}).then(() => setTimeout(() => { if (user) SY.syncAuto(); }, 1500));
 }
 function renderAcct(){
   const a = $('acct');
   if (!user){ a.hidden = true; return; }
   a.innerHTML = 'Вы вошли: <b>' + esc(user.email || '') + '</b> <button class="btn quiet small" id="auOut">Выйти</button>';
   a.hidden = false;
-  $('auOut').addEventListener('click', async () => { await C.signOut(); user = null; students = null; route(); });
+  $('auOut').addEventListener('click', async () => { await C.signOut(); user = null; students = null; Schedule.clearCache(); route(); });
 }
 $('auGo').addEventListener('click', async () => {
   const email = $('auEmail').value.trim(), pw = $('auPass').value;
@@ -597,6 +600,8 @@ async function renderSettings(){
 Schedule.init({
   host: $('scHost'),
   students: () => loadStudents(),
+  // локальная копия недели — своя у каждого аккаунта
+  userId: () => (user ? user.id : null),
   addStudent: async name => { const s = await C.addStudent({ name }); students = null; return s; },
   settings: () => TS.get(),
   settingsChanged: f => TS.onChange(f),

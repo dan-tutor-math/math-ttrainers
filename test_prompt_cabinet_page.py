@@ -263,6 +263,9 @@ def main():
         page.click("a:has-text('← Ученики')")
         page.wait_for_selector("#csBody tr[data-sid]", timeout=5000)
         r0 = "#csBody tr[data-sid]"
+        # таблица сперва рисует список из памяти, потом свежий из базы — ждём свежий
+        # (заглушка базы отвечает по очереди, и обновление может прийти позже)
+        page.wait_for_function("() => { const i = document.querySelector('#csBody tr[data-sid] [data-f=name]'); return i && i.value === 'Мария Иванова'; }", timeout=5000)
         check("B6 в списке новое имя, класс и экзамен",
               page.input_value(r0 + " [data-f=name]") == "Мария Иванова" and page.input_value(r0 + " [data-f=grade]") == "9"
               and page.input_value(r0 + " [data-f=exam]") == "oge")

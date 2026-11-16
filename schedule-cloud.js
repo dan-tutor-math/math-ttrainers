@@ -45,9 +45,15 @@
     return res.data;
   }
   let writeChain = Promise.resolve();
+  // счётчик записей: +1 в начале и +1 по окончании. Расписание сверяет его
+  // до и после загрузки недели: изменился — ответ мог не увидеть правку,
+  // грузим ещё раз (неделя теперь видна и правится, пока идёт обновление)
+  let writeCount = 0;
   function serial(fn){
+    writeCount++;
     const p = writeChain.catch(() => {}).then(fn);
     writeChain = p;
+    p.then(() => { writeCount++; }, () => { writeCount++; });
     return p;
   }
 
@@ -189,9 +195,13 @@
   }
   async function listGroups(){
     const c = need();
-    const gs = await run(c.from('student_groups').select(GROUP_COLS).order('created_at', { ascending: true }));
-    const ids = (gs || []).map(g => g.id);
-    const ms = ids.length ? await run(c.from('student_group_members').select('group_id, student_id, pos').in('group_id', ids).order('pos', { ascending: true })) : [];
+    // группы и участники — одним заходом, а не по очереди: каждый запрос к
+    // Supabase идёт 0,5–1 с, и цепочка «группы → участники» удваивала время
+    // открытия расписания. Участники — все свои (RLS по owner), их немного
+    const [gs, ms] = await Promise.all([
+      run(c.from('student_groups').select(GROUP_COLS).order('created_at', { ascending: true })),
+      run(c.from('student_group_members').select('group_id, student_id, pos').order('pos', { ascending: true })),
+    ]);
     const by = {};
     (ms || []).forEach(m => { (by[m.group_id] = by[m.group_id] || []).push(m); });
     return (gs || []).map(g => Object.assign({}, g, { members: (by[g.id] || []).sort((a, b) => a.pos - b.pos).map(m => m.student_id) }));
@@ -245,11 +255,14 @@
   }
   async function listTemplates(){
     const c = need();
-    const ts = await run(c.from('week_templates').select(TPL_COLS).order('pos', { ascending: true }).order('created_at', { ascending: true }));
-    const ids = (ts || []).map(t => t.id);
-    const slots = ids.length ? await run(c.from('template_slots').select(SLOT_COLS).in('template_id', ids).order('weekday', { ascending: true }).order('start_min', { ascending: true })) : [];
-    const sids = (slots || []).map(s => s.id);
-    const ps = sids.length ? await run(c.from('template_slot_students').select(SP_COLS).in('slot_id', sids).order('pos', { ascending: true })) : [];
+    // три таблицы шаблонов — параллельно (раньше шли цепочкой из трёх
+    // запросов). Слоты и их ученики — все свои: шаблонов единицы, слотов
+    // десятки; лишние строки (слот без шаблона) отсеет сборка ниже
+    const [ts, slots, ps] = await Promise.all([
+      run(c.from('week_templates').select(TPL_COLS).order('pos', { ascending: true }).order('created_at', { ascending: true })),
+      run(c.from('template_slots').select(SLOT_COLS).order('weekday', { ascending: true }).order('start_min', { ascending: true })),
+      run(c.from('template_slot_students').select(SP_COLS).order('pos', { ascending: true })),
+    ]);
     const pBy = {}, sBy = {};
     (ps || []).forEach(p => { (pBy[p.slot_id] = pBy[p.slot_id] || []).push(p); });
     (slots || []).forEach(s => { (sBy[s.template_id] = sBy[s.template_id] || []).push(Object.assign({}, s, { people: (pBy[s.id] || []).sort((a, b) => a.pos - b.pos) })); });
@@ -398,6 +411,7 @@
   window.ScheduleCloud = { FORMATS, STATUSES, GROUP_FORMATS, listRange, listForStudent, addLesson, updateLesson, deleteLesson, addPeople, setStatus, setPart, removePerson, movePerson,
     addLessons, deleteLessons, addSlots, deleteSlots,
     hasPayCols: () => payCols,
+    writes: () => writeCount,
     listGroups, addGroup, updateGroup, setGroupMembers, deleteGroup,
     listTemplates, addTemplate, renameTemplate, deleteTemplate, setActiveTemplate, addSlot, updateSlot, deleteSlot, addSlotPeople, removeSlotPerson, moveSlotPerson, setSlotPeople, duplicateTemplate };
 })();
