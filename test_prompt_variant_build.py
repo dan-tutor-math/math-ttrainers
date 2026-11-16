@@ -41,7 +41,7 @@ def idle(page, timeout=120000):
 
 
 SER = """() => window.__works.E.blocks.map(b => ({ key: b.series ? b.series.key : null, pos: b.series ? b.series.pos : null,
-  proto: b.series ? b.series.proto : null, title: b.series ? b.series.title : null,
+  proto: b.series ? b.series.proto : null, fipi: b.series ? b.series.fipi : null, title: b.series ? b.series.title : null,
   img: !!(b.img && b.img.light && b.img.light.url), gen: b._gen || null }))"""
 
 
@@ -155,6 +155,30 @@ def run():
         wid = db()["works"][0]["id"]
         check("B15 сохранилось: в базе 7 заданий с series", len(db()["work_variants"][0]["blocks"]) == 7
               and all(b.get("series") for b in db()["work_variants"][0]["blocks"]))
+
+        # ═══ G. задание по номеру ФИПИ; несобираемые строки остаются в Наборе ═══
+        print("\n— G. «это задание» по номеру ФИПИ, остаток Набора")
+        tp.goto(f"{BASE}/works.html#/build")
+        tp.wait_for_selector("#scrBuild:not([hidden])")
+        f3 = tp.evaluate("""async () => { const ix = await (await fetch('catalog-index.json')).json();
+          const p = ix['oge9|'].protos.find(x => x.id === 'p1'); const V = window.VariantSet; V.clear();
+          // место 7 устарело (банк «перевыгружен») — собрать надо по номеру ФИПИ, он на месте 2
+          V.add({ exam: 'oge', slug: 'oge9', proto: 'p1', pos: 7, fipi: p.fipi[2], count: 1 });
+          V.add({ exam: 'oge', slug: 'oge8', count: 1 });
+          return p.fipi[2]; }""")
+        tp.wait_for_function("() => document.querySelectorAll('#bdPreview .pl').length === 2")
+        pv = preview(tp)
+        check("G1 предпросмотр берёт место по номеру ФИПИ: «ФИПИ 3 из 10», oge8 не собирается",
+              pv[0]["ok"] and "ФИПИ 3 из 10" in pv[0]["t"] and not pv[1]["ok"], json.dumps(pv, ensure_ascii=False))
+        tp.click("#bdGo")
+        tp.wait_for_selector("#scrEdit:not([hidden])")
+        tp.wait_for_function("() => window.__works.E.blocks.length === 1", timeout=60000)
+        idle(tp)
+        g = tp.evaluate(SER)
+        check("G2 собрано то самое задание ФИПИ", len(g) == 1 and g[0]["fipi"] == f3 and g[0]["pos"] == 2, json.dumps(g, ensure_ascii=False)[:300])
+        left = tp.evaluate("() => window.VariantSet.all().map(x => x.slug)")
+        check("G3 несобранная строка (oge8) осталась в Наборе", left == ["oge8"], str(left))
+        tp.evaluate("() => { window.VariantSet.clear(); window.__works.E.dirty = false; }")
 
         # ═══ C. «Полный вариант» ОГЭ ═══
         print("\n— C. полный вариант ОГЭ")

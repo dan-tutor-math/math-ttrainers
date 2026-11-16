@@ -2414,8 +2414,12 @@ function planRow(r){
   if (!tr) return { ok: false, text: name + ' — тренажёр номера не найден', why: 'trainer' };
   const title = plainTitle(proto.title);
   if (!total) return { ok: false, text: name + ' · ' + title + ' — в банке прототипа нет заданий ФИПИ, в этой версии не собирается', why: 'gen' };
-  const random = $('bdSource').value === 'random' && r.pos == null;
-  const start = r.pos != null ? r.pos : Math.max(0, (Math.round(Number($('bdStart').value)) || 1) - 1);
+  // конкретное задание («это задание» с тренажёра) — место ищем по номеру ФИПИ:
+  // банк перевыгрузят, порядок сменится, а номер ФИПИ останется тем же
+  const byFipi = r.fipi ? (proto.fipi || []).indexOf(r.fipi) : -1;
+  const pinned = byFipi >= 0 ? byFipi : r.pos;
+  const random = $('bdSource').value === 'random' && pinned == null;
+  const start = pinned != null ? pinned : Math.max(0, (Math.round(Number($('bdStart').value)) || 1) - 1);
   const count = Math.max(1, Math.min(COUNT_MAX, r.count || 1));
   let text, warn = '', got;
   if (random){
@@ -2579,7 +2583,10 @@ function renderBuildPreview(){
 async function buildGo(){
   if (BD.busy) return;
   const rows = orderedRows();
-  const plans = rows.map(planRow).filter(p => p.ok);
+  const all = rows.map(r => ({ r, pl: planRow(r) }));
+  const plans = all.filter(x => x.pl.ok).map(x => x.pl);
+  // строки, которые в этой версии не собираются (нет каталога, только генератор), остаются в Наборе
+  const left = all.filter(x => !x.pl.ok).map(x => x.r);
   if (!plans.length){ toast('В наборе нет номеров, которые можно собрать'); return; }
   BD.busy = true; $('bdGo').disabled = true;
   const nv = Math.max(1, Math.min(10, Math.round(Number($('bdVars').value)) || 1));
@@ -2595,7 +2602,7 @@ async function buildGo(){
       E.title = 'Вариант' + (ex ? ' ' + ex.title : '');
       $('wkTitle').value = E.title;
     }
-    VS.clear();
+    VS.replace(left);
     // группы встают по порядку набора — в конец листа, как бы ни стояло «↑ ↓»
     const keepPos = addPos; addPos = 'end';
     let made = 0;
@@ -2611,7 +2618,7 @@ async function buildGo(){
       for (let i = 1; i < nv; i++) newVariant();
       E.cur = 0; renderVariants(); renderTasks(); renderLink();
     }
-    toastAction('Собрано групп: ' + made + '. Набор очищен', 'Вернуть набор', () => { VS.replace(saved); toast('Набор возвращён'); }, 10000);
+    toastAction('Собрано групп: ' + made + (left.length ? '. В наборе осталось несобранных строк: ' + left.length : '. Набор очищен'), 'Вернуть набор', () => { VS.replace(saved); toast('Набор возвращён'); }, 10000);
   } finally { BD.busy = false; }
 }
 // тост с кнопкой (у обычного toast() только текст)
