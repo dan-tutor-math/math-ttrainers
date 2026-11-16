@@ -221,6 +221,17 @@ def run():
         n = sp.evaluate("() => window.__work.S.blocks.length")
         check("D1 у ученика работа открылась, все задания на месте", n == len(bl), f"{n} из {len(bl)}")
         sctx.close()
+
+        # ═══ E. ОГЭ ч. 1: каталог без поля tasks (только fipi) ═══
+        print("\n— E. группа на ОГЭ №9")
+        before = tp.evaluate("() => window.__works.E.blocks.length")
+        tp.evaluate("""async () => { await window.__works.addSeries({ tid: 'oge9', href: 'oge9.html', exam: 'oge', proto: 'p1',
+          count: 2, source: 'order', startPos: 0 }); }""")
+        idle(tp)
+        s = tp.evaluate(SER)[before:]
+        check("E1 два задания ОГЭ №9 созданы, с картинкой и номером ФИПИ",
+              len(s) == 2 and all(x and x["img"] and not x["gen"] and x["fipi"] for x in s), json.dumps(s, ensure_ascii=False)[:400])
+        check("E2 места 0–1 и размер банка из fipi", [x["pos"] for x in s] == [0, 1] and s[0]["total"] > 1, str([(x["pos"], x["total"]) for x in s]))
         tctx.close()
         browser.close()
 
