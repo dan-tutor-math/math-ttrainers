@@ -64,41 +64,9 @@
   const slug = (location.pathname.split('/').pop() || '').replace(/\.html?$/i, '');
   const range = (a, b) => Array.from({ length: b - a + 1 }, (_, i) => a + i);
 
-  /* Порядок номеров — как в каталоге на главной. №1–5 и №15–18 — один
-     тренажёр на несколько номеров, поэтому в ОГЭ позиция — это страница, а
-     у ОГЭ части 2 и ЕГЭ — страница плюс номер из адреса. Числа позиций
-     сверяет с банками тест №73 */
-  const OGE_PART1 = [
-    ['oge1_5', '№1–5'], ['oge6', '№6'], ['oge7', '№7'], ['oge8', '№8'], ['oge9', '№9'],
-    ['oge10', '№10'], ['oge11', '№11'], ['oge12', '№12'], ['oge13', '№13'], ['oge14', '№14'],
-    ['oge15_18', '№15–18'], ['oge19', '№19'],
-  ];
-  const EXAMS = {
-    oge: {
-      title: 'ОГЭ',
-      list: OGE_PART1.map(([s, label]) => ({ slug: s, label: label }))
-        .concat(range(20, 25).map(n => ({ slug: 'oge_part2', n: n, label: '№' + n }))),
-    },
-    ege_base: { title: 'ЕГЭ база', list: range(1, 21).map(n => ({ slug: 'ege_base', n: n, label: '№' + n })) },
-    ege_prof: { title: 'ЕГЭ профиль', list: range(1, 20).map(n => ({ slug: 'ege_prof', n: n, label: '№' + n })) },
-    soc_oge: { title: 'ОГЭ обществознание', list: range(1, 20).map(n => ({ slug: 'soc_oge', n: n, label: '№' + n })) },
-    phys_oge: { title: 'ОГЭ физика', list: range(1, 16).map(n => ({ slug: 'phys_oge', n: n, label: '№' + n })) },
-    inf_oge: { title: 'ОГЭ информатика', list: range(1, 10).map(n => ({ slug: 'inf_oge', n: n, label: '№' + n })) },
-    soc_ege: { title: 'ЕГЭ обществознание', list: range(1, 25).map(n => ({ slug: n<=16 ? 'soc_ege' : 'soc_ege_long', n: n, label: '№' + n })) },
-    // русский ОГЭ: №1 и №13 — свои страницы (изложение, сочинение), №2–12 — одна
-    // страница rus_oge.html, номер в адресе, меняется без перезагрузки (хук __examNav)
-    rus_oge: { title: 'ОГЭ русский', list: [{ slug: 'rus_oge01', label: '№1' }]
-      .concat(range(2, 12).map(n => ({ slug: 'rus_oge', n: n, label: '№' + n })))
-      .concat([{ slug: 'rus_oge13', label: '№13' }]) },
-    // русский ЕГЭ: №1–26 — rus_ege.html (номер в адресе, хук __examNav), №27 — сочинение
-    rus_ege: { title: 'ЕГЭ русский', list: range(1, 26).map(n => ({ slug: 'rus_ege', n: n, label: '№' + n }))
-      .concat([{ slug: 'rus_ege27', label: '№27' }]) },
-    // английский ОГЭ: в адресе первый номер набора (eng_oge.html, банк eng-oge-bank.js)
-    eng_oge: { title: 'ОГЭ английский', list: [
-      [1, '№1–4'], [5, '№5'], [6, '№6–11'], [12, '№12'], [13, '№13–19'], [20, '№20–28'], [29, '№29–34'],
-      [35, '№35'], [36, 'устная часть, №1'], [37, 'устная часть, №2'], [38, 'устная часть, №3'],
-    ].map(([n, label]) => ({ slug: 'eng_oge', n: n, label: label })) },
-  };
+  // Список номеров экзаменов — в exam-spec.js (подключён перед этим файлом)
+  const EXAMS = window.ExamSpec && window.ExamSpec.exams;
+  if (!EXAMS) return;
   let examId = null;
   Object.keys(EXAMS).forEach(id => { if (EXAMS[id].list.some(p => p.slug === slug)) examId = id; });
   if (!examId) return;
