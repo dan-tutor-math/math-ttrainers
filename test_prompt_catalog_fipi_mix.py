@@ -11,7 +11,7 @@ import test_prompt84_deck_slides as T
 
 T.PORT = 9131
 T.BASE = f"http://127.0.0.1:{T.PORT}"
-PAGES = ["oge6", "oge9", "oge15_18"]
+PAGES = ["oge6", "oge9", "oge15_18", "oge14", "oge7"]
 # ключи совместной сессии страница заводит сама по таймеру, к каталогу они не относятся
 STORE = """() => JSON.stringify(Object.keys(localStorage).sort()
   .filter(k => !k.startsWith('trainerSession') && !k.startsWith('tsSessions'))
