@@ -613,8 +613,8 @@ function genDemoTask(){
 const FIPI_BANK = window.OGE19_FIPI || null;
 const FIPI_PROMPT_ONE = 'Какое из следующих утверждений является истинным высказыванием? В ответ запишите номер истинного высказывания — отметьте его.';
 const FIPI_PROMPT_MANY = 'Какие из следующих утверждений являются истинными высказываниями? Отметьте все истинные.';
-function genFipiTask(){
-  const t = pick(FIPI_BANK.tasks);
+function genFipiTask(){ return fipiTaskOf(pick(FIPI_BANK.tasks)); }
+function fipiTaskOf(t){
   return {
     prompt: t.multi ? FIPI_PROMPT_MANY : FIPI_PROMPT_ONE,
     fipi: t.fipi,
@@ -857,6 +857,57 @@ function newTask() {
   solShown = false;
   syncSolutionUI();
 }
+
+/* Каталог для конструктора работ: список прототипов и задача по её месту в
+   банке. Экран задания включаем напрямую (как newTask, но без NoRepeat):
+   иначе в браузер учителя записалась бы память «недавних заданий» */
+window.__trainerCatalog = {
+  list(){
+    return Promise.resolve(MODES.filter(m => !m.demo).map(m => ({
+      id: m.id,
+      title: m.title,
+      section: null,
+      fipi: m.fipi ? FIPI_BANK.tasks.map(t => t.fipi) : [],
+      hasGen: true,
+    })));
+  },
+  openAt(protoId, pos){
+    const m = MODES.find(x => x.id === protoId && !x.demo);
+    if (!m) return { ok: false, reason: 'unknown' };
+    if (pos < 0) return { ok: false, reason: 'end' };
+    const bank = m.fipi ? FIPI_BANK.tasks : [];
+    let task;
+    if (pos < bank.length) task = fipiTaskOf(bank[pos]);
+    else {
+      task = genStatementsTask();
+      if (bank.length) task.basedOnFipi = true;
+    }
+    enterMode(protoId);
+    curSubMode = 'exam';
+    syncTabs();
+    curTask = task;
+    taskAnswered = false;
+    checked = false;
+    hadWrongPick = false;
+    pickedSet = new Set();
+    els.comingSoonPanel.style.display = 'none';
+    els.questionPanel.style.display = 'block';
+    renderPrompt();
+    els.stmtList.innerHTML = curTask.statements.map((s, i) =>
+      `<div class="stmt" data-i="${i}"><span class="slabel">${i + 1})</span><span class="stext">${s.text}</span></div>`
+    ).join('');
+    els.checkBtn.style.display = 'block';
+    els.checkBtn.disabled = false;
+    els.changeAnswerBtn.style.display = 'none';
+    attachStmtHandlers();
+    els.mainPanel.style.display = 'none';
+    els.explainBox.style.display = 'none';
+    els.nextBtn.style.display = 'none';
+    solShown = false;
+    syncSolutionUI();
+    return { ok: true, fipi: task.fipi || null, pos, total: bank.length };
+  },
+};
 
 function attachStmtHandlers() {
   const items = [...els.stmtList.querySelectorAll('.stmt')];

@@ -11,7 +11,7 @@ import test_prompt84_deck_slides as T
 
 T.PORT = 9131
 T.BASE = f"http://127.0.0.1:{T.PORT}"
-PAGES = ["oge6", "oge9", "oge15_18", "oge14", "oge7"]
+PAGES = ["oge6", "oge9", "oge15_18", "oge14", "oge7", "oge19"]
 # ключи совместной сессии страница заводит сама по таймеру, к каталогу они не относятся
 STORE = """() => JSON.stringify(Object.keys(localStorage).sort()
   .filter(k => !k.startsWith('trainerSession') && !k.startsWith('tsSessions'))
@@ -47,11 +47,11 @@ def run_page(browser, slug, errors):
         check(r["ok"] and r["fipi"] == want, f"{slug}: задача банка на месте {pos}", str(r))
         check(page.evaluate("() => curTask.fipi") == want, f"{slug}: на экране задача места {pos}")
         check(page.is_visible("#questionPanel"), f"{slug}: экран задания открыт")
-        prompts.append(page.evaluate("() => curTask.prompt"))
+        prompts.append(page.evaluate("() => JSON.stringify(curTask)"))
     check(len(set(prompts)) == 3, slug + ": три разные задачи")
 
     page.evaluate("([id]) => __trainerCatalog.openAt(id, 1)", [best["id"]])
-    check(page.evaluate("() => curTask.prompt") == prompts[1], slug + ": то же место — та же задача")
+    check(page.evaluate("() => JSON.stringify(curTask)") == prompts[1], slug + ": то же место — та же задача")
 
     end = len(best["fipi"])
     r = page.evaluate("([id, pos]) => __trainerCatalog.openAt(id, pos)", [best["id"], end])
