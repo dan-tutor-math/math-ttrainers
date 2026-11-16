@@ -275,7 +275,12 @@
     try { if (window.CabinetCloud && window.CabinetCloud.client()) return (sb = window.CabinetCloud.client()); } catch (e) {}
     const cfg = window.SUPABASE_CONFIG || {};
     if (!cfg.url || !cfg.anonKey || !window.supabase || !window.supabase.createClient) return null;
+    // один клиент входа на страницу (его же берёт кнопка «＋ В вариант» в
+    // exam-nav.js): два клиента с одним хранилищем сессии спорят при
+    // обновлении токена, и вход может слететь
+    if (window.__mathhSb) return (sb = window.__mathhSb);
     try { sb = (window.rtGuard || (c => c))(window.supabase.createClient(cfg.url, cfg.anonKey)); } catch (e) { sb = null; }
+    if (sb) window.__mathhSb = sb;
     return sb;
   }
   async function signedIn(c){

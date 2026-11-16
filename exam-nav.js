@@ -651,7 +651,10 @@
     try { if (window.CabinetCloud && window.CabinetCloud.client && window.CabinetCloud.client()) return (vbSb = window.CabinetCloud.client()); } catch (e) {}
     const cfg = window.SUPABASE_CONFIG || {};
     if (!cfg.url || !cfg.anonKey || !window.supabase || !window.supabase.createClient) return null;
+    // общий клиент страницы — тот же, что у student-memory.js (см. там, client())
+    if (window.__mathhSb) return (vbSb = window.__mathhSb);
     try { vbSb = (window.rtGuard || (c => c))(window.supabase.createClient(cfg.url, cfg.anonKey)); } catch (e) { vbSb = null; }
+    if (vbSb) window.__mathhSb = vbSb;
     return vbSb;
   }
   async function vbRefreshAuth() {

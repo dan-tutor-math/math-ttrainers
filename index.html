@@ -1661,7 +1661,10 @@ document.getElementById('topics').addEventListener('click', function (e) {
     try { if (window.CabinetCloud && CabinetCloud.client && CabinetCloud.client()) return (sb = CabinetCloud.client()); } catch(e){}
     const cfg = window.SUPABASE_CONFIG || {};
     if (!cfg.url || !cfg.anonKey || !window.supabase || !window.supabase.createClient) return null;
+    // общий клиент страницы — тот же, что у student-memory.js (два клиента спорят при обновлении входа)
+    if (window.__mathhSb) return (sb = window.__mathhSb);
     try { sb = (window.rtGuard || (c => c))(window.supabase.createClient(cfg.url, cfg.anonKey)); } catch(e){ sb = null; }
+    if (sb) window.__mathhSb = sb;
     return sb;
   }
   function follower(){
