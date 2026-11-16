@@ -63,11 +63,115 @@ def pics(markup):
     return re.findall(r"ShowPictureQ\(['\"]([^'\"]+\.(?:gif|png|jpe?g|svg))['\"]", markup, re.I)
 
 
+# Формулы ФИПИ записаны MathML (<m:math>). Раньше теги просто вырезались, и от формулы оставались
+# буквы и цифры подряд: «в √2 раза» превращалось «в 2 раза», «Дж/(кг·°С)» — в «Дж кг⋅°С»,
+# ядро урана — в «U92238». Формулы со структурой (дробь, степень, индекс, корень, вектор, ядро)
+# переводим в TeX: страница рисует $…$ через KaTeX. Формулы без структуры (один знак, буква,
+# «°С») остаются текстом, как были, — у них терять нечего.
+MATH_STRUCT = ('mfrac', 'msup', 'msub', 'msqrt', 'mroot', 'mover', 'mmultiscripts', 'menclose')
+TEXPLAIN = {}
+
+
+def _tex_text(s, upright):
+    out, buf = [], ''
+
+    def flush():
+        nonlocal buf
+        if buf:
+            out.append(buf if (len(buf) == 1 and buf.isascii() and not upright) else '\\text{%s}' % buf)
+            buf = ''
+    for ch in s:
+        if ch.isalpha() and not ('\u0370' <= ch <= '\u03ff'):
+            buf += ch
+            continue
+        flush()
+        if ch.isdigit() or ch in '+-=()?!,.:;/' or '\u0370' <= ch <= '\u03ff':
+            out.append('{,}' if ch == ',' else ch)
+        elif ch == '°':
+            out.append('{}^\\circ')
+        elif ch in '\u2013\u2212':
+            out.append('-')
+        elif ch in '\u22c5\u00b7':
+            out.append('\\cdot ')
+        elif ch == '\u2192':
+            out.append('\\to ')
+        elif ch == '№':
+            out.append('\\text{№}')
+        elif ch.isspace() or ch in '\u2009\u2004\u00a0':
+            out.append('\\,')
+        else:
+            raise ValueError('формула ФИПИ: неизвестный знак %r' % ch)
+    flush()
+    return ''.join(out)
+
+
+def _tex(el, upright):
+    tag = el.tag
+    kids = list(el)
+    parts = lambda: ''.join(_tex(k, upright) for k in kids)
+    if tag in ('math', 'mstyle', 'semantics', 'mrow'):
+        return parts()
+    if tag in ('mn', 'mo', 'mtext'):
+        return _tex_text(el.text or '', upright or tag == 'mtext')
+    if tag == 'mi':
+        return _tex_text(el.text or '', upright)
+    if tag == 'mfrac' and len(kids) == 2:
+        return '\\dfrac{%s}{%s}' % (_tex(kids[0], upright), _tex(kids[1], upright))
+    if tag == 'msup' and len(kids) == 2:
+        return '{%s}^{%s}' % (_tex(kids[0], upright), _tex(kids[1], upright))
+    if tag == 'msub' and len(kids) == 2:
+        return '{%s}_{%s}' % (_tex(kids[0], upright), _tex(kids[1], upright))
+    if tag == 'msqrt':
+        return '\\sqrt{%s}' % parts()
+    if tag == 'menclose':
+        return '\\boxed{%s}' % parts()
+    if tag == 'mover' and len(kids) == 2:
+        base, over = _tex(kids[0], upright), _tex(kids[1], upright)
+        if over.strip() == '\\to':
+            return '\\vec{%s}' % base
+        if not over.strip():      # стрелка реакции с пустой надписью над ней
+            return base
+        return '\\overset{%s}{%s}' % (over, base)
+    if tag == 'mmultiscripts' and len(kids) == 4 and kids[1].tag == 'mprescripts':
+        # ядро: слева внизу заряд, слева вверху массовое число; символ элемента — прямым шрифтом
+        return '{}^{%s}_{%s}%s' % (_tex(kids[3], True), _tex(kids[2], True), _tex(kids[0], True))
+    raise ValueError('формула ФИПИ: неизвестная конструкция <%s>' % tag)
+
+
+def math_tex(mathml):
+    """MathML ФИПИ → (TeX, хвост): знаки конца фразы («?», «.», «,») выносим из формулы в текст."""
+    import xml.etree.ElementTree as ET
+    xml = re.sub(r'<(/?)m:', r'<\1', mathml)
+    xml = re.sub(r'&(#x?[0-9a-fA-F]+|nbsp);', lambda m: html.unescape(m[0]), xml)
+    root = ET.fromstring(xml)
+    for el in root.iter():
+        el.text = (el.text or '').strip('\n\r\t ') if el.tag not in ('mtext',) else (el.text or '')
+    tex = _tex(root, 'mmultiscripts' in mathml)
+    tex = re.sub(r'(\\text\{[^{}]*?)([?.,]+)\}$', r'\1}\2', tex)
+    tex = re.sub(r'^(?:\\,)+|(?:\\,)+$', '', tex).replace('\\text{}', '')
+    m = re.search(r'(?:\{,\}|[?.,])+$', tex)
+    tail = ''
+    if m and not tex[:m.start()].endswith('\\boxed{'):
+        tail = m[0].replace('{,}', ',')
+        tex = tex[:m.start()]
+    return re.sub(r'(?:\\,)+$', '', tex).strip(), tail
+
+
 def clean(markup, img):
     # Рисунок ФИПИ ставит скрипт ShowPictureQ: сохраняем его место до удаления скриптов
     markup = re.sub(r"<script[^>]*>\s*ShowPictureQ\(['\"]([^'\"]+)['\"](?:\s*,[^)]*)?\);?\s*</script>",
                     lambda m: '[[IMG:' + img_name(m[1]) + ']]', markup, flags=re.I)
     markup = re.sub(r'<script\b.*?</script>|<style\b.*?</style>|<!--.*?-->', '', markup, flags=re.I | re.S)
+    formulas = []
+
+    def formula(m):
+        if not any('<m:' + s in m[0] or '<' + s in m[0] for s in MATH_STRUCT):
+            return m[0]
+        tex, tail = math_tex(m[0])
+        TEXPLAIN[tex] = re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', '', m[0]))).strip()
+        formulas.append(tex)
+        return '[[TEX:%d]]' % (len(formulas) - 1) + tail
+    markup = re.sub(r'<(?:m:)?math\b.*?</(?:m:)?math>', formula, markup, flags=re.I | re.S)
     markup = re.sub(r'<\?.*?\?>', '', markup, flags=re.S)
     markup = re.sub(r'<(/?)div\b[^>]*>', r'<\1p>', markup, flags=re.I)
 
@@ -83,7 +187,8 @@ def clean(markup, img):
     markup = re.sub(r'\s+', ' ', markup.replace('\xa0', ' '))
     markup = re.sub(r'<p>\s*(?:&nbsp;|\s)*</p>', '', markup)
     markup = re.sub(r'\[\[IMG:([^\]]+)\]\]', lambda m: '<img class="fig" src="%s/%s" alt="Иллюстрация к заданию">' % (img, m[1]), markup)
-    return markup.strip().replace('$', '&#36;')
+    markup = markup.strip().replace('$', '&#36;')
+    return re.sub(r'\[\[TEX:(\d+)\]\]', lambda m: '$' + formulas[int(m[1])] + '$', markup)
 
 
 def options(src, t, img):
@@ -119,6 +224,8 @@ def grid_tables(q):
 
 
 def peek(q):
+    # в короткой подписи карточки формула — простым текстом, как раньше
+    q = re.sub(r'\$([^$]+)\$', lambda m: ' ' + TEXPLAIN.get(m[1], m[1]) + ' ', q)
     text = re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', q))).strip()
     return html.escape(text[:150] + ('…' if len(text) > 150 else ''), quote=False)
 
