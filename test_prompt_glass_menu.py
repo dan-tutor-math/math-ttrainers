@@ -118,7 +118,7 @@ def run():
         page.click("#lgMenuToggle"); page.wait_for_timeout(400)
         check(page.evaluate("document.querySelector('.lg-menu').classList.contains('is-open')")
               and page.get_attribute("#lgMenuToggle", "aria-expanded") == "true", "«⋯» открывает меню")
-        check(labels(page) == ["Совместный доступ", "Тёмная тема", "Эффекты: обычные", "Сбросить прогресс", "Подборка заданий"],
+        check(labels(page) == ["Совместный доступ", "Тёмная тема", "Эффекты: обычные", "Фон: по предмету", "Сбросить прогресс", "Подборка заданий"],
               f"пункты меню и подписи: {labels(page)}")
         h = page.evaluate("document.querySelector('.lg-menu-glass').getBoundingClientRect().height")
         check(h > 200, f"стекло меню вытянулось под список ({h:.0f}px)")
