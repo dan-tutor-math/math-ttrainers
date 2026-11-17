@@ -10,7 +10,11 @@
                                   (studentId — Б5: явному ученику, без сессии)
      recordTask(task, {clean, mode, page}) — итог решения из страницы тренажёра (Б2):
                                   ключ строит TaskKey.fromTask, событие ok (с первого
-                                  раза) или bad (после ошибок или с подсказкой)
+                                  раза) или bad (после ошибок или с подсказкой).
+                                  Старый вызов, страницы переходят на recordAttempt
+     recordAttempt(task, {ok, mode, page}) — задача 56: каждая попытка сразу —
+                                  bad на неверный ответ (подсказку), ok на верный,
+                                  даже после ошибок: в истории «неверно → верно»
                                   event: hw / board / ok / bad; ключ — task-key.js (А1)
      summary(key, {studentId})  — даты и счётчики по каждому виду события
      kindSummary(prefix, …)     — то же по всем ключам вида («gen:oge9:3», «fipi:oge:9»)
@@ -355,6 +359,23 @@
       const key = window.TaskKey.fromTask(page, t);
       if (!key) return { ok: false, reason: 'no_key' };
       return record(key, opts.clean === false ? 'bad' : 'ok', { source: 'trainer', srcRef: page });
+    } catch (e) { return { ok: false, reason: 'error' }; }
+  }
+
+  // Задача 56: одна попытка — одно событие. Неверный ответ (или подсказка,
+  // показанный разбор) — bad сразу, в момент ошибки; верный — ok всегда, даже
+  // после ошибок. Так в истории остаётся и ошибка, и итог («неверно → верно»),
+  // а «сразу верно» — это ok без bad перед ним. Повтор одного события по
+  // заданию в 10 минут по-прежнему отсекает record (три ошибки подряд — одно bad)
+  function recordAttempt(task, opts){
+    opts = opts || {};
+    try {
+      if (!task || !window.TaskKey) return { ok: false, reason: 'no_key' };
+      const page = opts.page || (location.pathname.split('/').pop() || '').replace(/\.html$/, '');
+      const t = (opts.mode && task.mode == null) ? Object.assign({}, task, { mode: opts.mode }) : task;
+      const key = window.TaskKey.fromTask(page, t);
+      if (!key) return { ok: false, reason: 'no_key' };
+      return record(key, opts.ok ? 'ok' : 'bad', { source: 'trainer', srcRef: page });
     } catch (e) { return { ok: false, reason: 'error' }; }
   }
 
@@ -721,7 +742,7 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 
   window.StudentMemory = {
-    current, start, end, pause, record, recordTask, summary, kindSummary, keys, logState, forget, fetchLog, loadLog,
+    current, start, end, pause, record, recordTask, recordAttempt, summary, kindSummary, keys, logState, forget, fetchLog, loadLog,
     listStudents, onChange, flush, isFollower, bindMode, setPickerContext,
     queue: () => readQueue().slice(), deadLetters: () => parse(lsGet(LS_DEAD), []),
     THROTTLE_MS,

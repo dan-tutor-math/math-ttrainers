@@ -972,12 +972,14 @@ els.checkBtn.onclick = () => {
     els.stStreak.textContent = streak;
     taskAnswered = true;
     els.checkBtn.style.display = 'none';
-    finishTask(true);
+    finishTask(true, false); // вторая ошибка — ответ показан, итог bad
   } else {
     items.forEach((el, i) => {
       if (pickedSet.has(i) && !correctSet.has(i)) el.classList.add('wrong');
     });
     hadWrongPick = true;
+    // задача 56: ошибка — сразу в память ученика
+    if (window.StudentMemory) StudentMemory.recordAttempt(curTask, { ok: false, mode: curMode });
     streak = 0; totalErrors++;
     els.stErrors.textContent = totalErrors;
     els.stStreak.textContent = streak;
@@ -994,9 +996,11 @@ els.changeAnswerBtn.onclick = () => {
   attachStmtHandlers();
 };
 
-function finishTask(isFreshSolve) {
+function finishTask(isFreshSolve, solvedOk) {
   // кабинет (Б2): итог в журнал ученика; вне сессии, на паузе и у follower модуль молчит
-  if (isFreshSolve && window.StudentMemory) StudentMemory.recordTask(curTask, { mode: curMode, clean: !hadWrongPick });
+  // задача 56: верный ответ — ok (даже после ошибки); solvedOk===false — показали ответ после
+  // второй ошибки, там итог тоже bad (повтор в течение 10 минут отсекает StudentMemory)
+  if (isFreshSolve && window.StudentMemory) StudentMemory.recordAttempt(curTask, { ok: solvedOk !== false, mode: curMode });
   els.solBtnRow.style.display = 'none';
   els.mainPanel.style.display = 'block';
   els.explainBox.style.display = 'block';
@@ -1070,7 +1074,10 @@ function tsRenderStatements(taskChanged, wrongShown){
     // смотрим на «Следующий пример», а не на саму панель: в «Тренировке» она
     // уже может быть открыта кнопкой «Показать решение», а разбор после
     // ответа — другой
-    if (els.nextBtn.style.display === 'none') finishTask();
+    // задача 56: итог берём из отметок снимка — finishTask() без него записал бы
+    // «верно» и при неверном выборе (у follower StudentMemory всё равно молчит)
+    const pickOk = pickedSet.size === correctSet.size && [...correctSet].every(i => pickedSet.has(i));
+    if (els.nextBtn.style.display === 'none') finishTask(undefined, pickOk);
     return;
   }
   els.checkBtn.style.display = 'block';
