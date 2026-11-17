@@ -15,13 +15,13 @@
   --st-ok-c:#1E7A3C;  --st-ok-b:rgba(52,170,90,.17);
   --st-no-c:#B3261E;  --st-no-b:rgba(229,80,70,.13);
   --st-mv-c:#1F5FBF;  --st-mv-b:rgba(60,120,220,.15);
-  --pl-plan:rgba(255,255,255,.55);   --pl-plan-b:rgba(255,255,255,.95);
+  --pl-plan:#F3F6FF;   --pl-plan-b:rgba(40,70,140,.38);   /* «не проведено»: холодная белая с чёткой рамкой, чтобы не сливалась с фоном */
   --pl-done:rgba(220,244,228,.68);   --pl-done-b:rgba(52,150,90,.3);
   --pl-skip:rgba(232,232,236,.72);   --pl-skip-b:rgba(0,0,0,.08);
   --pl-move:rgba(222,234,255,.72);   --pl-move-b:rgba(60,120,220,.3);
   --pl-open:rgba(255,255,255,.97);
   --pl-hi:rgba(255,255,255,.8);
-  --pl-sh:0 1px 4px rgba(20,30,60,.07);
+  --pl-sh:0 1px 3px rgba(20,30,60,.16);
   --frame:rgba(255,159,10,.07);      --frame-b:rgba(230,150,40,.2);
   --grab:rgba(0,76,153,.5);
   --chip:rgba(0,40,100,.06);
@@ -252,7 +252,21 @@ button.rw-ic:hover{filter:brightness(1.08);border-color:var(--ink);}
 .sc-pini .st-move{box-shadow:inset 0 0 0 1.5px var(--st-mv-c);}
 .sc-picons{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px;}
 .sc-ev{font-style:italic;color:var(--muted-3);}
-.sc-rz{position:absolute;left:0;right:0;bottom:0;height:8px;cursor:ns-resize;}
+.sc-rz,.sc-rzt{position:absolute;left:0;right:0;height:10px;cursor:ns-resize;z-index:2;}
+.sc-rz{bottom:0;} .sc-rzt{top:0;}
+/* «ручка»: короткая полоска по центру края, видна при наведении (на телефоне — всегда слегка) */
+.sc-rz::after,.sc-rzt::after{content:"";position:absolute;left:50%;width:26px;height:3px;margin-left:-13px;border-radius:2px;background:var(--ink);opacity:0;transition:opacity .15s;}
+.sc-rz::after{bottom:2px;} .sc-rzt::after{top:2px;}
+.sc-plate:hover .sc-rz::after,.sc-plate:hover .sc-rzt::after{opacity:.28;}
+.sc-rz:hover::after,.sc-rzt:hover::after{opacity:.6 !important;}
+.sc-plate.short .sc-rz,.sc-plate.short .sc-rzt{height:6px;}
+.sc-plate.short .sc-rz::after,.sc-plate.short .sc-rzt::after{display:none;}
+.sc-grid .sc-rz,.sc-grid .sc-rzt,.sc-grid.rs .sc-rz,.sc-grid.rs .sc-rzt,.sc-grid.cs .sc-rz,.sc-grid.cs .sc-rzt{cursor:ns-resize !important;}
+@media (pointer:coarse){
+  .sc-rz,.sc-rzt{height:16px;}
+  .sc-plate.short .sc-rz,.sc-plate.short .sc-rzt{height:8px;}
+  .sc-rz::after,.sc-rzt::after{opacity:.22;}
+}
 .sc-ghint{margin:8px 4px 0;}
 
 /* карточка ученика по щелчку на имя */
@@ -519,3 +533,11 @@ button.rw-ic:hover{filter:brightness(1.08);border-color:var(--ink);}
 @media (prefers-reduced-motion:reduce){.sc-step.run i{animation:none;}}
 .sc-sp-pick-boards{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}
 .sc-sp-pick-boards .label{flex-basis:100%;}
+
+/* подсказка у края при растягивании/переносе плашки */
+.sc-dtip{position:absolute;right:6px;z-index:60;pointer-events:none;padding:3px 9px;border-radius:9px;font:600 12.5px/18px var(--font-ui);
+  font-variant-numeric:tabular-nums;white-space:nowrap;color:#fff;background:rgba(20,30,60,.88);box-shadow:0 4px 12px rgba(10,20,50,.25);}
+[data-theme="dark"] .sc-dtip{background:rgba(235,240,255,.94);color:#14203c;}
+/* образцы цветов схемы в меню «Вид» */
+.sc-palsw{display:inline-flex;gap:3px;margin-left:auto;}
+.sc-palsw i{width:16px;height:16px;border-radius:5px;border:1px solid rgba(0,0,0,.25);}

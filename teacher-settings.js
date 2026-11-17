@@ -25,6 +25,7 @@
                    занятий; remindDays — за сколько дней до конца срока;
                    flags [{id, name, free}] — свои флаги преподавателя;
                    monthMode 'x4'|'tpl' — как считать «в месяц» (В4б) }
+     planner     — вид планера { end, grp, span, pal } (schedule.js); null — ещё не задан
      incomeGroups — группы дохода (В4б, фильтр статистики):
                    [{id, name, members [student_id], from, to, auto}];
                    auto — в группу сами попадают все ученики, кроме out
@@ -41,7 +42,7 @@
 
   // чужие и испорченные значения отбрасываем: настройку правят руками в базе
   function normalize(raw){
-    const o = Object.assign({}, DEFAULTS, { pay: normalizePay(null), incomeGroups: [], studentCats: [] });
+    const o = Object.assign({}, DEFAULTS, { pay: normalizePay(null), incomeGroups: [], studentCats: [], planner: null });
     if (!raw || typeof raw !== 'object') return o;
     if (raw.sessionBind === 'tab' || raw.sessionBind === 'browser') o.sessionBind = raw.sessionBind;
     if (typeof raw.sessionGoHome === 'boolean') o.sessionGoHome = raw.sessionGoHome;
@@ -62,6 +63,7 @@
     o.pay = normalizePay(raw.pay);
     o.incomeGroups = normalizeGroups(raw.incomeGroups);
     o.studentCats = normalizeCats(raw.studentCats);
+    o.planner = normalizePlanner(raw.planner);
     return o;
   }
   // флаги правят руками на странице — id латиницей, имя до 30 знаков, не больше 20
@@ -116,6 +118,17 @@
         members: Array.isArray(c.members) ? Array.from(new Set(c.members.map(String).filter(x => x && x.length <= 64))).slice(0, 500) : [] });
     });
     return out;
+  }
+  // вид планера (schedule.js): время занятия, пары/группы, показ в «Строках», схема цветов.
+  // null — на аккаунте вида ещё нет (тогда берётся копия устройства и уходит на аккаунт)
+  function normalizePlanner(raw){
+    if (!raw || typeof raw !== 'object') return null;
+    return {
+      end: !!raw.end,
+      grp: ['names', 'ini', 'cnt', 'col'].indexOf(raw.grp) >= 0 ? raw.grp : 'names',
+      span: raw.span === 'week' ? 'week' : 'month',
+      pal: typeof raw.pal === 'string' && /^[a-z]{1,16}$/.test(raw.pal) ? raw.pal : 'contrast',
+    };
   }
   function readLocal(){
     try { return normalize(JSON.parse(localStorage.getItem(LS_KEY) || 'null')); } catch (e) { return normalize(null); }

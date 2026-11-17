@@ -1000,7 +1000,7 @@
       patch: (l, patch) => patchLesson(l, patch),
       dayPatch: key => ({ day: key }),
       pick: l => { st.pick = l.id; },
-      hint: 'Щёлкните по свободному месту — новое занятие. Плашку можно перетащить и растянуть за нижний край; высоту часа и ширину дня — потянуть за линию часа и край дня.',
+      hint: 'Щёлкните по свободному месту — новое занятие. Плашку можно перетащить и растянуть за нижний или верхний край (шаг 15 минут); высоту часа и ширину дня — потянуть за линию часа и край дня.',
     };
   }
   let gs = null;                           // источник сетки, которую рисуем сейчас
@@ -1033,6 +1033,8 @@
     return [Math.max(0, a), Math.min(1440, b)];
   }
   const initials = n => String(n || '?').split(/\s+/).filter(Boolean).map(w => w[0]).join('').slice(0, 2).toUpperCase();
+  // «1 ч 15 мин», «45 мин»
+  function durText(m){ const h = Math.floor(m / 60), r = m % 60; return h ? h + ' ч' + (r ? ' ' + r + ' мин' : '') : r + ' мин'; }
   function gTime(l){ return hm(l.start_min) + (look.end ? '–' + hm(Math.min(1440, l.start_min + l.dur_min)) : ''); }
   function nameSpan(l, p){
     const gone = G().statuses && (p.status === 'skip' || p.status === 'move');
@@ -1068,14 +1070,14 @@
       const need = 38 + l.people.length * 24;
       pos = (top + need > H ? 'bottom:' + Math.max(2, H - top - hgt) + 'px' : 'top:' + top + 'px') + ';min-height:' + hgt + 'px;left:4px;right:4px';
     } else pos = 'top:' + top + 'px;height:' + hgt + 'px;' + (geo.lone ? 'left:4px;right:4px' : 'left:' + (4 + (geo.half ? SH : 0)) + 'px;width:calc(100% - ' + (8 + SH) + 'px)');
-    return '<div class="sc-plate st-' + agg + (open ? ' open' : '') + (l.is_event ? ' ev' : '') + (hl ? ' hl' : '') + (picked ? ' picked' : '') + '" data-id="' + esc(l.id) + '" style="' + pos + ';z-index:' + (open ? 30 : 1 + geo.z) + '" ' +
+    return '<div class="sc-plate st-' + agg + (open ? ' open' : '') + (l.is_event ? ' ev' : '') + (hgt < 34 ? ' short' : '') + (hl ? ' hl' : '') + (picked ? ' picked' : '') + '" data-id="' + esc(l.id) + '" style="' + pos + ';z-index:' + (open ? 30 : 1 + geo.z) + '" ' +
         'role="button" tabindex="0" aria-label="' + esc(timeText(l) + ', ' + (l.is_event ? l.title : l.people.map(personName).join(', '))) + '">' +
         '<div class="sc-ph">' + (l.is_event || !l.people.length ? '' : ic(agg, 'data-rst title="' + esc(multi ? 'Статус всем' : 'Статус') + ' — нажмите, чтобы сменить"')) +
           '<span class="sc-pt">' + esc(gTime(l)) + '</span>' +
           (multi && look.grp === 'cnt' && !open ? '<span class="sc-pc">' + (G().statuses ? came + ' из ' + l.people.length : l.people.length + ' уч.') + '</span>' : '') +
           (multi ? '<button type="button" class="sc-pexp" data-exp aria-label="' + (open ? 'Свернуть' : 'Показать всех') + '" aria-expanded="' + open + '">' + (open ? '⌃' : '⌄') + '</button>' : '') +
         '</div>' + plateBody(l, hgt, open) +
-        (open ? '' : '<div class="sc-rz" title="Потяните, чтобы изменить длительность" aria-hidden="true"></div>') +
+        (open ? '' : '<div class="sc-rzt" title="Потяните вверх или вниз — изменится начало" aria-hidden="true"></div><div class="sc-rz" title="Потяните, чтобы изменить длительность" aria-hidden="true"></div>') +
       '</div>';
   }
   // раскладка дня: одиночное — во всю ширину; в наложении — одна ширина,
@@ -1170,7 +1172,7 @@
       const hv = col.querySelector('.sc-hv');
       col.addEventListener('pointermove', e => {
         if (e.buttons) return;
-        const hit = edgeAt(col, e);
+        const hit = e.target.closest('.sc-rz, .sc-rzt') ? null : edgeAt(col, e);
         showEdge(hit);
         if (hit || e.target.closest('.sc-plate')) { hv.style.display = 'none'; return; }
         // свободное место: мягко подсветить получас под курсором
@@ -1186,7 +1188,8 @@
       col.addEventListener('pointerleave', () => { hv.style.display = 'none'; if (!document.querySelector('.sc-grid.rs:active, .sc-grid.cs:active')) showEdge(null); });
       col.addEventListener('pointerdown', e => {
         if (e.button !== 0) return;
-        const hit = edgeAt(col, e);
+        // ручка растяжения плашки важнее линии часа: плашки чаще всего кончаются ровно на часе
+        const hit = e.target.closest('.sc-rz, .sc-rzt') ? null : edgeAt(col, e);
         if (hit && !e.target.closest('button, .sc-n, [data-p]')) { startEdgeDrag(e, hit, col); return; }
         const plate = e.target.closest('.sc-plate');
         const r0 = col.getBoundingClientRect();
@@ -1208,23 +1211,41 @@
         const l = S.find(plate.dataset.id);
         if (!l) return;
         e.preventDefault();
-        const resize = !!e.target.closest('.sc-rz');
+        const resize = e.target.closest('.sc-rz') ? 'b' : e.target.closest('.sc-rzt') ? 't' : '';
         const rects = cols.map(c => c.getBoundingClientRect());
         const ci = cols.indexOf(col);
         const x0 = e.clientX, y0 = e.clientY;
-        let moved = false, dMin = 0, dCol = 0, newDur = l.dur_min;
+        let moved = false, dMin = 0, dCol = 0, newDur = l.dur_min, newStart = l.start_min;
+        const end0 = l.start_min + l.dur_min, top0 = parseFloat(plate.style.top) || 0;
         try { plate.setPointerCapture(e.pointerId); } catch (er) {}
         const label = plate.querySelector('.sc-pt');
         const P = pxm();
+        let tip = null;
+        const showTip = (text, yPx, dxPx) => {
+          if (!tip) { tip = document.createElement('div'); tip.className = 'sc-dtip'; col.appendChild(tip); }
+          tip.textContent = text;
+          tip.style.top = Math.max(0, yPx) + 'px';
+          tip.style.transform = 'translateX(' + (dxPx || 0) + 'px)';
+        };
+
         const move = ev => {
           const dy = ev.clientY - y0, dx = ev.clientX - x0;
           if (!moved && Math.abs(dy) < 4 && Math.abs(dx) < 4) return;
           moved = true;
           plate.classList.add('drag');
-          if (resize) {
+          if (resize === 'b') {
             newDur = Math.max(STEP, Math.min(1440 - l.start_min, l.dur_min + snap(dy / P)));
             plate.style.height = newDur * P - 4 + 'px';
             label.textContent = hm(l.start_min) + '–' + hm(l.start_min + newDur);
+            showTip(durText(newDur), top0 + newDur * P - 2);
+          } else if (resize === 't') {
+            // верхний край: конец стоит, начало едет шагами по 15 минут
+            newStart = Math.max(0, Math.min(end0 - STEP, l.start_min + snap(dy / P)));
+            newDur = end0 - newStart;
+            plate.style.top = top0 + (newStart - l.start_min) * P + 'px';
+            plate.style.height = newDur * P - 4 + 'px';
+            label.textContent = hm(newStart) + '–' + hm(end0);
+            showTip(durText(newDur), top0 + (newStart - l.start_min) * P - 26);
           } else {
             dMin = Math.max(-l.start_min, Math.min(1440 - l.dur_min - l.start_min, snap(dy / P)));
             let k = rects.findIndex(r => ev.clientX >= r.left && ev.clientX < r.right);
@@ -1232,9 +1253,11 @@
             dCol = k - ci;
             plate.style.transform = 'translate(' + (rects[k].left - rects[ci].left) + 'px,' + dMin * P + 'px)';
             label.textContent = hm(l.start_min + dMin) + '–' + hm(l.start_min + dMin + l.dur_min);
+            showTip(hm(l.start_min + dMin), top0 + dMin * P - 26, rects[k].left - rects[ci].left);
           }
         };
         const up = () => {
+          if (tip) tip.remove();
           plate.removeEventListener('pointermove', move);
           plate.removeEventListener('pointerup', up);
           plate.removeEventListener('pointercancel', up);
@@ -1246,7 +1269,11 @@
             if (p && S.person) S.person(l, p, n); else S.open(l);
             return;
           }
-          if (resize) { if (newDur !== l.dur_min) S.patch(l, { dur_min: newDur }); else render(); return; }
+          if (resize) {
+            if (newDur === l.dur_min && newStart === l.start_min) render();
+            else S.patch(l, resize === 't' ? { start_min: newStart, dur_min: newDur } : { dur_min: newDur });
+            return;
+          }
           const patch = {};
           if (dMin) patch.start_min = l.start_min + dMin;
           if (dCol) Object.assign(patch, S.dayPatch(cols[ci + dCol].dataset.day));
@@ -1376,9 +1403,61 @@
   const LOOK_KEY = 'cabinet:schedule:look';
   // hh: null — высота часа подбирается сама (autoHH), число — своя, потянутая
   // учителем, и она запоминается на этом устройстве
-  const look = { end: false, grp: 'names', hh: null, cw: null, span: 'month' };
+  const look = { end: false, grp: 'names', hh: null, cw: null, span: 'month', pal: 'contrast' };
   try { Object.assign(look, JSON.parse(localStorage.getItem(LOOK_KEY) || '{}')); } catch (e) {}
-  function saveLook(){ try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (e) {} }
+  // Вид живёт на аккаунте (TeacherSettings.planner: время, пары/группы, показ в «Строках», цвета),
+  // чтобы на телефоне и ноутбуке было одинаково. Масштаб (hh, cw) — по экрану, он остаётся на устройстве.
+  const ACC_KEYS = ['end', 'grp', 'span', 'pal'];
+  const accLook = () => { const o = {}; ACC_KEYS.forEach(k => { o[k] = look[k]; }); return o; };
+  const isDefaultLook = () => !look.end && look.grp === 'names' && look.span === 'month' && look.pal === 'contrast';
+  function saveLook(){
+    try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (e) {}
+    const TS = window.TeacherSettings;
+    if (!TS) return;
+    const cur = TS.get().planner;
+    if (cur && ACC_KEYS.every(k => cur[k] === look[k])) return;
+    Promise.resolve(TS.set({ planner: accLook() })).catch(() => {});   // нет сети — вид остаётся в копии устройства
+  }
+  // вид с аккаунта пришёл (вход, загрузка, правка на другом устройстве)
+  function pullLook(){
+    const TS = window.TeacherSettings, p = TS && TS.get().planner;
+    if (!p) { if (TS && !isDefaultLook()) saveLook(); return; }
+    if (ACC_KEYS.every(k => p[k] === look[k])) return;
+    const spanChanged = p.span !== look.span;
+    ACC_KEYS.forEach(k => { look[k] = p[k]; });
+    try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (e) {}
+    applyPal();
+    if (!(spanChanged && applyWin())) render();
+  }
+  /* Цвета плашек по статусам: схема в look.pal. «contrast» — по умолчанию (значения в schedule.css),
+     остальные переопределяют переменные --pl-* через <style id="scPal"> для светлой и тёмной темы. */
+  const PALS = {
+    contrast: { name: 'Контрастная', sw: ['#F3F6FF', '#DCF4E4', '#E8E8EC', '#DEEAFF'] },
+    soft: { name: 'Мягкая', sw: ['#FFFFFF', '#DCF4E4', '#E8E8EC', '#DEEAFF'],
+      l: '--pl-plan:rgba(255,255,255,.55);--pl-plan-b:rgba(255,255,255,.95);--pl-sh:0 1px 4px rgba(20,30,60,.07);' },
+    vivid: { name: 'Яркая', sw: ['#D9E6FF', '#BDEBCB', '#D6D6DC', '#C9DBFF'],
+      l: '--pl-plan:#D9E6FF;--pl-plan-b:rgba(40,90,200,.55);--pl-done:#BDEBCB;--pl-done-b:rgba(30,140,70,.6);--pl-skip:#D6D6DC;--pl-skip-b:rgba(0,0,0,.28);--pl-move:#E4D6FF;--pl-move-b:rgba(110,70,210,.55);',
+      d: '--pl-plan:rgba(70,110,230,.5);--pl-plan-b:rgba(150,185,255,.7);--pl-done:rgba(40,160,90,.5);--pl-done-b:rgba(110,220,150,.7);--pl-skip:rgba(130,130,140,.45);--pl-skip-b:rgba(255,255,255,.3);--pl-move:rgba(130,90,230,.5);--pl-move-b:rgba(190,160,255,.7);' },
+    warm: { name: 'Тёплая', sw: ['#FFF3DC', '#DDF2D2', '#ECE6DE', '#E6E4FF'],
+      l: '--pl-plan:#FFF3DC;--pl-plan-b:rgba(200,130,20,.5);--pl-done:#DDF2D2;--pl-done-b:rgba(70,140,40,.4);--pl-skip:#ECE6DE;--pl-skip-b:rgba(90,70,40,.22);--pl-move:#E6E4FF;--pl-move-b:rgba(90,80,200,.4);',
+      d: '--pl-plan:rgba(210,150,50,.32);--pl-plan-b:rgba(255,200,110,.5);' },
+    mono: { name: 'Графит', sw: ['#FFFFFF', '#E3E3E3', '#CFCFCF', '#F1F1F1'],
+      l: '--pl-plan:#FFFFFF;--pl-plan-b:rgba(0,0,0,.5);--pl-done:#E6E6E6;--pl-done-b:rgba(0,0,0,.45);--pl-skip:#D4D4D4;--pl-skip-b:rgba(0,0,0,.3);--pl-move:#F2F2F2;--pl-move-b:rgba(0,0,0,.4);',
+      d: '--pl-plan:rgba(255,255,255,.14);--pl-plan-b:rgba(255,255,255,.55);--pl-done:rgba(255,255,255,.24);--pl-done-b:rgba(255,255,255,.55);--pl-skip:rgba(255,255,255,.07);--pl-skip-b:rgba(255,255,255,.25);--pl-move:rgba(255,255,255,.18);--pl-move-b:rgba(255,255,255,.4);' },
+  };
+  function applyPal(){
+    let el = document.getElementById('scPal');
+    const pal = PALS[look.pal] || PALS.contrast;
+    if (!pal.l && !pal.d) { if (el) el.remove(); return; }
+    if (!el) { el = document.createElement('style'); el.id = 'scPal'; document.head.appendChild(el); }
+    el.textContent = (pal.l ? ':root{' + pal.l + '}' : '') + (pal.d ? '[data-theme="dark"]{' + pal.d + '}' : '');
+  }
+  applyPal();
+  if (window.TeacherSettings) window.TeacherSettings.onChange(() => { if (host && host.isConnected) pullLook(); });
+  { // вид аккаунта уже в копии настроек — берём его до первой отрисовки
+    const p0 = window.TeacherSettings && window.TeacherSettings.get().planner;
+    if (p0) { ACC_KEYS.forEach(k => { look[k] = p0[k]; }); applyPal(); }
+  }
   function lookPreview(end, grp){
     const ps = [['Маша', 'done'], ['Петя', 'done'], ['Аня', 'plan']];
     const body = grp === 'ini' ? '<div class="sc-pini">' + ps.map(p => '<span class="st-' + p[1] + '">' + p[0][0] + '</span>').join('') + '</div>'
@@ -1403,8 +1482,12 @@
       it('Инициалы', look.grp === 'ini', lookPreview(false, 'ini'), () => { look.grp = 'ini'; }),
       it('Число', look.grp === 'cnt', lookPreview(false, 'cnt'), () => { look.grp = 'cnt'; }),
       it('Столбиком', look.grp === 'col', lookPreview(false, 'col'), () => { look.grp = 'col'; }),
+      { head: 'Цвета плашек' },
+      ...Object.keys(PALS).map(k => it(PALS[k].name, (look.pal || 'contrast') === k,
+        '<span class="sc-palsw">' + PALS[k].sw.map(c => '<i style="background:' + c + '"></i>').join('') + '</span>', () => { look.pal = k; applyPal(); })),
       { sep: true },
       { label: 'Масштаб по умолчанию', hint: 'все плашки без наезда имён', act: () => { look.hh = null; look.cw = null; saveLook(); render(); } },
+      { label: 'Сбросить вид', hint: 'время, показ, цвета и масштаб', act: () => { Object.assign(look, { end: false, grp: 'names', hh: null, cw: null, span: 'month', pal: 'contrast' }); applyPal(); applyWin(); saveLook(); render(); } },
     ];
   }
 
