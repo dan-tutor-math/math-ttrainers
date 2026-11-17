@@ -103,9 +103,10 @@
    нужна настоящая вёрстка, чтобы найти узел задания */
 .titem.parked{position:fixed!important;left:-300vw!important;top:0!important;visibility:hidden!important;pointer-events:none!important;}
 .vseg.zoom button{min-width:38px;}
-.tc-resize{position:absolute;right:-9px;bottom:-9px;width:22px;height:22px;border-radius:7px;background:var(--glass-strong);border:1px solid var(--glass-border);
-  box-shadow:0 1px 5px rgba(0,0,0,.2);cursor:nwse-resize;z-index:4;touch-action:none;display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-size:11px;}
-.tc-resize::before{content:'⤡';}
+.tc-resize{position:absolute;top:0;bottom:0;width:12px;cursor:ew-resize;touch-action:none;z-index:4;display:flex;align-items:center;justify-content:center;}
+.tc-resize.left{left:0;} .tc-resize.right{right:0;}
+.tc-resize::before{content:'';width:4px;height:44px;max-height:60%;border-radius:3px;background:var(--muted-2);opacity:.25;transition:opacity .15s;}
+.tc-resize:hover::before,.tc-resize.dragging::before{opacity:.75;}
 .tc-in{position:absolute;box-sizing:border-box;margin:0;padding:0 .35em;border:2px solid rgba(0,0,0,.2);background:#fff;color:#1c1c1e;
   text-align:center;outline:none;font-weight:600;font-family:inherit;line-height:1;min-width:0;}
 .tc-in:focus{border-color:var(--ink);}
@@ -868,11 +869,8 @@ function renderCard(v){
       v.check = cb; v.checkText = cb.textContent;
     }
   } else buildBelow(v);
-  const rz = el('div', 'tc-resize');
-  rz.title = 'Потяните, чтобы сузить или растянуть задание; двойной щелчок — во всю ширину';
-  wireResize(rz, v);
   wrap.appendChild(box);
-  wrap.appendChild(rz);
+  addResizeHandles(v, wrap);
   v.box = box; v.W = W; v.H = H;
 }
 // запасной путь: ответ под заданием обычной формой (мест под поля на
@@ -959,20 +957,32 @@ function fitView(v){
 }
 function fitAll(){ VIEWS.forEach(fitView); }
 window.addEventListener('resize', fitAll);
-function wireResize(rz, v){
+// ширина задания — за боковые края, как у рабочей зоны в тренажёрах:
+// тянем левый или правый край, карточка расходится от середины в обе стороны
+function addResizeHandles(v, wrap){
+  ['left', 'right'].forEach(side => {
+    const rz = el('div', 'tc-resize ' + side);
+    rz.title = 'Потяните за край, чтобы сузить или расширить задание; двойной щелчок — во всю ширину';
+    wireResize(rz, v, side);
+    wrap.appendChild(rz);
+  });
+}
+function wireResize(rz, v, side){
   let st = null;
   rz.addEventListener('pointerdown', e => {
     e.preventDefault(); e.stopPropagation();
     rz.setPointerCapture(e.pointerId);
+    rz.classList.add('dragging');
     st = { x: e.clientX, w: v.W * (v.k || 1), avail: availOf(v) };
   });
   rz.addEventListener('pointermove', e => {
     if (!st) return;
-    const w = Math.max(160, st.w + (e.clientX - st.x));
+    const dx = side === 'right' ? e.clientX - st.x : st.x - e.clientX;
+    const w = Math.max(160, st.w + dx * 2);
     S.fill = clampFill(w / st.avail);
     fitAll();
   });
-  const end = () => { if (!st) return; st = null; lsSet(LS.fill, S.fill); };
+  const end = () => { if (!st) return; st = null; rz.classList.remove('dragging'); lsSet(LS.fill, S.fill); };
   rz.addEventListener('pointerup', end);
   rz.addEventListener('pointercancel', end);
   rz.addEventListener('dblclick', () => { S.fill = 1; lsSet(LS.fill, 1); fitAll(); });
@@ -1000,7 +1010,7 @@ function wireResize(rz, v){
    ушедшее далеко задание снова становится картинкой, набранное — в черновике. */
 const LIVE_W = 440;        // ширина кадра при масштабе 1 — как у снимка (CAP_W в works.html)
 const LIVE_MIN = 300;      // уже тренажёры не рассчитаны
-const LIVE_MAX = 4;
+const LIVE_MAX = (window.matchMedia && matchMedia('(pointer:coarse)').matches) ? 4 : 8;   // телефон — меньше: кадр = целая страница тренажёра
 const LIVE_MARGIN = '700px 0px';
 const ZOOM_MIN = 0.6, ZOOM_MAX = LIVE_W / LIVE_MIN;
 // work:noLive = '1' — показывать и новые задания картинками: тесты пути
@@ -1022,8 +1032,10 @@ const liveIO = 'IntersectionObserver' in window ? new IntersectionObserver(entri
     // экране», но его кадр нужен — к нему вернутся или оно следующее
     if (!v || !v.live || S.view !== 'list') return;
     v.live.inView = en.isIntersecting;
+    // ушедшее с экрана задание кадр НЕ теряет: иначе при листании кадры
+    // сбрасываются в картинки и грузятся заново, а страница прыгает.
+    // Отдаём кадр только когда нужен новый сверх LIVE_MAX (см. liveLoad)
     if (en.isIntersecting) liveLoad(v);
-    else if (v.live.state !== 'idle' && v.live.state !== 'failed') liveDrop(v);
   });
 }, { rootMargin: LIVE_MARGIN }) : null;
 function liveWatch(v){
@@ -1043,7 +1055,8 @@ function liveLoad(v){
   const busy = allViews().filter(x => x !== v && x.live && (x.live.state === 'loading' || x.live.state === 'ready'));
   if (busy.length >= LIVE_MAX){
     // «По одному» — отдаём кадры самых далёких от текущего заданий
-    const free = S.view === 'list' ? busy.filter(x => !x.live.inView)
+    const dist = x => { const r = x.root.getBoundingClientRect(); return Math.abs((r.top + r.bottom) / 2 - innerHeight / 2); };
+    const free = S.view === 'list' ? busy.filter(x => !x.live.inView).sort((a, b) => dist(b) - dist(a))
       : busy.filter(x => x.i !== S.cur && x.i !== S.cur + 1).sort((a, b) => Math.abs(b.i - S.cur) - Math.abs(a.i - S.cur));
     free.slice(0, busy.length - LIVE_MAX + 1).forEach(liveDrop);
   }
@@ -1064,7 +1077,13 @@ function liveDrop(v){
   const was = v.live.state;
   if (v.live.fr) v.live.fr.src = 'about:blank';
   v.live = { state: was === 'failed' ? 'failed' : 'idle', inView: v.live.inView };
-  if (v.root.isConnected){ renderCard(v); fitView(v); applyState(v); }
+  if (v.root.isConnected){
+    // карточка выше экрана сменила высоту — страницу сдвигаем на столько же,
+    // чтобы то, что читает ученик, не уезжало
+    const r0 = v.root.getBoundingClientRect(), above = r0.bottom <= 0;
+    renderCard(v); fitView(v); applyState(v);
+    if (above){ const d = v.root.getBoundingClientRect().height - r0.height; if (d) window.scrollBy(0, d); }
+  }
 }
 async function liveBoot(v, my){
   const b = v.b;
@@ -1094,11 +1113,7 @@ async function liveBoot(v, my){
     if (v.box && v.box !== my.lbox) v.box.remove();
     v.box = my.lbox; v.wait = false;
     my.lbox.classList.remove('loading');
-    if (!v.wrap.querySelector('.tc-resize')){
-      const rz = el('div', 'tc-resize');
-      rz.title = 'Потяните, чтобы сузить или растянуть задание; двойной щелчок — во всю ширину';
-      wireResize(rz, v); v.wrap.appendChild(rz);
-    }
+    if (!v.wrap.querySelector('.tc-resize')) addResizeHandles(v, v.wrap);
     v.below.innerHTML = ''; v.below.hidden = true;
     v.inputs = []; v.opts = []; v.check = null; v.belowMode = false;
     liveMap(v, w, keep);

@@ -19,7 +19,7 @@
      верный — «Верно!», в базе; выбор варианта ОГЭ №7 — сразу ответ;
      утверждения ОГЭ №19; ЕГЭ база №8 — поле по data-fid; «Проценты»;
      столбик — картинка с полем, как раньше;
-  D. «Списком»: живых кадров не больше LIVE_MAX, у первого — кадр;
+  D. «Списком»: живых кадров не больше LIVE_MAX (8; на телефоне 4), у первого — кадр;
   E. запасной путь: задание без live — картинка; ответ в работе не совпал с
      заданием в тренажёре — картинка, кадра нет;
   F. нет ошибок JavaScript.
@@ -217,7 +217,13 @@ def run():
         sp.wait_for_timeout(3500)
         n_live = sp.evaluate("() => window.__work.views.filter(v => v.live && (v.live.state === 'ready' || v.live.state === 'loading')).length")
         first = sp.evaluate("() => !!(window.__work.views[0].live && window.__work.views[0].live.state === 'ready')")
-        check("D1 живых кадров не больше 4, у первого задания (наверху) — кадр", 1 <= n_live <= 4 and first, f"{n_live} {first}")
+        check("D1 живых кадров не больше 8, у первого задания (наверху) — кадр", 1 <= n_live <= 8 and first, f"{n_live} {first}")
+        # листание не пересоздаёт кадры: тот же iframe после прокрутки вниз и обратно
+        sp.evaluate("() => { window.__fr0 = document.querySelector('.titem .live-box iframe'); }")
+        sp.evaluate("() => window.scrollTo(0, document.body.scrollHeight)"); sp.wait_for_timeout(1500)
+        sp.evaluate("() => window.scrollTo(0, 0)"); sp.wait_for_timeout(1500)
+        same = sp.evaluate("() => window.__fr0 && window.__fr0.isConnected && document.querySelector('.titem .live-box iframe') === window.__fr0 && window.__work.views[0].live.state === 'ready'")
+        check("D1a листание вниз и назад — первый кадр тот же, не загружен заново", same)
         check("D2 страница не шире экрана", overflow_x(sp) <= 0, str(overflow_x(sp)))
         sctx.close()
 

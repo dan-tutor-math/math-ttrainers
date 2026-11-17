@@ -68,7 +68,7 @@ def col_w(page):
 
 
 def drag_corner(page, dx):
-    rz = page.locator(".titem.cur .tc-resize").bounding_box()
+    rz = page.locator(".titem.cur .tc-resize.right").bounding_box()
     page.mouse.move(rz["x"] + rz["width"] / 2, rz["y"] + rz["height"] / 2); page.mouse.down()
     page.mouse.move(rz["x"] + rz["width"] / 2 + dx, rz["y"] + 10, steps=6); page.mouse.up()
     page.wait_for_timeout(100)
@@ -167,7 +167,7 @@ def run():
         # уголок
         drag_corner(sp, -260)
         w_small = wrap_w(sp)
-        check("C4 уголок сужает", w_small < w_nat - 200, f"{w_nat} → {w_small}")
+        check("C4 боковой край сужает", w_small < w_nat - 200, f"{w_nat} → {w_small}")
         sp.reload(); sp.wait_for_selector("#scrTask:not([hidden])")
         check("C6 размер помнится после перезагрузки", abs(wrap_w(sp) - w_small) < 2, f"{wrap_w(sp)} vs {w_small}")
         sp.set_viewport_size({"width": 700, "height": 900}); sp.wait_for_timeout(250)
@@ -178,7 +178,15 @@ def run():
         w_big = wrap_w(sp)
         check("C5 растягивается обратно до колонки, не шире", abs(w_big - w_full) < 1.5, f"{w_small} → {w_big}, колонка {w_full}")
         drag_corner(sp, -200)
-        sp.dblclick(".titem.cur .tc-resize")
+        # левый край — тоже, и от середины в обе стороны (как рабочая зона в тренажёрах)
+        w_b = wrap_w(sp)
+        lz = sp.locator(".titem.cur .tc-resize.left").bounding_box()
+        c0 = sp.evaluate("() => { const r = document.querySelector('.titem.cur .tc-wrap').getBoundingClientRect(); return (r.left + r.right) / 2; }")
+        sp.mouse.move(lz["x"] + 5, lz["y"] + 30); sp.mouse.down(); sp.mouse.move(lz["x"] + 55, lz["y"] + 30, steps=5); sp.mouse.up()
+        sp.wait_for_timeout(100)
+        c1 = sp.evaluate("() => { const r = document.querySelector('.titem.cur .tc-wrap').getBoundingClientRect(); return (r.left + r.right) / 2; }")
+        check("C7a левый край сужает на 2·dx (50→100), середина на месте", abs((w_b - wrap_w(sp)) - 100) < 4 and abs(c0 - c1) < 2, f"{w_b}→{wrap_w(sp)}, середина {c0}→{c1}")
+        sp.dblclick(".titem.cur .tc-resize.right")
         check("C7 двойной щелчок — снова во всю ширину", abs(wrap_w(sp) - w_full) < 1.5)
         # теория
         sp.click(".num[data-i='2']")
