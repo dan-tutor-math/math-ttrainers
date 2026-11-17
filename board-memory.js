@@ -11,6 +11,8 @@
      или собеседник на общей доске (boardsApplyTaskLive): ученик решает со
      своего устройства, а сессия идёт в браузере преподавателя;
    - подпись у текущего задания в панели тренажёров: было ли оно у ученика;
+   - метка над каждым заданием на доске: было ли оно у ученика, с «✕» —
+     забыть это задание у ученика (17.11, просьба Даниила);
    - кнопка «Начать сессию» на открытой своей доске: если доска привязана к
      ученику (students.boards в кабинете) — сразу с ним.
 
@@ -160,10 +162,100 @@
     labelEl.title = key;
   }
 
+  /* ── метка «уже было у ученика» у заданий на самой доске ──
+     Зовётся из syncTaskOverlays (boards-core.js) на каждый кадр для задания в
+     кадре; узел живёт в живом слое задания (.bd-task), поэтому едет и
+     масштабируется вместе с ним, режется верхними карточками и уходит, когда
+     задание вышло из кадра. В данные доски и в совместную сессию ничего не
+     пишется — только DOM у преподавателя.
+     Почему кеш по memVer: сводка читает копию журнала из localStorage, а кадров
+     в секунду десятки — пересчитываем, только когда журнал, ученик или
+     настройка подписей поменялись */
+  let memVer = 1;
+  // зовётся на каждый кадр для каждого задания — ответ держим до смены memVer
+  // и не дольше секунды (настройку могли поменять в этой же вкладке)
+  let onCache = null;
+  function marksOn(){
+    const now = Date.now();
+    if (onCache && onCache.v === memVer && now - onCache.t < 1000) return onCache.on;
+    const m = SM();
+    let on = false;
+    try { on = !!(m && !m.isFollower() && m.current() && labelsMode().labels !== 'off'); } catch (e) {}
+    onCache = { v: memVer, t: now, on };
+    return on;
+  }
+  const MARK_CSS = `
+.bd-mem{position:absolute;left:0;bottom:100%;margin-bottom:5px;pointer-events:auto;display:flex;align-items:center;gap:6px;
+  max-width:max(100%,220px);box-sizing:border-box;padding:3px 4px 3px 9px;border-radius:999px;background:var(--glass-strong,#fff);
+  color:var(--pencil,#222);box-shadow:0 1px 6px rgba(0,0,0,.22);font:600 12px/1.25 var(--font-ui,system-ui);white-space:nowrap;}
+.bd-mem::before{content:'';flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--muted-3,#8a8a8a);}
+.bd-mem[data-last="ok"]::before{background:var(--ok,#2e9e5b);}
+.bd-mem[data-last="bad"]::before{background:#d9822b;}
+.bd-mem-t{overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.bd-mem button{flex:0 0 auto;border:none;background:none;color:inherit;font:inherit;cursor:pointer;border-radius:999px;padding:1px 7px;opacity:.7;}
+.bd-mem button:hover{opacity:1;background:var(--hover-1,rgba(0,0,0,.08));}
+.bd-mem button.yes{opacity:1;background:var(--ink,#222);color:#fff;}`;
+  function markCss(){
+    if (document.getElementById('bdMemCss')) return;
+    const st = document.createElement('style');
+    st.id = 'bdMemCss';
+    st.textContent = MARK_CSS;
+    document.head.appendChild(st);
+  }
+  function markTask(root, obj){
+    if (!root) return;
+    let el = root.querySelector(':scope > .bd-mem');
+    const key = marksOn() ? keyOf(obj) : null;
+    const m = SM();
+    const cur = key && m ? m.current() : null;
+    const s = cur ? m.summary(key) : null;
+    if (!s || !s.total){ if (el) el.remove(); return; }
+    // пока открыт вопрос «забыть?», не перерисовываем
+    if (el && el.dataset.ask) return;
+    const sig = memVer + '|' + key + '|' + cur.id;
+    if (el && el.dataset.sig === sig) return;
+    markCss();
+    if (!el){
+      el = document.createElement('div');
+      el.className = 'bd-mem';
+      el.setAttribute('data-bd-mem', '1');
+      // клик по метке — не жест доски и не подъём карточки
+      el.addEventListener('pointerdown', e => e.stopPropagation());
+      root.appendChild(el);
+    }
+    el.dataset.sig = sig;
+    el.dataset.key = key;
+    const last = s.events.length ? s.events[s.events.length - 1].event : '';
+    el.dataset.last = last;
+    const name = cur.name || 'ученика';
+    el.title = 'Было у ' + name + ' (' + key + ')';
+    el.innerHTML = '<span class="bd-mem-t"></span><button type="button" data-mem-x="1" title="Убрать из памяти ученика">✕</button>';
+    el.firstChild.textContent = name + ': ' + labelText(s, name, labelsMode());
+    el.lastChild.onclick = e => { e.stopPropagation(); askForget(el, name); };
+  }
+  // «✕» — переспросить: удаление строк журнала с сервера не отменить
+  function askForget(el, name){
+    el.dataset.ask = '1';
+    el.innerHTML = '<span class="bd-mem-t"></span><button type="button" class="yes" data-mem-yes="1">Забыть</button><button type="button" data-mem-no="1">Нет</button>';
+    el.firstChild.textContent = 'Забыть это задание у ' + name + '?';
+    const done = () => { delete el.dataset.ask; el.dataset.sig = ''; redraw(); };
+    el.querySelector('[data-mem-no]').onclick = e => { e.stopPropagation(); done(); };
+    const yes = el.querySelector('[data-mem-yes]');
+    yes.onclick = async e => {
+      e.stopPropagation();
+      yes.disabled = true;
+      try { await SM().forget([el.dataset.key]); done(); }
+      catch (err) { yes.disabled = false; yes.textContent = 'Не вышло — ещё раз'; }
+    };
+  }
+  function redraw(){ try { if (typeof scheduleRedraw === 'function') scheduleRedraw(); } catch (e) {} }
+
   function boot(){
     const m = SM();
     if (m && m.setPickerContext) m.setPickerContext(pickerContext);
-    if (m && m.onChange) m.onChange(() => { labelSig = ''; renderLabel(); });
+    if (m && m.onChange) m.onChange(() => { labelSig = ''; renderLabel(); memVer++; redraw(); });
+    // настройку подписей меняют в кабинете (другая вкладка) — перерисовать метки
+    window.addEventListener('storage', e => { if (e.key === 'teacher:settings:v1') { memVer++; redraw(); } });
     // задание в кадре меняется без событий (⟳, стрелки, список ФИПИ) —
     // сверяемся раз в секунду, и только пока панель с тренажёром открыта
     setInterval(() => {
@@ -174,5 +266,5 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 
-  window.BoardMemory = { keyOf, taskAdded, taskChecked, pickerContext, frameTaskKey, renderLabel };
+  window.BoardMemory = { keyOf, taskAdded, taskChecked, pickerContext, frameTaskKey, renderLabel, marksOn, markTask };
 })();

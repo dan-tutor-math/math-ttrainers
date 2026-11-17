@@ -9358,7 +9358,9 @@ function syncTaskOverlays(){
       // — у любого задания с тренажёра, даже если ответ доске не известен
       const live = !!(o.task && o.task.hot);
       const hasSol = !!(o.sol && o.sol.hot);
-      if (!live && !o.gen && !hasSol) continue;
+      // метка «уже было у ученика» (board-memory.js) — и у задания без полей и «ещё такое же»
+      const mem = !!(o.tkey && window.BoardMemory && window.BoardMemory.marksOn());
+      if (!live && !o.gen && !hasSol && !mem) continue;
       const x = o.points[0].x, y = o.points[0].y;
       if (x + o.w < vx0 || x > vx1 || y + o.h < vy0 || y > vy1) continue;
       // №117: задание за рамкой слайда обрезано на холсте — поля без него не нужны
@@ -9414,6 +9416,7 @@ function syncTaskOverlays(){
       root.style.width = sw + 'px'; root.style.height = sh + 'px';
       if (o.gen) root.classList.toggle('more-in', taskMoreBlocked(o));
       if (hasSol) syncSolutionToggle(rec, o, sw, sh);
+      if (window.BoardMemory) window.BoardMemory.markTask(rec.root, o);
       // шрифт и скругления — в масштабе картинки: сколько экранных пикселей
       // приходится на один CSS-пиксель тренажёра
       if (!live) continue;
