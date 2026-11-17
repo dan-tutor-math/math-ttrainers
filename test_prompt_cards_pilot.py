@@ -133,15 +133,20 @@ def main():
     check("9 README описывает интерфейс плагина", all(w in readme for w in ("collect(page, slug", "normalize(raw)", "Skip", "families/")))
     # 2. свежая сборка = лежащая
     with tempfile.TemporaryDirectory() as tmp:
-        r = subprocess.run([sys.executable, os.path.join(HERE, "tools", "cards", "build.py"), "--limit", "10", "--out", tmp],
+        # только страницы пилота: у других семей файлы собраны целиком, не --limit 10
+        slugs = [a for s in PILOT for a in ("--slug", s)]
+        r = subprocess.run([sys.executable, os.path.join(HERE, "tools", "cards", "build.py"), "--limit", "10", "--out", tmp] + slugs,
                            cwd=HERE, capture_output=True, text=True, timeout=600)
         check("2 сборка прошла без необработанных", r.returncode == 0, r.stdout[-800:] + r.stderr[-800:])
         for slug in PILOT:
             a = open(os.path.join(tmp, slug + ".json"), "rb").read()
             b = open(os.path.join(HERE, "cards", slug + ".json"), "rb").read()
             check(f"2 {slug}: свежая сборка = cards/{slug}.json", a == b)
-        ok, why = dircmp_equal(os.path.join(tmp, "img"), os.path.join(HERE, "cards", "img"))
-        check("2 рисунки свежей сборки = cards/img", ok, why)
+        for slug in PILOT:
+            a, b = os.path.join(tmp, "img", slug), os.path.join(HERE, "cards", "img", slug)
+            if os.path.isdir(a) or os.path.isdir(b):
+                ok, why = dircmp_equal(a, b) if os.path.isdir(a) and os.path.isdir(b) else (False, "папки нет с одной стороны")
+                check(f"2 {slug}: рисунки свежей сборки = cards/img/{slug}", ok, why)
 
     with local_server(), sync_playwright() as p:
         br = p.chromium.launch()
