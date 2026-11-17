@@ -179,6 +179,9 @@ table.res td.nm small{display:block;color:var(--muted-2);font-size:12px;}
 .detail{margin-top:12px;font-size:14px;line-height:1.55;}
 .detail b{color:var(--pencil);}
 .score{font-weight:700;}
+.score .sc{display:flex;flex-direction:column-reverse;align-items:center;}
+.score .pts{font-weight:500;font-size:11.5px;color:var(--muted-2);white-space:nowrap;cursor:help;}
+.late{color:var(--warn);font-weight:600;}
 /* ── видео в работе («видео в работах») ── */
 .cat-item.vid .n{font-size:13px;}
 .vid-list{overflow:auto;flex:1;display:flex;flex-direction:column;gap:10px;padding-right:2px;}
@@ -385,6 +388,13 @@ html.rv-on{overflow:hidden;}
           <label class="check-line"><input type="checkbox" id="wkViewSwitch"> Ученик может переключать сам</label>
         </div>
         <div class="sheet-row">
+          <span class="label">Время на работу</span>
+          <div class="seg" id="wkTime">
+            <button data-m="0">выкл</button><button data-m="20">20 мин</button><button data-m="45">45 мин</button><input class="own" id="wkTimeOwn" type="number" min="1" max="600" inputmode="numeric" placeholder="мин" title="Своё время в минутах">
+          </div>
+          <div class="hint" id="timeHint"></div>
+        </div>
+        <div class="sheet-row">
           <span class="label">Варианты</span>
           <div class="seg" id="wkVariants"></div>
           <div class="var-tools" id="varTools" hidden>
@@ -407,6 +417,7 @@ html.rv-on{overflow:hidden;}
         <div class="tasks" id="wkTasks"></div>
         <div class="sheet-foot">
           <button class="btn" id="wkSave">Сохранить</button>
+          <button class="btn quiet" id="wkPrint" title="Задания по вариантам, бланк ответов, ключ для учителя">🖨 Печать</button>
           <span class="saved" id="wkSaved"></span>
         </div>
         <div class="link-box" id="wkLinkBox" hidden>
@@ -500,6 +511,7 @@ html.rv-on{overflow:hidden;}
 <script src="task-key.js"></script>
 <script src="trainer-tasks.js"></script>
 <script src="exam-spec.js"></script>
+<script src="work-print.js"></script>
 <script src="variant-set.js"></script>
 <script src="video-links.js"></script>
 <script src="video-player.js"></script>
@@ -750,6 +762,15 @@ function renderSettings(){
   const view = E.settings.view === 'list' ? 'list' : 'one';
   $('wkView').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.v === view));
   $('wkViewSwitch').checked = E.settings.viewSwitch !== false;
+  // таймер: settings.timeLimit — минуты или null (выкл)
+  const tl = timeLimitOf(E.settings);
+  $('wkTime').querySelectorAll('button').forEach(b => b.classList.toggle('active', Number(b.dataset.m) === tl));
+  const tOwn = $('wkTimeOwn'), tIsOwn = tl > 0 && [20, 45].indexOf(tl) < 0;
+  tOwn.classList.toggle('active', tIsOwn);
+  if (document.activeElement !== tOwn) tOwn.value = tIsOwn ? String(tl) : '';
+  $('timeHint').textContent = tl
+    ? 'Отсчёт идёт от начала захода и не сбрасывается перезагрузкой. На нуле работа сдаётся сама. Таймер честный, но на устройстве ученика: сервер время не проверяет — сданное позже в «Результатах» помечено «после времени».'
+    : 'Без ограничения времени.';
   // при «только в конце» ученик не знает, ошибся ли, — повторять ему нечего
   $('triesHint').textContent = end ? 'При «только в конце» попыток нет: ответ можно менять до «Завершить работу».' : 'Кончились попытки — ученик видит верный ответ. «Пропустить» есть всегда.';
 }
@@ -779,6 +800,25 @@ $('wkView').addEventListener('click', e => {
   E.settings.view = b.dataset.v; renderSettings(); markDirty();
 });
 $('wkViewSwitch').addEventListener('change', () => { E.settings.viewSwitch = $('wkViewSwitch').checked; markDirty(); });
+function timeLimitOf(st){ const n = Math.round(Number(st && st.timeLimit)); return n > 0 ? n : 0; }
+$('wkTime').addEventListener('click', e => {
+  const b = e.target.closest('button[data-m]'); if (!b) return;
+  const m = Number(b.dataset.m);
+  if (m) E.settings.timeLimit = m; else delete E.settings.timeLimit;
+  renderSettings(); markDirty();
+});
+$('wkTimeOwn').addEventListener('input', () => {
+  const n = Math.round(Number($('wkTimeOwn').value));
+  if (!n || n < 1) return;
+  E.settings.timeLimit = Math.min(600, n);
+  renderSettings(); markDirty();
+});
+// печать — из того, что сейчас в редакторе (в том числе несохранённого)
+$('wkPrint').addEventListener('click', () => WorkPrint.ask(() => {
+  if (!E.blocks.some(isTask)) return 'В работе нет заданий';
+  if (E.variants.some(v => v.blocks.some(b => b._gen && b._gen !== 'fail'))) return 'Задания вариантов ещё создаются — подождите';
+  return { title: E.title.trim() || C.kindLabel(E.kind, E.settings), variants: E.variants.map(v => ({ num: v.num, blocks: v.blocks })) };
+}));
 
 function renderVariants(){
   const box = $('wkVariants');
@@ -2291,10 +2331,13 @@ function renderResults(){
     const by = {}; (r.work_answers || []).forEach(a => { by[a.task_id] = a; });
     const mine = tasks.map(m => taskInVariant(v, m));
     const ok = mine.filter(b => b && (by[b.id] || {}).status === 'ok').length;
+    const sc = scoreOf(mine, by);
+    const late = lateOf(r, w.settings);
     const vtag = vs.length > 1 ? '<span class="vtag">В' + v.num + '</span>' : '';
-    html += '<tr data-r="' + ri + '"><td class="nm"><b>' + esc(r.student_name) + '</b><small>' + vtag + esc(fmtDate(r.started_at)) + (r.finished_at ? ' · сдал(а)' : ' · решает') + '</small>'
+    html += '<tr data-r="' + ri + '"><td class="nm"><b>' + esc(r.student_name) + '</b><small>' + vtag + esc(fmtDate(r.started_at)) + (r.finished_at ? ' · сдал(а)' : ' · решает') + (late ? ' · <span class="late" title="Сдано позже лимита времени: таймер на устройстве ученика, сервер время не проверяет">после времени</span>' : '') + '</small>'
       + (tasks.length ? '<button class="btn quiet small rv-open-btn" data-view="' + ri + '">Смотреть работу</button>' : '') + '</td>'
-      + '<td class="score">' + ok + ' / ' + tasks.length + '</td><td>' + fmtMin(r.active_ms) + '</td>';
+      // баллы в разметке раньше счёта, а на экране — под ним (column-reverse): счёт «X / Y» остаётся концом ячейки
+      + '<td class="score"><div class="sc"><small class="pts" title="' + esc(sc.hint) + '">баллов: ' + sc.got + ' из ' + sc.max + (sc.longs ? ', без развёрнутых' : '') + '</small><span>' + ok + ' / ' + tasks.length + '</span></div></td><td>' + fmtMin(r.active_ms) + '</td>';
     mine.forEach((b, ti) => {
       const a = b ? by[b.id] : null;
       const { st, sym } = taskMark(a);
@@ -2327,6 +2370,28 @@ function renderResults(){
     if (!confirm('Удалить заход «' + r.student_name + '» (' + fmtDate(r.started_at) + ')? Его ответы пропадут.')) return;
     try { await C.deleteAttempt(r.id); RS.rows.splice(+b.dataset.del, 1); renderResults(); } catch (e) { toast(e.message); }
   }));
+}
+// баллы захода по баллам позиций ExamSpec. Частичных нет: верно — полный
+// балл, неверно — 0 (проверка та же, что всегда). Развёрнутые проверяет
+// учитель — в сумму не идут
+function scoreOf(mine, by){
+  let got = 0, max = 0, longs = 0, two = false;
+  mine.forEach(b => {
+    if (!b) return;
+    const f = WorkPrint.info(b);
+    if (f.long){ longs++; return; }
+    max += f.points; if (f.points > 1) two = true;
+    if ((by[b.id] || {}).status === 'ok') got += f.points;
+  });
+  const hint = 'Баллы — по позициям экзамена (ExamSpec).' + (two ? ' Задание на 2 и больше баллов: верно — полный балл, неверно — 0, частичных нет.' : '')
+    + (longs ? ' Развёрнутые (' + longs + ') проверяет учитель — в сумму не идут.' : '');
+  return { got, max, longs, hint };
+}
+// сдано позже лимита времени (+1 минута на связь)
+function lateOf(r, st){
+  const lim = timeLimitOf(st);
+  if (!lim || !r.finished_at || !r.started_at) return false;
+  return new Date(r.finished_at) - new Date(r.started_at) > (lim + 1) * 60000;
 }
 function answerText(t, v){
   if (!v || !t) return '—';

@@ -151,6 +151,12 @@
 .confirm .actions{margin-top:4px;}
 .net{position:fixed;left:50%;top:12px;transform:translateX(-50%);background:var(--warn-tint);color:var(--warn);border:1px solid var(--warn);
   font-size:13px;font-weight:600;padding:6px 12px;border-radius:10px;z-index:300;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+/* таймер работы (settings.timeLimit): плашка сверху справа, за 5 минут — красная */
+.wtimer{position:fixed;right:12px;top:12px;z-index:290;background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:12px;
+  padding:6px 12px;font-weight:700;font-size:15px;font-variant-numeric:tabular-nums;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
+.wtimer.warn{background:#D70015;color:#fff;border-color:#D70015;animation:wtPulse 1s ease-in-out 3;}
+@keyframes wtPulse{50%{transform:scale(1.08)}}
+@media (prefers-reduced-motion: reduce){.wtimer.warn{animation:none}}
 .who{text-align:center;color:var(--muted-2);font-size:13.5px;margin-top:26px;}
 .who button{background:none;border:none;color:var(--ink);font:inherit;text-decoration:underline;cursor:pointer;}
 
@@ -191,6 +197,7 @@
 </head>
 <body>
 <button class="corner-btn right" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<div class="wtimer" id="wTimer" hidden role="timer" aria-live="off"></div>
 <div class="net" id="netBanner" hidden>Нет связи — ответы сохранятся, когда она вернётся</div>
 <div class="wrap">
   <div class="kind" id="wKind"></div>
@@ -254,6 +261,7 @@
 <script src="trainer-tasks.js"></script>
 <script src="video-links.js"></script>
 <script src="video-player.js"></script>
+<script src="work-print.js"></script>
 <script src="works-cloud.js"></script>
 <script>
 (function(){
@@ -434,6 +442,60 @@ function handleFatal(e){
   toast(e.message);
 }
 
+/* ── таймер работы (settings.timeLimit, минуты) ──
+   Отсчёт — от начала захода по времени сервера (started_at), а не от
+   открытия страницы: перезагрузка его не обнуляет. На нуле работа сдаётся
+   тем же путём, что «Завершить работу»: сначала очередь ответов, потом
+   C.finish. Таймер честный, но на устройстве ученика — сервер время не
+   проверяет; учителю в «Результатах» видно «после времени». */
+const timeLimitMs = () => { const n = Math.round(Number(S.settings.timeLimit)); return n > 0 ? n * 60000 : 0; };
+let timerT = null, timerWarned = false, autoP = null, autoRetryAt = 0;
+const timeLeft = () => new Date(S.att.startedAt).getTime() + timeLimitMs() - Date.now();
+const hasTimer = () => !!(timeLimitMs() && S.att && S.att.startedAt && !isNaN(new Date(S.att.startedAt)));
+function fmtLeft(ms){
+  const t = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), sec = t % 60;
+  const p2 = x => (x < 10 ? '0' : '') + x;
+  return (h ? h + ':' + p2(m) : m) + ':' + p2(sec);
+}
+function timerTick(){
+  if (S.finished || !hasTimer()){ stopTimer(); return; }
+  const left = timeLeft();
+  const t = $('wTimer');
+  t.hidden = false;
+  t.textContent = '⏱ ' + fmtLeft(left);
+  t.title = 'Осталось времени на работу. На нуле работа сдастся сама';
+  const warn = left <= 5 * 60000;
+  t.classList.toggle('warn', warn);
+  if (warn && left > 0 && !timerWarned){ timerWarned = true; toast('Осталось ' + (left > 60000 ? Math.ceil(left / 60000) + ' мин' : 'меньше минуты') + ' — на нуле работа сдастся сама'); }
+  if (left <= 0) autoFinish();
+}
+function startTimer(){
+  if (!hasTimer() || S.finished){ stopTimer(); return; }
+  if (!timerT) timerT = setInterval(timerTick, 1000);
+  timerTick();
+}
+function stopTimer(){ if (timerT){ clearInterval(timerT); timerT = null; } $('wTimer').hidden = true; }
+// сдача по времени: один раз; нет связи — повтор не чаще раза в 10 секунд
+function autoFinish(){
+  if (autoP || S.finished || Date.now() < autoRetryAt) return autoP || Promise.resolve();
+  autoP = (async () => {
+    $('wConfirm').hidden = true;
+    const b = curBlock();
+    if (bankTaskTime() && b) enqueue(b.id);
+    try {
+      await flush();
+      if (queue.length) throw new C.WorkError({ message: 'network' });
+      await C.finish(S.att.attempt, S.att.secret, S.activeMs);
+      finishLocal();
+      toast('Время вышло — работа сдана');
+    } catch (e) {
+      if (e.code === 'attempt_finished') finishLocal();
+      else { autoRetryAt = Date.now() + 10000; toast('Время вышло. Нет связи — работа сдастся, как только появится интернет'); }
+    }
+  })().finally(() => { autoP = null; });
+  return autoP;
+}
+
 /* ── загрузка ── */
 async function boot(){
   if (!code){ fail('В ссылке нет кода работы', 'Попроси у учителя ссылку ещё раз.'); return; }
@@ -470,7 +532,7 @@ async function tryResume(rec, closed){
     fail(e.message, 'Проверь интернет и обнови страницу.');
     return true;
   }
-  S.att = { attempt: rec.attempt, secret: rec.secret, name: r.name };
+  S.att = { attempt: rec.attempt, secret: rec.secret, name: r.name, startedAt: r.started_at || null };
   S.activeMs = r.active_ms || 0;
   (r.answers || []).forEach(a => { S.answers[a.task_id] = a; });
   queue = lsGet(LS.queue(), []);
@@ -486,8 +548,14 @@ async function tryResume(rec, closed){
     return true;
   }
   S.cur = Math.min(Math.max(0, lsGet(LS.idx(), 0) | 0), Math.max(0, taskBlocks().length - 1));
+  // зашёл, когда время уже вышло, — сразу сдаём и показываем итог
+  if (hasTimer() && timeLeft() <= 0){
+    await autoFinish();
+    if (S.finished) return true;
+  }
   startTick(); flush();
   showTask();
+  startTimer();
   return true;
 }
 function showStart(){
@@ -499,6 +567,7 @@ function showStart(){
       ? '<div>Верно или нет — увидишь <b>в конце</b>, после «Завершить работу». До этого ответы можно менять.</div>'
       : '<div>Верно или нет — видно <b>сразу после каждого задания</b>.</div>',
     feedbackEnd() ? '' : '<div>Попыток на задание: <b>' + (tries === Infinity ? 'сколько угодно' : tries) + '</b>. Задание можно пропустить и вернуться к нему.</div>',
+    timeLimitMs() ? '<div>Время на работу: <b>' + Math.round(timeLimitMs() / 60000) + ' мин</b>. Отсчёт пойдёт после «Начать»; когда время выйдет, работа сдастся сама.</div>' : '',
   ].join('');
   show('scrStart');
   setTimeout(() => $('wName').focus(), 50);
@@ -511,12 +580,13 @@ async function startWork(){
   $('wStart').disabled = true; $('startMsg').textContent = '';
   try {
     const r = await C.start(code, name);
-    S.att = { attempt: r.attempt, secret: r.secret, name: r.name };
-    C.remember(code, S.att);
+    // начало — по часам сервера; старая база без started_at — по своим
+    S.att = { attempt: r.attempt, secret: r.secret, name: r.name, startedAt: r.started_at || new Date().toISOString() };
+    C.remember(code, { attempt: r.attempt, secret: r.secret, name: r.name });
     S.answers = {}; S.drafts = {}; S.notes = {}; S.cur = 0; queue = [];
     lsSet(LS.queue(), []); lsSet(LS.drafts(), {}); lsSet(LS.idx(), 0); lsSet(LS.notes(), {});
     lsSet('work:vid:' + code, {}); VW = null;
-    showWho(); startTick(); showTask();
+    showWho(); startTick(); showTask(); startTimer();
   } catch (e) {
     $('startMsg').textContent = e.message;
   } finally { $('wStart').disabled = false; }
@@ -1269,17 +1339,8 @@ function applyState(v){
   else if (a.status === 'pending' && a.tries > 0) setMsg(v, 'Неверно — попробуй ещё раз', 'bad');
   else setMsg(v, '', '');
 }
-function correctText(t){
-  if (!t) return '';
-  if (t.kind === 'fields') return (t.fields || []).map(f => {
-    const lbl = taPlainLabel(f.label);
-    const val = String(f.value == null ? '' : f.value) || 'нет корней';
-    return (t.fields.length > 1 || (lbl && lbl !== 'Ответ:') ? (lbl ? lbl + ' ' : '') : '') + val + (f.unit ? ' ' + f.unit : '');
-  }).join('; ');
-  if (t.kind === 'choice') return 'вариант ' + (t.correct + 1);
-  if (t.kind === 'multi') return (t.correct || []).map(i => i + 1).join(', ') || 'ни одного';
-  return '';
-}
+// верный ответ — общий с ключом для печати (work-print.js): ученик и учитель видят одно и то же
+const correctText = t => WorkPrint.correctText(t);
 function answerText(t, val){
   if (!val || !t) return '—';
   if (t.kind === 'fields') return (t.fields || []).map(f => (val.vals || {})[f.id] || '—').join('; ');
@@ -1603,6 +1664,7 @@ $('wConfirmYes').addEventListener('click', async () => {
 });
 function finishLocal(){
   S.finished = true;
+  stopTimer();
   VIEWS.forEach(v => closeTrainer(v));
   lsSet(LS.drafts(), {});
   showDone();
