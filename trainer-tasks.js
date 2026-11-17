@@ -1232,7 +1232,10 @@ function genFrameFor(href, vw){
           try { w = frame.contentWindow; } catch (e) {}
           // __fipiBusy: ОГЭ ч. 2 догружает задания ФИПИ своего номера отдельным
           // файлом — без них «ещё такое же» взяло бы демоверсию
-          if (w && w.document && w.document.readyState === 'complete' && typeof w.tsGetState === 'function'
+          // готов: есть состояние тренажёра (tsGetState) или хотя бы каталог —
+          // у русского tsGetState нет, а задания по месту конструктор берёт из каталога
+          if (w && w.document && w.document.readyState === 'complete'
+              && (typeof w.tsGetState === 'function' || !!w.__trainerCatalog)
               && !(typeof w.__fipiBusy === 'function' && w.__fipiBusy())){
             setTimeout(() => resolve(frame), 400);   // стартовые таймеры страницы (восстановление прогресса)
             return;

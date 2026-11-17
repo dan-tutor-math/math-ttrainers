@@ -11,8 +11,8 @@
      предпросмотр текстом «ОГЭ №9 · … · ФИПИ 1–2 из 10» → «Собрать» → в новой
      работе 3 группы, задания созданы; Набор очищен, «Вернуть набор» в тосте
      его возвращает;
-  C. «Полный вариант» ОГЭ — предпросмотр по всем номерам, oge8/oge12 «нет
-     каталога», oge10/11/13 собираются нашим генератором (этап 7), «банк кончится»;
+  C. «Полный вариант» ОГЭ — предпросмотр по всем номерам,
+     oge8/oge12 и oge10/11/13 собираются (этапы 7 и 10б), «банк кончится»;
   D. #/edit/<id>?build=1 дописывает в сохранённую работу;
   E. 375 px: дерево над предпросмотром, без горизонтальной прокрутки;
   F. нет ошибок JavaScript.
@@ -164,11 +164,12 @@ def run():
           const p = ix['oge9|'].protos.find(x => x.id === 'p1'); const V = window.VariantSet; V.clear();
           // место 7 устарело (банк «перевыгружен») — собрать надо по номеру ФИПИ, он на месте 2
           V.add({ exam: 'oge', slug: 'oge9', proto: 'p1', pos: 7, fipi: p.fipi[2], count: 1 });
-          V.add({ exam: 'oge', slug: 'oge8', count: 1 });
+          // изложение ОГЭ русского — каталога нет (oge8 с этапа 10б собирается)
+          V.add({ exam: 'rus_oge', slug: 'rus_oge01', count: 1 });
           return p.fipi[2]; }""")
         tp.wait_for_function("() => document.querySelectorAll('#bdPreview .pl').length === 2")
         pv = preview(tp)
-        check("G1 предпросмотр берёт место по номеру ФИПИ: «ФИПИ 3 из 10», oge8 не собирается",
+        check("G1 предпросмотр берёт место по номеру ФИПИ: «ФИПИ 3 из 10», изложение не собирается",
               pv[0]["ok"] and "ФИПИ 3 из 10" in pv[0]["t"] and not pv[1]["ok"], json.dumps(pv, ensure_ascii=False))
         tp.click("#bdGo")
         tp.wait_for_selector("#scrEdit:not([hidden])")
@@ -177,7 +178,7 @@ def run():
         g = tp.evaluate(SER)
         check("G2 собрано то самое задание ФИПИ", len(g) == 1 and g[0]["fipi"] == f3 and g[0]["pos"] == 2, json.dumps(g, ensure_ascii=False)[:300])
         left = tp.evaluate("() => window.VariantSet.all().map(x => x.slug)")
-        check("G3 несобранная строка (oge8) осталась в Наборе", left == ["oge8"], str(left))
+        check("G3 несобранная строка (изложение) осталась в Наборе", left == ["rus_oge01"], str(left))
         tp.evaluate("() => { window.VariantSet.clear(); window.__works.E.dirty = false; }")
 
         # ═══ C. «Полный вариант» ОГЭ ═══
@@ -200,17 +201,18 @@ def run():
         pv = preview(tp)
         by = {x["t"].split(" ")[1]: x for x in pv}
         check("C4 предпросмотр по всем 18 позициям", len(pv) == 18, str(len(pv)))
-        check("C5 oge8 и oge12 — «нет каталога», не собираются",
-              not by["№8"]["ok"] and "нет каталога" in by["№8"]["t"] and not by["№12"]["ok"] and "нет каталога" in by["№12"]["t"],
+        # этап 10б: у oge8 и oge12 появился каталог — №8 из банка ФИПИ, №12 (банка нет) — наш генератор
+        check("C5 oge8 — «ФИПИ 1 из …», oge12 — «наших на основе ФИПИ: 1»",
+              by["№8"]["ok"] and "ФИПИ 1 из" in by["№8"]["t"] and by["№12"]["ok"] and "наших на основе ФИПИ: 1" in by["№12"]["t"],
               json.dumps([by.get("№8"), by.get("№12")], ensure_ascii=False))
         # этап 7: банка ФИПИ нет — собираются нашим генератором «на основе ФИПИ»
         check("C6 oge10, 11, 13 — собираются: «наших на основе ФИПИ: 1»",
               all(by[k]["ok"] and "наших на основе ФИПИ: 1" in by[k]["t"] for k in ["№10", "№11", "№13"]),
               json.dumps([by.get(k) for k in ["№10", "№11", "№13"]], ensure_ascii=False))
         check("C7 остальные номера собираются, с «ФИПИ … из …»",
-              all(x["ok"] and " из " in x["t"] for k, x in by.items() if k not in ["№8", "№12", "№10", "№11", "№13"]),
+              all(x["ok"] and " из " in x["t"] for k, x in by.items() if k not in ["№12", "№10", "№11", "№13"]),
               json.dumps([x for k, x in by.items() if not x["ok"]], ensure_ascii=False)[:500])
-        check("C8 итог под предпросмотром: 16 групп, пропущено 2", "Групп: 16" in tp.inner_text("#bdGoNote") and "пропущено строк: 2" in tp.inner_text("#bdGoNote"),
+        check("C8 итог под предпросмотром: 18 групп, ничего не пропущено", "Групп: 18" in tp.inner_text("#bdGoNote") and "пропущено" not in tp.inner_text("#bdGoNote"),
               tp.inner_text("#bdGoNote"))
         # перетаскивание номера целиком: последний (№25) — перед №23 (оба на экране: через прокрутку drag_to ненадёжен)
         src = tp.locator("#bdTree .bd-num").nth(17)
