@@ -146,7 +146,7 @@ def run():
         check("P1 кнопка «Печать» рядом с «Сохранить»", tp.evaluate("() => document.getElementById('wkPrint').parentElement === document.getElementById('wkSave').parentElement"))
         tp.click("#wkPrint")
         tp.wait_for_selector("#wpDlg")
-        check("P2 окно: «Задания», «Бланк ответов», «Ключ для учителя»", all(x in tp.inner_text("#wpDlg") for x in ["Задания", "Бланк ответов", "Ключ для учителя"]))
+        check("P2 окно: «Задания», «Бланк ответов», «Ключ для учителя»", all(x in tp.inner_text("#wpDlg") for x in ["Задания", "Бланк ответов", "Ключ для учителя", "Скачать PDF", "Книжная", "Альбомная"]))
         tp.uncheck("#wpTasks"); tp.click("#wpGo")
         check("P3 ничего не отмечено — просьба отметить, печати нет", "Отметьте" in tp.inner_text("#wpNote") and tp.evaluate("() => window.__printed") == 0)
         tp.check("#wpTasks"); tp.check("#wpBlank"); tp.check("#wpKey"); tp.click("#wpGo")
@@ -154,15 +154,18 @@ def run():
         check("P4 окно закрылось, вызвана печать браузера", tp.locator("#wpDlg").count() == 0)
         pr = tp.evaluate("""() => {
           const R = document.getElementById('wpPrint');
-          const tasks = [...R.querySelectorAll('.wp-tasks')].map(s => ({
-            head: s.querySelector('.wp-head').innerText, who: s.querySelector('.wp-who').innerText,
-            nums: [...s.querySelectorAll('.wp-n')].map(n => n.textContent), imgs: s.querySelectorAll('.wp-task img').length }));
-          const blanks = [...R.querySelectorAll('.wp-blank')].map(s => ({
-            head: s.querySelector('.wp-head').innerText,
-            rows: [...s.querySelectorAll('.wp-bt tr')].map(r => ({ n: r.querySelector('.n').textContent, cells: r.querySelectorAll('.wp-cells i').length, long: !!r.querySelector('.wp-long') })) }));
+          // раздел = первый лист с шапкой и следующие за ним без шапки (задания могут занять несколько листов)
+          const group = cls => { const out = []; R.querySelectorAll('.wp-sheet.' + cls).forEach(s => {
+            const h = s.querySelector('.wp-head');
+            if (h) out.push({ head: h.innerText, who: (s.querySelector('.wp-who') || {}).innerText || '', sheets: [s] }); else out[out.length - 1].sheets.push(s); }); return out; };
+          const tasks = group('wp-tasks').map(g => ({ head: g.head, who: g.who,
+            nums: g.sheets.flatMap(s => [...s.querySelectorAll('.wp-n')].map(n => n.textContent)), imgs: g.sheets.reduce((a, s) => a + s.querySelectorAll('.wp-task img').length, 0) }));
+          const blanks = group('wp-blank').map(g => ({ head: g.head,
+            rows: g.sheets.flatMap(s => [...s.querySelectorAll('.wp-brow')].map(r => ({ n: r.querySelector('.n').textContent, cells: r.querySelectorAll('.wp-cells i').length, long: !!r.querySelector('.wp-long') }))) }));
           const keys = [...R.querySelectorAll('.wp-kt')].map(t => ({ cap: t.caption.textContent,
             rows: [...t.tBodies[0].rows].map(r => [...r.cells].map(c => c.textContent)), total: t.tFoot.rows[0].cells[2].textContent }));
-          return { tasks, blanks, keys, pages: R.querySelectorAll('.wp-page').length, keyPages: R.querySelectorAll('.wp-key').length };
+          return { tasks, blanks, keys, pages: R.querySelectorAll('.wp-page').length, keyPages: R.querySelectorAll('.wp-key').length,
+            foot: [...R.querySelectorAll('.wp-foot')].map(f => f.textContent) };
         }""")
         check("P5 две страницы заданий, шапка «Название · Вариант N»",
               len(pr["tasks"]) == 2 and pr["tasks"][0]["head"] == "Контрольная · Вариант 1" and pr["tasks"][1]["head"] == "Контрольная · Вариант 2", str([t["head"] for t in pr["tasks"]]))
@@ -177,7 +180,7 @@ def run():
         check("P12 ответы варианта 2: 7, —, 25", len(k) > 1 and [r[1] for r in k[1]["rows"]] == ["7", "—", "25"], str(len(k) > 1 and k[1]["rows"]))
         check("P13 баллы из ExamSpec: ОГЭ №9 — 1, №20 — 2, вне экзамена — 1; всего 4",
               k and [r[2] for r in k[0]["rows"]] == ["1", "2", "1"] and k[0]["total"] == "4", str(k and k[0]))
-        check("P14 всего листов: 2 задания + 2 бланка + ключ", pr["pages"] == 5, str(pr["pages"]))
+        check("P14 листы пронумерованы «Страница i из N», ключ на одном листе", pr["pages"] >= 5 and pr["foot"][-1] == "Страница %d из %d" % (pr["pages"], pr["pages"]), str(pr["foot"][-2:]))
         check("P15 на экране листа не видно", tp.evaluate("() => getComputedStyle(document.getElementById('wpPrint')).display") == "none")
         tp.emulate_media(media="print")
         vis = tp.evaluate("() => ({ sheet: getComputedStyle(document.getElementById('wpPrint')).display, app: getComputedStyle(document.querySelector('.wrap') || document.body.firstElementChild).display })")

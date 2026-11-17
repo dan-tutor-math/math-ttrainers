@@ -8,10 +8,13 @@
      развёрнутый). Позиция ищется по странице тренажёра и номеру; не нашлась —
      краткий ответ, 1 балл. Это подсказка для бланка, ключа и суммы баллов —
      проверку ответа она не меняет.
-   - render / print / ask — печать: задания по вариантам, бланк ответов, ключ.
-     Печать — окно браузера (window.print) и @media print: на экране блок
-     #wpPrint скрыт, при печати скрыто всё, кроме него. Стили — здесь же, чтобы
-     не раздувать works.html.
+   - build / print / download / ask — печать и PDF: задания по вариантам,
+     бланк ответов, ключ. Одна вёрстка листов А4 (книжная или альбомная; в
+     альбомной — две колонки, как КИМ) идёт и в печать (window.print и
+     @media print), и в PDF-файл (html2canvas + jsPDF, каждый лист — страница).
+     На экране блок #wpPrint скрыт, при печати скрыто всё, кроме него. Стили —
+     здесь же, чтобы не раздувать works.html. Задания пока снимками (текст и
+     формулы вектором — после задачи 63).
 
    Нужны раньше: trainer-tasks.js (taPlainLabel), subjects-catalog.js
    (страница тренажёра по tid), exam-spec.js. Без них работает с запасными
@@ -73,141 +76,274 @@
     return { spec: sp, points: pts, long, label: sp ? sp.label : '' };
   }
 
-  /* ── разметка печати ── */
+  /* ── разметка листов ── */
   const head = (title, v, many) => '<div class="wp-head"><b>' + esc(title || 'Работа') + (many || v.num > 1 ? ' · Вариант ' + v.num : '') + '</b></div>';
   const who = '<div class="wp-who"><span>Фамилия, имя <i class="wp-line"></i></span><span>Класс <i class="wp-line short"></i></span></div>';
   const imgOf = x => { const im = (x && x.img) || {}; const o = im.light || im.dark; return o && o.url ? o.url : ''; };
+  const runT = (title, v, many) => (title || 'Работа') + (many || v.num > 1 ? ' · Вариант ' + v.num : '');
 
-  function tasksHtml(title, v, many) {
-    const list = (v.blocks || []).filter(isTask);
-    return '<section class="wp-page wp-tasks">' + head(title, v, many) + who
-      + list.map((b, i) => {
-        const th = b.theory && imgOf(b.theory) ? '<img class="wp-theory" alt="Теория" src="' + esc(imgOf(b.theory)) + '">' : '';
-        const src = imgOf(b);
-        return '<div class="wp-task"><div class="wp-n">' + (i + 1) + '</div><div class="wp-body">' + th
-          + (src ? '<img alt="Задание ' + (i + 1) + '" src="' + esc(src) + '">' : '<div class="wp-noimg">' + esc(b.name || 'Задание') + '</div>') + '</div></div>';
-      }).join('') + '</section>';
+  const mk = html => { const d = document.createElement('div'); d.innerHTML = html; return d.firstElementChild; };
+  // ширина снимка на листе: CSS-размер снимка (b.css / hot) с запасом на
+  // читаемость; img.style.maxWidth:100% не даст выйти из колонки
+  const ZOOM = 1.0;
+  function cssW(b) { return (b.hot && b.hot.w) || (b.css && b.css.w) || 441; }
+  // Снимок задания — карточка тренажёра: серый фон, поле ответа, «Проверить»,
+  // «Источник». В КИМ этого нет, поэтому картинку готовим: режем всё ниже поля
+  // ответа (поля внизу) или ниже последнего варианта выбора, поля внутри текста
+  // закрашиваем белым, серый фон карточки и тень по краям убираем (светлее 244
+  // по всем каналам → белый). Не получилось — исходная картинка.
+  async function prepImg(b) {
+    const src = imgOf(b);
+    if (!src) return '';
+    try {
+      // crossOrigin: снимки в облаке — чужой адрес; без него холст «грязный» и не читается
+      const im = await new Promise((res, rej) => { const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => res(i); i.onerror = rej; i.src = src; });
+      const W = im.naturalWidth, H = im.naturalHeight;
+      if (!W || !H) return src;
+      const t = b.task || {}, hot = b.hot || null;
+      let cutY = H, blanks = [];
+      if (hot && t.kind === 'fields' && hot.fields && hot.fields.length) {
+        const ymin = Math.min(...hot.fields.map(r => r.y));
+        if (ymin >= 0.4) cutY = Math.max(40, Math.round(ymin * H) - Math.round(H * 0.01));
+        else blanks = hot.fields;
+      } else if (hot && (t.kind === 'choice' || t.kind === 'multi') && hot.opts && hot.opts.length) {
+        const yb = Math.max(...hot.opts.map(r => r.y + r.h));
+        if (yb < 0.97) cutY = Math.min(H, Math.round(yb * H) + Math.round(H * 0.02));
+      }
+      const m = Math.max(2, Math.round(W * 0.012));   // тень и скругление карточки по краям
+      const cv = document.createElement('canvas');
+      cv.width = Math.max(1, W - 2 * m); cv.height = Math.max(1, cutY - 2 * m);
+      const cx = cv.getContext('2d', { willReadFrequently: true });
+      cx.fillStyle = '#fff'; cx.fillRect(0, 0, cv.width, cv.height);
+      cx.drawImage(im, m, m, cv.width, cv.height, 0, 0, cv.width, cv.height);
+      blanks.forEach(r => { cx.fillStyle = '#fff'; cx.fillRect(r.x * W - m - 2, r.y * H - m - 2, r.w * W + 4, r.h * H + 4); });
+      const d = cx.getImageData(0, 0, cv.width, cv.height), px = d.data;
+      for (let k = 0; k < px.length; k += 4) if (px[k] >= 244 && px[k + 1] >= 244 && px[k + 2] >= 244) { px[k] = px[k + 1] = px[k + 2] = 255; }
+      cx.putImageData(d, 0, 0);
+      return cv.toDataURL('image/png');
+    } catch (e) { return src; }
   }
-  function blankHtml(title, v, many) {
+  function taskItem(b, i, prepared) {
+    const th = b.theory && imgOf(b.theory) ? '<img class="wp-theory" alt="Теория" src="' + esc(imgOf(b.theory)) + '">' : '';
+    const src = prepared || imgOf(b);
+    const it = mk('<div class="wp-task"><div class="wp-n">' + (i + 1) + '</div><div class="wp-body">' + th
+      + (src ? '<img alt="Задание ' + (i + 1) + '" src="' + esc(src) + '">' : '<div class="wp-noimg">' + esc(b.name || 'Задание') + '</div>') + '</div></div>');
+    const im = it.querySelector('.wp-body > img:not(.wp-theory)');
+    if (im) im.style.width = Math.round(cssW(b) * ZOOM) + 'px';
+    return it;
+  }
+  function blankItems(v) {
     const list = (v.blocks || []).filter(isTask);
     const cells = '<span class="wp-cells">' + '<i></i>'.repeat(14) + '</span>';
-    return '<section class="wp-page wp-blank">' + head(title, v, many) + '<div class="wp-sub">Бланк ответов</div>' + who
-      + '<table class="wp-bt"><tbody>' + list.map((b, i) => {
-        const f = info(b);
-        return '<tr><td class="n">' + (i + 1) + '</td><td>' + (f.long ? '<span class="wp-long">решение на отдельном листе</span>' : cells) + '</td></tr>';
-      }).join('') + '</tbody></table></section>';
+    return list.map((b, i) => mk('<div class="wp-brow"><span class="n">' + (i + 1) + '</span><span class="c">'
+      + (info(b).long ? '<span class="wp-long">решение на отдельном листе</span>' : cells) + '</span></div>'));
   }
-  function keyHtml(title, vs) {
-    return '<section class="wp-page wp-key"><div class="wp-head"><b>' + esc(title || 'Работа') + ' · ключ для учителя</b></div><div class="wp-keys">'
-      + vs.map(v => {
-        const list = (v.blocks || []).filter(isTask);
-        let sum = 0;
-        const rows = list.map((b, i) => {
-          const f = info(b); sum += f.points;
-          const a = correctText(b.task);
-          return '<tr><td class="n">' + (i + 1) + '</td><td class="a">' + esc(a || '—') + '</td><td class="p">' + f.points + '</td></tr>';
-        }).join('');
-        return '<table class="wp-kt"><caption>Вариант ' + v.num + '</caption><thead><tr><th>№</th><th>Ответ</th><th>Балл</th></tr></thead><tbody>'
-          + rows + '</tbody><tfoot><tr><td></td><td>Всего</td><td class="p">' + sum + '</td></tr></tfoot></table>';
-      }).join('') + '</div></section>';
+  function keyItem(v) {
+    const list = (v.blocks || []).filter(isTask);
+    let sum = 0;
+    const rows = list.map((b, i) => {
+      const f = info(b); sum += f.points;
+      const a = correctText(b.task);
+      return '<tr><td class="n">' + (i + 1) + '</td><td class="a">' + esc(a || '—') + '</td><td class="p">' + f.points + '</td></tr>';
+    }).join('');
+    return mk('<table class="wp-kt"><caption>Вариант ' + v.num + '</caption><thead><tr><th>№</th><th>Ответ</th><th>Балл</th></tr></thead><tbody>'
+      + rows + '</tbody><tfoot><tr><td></td><td>Всего</td><td class="p">' + sum + '</td></tr></tfoot></table>');
   }
-  // what: { tasks, blank, key } — что печатать
-  function render(work, what) {
+  function mkSheet(sec, orient, first) {
+    const cols = orient === 'landscape' ? 2 : 1;
+    return mk('<section class="wp-sheet wp-page ' + (orient === 'landscape' ? 'l' : 'p') + ' ' + sec.cls + '">'
+      + (first ? sec.head : '<div class="wp-run">' + esc(sec.run) + '</div>')
+      + '<div class="wp-cols">' + '<div class="wp-col"></div>'.repeat(cols) + '</div><div class="wp-foot"></div></section>');
+  }
+  const over = c => c.scrollHeight > c.clientHeight + 1;
+  function flowSection(root, sec, orient) {
+    let sheet, cols, ci;
+    const open = first => { sheet = mkSheet(sec, orient, first); root.appendChild(sheet); cols = [...sheet.querySelectorAll('.wp-col')]; ci = 0; };
+    const advance = () => { if (ci + 1 < cols.length) ci++; else open(false); };
+    open(true);
+    sec.items.forEach(it => {
+      cols[ci].appendChild(it);
+      if (over(cols[ci]) && cols[ci].children.length > 1) { advance(); cols[ci].appendChild(it); }
+      if (over(cols[ci])) {
+        // одно не влезает в целую колонку — уменьшаем картинки до её высоты
+        const mh = Math.max(80, cols[ci].clientHeight - 24) + 'px';
+        it.querySelectorAll('img').forEach(im => { im.style.width = 'auto'; im.style.maxHeight = mh; });
+      }
+    });
+  }
+  function ensureRoot() {
+    ensureStyle();
+    let root = document.getElementById('wpPrint');
+    if (!root) { root = document.createElement('div'); root.id = 'wpPrint'; document.body.appendChild(root); }
+    return root;
+  }
+  function setPage(orient) {
+    let st = document.getElementById('wpPage');
+    if (!st) { st = document.createElement('style'); st.id = 'wpPage'; document.head.appendChild(st); }
+    st.textContent = '@page{size:A4 ' + (orient === 'landscape' ? 'landscape' : 'portrait') + ';margin:0}';
+  }
+  const loadImg = src => new Promise(r => { const i = new Image(); i.onload = i.onerror = r; i.src = src; });
+
+  // what: { tasks, blank, key }; orient: 'portrait' | 'landscape'. Собирает листы
+  // в #wpPrint (в режиме замера — вне экрана) и возвращает их список
+  async function build(work, what, orient) {
+    orient = orient === 'landscape' ? 'landscape' : 'portrait';
+    const root = ensureRoot();
+    setPage(orient);
+    root.innerHTML = ''; root.className = 'wp-measure';
     const vs = (work.variants || []).filter(v => (v.blocks || []).some(isTask));
     const many = vs.length > 1;
-    let html = '';
-    if (what.tasks) html += vs.map(v => tasksHtml(work.title, v, many)).join('');
-    if (what.blank) html += vs.map(v => blankHtml(work.title, v, many)).join('');
-    if (what.key) html += keyHtml(work.title, vs);
-    return html;
+    const secs = [];
+    const prep = new Map();
+    if (what.tasks) await Promise.all(vs.flatMap(v => (v.blocks || []).filter(isTask)).map(async b => { prep.set(b, await prepImg(b)); }));
+    if (what.tasks) vs.forEach(v => secs.push({ cls: 'wp-tasks', head: head(work.title, v, many) + who, run: runT(work.title, v, many),
+      items: (v.blocks || []).filter(isTask).map((b, i) => taskItem(b, i, prep.get(b))) }));
+    if (what.blank) vs.forEach(v => secs.push({ cls: 'wp-blank', head: head(work.title, v, many) + '<div class="wp-sub">Бланк ответов</div>' + who,
+      run: runT(work.title, v, many) + ' · бланк ответов', items: blankItems(v) }));
+    if (what.key) secs.push({ cls: 'wp-key', head: '<div class="wp-head"><b>' + esc(work.title || 'Работа') + ' · ключ для учителя</b></div>',
+      run: (work.title || 'Работа') + ' · ключ', items: vs.map(keyItem) });
+    // картинки грузим до вёрстки: высоты нужны сразу
+    await Promise.all([].concat(...secs.map(sc => sc.items.map(it => [...it.querySelectorAll('img')])), []).flat().map(im => loadImg(im.src)));
+    secs.forEach(sc => flowSection(root, sc, orient));
+    const sheets = [...root.querySelectorAll('.wp-sheet')];
+    sheets.forEach((sh, i) => { sh.querySelector('.wp-foot').textContent = 'Страница ' + (i + 1) + ' из ' + sheets.length; });
+    return sheets;
   }
+  // совместимость: разметка листов строкой (тесты, отладка)
+  async function render(work, what, orient) { await build(work, what, orient); return document.getElementById('wpPrint').innerHTML; }
 
   const CSS = `
 #wpPrint{display:none}
+#wpPrint.wp-measure{display:block;position:fixed;left:-99999px;top:0;pointer-events:none}
+.wp-sheet{box-sizing:border-box;position:relative;background:#fff;color:#000;overflow:hidden;display:flex;flex-direction:column;font:13px/1.35 'Onest',Arial,sans-serif}
+.wp-sheet.p{width:210mm;height:296.4mm;padding:14mm 15mm 10mm}
+.wp-sheet.l{width:297mm;height:209.4mm;padding:11mm 13mm 8mm}
+.wp-cols{flex:1;min-height:0;display:flex;gap:9mm}
+.wp-col{flex:1;min-width:0;overflow:hidden}
+.wp-sheet.l .wp-col + .wp-col{border-left:.6px solid #777;padding-left:9mm}
+.wp-run{font-size:10.5px;color:#333;border-bottom:.6px solid #777;padding-bottom:1.5mm;margin-bottom:4mm}
+.wp-foot{text-align:center;font-size:10.5px;color:#333;padding-top:2mm;flex:none}
+.wp-head{font-size:17px;margin-bottom:2mm;border:1.2px solid #000;padding:3mm 4mm;text-align:center}
+.wp-sub{font-weight:700;margin:2mm 0}
+.wp-who{display:flex;gap:24px;margin:3mm 0 5mm}
+.wp-line{display:inline-block;width:230px;border-bottom:1px solid #000;height:14px;vertical-align:bottom}
+.wp-line.short{width:60px}
+.wp-task{display:flex;gap:8px;margin:0 0 5mm}
+.wp-n{flex:none;width:26px;height:26px;border:1.5px solid #000;border-radius:50%;text-align:center;line-height:23px;font-weight:700}
+.wp-body{flex:1;min-width:0}
+.wp-body img{display:block;max-width:100%}
+.wp-theory{margin-bottom:6px}
+.wp-brow{display:flex;gap:8px;align-items:center;border:1px solid #000;margin:-1px 0 0;padding:4px 8px;min-height:28px}
+.wp-brow .n{width:26px;text-align:center;font-weight:700}
+.wp-cells{display:inline-flex}
+.wp-cells i{display:inline-block;width:18px;height:22px;border:1px solid #000;margin-left:-1px}
+.wp-long{font-style:italic}
+.wp-kt{border-collapse:collapse;margin:0 0 6mm;font-size:12px}
+.wp-kt caption{font-weight:700;text-align:left;padding-bottom:2px}
+.wp-kt th, .wp-kt td{border:1px solid #000;padding:2px 6px}
+.wp-kt td.n, .wp-kt td.p{text-align:center}
 .wp-dlg{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px}
-.wp-dlg .box{background:var(--bg,#fff);color:var(--pencil,#1D1D1F);border-radius:16px;padding:20px 22px;max-width:380px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+.wp-dlg .box{background:var(--bg,#fff);color:var(--pencil,#1D1D1F);border-radius:16px;padding:20px 22px;max-width:400px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)}
 .wp-dlg h3{margin:0 0 12px;font-size:18px}
 .wp-dlg label{display:flex;gap:10px;align-items:flex-start;margin:10px 0;font-size:15px;line-height:1.3;cursor:pointer}
 .wp-dlg label small{display:block;color:var(--muted-2,#6E6E73);font-size:12.5px}
-.wp-dlg .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.wp-dlg .ori{display:flex;gap:14px;margin:6px 0 2px;font-size:14px}
+.wp-dlg .ori label{margin:0;align-items:center}
+.wp-dlg .row{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
 .wp-dlg .note{color:var(--warn,#B25000);font-size:13px;min-height:16px}
 @media print{
   body.wp-on > *:not(#wpPrint){display:none !important}
   body.wp-on{background:#fff !important;padding:0 !important;margin:0 !important}
-  body.wp-on #wpPrint{display:block;color:#000;font:13px/1.35 'Onest',Arial,sans-serif}
-  #wpPrint .wp-page{break-after:page;page-break-after:always}
-  #wpPrint .wp-page:last-child{break-after:auto;page-break-after:auto}
-  #wpPrint .wp-head{font-size:16px;margin-bottom:6px}
-  #wpPrint .wp-sub{font-weight:700;margin-bottom:4px}
-  #wpPrint .wp-who{display:flex;gap:24px;margin:4px 0 12px}
-  #wpPrint .wp-line{display:inline-block;width:230px;border-bottom:1px solid #000;height:14px;vertical-align:bottom}
-  #wpPrint .wp-line.short{width:60px}
-  #wpPrint .wp-task{display:flex;gap:8px;margin:0 0 10px;break-inside:avoid;page-break-inside:avoid}
-  #wpPrint .wp-n{flex:none;width:26px;height:26px;border:1.5px solid #000;border-radius:50%;text-align:center;line-height:23px;font-weight:700}
-  #wpPrint .wp-body{flex:1;min-width:0}
-  #wpPrint .wp-body img{display:block;max-width:100%;max-height:120mm}
-  #wpPrint .wp-theory{margin-bottom:6px}
-  #wpPrint table{border-collapse:collapse}
-  #wpPrint .wp-bt td{border:1px solid #000;padding:5px 8px;height:28px}
-  #wpPrint .wp-bt td.n{width:30px;text-align:center;font-weight:700}
-  #wpPrint .wp-cells{display:inline-flex}
-  #wpPrint .wp-cells i{display:inline-block;width:18px;height:22px;border:1px solid #000;margin-left:-1px}
-  #wpPrint .wp-long{font-style:italic}
-  #wpPrint .wp-keys{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
-  #wpPrint .wp-kt{break-inside:avoid;page-break-inside:avoid;font-size:12px}
-  #wpPrint .wp-kt caption{font-weight:700;text-align:left;padding-bottom:2px}
-  #wpPrint .wp-kt th, #wpPrint .wp-kt td{border:1px solid #000;padding:2px 6px}
-  #wpPrint .wp-kt td.n, #wpPrint .wp-kt td.p{text-align:center}
+  body.wp-on #wpPrint{display:block;color:#000}
+  #wpPrint .wp-sheet{break-after:page;page-break-after:always;margin:0}
+  #wpPrint .wp-sheet:last-child{break-after:auto;page-break-after:auto}
 }`;
   function ensureStyle() {
     if (document.getElementById('wpStyle')) return;
     const st = document.createElement('style'); st.id = 'wpStyle'; st.textContent = CSS;
     document.head.appendChild(st);
   }
-  function print(work, what) {
-    ensureStyle();
-    let root = document.getElementById('wpPrint');
-    if (!root) { root = document.createElement('div'); root.id = 'wpPrint'; document.body.appendChild(root); }
-    root.innerHTML = render(work, what);
+  async function print(work, what, orient) {
+    const root = ensureRoot();
+    await build(work, what, orient);
+    root.className = '';
     document.body.classList.add('wp-on');
     // класс снимаем после печати: иначе Ctrl+P позже напечатает этот же лист
     const off = () => { document.body.classList.remove('wp-on'); window.removeEventListener('afterprint', off); };
     window.addEventListener('afterprint', off);
-    // картинки успевают загрузиться до окна печати
-    const imgs = [...root.querySelectorAll('img')].filter(i => !i.complete);
-    const ready = Promise.race([
-      Promise.all(imgs.map(i => new Promise(r => { i.onload = i.onerror = r; }))),
-      new Promise(r => setTimeout(r, 4000)),
-    ]);
-    return ready.then(() => { window.print(); });
+    window.print();
   }
-  // окно «что печатать»; getWork() — свежая работа на момент нажатия
-  function ask(getWork) {
+  const safeName = s => String(s || 'Работа').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Работа';
+  // PDF-файл: каждый лист — страница А4 нужной ориентации
+  async function download(work, what, orient) {
+    orient = orient === 'landscape' ? 'landscape' : 'portrait';
+    const L = window.MathhLibs;
+    if (!L) throw new Error('нет lazy-libs.js');
+    const [h2c, lib] = await Promise.all([L.load('html2canvas'), L.load('jspdf')]);
+    const sheets = await build(work, what, orient);
+    const root = document.getElementById('wpPrint');
+    try {
+      const doc = new lib.jsPDF({ orientation: orient, unit: 'mm', format: 'a4', compress: true });
+      const W = orient === 'landscape' ? 297 : 210, H = orient === 'landscape' ? 210 : 297;
+      for (let i = 0; i < sheets.length; i++) {
+        const cv = await h2c(sheets[i], { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
+        if (i) doc.addPage('a4', orient);
+        doc.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H, undefined, 'FAST');
+      }
+      const vs = (work.variants || []).filter(v => (v.blocks || []).some(isTask));
+      doc.save(safeName(work.title) + (vs.length > 1 ? '' : (vs[0] && vs[0].num > 1 ? ' — вариант ' + vs[0].num : '')) + '.pdf');
+      return sheets.length;
+    } finally { root.innerHTML = ''; root.className = ''; }
+  }
+  const LS_OR = 'wp:orient';
+  const lsGet = () => { try { return localStorage.getItem(LS_OR) === 'landscape' ? 'landscape' : 'portrait'; } catch (e) { return 'portrait'; } };
+  const lsSet = v => { try { localStorage.setItem(LS_OR, v); } catch (e) {} };
+  // окно «что печатать»; getWork() — свежая работа на момент нажатия.
+  // opts.student — без ключа с ответами
+  function ask(getWork, opts) {
+    opts = opts || {};
     ensureStyle();
+    if (window.MathhLibs) { window.MathhLibs.load('html2canvas').catch(() => {}); window.MathhLibs.load('jspdf').catch(() => {}); }
     const old = document.querySelector('.wp-dlg'); if (old) old.remove();
     const d = document.createElement('div'); d.className = 'wp-dlg'; d.id = 'wpDlg';
-    d.innerHTML = '<div class="box" role="dialog" aria-modal="true" aria-labelledby="wpDlgH"><h3 id="wpDlgH">Печать</h3>'
-      + '<label><input type="checkbox" id="wpTasks" checked><span>Задания<small>каждый вариант с новой страницы, поля «Фамилия, имя» и «Класс»</small></span></label>'
+    const cur = lsGet();
+    d.innerHTML = '<div class="box" role="dialog" aria-modal="true" aria-labelledby="wpDlgH"><h3 id="wpDlgH">Печать и PDF</h3>'
+      + '<label><input type="checkbox" id="wpTasks" checked><span>Задания<small>как в экзаменационной работе: шапка, нумерация, номера страниц</small></span></label>'
       + '<label><input type="checkbox" id="wpBlank"><span>Бланк ответов<small>клетки для ответа; у развёрнутых — «решение на отдельном листе»</small></span></label>'
-      + '<label><input type="checkbox" id="wpKey"><span>Ключ для учителя<small>все варианты: № → ответ → балл</small></span></label>'
+      + (opts.student ? '' : '<label><input type="checkbox" id="wpKey"><span>Ключ для учителя<small>все варианты: № → ответ → балл</small></span></label>')
+      + '<div class="ori" role="radiogroup" aria-label="Ориентация листа">'
+      + '<label><input type="radio" name="wpOri" value="portrait"' + (cur === 'portrait' ? ' checked' : '') + '>Книжная</label>'
+      + '<label><input type="radio" name="wpOri" value="landscape"' + (cur === 'landscape' ? ' checked' : '') + '>Альбомная</label></div>'
       + '<div class="note" id="wpNote"></div>'
-      + '<div class="row"><button class="btn quiet" id="wpCancel">Отмена</button><button class="btn" id="wpGo">Печатать</button></div></div>';
+      + '<div class="row"><button class="btn quiet" id="wpCancel">Отмена</button><button class="btn quiet" id="wpPdf">Скачать PDF</button><button class="btn" id="wpGo">Печатать</button></div></div>';
     document.body.appendChild(d);
     const close = () => d.remove();
     d.addEventListener('click', e => { if (e.target === d) close(); });
     d.querySelector('#wpCancel').addEventListener('click', close);
     d.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
-    d.querySelector('#wpGo').addEventListener('click', () => {
-      const what = { tasks: d.querySelector('#wpTasks').checked, blank: d.querySelector('#wpBlank').checked, key: d.querySelector('#wpKey').checked };
-      if (!what.tasks && !what.blank && !what.key) { d.querySelector('#wpNote').textContent = 'Отметьте, что печатать'; return; }
+    const collect = () => {
+      const q = id => d.querySelector(id);
+      const what = { tasks: q('#wpTasks').checked, blank: q('#wpBlank').checked, key: !!(q('#wpKey') && q('#wpKey').checked) };
+      if (!what.tasks && !what.blank && !what.key) { q('#wpNote').textContent = 'Отметьте, что печатать'; return null; }
       const w = getWork();
-      if (typeof w === 'string') { d.querySelector('#wpNote').textContent = w; return; }
-      close();
-      print(w, what);
+      if (typeof w === 'string') { q('#wpNote').textContent = w; return null; }
+      const orient = d.querySelector('input[name="wpOri"]:checked').value;
+      lsSet(orient);
+      return { w, what, orient };
+    };
+    d.querySelector('#wpGo').addEventListener('click', () => {
+      const c = collect(); if (!c) return;
+      close(); print(c.w, c.what, c.orient);
+    });
+    d.querySelector('#wpPdf').addEventListener('click', async () => {
+      const c = collect(); if (!c) return;
+      const b = d.querySelector('#wpPdf'); b.disabled = true; b.textContent = 'Готовлю PDF…';
+      try { await download(c.w, c.what, c.orient); close(); }
+      catch (e) { console.error('[печать] PDF не собрался', e); d.querySelector('#wpNote').textContent = 'PDF не собрался: ' + (e.message || e); b.disabled = false; b.textContent = 'Скачать PDF'; }
     });
     d.querySelector('#wpGo').focus();
     return d;
   }
 
-  window.WorkPrint = { correctText, info, specOf, render, print, ask };
+  window.WorkPrint = { correctText, info, specOf, build, render, print, download, ask };
 })();
