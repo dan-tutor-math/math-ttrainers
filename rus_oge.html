@@ -638,12 +638,16 @@ function runCheck(){
   }
   S.tries++;
   if (checkAnswer(t, v)) {
+    // задача 56: каждая попытка — в память ученика; верный ответ пишется ok, даже если до него были ошибки
+    if (window.StudentMemory) StudentMemory.recordAttempt({ id: t.id }, { page: 'rus_oge', ok: true });
     finish(S.revealed ? 'shown' : 'ok');
     fb.className = 'feedback good';
     fb.textContent = S.revealed ? 'Верно — но ответ был подсмотрен' : 'Верно!';
     return;
   }
   markWrong(t, v);
+  // задача 56: неверная попытка пишется bad сразу, а не в конце задания
+  if (window.StudentMemory) StudentMemory.recordAttempt({ id: t.id }, { page: 'rus_oge', ok: false });
   if (mode === 'exam' && S.tries >= EXAM_ATTEMPTS) {
     finish('bad');
     fb.className = 'feedback bad';
@@ -675,8 +679,7 @@ function finish(kind){
   // итог задания пишем один раз: повторный заход в уже решённое задание не
   // должен ни добавлять «верно», ни портить прошлый результат
   if (!results[t.id]) { results[t.id] = kind; LS.set('rusOge:results', results); }
-  // кабинет (Б2): верно без подсказки — ok, иначе (попытки кончились, ответ подсмотрен) — bad
-  if (window.StudentMemory) StudentMemory.recordTask({ id: t.id }, { page: 'rus_oge', clean: kind === 'ok' });
+  // память ученика (задача 56) пишется по каждой проверке в runCheck, здесь ничего не дублируем
   $('checkBtn').disabled = true;
   const P = $('questionPanel');
   if (t.k === 'mask') {
@@ -705,7 +708,11 @@ function showAnswer(){
 }
 function toggleReveal(){
   S.revealed = !S.revealed;
-  if (S.revealed) { showAnswer(); $('showBtn').textContent = 'Скрыть ответ'; }
+  if (S.revealed) {
+    showAnswer(); $('showBtn').textContent = 'Скрыть ответ';
+    // задача 56: подсказка до верного ответа — bad в момент подсказки (уже решённое не трогаем)
+    if (!S.done && !results[curTask().id] && window.StudentMemory) StudentMemory.recordAttempt({ id: curTask().id }, { page: 'rus_oge', ok: false });
+  }
   else { $('answerBox').innerHTML = ''; $('showBtn').textContent = 'Показать ответ'; }
 }
 function escapeHTML(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
