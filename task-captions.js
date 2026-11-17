@@ -118,16 +118,33 @@
         a.n += s[e].n; a.dates = a.dates.concat(s[e].dates);
       });
     });
+    // одно задание — решения цепочкой по времени («Решали: неверно 17.11 →
+    // верно 17.11», задача 56); у группы заданий цепочка смысла не имеет —
+    // там по-прежнему «Верно: даты», «Неверно: даты»
+    const chain = keys.length === 1 ? solveChain(keys[0], opt) : '';
     NAMES.forEach(([e, name]) => {
       const a = agg[e];
       if (!a) return;
+      if (chain && (e === 'ok' || e === 'bad')) return;
       a.dates.sort((x, y) => x - y);
       let t = name;
       if (opt.labelDates) t += ': ' + a.dates.slice(-4).map(fmtDate).join(', ') + (a.dates.length > 4 ? '…' : '');
       if (opt.labelCount && a.n > 1) t += ' ×' + a.n;
       out.push(t);
     });
+    if (chain) out.push('Решали: ' + chain);
     return { lines: out, total, last: lastEvent(keys) };
+  }
+  function solveChain(key, opt){
+    const s = summaryOf(key), runs = [];
+    ((s && s.events) || []).forEach(x => {
+      if (x.event !== 'ok' && x.event !== 'bad') return;
+      const r = runs[runs.length - 1];
+      if (r && r.e === x.event) { r.n++; r.last = x.at; } else runs.push({ e: x.event, n: 1, last: x.at });
+    });
+    const shown = runs.slice(-4);
+    const txt = shown.map(r => (r.e === 'ok' ? 'верно' : 'неверно') + (opt.labelDates ? ' ' + fmtDate(r.last) : '') + (opt.labelCount && r.n > 1 ? ' ×' + r.n : ''));
+    return txt.length ? (runs.length > shown.length ? '… → ' : '') + txt.join(' → ') : '';
   }
   function lastEvent(keys){
     let best = null;

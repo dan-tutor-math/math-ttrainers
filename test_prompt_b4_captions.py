@@ -139,7 +139,8 @@ def test_oge9(browser):
     page.hover('.tc-cur [data-tc-dot]')
     page.wait_for_timeout(200)
     pop = page.evaluate("document.querySelector('.tc-pop') ? document.querySelector('.tc-pop').innerText : ''")
-    check("oge9: всплывашка с событием и датой", "Верно" in pop and "." in pop and "Забыть" in pop, pop)
+    # задача 56: решения одного задания — строкой «Решали: верно 17.11» (цепочкой по времени)
+    check("oge9: всплывашка с событием и датой", "Решали: верно" in pop and "." in pop and "Забыть" in pop, pop)
     page.mouse.move(5, 5)
     page.wait_for_timeout(400)
 

@@ -55,17 +55,17 @@
     return r;
   }
 
-  // prev — итог до проверки. ok с первой попытки — ok; неверно — bad; верно
-  // после ошибки — тоже bad (как в тренажёрах, Б2): если сообщение о
-  // неверной попытке собеседника не дошло, bad всё равно запишется, а
-  // дубль в 10 минут отсекает StudentMemory
+  // prev — итог до проверки. Задача 56 (17.11): неверно — bad, верно — ok
+  // всегда, даже после ошибок, — в истории остаются и ошибка, и итог
+  // («неверно → верно»). Раньше верное после ошибки писалось как bad, и что
+  // задачу в конце решили, не было видно. Повтор в 10 минут отсекает StudentMemory
   function taskChecked(obj, prev){
     const st = obj && obj.task && obj.task.st;
     if (!st || (st.res !== 'ok' && st.res !== 'bad')) return null;
     const tries = Number(st.tries) || 1;
     // присланное собеседником состояние без новой попытки (повтор, ↺) — не проверка
     if (prev && (Number(prev.tries) || 0) >= tries && prev.res === st.res) return null;
-    return rec(keyOf(obj), st.res === 'ok' && tries <= 1 ? 'ok' : 'bad');
+    return rec(keyOf(obj), st.res === 'ok' ? 'ok' : 'bad');
   }
 
   /* ── кнопка «Начать сессию» на доске ──
@@ -123,6 +123,19 @@
     const d = new Date(t);
     return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0');
   }
+  // решения — цепочкой по времени («неверно 17.11 → верно 17.11», задача 56):
+  // подряд одинаковые склеиваются (×N), видны последние три звена
+  function solveChain(events, opt){
+    const runs = [];
+    (events || []).forEach(x => {
+      if (x.event !== 'ok' && x.event !== 'bad') return;
+      const r = runs[runs.length - 1];
+      if (r && r.e === x.event) { r.n++; r.last = x.at; } else runs.push({ e: x.event, n: 1, last: x.at });
+    });
+    const shown = runs.slice(-3);
+    const txt = shown.map(r => (r.e === 'ok' ? 'верно' : 'неверно') + (opt.labelDates ? ' ' + fmtDate(r.last) : '') + (opt.labelCount && r.n > 1 ? ' ×' + r.n : ''));
+    return txt.length ? (runs.length > shown.length ? '… → ' : '') + txt.join(' → ') : '';
+  }
   function labelText(s, name, opt){
     if (!s || !s.total) return 'Новое для ' + name;
     const part = (e, word) => {
@@ -130,7 +143,7 @@
       if (!b) return '';
       return word + (opt.labelDates ? ' ' + fmtDate(b.last) : '') + (opt.labelCount && b.n > 1 ? ' ×' + b.n : '');
     };
-    return [part('hw', 'в ДЗ'), part('board', 'на доске'), part('ok', 'верно'), part('bad', 'неверно')].filter(Boolean).join(' · ');
+    return [part('hw', 'в ДЗ'), part('board', 'на доске'), solveChain(s.events, opt)].filter(Boolean).join(' · ');
   }
   let labelEl = null, labelSig = '';
   function renderLabel(){

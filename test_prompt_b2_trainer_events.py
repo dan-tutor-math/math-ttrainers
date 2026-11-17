@@ -14,6 +14,9 @@ ok — с первого раза, bad — после ошибки. Сеть з�
   B. ege_prof: решено с первого раза — ok, ключ fipi:ege:<номер> (или gen:ege_prof:<id>);
      после ошибки — bad;
   C. вне сессии, на паузе — очередь пуста; follower (?s= в адресе) — пусто;
+  E. StudentMemory.recordAttempt (задача 56): неверно → bad сразу, потом
+     верно → ok (оба в очереди, по порядку); повтор bad в 10 минут — одной
+     строкой; ключ тот же, что у recordTask; follower — отказ;
   D. остальные страницы из таблицы аудита (oge1_5, oge7, oge15_18, oge19, русский,
      копии ege_prof) открываются без ошибок и подключают task-key.js до student-memory.js.
 
@@ -190,6 +193,26 @@ def test_ege_prof(browser):
     ctx.close()
 
 
+def test_record_attempt(browser):
+    ctx, page, errors = new_page(browser, f"{BASE}/oge6.html")
+    t = "{ fipi: 'ATT056' }"
+    page.evaluate(f"StudentMemory.recordAttempt({t}, {{ page: 'oge6', ok: false }})")
+    page.evaluate(f"StudentMemory.recordAttempt({t}, {{ page: 'oge6', ok: false }})")
+    page.evaluate(f"StudentMemory.recordAttempt({t}, {{ page: 'oge6', ok: true }})")
+    q = [(r["event"], r["task_key"]) for r in queue(page)]
+    check("recordAttempt: неверно, неверно, верно → bad, ok (повтор bad склеен)",
+          q == [("bad", "fipi:oge:ATT056"), ("ok", "fipi:oge:ATT056")], str(q))
+    s = page.evaluate("StudentMemory.summary('fipi:oge:ATT056')")
+    check("recordAttempt: в сводке порядок «неверно → верно»", [e["event"] for e in s["events"]] == ["bad", "ok"], str(s["events"]))
+    r = page.evaluate("StudentMemory.recordAttempt({ id: 'x' }, { page: 'нет_такой', ok: true })")
+    check("recordAttempt: без ключа — отказ no_key", r.get("ok") is False and r.get("reason") == "no_key", str(r))
+    page.evaluate("sessionStorage.setItem('tsTab:role', 'follower')")
+    r = page.evaluate("StudentMemory.recordAttempt({ fipi: 'ATT057' }, { page: 'oge6', ok: true })")
+    check("recordAttempt: follower — отказ", r.get("ok") is False and r.get("reason") == "follower", str(r))
+    check("recordAttempt: без ошибок JS", not errors, str(errors[:1]))
+    ctx.close()
+
+
 def test_other_pages(browser):
     pages = ["oge1_5", "oge7", "oge15_18", "oge19", "rus_oge", "rus_oge01", "rus_oge13",
              "ege_base", "oge_part2", "soc_oge", "eng_oge"]
@@ -212,6 +235,7 @@ def main():
         test_no_session(browser)
         test_follower(browser)
         test_ege_prof(browser)
+        test_record_attempt(browser)
         test_other_pages(browser)
         browser.close()
     print("\nПровалено:", len(FAILS))

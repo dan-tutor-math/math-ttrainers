@@ -17,7 +17,9 @@ Supabase — заглушка (как в test_prompt_b3_board_memory.py), но �
   D. Подписи выключены (labels = off) — метки нет; включены — снова есть;
   E. «✕» → «Забыть» → строки по ключу удалены из очереди и копии журнала,
      метка пропала; «Нет» — метка остаётся;
-  F. follower и конец сессии — меток нет.
+  F. follower и конец сессии — меток нет;
+  G. задача 56: на доске неверно, потом верно → в очереди bad и ok, метка
+     «Петя: … неверно … → верно …», точка зелёная.
 
 Запуск: python3 test_prompt_b3_board_marks.py (сервер поднимается сам).
 """
@@ -122,6 +124,21 @@ def main():
         page.wait_for_timeout(1100)
         frames(page)
         check("F: follower — меток нет", mark(page, o["id"]) is None)
+
+        # G. неверно, потом верно — в истории оба (задача 56)
+        page.evaluate("sessionStorage.removeItem('tsTab:role')")
+        page.wait_for_timeout(1100)
+        o2 = B.add_oge6(page)
+        k2 = o2.get("tkey")
+        R.focus_on(page, o2["id"])
+        st = R.fill_check(page, o2["id"], ["987654321"])
+        st = R.fill_check(page, o2["id"], [B.answer_of(o2) or ""])
+        frames(page)
+        ev = [r["event"] for r in B.queue(page) if r["task_key"] == k2 and r["event"] in ("ok", "bad")]
+        check("G: неверно, потом верно → bad, затем ok", st.get("res") == "ok" and ev == ["bad", "ok"], f"{st} {ev}")
+        mk = mark(page, o2["id"]) or {}
+        check("G: метка цепочкой «неверно … → верно …»", "неверно" in mk.get("text", "") and "→ верно" in mk.get("text", ""), str(mk))
+        check("G: точка зелёная — последнее верно", mk.get("last") == "ok", str(mk))
 
         check("без ошибок JS", not errors, str(errors[:2]))
         br.close()

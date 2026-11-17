@@ -6,7 +6,7 @@
    Что показывает: задания ФИПИ — по экзамену, у каждого события с датами
    («в ДЗ 19.01 · на доске 21.02 · решали 21.02, верно»); сгенерированные —
    по номеру (странице) и виду со счётчиком и датой последнего раза.
-   Фильтр «решено неверно»; выбор строк → «Забыть выбранные»; «Забыть вид»,
+   Фильтр «были ошибки»; выбор строк → «Забыть выбранные»; «Забыть вид»,
    «Забыть номер», «Забыть всё по экзамену» — каждое с подтверждением.
 
    Почему так:
@@ -16,8 +16,10 @@
      при открытии карточки, а forget правит и сервер, и копию.
    - Ключи («fipi:oge:2933FB», «gen:oge9:p3») разбираем сами по правилам
      task-key.js: ни одного вымышленного поля, только то, что в ключе.
-   - «Решено неверно» — когда ПОСЛЕДНЕЕ решение по заданию (ok/bad) было
-     неверным: если потом решили верно, задание из фильтра уходит.
+   - «Были ошибки» — по заданию есть хоть одно bad (задача 56, 17.11): с
+     нею неверный ответ пишется сразу, а верный потом — отдельным ok, и
+     «неверно → верно» тоже стоит повторить. Раньше фильтр смотрел последнее
+     решение, и такое задание из него уходило.
    ========================================================== */
 (function(){
   'use strict';
@@ -50,6 +52,7 @@
     return e.event === 'hw' ? 'в ДЗ ' + d : e.event === 'board' ? 'на доске ' + d
       : e.event === 'ok' ? 'решали ' + d + ', верно' : 'решали ' + d + ', неверно';
   }
+  function hadBad(events){ return events.some(e => e.event === 'bad'); }
   function lastSolve(events){
     for (let i = events.length - 1; i >= 0; i--) if (events[i].event === 'ok' || events[i].event === 'bad') return events[i].event;
     return null;
@@ -69,7 +72,7 @@
         const p = parseKey(k);
         if (p.type === 'fipi'){
           const s = SM.summary(k, { studentId: sid });
-          (fipi[p.exam] = fipi[p.exam] || []).push({ key: k, id: p.id, events: s.events, last: s.last, solve: lastSolve(s.events) });
+          (fipi[p.exam] = fipi[p.exam] || []).push({ key: k, id: p.id, events: s.events, last: s.last, solve: lastSolve(s.events), bad: hadBad(s.events) });
         } else if (p.type === 'gen'){
           const g = (gen[p.page] = gen[p.page] || {});
           g[p.kind] = g[p.kind] || { key: 'gen:' + p.page + ':' + p.kind };
@@ -79,6 +82,7 @@
         const e = gen[pg][kd];
         e.sum = SM.kindSummary(e.key, { studentId: sid });
         e.solve = lastSolve(e.sum.events);
+        e.bad = hadBad(e.sum.events);
       }));
       return { fipi, gen };
     }
@@ -107,14 +111,14 @@
       let html = '', visible = 0;
       const vis = [];
       exams.forEach(ex => {
-        const rows = m.fipi[ex].filter(r => !onlyBad || r.solve === 'bad').sort((a, b) => b.last - a.last);
+        const rows = m.fipi[ex].filter(r => !onlyBad || r.bad).sort((a, b) => b.last - a.last);
         if (!rows.length) return;
         visible += rows.length; rows.forEach(r => vis.push(r.key));
         html += '<div class="mgrp"><div class="mgh"><b>Задания ФИПИ · ' + esc(EXAM_NAMES[ex] || ex) + '</b><span class="hint">' + plural(rows.length, 'задание', 'задания', 'заданий') + '</span>' +
           '<button class="btn quiet small" data-forget="fipi:' + esc(ex) + '" data-what="все задания ФИПИ: ' + esc(EXAM_NAMES[ex] || ex) + '">Забыть всё по экзамену</button></div>' + rows.map(fipiRow).join('') + '</div>';
       });
       pages.forEach(pg => {
-        const kinds = Object.keys(m.gen[pg]).filter(kd => !onlyBad || m.gen[pg][kd].solve === 'bad').sort();
+        const kinds = Object.keys(m.gen[pg]).filter(kd => !onlyBad || m.gen[pg][kd].bad).sort();
         if (!kinds.length) return;
         visible += kinds.length; kinds.forEach(kd => vis.push(m.gen[pg][kd].key));
         html += '<div class="mgrp"><div class="mgh"><b>Сгенерированные · ' + esc(pageName(pg)) + '</b><span class="hint">' + plural(kinds.length, 'вид', 'вида', 'видов') + '</span>' +
@@ -123,12 +127,12 @@
       // выбранное, чего больше нет на экране (забыто или отфильтровано), снимаем
       selected = new Set(Array.from(selected).filter(k => vis.indexOf(k) >= 0));
       if (!html) html = '<div class="hint" style="padding:6px 2px">' + (loadErr ? esc(loadErr)
-        : onlyBad ? 'Неверно решённых заданий нет.' : 'Пока ничего: что выдавали в ДЗ, выводили на доску и решали в сессии с этим учеником — появится здесь.') + '</div>';
+        : onlyBad ? 'Заданий с ошибками нет.' : 'Пока ничего: что выдавали в ДЗ, выводили на доску и решали в сессии с этим учеником — появится здесь.') + '</div>';
       const confirmHtml = pending
         ? '<div class="mconf" role="alertdialog"><span>Забыть ' + esc(pending.what) + '? Строки журнала удалятся, это нельзя отменить.</span>' +
           '<button class="btn danger small" data-act="yes">Забыть</button><button class="btn quiet small" data-act="no">Отмена</button></div>' : '';
       box.innerHTML = '<div class="memory"><div class="mhead"><b>Память заданий</b>' +
-        '<label class="mfilt"><input type="checkbox" id="mBad"' + (onlyBad ? ' checked' : '') + '> решено неверно</label>' +
+        '<label class="mfilt"><input type="checkbox" id="mBad"' + (onlyBad ? ' checked' : '') + '> были ошибки</label>' +
         '<button class="btn small" id="mForgetSel"' + (selected.size ? '' : ' disabled') + '>Забыть выбранные' + (selected.size ? ' (' + selected.size + ')' : '') + '</button></div>' +
         confirmHtml + (msg ? '<div class="hint" role="status" id="mMsg">' + esc(msg) + '</div>' : '') + html + '</div>';
     }
