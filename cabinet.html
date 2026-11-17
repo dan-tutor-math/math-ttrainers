@@ -249,6 +249,8 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
             <button type="button" data-v="browser">Весь браузер</button>
             <button type="button" data-v="tab">Вкладка</button>
           </div>
+          <label class="chk"><input type="checkbox" id="setGoHome"> После «Начать сессию» переходить на главную</label>
+          <div class="hint">На главной сессия уже идёт, а сверху висит «Отменить» — до первого нажатия на что-нибудь другое. Он закончит сессию и вернёт в кабинет.</div>
         </div>
         <div class="set-group">
           <h3>Подписи заданий</h3>
@@ -500,8 +502,10 @@ function bindSessionBtn(s){
     const cur = SM.current();
     if (cur && cur.id === String(s.id)) { SM.end(); return; }
     btn.disabled = true;
-    try { await SM.start({ id: s.id, name: $('cName').textContent || s.name }); }
+    let ok = false;
+    try { await SM.start({ id: s.id, name: $('cName').textContent || s.name }); ok = true; }
     finally { btn.disabled = !!s.archived_at; paint(); }
+    if (ok && TS.get().sessionGoHome && SM.goHome) SM.goHome();
   });
   off = SM.onChange(paint);
   paint();
@@ -550,6 +554,7 @@ function paintSettings(){
   document.querySelectorAll('#fmtNames input').forEach(inp => {
     if (document.activeElement !== inp) inp.value = (s.formatLabels || {})[inp.dataset.fmt] || '';
   });
+  $('setGoHome').checked = !!s.sessionGoHome;
   $('setDates').checked = s.labelDates;
   $('setCount').checked = s.labelCount;
   const custom = [45, 60, 90].indexOf(s.lessonMin) < 0 || $('segMin').dataset.custom === '1';
@@ -577,6 +582,7 @@ async function renderSettings(){
       }
       save({ [key]: b.dataset.v });
     }));
+    $('setGoHome').addEventListener('change', e => save({ sessionGoHome: e.target.checked }));
     $('setDates').addEventListener('change', e => save({ labelDates: e.target.checked }));
     document.querySelectorAll('#fmtNames input').forEach(inp => inp.addEventListener('change', () => {
       const fl = Object.assign({}, TS.get().formatLabels);

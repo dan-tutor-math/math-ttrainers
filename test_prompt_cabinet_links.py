@@ -69,6 +69,7 @@ def seed():
     d["students"][0]["boards"] = ["bd-vanya"]
     d["students"][0]["note"] = "Слабо знает дроби"
     d["students"][0]["grade"] = "9"
+    d["boards"] = [{"id": "bd-petya", "owner": OWNER, "title": "Доска Пети", "trashed_at": None}]
     d["lessons"] = [
         lesson(L_OLD, "2026-11-12", 900),                           # давнее, без записей
         lesson(L_YDAY, "2026-11-17", 900, "pair"),                  # вчера, пара: Ваня и Петя
@@ -158,7 +159,16 @@ def main():
         check("B4 доска ученика: ссылка на boards.html#board=", p.get_attribute("#spBoard", "href") == "boards.html#board=bd-vanya")
         p.click(f'.sc-sp-pick button[data-pick="{PETYA}"]')
         check("B5 выбран Петя — карточка и ссылка поменялись", "Петя" in p.inner_text(".sc-sp-card") and p.get_attribute("#spCard", "href") == f"#/students/{PETYA}")
-        check("B6 у Пети доски нет — кнопка выключена", p.is_disabled("#spBoard"))
+        check("B6 у Пети доски нет — вместо серой кнопки «Закрепить доску»",
+              p.locator("#spBoard").count() == 0 and p.is_enabled("#spPin") and p.inner_text("#spPin") == "Закрепить доску")
+        p.click("#spPin")
+        p.wait_for_selector('[data-pin-board="bd-petya"]', timeout=5000)
+        check("B6a список досок преподавателя", "Доска Пети" in p.inner_text(".sc-sp-pick-boards"))
+        p.click('[data-pin-board="bd-petya"]')
+        p.wait_for_selector("a#spBoard", timeout=5000)
+        check("B6b доска закреплена — «Открыть доску» ведёт на неё", p.get_attribute("#spBoard", "href") == "boards.html#board=bd-petya")
+        pet = [x for x in db()["students"] if x["id"] == PETYA][0]
+        check("B6c в базе у Пети доска записана", pet.get("boards") == ["bd-petya"], str(pet.get("boards")))
         p.keyboard.press("Escape")
         check("B7 Esc закрывает панель", p.locator(".sc-side").count() == 0)
 
@@ -224,6 +234,33 @@ def main():
         p.evaluate("() => { location.hash = '#/settings'; }")
         p.wait_for_function("() => !document.querySelector('.sc-side')", timeout=3000)
         check("C10 панель не остаётся на других вкладках", p.locator(".sc-side").count() == 0)
+
+        # ── E. шаги загрузки и «Начать сессию» с переходом на главную ──
+        p.goto(f"{BASE}/cabinet.html#/schedule/2026-11-16")
+        p.reload()
+        p.wait_for_selector("#scSteps .sc-step", timeout=10000)
+        p.wait_for_function("() => document.querySelectorAll('#scSteps .sc-step.ok').length >= 1 && !document.querySelector('#scSteps .sc-step.run')", timeout=8000)
+        txt = p.inner_text("#scSteps")
+        check("E1 строка шагов: локальная копия и облако готовы", "Локальная копия" in txt and "Облако обновлено" in txt, txt)
+        p.evaluate("() => TeacherSettings.set({ sessionGoHome: true })")
+        open_lesson(p, L_NOON)
+        p.wait_for_selector("#spSession")
+        p.click("#spSession")
+        p.wait_for_url("**/index.html", timeout=10000)
+        p.wait_for_selector("#smUndo", timeout=5000)
+        check("E2 после старта — главная, сессия идёт, висит «Отменить»", p.evaluate("() => !!StudentMemory.current()"))
+        p.click("#smUndo")
+        p.wait_for_url("**/cabinet.html**", timeout=10000)
+        p.wait_for_function("() => !StudentMemory.current()", timeout=5000)
+        check("E3 «Отменить» закончил сессию и вернул в кабинет", True)
+        open_lesson(p, L_NOON)
+        p.wait_for_selector("#spSession")
+        p.click("#spSession")
+        p.wait_for_url("**/index.html", timeout=10000)
+        p.wait_for_selector("#smUndo", timeout=5000)
+        p.mouse.click(400, 400)
+        p.wait_for_selector("#smUndo", state="detached", timeout=3000)
+        check("E4 нажатие на другое убирает «Отменить», сессия остаётся", p.evaluate("() => !!StudentMemory.current()"))
 
         check("D нет ошибок JavaScript", not errors, "; ".join(errors))
         browser.close()

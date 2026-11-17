@@ -483,3 +483,18 @@ button.rw-ic:hover{filter:brightness(1.08);border-color:var(--ink);}
   .sc-tplbar .btn.sc-wclear,.sc-tplbar .btn#tplDel{grid-column:span 3;}
   .sc-tplbar .seg.sc-views{width:100%;}
 }
+
+/* строка шагов загрузки: локальная копия › облако › старое приложение */
+.sc-steps{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;margin:-6px 0 10px;font-size:12.5px;color:var(--muted,#6b7280);min-height:20px;}
+.sc-step{display:inline-flex;align-items:center;gap:5px;}
+.sc-step i{font-style:normal;display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;font-size:10px;font-weight:700;background:rgba(127,127,127,.18);}
+.sc-step.ok i{background:#2fa35b;color:#fff;}
+.sc-step.err i{background:#d64545;color:#fff;}
+.sc-step.err{color:#d64545;}
+.sc-step.run i{background:none;border:2px solid rgba(127,127,127,.35);border-top-color:var(--accent,#4f6bed);animation:scSpin .8s linear infinite;}
+.sc-step.run{color:var(--ink,#222);}
+.sc-step-arrow{opacity:.45;}
+@keyframes scSpin{to{transform:rotate(360deg);}}
+@media (prefers-reduced-motion:reduce){.sc-step.run i{animation:none;}}
+.sc-sp-pick-boards{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0;}
+.sc-sp-pick-boards .label{flex-basis:100%;}

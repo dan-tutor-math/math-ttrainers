@@ -32,7 +32,7 @@
 (function(){
   const LS_KEY = 'teacher:settings:v1';
   const FORMAT_LABELS = { single: 'Индивидуальное', pair: 'Пара', group: 'Группа', semi: 'Полупараллелка' };
-  const DEFAULTS = { sessionBind: 'browser', labels: 'show', labelDates: true, labelCount: true, lessonMin: 60,
+  const DEFAULTS = { sessionBind: 'browser', sessionGoHome: false, labels: 'show', labelDates: true, labelCount: true, lessonMin: 60,
                      formatLabels: Object.assign({}, FORMAT_LABELS),
                      pay: { skipRule: 'free', reason: 'болезнь', remindLeft: 1, remindDays: 3, flags: [], monthMode: 'x4' },
                      incomeGroups: [] };
@@ -44,6 +44,7 @@
     const o = Object.assign({}, DEFAULTS, { pay: normalizePay(null), incomeGroups: [], studentCats: [] });
     if (!raw || typeof raw !== 'object') return o;
     if (raw.sessionBind === 'tab' || raw.sessionBind === 'browser') o.sessionBind = raw.sessionBind;
+    if (typeof raw.sessionGoHome === 'boolean') o.sessionGoHome = raw.sessionGoHome;
     if (['show', 'off', 'hide_solved'].indexOf(raw.labels) >= 0) o.labels = raw.labels;
     if (typeof raw.labelDates === 'boolean') o.labelDates = raw.labelDates;
     if (typeof raw.labelCount === 'boolean') o.labelCount = raw.labelCount;

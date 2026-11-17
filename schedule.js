@@ -120,7 +120,10 @@
                // или прошлой загрузки): её обновляем молча, без «Загружаем»;
                // edits — свои правки оплат и итогов дня (правки занятий
                // считает schedule-cloud.js, SC.writes)
-               shown: null, edits: 0 };
+               shown: null, edits: 0,
+               // шаги загрузки для строки #scSteps: local — on (показана
+               // локальная копия) | none; cloud — run | ok | err
+               steps: { local: 'none', cloud: 'run' } };
   let modal = null;           // открытая карточка занятия
 
   function readView(){
@@ -204,8 +207,33 @@
      Две волны вместо пяти запросов подряд: всё, что не зависит друг от
      друга, — параллельно; оплаты берём по всем ученикам (не ждём занятий
      недели), итоги дней — сразу */
+  /* ── строка шагов: локальная копия → облако → старое приложение ──
+     Раньше неделя тихо подменялась свежей, и было не видно, что происходит.
+     Строка живёт в #scSteps и перерисовывается сама (не всем render) */
+  function stepsInner(){
+    const SY = window.ScheduleSync, sp = st.steps, fmt = at => new Date(at).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    const chip = (cls, mark, text) => '<span class="sc-step ' + cls + '"><i>' + mark + '</i>' + esc(text) + '</span>';
+    const a = sp.local === 'on' ? chip('ok', '✓', 'Локальная копия показана') : chip('skip', '–', 'Локальной копии нет');
+    const b = sp.cloud === 'run' ? chip('run', '', 'Загружаем свежее из облака…') : sp.cloud === 'err' ? chip('err', '!', 'Облако не отвечает') : chip('ok', '✓', 'Облако обновлено');
+    let c = '';
+    if (SY && SY.config().url) {
+      const s = SY.state;
+      c = s.busy ? chip('run', '', 'Синхронизируем со старым приложением…')
+        : s.status === 'ok' ? chip('ok', '✓', 'Старое приложение ' + fmt(s.at))
+        : s.status === 'error' ? chip('err', '!', 'Старое приложение: ошибка')
+        : chip('wait', '·', 'Старое приложение: ждёт очереди');
+    }
+    return a + '<span class="sc-step-arrow">›</span>' + b + (c ? '<span class="sc-step-arrow">›</span>' + c : '');
+  }
+  function paintSteps(){
+    const el = host && host.querySelector('#scSteps');
+    if (el) el.innerHTML = stepsInner();
+  }
+
   async function load(){
     const tok = ++st.loadTok;
+    st.steps.cloud = 'run';
+    paintSteps();
     const quiet = st.shown === st.week && !st.err;
     st.err = '';
     // эта неделя ещё не на экране — любая перерисовка (пришли настройки,
@@ -222,6 +250,7 @@
     } catch (e) {
       if (tok !== st.loadTok) return;
       st.loading = false;
+      st.steps.cloud = 'err'; paintSteps();
       // на экране уже эта неделя — оставляем её и говорим, что не обновилась
       if (quiet) { api.toast('Не удалось обновить расписание: ' + (e.message || e)); return; }
       st.err = e.message || String(e);
@@ -236,6 +265,7 @@
     applyData(fresh);
     st.loading = false;
     st.shown = st.week;
+    st.steps.cloud = 'ok';
     render();
     cacheSave();
     if (INS()) INS().weekLoaded();
@@ -1518,8 +1548,41 @@
     if (t.classList.contains('sc-x')) closePanel();
     else if (t.dataset.pick) { panel.sid = t.dataset.pick; paintPanel(); }
     else if (t.id === 'spEdit') openEditor(l);
+    else if (t.id === 'spPin') openPin();
+    else if (t.dataset.pinBoard) pinBoard(t.dataset.pinBoard);
+    else if (t.id === 'spPinX') { panel.pick = null; paintPanel(); }
     else if (t.id === 'spWhy' || t.id === 'spPaid' || t.dataset.flag) onPanelPay(t, l);
     else if (t.id === 'spSession') toggleSession(l);
+  }
+  /* «Закрепить доску»: вместо серой кнопки — список досок преподавателя;
+     выбранная привязывается к ученику (students.boards), как в его карточке */
+  function pinPickHtml(){
+    const k = panel.pick;
+    let h = '<div class="sc-sp-pick-boards"><div class="label">Какую доску закрепить за учеником</div>';
+    if (k.err) h += '<div class="hint">' + esc(k.err) + '</div>';
+    else if (!k.list) h += '<div class="hint">Загружаем доски…</div>';
+    else if (!k.list.length) h += '<div class="hint">Досок пока нет — создайте их на странице «Доски».</div>';
+    else h += k.list.map(b => '<button type="button" class="btn quiet small" data-pin-board="' + esc(b.id) + '"' + (k.busy ? ' disabled' : '') + '>' + esc(b.title) + '</button>').join('');
+    return h + '<button type="button" class="btn quiet small" id="spPinX">Отмена</button></div>';
+  }
+  async function openPin(){
+    if (!panel) return;
+    const pk = panel.pick = { list: null, err: '', busy: false };
+    paintPanel();
+    try { pk.list = await window.CabinetCloud.listBoards(); }
+    catch (e) { pk.err = 'Не удалось загрузить доски: ' + (e.message || e); }
+    if (panel && panel.pick === pk) paintPanel();
+  }
+  async function pinBoard(id){
+    const s = panel && panel.sid && st.byId[panel.sid], pk = panel && panel.pick;
+    if (!s || !pk || pk.busy) return;
+    pk.busy = true; paintPanel();
+    try {
+      const fresh = await window.CabinetCloud.updateStudent(s.id, { boards: (s.boards || []).filter(b => b !== id).concat(id) });
+      s.boards = fresh.boards || [id];
+      api.toast('Доска закреплена');
+    } catch (e) { api.toast('Не сохранилось: ' + (e.message || e)); }
+    if (panel) { panel.pick = null; paintPanel(); }
   }
   async function toggleSession(l){
     const SM = window.StudentMemory, s = st.byId[panel.sid];
@@ -1528,9 +1591,12 @@
     if (cur && cur.id === String(s.id) && cur.lessonId === l.id) { SM.end(); return; }
     const btn = panel.el.querySelector('#spSession');
     if (btn) btn.disabled = true;
-    try { await SM.start({ id: s.id, name: s.name }, { lessonId: l.id }); }
+    let ok = false;
+    try { await SM.start({ id: s.id, name: s.name }, { lessonId: l.id }); ok = true; }
     catch (er) { api.toast('Сессия не началась: ' + (er.message || er)); }
     paintPanel();
+    // настройка «переходить на главную»: сессия уже идёт, там висит «Отменить»
+    if (ok && settings().sessionGoHome && SM.goHome) SM.goHome();
   }
   function paintPanel(){
     if (!panel) return;
@@ -1560,9 +1626,10 @@
         '<div class="sc-sp-btns">' +
           '<a class="btn quiet" id="spCard" href="#/students/' + esc(s.id) + '">Открыть карточку</a>' +
           (board ? '<a class="btn quiet" id="spBoard" target="_blank" rel="noopener" href="boards.html#board=' + encodeURIComponent(board) + '" title="' + esc(boardWhere) + '">Открыть доску</a>'
-                 : '<button type="button" class="btn quiet" id="spBoard" disabled title="Ни к занятию, ни к ученику доска не привязана">Открыть доску</button>') +
+                 : '<button type="button" class="btn quiet" id="spPin" title="К занятию и ученику доска не привязана">Закрепить доску</button>') +
           '<button type="button" class="btn" id="spSession"' + (s.archived_at ? ' disabled title="Ученик в архиве"' : '') + '>' + (mine ? 'Закончить сессию' : 'Начать сессию') + '</button>' +
         '</div>' +
+        (panel.pick && !board ? pinPickHtml() : '') +
         '<div class="hint" id="spHint">' + (mine ? 'Идёт сессия с этим учеником' + (cur.paused ? ' (пауза)' : '') + ': задания запишутся на это занятие.'
           : cur ? 'Сейчас идёт сессия с учеником «' + esc(cur.name) + '» — она сменится.' : 'Задания сессии запишутся на это занятие.') +
           (board ? ' Доска: ' + esc(boardWhere) + '.' : '') + '</div>';
@@ -1810,7 +1877,7 @@
     else if (st.err) body = '<div class="empty">' + esc(st.err) + ' <button type="button" class="btn quiet small" id="scRetry">Повторить</button></div>';
     else if (st.mode !== 'week') body = TPL().paneHtml();
     else body = (st.view === 'grid' ? gridHtml() : listHtml()) + (INS() ? INS().weekBlocksHtml() : '');
-    host.innerHTML = headHtml() + '<div class="sc-body sc-v-' + st.view + '" id="scBody">' + body + '</div>';
+    host.innerHTML = headHtml() + '<div class="sc-steps" id="scSteps" role="status" aria-live="polite">' + stepsInner() + '</div><div class="sc-body sc-v-' + st.view + '" id="scBody">' + body + '</div>';
     const tb = host.querySelector('#scToday');
     // уже на этой неделе — адрес не меняется, перерисовываем сами (одна
     // перерисовка: вторая сняла бы вспышку дня)
@@ -1882,6 +1949,7 @@
     if (INS()) INS().attach(ctx);
     host = opts.host;
     st.view = readView();
+    if (window.ScheduleSync && window.ScheduleSync.onChange) window.ScheduleSync.onChange(paintSteps);
     if (api.settingsChanged) api.settingsChanged(() => { if (st.week) render(); });
   }
   function show(weekParam){
@@ -1898,6 +1966,8 @@
     closeStudentCard();
     // есть копия недели — рисуем её сразу, load() обновит молча
     const cached = cacheWeek(mon);
+    st.steps.local = cached ? 'on' : 'none';
+    st.steps.cloud = 'run';
     if (cached) { applyData(cached); st.err = ''; st.loading = false; st.shown = mon; render(); }
     return load();
   }

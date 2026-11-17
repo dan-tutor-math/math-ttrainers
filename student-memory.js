@@ -741,9 +741,42 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 
+
+  /* ── «Начать сессию» с переходом на главную и «Отменить» ──
+     Настройка кабинета sessionGoHome: после старта кабинет зовёт goHome() —
+     запоминает, откуда пришли (sessionStorage, только эта вкладка), и
+     открывает главную. Там сверху висит «Отменить»: закончит сессию и
+     вернёт обратно. Первое же нажатие на что-либо другое (или клавиша)
+     убирает кнопку — тогда начало сессии считается намеренным */
+  const UNDO_KEY = 'smUndo:v1', UNDO_TTL = 5 * 60 * 1000;
+  function goHome(){
+    try { sessionStorage.setItem(UNDO_KEY, JSON.stringify({ back: location.href, at: Date.now() })); } catch (e) {}
+    location.href = 'index.html';
+  }
+  function undoInit(){
+    if (!IN_TOP) return;
+    let u = null;
+    try { u = JSON.parse(sessionStorage.getItem(UNDO_KEY) || 'null'); sessionStorage.removeItem(UNDO_KEY); } catch (e) {}
+    if (!u || !u.back || Date.now() - u.at > UNDO_TTL || !current()) return;
+    css();
+    const st = document.createElement('style');
+    st.textContent = '#smUndo{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:2147483000;font:600 15px/1 system-ui,-apple-system,"Segoe UI",sans-serif;' +
+      'color:#fff;background:rgba(28,30,40,.92);border:0;border-radius:999px;padding:12px 20px;cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.28)}#smUndo:hover{background:#000}';
+    document.head.appendChild(st);
+    const b = document.createElement('button');
+    b.id = 'smUndo'; b.type = 'button'; b.textContent = '↩ Отменить начало сессии';
+    document.body.appendChild(b);
+    const drop = () => { b.remove(); st.remove(); document.removeEventListener('pointerdown', onAny, true); document.removeEventListener('keydown', onAny, true); };
+    const onAny = e => { if (e.target !== b) drop(); };
+    document.addEventListener('pointerdown', onAny, true);
+    document.addEventListener('keydown', onAny, true);
+    b.addEventListener('click', () => { drop(); end(); location.href = u.back; });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', undoInit); else undoInit();
+
   window.StudentMemory = {
     current, start, end, pause, record, recordTask, recordAttempt, summary, kindSummary, keys, logState, forget, fetchLog, loadLog,
-    listStudents, onChange, flush, isFollower, bindMode, setPickerContext,
+    listStudents, onChange, flush, isFollower, bindMode, setPickerContext, goHome,
     queue: () => readQueue().slice(), deadLetters: () => parse(lsGet(LS_DEAD), []),
     THROTTLE_MS,
   };
