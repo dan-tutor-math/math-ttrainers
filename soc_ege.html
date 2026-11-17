@@ -1665,7 +1665,10 @@ function captionList(list){
     if (card.dataset.pid) return [capKey(protoById(S.n, card.dataset.pid))];
     return list.filter(p => p.group === card.dataset.gid).map(capKey);
   });
-  TaskCaptions.showCurrent(els.pageSub, null);
+  // openTask сам зовёт renderPicker (список под заданием) уже после того, как
+  // поставил точку текущему заданию, — на экране задания её не сбрасываем,
+  // иначе точка «уже было у ученика» не живёт дольше одного кадра
+  TaskCaptions.showCurrent(els.pageSub, S.screen === 'task' && curProto ? curProto : null);
 }
 // сосед, который не пропускается; все пропущены — обычный сосед (пустого хода не бывает)
 function freshNeighbour(delta){

@@ -97,12 +97,16 @@
     return d;
   }
   // ключ задания, открытого сейчас в кадре панели (то, что «Добавить» положит)
-  function frameTaskKey(){
+  // tid и win можно передать снаружи: панель-устройство (boards-panel.html)
+  // держит тренажёр в своём кадре и знает свой id сама; на доске — как раньше
+  function frameTaskKey(tidArg, winArg){
     if (!window.TaskKey) return null;
-    let tid = null, win = null;
-    try { tid = typeof trainersOpenId !== 'undefined' ? trainersOpenId : null; } catch (e) {}
-    const fr = document.getElementById('bdTrainersIframe');
-    try { win = fr && fr.contentWindow; void win.document; } catch (e) { win = null; }
+    let tid = tidArg || null, win = winArg || null;
+    if (!tid && !win){
+      try { tid = typeof trainersOpenId !== 'undefined' ? trainersOpenId : null; } catch (e) {}
+      const fr = document.getElementById('bdTrainersIframe');
+      try { win = fr && fr.contentWindow; void win.document; } catch (e) { win = null; }
+    }
     if (!tid || !win) return null;
     try {
       const page = window.TaskKey.canonPage(tid);
@@ -173,6 +177,40 @@
     }
     labelEl.textContent = text;
     labelEl.title = key;
+  }
+
+  /* ── подпись в панели-устройстве (boards-panel.html) ──
+     Там тренажёр открыт в кадре, и точку страницы в кадре не рисуем (она нужна
+     только на самой странице). Поэтому та же подпись, что у панели на доске
+     («Имя: верно 17.11», «на доске», «Новое для Имени»), стоит над кнопками
+     «Добавить». Читает копию журнала из localStorage, как и доска, так что
+     после «Добавить» (событие пишет доска) и после решения подпись обновляется
+     сама. o: { el — узел подписи, tid() — id тренажёра, win() — окно кадра } */
+  function mountPanelLabel(o){
+    let sig = null;
+    function upd(){
+      let text = '', key = null;
+      try {
+        const m = SM();
+        const cur = m && !m.isFollower() ? m.current() : null;
+        if (cur && labelsMode().labels !== 'off'){
+          key = frameTaskKey(o.tid(), o.win());
+          if (key) text = labelText(m.summary(key), cur.name || 'ученика', labelsMode());
+        }
+      } catch (e) {}
+      const s2 = key + '|' + text;
+      if (s2 === sig) return;
+      sig = s2;
+      o.el.textContent = text;
+      o.el.title = key || '';
+      o.el.style.display = text ? '' : 'none';
+    }
+    const m0 = SM();
+    if (m0 && m0.onChange) m0.onChange(upd);
+    // задание в кадре меняется без событий (⟳, стрелки, список) — сверяемся раз в секунду
+    setInterval(upd, 1000);
+    upd();
+    return upd;
   }
 
   /* ── метка «уже было у ученика» у заданий на самой доске ──
@@ -279,5 +317,5 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 
-  window.BoardMemory = { keyOf, taskAdded, taskChecked, pickerContext, frameTaskKey, renderLabel, marksOn, markTask };
+  window.BoardMemory = { keyOf, taskAdded, taskChecked, pickerContext, frameTaskKey, renderLabel, marksOn, markTask, mountPanelLabel };
 })();
