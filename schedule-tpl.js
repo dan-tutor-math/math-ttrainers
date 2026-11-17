@@ -36,18 +36,18 @@
   const slotPeople = s => (s.is_event ? esc(s.title || 'событие') : s.people.length ? s.people.map(p => esc(X.personName(p))).join(', ') : '<span class="hint">нет учеников</span>');
 
   /* ── меню «Шаблон недели» в шапке: своё, стеклянное (не браузерный select) ── */
-  function weekMenuHtml(){
-    return '<button type="button" class="btn quiet small sc-tplbtn" id="scTplMenu" aria-haspopup="menu" title="Вставить шаблон в эту неделю или открыть шаблоны">Шаблон недели <span aria-hidden="true">▾</span></button>';
+  // mon — неделя списка (у каждой своя кнопка); без неё — кнопка шапки текущей недели
+  function weekMenuHtml(mon){
+    return '<button type="button" class="btn quiet small sc-tplbtn"' + (mon ? ' data-wk="' + mon + '"' : ' id="scTplMenu"') + ' aria-haspopup="menu" title="Вставить шаблон в эту неделю или открыть шаблоны">Шаблон недели <span aria-hidden="true">▾</span></button>';
   }
   function bindWeekMenu(host){
-    const btn = host.querySelector('#scTplMenu');
-    if (!btn) return;
-    btn.addEventListener('click', () => {
-      const ts = X.st.tpls;
-      const items = ts.length ? [{ head: 'Вставить в эту неделю' }].concat(ts.map(t => ({ label: (t.is_active ? '★ ' : '') + tplName(t), act: () => openInsert(t) })), [{ sep: true }]) : [];
+    host.querySelectorAll('.sc-tplbtn').forEach(btn => btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const mon = btn.dataset.wk || X.st.week, ts = X.st.tpls;
+      const items = ts.length ? [{ head: 'Вставить в эту неделю' }].concat(ts.map(t => ({ label: (t.is_active ? '★ ' : '') + tplName(t), act: () => openInsert(t, mon) })), [{ sep: true }]) : [];
       items.push({ label: 'Управлять шаблонами…', act: () => { X.st.mode = 'tpl'; X.render(); } });
       window.ScheduleRows.openMenu(btn, items);
-    });
+    }));
   }
 
   /* ── вставка шаблона в неделю ── */
@@ -56,15 +56,15 @@
     return X.st.lessons.find(l => l.day === day && (l.from_slot === s.id ||
       (s.start_min != null && l.start_min != null && l.start_min < s.start_min + s.dur_min && s.start_min < l.start_min + l.dur_min)));
   }
-  function openInsert(t){
-    const st = X.st;
+  function openInsert(t, wkMon){
+    const st = X.st, mon = wkMon || st.week;
     const items = t.slots.slice().sort((a, b) => a.weekday - b.weekday || byTime(a, b))
-      .map(s => { const day = X.addDays(st.week, s.weekday - 1); return { s, day, clash: clashOf(s, day) }; });
+      .map(s => { const day = X.addDays(mon, s.weekday - 1); return { s, day, clash: clashOf(s, day) }; });
     const m = X.modalShell('Вставить шаблон');
     const free = items.filter(i => !i.clash), busy = items.length - free.length;
     m.sheet.innerHTML =
       '<div class="sc-ed-head"><b>Вставить «' + esc(tplName(t)) + '»</b><button type="button" class="sc-x" aria-label="Закрыть">×</button></div>' +
-      '<div class="hint">Неделя ' + esc(X.rangeText(st.week)) + '. Будут созданы настоящие занятия — их можно двигать и отмечать как обычные.</div>' +
+      '<div class="hint">Неделя ' + esc(X.rangeText(mon)) + '. Будут созданы настоящие занятия — их можно двигать и отмечать как обычные.</div>' +
       (items.length ? '<div class="sc-ins">' + items.map(i =>
         '<div class="sc-ins-row' + (i.clash ? ' busy' : '') + '"><b>' + X.DAY_SHORT[i.s.weekday - 1] + '</b> <span class="mono">' + esc(slotTime(i.s)) + '</span> ' + slotPeople(i.s) +
         (i.clash ? ' <span class="sc-busy">уже занято: ' + esc(X.timeText(i.clash)) + '</span>' : '') + '</div>').join('') + '</div>'

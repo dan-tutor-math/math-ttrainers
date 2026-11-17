@@ -163,6 +163,8 @@ FIXED_NOW_JS = r"""
   window.confirm = () => { window.__nativeAsk++; return true; };
   window.alert = () => { window.__nativeAsk++; };
   window.prompt = () => { window.__nativeAsk++; return null; };
+  // проверки — про показ одной недели («Вид → Показ в „Строках“»); список месяца — в test_prompt_cabinet_week_month.py
+  try { if (!localStorage.getItem('cabinet:schedule:look')) localStorage.setItem('cabinet:schedule:look', JSON.stringify({ span: 'week' })); } catch (e) {}
 })();
 """
 

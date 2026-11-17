@@ -55,6 +55,8 @@ FIXED_NOW_JS = r"""
     static now(){ return R.now() + OFF; }
   }
   window.Date = D;
+  // старые тесты проверяют показ одной недели («Вид → Показ в „Строках“»); список месяца — в test_prompt_cabinet_week_month.py
+  try { if (!localStorage.getItem('cabinet:schedule:look')) localStorage.setItem('cabinet:schedule:look', JSON.stringify({ span: 'week' })); } catch (e) {}
 })();
 """
 B1.FAKE_SB_JS = B1.FAKE_SB_JS.replace(

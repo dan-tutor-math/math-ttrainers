@@ -62,7 +62,9 @@
     return t ? P().tplLoad(t, sid, rates(sid), today()).n : 0;
   }
   // kind: 'week' | 'tpl'
-  function whoHtml(kind, items){
+  // mon — неделя блока (в списке месяца у каждой недели свои сводки); у текущей id прежние, у остальных — с датой
+  const sfx = mon => (mon && mon !== st().week ? '_' + mon : '');
+  function whoHtml(kind, items, mon){
     const cnt = counts(items, kind === 'week' ? live : () => true);
     const list = X.activeStudents().slice().sort((a, b) => a.name.localeCompare(b.name, 'ru'));
     let need = 0, have = 0, short = 0, total = 0;
@@ -100,7 +102,7 @@
       const T = tplMoney(items);
       extra = ' · ' + money(T.inc) + ' в неделю · ' + money(T.inc * 4) + ' в месяц';
     }
-    const id = kind === 'week' ? 'scWho' : 'tplWho', fk = kind + ':' + (kind === 'week' ? st().week : st().tplId) + ':who';
+    const id = (kind === 'week' ? 'scWho' + sfx(mon) : 'tplWho'), fk = kind + ':' + (kind === 'week' ? (mon || st().week) : st().tplId) + ':who';
     const title = kind === 'week' ? 'Кто в этой неделе' : 'Кто уже в шаблоне';
     const hint = 'заливка — сколько раз в неделю поставлен из нужного · щелчок — подсветить, двойной щелчок — вписать в выбранную строку';
     return '<details class="si-box" id="' + id + '" data-fold="' + esc(fk) + '"' + (fold[fk] ? ' open' : '') + '>' +
@@ -113,12 +115,13 @@
   /* ══ деньги и часы ══ */
   // доход занятий: проведённое и запланированное (как сумма недели в
   // старом), ручной итог дня — вместо расчёта этого дня
-  function weekCalc(){
+  function weekCalc(mon){
+    mon = mon || st().week;
     const ps = P().paySettings(X.settings());
     let hours = 0, inc = 0, noRate = 0;
     const per = {};
     for (let i = 0; i < 7; i++) {
-      const day = X.addDays(st().week, i), ls = X.lessonsOf(day).filter(l => !l.is_event);
+      const day = X.addDays(mon, i), ls = X.lessonsOf(day).filter(l => !l.is_event);
       hours += P().busyHours(ls.filter(l => l.people.some(live)));
       let dayInc = 0;
       ls.forEach(l => l.people.forEach(p => {
@@ -148,15 +151,16 @@
     return { inc, noRate, hours, perHour: hours ? inc / hours : 0 };
   }
   const tile = (id, label, val, sub) => '<div class="pay-stat" id="' + id + '"><span class="label">' + label + '</span><b>' + val + '</b><small>' + sub + '</small></div>';
-  function weekStatsHtml(){
-    const W = weekCalc(), fk = 'week:' + st().week + ':stats';
+  function weekStatsHtml(mon){
+    mon = mon || st().week;
+    const W = weekCalc(mon), fk = 'week:' + mon + ':stats', k = sfx(mon);
     const sum = W.hours ? hoursText(W.hours) + ' · ' + money(W.perHour) + ' за час' : 'пока пусто';
-    return '<details class="si-box" id="scWeekStats" data-fold="' + esc(fk) + '"' + (fold[fk] ? ' open' : '') + '>' +
+    return '<details class="si-box" id="scWeekStats' + k + '" data-fold="' + esc(fk) + '"' + (fold[fk] ? ' open' : '') + '>' +
       '<summary><b>Статистика недели</b> <span class="si-sum">' + esc(sum) + '</span>' +
-        '<button type="button" class="btn quiet small si-stu" id="scWeekStu">Статистика по ученикам</button></summary>' +
+        '<button type="button" class="btn quiet small si-stu" id="scWeekStu' + k + '" data-wstu="' + mon + '">Статистика по ученикам</button></summary>' +
       '<div class="st-cards si-tiles">' +
-        tile('scWkHours', 'Часов в неделю', fmtH(W.hours), W.hours ? 'по времени занятий — пересечения не задваиваются' : 'пока пусто') +
-        tile('scWkHour', 'Средняя стоимость часа', money(W.perHour), W.hours ? 'доход за неделю ' + money(W.inc) + ' — проведённое и запланированное' : 'нет занятых часов') +
+        tile('scWkHours' + k, 'Часов в неделю', fmtH(W.hours), W.hours ? 'по времени занятий — пересечения не задваиваются' : 'пока пусто') +
+        tile('scWkHour' + k, 'Средняя стоимость часа', money(W.perHour), W.hours ? 'доход за неделю ' + money(W.inc) + ' — проведённое и запланированное' : 'нет занятых часов') +
       '</div>' + (W.noRate ? '<div class="hint st-warn">Без ставки: ' + P().plural(W.noRate, 'занятие', 'занятия', 'занятий') + ' — не вошли в доход.</div>' : '') +
       '</details>';
   }
@@ -174,14 +178,15 @@
   }
 
   /* ══ окно «Статистика по ученикам» за неделю ══ */
-  function openWeekStudents(){
-    const W = weekCalc(), m = X.modalShell('Статистика по ученикам');
+  function openWeekStudents(mon){
+    mon = mon || st().week;
+    const W = weekCalc(mon), m = X.modalShell('Статистика по ученикам');
     const byId = {};
     X.st.students.forEach(s => { byId[s.id] = s; });
     const rows = Object.keys(W.per).map(sid => ({ s: byId[sid], x: W.per[sid] })).filter(r => r.s)
       .sort((a, b) => b.x.inc - a.x.inc || a.s.name.localeCompare(b.s.name, 'ru'));
     const tot = rows.reduce((a, r) => ({ n: a.n + r.x.n, off: a.off + r.x.off, inc: a.inc + r.x.inc }), { n: 0, off: 0, inc: 0 });
-    m.sheet.innerHTML = '<div class="sc-ed-head"><b>Статистика по ученикам · ' + esc(X.rangeText(st().week)) + '</b><button type="button" class="sc-x" aria-label="Закрыть">×</button></div>' +
+    m.sheet.innerHTML = '<div class="sc-ed-head"><b>Статистика по ученикам · ' + esc(X.rangeText(mon)) + '</b><button type="button" class="sc-x" aria-label="Закрыть">×</button></div>' +
       (rows.length ? '<table class="si-tab" id="siWeekTab"><thead><tr><th>Ученик</th><th>Занятий</th><th>Отм./перен.</th><th>Доход</th></tr></thead><tbody>' +
         rows.map(r => '<tr data-sid="' + esc(r.s.id) + '"><td><a href="#/students/' + esc(r.s.id) + '">' + esc(r.s.name) + '</a></td><td>' + r.x.n + '</td><td>' + (r.x.off || '—') + '</td><td>' + esc(money(r.x.inc)) + '</td></tr>').join('') +
         '</tbody><tfoot><tr><td>Всего</td><td>' + tot.n + '</td><td>' + (tot.off || '—') + '</td><td>' + esc(money(tot.inc)) + '</td></tr></tfoot></table>' +
@@ -223,11 +228,11 @@
   // дни открытой недели берём из живого состояния расписания: отметка ✓
   // сразу меняет итог месяца, без новой загрузки
   function monthLessons(){
-    const a = st().week, b = X.addDays(a, 6), ym = month.key;
+    const a = st().win.from, b = st().win.to, ym = month.key;
     return month.lessons.filter(l => l.day < a || l.day > b).concat(st().lessons.filter(l => l.day.slice(0, 7) === ym));
   }
   function monthTotals(){
-    const a = st().week, b = X.addDays(a, 6), out = {};
+    const a = st().win.from, b = st().win.to, out = {};
     Object.keys(month.totals).forEach(d => { if (d < a || d > b) out[d] = month.totals[d]; });
     Object.keys(st().totals || {}).forEach(d => { if (d.slice(0, 7) === month.key) out[d] = Number(st().totals[d].amount); });
     return out;
@@ -345,8 +350,7 @@
      host — блок недели или шаблона; o = { insert(sid) } — вписать ученика */
   function bind(root, o){
     root.querySelectorAll('details.si-box').forEach(d => d.addEventListener('toggle', () => { fold[d.dataset.fold] = d.open; }));
-    const wst = root.querySelector('#scWeekStu');
-    if (wst) wst.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); openWeekStudents(); });
+    root.querySelectorAll('[data-wstu]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); openWeekStudents(b.dataset.wstu); }));
     let timer = null;
     root.querySelectorAll('[data-who]').forEach(b => {
       b.addEventListener('click', () => {
@@ -368,7 +372,11 @@
     const mon = root.querySelector('#scMonth');
     if (mon) bindMonth(mon);
   }
-  function weekBlocksHtml(){ return '<div class="si-blocks" id="scBlocks">' + whoHtml('week', X.st.lessons) + weekStatsHtml() + '</div>'; }
+  function weekBlocksHtml(mon){
+    mon = mon || st().week;
+    const items = X.st.lessons.filter(l => l.day >= mon && l.day <= X.addDays(mon, 6));
+    return '<div class="si-blocks"' + (sfx(mon) ? '' : ' id="scBlocks"') + '>' + whoHtml('week', items, mon) + weekStatsHtml(mon) + '</div>';
+  }
   function tplBlocksHtml(slots){ return '<div class="si-blocks" id="tplBlocks">' + whoHtml('tpl', slots) + tplStatsHtml(slots) + '</div>'; }
   // неделя сменилась или занятия переписали — месяц пересчитать
   function weekLoaded(){ if (monthOfWeek() !== month.key) { month.lessons = null; month.err = ''; } loadMonth(true); if (pop && pop.paint) pop.paint(); }

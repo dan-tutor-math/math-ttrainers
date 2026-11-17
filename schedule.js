@@ -121,6 +121,8 @@
                // edits — свои правки оплат и итогов дня (правки занятий
                // считает schedule-cloud.js, SC.writes)
                shown: null, edits: 0,
+               // окно загруженных занятий: неделя или весь месяц (см. winOf); wopen — какие недели списка развёрнуты
+               win: null, shownWin: null, wopen: {},
                // шаги загрузки для строки #scSteps: local — on (показана
                // локальная копия) | none; cloud — run | ok | err
                steps: { local: 'none', cloud: 'run' } };
@@ -133,7 +135,46 @@
   function setView(v){
     st.view = v;
     try { localStorage.setItem(VIEW_KEY, v); } catch (e) {}
-    render();
+    if (!applyWin()) render();
+  }
+  /* ── окно данных: одна неделя или весь месяц ──
+     В виде «Строки» (если не выключено в «Вид → Показ») недели месяца идут
+     списком, и править можно любую развёрнутую. Поэтому занятия грузим за
+     весь месяц целиком (недели, которые его задевают), а st.week — «текущая»
+     неделя: у неё открыты блоки и на неё смотрят сводки. Месяц недели — тот,
+     на который приходится её четверг (как у итога месяца) */
+  const monthKey = mon => addDays(mon, 3).slice(0, 7);
+  const monthMode = () => st.view === 'list' && look.span !== 'week';
+  function winOf(mon){
+    if (!monthMode()) return { from: mon, to: addDays(mon, 6) };
+    const ym = monthKey(mon), y = Number(ym.slice(0, 4)), m = Number(ym.slice(5));
+    return { from: mondayOf(ym + '-01'), to: addDays(mondayOf(ym + '-' + pad(new Date(y, m, 0).getDate())), 6) };
+  }
+  const winKey = w => (w || st.win).from + '|' + (w || st.win).to;
+  // ключ копии: окно в одну неделю — её понедельник (как раньше), месяц — «с|по»
+  const cKey = w => { w = w || st.win; return w.to === addDays(w.from, 6) ? w.from : winKey(w); };
+  const inWin = day => !!st.win && day >= st.win.from && day <= st.win.to;
+  const weeksOfWin = () => { const a = []; for (let m = st.win.from; m <= st.win.to; m = addDays(m, 7)) a.push(m); return a; };
+  const weekOpen = mon => (mon in st.wopen ? st.wopen[mon] : mon === st.week);
+  const weekLessons = mon => st.lessons.filter(l => l.day >= mon && l.day <= addDays(mon, 6));
+  // вид или «Показ» поменяли — окно данных могло стать другим (неделя ↔ месяц).
+  // true — запустили перезагрузку (она сама перерисует)
+  function applyWin(){
+    if (!st.week) return false;
+    const nw = winOf(st.week);
+    if (st.win && winKey(nw) === winKey()) return false;
+    const old = st.win;
+    st.win = nw;
+    const cached = cacheWeek(cKey());
+    if (cached) { applyData(cached); st.err = ''; st.loading = false; st.shown = st.week; st.shownWin = winKey(); }
+    else if (old && nw.from >= old.from && nw.to <= old.to && st.shownWin) {
+      // новое окно целиком внутри загруженного — берём из него, свежее подтянет load()
+      st.lessons = st.lessons.filter(l => inWin(l.day));
+      Object.keys(st.totals || {}).forEach(d => { if (!inWin(d)) delete st.totals[d]; });
+      st.shownWin = winKey();
+    }
+    load();
+    return true;
   }
   const settings = () => (api.settings && api.settings()) || {};
   const fmtLabel = f => ((settings().formatLabels || {})[f]) || ({ single: 'Индивидуальное', pair: 'Пара', group: 'Группа', semi: 'Полупараллелка' })[f];
@@ -171,22 +212,22 @@
     try { const c = JSON.parse(localStorage.getItem(k) || 'null'); return c && c.v === 1 && c.weeks ? c : null; } catch (e) { return null; }
   }
   function cacheWeek(mon){
-    const c = cacheRead(), w = c && c.weeks[mon];
+    const c = cacheRead(), w = c && c.weeks[mon];  // mon — ключ окна (winKey)
     return w ? { students: c.students || [], lessons: w.lessons || [], pay: c.pay, totals: w.totals || {}, groups: c.groups || [], tpls: c.tpls || [] } : null;
   }
   let cacheT = 0;
   function cacheSave(){ clearTimeout(cacheT); cacheT = setTimeout(cacheWrite, 300); }
   function cacheWrite(){
     const k = cacheKey();
-    if (!k || !st.week || st.shown !== st.week || st.loading || st.err) return;
+    if (!k || !st.week || st.shown !== st.week || st.shownWin !== winKey() || st.loading || st.err) return;
     const c = cacheRead() || { v: 1, weeks: {} };
-    c.weeks[st.week] = { at: Date.now(), lessons: st.lessons, totals: st.totals };
+    c.weeks[cKey()] = { at: Date.now(), lessons: st.lessons, totals: st.totals };
     Object.keys(c.weeks).sort((a, b) => c.weeks[b].at - c.weeks[a].at).slice(CACHE_WEEKS).forEach(w => { delete c.weeks[w]; });
     Object.assign(c, { students: st.students, pay: st.pay, groups: st.groups, tpls: st.tpls });
     try { localStorage.setItem(k, JSON.stringify(c)); }
     catch (e) {
       // переполнено — оставляем только эту неделю
-      try { c.weeks = { [st.week]: c.weeks[st.week] }; localStorage.setItem(k, JSON.stringify(c)); } catch (e2) { try { localStorage.removeItem(k); } catch (e3) {} }
+      try { c.weeks = { [cKey()]: c.weeks[cKey()] }; localStorage.setItem(k, JSON.stringify(c)); } catch (e2) { try { localStorage.removeItem(k); } catch (e3) {} }
     }
   }
   function cacheClear(){
@@ -234,7 +275,7 @@
     const tok = ++st.loadTok;
     st.steps.cloud = 'run';
     paintSteps();
-    const quiet = st.shown === st.week && !st.err;
+    const quiet = st.shown === st.week && st.shownWin === winKey() && !st.err;
     st.err = '';
     // эта неделя ещё не на экране — любая перерисовка (пришли настройки,
     // щелчок в соседней вкладке) показывает «Загружаем», а не пустую неделю
@@ -244,7 +285,7 @@
     let fresh = null;
     try {
       const stuP = Promise.resolve(api.students());
-      const [students, lessons, groups, tpls, totals, pay] = await Promise.all([stuP, SC.listRange(st.week, addDays(st.week, 6)), SC.listGroups(), SC.listTemplates(),
+      const [students, lessons, groups, tpls, totals, pay] = await Promise.all([stuP, SC.listRange(st.win.from, st.win.to), SC.listGroups(), SC.listTemplates(),
         dayTotals(), stuP.then(list => payInfo(list))]);
       fresh = { students, lessons, groups, tpls, totals, pay };
     } catch (e) {
@@ -256,6 +297,7 @@
       st.err = e.message || String(e);
       st.lessons = [];
       st.shown = null;
+      st.shownWin = null;
       render();
       return;
     }
@@ -265,6 +307,7 @@
     applyData(fresh);
     st.loading = false;
     st.shown = st.week;
+    st.shownWin = winKey();
     st.steps.cloud = 'ok';
     render();
     cacheSave();
@@ -285,7 +328,7 @@
   async function dayTotals(){
     const P = window.Payments, out = {};
     if (!P || !P.listDayTotals) return out;
-    try { (await P.listDayTotals(st.week, addDays(st.week, 6))).forEach(r => { out[r.day] = r; }); } catch (e) {}
+    try { (await P.listDayTotals(st.win.from, st.win.to)).forEach(r => { out[r.day] = r; }); } catch (e) {}
     return out;
   }
   const paySet = () => (window.Payments ? window.Payments.paySettings(settings()) : { flags: [], skipRule: 'free', reason: '' });
@@ -306,7 +349,7 @@
     try { const fresh = await SC.updateLesson(l.id, patch); Object.assign(l, fresh); }
     catch (e) { Object.assign(l, old); api.toast('Не сохранилось: ' + e.message); }
     // занятие уехало в другую неделю — из этой его убираем
-    if (l.day < st.week || l.day > addDays(st.week, 6)) st.lessons = st.lessons.filter(x => x !== l);
+    if (!inWin(l.day)) st.lessons = st.lessons.filter(x => x !== l);
     render();
   }
   async function cycleStatus(l, p){
@@ -568,7 +611,7 @@
       // отработка (В4а): у её ученика сразу пометка и ссылка на пропуск
       const people = makeup ? r.people.map(p => (p.student_id && p.student_id === makeup.sid ? Object.assign({}, p, { makeup: true, makeup_for: makeup.forId }) : p)) : r.people;
       const l = await SC.addLesson({ day, start_min: r.start, dur_min: r.dur, format: r.format, group_id: r.group_id, is_event: !!r.is_event, title: r.title || '' }, people);
-      if (l.day >= st.week && l.day <= addDays(st.week, 6)) st.lessons.push(l);
+      if (inWin(l.day)) st.lessons.push(l);
       render();
       return { lesson: l };
     } catch (e) { return { msg: e.message }; }
@@ -616,11 +659,15 @@
     }
     return h;
   }
+  function weekSum(mon){
+    let sum = 0, any = false;
+    for (let i = 0; i < 7; i++) { const day = addDays(mon, i), m = dayMoney(day); if (m && (m.total || lessonsOf(day).length)) { sum += m.total; any = true; } }
+    return { sum, any };
+  }
   function weekMoneyHtml(){
     const P = window.Payments;
     if (!P) return '';
-    let sum = 0, any = false;
-    for (let i = 0; i < 7; i++) { const day = addDays(st.week, i), m = dayMoney(day); if (m && (m.total || lessonsOf(day).length)) { sum += m.total; any = true; } }
+    const { sum, any } = weekSum(st.week);
     return any ? '<span class="sc-wsum" id="scWeekSum" title="Доход недели по отметкам и ручным итогам дней">' + esc(P.money(sum)) + ' за неделю</span>' : '';
   }
   async function saveDayTotal(day, amount){
@@ -665,20 +712,33 @@
       [['week', 'Занятия'], ['tpl', 'Шаблоны недели'], ['groups', 'Пары и группы']].map(m =>
         '<button type="button" data-mode="' + m[0] + '" class="' + (st.mode === m[0] ? 'on' : '') + '">' + m[1] + '</button>').join('') + '</div>';
   }
+  const MONTHS_NOM = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+  // неделя, с которой открывается месяц: первая, у которой четверг в этом месяце
+  const firstWeekOf = ym => mondayOf(addDays(ym + '-01', 3));
+  const addMonth = (ym, d) => { const y = Number(ym.slice(0, 4)), m = Number(ym.slice(5)) - 1 + d; return new Date(y, m, 1).getFullYear() + '-' + pad(new Date(y, m, 1).getMonth() + 1); };
   function headHtml(){
     if (st.mode !== 'week') return modesHtml();
-    return modesHtml() + '<div class="sc-head">' +
-        '<div class="sc-nav">' +
+    const mm = monthMode(), ym = monthKey(st.week);
+    const nav = mm
+      ? '<div class="sc-nav sc-nav-m">' +
+          '<a class="btn quiet small sc-arrow" id="scPrev" href="' + esc(api.weekHref(firstWeekOf(addMonth(ym, -1)))) + '" aria-label="Предыдущий месяц">‹</a>' +
+          '<span class="sc-range" id="scRange">' + MONTHS_NOM[Number(ym.slice(5)) - 1] + ' ' + ym.slice(0, 4) + '</span>' +
+          '<a class="btn quiet small sc-arrow" id="scNext" href="' + esc(api.weekHref(firstWeekOf(addMonth(ym, 1)))) + '" aria-label="Следующий месяц">›</a>' +
+          '<a class="btn quiet small" id="scToday" href="' + esc(api.weekHref(null)) + '"' + (mondayOf(today()) === st.week ? ' aria-current="true"' : '') + '>Сегодня</a>' +
+        '</div>'
+      : '<div class="sc-nav">' +
           '<a class="btn quiet small sc-arrow" id="scPrev" href="' + esc(api.weekHref(addDays(st.week, -7))) + '" aria-label="Предыдущая неделя">‹</a>' +
           '<span class="sc-range" id="scRange">' + esc(rangeText(st.week)) + '</span>' +
           (st.loading || st.err ? '' : weekMoneyHtml()) +
           '<a class="btn quiet small sc-arrow" id="scNext" href="' + esc(api.weekHref(addDays(st.week, 7))) + '" aria-label="Следующая неделя">›</a>' +
           '<a class="btn quiet small" id="scToday" href="' + esc(api.weekHref(null)) + '"' + (mondayOf(today()) === st.week ? ' aria-current="true"' : '') + '>Сегодня</a>' +
-        '</div>' +
-        TPL().weekMenuHtml() + weekClearHtml('week:') +
+        '</div>';
+    return modesHtml() + '<div class="sc-head">' + nav +
+        // в списке недель у каждой недели свои «Шаблон» и «Очистить» — в шапке они лишние
+        (mm ? '' : TPL().weekMenuHtml() + weekClearHtml('week:')) +
         '<div class="seg sc-views" role="group" aria-label="Вид расписания">' +
           '<button type="button" data-v="list" class="' + (st.view === 'list' ? 'on' : '') + '">Строки</button>' +
-          '<button type="button" data-v="grid" class="' + (st.view === 'grid' ? 'on' : '') + '">Неделя</button>' +
+          '<button type="button" data-v="grid" class="' + (st.view === 'grid' ? 'on' : '') + '">Планер</button>' +
         '</div>' +
         '<button type="button" class="btn quiet small sc-lookbtn" id="scLook" aria-haspopup="menu" title="Как показывать время, пары и группы">Вид <span aria-hidden="true">▾</span></button>' +
       '</div>' + (st.loading || st.err || !INS() ? '' : INS().monthHtml());
@@ -689,7 +749,7 @@
   const R = window.ScheduleRows;
   const DAY_TITLE = ['Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота', 'Воскресенье'];
   const dm = s => { const d = toDate(s); return pad(d.getDate()) + '.' + pad(d.getMonth() + 1); };
-  const weekDays = () => { const a = []; for (let i = 0; i < 7; i++) a.push(addDays(st.week, i)); return a; };
+  const weekDays = mon => { const a = []; for (let i = 0; i < 7; i++) a.push(addDays(mon || st.week, i)); return a; };
 
   // статус всей строки (пара, группа) одним нажатием: всем — следующий
   // после общего; личные статусы при этом сбрасываются (как в старом)
@@ -810,7 +870,7 @@
       const nl = await SC.addLesson({ day: to.day, start_min: start, dur_min: start == null ? l.dur_min : Math.min(l.dur_min, 1440 - start), format: 'single' }, []);
       const moved = await SC.movePerson(p.id, nl.id, 0);
       nl.people = [Object.assign(p, moved)];
-      if (nl.day >= st.week && nl.day <= addDays(st.week, 6)) st.lessons.push(nl);
+      if (inWin(nl.day)) st.lessons.push(nl);
       if (fL) await SC.updateLesson(l.id, { format: fL });
     } catch (e) { api.toast('Не сохранилось: ' + e.message); load(); return; }
     render();
@@ -819,7 +879,8 @@
   const rows = R.create({
     statuses: true,
     itemsOf: day => lessonsOf(day),
-    days: weekDays,
+    // стрелки ←/→ между днями идут по всем развёрнутым неделям списка
+    days: () => (monthMode() ? weeksOfWin().filter(weekOpen).reduce((a, m) => a.concat(weekDays(m)), []) : weekDays()),
     name: personName,
     personExtra: (l, p) => flagsHtml(p) + (isAbsent(p) && window.Payments ? '<button type="button" class="sc-why" data-why="' + esc(p.id) + '" title="Пропуск: оплачивается ли и причина — нажмите, чтобы сменить">' + esc(whyText(p, l)) + '</button>' : '') + paidBtn(p, l),
     showEnd: () => look.end,
@@ -846,9 +907,9 @@
       move: d => moveDrop(d),
     },
   });
-  function listHtml(){
+  function daysHtml(mon){
     let h = '<div class="sc-days">';
-    weekDays().forEach((day, i) => {
+    weekDays(mon).forEach((day, i) => {
       const ls = lessonsOf(day);
       h += '<section class="sc-day' + (day === today() ? ' today' : '') + '" data-day="' + day + '" data-rw-day="' + day + '">' +
         '<header class="sc-dh"><b>' + DAY_TITLE[i] + '</b><span>' + dm(day) + (day === today() ? ' · сегодня' : '') + '</span>' + dayActions('week:' + day) + '</header>' +
@@ -858,9 +919,38 @@
     });
     return h + '</div>';
   }
+  const weekTitle = mon => dm(mon) + ' – ' + dm(addDays(mon, 6));
+  // «Показ: месяц» — недели месяца списком (как в старом приложении): текущая
+  // развёрнута, остальные сворачиваются; у каждой недели свои сводки и кнопки
+  function listHtml(){
+    if (!monthMode()) return daysHtml(st.week);
+    let h = '<div class="sc-weeks">';
+    weeksOfWin().forEach(mon => {
+      const open = weekOpen(mon), ws = weekSum(mon), cur = mon === st.week;
+      h += '<section class="sc-wk' + (open ? ' open' : '') + (cur ? ' cur' : '') + '" data-wk="' + mon + '">' +
+        '<div class="sc-wkh" role="button" tabindex="0" aria-expanded="' + open + '" data-wktoggle="' + mon + '">' +
+          '<i class="sc-wkcar" aria-hidden="true">' + (open ? '▾' : '▸') + '</i>' +
+          '<b>Неделя ' + weekTitle(mon) + '</b>' +
+          (ws.any ? '<span class="sc-wsum"' + (cur ? ' id="scWeekSum"' : '') + '>' + esc(window.Payments.money(ws.sum)) + '</span>' : '<span class="sc-wsum none">—</span>') +
+          TPL().weekMenuHtml(mon) + weekClearHtml('week:' + mon) +
+        '</div>' +
+        (open ? '<div class="sc-wkbody">' + daysHtml(mon) + (INS() ? INS().weekBlocksHtml(mon) : '') + '</div>' : '') +
+      '</section>';
+    });
+    return h + '</div>';
+  }
   function bindList(){
-    rows.bind(host.querySelector('.sc-days'));
+    rows.bind(host.querySelector('.sc-weeks, .sc-days'));
+    bindWeekToggles();
     bindCommon();
+  }
+  function bindWeekToggles(){
+    host.querySelectorAll('[data-wktoggle]').forEach(h => {
+      const mon = h.dataset.wktoggle;
+      const flip = () => { rows.cancel(); st.wopen[mon] = !weekOpen(mon); render(); };
+      h.addEventListener('click', e => { if (e.target.closest('button, a, input')) return; flip(); });
+      h.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target === h) { e.preventDefault(); flip(); } });
+    });
   }
   function bindCommon(){
     bindDayMoney();
@@ -1286,7 +1376,7 @@
   const LOOK_KEY = 'cabinet:schedule:look';
   // hh: null — высота часа подбирается сама (autoHH), число — своя, потянутая
   // учителем, и она запоминается на этом устройстве
-  const look = { end: false, grp: 'names', hh: null, cw: null };
+  const look = { end: false, grp: 'names', hh: null, cw: null, span: 'month' };
   try { Object.assign(look, JSON.parse(localStorage.getItem(LOOK_KEY) || '{}')); } catch (e) {}
   function saveLook(){ try { localStorage.setItem(LOOK_KEY, JSON.stringify(look)); } catch (e) {} }
   function lookPreview(end, grp){
@@ -1305,7 +1395,10 @@
       { head: 'Время занятия' },
       it('Только начало', !look.end, lookPreview(false, null), () => { look.end = false; }),
       it('Начало и конец', look.end, lookPreview(true, null), () => { look.end = true; }),
-      { head: 'Пары и группы в «Неделе»' },
+      { head: 'Показ в «Строках»' },
+      it('Весь месяц — недели списком', look.span !== 'week', '', () => { look.span = 'month'; applyWin(); }),
+      it('Только одна неделя', look.span === 'week', '', () => { look.span = 'week'; applyWin(); }),
+      { head: 'Пары и группы в «Планере»' },
       it('Имена', look.grp === 'names', lookPreview(false, 'names'), () => { look.grp = 'names'; }),
       it('Инициалы', look.grp === 'ini', lookPreview(false, 'ini'), () => { look.grp = 'ini'; }),
       it('Число', look.grp === 'cnt', lookPreview(false, 'cnt'), () => { look.grp = 'cnt'; }),
@@ -1745,7 +1838,7 @@
   }
   // «очистить неделю» (ref «week:» — неделя расписания, «tpl:» — весь шаблон)
   function weekClearHtml(ref){
-    const all = ref === 'tpl:' ? TPL().dayKind.all() : st.lessons;
+    const all = ref === 'tpl:' ? TPL().dayKind.all() : weekLessons(keyOf(ref) || st.week);
     return '<button type="button" class="btn quiet small sc-wclear" data-wclear="' + esc(ref) + '"' + (all.length && !dayBusy ? '' : ' disabled') +
       ' title="' + (ref === 'tpl:' ? 'Удалить все слоты шаблона' : 'Удалить все занятия этой недели') + '">✕ ' + (ref === 'tpl:' ? 'Очистить шаблон' : 'Очистить неделю') + '</button>';
   }
@@ -1813,9 +1906,10 @@
   }
   async function clearWeek(ref){
     const tpl = ref === 'tpl:', K = tpl ? TPL().dayKind : weekKind;
-    const list = tpl ? K.all() : st.lessons.slice();
+    const mon = keyOf(ref) || st.week;
+    const list = tpl ? K.all() : weekLessons(mon);
     if (!list.length) return;
-    const where = tpl ? 'из шаблона «' + esc(K.name()) + '»' : 'с недели ' + esc(rangeText(st.week));
+    const where = tpl ? 'из шаблона «' + esc(K.name()) + '»' : 'с недели ' + esc(rangeText(mon));
     const ok = await askSheet(tpl ? 'Очистить шаблон' : 'Очистить неделю', 'Удалить ' + esc(K.noun(list.length)) + ' ' + where + '? Отменить это нельзя.' + lossNote(list),
       [{ label: 'Отмена', cls: 'quiet', value: null }, { label: 'Удалить ' + K.noun(list.length), cls: 'danger', value: true }]);
     if (!ok) return;
@@ -1876,13 +1970,14 @@
     if (loading) body = '<div class="empty">Загружаем…</div>';
     else if (st.err) body = '<div class="empty">' + esc(st.err) + ' <button type="button" class="btn quiet small" id="scRetry">Повторить</button></div>';
     else if (st.mode !== 'week') body = TPL().paneHtml();
-    else body = (st.view === 'grid' ? gridHtml() : listHtml()) + (INS() ? INS().weekBlocksHtml() : '');
+    else body = (st.view === 'grid' ? gridHtml() : listHtml()) + (INS() && !(st.view === 'list' && monthMode()) ? INS().weekBlocksHtml(st.week) : '');
     host.innerHTML = headHtml() + '<div class="sc-steps" id="scSteps" role="status" aria-live="polite">' + stepsInner() + '</div><div class="sc-body sc-v-' + st.view + '" id="scBody">' + body + '</div>';
     const tb = host.querySelector('#scToday');
     // уже на этой неделе — адрес не меняется, перерисовываем сами (одна
     // перерисовка: вторая сняла бы вспышку дня)
     if (tb) tb.addEventListener('click', e => {
       st.goToday = true;
+      st.wopen[mondayOf(today())] = true;
       if (mondayOf(today()) === st.week) { e.preventDefault(); if (location.hash !== tb.getAttribute('href')) history.replaceState(null, '', tb.getAttribute('href')); render(); }
     });
     host.querySelectorAll('.sc-views button').forEach(b => b.addEventListener('click', () => { rows.cancel(); setView(b.dataset.v); }));
@@ -1964,13 +2059,21 @@
     closeModal();
     closePanel();
     closeStudentCard();
-    // есть копия недели — рисуем её сразу, load() обновит молча
-    const cached = cacheWeek(mon);
+    const nw = winOf(mon);
+    st.win = nw;
+    // неделя из уже загруженного месяца — данные те же, перезагрузка не нужна
+    if (st.shownWin === winKey(nw) && st.lessons && !st.err && host.querySelector('.sc-body')) {
+      st.shown = mon; st.loading = false; render();
+      if (INS()) INS().weekLoaded();
+      return Promise.resolve();
+    }
+    // есть копия окна — рисуем её сразу, load() обновит молча
+    const cached = cacheWeek(cKey(nw));
     st.steps.local = cached ? 'on' : 'none';
     st.steps.cloud = 'run';
-    if (cached) { applyData(cached); st.err = ''; st.loading = false; st.shown = mon; render(); }
+    if (cached) { applyData(cached); st.err = ''; st.loading = false; st.shown = mon; st.shownWin = winKey(nw); render(); }
     return load();
   }
 
-  window.Schedule = { init, show, hide: () => { closePanel(); closeStudentCard(); R.closeMenu(); if (INS()) INS().closePop(); const c = document.getElementById('scClip'); if (c) c.remove(); }, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), clearCache: () => { cacheClear(); st.week = null; st.shown = null; st.lessons = []; }, setMode: m => { st.mode = m; render(); } };
+  window.Schedule = { init, show, hide: () => { closePanel(); closeStudentCard(); R.closeMenu(); if (INS()) INS().closePop(); const c = document.getElementById('scClip'); if (c) c.remove(); }, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), clearCache: () => { cacheClear(); st.week = null; st.shown = null; st.shownWin = null; st.win = null; st.lessons = []; }, setMode: m => { st.mode = m; render(); } };
 })();
