@@ -24,8 +24,8 @@ def main():
     disk = B.load_on_disk()
     check(len(disk) > 0, "индекс на диске не пустой")
     check(all(set(v) == {"title", "protos"} for v in disk.values()), "у записей поля title и protos")
-    check(all(set(p) == {"id", "title", "fipi", "hasGen"} for v in disk.values() for p in v["protos"]),
-          "у прототипов поля id, title, fipi, hasGen")
+    check(all(set(p) - {"link"} == {"id", "title", "fipi", "hasGen"} for v in disk.values() for p in v["protos"]),
+          "у прототипов поля id, title, fipi, hasGen (+ link у связанных наборов ОГЭ №1–5)")
     for name in sorted(p.name for p in B.ROOT.glob("catalog-index*.json")):
         check((B.ROOT / name).stat().st_size <= B.LIMIT, f"{name} не больше {B.LIMIT // 1024} КБ")
 
