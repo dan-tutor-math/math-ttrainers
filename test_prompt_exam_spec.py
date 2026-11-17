@@ -23,7 +23,14 @@ PORT = 8975
 t54.PORT = PORT
 BASE = f"http://127.0.0.1:{PORT}"
 
-MAX_POINTS = {"oge": 31, "ege_base": 21}
+# максимум первичного балла по спецификациям КИМ 2027 (fipi-pilot/demo); у экзаменов,
+# где наши позиции покрывают весь КИМ, сумма должна совпасть
+MAX_POINTS = {"oge": 31, "ege_base": 21, "soc_oge": 32, "soc_ege": 58, "rus_ege": 50, "eng_oge": 68}
+# неполные (на сайте не все номера КИМ): сумма по имеющимся позициям — физика ОГЭ №1–16
+# из 22 (23 из 39; №17–22 развёрнутые, 16 баллов), информатика ОГЭ №1–10 из 16 (10 из 21)
+PARTIAL_POINTS = {"phys_oge": 23, "inf_oge": 10}
+# экзамены без документа 2027 — баллы остаются null: ЕГЭ профиль, ОГЭ русский
+NO_DOC = {"ege_prof", "rus_oge"}
 
 # список номеров, который exam-nav.js держал у себя до выноса в exam-spec.js
 OLD_OGE = (["oge1_5", "oge6", "oge7", "oge8", "oge9", "oge10", "oge11", "oge12", "oge13", "oge14",
@@ -74,9 +81,30 @@ def check_spec(page, failures):
         if eid in MAX_POINTS:
             if None in pts or sum(pts) != MAX_POINTS[eid]:
                 failures.append(f"B/{eid}: сумма баллов {sum(x or 0 for x in pts)}, нужно {MAX_POINTS[eid]}")
-        elif any(x is not None for x in pts):
-            failures.append(f"B/{eid}: баллы не подтверждены документом — должны быть null")
-    print(f"  A, B: {len(spec)} экзаменов, номера подряд, суммы баллов {MAX_POINTS}")
+        elif eid in PARTIAL_POINTS:
+            if None in pts or sum(pts) != PARTIAL_POINTS[eid]:
+                failures.append(f"B/{eid}: сумма баллов {sum(x or 0 for x in pts)}, нужно {PARTIAL_POINTS[eid]}")
+        elif eid in NO_DOC and any(x is not None for x in pts):
+            failures.append(f"B/{eid}: документа 2027 нет — баллы должны быть null")
+        # answer у экзаменов с документом задан везде
+        if eid in MAX_POINTS or eid in PARTIAL_POINTS:
+            if any(p["answer"] is None for p in ex["list"]):
+                failures.append(f"B/{eid}: у позиции нет answer")
+    # точечные сверки с документом
+    def pt(eid, slug, n=None):
+        return next(p for p in spec[eid]["list"] if p["slug"] == slug and (n is None or p.get("n") == n))
+    if (pt("soc_oge", "soc_oge", 12)["points"], pt("soc_oge", "soc_oge", 14)["points"],
+            pt("soc_oge", "soc_oge", 14)["answer"], pt("soc_oge", "soc_oge", 12)["answer"]) != (4, 2, "short", "long"):
+        failures.append("B: ОГЭ обществознание №12 / №14")
+    if (pt("rus_ege", "rus_ege27")["points"], pt("rus_ege", "rus_ege27")["part"], pt("rus_ege", "rus_ege", 8)["points"]) != (22, 2, 2):
+        failures.append("B: ЕГЭ русский №8 / №27")
+    if sum(p["points"] for p in spec["soc_ege"]["list"] if p["part"] == 1) != 28 or \
+            sum(p["points"] for p in spec["soc_ege"]["list"] if p["part"] == 2) != 30:
+        failures.append("B: ЕГЭ обществознание части 28 + 30")
+    if sum(p["points"] for p in spec["eng_oge"]["list"] if p["part"] == 1) != 53 or \
+            sum(p["points"] for p in spec["eng_oge"]["list"] if p["part"] == 2) != 15:
+        failures.append("B: ОГЭ английский письменная 53 + устная 15")
+    print(f"  A, B: {len(spec)} экзаменов, номера подряд, суммы баллов {MAX_POINTS}, неполные {PARTIAL_POINTS}")
     f = page.evaluate("""() => [ExamSpec.find('oge_part2', 22), ExamSpec.find('oge9'), ExamSpec.find('ege_prof', 13),
                               ExamSpec.find('rus_oge', 5), ExamSpec.find('oge_part2', 99), ExamSpec.find('nope')]""")
     ok = (f[0] and f[0]["exam"] == "oge" and f[0]["part"] == 2 and f[0]["answer"] == "long"
