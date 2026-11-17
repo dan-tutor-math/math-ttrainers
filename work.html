@@ -642,6 +642,7 @@ function renderTasks(){
   VIEWS.forEach(v => { host.appendChild(v.root); });
   VIEWS.forEach(v => { fitView(v); applyState(v); liveWatch(v); });
   renderNums();
+  livePreload();
 }
 // «По одному»: показать задание i. Блок уже открытого задания берётся как
 // есть — с живым кадром, без повторной загрузки; следующее грузится заранее,
@@ -916,7 +917,19 @@ function availOf(v){
   return v.root.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 4;
 }
 const SCRATCH_H = 240;   // поле для записей под карточкой, в единицах карточки
+// Высота карточки меняется при загрузке кадра, замере и сбросе в картинку.
+// Если карточка целиком выше экрана — страницу сдвигаем на разницу, чтобы то,
+// что читает ученик, не уезжало и «длина страницы» не прыгала под рукой.
 function fitView(v){
+  if (!v.root || !v.root.isConnected || S.view !== 'list') return fitViewRaw(v);
+  const r0 = v.root.getBoundingClientRect();
+  fitViewRaw(v);
+  if (r0.bottom <= 0){
+    const d = v.root.getBoundingClientRect().height - r0.height;
+    if (Math.abs(d) >= 1) window.scrollBy(0, d);
+  }
+}
+function fitViewRaw(v){
   if (!v.box || !v.root.isConnected) return;
   const avail = availOf(v);
   let k = kFor(avail, v.W);
@@ -1010,7 +1023,7 @@ function wireResize(rz, v, side){
    ушедшее далеко задание снова становится картинкой, набранное — в черновике. */
 const LIVE_W = 440;        // ширина кадра при масштабе 1 — как у снимка (CAP_W в works.html)
 const LIVE_MIN = 300;      // уже тренажёры не рассчитаны
-const LIVE_MAX = (window.matchMedia && matchMedia('(pointer:coarse)').matches) ? 4 : 8;   // телефон — меньше: кадр = целая страница тренажёра
+const LIVE_MAX = (window.matchMedia && matchMedia('(pointer:coarse)').matches) ? 20 : 60;   // телефон — меньше: кадр = целая страница тренажёра
 const LIVE_MARGIN = '700px 0px';
 const ZOOM_MIN = 0.6, ZOOM_MAX = LIVE_W / LIVE_MIN;
 // work:noLive = '1' — показывать и новые задания картинками: тесты пути
@@ -1071,6 +1084,25 @@ function liveLoad(v){
   fr.addEventListener('load', () => liveBoot(v, my), { once: true });
   fr.src = v.b.href;
 }
+// Весь вариант грузится сразу, по очереди (по одному кадру за раз), а не по
+// мере прокрутки: иначе задания у края экрана появляются с задержкой, а при
+// лимите LIVE_MAX дальние сбрасываются в картинки и грузятся заново.
+let preloading = false;
+async function livePreload(){
+  if (preloading) return;
+  preloading = true;
+  try {
+    for (const v of allViews()){
+      if (S.view !== 'list') break;
+      if (!v.live || v.live.state !== 'idle' || !v.root.isConnected) continue;
+      // упёрлись в лимит — дальше только по прокрутке, ничего не сбрасываем
+      if (allViews().filter(x => x.live && (x.live.state === 'loading' || x.live.state === 'ready')).length >= LIVE_MAX) break;
+      liveLoad(v);
+      const my = v.live, t0 = Date.now();
+      while (v.live === my && my.state === 'loading' && Date.now() - t0 < 25000) await wait(150);
+    }
+  } finally { preloading = false; }
+}
 // назад к картинке; набранное уже в черновике, его покажут поля картинки
 function liveDrop(v){
   if (!v.live) return;
@@ -1081,7 +1113,7 @@ function liveDrop(v){
     // карточка выше экрана сменила высоту — страницу сдвигаем на столько же,
     // чтобы то, что читает ученик, не уезжало
     const r0 = v.root.getBoundingClientRect(), above = r0.bottom <= 0;
-    renderCard(v); fitView(v); applyState(v);
+    renderCard(v); fitViewRaw(v); applyState(v);
     if (above){ const d = v.root.getBoundingClientRect().height - r0.height; if (d) window.scrollBy(0, d); }
   }
 }
@@ -1814,7 +1846,7 @@ function showDone(){
 }
 
 document.addEventListener('visibilitychange', () => { if (!document.hidden) flush(); });
-window.__work = { S, renderTasks, flush, openVideo, vidWatched, get queue(){ return queue; }, get views(){ return VIEWS; } };   // для тестов и отладки из консоли
+window.__work = { S, renderTasks, fitView, flush, openVideo, vidWatched, get queue(){ return queue; }, get views(){ return VIEWS; } };   // для тестов и отладки из консоли
 boot();
 })();
 </script>

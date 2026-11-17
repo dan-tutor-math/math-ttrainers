@@ -956,6 +956,10 @@ function renderTasks(){
     box.innerHTML = '<div class="empty">Слева выберите тренажёр, откройте нужное задание и нажмите «Добавить в работу». Видео с платформы — в разделе «Видео» там же.</div>';
     return;
   }
+  // перерисовка листа целиком (↑ ↓, ◀ ▶, ⟳): высоту и прокрутку держим, чтобы
+  // страница не схлопывалась и не прыгала на каждом действии
+  const keepH = box.offsetHeight, keepY = window.scrollY;
+  box.style.minHeight = keepH ? keepH + 'px' : '';
   box.innerHTML = '';
   let tn = 0;   // номера — только у заданий: у ученика видео тоже без номера
   // единицы листа: группа (подряд блоки одного series.key) или одна строка —
@@ -980,6 +984,10 @@ function renderTasks(){
     u.items.forEach(i => g.appendChild(taskRow(tasks[i], i, tasks, isMaster, ++tn, true)));
     box.appendChild(g);
   });
+  window.scrollTo(0, keepY);
+  // запас высоты снимаем, когда картинки заняли свои места
+  clearTimeout(renderTasks._mh);
+  renderTasks._mh = setTimeout(() => { box.style.minHeight = ''; }, 800);
 }
 function taskRow(b, i, tasks, isMaster, num, inSeries){
     const im = (b.img || {})[curTheme()] || (b.img || {}).light || {};
@@ -1006,7 +1014,16 @@ function taskRow(b, i, tasks, isMaster, num, inSeries){
     el.innerHTML = '<div class="ti-num">' + num + '</div><div><div class="ti-img">' + (im.url ? '<img alt="Задание ' + num + '">' : '<div class="ti-ph">' + (busy ? 'Создаётся…' : 'Нет картинки') + '</div>') + '</div>'
       + '<div class="ti-row"><span class="ti-name">' + esc(b.name || trainerName(b.tid)) + '</span>' + modeUi + posUi
       + '<div class="ti-btns">' + btns + '</div></div>' + note + '</div>';
-    const img = el.querySelector('img'); if (img) img.src = im.url;
+    const img = el.querySelector('img');
+    if (img){
+      // место под превью резервируем по размеру снимка (max-height 130 из CSS):
+      // пока картинка не загрузилась, карточка не 0 px высотой, и длина листа
+      // не растёт по мере загрузки — иначе при прокрутке всё «плывёт»
+      const hh = (b.hot && b.hot.h) || (b.css && b.css.h) || 0;
+      const holder = el.querySelector('.ti-img');
+      if (hh && holder){ holder.style.minHeight = Math.min(130, hh) + 'px'; img.addEventListener('load', () => { holder.style.minHeight = ''; }, { once: true }); }
+      img.src = im.url;
+    }
     // Б5: «уже было у ученика» — точка после названия (только в сессии, по переключателю)
     const cap = memCaption(b);
     if (cap){ const nm = el.querySelector('.ti-name'); if (nm) nm.insertAdjacentElement('afterend', cap); }
