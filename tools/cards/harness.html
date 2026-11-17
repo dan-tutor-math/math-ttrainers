@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<title>Сборка карточек ФИПИ</title>
+<!-- Служебная страница сборщика карточек (tools/cards/build.py). Устроена как
+     конструктор работ: тренажёр в кадре того же сайта, ответ задания читает
+     тот же trainerTaskInfo (trainer-tasks.js), что у «Добавить в работу», —
+     поэтому ответ карточки совпадает с ответом живого задания, а не
+     вычисляется сборщиком заново. Ученикам не показывается. -->
+<script src="../../subjects-catalog.js"></script>
+<script src="../../trainer-tasks.js"></script>
+<script src="../../exam-spec.js"></script>
+<script src="collect.js"></script>
+<style>body{margin:0}#f{width:1100px;height:1400px;border:0}</style>
+</head><body><iframe id="f"></iframe></body></html>

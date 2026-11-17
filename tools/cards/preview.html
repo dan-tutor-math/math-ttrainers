@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Карточки ФИПИ — просмотр</title>
+<!-- Просмотр собранных карточек одной страницы-экзамена: глазами сверить с
+     тренажёром и для теста test_prompt_cards_pilot.py. Адрес:
+     tools/cards/preview.html?slug=oge9[&answer=1][&solution=1][&source=1][&print=1]
+     Ученикам не показывается. -->
+<script src="../../card-render.js"></script>
+<style>
+body{margin:0;background:#f5f5f7;color:#1d1d1f;font-family:Onest,system-ui,sans-serif;}
+main{max-width:720px;margin:0 auto;padding:16px;}
+h1{font-size:18px;margin:8px 0 16px;}
+.item{background:#fff;border-radius:14px;padding:16px 18px;margin-bottom:14px;}
+.meta{font-size:12px;color:#86868b;margin-bottom:8px;}
+</style>
+</head><body><main><h1 id="h"></h1><div id="list"></div></main>
+<script>
+(async function () {
+  const q = new URLSearchParams(location.search);
+  const slug = q.get('slug') || 'oge9';
+  const d = await (await fetch('../../cards/' + slug + '.json')).json();
+  await CardRender.ready(d.cards, { root: '../../' });
+  document.getElementById('h').textContent = 'cards/' + slug + '.json — ' + d.cards.length + ' карточек';
+  const opts = { base: '../../cards/', answer: q.get('answer') === '1', solution: q.get('solution') === '1',
+    source: q.get('source') === '1', print: q.get('print') === '1' };
+  const list = document.getElementById('list');
+  d.cards.forEach((c, i) => {
+    const box = document.createElement('div');
+    box.className = 'item';
+    box.dataset.id = c.id;
+    box.innerHTML = '<div class="meta">' + c.id + ' · №' + c.n + ' · ' + c.proto + ' #' + c.pos + '</div>';
+    box.appendChild(CardRender.render(c, Object.assign({ num: q.get('num') === '1' ? i + 1 : null }, opts)));
+    list.appendChild(box);
+  });
+  if (document.fonts) await document.fonts.ready;
+  document.documentElement.dataset.ready = '1';
+})();
+</script>
+</body></html>

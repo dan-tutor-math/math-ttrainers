@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "cards/_schema.json",
+  "title": "Карточка задания ФИПИ, версия 1 (задача 63)",
+  "description": "Файл cards/<slug>.json — одна страница-экзамен (slug — имя страницы тренажёра без .html). Карточки собирает tools/cards/build.py, проверяет tools/cards/validate.py, рисует card-render.js. Схему меняют только по согласованию с Даниилом: по ней работают сборщики семей, конструктор, страница ученика и печать.",
+  "type": "object",
+  "required": ["v", "slug", "exam", "family", "src", "cards"],
+  "additionalProperties": false,
+  "properties": {
+    "v": { "const": 1 },
+    "slug": { "type": "string", "pattern": "^[a-z0-9_]+$", "description": "страница тренажёра без .html: oge9, oge19, ege_prof" },
+    "exam": { "type": "string", "description": "экзамен по exam-spec.js (ExamSpec.find): oge, ege_prof, ege_base, rus_oge…" },
+    "family": { "type": "string", "description": "плагин сборщика: tools/cards/families/<family>.py" },
+    "src": { "type": "object", "description": "sha1 файлов, из которых собрано (страница, банк): изменился файл — карточки пересобрать", "additionalProperties": { "type": "string", "pattern": "^[0-9a-f]{40}$" } },
+    "partial": { "type": "boolean", "description": "true — собрана не вся страница (пилот, --limit)" },
+    "cards": { "type": "array", "items": { "$ref": "#/$defs/card" } }
+  },
+  "$defs": {
+    "card": {
+      "type": "object",
+      "required": ["v", "id", "exam", "slug", "n", "proto", "pos", "math", "text", "figs", "table", "opts", "answer", "solution", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "v": { "const": 1 },
+        "id": { "type": "string", "pattern": "^fipi:[0-9A-Za-z]{6}$", "description": "номер задания в открытом банке ФИПИ; регистр букв как у ФИПИ" },
+        "exam": { "type": "string" },
+        "slug": { "type": "string", "pattern": "^[a-z0-9_]+$" },
+        "n": { "type": "integer", "minimum": 1, "description": "номер задания в КИМ" },
+        "proto": { "type": "string", "description": "id прототипа в __trainerCatalog.list() страницы" },
+        "pos": { "type": "integer", "minimum": 0, "description": "место в прототипе — то же, что __trainerCatalog.openAt(proto, pos)" },
+        "math": { "enum": ["tex", "html"], "description": "tex — в text/opts/solution есть формулы TeX в $…$ (строчные) и $$…$$ (отдельной строкой), их рисует KaTeX; html — формулы только HTML-разметкой (курсив, степени, дроби c-frac)" },
+        "text": { "type": "string", "minLength": 1, "description": "условие: HTML из разрешённых тегов (b strong i em u s sub sup br p div span ol ul li nobr) и классов c-*; рисунок — [[fig:k]], таблица — [[table:k]] (k с нуля), место списка вариантов — [[opts]] (без метки — после условия); литеральный знак доллара — &#36;. Без кнопок, полей, подписей интерфейса и источника" },
+        "figs": {
+          "type": "array",
+          "description": "рисунки — отдельные файлы; растр из PNG/GIF/холста — .png, вектор — .svg. Рисунок без [[fig:k]] в тексте ставится после условия",
+          "items": {
+            "type": "object",
+            "required": ["file", "w", "h", "alt"],
+            "additionalProperties": false,
+            "properties": {
+              "file": { "type": "string", "pattern": "^img/[a-z0-9_]+/[0-9A-Za-z_.-]+\\.(png|svg|jpg)$", "description": "путь от папки cards/" },
+              "w": { "type": "integer", "minimum": 1, "description": "собственная ширина файла, px (у svg — CSS px)" },
+              "h": { "type": "integer", "minimum": 1 },
+              "maxw": { "type": "integer", "minimum": 1, "description": "ширина на странице тренажёра, CSS px: больше неё рисунок не растягивается" },
+              "alt": { "type": "string" }
+            }
+          }
+        },
+        "table": {
+          "type": ["array", "null"],
+          "description": "таблицы условия текстом (не картинкой); место — [[table:k]] в text",
+          "items": {
+            "type": "object",
+            "required": ["rows"],
+            "additionalProperties": false,
+            "properties": {
+              "head": { "type": ["array", "null"], "items": { "type": "string" } },
+              "rows": { "type": "array", "minItems": 1, "items": { "type": "array", "items": { "type": "string" } } }
+            }
+          }
+        },
+        "opts": {
+          "type": ["array", "null"],
+          "description": "варианты ответа / утверждения (answer.kind choice и multi): HTML каждого без номера, номера 1) 2) … ставит рендерер; индекс — номер в answer.correct",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "answer": { "$ref": "#/$defs/answer" },
+        "solution": { "type": ["string", "null"], "description": "разбор: та же разметка, что у text; строка действия — <div class=\"c-line\">" },
+        "source": { "type": "string", "description": "подпись источника: «Открытый банк заданий ФИПИ, задание 2933FB»" }
+      }
+    },
+    "answer": {
+      "description": "Тот же объект, что task у блока работы (trainer-tasks.js: kind/fields/n/correct) — work.html проверяет его без изменений логики (evaluate, taCheckField); плюс value — ответ в записи для бланка",
+      "type": "object",
+      "required": ["kind", "value"],
+      "properties": {
+        "kind": { "enum": ["fields", "choice", "multi", "long"] },
+        "value": { "type": "string", "description": "ответ, как его пишут в бланк: «-0,9», «13», «174»; у long — эталон ответа (HTML)" },
+        "fields": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["id", "label", "type", "value"],
+            "properties": {
+              "id": { "type": "string" }, "label": { "type": "string" },
+              "type": { "enum": ["plain", "num", "nums", "set", "yesno", "pairs", "word", "term"] },
+              "value": { "type": "string" }, "alts": { "type": "array", "items": { "type": "string" } },
+              "seq": { "type": "boolean" }, "anyOrder": { "type": "boolean" }, "anyCols": { "type": "boolean" },
+              "exactLen": { "type": "boolean" }, "unit": { "type": "string" },
+              "choices": { "type": "array", "items": { "type": "string" } }, "norm": { "enum": ["ru", "en"] }
+            }
+          }
+        },
+        "n": { "type": "integer", "minimum": 1 },
+        "correct": { "description": "choice — номер верного (с нуля), multi — номера верных по возрастанию" },
+        "criteria": { "type": ["string", "null"], "description": "long: критерии оценивания ФИПИ (HTML)" }
+      }
+    }
+  }
+}

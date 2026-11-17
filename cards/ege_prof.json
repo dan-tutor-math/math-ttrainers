@@ -1,0 +1,413 @@
+{
+ "v": 1,
+ "slug": "ege_prof",
+ "exam": "ege_prof",
+ "family": "ege_prof",
+ "src": {
+  "ege-prof-fipi1.js": "be7c5dd49cb6b3e09d4220147d5da8f6870b4065",
+  "ege_prof.html": "3a71293abbef233645010511fdf949462c84ed76"
+ },
+ "partial": true,
+ "cards": [
+  {
+   "v": 1,
+   "id": "fipi:2933FB",
+   "exam": "ege_prof",
+   "slug": "ege_prof",
+   "n": 1,
+   "proto": "triangle",
+   "pos": 0,
+   "math": "tex",
+   "text": "<div>В треугольнике $ABC$ стороны $AC$ и $BC$ равны, угол $C$ равен $168^\\circ$, угол $CBD$ внешний. Найдите величину угла $CBD$. Ответ дайте в градусах.[[fig:0]]</div>",
+   "figs": [
+    {
+     "file": "img/ege_prof/2933FB_1.png",
+     "w": 312,
+     "h": 104,
+     "alt": "Рисунок к заданию",
+     "maxw": 420
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "plain",
+      "value": "174",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": ""
+     }
+    ],
+    "value": "174"
+   },
+   "solution": "<div class=\"c-line\">Углы при основании равны: $$\\angle B = \\dfrac{180^\\circ - 168^\\circ}{2} = 6^\\circ$$</div><div class=\"c-line\">Внешний угол: $$180^\\circ - 6^\\circ = 174^\\circ$$</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 2933FB"
+  },
+  {
+   "v": 1,
+   "id": "fipi:A33A46",
+   "exam": "ege_prof",
+   "slug": "ege_prof",
+   "n": 1,
+   "proto": "trig",
+   "pos": 0,
+   "math": "tex",
+   "text": "<div>В треугольнике $ABC$ угол $C$ равен $90^\\circ$, $AB = 10$, $BC = \\sqrt{19}$. Найдите $\\cos A$.[[fig:0]]</div>",
+   "figs": [
+    {
+     "file": "img/ege_prof/A33A46_1.png",
+     "w": 221,
+     "h": 133,
+     "alt": "Рисунок к заданию",
+     "maxw": 420
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "plain",
+      "value": "0,9",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": ""
+     }
+    ],
+    "value": "0,9"
+   },
+   "solution": "<div class=\"c-line\">По теореме Пифагора: $$AC = \\sqrt{10^2 - 19} = 9$$</div><div class=\"c-line\">$$\\cos A = \\dfrac{AC}{AB} = \\dfrac{9}{10} = 0{,}9$$</div>",
+   "source": "Открытый банк заданий ФИПИ, задание A33A46"
+  },
+  {
+   "v": 1,
+   "id": "fipi:80A34C",
+   "exam": "ege_prof",
+   "slug": "ege_prof",
+   "n": 1,
+   "proto": "circle",
+   "pos": 0,
+   "math": "tex",
+   "text": "<div>Отрезки $AC$ и $BD$ — диаметры окружности с центром $O$. Угол $ACB$ равен $41^\\circ$. Найдите величину угла $AOD$. Ответ дайте в градусах.[[fig:0]]</div>",
+   "figs": [
+    {
+     "file": "img/ege_prof/80A34C_1.png",
+     "w": 163,
+     "h": 159,
+     "alt": "Рисунок к заданию",
+     "maxw": 420
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "plain",
+      "value": "98",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": ""
+     }
+    ],
+    "value": "98"
+   },
+   "solution": "<div class=\"c-line\">Вписанный угол $ACB$ опирается на дугу $AB$, центральный $AOB = 2 \\cdot 41^\\circ = 82^\\circ$.</div><div class=\"c-line\">Углы $AOB$ и $AOD$ смежные: $$180^\\circ - 82^\\circ = 98^\\circ$$</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 80A34C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:B77903",
+   "exam": "ege_prof",
+   "slug": "ege_prof",
+   "n": 1,
+   "proto": "quad",
+   "pos": 0,
+   "math": "tex",
+   "text": "<div>В четырёхугольник $ABCD$, периметр которого равен 24, вписана окружность, $AB = 5$. Найдите длину стороны $CD$.[[fig:0]]</div>",
+   "figs": [
+    {
+     "file": "img/ege_prof/B77903_1.png",
+     "w": 181,
+     "h": 190,
+     "alt": "Рисунок к заданию",
+     "maxw": 420
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "plain",
+      "value": "7",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": ""
+     }
+    ],
+    "value": "7"
+   },
+   "solution": "<div class=\"c-line\">В описанном четырёхугольнике суммы противоположных сторон равны: $AB + CD = BC + AD$.</div><div class=\"c-line\">$$AB + CD = 24 : 2 = 12$$ $$CD = 12 - 5 = 7$$</div>",
+   "source": "Открытый банк заданий ФИПИ, задание B77903"
+  },
+  {
+   "v": 1,
+   "id": "fipi:F12D1C",
+   "exam": "ege_prof",
+   "slug": "ege_prof",
+   "n": 1,
+   "proto": "area",
+   "pos": 0,
+   "math": "tex",
+   "text": "<div>Площадь параллелограмма $ABCD$ равна 28. Точка $E$ — середина стороны $AD$. Найдите площадь трапеции $BCDE$.[[fig:0]]</div>",
+   "figs": [
+    {
+     "file": "img/ege_prof/F12D1C_1.png",
+     "w": 223,
+     "h": 148,
+     "alt": "Рисунок к заданию",
+     "maxw": 420
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "plain",
+      "value": "21",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": ""
+     }
+    ],
+    "value": "21"
+   },
+   "solution": "<div class=\"c-line\">$S_{ABE} = \\dfrac{1}{2} \\cdot AE \\cdot h = \\dfrac{1}{4} \\cdot 28 = 7$ (основание $AE$ — половина $AD$).</div><div class=\"c-line\">$$S_{BCDE} = 28 - 7 = 21$$</div>",
+   "source": "Открытый банк заданий ФИПИ, задание F12D1C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:1DD37A",
+   "exam": "ege_prof",
+   "slug": "ege_prof",
+   "n": 1,
+   "proto": "triangle",
+   "pos": 1,
+   "math": "tex",
+   "text": "<div>В треугольнике $ABC$ сторона $AB$ равна $3\\sqrt{2}$, угол $C$ равен $135^\\circ$. Найдите радиус описанной около этого треугольника окружности.[[fig:0]]</div>",
+   "figs": [
+    {
+     "file": "img/ege_prof/1DD37A_1.png",
+     "w": 170,
+     "h": 185,
+     "alt": "Рисунок к заданию",
+     "maxw": 420
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "plain",
+      "value": "3",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": ""
+     }
+    ],
+    "value": "3"
+   },
+   "solution": "<div class=\"c-line\">По теореме синусов $\\dfrac{AB}{\\sin C} = 2R$:</div><div class=\"c-line\">$$R = \\dfrac{3 \\sqrt{2}}{2\\sin 135^\\circ} = \\dfrac{3 \\sqrt{2}}{2 \\cdot \\frac{\\sqrt{2}}{2}} = 3$$</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 1DD37A"
+  },
+  {
+   "v": 1,
+   "id": "fipi:7FA4FB",
+   "exam": "ege_prof",
+   "slug": "ege_prof",
+   "n": 1,
+   "proto": "trig",
+   "pos": 1,
+   "math": "tex",
+   "text": "<div>В треугольнике $ABC$ угол $C$ равен $90^\\circ$, $AB = 10$, $AC = \\sqrt{51}$. Найдите $\\sin A$.[[fig:0]]</div>",
+   "figs": [
+    {
+     "file": "img/ege_prof/7FA4FB_1.png",
+     "w": 221,
+     "h": 148,
+     "alt": "Рисунок к заданию",
+     "maxw": 420
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "plain",
+      "value": "0,7",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": ""
+     }
+    ],
+    "value": "0,7"
+   },
+   "solution": "<div class=\"c-line\">По теореме Пифагора: $$BC = \\sqrt{10^2 - 51} = 7$$</div><div class=\"c-line\">$$\\sin A = \\dfrac{BC}{AB} = \\dfrac{7}{10} = 0{,}7$$</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 7FA4FB"
+  },
+  {
+   "v": 1,
+   "id": "fipi:84E9F2",
+   "exam": "ege_prof",
+   "slug": "ege_prof",
+   "n": 1,
+   "proto": "circle",
+   "pos": 1,
+   "math": "tex",
+   "text": "<div>Найдите величину угла $ACO$, если его сторона $CA$ касается окружности с центром $O$, отрезок $CO$ пересекает окружность в точке $B$ (см. рисунок), а дуга $AB$ окружности, заключённая внутри этого угла, равна $66^\\circ$. Ответ дайте в градусах.[[fig:0]]</div>",
+   "figs": [
+    {
+     "file": "img/ege_prof/84E9F2_1.png",
+     "w": 213,
+     "h": 147,
+     "alt": "Рисунок к заданию",
+     "maxw": 420
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "plain",
+      "value": "24",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": ""
+     }
+    ],
+    "value": "24"
+   },
+   "solution": "<div class=\"c-line\">Радиус $OA$ перпендикулярен касательной: $\\angle OAC = 90^\\circ$. Центральный угол $AOB$ равен дуге: $66^\\circ$.</div><div class=\"c-line\">$$\\angle ACO = 90^\\circ - 66^\\circ = 24^\\circ$$</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 84E9F2"
+  },
+  {
+   "v": 1,
+   "id": "fipi:AAB5B7",
+   "exam": "ege_prof",
+   "slug": "ege_prof",
+   "n": 1,
+   "proto": "quad",
+   "pos": 1,
+   "math": "tex",
+   "text": "<div>В четырёхугольник $ABCD$ вписана окружность, $AB = 14$, $CD = 17$. Найдите периметр четырёхугольника $ABCD$.[[fig:0]]</div>",
+   "figs": [
+    {
+     "file": "img/ege_prof/AAB5B7_1.png",
+     "w": 150,
+     "h": 204,
+     "alt": "Рисунок к заданию",
+     "maxw": 420
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "plain",
+      "value": "62",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": ""
+     }
+    ],
+    "value": "62"
+   },
+   "solution": "<div class=\"c-line\">В описанном четырёхугольнике суммы противоположных сторон равны: $AB + CD = BC + AD$.</div><div class=\"c-line\">$$P = 2(AB + CD) = 2 \\cdot (14 + 17) = 62$$</div>",
+   "source": "Открытый банк заданий ФИПИ, задание AAB5B7"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5B3F1A",
+   "exam": "ege_prof",
+   "slug": "ege_prof",
+   "n": 1,
+   "proto": "area",
+   "pos": 1,
+   "math": "tex",
+   "text": "<div>Площадь треугольника $ABC$ равна 24, $DE$ — средняя линия, параллельная стороне $AB$. Найдите площадь трапеции $ABED$.[[fig:0]]</div>",
+   "figs": [
+    {
+     "file": "img/ege_prof/5B3F1A_1.png",
+     "w": 188,
+     "h": 119,
+     "alt": "Рисунок к заданию",
+     "maxw": 420
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "plain",
+      "value": "18",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": ""
+     }
+    ],
+    "value": "18"
+   },
+   "solution": "<div class=\"c-line\">Треугольник $CDE$ подобен $ABC$ с коэффициентом $\\dfrac{1}{2}$, площадь — в $4$ раза меньше:</div><div class=\"c-line\">$$S_{CDE} = 24 : 4 = 6$$ $$S_{ABED} = 24 - 6 = 18$$</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 5B3F1A"
+  }
+ ]
+}
