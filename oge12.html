@@ -1563,6 +1563,67 @@ function resumeOrNewTask() {
   }
 }
 
+/* Каталог для конструктора вариантов (works.html) и кнопки «＋ В вариант»
+   (exam-nav.js) — тот же контракт, что у oge9: list / openAt / current.
+   банка ФИПИ у №12 пока нет: у прототипов только наш генератор (fipi пуст),
+   место pos ничего не выбирает — openAt выдаёт новое задание генератора.
+   openAt включает экран задания напрямую, а не через openTask/newTask: те
+   пишут прогресс прототипа (ogeProg:*), память «ФИПИ решены» и рассылают
+   снимок в совместную сессию (TrainerSession.push) — учитель собирает
+   вариант, а не решает задачи */
+window.__trainerCatalog = {
+  list(){
+    return Promise.resolve(ALL_MODES.filter(m => !m.demo).map(m => ({
+      id: m.id,
+      title: m.title,
+      section: null,
+      fipi: (m.fipiList || []).map(f => f.fipi),
+      hasGen: !!(m.fipiList ? m.ownGen : m.gen),
+    })));
+  },
+  /* что сейчас на экране: { n, proto, pos, fipi } или null на экране выбора. Только читает */
+  current(){
+    if (!curMode || !curTask || els.taskArea.style.display === 'none') return null;
+    const m = ALL_MODES.find(x => x.id === curMode && !x.demo);
+    if (!m) return null;
+    const fipi = curTask.fipi || null;
+    const i = fipi ? (m.fipiList || []).findIndex(f => f.fipi === fipi) : -1;
+    return { n: null, proto: curMode, pos: i >= 0 ? i : null, fipi: fipi };
+  },
+  openAt(protoId, pos){
+    const m = ALL_MODES.find(x => x.id === protoId && !x.demo);
+    if (!m) return { ok: false, reason: 'unknown' };
+    // m.gen у прототипа с банком — уже FipiMix.next (он пишет память), берём сам генератор
+    const own = m.fipiList ? m.ownGen : m.gen;
+    const gen = own ? () => own(false) : null;
+    const list = m.fipiList || [];
+    const task = window.FipiMix ? FipiMix.at(list, pos, gen) : (pos >= 0 && gen ? gen() : null);
+    if (!task) return { ok: false, reason: 'end' };
+    curMode = protoId;
+    curSubMode = 'exam';
+    curProg = freshProg();
+    curTask = task;
+    taskAnswered = false;
+    hadWrongPick = false;
+    els.picker.style.display = 'none';
+    els.taskArea.style.display = 'block';
+    els.comingSoonPanel.style.display = 'none';
+    els.tasksColumnsWrap.style.display = '';
+    els.refreshBtn.style.display = 'inline-flex';
+    els.prevTypeBtn.style.display = 'inline-flex';
+    els.nextTypeBtn.style.display = 'inline-flex';
+    els.tabLearn.classList.remove('active');
+    els.tabPractice.classList.remove('active');
+    els.tabExam.classList.add('active');
+    els.taskTitle.textContent = m.title;
+    syncHardToggle();
+    renderMedalBadges();
+    renderExampleHistory();
+    renderCurrentTask();
+    return { ok: true, fipi: task.fipi || null, pos, total: list.length };
+  },
+};
+
 function submitInputAnswer() {
   if (taskAnswered) return;
   const raw = els.answerInput.value.trim().replace(',', '.');

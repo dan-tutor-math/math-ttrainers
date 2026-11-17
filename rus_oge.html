@@ -759,7 +759,9 @@ if (startN && (POOL[startN] || []).length) {
   if (!params.get('t') && topicsOf(startN).length) renderTopics(startN);
   else openNumber(startN, params.get('t'), params.get('tp'));
 }
-else if (SHOW_ALL) renderPicker();
+// в невидимом кадре конструктора вариантов (works.html) без номера — не уводить на
+// главную: кадру нужен каталог этой страницы, а не index.html
+else if (SHOW_ALL || window.parent !== window) renderPicker();
 // старая закладка на rus_oge.html без номера — на главную, к номерам русского
 else location.replace(HOME);
 
@@ -801,6 +803,54 @@ window.__examNav = {
   n: () => S.n,
   pid: () => (S.screen === 'task' && curTask()) ? curTask().id : null,
   open: (n, pid) => { if ((POOL[n] || []).length) openNumber(n, pid || null, null); },
+};
+
+// Каталог для конструктора вариантов (works.html) и кнопки «＋ В вариант» (exam-nav.js):
+// list(n) / openAt(proto, pos, n) / current(), контракт как у страниц ОГЭ ч. 1.
+// Место в банке = конкретное задание ФИПИ (fipi — его id). Прототипы номера — подтемы
+// (topicsOf, задание в одной подтеме), у номера без подтем — один «all» на весь номер;
+// порядок — как в банке. Наших генераторов у русского нет намеренно (hasGen: false):
+// за концом банка — end. openAt не пишет память страницы (последнее задание, results)
+// и журнал ученика: учитель собирает вариант, а не решает
+function catalogProtos(n){
+  const meta = NUMS.find(m => m.n === n);
+  if (!meta || !(POOL[n] || []).length) return [];
+  const tps = topicsOf(n);
+  if (tps.length) return tps.map(tp => ({ id: tp.id, title: tp.title, list: listOf(n, tp.id) }));
+  return [{ id: 'all', title: meta.title, list: listOf(n, null) }];
+}
+window.__trainerCatalog = {
+  // номера страницы для индекса каталога (tools/build_catalog_index.py): NUMS в замыкании
+  nums: () => NUMS.filter(m => (POOL[m.n] || []).length).map(m => ({ n: m.n, title: m.title, label: '№' + m.n })),
+  list(n){
+    return Promise.resolve(catalogProtos(+n || S.n).map(p => ({
+      id: p.id, title: p.title, section: null, fipi: p.list.map(t => t.id), hasGen: false,
+    })));
+  },
+  /* что сейчас на экране: { n, proto, pos, fipi } или null вне задания. Только читает */
+  current(){
+    const t = S.screen === 'task' ? curTask() : null;
+    if (!t) return null;
+    const p = catalogProtos(S.n).find(x => x.list.includes(t));
+    if (!p) return null;
+    return { n: S.n, proto: p.id, pos: p.list.indexOf(t), fipi: t.id };
+  },
+  openAt(protoId, pos, n){
+    n = +n || S.n;
+    const p = catalogProtos(n).find(x => x.id === protoId);
+    if (!p) return Promise.resolve({ ok: false, reason: 'unknown' });
+    if (!(pos >= 0 && pos < p.list.length)) return Promise.resolve({ ok: false, reason: 'end', total: p.list.length });
+    S.screen = 'task'; S.n = n; S.topic = protoId === 'all' ? null : protoId; S.list = p.list; S.idx = pos;
+    S.picked = new Set(); S.tries = 0; S.done = false; S.revealed = false; S.last = null;
+    // адрес — как у openTask (обновление страницы вернёт то же задание), а LS.set(lastKey()) — нет
+    const t = p.list[pos];
+    const url = new URL(location.href);
+    url.searchParams.set('n', n); url.searchParams.set('t', t.id);
+    if (S.topic) url.searchParams.set('tp', S.topic); else url.searchParams.delete('tp');
+    history.replaceState(null, '', url);
+    renderTask(true);
+    return Promise.resolve({ ok: true, fipi: t.id, pid: t.id, pos, total: p.list.length });
+  },
 };
 
 // для тестов: состояние страницы без доступа к замыканию
