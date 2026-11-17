@@ -275,6 +275,13 @@ html.rv-on{overflow:hidden;}
 .bd-pv .pl.skip{opacity:.7;border-style:dashed;}
 .bd-pv .warn{color:var(--warn);font-size:13px;}
 .bd-go{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px;}
+.bd-pre{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;}
+.bd-pre .sep{width:1px;align-self:stretch;background:var(--glass-border);margin:0 4px;}
+.bd-tpl{display:inline-flex;align-items:center;gap:2px;padding:2px 4px 2px 10px;border-radius:12px;border:1px solid var(--glass-border);background:var(--card);font-size:14px;max-width:100%;}
+.bd-tpl b{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px;}
+.bd-tpl small{color:var(--muted-2);font-size:12px;margin-left:4px;}
+.bd-tpl button{border:0;background:none;color:var(--pencil);cursor:pointer;font:inherit;font-size:13.5px;padding:5px 6px;border-radius:8px;}
+.bd-tpl button:hover{background:var(--glass);}
 .toast.act.show{pointer-events:auto;}   /* тост с кнопкой «Вернуть набор» — кнопку надо нажимать */
 .toast button{margin-left:10px;color:#fff;border-color:rgba(255,255,255,.35);background:rgba(255,255,255,.12);}
 @media (max-width:760px){
@@ -423,12 +430,22 @@ html.rv-on{overflow:hidden;}
       <label>Вариантов <input type="number" id="bdVars" min="1" max="10" value="1" title="Вариант 2 берёт следующие места банка за вариантом 1, вариант 3 — за вариантом 2: задания в вариантах не повторяются"></label>
       <label id="bdForBox" hidden>Для ученика <select id="bdFor"><option value="">— без ученика —</option></select></label>
     </div>
+    <!-- пресеты и свои шаблоны (этап 8): пресет и шаблон заменяют Набор, «Вернуть набор» — в тосте -->
+    <div class="panel bd-pre" id="bdPresets">
+      <select class="bd-exam" id="bdExam" aria-label="Экзамен"></select>
+      <button class="btn quiet small" id="bdFull">Полный вариант</button>
+      <button class="btn quiet small" id="bdPart1" hidden>Часть 1</button>
+      <button class="btn quiet small" id="bdPart2" hidden>Часть 2</button>
+      <button class="btn quiet small" id="bdHw" title="Три первых номера экзамена, по 3 задания">Домашка: 3 номера ×3</button>
+      <span class="sep"></span>
+      <span id="bdTpls" style="display:contents"></span>
+      <button class="btn quiet small" id="bdTplSave" title="Запомнить строки Набора и настройки — потом открыть одной кнопкой">Сохранить как шаблон</button>
+    </div>
     <div class="bd">
       <div class="panel" id="bdSetBox">
         <div class="bd-h"><span>Набор</span><button class="btn quiet small" id="bdGridToggle" hidden>+ номера</button><button class="btn quiet small" id="bdClear" hidden>Очистить</button></div>
         <div id="bdTree"></div>
         <div id="bdGridBox">
-          <div class="bd-h"><select class="bd-exam" id="bdExam"></select><button class="btn quiet small" id="bdFull">Полный вариант</button></div>
           <div class="bd-grid" id="bdGrid"></div>
         </div>
       </div>
@@ -993,6 +1010,8 @@ async function save(){
     const isNew = !E.id;
     E.id = r.id; E.deleted = []; E.dirty = false;
     buildWas();
+    // работа из шаблона — шаблон запоминает, с какого места банка продолжать; сбой здесь работу не портит
+    try { await tplAdvance(); } catch (e) { console.warn('[работы] шаблон не сдвинулся', e); toast('Работа сохранена, но шаблон не запомнил место: ' + e.message, 6000); }
     r.variants.forEach((x, i) => { if (E.variants[i]) Object.assign(E.variants[i], { id: x.id, code: x.code }); });
     $('wkSaved').textContent = 'Сохранено ' + new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
     $('edHead').textContent = 'Работа';
@@ -2651,8 +2670,11 @@ function planRow(r){
   // банк перевыгрузят, порядок сменится, а номер ФИПИ останется тем же
   const byFipi = r.fipi ? (proto.fipi || []).indexOf(r.fipi) : -1;
   const pinned = byFipi >= 0 ? byFipi : r.pos;
+  // «с какого места» строки (шаблон, этап 8): по номеру ФИПИ, иначе по месту; поля нет — место с панели
+  const sf = r.startFipi ? (proto.fipi || []).indexOf(r.startFipi) : -1;
+  const rowStart = sf >= 0 ? sf : r.start;
   const random = $('bdSource').value === 'random' && pinned == null;
-  const start = pinned != null ? pinned : Math.max(0, (Math.round(Number($('bdStart').value)) || 1) - 1);
+  const start = pinned != null ? pinned : rowStart != null ? rowStart : Math.max(0, (Math.round(Number($('bdStart').value)) || 1) - 1);
   const count = Math.max(1, Math.min(COUNT_MAX, r.count || 1));
   let text, warn = '', got, poss = null, skipped = 0;
   if (random){
@@ -2711,6 +2733,7 @@ async function openBuild(target){
   BD.gridOpen = false;
   renderBuild();
   fillBuildStudents();
+  loadTemplates();
 }
 // «Для ученика» — только вошедшему учителю с кабинетом (список учеников из StudentMemory)
 async function fillBuildStudents(){
@@ -2746,6 +2769,7 @@ function renderBuild(){
   $('bdGridToggle').hidden = !rows.length;
   $('bdGridToggle').textContent = BD.gridOpen ? 'Скрыть номера' : '+ номера';
   $('bdClear').hidden = !rows.length;
+  renderPresets();
   renderBuildTree(rows); renderBuildGrid(rows); renderBuildPreview();
 }
 function renderBuildTree(rows){
@@ -2771,7 +2795,7 @@ function renderBuildTree(rows){
             + cat.protos.map(p => '<option value="' + esc(p.id) + '"' + (p.id === r.proto ? ' selected' : '') + '>' + esc(plainTitle(p.title)) + ' · ' + (p.fipi || []).length + '</option>').join('') + '</select>';
         } else protoHtml = '<span class="auth-note" style="flex:1">без каталога</span>';
         row.innerHTML = '<span class="grip">⠿</span>' + protoHtml
-          + (r.pos != null ? '<span class="auth-note">с №' + (r.pos + 1) + '</span>' : '')
+          + (r.pos != null ? '<span class="auth-note">с №' + (r.pos + 1) + '</span>' : r.start != null ? '<span class="auth-note" title="Шаблон продолжает с этого места банка">с №' + (r.start + 1) + '</span>' : '')
           + '<span class="bd-step"><button data-r="minus" aria-label="Меньше">−</button><b>×' + (r.count || 1) + '</b><button data-r="plus" aria-label="Больше">+</button></span>'
           + '<button class="x" data-r="del" title="Убрать из набора" aria-label="Убрать">✕</button>';
         const sel = row.querySelector('select');
@@ -2853,7 +2877,8 @@ async function buildGo(){
   if (BD.busy) return;
   const rows = orderedRows();
   const all = rows.map(r => ({ r, pl: planRow(r) }));
-  const plans = all.filter(x => x.pl.ok).map(x => x.pl);
+  const oks = all.filter(x => x.pl.ok);
+  const plans = oks.map(x => x.pl);
   // строки, которые в этой версии не собираются (нет каталога, только генератор), остаются в Наборе
   const left = all.filter(x => !x.pl.ok).map(x => x.r);
   if (!plans.length){ toast('В наборе нет номеров, которые можно собрать'); return; }
@@ -2876,8 +2901,8 @@ async function buildGo(){
     const keepPos = addPos; addPos = 'end';
     let made = 0;
     try {
-      for (const pl of plans){
-        try { if (await addSeries(pl.args)) made++; }
+      for (const { r, pl } of oks){
+        try { const key = await addSeries(pl.args); if (key){ made++; if (r.tpl) tplTag(key, r); } }
         catch (e) { console.error('[работы] группа не собралась', e); toast(e.message, 6000); }
       }
     } finally { addPos = keepPos; }
@@ -2911,18 +2936,7 @@ $('bdBack').addEventListener('click', () => {
 $('bdGo').addEventListener('click', buildGo);
 $('bdClear').addEventListener('click', () => { const saved = VS.all(); VS.clear(); toastAction('Набор очищен', 'Вернуть', () => VS.replace(saved), 10000); });
 $('bdGridToggle').addEventListener('click', () => { BD.gridOpen = !BD.gridOpen; renderBuild(); });
-$('bdExam').addEventListener('change', () => renderBuild());
-$('bdFull').addEventListener('click', () => {
-  const exam = $('bdExam').value, ex = examsSpec()[exam];
-  if (!ex) return;
-  const have = VS.all();
-  const each = Math.max(1, Number($('bdEach').value) || 1);
-  ex.list.forEach(p => {
-    const n = p.n == null ? null : p.n;
-    if (!have.some(r => r.exam === exam && r.slug === p.slug && r.n === n)) VS.add({ exam, slug: p.slug, n, count: each, source: $('bdSource').value });
-  });
-  BD.gridOpen = false; renderBuild();
-});
+$('bdExam').addEventListener('change', () => { renderPresets(); renderBuild(); });
 $('bdEach').addEventListener('change', () => {
   const c = Math.max(1, Math.min(COUNT_MAX, Math.round(Number($('bdEach').value)) || 1));
   $('bdEach').value = c;
@@ -2931,7 +2945,163 @@ $('bdEach').addEventListener('change', () => {
 ['bdSource', 'bdStart', 'bdVars'].forEach(id => $(id).addEventListener('input', renderBuildPreview));
 window.addEventListener('variantset:change', () => renderBuild());
 
-window.__works = { E, renderTasks, addSeries, openBuild, renderBuild, planRow, buildGo, seriesNext, seriesPrev, seriesShuffle, seriesMore, seriesSetOne, seriesMove, seriesRemove, addFromFrame, openTrainer, openVideos, addVideo, save, route, gens, canon, openResults, openReview, closeReview };   // для тестов и отладки из консоли
+/* ── пресеты и шаблоны работ (этап 8 конструктора) ──
+   Пресет — готовый Набор по ExamSpec выбранного экзамена: «Полный вариант»,
+   «Часть 1/2» (по полю part; у экзамена, где часть хоть у одного номера
+   неизвестна или часть одна, кнопок нет), «Домашка: 3 номера ×3» — три первых
+   номера сетки. Шаблон — свой сохранённый Набор с настройками
+   (WorksCloud.templates: облако work_templates, без таблицы — localStorage).
+   И пресет, и шаблон заменяют Набор; прежний — «Вернуть набор» в тосте.
+   Место в банке: строка шаблона помнит next_pos/next_fipi — открытый шаблон
+   кладёт их в поле строки start/startFipi, и planRow берёт место оттуда.
+   Группы работы, собранной из шаблона, помнят его (series.tpl, tplRow), а
+   при «Сохранить» работы tplAdvance сдвигает next_pos за самое большое место
+   группы во всех вариантах — листание «Следующие 3» шаблон не двигает. */
+const TPL = { list: [], loaded: false };
+function examParts(ex){
+  const parts = new Set(ex.list.map(p => p.part));
+  return parts.has(null) || parts.has(undefined) || parts.size < 2 ? [] : [...parts].sort();
+}
+function renderPresets(){
+  const ex = examsSpec()[$('bdExam').value];
+  const parts = ex ? examParts(ex) : [];
+  $('bdPart1').hidden = parts.indexOf(1) < 0;
+  $('bdPart2').hidden = parts.indexOf(2) < 0;
+}
+function setPresetRows(rows, label){
+  const saved = VS.all();
+  VS.replace([]);
+  rows.forEach(r => VS.add(r));
+  BD.gridOpen = false; renderBuild();
+  if (saved.length) toastAction(label + ': Набор заменён', 'Вернуть набор', () => { VS.replace(saved); toast('Набор возвращён'); }, 10000);
+}
+function applyPreset(kind){
+  const exam = $('bdExam').value, ex = examsSpec()[exam];
+  if (!ex) return;
+  const each = Math.max(1, Math.min(COUNT_MAX, Math.round(Number($('bdEach').value)) || 1));
+  let list = ex.list, count = each, label = 'Полный вариант';
+  if (kind === 1 || kind === 2){ list = ex.list.filter(p => p.part === kind); label = 'Часть ' + kind; }
+  if (kind === 'hw'){ list = ex.list.slice(0, 3); count = 3; label = 'Домашка'; }
+  setPresetRows(list.map(p => ({ exam, slug: p.slug, n: p.n == null ? null : p.n, count, source: $('bdSource').value })), label);
+}
+$('bdFull').addEventListener('click', () => applyPreset('full'));
+$('bdPart1').addEventListener('click', () => applyPreset(1));
+$('bdPart2').addEventListener('click', () => applyPreset(2));
+$('bdHw').addEventListener('click', () => applyPreset('hw'));
+
+async function loadTemplates(){
+  try { TPL.list = await C.templates.list(); }
+  catch (e) { TPL.list = []; toast('Шаблоны не загрузились: ' + e.message, 6000); }
+  TPL.loaded = true;
+  renderTemplates();
+}
+function renderTemplates(){
+  const box = $('bdTpls');
+  box.innerHTML = '';
+  TPL.list.forEach(t => {
+    const el = document.createElement('span'); el.className = 'bd-tpl'; el.dataset.id = t.id;
+    el.innerHTML = '<b title="' + esc(t.title) + '">' + esc(t.title) + '</b>'
+      + (t.local ? '<small class="tpl-local" title="Таблицы шаблонов в облаке ещё нет или вы не вошли — шаблон лежит в этом браузере">только на этом компьютере</small>' : '')
+      + '<button data-t="open">Открыть</button><button data-t="ren" title="Переименовать" aria-label="Переименовать">✎</button><button data-t="del" title="Удалить шаблон" aria-label="Удалить шаблон">✕</button>';
+    el.querySelector('[data-t="open"]').addEventListener('click', () => tplOpen(t));
+    el.querySelector('[data-t="ren"]').addEventListener('click', () => tplRename(t));
+    el.querySelector('[data-t="del"]').addEventListener('click', () => tplDelete(t));
+    box.appendChild(el);
+  });
+}
+const ROW_KEEP = ['exam', 'slug', 'n', 'tid', 'href', 'proto', 'pos', 'fipi', 'count', 'source'];
+function tplOpen(t){
+  const st = t.settings || {};
+  if (st.each) $('bdEach').value = st.each;
+  if (st.source) $('bdSource').value = st.source === 'random' ? 'random' : 'order';
+  if (st.vars) $('bdVars').value = st.vars;
+  if (st.start) $('bdStart').value = st.start;
+  const items = t.items || [];
+  if (items[0] && examsSpec()[items[0].exam]) $('bdExam').value = items[0].exam;
+  setPresetRows(items.map((it, i) => {
+    const r = {};
+    ROW_KEEP.forEach(k => { r[k] = it[k]; });
+    // место, с которого шаблон продолжает: next_pos сдвигает «Сохранить» работы
+    r.start = it.next_pos != null ? it.next_pos : null;
+    r.startFipi = it.next_fipi || null;
+    r.tpl = t.id; r.tplRow = i;
+    return r;
+  }), 'Шаблон «' + t.title + '»');
+}
+async function tplSaveCur(){
+  const rows = orderedRows();
+  if (!rows.length){ toast('Набор пуст — сохранять нечего'); return; }
+  if (rows.length > C.templates.ROWS){ toast('В шаблоне не больше ' + C.templates.ROWS + ' строк'); return; }
+  if (TPL.list.length >= C.templates.MAX){ toast('Шаблонов уже ' + C.templates.MAX + ' — удалите ненужные'); return; }
+  const def = 'Шаблон: ' + [...new Set(rows.map(numName))].slice(0, 3).join(', ') + (rows.length > 3 ? '…' : '');
+  let title = prompt('Название шаблона', def);
+  if (title == null) return;
+  title = title.trim() || def;
+  const items = rows.map(r => {
+    const it = {};
+    ROW_KEEP.forEach(k => { it[k] = r[k] == null ? null : r[k]; });
+    it.next_pos = r.start != null ? r.start : null;
+    it.next_fipi = r.startFipi || null;
+    return it;
+  });
+  const settings = { each: Number($('bdEach').value) || 1, source: $('bdSource').value, vars: Number($('bdVars').value) || 1, start: Number($('bdStart').value) || 1 };
+  try {
+    const t = await C.templates.save({ title, items, settings });
+    await loadTemplates();
+    toast('Шаблон «' + t.title + '» сохранён' + (t.local ? ' — только на этом компьютере' : ''));
+  } catch (e) { toast('Шаблон не сохранился: ' + e.message, 6000); }
+}
+async function tplRename(t){
+  let title = prompt('Новое название шаблона', t.title);
+  if (title == null || !(title = title.trim()) || title === t.title) return;
+  try { await C.templates.save(Object.assign({}, t, { title })); await loadTemplates(); }
+  catch (e) { toast('Не переименовался: ' + e.message, 6000); }
+}
+async function tplDelete(t){
+  if (!confirm('Удалить шаблон «' + t.title + '»? Работы, собранные из него, останутся.')) return;
+  try { await C.templates.remove(t); await loadTemplates(); toast('Шаблон удалён'); }
+  catch (e) { toast('Не удалился: ' + e.message, 6000); }
+}
+$('bdTplSave').addEventListener('click', tplSaveCur);
+// группа собрана из строки шаблона — помечаем её задания и работу
+function tplTag(key, r){
+  E.variants[0].blocks.forEach(b => {
+    if (b.series && b.series.key === key) b.series = Object.assign({}, b.series, { tpl: r.tpl, tplRow: r.tplRow });
+  });
+  if (!E.settings.templateId) E.settings.templateId = r.tpl;
+}
+// «Сохранить» работы: строки шаблона продолжают за самым большим местом группы во всех вариантах
+async function tplAdvance(){
+  const top = new Map();   // 'tpl|row' → { pos, proto }
+  E.variants.forEach(v => v.blocks.forEach(b => {
+    const s = b.series;
+    if (!s || !s.tpl || s.tplRow == null || s.pos == null || s.src === 'random') return;
+    const k = s.tpl + '|' + s.tplRow, m = top.get(k);
+    if (!m || s.pos > m.pos) top.set(k, { pos: s.pos, proto: s.proto });
+  }));
+  if (!top.size) return;
+  const list = await C.templates.list();
+  let idx = null;
+  try { idx = await catIndex(); } catch (e) {}
+  for (const t of list){
+    let changed = false;
+    const items = (t.items || []).map((it, i) => {
+      const m = top.get(t.id + '|' + i);
+      if (!m) return it;
+      const next = m.pos + 1;
+      // назад не двигаем: пересохранили старую работу — шаблон уже ушёл дальше
+      if (it.next_pos != null && it.next_pos >= next) return it;
+      const cat = idx && idx[it.slug + '|' + (it.n == null ? '' : it.n)];
+      const proto = cat && cat.protos ? cat.protos.find(p => p.id === m.proto) : null;
+      changed = true;
+      return Object.assign({}, it, { next_pos: next, next_fipi: (proto && (proto.fipi || [])[next]) || null });
+    });
+    if (changed) await C.templates.save(Object.assign({}, t, { items }));
+  }
+  TPL.loaded = false;
+}
+
+window.__works = { E, renderTasks, addSeries, openBuild, renderBuild, planRow, buildGo, applyPreset, loadTemplates, tplOpen, tplAdvance, TPL, seriesNext, seriesPrev, seriesShuffle, seriesMore, seriesSetOne, seriesMove, seriesRemove, addFromFrame, openTrainer, openVideos, addVideo, save, route, gens, canon, openResults, openReview, closeReview };   // для тестов и отладки из консоли
 boot();
 })();
 </script>

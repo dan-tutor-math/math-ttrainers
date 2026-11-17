@@ -7,6 +7,10 @@
    Строка: { id, exam, slug, n, tid, href, proto, pos, fipi, count, source,
    from, addedAt }. proto/pos пустые — «весь номер» (при сборке берётся первый
    прототип каталога и место с панели «с какого номера банка»).
+   start/startFipi — «с какого места» у строки (этап 8, шаблоны): место в банке
+   и номер ФИПИ на нём (по номеру ищется место, если банк перевыгрузят). Нет
+   поля — место с панели, как раньше. tpl/tplRow — шаблон и номер его строки:
+   после «Сохранить» работы шаблон запоминает, с какого места продолжать.
 
    Хранится в localStorage, как подборка (basket-core.js): ключ свой у каждой
    совместной сессии — учитель ведёт параллельные занятия в разных вкладках,
@@ -36,12 +40,14 @@
     emit(items);
     return items;
   }
-  const FIELDS = ['exam', 'slug', 'n', 'tid', 'href', 'proto', 'pos', 'fipi', 'count', 'source', 'from'];
+  const FIELDS = ['exam', 'slug', 'n', 'tid', 'href', 'proto', 'pos', 'fipi', 'count', 'source', 'from', 'start', 'startFipi', 'tpl', 'tplRow'];
   function norm(item) {
     const o = {};
     FIELDS.forEach(f => { o[f] = item[f] == null || item[f] === '' ? null : item[f]; });
     o.n = o.n == null ? null : Number(o.n);
     o.pos = o.pos == null ? null : Number(o.pos);
+    o.start = o.start == null ? null : Math.max(0, Math.round(Number(o.start)) || 0);
+    o.tplRow = o.tplRow == null ? null : Number(o.tplRow);
     o.count = Math.max(1, Math.round(Number(item.count) || 1));
     if (o.source !== 'random') o.source = 'order';
     return o;

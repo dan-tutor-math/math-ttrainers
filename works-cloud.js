@@ -170,6 +170,100 @@
     return c.storage.from(BUCKET).getPublicUrl(path).data.publicUrl;
   }
 
+  /* ── шаблоны работ (этап 8 конструктора вариантов, work-templates-schema.sql) ──
+     Шаблон — строки Набора и общие настройки экрана «Собрать вариант»; в список
+     работ не попадает. Таблицы work_templates может ещё не быть (SQL запускает
+     Даниил) — тогда шаблоны живут в localStorage этого браузера с пометкой
+     local, а когда таблица появится, list() сам перенесёт их в облако (как у
+     deck_templates). Без входа — тоже локально. Сеть пропала при облачной
+     таблице — ошибка, а не тихая запись в браузер: иначе при переносе копия
+     из браузера разошлась бы с облачной. */
+  const TPL_TABLE = 'work_templates', TPL_LOCAL = 'workTemplates:v1', TPL_COLS = 'id, title, items, settings, created_at, updated_at';
+  const TPL_MAX = 100, TPL_ROWS = 30;
+  let tplCloudOff = false;
+  // нет таблицы: Postgres 42P01 «relation … does not exist», PostgREST PGRST205 «… schema cache», 404
+  const tplMissing = e => /42P01|PGRST20[45]|does not exist|schema cache|\b404\b/i.test(String((e && e.message) || '') + ' ' + String((e && (e.code || e.status)) || ''));
+  function tplLocalAll(){ try { const a = JSON.parse(localStorage.getItem(TPL_LOCAL) || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } }
+  function tplLocalPut(a){ try { localStorage.setItem(TPL_LOCAL, JSON.stringify(a)); } catch (e) {} }
+  const asLocal = t => Object.assign({}, t, { local: true });
+  const tplUid = () => (crypto.randomUUID ? crypto.randomUUID() : 'xxxxxxxx-xxxx-4xxx-8xxx-xxxxxxxxxxxx'.replace(/x/g, () => (Math.random() * 16 | 0).toString(16)));
+  async function tplCloud(){
+    if (tplCloudOff) return null;
+    const c = client();
+    if (!c || !(await currentUser())) return null;
+    return c;
+  }
+  async function listTemplates(){
+    const local = tplLocalAll();
+    const c = await tplCloud();
+    if (!c) return local.map(asLocal);
+    let res;
+    try { res = await c.from(TPL_TABLE).select(TPL_COLS).order('created_at', { ascending: true }); }
+    catch (e) { return local.map(asLocal); }   // нет сети — показываем хотя бы то, что в браузере
+    if (res.error){
+      if (tplMissing(res.error)) tplCloudOff = true;
+      return local.map(asLocal);
+    }
+    const rows = res.data || [];
+    if (!local.length) return rows;
+    // таблица появилась — шаблоны из браузера уезжают в облако под тем же id
+    const left = [];
+    for (const t of local){
+      if (rows.some(r => r.id === t.id)) continue;
+      if (rows.length >= TPL_MAX){ left.push(t); continue; }
+      try {
+        const r = await c.from(TPL_TABLE).insert({ id: t.id, title: t.title, items: t.items || [], settings: t.settings || {} }).select(TPL_COLS).single();
+        if (r.error) left.push(t); else rows.push(r.data);
+      } catch (e) { left.push(t); }
+    }
+    tplLocalPut(left);
+    return rows.concat(left.map(asLocal));
+  }
+  // t: { id?, local?, title, items, settings } → сохранённый шаблон (local: true — только в этом браузере)
+  async function saveTemplate(t){
+    const title = String(t.title || '').trim().slice(0, 80);
+    if (!title) throw new WorkError({ message: 'У шаблона нет названия' });
+    const items = (t.items || []).slice();
+    if (!items.length) throw new WorkError({ message: 'В шаблоне нет строк' });
+    if (items.length > TPL_ROWS) throw new WorkError({ message: 'В шаблоне больше ' + TPL_ROWS + ' строк — столько не помещается в Набор' });
+    const settings = t.settings || {};
+    const c = t.local && t.id ? null : await tplCloud();
+    if (c){
+      let res;
+      try {
+        if (t.id) res = await c.from(TPL_TABLE).update({ title, items, settings }).eq('id', t.id).select(TPL_COLS);
+        else {
+          const have = await c.from(TPL_TABLE).select('id');
+          if (!have.error && (have.data || []).length >= TPL_MAX) throw new WorkError({ message: 'Шаблонов уже ' + TPL_MAX + ' — удалите ненужные' });
+          res = have.error ? have : await c.from(TPL_TABLE).insert({ id: tplUid(), title, items, settings }).select(TPL_COLS);
+        }
+      } catch (e) { throw e instanceof WorkError ? e : new WorkError(e); }
+      if (!res.error){
+        const row = Array.isArray(res.data) ? res.data[0] : res.data;
+        if (row) return row;
+        throw new WorkError({ message: 'Шаблон не найден — обновите страницу' });
+      }
+      if (!tplMissing(res.error)) throw new WorkError(res.error);
+      tplCloudOff = true;   // таблицы нет — дальше как без неё
+    }
+    const all = tplLocalAll();
+    const now = new Date().toISOString();
+    const i = t.id ? all.findIndex(x => x.id === t.id) : -1;
+    if (i < 0 && all.length >= TPL_MAX) throw new WorkError({ message: 'Шаблонов уже ' + TPL_MAX + ' — удалите ненужные' });
+    const rec = i >= 0 ? Object.assign({}, all[i], { title, items, settings, updated_at: now })
+      : { id: t.id || tplUid(), title, items, settings, created_at: now, updated_at: now };
+    if (i >= 0) all[i] = rec; else all.push(rec);
+    tplLocalPut(all);
+    return asLocal(rec);
+  }
+  async function deleteTemplate(t){
+    if (t.local){ tplLocalPut(tplLocalAll().filter(x => x.id !== t.id)); return; }
+    const c = await tplCloud();
+    if (!c) throw new WorkError({ message: 'Нужно войти' });
+    check(await c.from(TPL_TABLE).delete().eq('id', t.id));
+  }
+  const templates = { list: listTemplates, save: saveTemplate, remove: deleteTemplate, MAX: TPL_MAX, ROWS: TPL_ROWS, cloudOff: () => tplCloudOff };
+
   // ссылка для ученика — рядом с текущей страницей, на том же сайте
   function linkFor(code){
     const base = location.href.replace(/[#?].*$/, '').replace(/[^/]*$/, '');
@@ -186,6 +280,6 @@
     client, errorText, codeOf, WorkError,
     open, start, resume, save, finish, remember, recall, forget,
     currentUser, signIn, signOut, listWorks, getWork, saveWork, setClosed, deleteWork, results, deleteAttempt,
-    uploadImage, linkFor, kindLabel, KINDS,
+    uploadImage, linkFor, kindLabel, KINDS, templates,
   };
 })();
