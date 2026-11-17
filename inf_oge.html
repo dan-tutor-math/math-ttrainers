@@ -2057,7 +2057,8 @@ function renderProofScore(allShown){
       try { localStorage.setItem(SCORES_KEY, JSON.stringify(proofScoreMap)); } catch (e) {}
       markSolved(p.id);
       // кабинет (Б2): самооценка доказательства — полный балл считаем ok, меньше — bad
-      if (window.StudentMemory) StudentMemory.recordTask(p, { clean: +btn.dataset.b >= max });
+      // задача 56: пишем итог попытки (ok/bad) через recordAttempt, а не «чисто/нечисто»
+      if (window.StudentMemory) StudentMemory.recordAttempt(p, { ok: +btn.dataset.b >= max });
       render();
     };
   });
@@ -2368,8 +2369,9 @@ function runCheck(p, st, root){
   if (allOk) {
     st.answered = true; st.correct = true;
     totalSolved++; streak++;
-    // кабинет (Б2): с первого раза — ok, после ошибки или подсказки — bad
-    if (window.StudentMemory) StudentMemory.recordTask(p, { clean: !st.hadWrong });
+    // кабинет (Б2): задача 56 — верный ответ пишем как ok всегда; если до него была
+    // ошибка, её bad уже записан в ветке ниже, и в журнале получается цепочка bad → ok
+    if (window.StudentMemory) StudentMemory.recordAttempt(p, { ok: true });
     markSolved(p.id);
     addHistory(p, st, true);
     awardMedals();
@@ -2381,10 +2383,14 @@ function runCheck(p, st, root){
     list.forEach(f => { if (!results[f.id]) st.marks[f.id] = 'fixed'; });
     totalErrors++; streak = 0;
     curProg.errorsInBatch = (curProg.errorsInBatch || 0) + 1;
-    if (window.StudentMemory) StudentMemory.recordTask(p, { clean: false });
+    // задача 56: после первой ошибки bad уже записан (ветка ниже), второй не дублируем.
+    // Но в «Экзамене» с oneTry первая же ошибка приходит сюда минуя st.hadWrong — тогда пишем bad здесь
+    if (!st.hadWrong && window.StudentMemory) StudentMemory.recordAttempt(p, { ok: false });
     addHistory(p, st, false);
   } else {
     st.hadWrong = true;
+    // задача 56: ошибку пишем в момент ошибки, а не при итоге — иначе при уходе со страницы она теряется
+    if (window.StudentMemory) StudentMemory.recordAttempt(p, { ok: false });
     totalErrors++; streak = 0;
     // ошибка в пятёрке решает, какой будет медаль: без ошибок — золото
     curProg.errorsInBatch = (curProg.errorsInBatch || 0) + 1;
