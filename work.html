@@ -275,6 +275,7 @@
 <script src="video-player.js"></script>
 <script src="exam-spec.js"></script>
 <script src="lazy-libs.js"></script>
+<script src="blank-forms.js"></script>
 <script src="work-print.js"></script>
 <script src="works-cloud.js"></script>
 <script>
@@ -339,7 +340,7 @@ const maxTries = () => {
 $('wPrint') && $('wPrint').addEventListener('click', () => WorkPrint.ask(() => {
   const blocks = taskBlocks();
   if (!blocks.length) return 'В работе нет заданий';
-  return { title: (S.work && S.work.title) || C.kindLabel(S.work.kind, S.settings), variants: [{ num: 1, blocks }] };
+  return { key: code, title: (S.work && S.work.title) || C.kindLabel(S.work.kind, S.settings), variants: [{ num: 1, blocks }] };
 }, { student: true }));
 const taskBlocks = () => (S.blocks || []).filter(b => (b.type || 'task') === 'task');
 const curBlock = () => taskBlocks()[S.cur];

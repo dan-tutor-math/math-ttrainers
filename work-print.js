@@ -80,11 +80,13 @@
      ЕГЭ-2026: образцы из «Правил заполнения бланков» Рособрнадзора, картинки как
      есть. Математика базовая — без бланка № 2. Экзамены, которых тут нет (ОГЭ),
      получают свой бланк-таблицу: официального образца в открытых документах нет. */
-  const B = 'blanks/ege2026/';
-  const SET_SHORT = [['reg', 'Бланк регистрации'], ['o1', 'Бланк ответов № 1']];
-  const SET_FULL = SET_SHORT.concat([['o2l1', 'Бланк ответов № 2, лист 1'], ['o2l2', 'Бланк ответов № 2, лист 2'], ['dop', 'Дополнительный бланк ответов № 2']]);
-  const OFFICIAL = { ege_base: SET_SHORT, ege_prof: SET_FULL, soc_ege: SET_FULL, rus_ege: SET_FULL };
-  const OFFICIAL_NAME = { ege_base: 'ЕГЭ', ege_prof: 'ЕГЭ', soc_ege: 'ЕГЭ', rus_ege: 'ЕГЭ' };
+  /* Бланки — объекты (blank-forms.js): вёрстка вектором, клетки — поля ввода.
+     ЕГЭ — по образцам ЕГЭ-2026 (blanks/ege2026, SOURCES.md); ОГЭ: бланк № 2 по
+     образцу ОГЭ-2024, бланк № 1 — наша таблица (образца ОГЭ № 1 нет: 'table'). */
+  const SET_SHORT = [['ege_reg', 'Бланк регистрации'], ['ege_o1', 'Бланк ответов № 1']];
+  const SET_FULL = SET_SHORT.concat([['ege_o2l1', 'Бланк ответов № 2, лист 1'], ['ege_o2l2', 'Бланк ответов № 2, лист 2'], ['ege_dop', 'Дополнительный бланк ответов № 2']]);
+  const SET_OGE = [['table', 'Бланк ответов № 1 (наш)'], ['oge_o2l1', 'Бланк ответов № 2, лист 1'], ['oge_o2l2', 'Бланк ответов № 2, лист 2']];
+  const OFFICIAL = { ege_base: SET_SHORT, ege_prof: SET_FULL, soc_ege: SET_FULL, rus_ege: SET_FULL, oge: SET_OGE };
   // экзамен работы — по большинству заданий (ExamSpec); не определился — null
   function examOf(work) {
     const cnt = {};
@@ -95,9 +97,13 @@
     return k || null;
   }
   const officialSet = work => OFFICIAL[examOf(work)] || null;
-  function officialItems(set) {
-    return set.map(([f, label]) => ({ f, label }));
+  // значения клеток бланков живут в браузере (localStorage), по ключу работы
+  const stKey = work => 'wp:blank:' + ((work && work.key) || 'work');
+  function blankState(work) {
+    try { return JSON.parse(localStorage.getItem(stKey(work)) || '{}') || {}; } catch (e) { return {}; }
   }
+  function blankSave(work, st) { try { localStorage.setItem(stKey(work), JSON.stringify(st)); } catch (e) {} }
+  const formsOf = set => (set || []).filter(x => x[0] !== 'table');
 
   /* ── разметка листов ── */
   const head = (title, v, many) => '<div class="wp-head"><b>' + esc(title || 'Работа') + (many || v.num > 1 ? ' · Вариант ' + v.num : '') + '</b></div>';
@@ -222,7 +228,7 @@
     if (what.tasks) vs.forEach(v => secs.push({ cls: 'wp-tasks', head: head(work.title, v, many) + who, run: runT(work.title, v, many),
       items: (v.blocks || []).filter(isTask).map((b, i) => taskItem(b, i, prep.get(b))) }));
     const off = what.blank ? officialSet(work) : null;
-    if (what.blank && !off) vs.forEach(v => secs.push({ cls: 'wp-blank', head: head(work.title, v, many) + '<div class="wp-sub">Бланк ответов</div>' + who,
+    if (what.blank && (!off || off.some(x => x[0] === 'table'))) vs.forEach(v => secs.push({ cls: 'wp-blank', head: head(work.title, v, many) + '<div class="wp-sub">Бланк ответов</div>' + who,
       run: runT(work.title, v, many) + ' · бланк ответов', items: blankItems(v) }));
     if (what.key) secs.push({ cls: 'wp-key', head: '<div class="wp-head"><b>' + esc(work.title || 'Работа') + ' · ключ для учителя</b></div>',
       run: (work.title || 'Работа') + ' · ключ', items: vs.map(keyItem) });
@@ -232,11 +238,14 @@
     // «Страница i из N» — только у наших листов; официальные бланки без правок
     const own = [...root.querySelectorAll('.wp-sheet')];
     own.forEach((sh, i) => { sh.querySelector('.wp-foot').textContent = 'Страница ' + (i + 1) + ' из ' + own.length; });
-    // официальные бланки — после заданий (по набору на вариант), всегда книжные, как оригинал
-    if (off) {
-      const imgs = officialItems(off);
-      await Promise.all(imgs.map(o => loadImg(B + o.f + '.png')));
-      vs.forEach(() => imgs.forEach(o => root.appendChild(mk('<section class="wp-sheet wp-page wp-off wp-blank" data-form="' + o.f + '"><img alt="' + esc(o.label) + '" src="' + B + o.f + '.png"></section>'))));
+    // бланки-объекты — после заданий (по набору на вариант), всегда книжные, как оригинал; значения полей — из черновика бланка
+    if (off && window.BlankForms) {
+      const st = blankState(work);
+      vs.forEach(() => formsOf(off).forEach(([k]) => {
+        const sec = mk('<section class="wp-sheet wp-page wp-off wp-blank" data-form="' + k + '"></section>');
+        sec.appendChild(window.BlankForms.create(k, st, { readonly: true }));
+        root.appendChild(sec);
+      }));
     }
     return [...root.querySelectorAll('.wp-sheet')];
   }
@@ -250,7 +259,6 @@
 .wp-sheet.p{width:210mm;height:296.4mm;padding:14mm 15mm 10mm}
 .wp-sheet.l{width:297mm;height:209.4mm;padding:11mm 13mm 8mm}
 .wp-sheet.wp-off{width:210mm;height:296.4mm;padding:0;page:wpo}
-.wp-off img{display:block;width:100%;height:100%;object-fit:contain}
 .wp-cols{flex:1;min-height:0;display:flex;gap:9mm}
 .wp-col{flex:1;min-width:0;overflow:hidden}
 .wp-sheet.l .wp-col + .wp-col{border-left:.6px solid #777;padding-left:9mm}
@@ -275,6 +283,14 @@
 .wp-kt caption{font-weight:700;text-align:left;padding-bottom:2px}
 .wp-kt th, .wp-kt td{border:1px solid #000;padding:2px 6px}
 .wp-kt td.n, .wp-kt td.p{text-align:center}
+.wp-fill{position:fixed;inset:0;z-index:600;background:var(--bg,#f2f3f5);color:var(--pencil,#1D1D1F);overflow:auto;padding:0 0 40px}
+.wp-fill .bar{position:sticky;top:0;z-index:2;display:flex;gap:8px;align-items:center;padding:10px 14px;background:var(--bg,#fff);border-bottom:1px solid rgba(128,128,128,.3)}
+.wp-fill .bar .sp{flex:1}
+.wp-fill .note{padding:8px 14px;font-size:13px;color:var(--muted-2,#6E6E73)}
+.wp-fill .sheets{display:flex;flex-direction:column;align-items:center;gap:6px}
+.wp-fill .sh{width:100%;display:flex;flex-direction:column;align-items:center}
+.wp-fill .cap{font-size:13px;color:var(--muted-2,#6E6E73);margin:10px 0 2px}
+.wp-fill .fit{transform-origin:top center;width:210mm;box-shadow:0 2px 14px rgba(0,0,0,.18)}
 .wp-dlg{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px}
 .wp-dlg .box{background:var(--bg,#fff);color:var(--pencil,#1D1D1F);border-radius:16px;padding:20px 22px;max-width:400px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.25)}
 .wp-dlg h3{margin:0 0 12px;font-size:18px}
@@ -330,6 +346,45 @@
       return sheets.length;
     } finally { root.innerHTML = ''; root.className = ''; }
   }
+  // Экран заполнения: листы бланков на странице, клетки вводятся и сохраняются
+  // сами (localStorage); отсюда же — печать и PDF с вписанным
+  function fill(work, orient) {
+    ensureStyle();
+    const set = officialSet(work), BF = window.BlankForms;
+    if (!set || !BF) return null;
+    BF.ensureCss();
+    const old = document.getElementById('wpFillBox'); if (old) old.remove();
+    const st = blankState(work);
+    const d = document.createElement('div'); d.id = 'wpFillBox'; d.className = 'wp-fill';
+    d.innerHTML = '<div class="bar"><b>Бланки ответов</b><span class="sp"></span>'
+      + '<button class="btn quiet" id="wfClear">Очистить</button><button class="btn quiet" id="wfPdf">Скачать PDF</button><button class="btn" id="wfPrint">Печатать</button><button class="btn quiet" id="wfClose" aria-label="Закрыть">✕</button></div>'
+      + '<div class="note">Клетки заполняются заглавными буквами, цифрами, запятой и минусом; курсор переходит сам. Значения сохраняются в этом браузере.</div><div class="sheets"></div>';
+    const box = d.querySelector('.sheets');
+    formsOf(set).forEach(([k, label]) => {
+      const wrap = document.createElement('div'); wrap.className = 'sh'; wrap.dataset.form = k;
+      wrap.innerHTML = '<div class="cap">' + esc(label) + '</div>';
+      const inner = document.createElement('div'); inner.className = 'fit';
+      inner.appendChild(BF.create(k, st, { onChange: () => blankSave(work, st) }));
+      wrap.appendChild(inner); box.appendChild(wrap);
+    });
+    document.body.appendChild(d);
+    const fit = () => { const k = Math.min(1, (d.clientWidth - 24) / 794); d.querySelectorAll('.fit').forEach(f => { f.style.transform = 'scale(' + k + ')'; f.parentNode.style.height = (f.firstChild.offsetHeight * k + 28) + 'px'; }); };
+    fit(); window.addEventListener('resize', fit);
+    const close = () => { window.removeEventListener('resize', fit); d.remove(); };
+    d.querySelector('#wfClose').addEventListener('click', close);
+    d.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+    d.querySelector('#wfClear').addEventListener('click', () => {
+      Object.keys(st).forEach(k => delete st[k]); blankSave(work, st);
+      d.querySelectorAll('.sheets input').forEach(i => { i.value = ''; });
+    });
+    d.querySelector('#wfPrint').addEventListener('click', () => { print(work, { blank: true }, orient); });
+    d.querySelector('#wfPdf').addEventListener('click', async () => {
+      const b = d.querySelector('#wfPdf'); b.disabled = true; b.textContent = 'Готовлю PDF…';
+      try { await download(work, { blank: true }, orient); } catch (e) { console.error(e); } finally { b.disabled = false; b.textContent = 'Скачать PDF'; }
+    });
+    const first = d.querySelector('input'); if (first) first.focus();
+    return d;
+  }
   const LS_OR = 'wp:orient';
   const lsGet = () => { try { return localStorage.getItem(LS_OR) === 'landscape' ? 'landscape' : 'portrait'; } catch (e) { return 'portrait'; } };
   const lsSet = v => { try { localStorage.setItem(LS_OR, v); } catch (e) {} };
@@ -350,7 +405,7 @@
       + '<label><input type="radio" name="wpOri" value="portrait"' + (cur === 'portrait' ? ' checked' : '') + '>Книжная</label>'
       + '<label><input type="radio" name="wpOri" value="landscape"' + (cur === 'landscape' ? ' checked' : '') + '>Альбомная</label></div>'
       + '<div class="note" id="wpNote"></div>'
-      + '<div class="row"><button class="btn quiet" id="wpCancel">Отмена</button><button class="btn quiet" id="wpPdf">Скачать PDF</button><button class="btn" id="wpGo">Печатать</button></div></div>';
+      + '<div class="row"><button class="btn quiet" id="wpCancel">Отмена</button><button class="btn quiet" id="wpFill" hidden>✎ Заполнить бланк</button><button class="btn quiet" id="wpPdf">Скачать PDF</button><button class="btn" id="wpGo">Печатать</button></div></div>';
     document.body.appendChild(d);
     // подпись у бланка: какой именно выдастся (по заданиям работы)
     try {
@@ -358,14 +413,17 @@
       if (w0 && typeof w0 !== 'string') {
         const set = officialSet(w0);
         d.querySelector('#wpBlankNote').textContent = set
-          ? 'официальный образец ЕГЭ-2026 (Рособрнадзор): ' + set.map(x => x[1].toLowerCase()).join(', ')
+          ? (set[0][0].indexOf('ege_') === 0 ? 'копия бланков ЕГЭ-2026 (Рособрнадзор), клетки можно заполнить на экране: ' : 'бланк № 2 по образцу ОГЭ, бланк № 1 — наш (официального образца нет): ')
+            + set.map(x => x[1].toLowerCase()).join(', ')
           : 'официального образца для этого экзамена пока нет — наш бланк: клетки для ответа';
+        if (formsOf(set).length) d.querySelector('#wpFill').hidden = false;
       }
     } catch (e) {}
     const close = () => d.remove();
     d.addEventListener('click', e => { if (e.target === d) close(); });
     d.querySelector('#wpCancel').addEventListener('click', close);
     d.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+    const collectOrient = () => d.querySelector('input[name="wpOri"]:checked').value;
     const collect = () => {
       const q = id => d.querySelector(id);
       const what = { tasks: q('#wpTasks').checked, blank: q('#wpBlank').checked, key: !!(q('#wpKey') && q('#wpKey').checked) };
@@ -376,6 +434,10 @@
       lsSet(orient);
       return { w, what, orient };
     };
+    d.querySelector('#wpFill').addEventListener('click', () => {
+      const w = getWork(); if (typeof w === 'string') { d.querySelector('#wpNote').textContent = w; return; }
+      fill(w, collectOrient());
+    });
     d.querySelector('#wpGo').addEventListener('click', () => {
       const c = collect(); if (!c) return;
       close(); print(c.w, c.what, c.orient);
@@ -390,5 +452,5 @@
     return d;
   }
 
-  window.WorkPrint = { correctText, info, specOf, examOf, officialSet, build, render, print, download, ask };
+  window.WorkPrint = { correctText, info, specOf, examOf, officialSet, build, render, print, download, ask, fill, blankState };
 })();

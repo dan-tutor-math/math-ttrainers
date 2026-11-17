@@ -549,6 +549,7 @@ html.rv-on{overflow:hidden;}
 <script src="task-key.js"></script>
 <script src="trainer-tasks.js"></script>
 <script src="exam-spec.js"></script>
+<script src="blank-forms.js"></script>
 <script src="work-print.js"></script>
 <script src="variant-set.js"></script>
 <script src="video-links.js"></script>
@@ -855,7 +856,7 @@ $('wkTimeOwn').addEventListener('input', () => {
 $('wkPrint').addEventListener('click', () => WorkPrint.ask(() => {
   if (!E.blocks.some(isTask)) return 'В работе нет заданий';
   if (E.variants.some(v => v.blocks.some(b => b._gen && b._gen !== 'fail'))) return 'Задания вариантов ещё создаются — подождите';
-  return { title: E.title.trim() || C.kindLabel(E.kind, E.settings), variants: E.variants.map(v => ({ num: v.num, blocks: v.blocks })) };
+  return { key: E.id || 'new', title: E.title.trim() || C.kindLabel(E.kind, E.settings), variants: E.variants.map(v => ({ num: v.num, blocks: v.blocks })) };
 }));
 
 function renderVariants(){

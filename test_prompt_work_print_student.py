@@ -41,12 +41,12 @@ def main():
         sp.check("#wpBlank"); sp.click("#wpGo")
         sp.wait_for_function("() => window.__printed === 1", timeout=20000)
         d = sp.evaluate("""() => { const R = document.getElementById('wpPrint'); const sh = [...R.querySelectorAll('.wp-sheet')];
-          return { n: sh.length, key: R.querySelectorAll('.wp-kt, .wp-key').length, ctl: R.querySelectorAll('button, input, select').length,
-            head: sh[0].querySelector('.wp-head').innerText, who: sh[0].querySelector('.wp-who').innerText, foot: sh.map(s => s.querySelector('.wp-foot').textContent),
+          return { n: sh.length, key: R.querySelectorAll('.wp-kt, .wp-key').length, ctl: [...R.querySelectorAll('button, input, select')].filter(e => !e.closest('.bf-sheet')).length,
+            head: sh[0].querySelector('.wp-head').innerText, who: sh[0].querySelector('.wp-who').innerText, foot: sh.filter(s => !s.classList.contains('wp-off')).map(s => s.querySelector('.wp-foot').textContent), nOwn: sh.filter(s => !s.classList.contains('wp-off')).length,
             task: sh.filter(s => s.classList.contains('wp-tasks')).reduce((a, s) => a + s.querySelectorAll('.wp-task').length, 0), cols: sh[0].querySelectorAll('.wp-col').length }; }""")
         check("2 листов > 0, ключа нет, элементов управления сайта нет", d["n"] >= 2 and d["key"] == 0 and d["ctl"] == 0, str(d))
         check("2 шапка, «Фамилия, имя», «Класс», 3 задания", d["head"] and "Фамилия, имя" in d["who"] and "Класс" in d["who"] and d["task"] == 3, str(d))
-        check("2 «Страница i из N»", d["foot"][0] == "Страница 1 из %d" % d["n"] and d["foot"][-1] == "Страница %d из %d" % (d["n"], d["n"]), str(d["foot"]))
+        check("2 «Страница i из N»", d["foot"][0] == "Страница 1 из %d" % d["nOwn"] and d["foot"][-1] == "Страница %d из %d" % (d["nOwn"], d["nOwn"]), str(d["foot"]))
         check("2 книжная — одна колонка", d["cols"] == 1)
         # 3: подготовленная картинка короче исходной
         r = sp.evaluate("""async () => { const b = window.__work.S.blocks[0]; const o = b.img.light.url; const im = new Image(); im.src = o; await im.decode();

@@ -180,7 +180,7 @@ def run():
         check("P12 ответы варианта 2: 7, —, 25", len(k) > 1 and [r[1] for r in k[1]["rows"]] == ["7", "—", "25"], str(len(k) > 1 and k[1]["rows"]))
         check("P13 баллы из ExamSpec: ОГЭ №9 — 1, №20 — 2, вне экзамена — 1; всего 4",
               k and [r[2] for r in k[0]["rows"]] == ["1", "2", "1"] and k[0]["total"] == "4", str(k and k[0]))
-        check("P14 листы пронумерованы «Страница i из N», ключ на одном листе", pr["pages"] >= 5 and pr["foot"][-1] == "Страница %d из %d" % (pr["pages"], pr["pages"]), str(pr["foot"][-2:]))
+        check("P14 листы пронумерованы «Страница i из N», ключ на одном листе", pr["pages"] >= 5 and len(pr["foot"]) >= 2 and pr["foot"][-1].split()[1] == pr["foot"][-1].split()[3], str(pr["foot"][-2:]))
         check("P15 на экране листа не видно", tp.evaluate("() => getComputedStyle(document.getElementById('wpPrint')).display") == "none")
         tp.emulate_media(media="print")
         vis = tp.evaluate("() => ({ sheet: getComputedStyle(document.getElementById('wpPrint')).display, app: getComputedStyle(document.querySelector('.wrap') || document.body.firstElementChild).display })")
