@@ -262,6 +262,18 @@ def main():
         p.wait_for_selector("#smUndo", state="detached", timeout=3000)
         check("E4 нажатие на другое убирает «Отменить», сессия остаётся", p.evaluate("() => !!StudentMemory.current()"))
 
+        # ── F. «на доску» в плашке сессии и подсветка доски ученика ──
+        p.evaluate("() => { localStorage.setItem('smBarMini:v1', '0'); }")
+        p.reload()
+        p.wait_for_selector("#smBar a.sm-board", timeout=15000)
+        check("F1 в плашке сессии «на доску» ведёт на доску ученика",
+              p.get_attribute("#smBar a.sm-board", "href") == "boards.html#board=bd-vanya", p.inner_text("#smBar"))
+        p.evaluate("""() => { const d = document.createElement('div'); d.className = 'bl-card'; d.setAttribute('data-board', 'bd-vanya');
+                            const e = document.createElement('div'); e.className = 'bl-card'; e.setAttribute('data-board', 'bd-x');
+                            document.body.append(d, e); }""")
+        p.wait_for_function("() => document.querySelector('.bl-card[data-board=bd-vanya]').classList.contains('sm-sess-board')", timeout=5000)
+        check("F2 доска ученика в списке выделена, чужая — нет", p.evaluate("() => !document.querySelector('.bl-card[data-board=bd-x]').classList.contains('sm-sess-board')"))
+
         check("D нет ошибок JavaScript", not errors, "; ".join(errors))
         browser.close()
     print("\nИТОГ:", "всё зелёное" if not B1.FAILS else "есть падения: " + ", ".join(B1.FAILS))
