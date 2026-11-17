@@ -76,6 +76,29 @@
     return { spec: sp, points: pts, long, label: sp ? sp.label : '' };
   }
 
+  /* ── официальные бланки ответов (blanks/SOURCES.md) ──
+     ЕГЭ-2026: образцы из «Правил заполнения бланков» Рособрнадзора, картинки как
+     есть. Математика базовая — без бланка № 2. Экзамены, которых тут нет (ОГЭ),
+     получают свой бланк-таблицу: официального образца в открытых документах нет. */
+  const B = 'blanks/ege2026/';
+  const SET_SHORT = [['reg', 'Бланк регистрации'], ['o1', 'Бланк ответов № 1']];
+  const SET_FULL = SET_SHORT.concat([['o2l1', 'Бланк ответов № 2, лист 1'], ['o2l2', 'Бланк ответов № 2, лист 2'], ['dop', 'Дополнительный бланк ответов № 2']]);
+  const OFFICIAL = { ege_base: SET_SHORT, ege_prof: SET_FULL, soc_ege: SET_FULL, rus_ege: SET_FULL };
+  const OFFICIAL_NAME = { ege_base: 'ЕГЭ', ege_prof: 'ЕГЭ', soc_ege: 'ЕГЭ', rus_ege: 'ЕГЭ' };
+  // экзамен работы — по большинству заданий (ExamSpec); не определился — null
+  function examOf(work) {
+    const cnt = {};
+    ((work && work.variants) || []).forEach(v => (v.blocks || []).filter(isTask).forEach(b => {
+      const sp = specOf(b); if (sp && sp.exam) cnt[sp.exam] = (cnt[sp.exam] || 0) + 1;
+    }));
+    const k = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0];
+    return k || null;
+  }
+  const officialSet = work => OFFICIAL[examOf(work)] || null;
+  function officialItems(set) {
+    return set.map(([f, label]) => ({ f, label }));
+  }
+
   /* ── разметка листов ── */
   const head = (title, v, many) => '<div class="wp-head"><b>' + esc(title || 'Работа') + (many || v.num > 1 ? ' · Вариант ' + v.num : '') + '</b></div>';
   const who = '<div class="wp-who"><span>Фамилия, имя <i class="wp-line"></i></span><span>Класс <i class="wp-line short"></i></span></div>';
@@ -180,7 +203,7 @@
   function setPage(orient) {
     let st = document.getElementById('wpPage');
     if (!st) { st = document.createElement('style'); st.id = 'wpPage'; document.head.appendChild(st); }
-    st.textContent = '@page{size:A4 ' + (orient === 'landscape' ? 'landscape' : 'portrait') + ';margin:0}';
+    st.textContent = '@page{size:A4 ' + (orient === 'landscape' ? 'landscape' : 'portrait') + ';margin:0}@page wpo{size:A4 portrait;margin:0}';
   }
   const loadImg = src => new Promise(r => { const i = new Image(); i.onload = i.onerror = r; i.src = src; });
 
@@ -198,16 +221,24 @@
     if (what.tasks) await Promise.all(vs.flatMap(v => (v.blocks || []).filter(isTask)).map(async b => { prep.set(b, await prepImg(b)); }));
     if (what.tasks) vs.forEach(v => secs.push({ cls: 'wp-tasks', head: head(work.title, v, many) + who, run: runT(work.title, v, many),
       items: (v.blocks || []).filter(isTask).map((b, i) => taskItem(b, i, prep.get(b))) }));
-    if (what.blank) vs.forEach(v => secs.push({ cls: 'wp-blank', head: head(work.title, v, many) + '<div class="wp-sub">Бланк ответов</div>' + who,
+    const off = what.blank ? officialSet(work) : null;
+    if (what.blank && !off) vs.forEach(v => secs.push({ cls: 'wp-blank', head: head(work.title, v, many) + '<div class="wp-sub">Бланк ответов</div>' + who,
       run: runT(work.title, v, many) + ' · бланк ответов', items: blankItems(v) }));
     if (what.key) secs.push({ cls: 'wp-key', head: '<div class="wp-head"><b>' + esc(work.title || 'Работа') + ' · ключ для учителя</b></div>',
       run: (work.title || 'Работа') + ' · ключ', items: vs.map(keyItem) });
     // картинки грузим до вёрстки: высоты нужны сразу
     await Promise.all([].concat(...secs.map(sc => sc.items.map(it => [...it.querySelectorAll('img')])), []).flat().map(im => loadImg(im.src)));
     secs.forEach(sc => flowSection(root, sc, orient));
-    const sheets = [...root.querySelectorAll('.wp-sheet')];
-    sheets.forEach((sh, i) => { sh.querySelector('.wp-foot').textContent = 'Страница ' + (i + 1) + ' из ' + sheets.length; });
-    return sheets;
+    // «Страница i из N» — только у наших листов; официальные бланки без правок
+    const own = [...root.querySelectorAll('.wp-sheet')];
+    own.forEach((sh, i) => { sh.querySelector('.wp-foot').textContent = 'Страница ' + (i + 1) + ' из ' + own.length; });
+    // официальные бланки — после заданий (по набору на вариант), всегда книжные, как оригинал
+    if (off) {
+      const imgs = officialItems(off);
+      await Promise.all(imgs.map(o => loadImg(B + o.f + '.png')));
+      vs.forEach(() => imgs.forEach(o => root.appendChild(mk('<section class="wp-sheet wp-page wp-off wp-blank" data-form="' + o.f + '"><img alt="' + esc(o.label) + '" src="' + B + o.f + '.png"></section>'))));
+    }
+    return [...root.querySelectorAll('.wp-sheet')];
   }
   // совместимость: разметка листов строкой (тесты, отладка)
   async function render(work, what, orient) { await build(work, what, orient); return document.getElementById('wpPrint').innerHTML; }
@@ -218,6 +249,8 @@
 .wp-sheet{box-sizing:border-box;position:relative;background:#fff;color:#000;overflow:hidden;display:flex;flex-direction:column;font:13px/1.35 'Onest',Arial,sans-serif}
 .wp-sheet.p{width:210mm;height:296.4mm;padding:14mm 15mm 10mm}
 .wp-sheet.l{width:297mm;height:209.4mm;padding:11mm 13mm 8mm}
+.wp-sheet.wp-off{width:210mm;height:296.4mm;padding:0;page:wpo}
+.wp-off img{display:block;width:100%;height:100%;object-fit:contain}
 .wp-cols{flex:1;min-height:0;display:flex;gap:9mm}
 .wp-col{flex:1;min-width:0;overflow:hidden}
 .wp-sheet.l .wp-col + .wp-col{border-left:.6px solid #777;padding-left:9mm}
@@ -283,11 +316,13 @@
     const sheets = await build(work, what, orient);
     const root = document.getElementById('wpPrint');
     try {
-      const doc = new lib.jsPDF({ orientation: orient, unit: 'mm', format: 'a4', compress: true });
-      const W = orient === 'landscape' ? 297 : 210, H = orient === 'landscape' ? 210 : 297;
+      const ori = sh => sh.classList.contains('wp-off') ? 'portrait' : orient;
+      const doc = new lib.jsPDF({ orientation: ori(sheets[0]), unit: 'mm', format: 'a4', compress: true });
       for (let i = 0; i < sheets.length; i++) {
+        const o = ori(sheets[i]);
+        const W = o === 'landscape' ? 297 : 210, H = o === 'landscape' ? 210 : 297;
         const cv = await h2c(sheets[i], { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false });
-        if (i) doc.addPage('a4', orient);
+        if (i) doc.addPage('a4', o);
         doc.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H, undefined, 'FAST');
       }
       const vs = (work.variants || []).filter(v => (v.blocks || []).some(isTask));
@@ -309,7 +344,7 @@
     const cur = lsGet();
     d.innerHTML = '<div class="box" role="dialog" aria-modal="true" aria-labelledby="wpDlgH"><h3 id="wpDlgH">Печать и PDF</h3>'
       + '<label><input type="checkbox" id="wpTasks" checked><span>Задания<small>как в экзаменационной работе: шапка, нумерация, номера страниц</small></span></label>'
-      + '<label><input type="checkbox" id="wpBlank"><span>Бланк ответов<small>клетки для ответа; у развёрнутых — «решение на отдельном листе»</small></span></label>'
+      + '<label><input type="checkbox" id="wpBlank"><span>Бланк ответов<small id="wpBlankNote">клетки для ответа; у развёрнутых — «решение на отдельном листе»</small></span></label>'
       + (opts.student ? '' : '<label><input type="checkbox" id="wpKey"><span>Ключ для учителя<small>все варианты: № → ответ → балл</small></span></label>')
       + '<div class="ori" role="radiogroup" aria-label="Ориентация листа">'
       + '<label><input type="radio" name="wpOri" value="portrait"' + (cur === 'portrait' ? ' checked' : '') + '>Книжная</label>'
@@ -317,6 +352,16 @@
       + '<div class="note" id="wpNote"></div>'
       + '<div class="row"><button class="btn quiet" id="wpCancel">Отмена</button><button class="btn quiet" id="wpPdf">Скачать PDF</button><button class="btn" id="wpGo">Печатать</button></div></div>';
     document.body.appendChild(d);
+    // подпись у бланка: какой именно выдастся (по заданиям работы)
+    try {
+      const w0 = getWork();
+      if (w0 && typeof w0 !== 'string') {
+        const set = officialSet(w0);
+        d.querySelector('#wpBlankNote').textContent = set
+          ? 'официальный образец ЕГЭ-2026 (Рособрнадзор): ' + set.map(x => x[1].toLowerCase()).join(', ')
+          : 'официального образца для этого экзамена пока нет — наш бланк: клетки для ответа';
+      }
+    } catch (e) {}
     const close = () => d.remove();
     d.addEventListener('click', e => { if (e.target === d) close(); });
     d.querySelector('#wpCancel').addEventListener('click', close);
@@ -345,5 +390,5 @@
     return d;
   }
 
-  window.WorkPrint = { correctText, info, specOf, build, render, print, download, ask };
+  window.WorkPrint = { correctText, info, specOf, examOf, officialSet, build, render, print, download, ask };
 })();
