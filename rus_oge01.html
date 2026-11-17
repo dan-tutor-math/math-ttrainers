@@ -565,7 +565,8 @@ function saveResult(sc){
   results[t.id] = { w:countWords($('essay').value), sc: sc != null ? sc : (prev.sc != null ? prev.sc : null) };
   LS.set('rusOge01:results', results);
   // кабинет (Б2): оценка по критериям выставлена — максимум баллов считаем верным решением
-  if (sc != null && window.StudentMemory) StudentMemory.recordTask({ id: t.id }, { page: 'rus_oge01', clean: sc >= MAX_SCORE });
+  // задача 56: каждая попытка — в память ученика
+  if (sc != null && window.StudentMemory) StudentMemory.recordAttempt({ id: t.id }, { page: 'rus_oge01', ok: sc >= MAX_SCORE });
   renderStats();
 }
 

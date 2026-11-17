@@ -18,7 +18,9 @@ ok — с первого раза, bad — после ошибки. Сеть з�
      верно → ok (оба в очереди, по порядку); повтор bad в 10 минут — одной
      строкой; ключ тот же, что у recordTask; follower — отказ;
   D. остальные страницы из таблицы аудита (oge1_5, oge7, oge15_18, oge19, русский,
-     копии ege_prof) открываются без ошибок и подключают task-key.js до student-memory.js.
+     копии ege_prof) открываются без ошибок и подключают task-key.js до student-memory.js;
+  F. русский ОГЭ (задача 56): неверный ответ — bad сразу, верный — ok после него;
+     второй верный ответ с первого раза — только ok.
 
 Запуск: python3 test_prompt_b2_trainer_events.py (сервер поднимается сам).
 """
@@ -213,6 +215,40 @@ def test_record_attempt(browser):
     ctx.close()
 
 
+def test_rus(browser):
+    """Задача 56, русский: у задания есть вторая попытка (режим «экзамен» — 3, «тренировка» — сколько угодно),
+    поэтому каждая проверка пишет свою строку: неверно → bad сразу, верно → ok."""
+    ctx, page, errors = new_page(browser, f"{BASE}/rus_oge.html?n=7")
+    check("rus_oge: до ответа очередь пуста", queue(page) == [])
+    # номер 7 — только текстовые задания; ответ берём из банка по id открытого задания (?t=)
+    tid = page.evaluate("new URL(location.href).searchParams.get('t')")
+    ans = page.evaluate("id => String(window.RUS_OGE_FIPI.tasks.find(t => t.id === id).a)", tid)
+    page.fill('#answerInput', 'неверно-тест')
+    page.click('#checkBtn')
+    page.wait_for_timeout(300)
+    q = queue(page)
+    check("rus_oge: неверный ответ — строка bad сразу", len(q) == 1 and q[0]["event"] == "bad", str(q))
+    check("rus_oge: после ошибки можно ответить ещё раз", not page.is_disabled('#checkBtn'))
+    page.fill('#answerInput', ans)
+    page.click('#checkBtn')
+    page.wait_for_timeout(300)
+    q = queue(page)
+    check("rus_oge: верный ответ потом — строка ok, очередь bad, ok", [r["event"] for r in q] == ["bad", "ok"], str(q))
+    check("rus_oge: обе строки — одно задание", len(q) == 2 and q[0]["task_key"] == q[1]["task_key"], str(q))
+    # следующее задание: сразу верно — только ok
+    page.click('#nextBtn')
+    page.wait_for_timeout(300)
+    tid2 = page.evaluate("new URL(location.href).searchParams.get('t')")
+    ans2 = page.evaluate("id => String(window.RUS_OGE_FIPI.tasks.find(t => t.id === id).a)", tid2)
+    page.fill('#answerInput', ans2)
+    page.click('#checkBtn')
+    page.wait_for_timeout(300)
+    q = queue(page)
+    check("rus_oge: сразу верно — ok без bad перед ним", len(q) == 3 and q[2]["event"] == "ok" and q[2]["task_key"] != q[0]["task_key"], str(q))
+    check("rus_oge: без ошибок JS", not errors, str(errors[:1]))
+    ctx.close()
+
+
 def test_other_pages(browser):
     pages = ["oge1_5", "oge7", "oge15_18", "oge19", "rus_oge", "rus_oge01", "rus_oge13",
              "ege_base", "oge_part2", "soc_oge", "eng_oge"]
@@ -236,6 +272,7 @@ def main():
         test_follower(browser)
         test_ege_prof(browser)
         test_record_attempt(browser)
+        test_rus(browser)
         test_other_pages(browser)
         browser.close()
     print("\nПровалено:", len(FAILS))
