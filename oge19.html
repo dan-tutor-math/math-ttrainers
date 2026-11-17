@@ -1074,7 +1074,10 @@ function tsRenderStatements(taskChanged, wrongShown){
     // смотрим на «Следующий пример», а не на саму панель: в «Тренировке» она
     // уже может быть открыта кнопкой «Показать решение», а разбор после
     // ответа — другой
-    if (els.nextBtn.style.display === 'none') finishTask();
+    // задача 56: итог берём из отметок снимка — finishTask() без него записал бы
+    // «верно» и при неверном выборе (у follower StudentMemory всё равно молчит)
+    const pickOk = pickedSet.size === correctSet.size && [...correctSet].every(i => pickedSet.has(i));
+    if (els.nextBtn.style.display === 'none') finishTask(undefined, pickOk);
     return;
   }
   els.checkBtn.style.display = 'block';
