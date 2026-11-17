@@ -622,6 +622,7 @@
       '#smBar button{font:inherit;color:inherit;background:transparent;border:0;border-radius:999px;padding:5px 9px;cursor:pointer}' +
       '#smBar button:hover{background:rgba(255,255,255,.14)}' +
       '#smBar .sm-dot{opacity:.5}' +
+      '#smBar a.sm-board{color:#9cf0b8;font-weight:650;text-decoration:none;padding:5px 9px;border-radius:999px}#smBar a.sm-board:hover{background:rgba(255,255,255,.14)}' +
       '#smMenu{position:absolute;left:0;bottom:calc(100% + 6px);min-width:220px;max-height:50vh;overflow:auto;background:rgba(28,30,40,.95);' +
       'border-radius:12px;padding:6px;box-shadow:0 8px 28px rgba(0,0,0,.3)}' +
       '#smMenu button{display:block;width:100%;text-align:left;border-radius:8px}' +
@@ -641,14 +642,49 @@
     (document.head || document.documentElement).appendChild(st);
   }
   function esc(s){ return String(s).replace(/[&<>"]/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[m])); }
+  /* доска сессии: из досок ученика — та, где были в этой сессии последней
+     (smLastBoard), иначе первая. Нужна кнопке «на доску» и подсветке в списке */
+  const LS_LASTB = 'smLastBoard:v1:';
+  function sessionBoards(s){
+    const st = s && studentsCache && studentsCache.find(x => x.id === s.id);
+    return st ? st.boards : [];
+  }
+  function sessionBoard(s){
+    const list = sessionBoards(s);
+    if (!list.length) return null;
+    const last = lsGet(LS_LASTB + s.id);
+    return list.indexOf(last) >= 0 ? last : list[0];
+  }
+  function trackBoard(s){
+    const ctx = s && pickCtx ? ctxNow() : null, list = sessionBoards(s);
+    const hit = ctx && ctx.boards ? ctx.boards.find(b => list.indexOf(b) >= 0) : null;
+    if (hit && lsGet(LS_LASTB + s.id) !== hit) lsSet(LS_LASTB + s.id, hit);
+  }
+  // в списке досок доска ученика сессии слегка выделена (карточки перерисовываются
+  // страницей, поэтому метим при каждом проходе плашки, а не один раз)
+  function markBoards(s){
+    const ids = s ? sessionBoards(s) : [];
+    document.querySelectorAll('.bl-card[data-board]').forEach(c => c.classList.toggle('sm-sess-board', ids.indexOf(c.getAttribute('data-board')) >= 0));
+    if (ids.length && !document.getElementById('smMarkCss')) {
+      const st = document.createElement('style'); st.id = 'smMarkCss';
+      st.textContent = '.bl-card.sm-sess-board{box-shadow:0 0 0 2px #2fd36b,0 6px 18px rgba(47,211,107,.28)}' +
+        '.bl-card.sm-sess-board::after{content:"доска сессии";position:absolute;top:8px;right:8px;font:600 11px/1 system-ui,sans-serif;color:#fff;background:#2fa35b;border-radius:999px;padding:4px 8px;pointer-events:none}' +
+        '.bl-card.sm-sess-board{position:relative}';
+      document.head.appendChild(st);
+    }
+  }
   function renderBar(){
     if (!IN_TOP || !document.body) return;
     const s = isFollower() ? null : current();
+    if (s) { ensureStudents(); trackBoard(s); }
+    markBoards(s);
     const picker = !s && wantsPicker() && !isFollower();
     let bound = null;
     if (picker && pickCtx){ ensureStudents(); bound = boundStudent(ctxNow()); }
     const mini = isMini();
-    let sig = s ? 'S|' + s.id + '|' + s.name + '|' + s.paused : (picker ? 'P|' + (bound ? bound.id + '|' + bound.name : '') : '');
+    const tb = s ? sessionBoard(s) : null, ctxB = s && pickCtx ? ctxNow() : null;
+    const goBoard = tb && !(ctxB && ctxB.boards && ctxB.boards.indexOf(tb) >= 0) ? tb : null;
+    let sig = s ? 'S|' + s.id + '|' + s.name + '|' + s.paused + '|' + (goBoard || '') : (picker ? 'P|' + (bound ? bound.id + '|' + bound.name : '') : '');
     if (sig) sig += '|' + (mini ? 'm' : '');
     if (sig === barSig) return;
     barSig = sig; menuOpen = false;
@@ -665,6 +701,7 @@
     } else if (s){
       bar.innerHTML = '<span class="sm-name">Сессия: <b>' + esc(s.name || 'ученик') + '</b>' + (s.paused ? ' · на паузе' : '') + '</span>' +
         '<button type="button" data-sm="pause">' + (s.paused ? 'продолжить' : 'пауза') + '</button>' +
+        (goBoard ? '<span class="sm-dot">·</span><a class="sm-board" href="boards.html#board=' + encodeURIComponent(goBoard) + '" title="Вернуться на доску ученика">на доску</a>' : '') +
         '<span class="sm-dot">·</span><button type="button" data-sm="end">закончить</button>' + HIDE;
     } else {
       bar.innerHTML = bound
