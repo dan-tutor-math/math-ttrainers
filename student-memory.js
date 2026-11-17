@@ -606,7 +606,20 @@
   // её развернули сами — тогда в памяти '0'
   const LS_MINI = 'smBarMini:v1';
   function isMini(){ return lsGet(LS_MINI) !== '0'; }
-  function setMini(v){ lsSet(LS_MINI, v ? '1' : '0'); barSig = null; renderBar(); }
+  const calm = () => !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  function setMini(v){
+    lsSet(LS_MINI, v ? '1' : '0'); barSig = null;
+    if (v && bar && !calm()) {           // сворачиваем: плашка уходит влево, потом остаётся точка
+      bar.classList.add('sm-out');
+      setTimeout(renderBar, 220);
+      return;
+    }
+    renderBar();
+    if (!v && bar && !calm()) {          // разворачиваем: плашка раскрывается из точки
+      bar.classList.add('sm-in');
+      setTimeout(() => { if (bar) bar.classList.remove('sm-in'); }, 280);
+    }
+  }
   function css(){
     if (document.getElementById('smBarCss')) return;
     const st = document.createElement('style');
@@ -621,6 +634,11 @@
       '#smBar.paused .sm-name{opacity:.7}' +
       '#smBar button{font:inherit;color:inherit;background:transparent;border:0;border-radius:999px;padding:5px 9px;cursor:pointer}' +
       '#smBar button:hover{background:rgba(255,255,255,.14)}' +
+      '#smBar.sm-move{transition:left .24s cubic-bezier(.2,.8,.2,1),bottom .24s cubic-bezier(.2,.8,.2,1)}' +
+      '#smBar.sm-in{animation:smIn .24s cubic-bezier(.2,.8,.2,1) both}#smBar.sm-out{animation:smOut .22s cubic-bezier(.2,.8,.2,1) both;pointer-events:none}' +
+      '@keyframes smIn{from{clip-path:inset(0 100% 0 0 round 999px);opacity:.3}to{clip-path:inset(0 0 0 0 round 999px);opacity:1}}' +
+      '@keyframes smOut{from{clip-path:inset(0 0 0 0 round 999px);opacity:1}to{clip-path:inset(0 100% 0 0 round 999px);opacity:.3}}' +
+      '@media (prefers-reduced-motion:reduce){#smBar.sm-move{transition:none}#smBar.sm-in,#smBar.sm-out{animation:none}}' +
       '#smBar .sm-dot{opacity:.5}' +
       '#smBar a.sm-board{color:#9cf0b8;font-weight:650;text-decoration:none;padding:5px 9px;border-radius:999px}#smBar a.sm-board:hover{background:rgba(255,255,255,.14)}' +
       '#smMenu{position:absolute;left:0;bottom:calc(100% + 6px);min-width:220px;max-height:50vh;overflow:auto;background:rgba(28,30,40,.95);' +
@@ -664,7 +682,14 @@
   // страницей, поэтому метим при каждом проходе плашки, а не один раз)
   function markBoards(s){
     const ids = s ? sessionBoards(s) : [];
-    document.querySelectorAll('.bl-card[data-board]').forEach(c => c.classList.toggle('sm-sess-board', ids.indexOf(c.getAttribute('data-board')) >= 0));
+    // у ученика в кабинете — облачные id досок, у карточки в списке — локальный
+    // id и cloudBoardId: сверяем по обоим
+    let local = [];
+    try { local = (window.getDB && window.getDB().boards) || []; } catch (e) {}
+    document.querySelectorAll('.bl-card[data-board]').forEach(c => {
+      const id = c.getAttribute('data-board'), b = local.find(x => x.id === id);
+      c.classList.toggle('sm-sess-board', ids.indexOf(id) >= 0 || !!(b && b.cloudBoardId && ids.indexOf(b.cloudBoardId) >= 0));
+    });
     if (ids.length && !document.getElementById('smMarkCss')) {
       const st = document.createElement('style'); st.id = 'smMarkCss';
       st.textContent = '.bl-card.sm-sess-board{box-shadow:0 0 0 2px #2fd36b,0 6px 18px rgba(47,211,107,.28)}' +
@@ -688,7 +713,12 @@
     }
     if (bar.style.left !== left) bar.style.left = left;
     if (bar.style.bottom !== bottom) bar.style.bottom = bottom;
+    // двигаться плавно — только после первой расстановки, иначе при загрузке
+    // страницы плашка ехала бы из угла
+    if (!bar.classList.contains('sm-move')) requestAnimationFrame(() => { if (bar) bar.classList.add('sm-move'); });
   }
+  // плашка входа раскрылась/свернулась — едем тут же, с той же длительностью и кривой
+  window.addEventListener('agpillchange', () => placeBar());
   function renderBar(){
     if (!IN_TOP || !document.body) return;
     placeBar();
@@ -708,6 +738,7 @@
     if (!sig){ if (bar) { bar.remove(); bar = null; } return; }
     css();
     if (!bar){ bar = document.createElement('div'); bar.id = 'smBar'; bar.setAttribute('role', 'status'); document.body.appendChild(bar); }
+    bar.classList.remove('sm-out');
     bar.classList.toggle('paused', !!(s && s.paused));
     bar.classList.toggle('mini', mini);
     setTimeout(placeBar, 0);

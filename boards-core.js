@@ -12036,7 +12036,8 @@ window.boardsAppBoot = function(){
     // «пережито», второй раз не повторяем попытку, а просто остаёмся на
     // списке и убираем хэш из адреса
     const m = /board=([^&]+)/.exec(location.hash);
-    if (m && DB.boards.some(b=>b.id===m[1] && !b.trashedAt)) {
+    const hb = m ? boardByRef(m[1]) : null;
+    if (hb) {
       let prevAttempt = null;
       try { prevAttempt = sessionStorage.getItem(AUTO_OPEN_GUARD_KEY); } catch(e){}
       if (prevAttempt === m[1]) {
@@ -12044,7 +12045,7 @@ window.boardsAppBoot = function(){
         location.hash = '';
       } else {
         try { sessionStorage.setItem(AUTO_OPEN_GUARD_KEY, m[1]); } catch(e){}
-        openBoard(m[1]);
+        openBoard(hb.id);
         // крах (если это он) обычно случается в первые пару секунд — если
         // вкладка их пережила, считаем открытие благополучным и снимаем метку
         setTimeout(() => { try { sessionStorage.removeItem(AUTO_OPEN_GUARD_KEY); } catch(e){} }, 4000);
@@ -12062,11 +12063,19 @@ if (!window.__hasCloudGate) window.boardsAppBoot();
 // ссылка «на доску» из плашки сессии ведёт на boards.html#board=<id>; если мы уже
 // на списке досок, страница не перезагружается, старт приложения не срабатывает —
 // без этого слушателя показывался бы просто список
-window.addEventListener('hashchange', () => {
-  if (boardActive || !DB || !DB.boards) return;
+// В кабинете к ученику привязаны ОБЛАЧНЫЕ id досок (boards.id в Supabase), а карточка
+// в списке живёт под локальным id (b.id) с cloudBoardId — ищем по любому из двух
+function boardByRef(ref){
+  return DB && DB.boards ? DB.boards.find(b => !b.trashedAt && (b.id === ref || b.cloudBoardId === ref)) || null : null;
+}
+function openBoardFromHash(){
+  if (boardActive) return;
   const m = /board=([^&]+)/.exec(location.hash);
-  if (m && DB.boards.some(b => b.id === m[1] && !b.trashedAt)) openBoard(m[1]);
-});
+  const b = m ? boardByRef(m[1]) : null;
+  if (b) openBoard(b.id);
+}
+window.openBoardFromHash = openBoardFromHash;
+window.addEventListener('hashchange', openBoardFromHash);
 window.addEventListener('beforeunload', () => { if (B) { rememberView(true); idbSaveDB(); } });
 window.addEventListener('pagehide', () => { if (B) rememberView(true); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && B) { rememberView(true); idbSaveDB(); } });

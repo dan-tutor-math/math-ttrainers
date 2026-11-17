@@ -71,6 +71,15 @@
       backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);
       box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);color:var(--muted-2);font-size:14px;}
     .ag-pill-handle:hover{color:var(--pencil);}
+    /* плавное раскрытие/сворачивание плашки входа; плашка сессии (student-memory.js)
+       едет рядом с тем же временем и кривой — задержка и кривая общие с #smBar */
+    .ag-user-pill.ag-in{animation:agPillIn .24s cubic-bezier(.2,.8,.2,1) both;}
+    .ag-user-pill.ag-out{animation:agPillOut .24s cubic-bezier(.2,.8,.2,1) both;pointer-events:none;}
+    .ag-pill-handle.ag-in{animation:agHandleIn .24s cubic-bezier(.2,.8,.2,1) both;}
+    @keyframes agPillIn{from{clip-path:inset(0 100% 0 0 round 12px);opacity:.3}to{clip-path:inset(0 0 0 0 round 12px);opacity:1}}
+    @keyframes agPillOut{from{clip-path:inset(0 0 0 0 round 12px);opacity:1}to{clip-path:inset(0 100% 0 0 round 12px);opacity:.3}}
+    @keyframes agHandleIn{from{opacity:0;transform:scale(.5)}to{opacity:1;transform:scale(1)}}
+    @media (prefers-reduced-motion:reduce){.ag-user-pill.ag-in,.ag-user-pill.ag-out,.ag-pill-handle.ag-in{animation:none}}
     /* Промпт №76: плашка состояния загрузки общей доски — сверху по центру,
        под строкой с названием доски; клики сквозь неё на доску не нужны,
        поэтому она обычный блок, а не pointer-events:none */
@@ -240,20 +249,38 @@
   // (signedIn) и свернул ли он сам плашку (pillCollapsed) — второе
   // запоминается в localStorage на этом устройстве, чтобы не сворачивать
   // заново на каждой доске/при каждой перезагрузке
-  function syncPillVisibility() {
+  let pillAnimT = 0;
+  function syncPillVisibility(animate) {
     const signedIn = !!window.CURRENT_USER;
-    pill.style.display = (signedIn && !pillCollapsed) ? 'flex' : 'none';
-    pillHandle.style.display = (signedIn && pillCollapsed) ? 'flex' : 'none';
+    const showPill = signedIn && !pillCollapsed, showHandle = signedIn && pillCollapsed;
+    clearTimeout(pillAnimT);
+    pill.classList.remove('ag-in', 'ag-out'); pillHandle.classList.remove('ag-in');
+    const still = !animate || !(window.matchMedia && !window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    if (still) {
+      pill.style.display = showPill ? 'flex' : 'none';
+      pillHandle.style.display = showHandle ? 'flex' : 'none';
+    } else if (showPill) {
+      pillHandle.style.display = 'none';
+      pill.style.display = 'flex'; pill.classList.add('ag-in');
+      pillAnimT = setTimeout(() => pill.classList.remove('ag-in'), 260);
+    } else {
+      // сворачиваем: кружок появляется сразу, плашка уходит влево и только потом скрывается
+      pillHandle.style.display = 'flex'; pillHandle.classList.add('ag-in');
+      pill.classList.add('ag-out');
+      pillAnimT = setTimeout(() => { pill.style.display = 'none'; pill.classList.remove('ag-out'); pillHandle.classList.remove('ag-in'); }, 260);
+    }
+    // соседи (плашка сессии) двигаются в тот же кадр, что и плашка входа
+    try { window.dispatchEvent(new Event('agpillchange')); } catch (e) {}
   }
   pillCollapseBtn.addEventListener('click', () => {
     pillCollapsed = true;
     try { localStorage.setItem('ag-pill-collapsed', '1'); } catch (e) {}
-    syncPillVisibility();
+    syncPillVisibility(true);
   });
   pillHandle.addEventListener('click', () => {
     pillCollapsed = false;
     try { localStorage.setItem('ag-pill-collapsed', '0'); } catch (e) {}
-    syncPillVisibility();
+    syncPillVisibility(true);
   });
 
   function setStage(stage, msg) {
@@ -3047,6 +3074,8 @@
       });
     }
     if (changed) { window.saveDB(); if (window.renderList) window.renderList(); }
+    // ссылка из кабинета (#board=<облачный id>) могла прийти раньше карточки доски
+    if (window.openBoardFromHash) window.openBoardFromHash();
   };
 
   const CLOUD_TRACE_REFRESH_MS = 30 * 24 * 3600 * 1000;
