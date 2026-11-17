@@ -42,7 +42,8 @@ def idle(page, timeout=120000):
 
 SER = """() => window.__works.E.blocks.map(b => ({ key: b.series ? b.series.key : null, pos: b.series ? b.series.pos : null,
   proto: b.series ? b.series.proto : null, fipi: b.series ? b.series.fipi : null, title: b.series ? b.series.title : null,
-  img: !!(b.img && b.img.light && b.img.light.url), gen: b._gen || null }))"""
+  // задание создано: снимок с картинкой или карточка ФИПИ (задача 63, у карточки картинок нет)
+  img: !!(b.img && b.img.light && b.img.light.url) || b.type === 'card', gen: b._gen || null }))"""
 
 
 def heads(page):
