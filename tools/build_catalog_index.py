@@ -9,6 +9,7 @@
 индекс не разошёлся с тем, что реально отдаёт страница). Страницы без каталога пропускаются
 с пометкой в выводе — скрипт перезапускают после слияния этапа 2.
 
+У прототипов связанных наборов (ОГЭ №1–5) есть ещё link: { set, part, parts }.
 Формат (у страниц ОГЭ ч. 1 без номера в адресе n пустой: "oge9|"): { "<slug>|<n>": { "title": "...", "protos": [ { "id", "title", "fipi": [...], "hasGen" } ] } }
 Порядок fipi — как в банке (тот же, что у openAt). Больше 400 КБ (LIMIT) — делим по экзаменам:
 catalog-index-oge.json, catalog-index-ege.json (общий файл тогда удаляется).
@@ -77,8 +78,13 @@ def server():
 
 
 def slim(proto):
-    return {'id': proto['id'], 'title': proto.get('title') or '',
-            'fipi': [f for f in (proto.get('fipi') or [])], 'hasGen': bool(proto.get('hasGen'))}
+    out = {'id': proto['id'], 'title': proto.get('title') or '',
+           'fipi': [f for f in (proto.get('fipi') or [])], 'hasGen': bool(proto.get('hasGen'))}
+    # link — задания набора про один сюжет (ОГЭ №1–5): место во всех частях набора = один источник.
+    # grp (ключи источников) в индекс не кладём: он нужен тесту связей, конструктору хватает link
+    if proto.get('link'):
+        out['link'] = {'set': proto['link']['set'], 'part': proto['link']['part'], 'parts': proto['link']['parts']}
+    return out
 
 
 def extract_page(browser, slug):

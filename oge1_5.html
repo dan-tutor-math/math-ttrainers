@@ -2005,12 +2005,48 @@ function catalogProtos(){
   }));
   return out;
 }
+/* Связанные задания. У сюжета ФИПИ №1–5 — пять заданий про один и тот же
+   текст (шина, план, тариф…). Источник задания — ключ из данных банка (v с
+   порядком повтора, иначе порядок в банке). Банк каждого задания набора
+   сводится к источникам, которые есть у ВСЕХ его заданий: тогда место pos в
+   «Задании 1…5» — один и тот же источник, и конструктор работ связывает
+   задания просто по месту. Новый сюжет или новая выгрузка банка подхватывается
+   сама: ничего вручную не перечисляется. Не проверенные сайтом ФИПИ задания
+   (checked) в банк не входят, и источник без одного из пяти заданий выпадает
+   целиком — иначе места «поехали» бы. */
+function setPartRaw(set, idx){
+  if (set.id === 'tire_fipi') return FIPI15.tasks.filter(t => t.plot === 'tire' && t.kind === TIRE_KINDS[idx]);
+  const id = set.tasks.filter(t => t.gen)[idx].id;
+  const n = Number((id.match(/_t(\d+)$/) || [])[1]);
+  return FIPI15.tasks.filter(t => t.plot === set.id.replace(/_fipi$/, '') && t.n === n);
+}
+function setPartKeyed(set, idx){
+  const seen = {};
+  return setPartRaw(set, idx).map((t, i) => {
+    let k;
+    if (t.v != null){ seen[t.v] = seen[t.v] || 0; k = t.v + '.' + seen[t.v]++; } else k = String(i);
+    return { t, k };
+  });
+}
+const linkBankCache = new Map();
+function linkedBank(set, idx){
+  const vis = t => t.checked || FIPI15_ALL;
+  const parts = set.tasks.filter(t => t.gen).length;
+  const ck = set.id + '|' + FIPI15_ALL;
+  if (!linkBankCache.has(ck)){
+    let common = null;
+    for (let i = 0; i < parts; i++){
+      const ks = new Set(setPartKeyed(set, i).filter(x => vis(x.t)).map(x => x.k));
+      common = common ? new Set([...common].filter(k => ks.has(k))) : ks;
+    }
+    linkBankCache.set(ck, common || new Set());
+  }
+  const common = linkBankCache.get(ck);
+  return setPartKeyed(set, idx).filter(x => vis(x.t) && common.has(x.k));
+}
 function catalogBank(p){
   if (!p.set || !p.set.fipi || !FIPI15) return [];
-  const vis = t => t.checked || FIPI15_ALL;
-  if (p.set.id === 'tire_fipi') return FIPI15.tasks.filter(t => t.plot === 'tire' && t.kind === TIRE_KINDS[p.idx] && vis(t));
-  const n = Number((p.id.match(/_t(\d+)$/) || [])[1]);
-  return FIPI15.tasks.filter(t => t.plot === p.set.id.replace(/_fipi$/, '') && t.n === n && vis(t));
+  return linkedBank(p.set, p.idx).map(x => x.t);
 }
 function catalogTask(p, t){
   if (p.set.id === 'tire_fipi') return tireFipiTaskOf(TIRE_FIPI.find(v => v.v === t.v), t);
@@ -2024,6 +2060,9 @@ window.__trainerCatalog = {
       section: null,
       fipi: catalogBank(p).map(t => t.fipi),
       hasGen: p.set ? (!p.set.fipi || p.set.id === 'tire_fipi') : true,
+      // задания набора про один сюжет: место pos во всех частях набора — один источник
+      link: p.set && p.set.fipi && FIPI15 ? { set: p.set.id, part: p.idx + 1, parts: p.set.tasks.filter(t => t.gen).length } : undefined,
+      grp: p.set && p.set.fipi && FIPI15 ? linkedBank(p.set, p.idx).map(x => x.k) : undefined,
     })));
   },
   /* что сейчас на экране: { n, proto, pos, fipi } или null на экране выбора. Только читает (кнопка «＋ В вариант», exam-nav.js) */

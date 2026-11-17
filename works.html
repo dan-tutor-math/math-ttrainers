@@ -138,6 +138,7 @@ body.editing .corner-btn{position:absolute;}
 .tg-btns button{height:30px;padding:0 10px;border-radius:10px;border:1px solid var(--glass-border);background:var(--glass-strong);color:var(--pencil);cursor:pointer;font-family:var(--font-ui);font-weight:600;font-size:13px;}
 .tg-btns button.sq{width:30px;padding:0;font-size:15px;}
 .tg-btns button:hover:not(:disabled){border-color:var(--ink);}
+.tg-btns button.lnk.off{opacity:.4;filter:grayscale(1);}
 .tg-btns button:disabled{opacity:.35;cursor:default;}
 .tg-btns .rm{color:var(--teacher);}
 .ti-pos{display:flex;align-items:center;gap:4px;font-size:12.5px;color:var(--muted-2);}
@@ -1844,7 +1845,8 @@ async function addSeries(o){
   const key = 's' + ttUid();
   const base = { tid, href, proto: u.id, n, vw: o.vw || null };
   const fresh = poss.map(pos => ({ id: 't' + ttUid(), type: 'task', mode: o.mode || 'exam', name: trainerName(tid), tid,
-    series: { key, title, pos, fipi: (u.fipi || [])[pos] || null, total, proto: u.id, n, href, src: o.source === 'random' ? 'random' : 'order', hasGen } }));
+    series: Object.assign({ key, title, pos, fipi: (u.fipi || [])[pos] || null, total, proto: u.id, n, href, src: o.source === 'random' ? 'random' : 'order', hasGen },
+      u.link ? { link: { set: u.link.set, part: u.link.part, parts: u.link.parts } } : null) }));
   if (skip.size) seriesSkip.set(key, skip);
   if (addPos === 'start') E.variants[0].blocks.unshift(...fresh); else E.variants[0].blocks.push(...fresh);
   fresh.forEach(b => seriesQueue(b, base, b.series.pos));
@@ -1871,6 +1873,36 @@ function shufflePick(arr, k){
   for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
   return a.slice(0, k).sort((x, y) => x - y);
 }
+/* ── связанные задания (ОГЭ №1–5) ──
+   У блока series.link = { set, part, parts }: набор заданий про один сюжет.
+   Каталог тренажёра выравнивает банк так, что место pos во всех частях набора —
+   один и тот же сюжет, поэтому «связь» — это просто одинаковое место у блоков
+   других групп того же набора. Меняем место у одного (◀ ▶, номер, ⟳, группой) —
+   остальные части сюжета едут на то же место. Кнопка 🔗 в шапке группы связь
+   отключает (link.off), если учителю нужно развести части. Страница ученика
+   поле не читает. */
+const linkOn = b => !!(b && b.series && b.series.link && !b.series.link.off);
+function linkMates(b, pos){
+  if (!linkOn(b)) return [];
+  const p = pos == null ? b.series.pos : pos;
+  return E.variants[0].blocks.filter(x => x !== b && linkOn(x) && x.series.key !== b.series.key
+    && x.series.link.set === b.series.link.set && x.series.href === b.series.href && x.series.pos === p);
+}
+function linkMove(m, pos){
+  const info = seriesInfo(seriesBlocks(m.series.key));
+  if (!seriesValid(info, pos)) return false;
+  m.series = Object.assign({}, m.series, { pos, fipi: null });
+  seriesQueue(m, seriesBase(info), pos);
+  return true;
+}
+// другие группы того же набора, стоящие на тех же местах, — для «+ ещё» и подписи
+function linkedKeys(key){
+  const sb = seriesBlocks(key); if (!sb.length || !linkOn(sb[0])) return [];
+  const sig = x => x.map(b => b.series.pos).sort((a, b) => a - b).join(',');
+  const mine = sig(sb), keys = [];
+  E.variants[0].blocks.forEach(x => { if (x.series && x.series.key !== key && !keys.includes(x.series.key)) keys.push(x.series.key); });
+  return keys.filter(k => { const o = seriesBlocks(k); return linkOn(o[0]) && o[0].series.link.set === sb[0].series.link.set && o[0].series.href === sb[0].series.href && sig(o) === mine; });
+}
 // новые места для всех заданий группы (по порядку блоков); мест меньше,
 // чем заданий, — лишние задания уходят, группа честно становится меньше
 function seriesSetPositions(key, poss, why){
@@ -1878,11 +1910,17 @@ function seriesSetPositions(key, poss, why){
   if (!sb.length || !poss.length) return;
   const info = seriesInfo(sb), base = seriesBase(info);
   const list = E.variants[0].blocks;
+  const mates = sb.map(b => linkMates(b));   // до сдвига: они стоят на прежних местах
   sb.forEach((b, i) => {
     if (i >= poss.length){ list.splice(list.indexOf(b), 1); return; }
     b.series = Object.assign({}, b.series, { pos: poss[i], fipi: null });
     seriesQueue(b, base, poss[i]);
   });
+  // части сюжета в других группах — на те же места; ушло место — уходит и его сюжет
+  mates.forEach((ms, i) => ms.forEach(m => {
+    if (i >= poss.length){ const j = list.indexOf(m); if (j >= 0) list.splice(j, 1); }
+    else linkMove(m, poss[i]);
+  }));
   if (poss.length < sb.length) toast((why || 'В банке прототипа больше нет заданий') + ' — в группе осталось ' + poss.length, 6000);
   resyncVariants();
   markDirty(); renderVariants(); renderTasks();
@@ -1930,11 +1968,15 @@ function seriesMore(key){
   const info = seriesInfo(sb);
   const pos = Math.max(...sb.map(b => b.series.pos)) + 1;
   if (!seriesValid(info, pos)){ toast('Дальше в банке этого прототипа заданий нет'); return; }
-  const last = sb[sb.length - 1], list = E.variants[0].blocks;
-  const b = { id: 't' + ttUid(), type: 'task', mode: last.mode || 'exam', name: last.name, tid: last.tid,
-    series: Object.assign({}, last.series, { pos, fipi: null }) };
-  list.splice(list.indexOf(last) + 1, 0, b);
-  seriesQueue(b, seriesBase(info), pos);
+  const list = E.variants[0].blocks;
+  const others = linkedKeys(key);   // до добавления: пока места групп ещё совпадают
+  [key].concat(others).forEach(k => {
+    const g = seriesBlocks(k), last = g[g.length - 1];
+    const b = { id: 't' + ttUid(), type: 'task', mode: last.mode || 'exam', name: last.name, tid: last.tid,
+      series: Object.assign({}, last.series, { pos, fipi: null }) };
+    list.splice(list.indexOf(last) + 1, 0, b);
+    seriesQueue(b, seriesBase(seriesInfo(g)), pos);
+  });
   resyncVariants();
   markDirty(); renderVariants(); renderTasks();
 }
@@ -1945,8 +1987,10 @@ function seriesSetOne(b, pos){
   if (!seriesValid(info, pos)){ toast(info.hasGen ? 'Номер — с 1' : 'В банке этого прототипа номера с 1 по ' + info.total); renderTasks(); return; }
   if (pos === b.series.pos) return;
   if (sb.some(x => x !== b && x.series.pos === pos)) toast('Задание №' + (pos + 1) + ' уже есть в этой группе — будет повтор', 5000);
+  const mates = linkMates(b);
   b.series = Object.assign({}, b.series, { pos, fipi: null });
   seriesQueue(b, seriesBase(info), pos);
+  mates.forEach(m => linkMove(m, pos));
   resyncVariants();
   markDirty(); renderTasks();
 }
@@ -1998,6 +2042,9 @@ function seriesHead(sb, isMaster, gi, groupsTotal){
       + '<button data-g="next" title="Следующие задания банка — от самого большого номера в группе">Следующие ' + N + ' ▶</button>'
       + '<button data-g="mix" title="Другие задания банка вразнобой">⟳ Вразнобой</button>'
       + '<button data-g="more" title="Ещё одно задание — следующее по банку">+ ещё</button>'
+      + (sb[0].series.link ? '<button data-g="lnk" class="sq lnk' + (linkOn(sb[0]) ? '' : ' off') + '" title="' + (linkOn(sb[0])
+        ? 'Задания этого сюжета связаны: ◀ ▶, номер и ⟳ меняют их вместе. Нажмите, чтобы разъединить'
+        : 'Связь с другими заданиями сюжета выключена. Нажмите, чтобы включить') + '">🔗</button>' : '')
       + '<button data-g="up" class="sq" title="Группу выше">↑</button><button data-g="down" class="sq" title="Группу ниже">↓</button>'
       + '<button data-g="rm" class="sq rm" title="Убрать группу из работы">✕</button></div>' : '');
   if (isMaster){
@@ -2014,6 +2061,12 @@ function seriesHead(sb, isMaster, gi, groupsTotal){
     q('up').addEventListener('click', () => seriesMove(info.key, -1));
     q('down').addEventListener('click', () => seriesMove(info.key, 1));
     q('rm').addEventListener('click', () => seriesRemove(info.key));
+    const lnk = q('lnk');
+    if (lnk) lnk.addEventListener('click', () => {
+      const on = !linkOn(sb[0]);
+      sb.forEach(b => { b.series.link = Object.assign({}, b.series.link, { off: !on }); if (on) delete b.series.link.off; });
+      markDirty(); renderTasks();
+    });
   }
   return head;
 }
@@ -2079,9 +2132,18 @@ function variantShuffleOne(b){
   if (!free.length && info.hasGen) free.push(Math.max(info.total - 1, ...used) + 1);
   if (!free.length){ toast('Свободных заданий в банке этого прототипа нет — все уже стоят в вариантах'); return; }
   const pos = free[Math.floor(Math.random() * free.length)];
+  // части того же сюжета в этом же варианте — на то же место (у них своя группа образца)
+  const oldPos = b.series.pos, v = E.variants.find(x => x.blocks.includes(b));
+  const mates = !(linkOn(m) && v) ? [] : v.blocks.filter(x => { const mm = masterOf(x); return x !== b && mm && linkOn(mm) && mm.series.key !== key
+    && mm.series.link.set === m.series.link.set && mm.series.href === m.series.href && x.series && x.series.pos === oldPos; });
   b.series = Object.assign({}, b.series, { pos, fipi: null, pinned: true });
   delete b.series.repeat;
   seriesQueue(b, seriesBase(info), pos);
+  mates.forEach(x => {
+    const mi = seriesInfo(seriesBlocks(masterOf(x).series.key));
+    x.series = Object.assign({}, x.series, { pos, fipi: null, pinned: true }); delete x.series.repeat;
+    seriesQueue(x, seriesBase(mi), pos);
+  });
   markDirty(); renderTasks();
 }
 // подпись под заданием группы: откуда оно и было ли уже в другой работе
@@ -2765,14 +2827,18 @@ function planRow(r){
   const total = (proto.fipi || []).length;
   const tr = trainerOf(r.slug, r.n);
   if (!tr) return { ok: false, text: name + ' — тренажёр номера не найден', why: 'trainer' };
-  const title = plainTitle(proto.title);
-  const hasGen = !!proto.hasGen;
+  // связанные задания (ОГЭ №1–5): строка «весь номер» собирает ВЕСЬ набор — все части про один
+  // сюжет, а не одно «Задание 1». Части и места берутся из каталога: новый сюжет подхватывается сам
+  const lk = linkSetOf(protos, proto, r);
+  const title = lk ? plainTitle(lk.title) : plainTitle(proto.title);
+  // за концом банка наш генератор у связанного набора не нужен: его задания между собой не связаны
+  const hasGen = !!proto.hasGen && !lk;
   if (!total && !hasGen) return { ok: false, text: name + ' · ' + title + ' — в банке прототипа нет заданий ФИПИ, не собирается', why: 'gen' };
   // решённые выбранным учеником места — пропускаем
   const skip = new Set();
   if (BD.solved){
     const ex = window.TaskKey ? TaskKey.examOf(r.slug) : null;
-    if (ex) (proto.fipi || []).forEach((f, i) => { if (f && BD.solved.has('fipi:' + ex + ':' + f)) skip.add(i); });
+    if (ex) (lk ? lk.parts : [proto]).forEach(pp => (pp.fipi || []).forEach((f, i) => { if (f && BD.solved.has('fipi:' + ex + ':' + f)) skip.add(i); }));
   }
   // конкретное задание («это задание» с тренажёра) — место ищем по номеру ФИПИ:
   // банк перевыгрузят, порядок сменится, а номер ФИПИ останется тем же
@@ -2785,7 +2851,14 @@ function planRow(r){
   const start = pinned != null ? pinned : rowStart != null ? rowStart : Math.max(0, (Math.round(Number($('bdStart').value)) || 1) - 1);
   const count = Math.max(1, Math.min(COUNT_MAX, r.count || 1));
   let text, warn = '', got, poss = null, skipped = 0;
-  if (random){
+  if (random && lk){
+    // вразнобой у набора — одни и те же места во всех частях (иначе сюжеты разойдутся)
+    poss = shufflePick([...Array(total).keys()].filter(p => !skip.has(p)), count);
+    got = poss.length; skipped = skip.size;
+    text = got ? 'ФИПИ вразнобой, ' + got + ' из ' + total : 'все задания уже решены учеником';
+    if (!got) return { ok: false, text: name + ' · ' + title + ' — ' + text, why: 'end' };
+    if (got < count) warn = 'банк кончится: сюжетов только ' + got + ' из ' + count;
+  } else if (random){
     const pool = total - skip.size;
     got = hasGen ? count : Math.min(count, pool);
     const own = Math.max(0, count - pool);
@@ -2803,10 +2876,25 @@ function planRow(r){
       : 'банк кончится: с №' + (start + 1) + ' только ' + got + ' из ' + count;
   }
   if (skipped) text += ' · пропущено ' + skipped + ' решённых';
+  if (lk) text += ' · сюжет целиком: задания ' + lk.parts.map(x => x.link.part).join(', ');
   // addSeries дописывает « №n» сам; у страниц ОГЭ ч. 1 номера в адресе нет — подпись целиком
   const exArg = r.n == null ? name : (EXAM_NAMES[r.exam] ? r.exam : ((examsSpec()[r.exam] || {}).title || r.exam));
   return { ok: true, got, text: name + ' · ' + title + ' · ' + text, warn,
-    args: { tid: r.tid || tr.tid, href: r.href || tr.href, exam: exArg, n: r.n, proto: proto.id, count, source: random ? 'random' : 'order', startPos: start, poss, skipPos: [...skip] } };
+    args: { tid: r.tid || tr.tid, href: r.href || tr.href, exam: exArg, n: r.n, proto: proto.id, count, source: random ? 'random' : 'order', startPos: start, poss, skipPos: [...skip],
+      linkProtos: lk ? lk.parts.map(x => x.id) : null } };
+}
+/* Набор связанных заданий: прототипы каталога с одним link.set. Строка «весь номер»
+   (proto не задан) у набора собирает все его части по порядку; строка с явным
+   прототипом — только эту часть (учитель выбрал сам), но связь у неё остаётся.
+   Набор неполный (в каталоге не все части) или места не совпадают по длине —
+   считаем обычным прототипом, а не ломаем сборку. */
+function linkSetOf(protos, proto, r){
+  if (!proto.link || r.proto) return null;
+  const parts = protos.filter(x => x.link && x.link.set === proto.link.set).sort((a, b) => a.link.part - b.link.part);
+  if (parts.length < 2 || parts.length !== proto.link.parts) return null;
+  if (parts.some(x => (x.fipi || []).length !== (proto.fipi || []).length)) return null;
+  const t = plainTitle(parts[0].title).replace(/\s*[—–-]\s*Задание\s*\d+\s*$/i, '');
+  return { parts, title: t };
 }
 
 // строки в порядке дерева (экзамен → номер по первому появлению) — в этом же порядке встают группы
@@ -3010,7 +3098,16 @@ async function buildGo(){
     let made = 0;
     try {
       for (const { r, pl } of oks){
-        try { const key = await addSeries(pl.args); if (key){ made++; if (r.tpl) tplTag(key, r); } }
+        try {
+          const parts = pl.args.linkProtos;
+          if (parts){
+            // набор связанных заданий: группа на каждую часть, места одни и те же
+            for (const pid of parts){
+              const key = await addSeries(Object.assign({}, pl.args, { proto: pid, poss: pl.args.poss }));
+              if (key){ made++; if (r.tpl) tplTag(key, r); }
+            }
+          } else { const key = await addSeries(pl.args); if (key){ made++; if (r.tpl) tplTag(key, r); } }
+        }
         catch (e) { console.error('[работы] группа не собралась', e); toast(e.message, 6000); }
       }
     } finally { addPos = keepPos; }
