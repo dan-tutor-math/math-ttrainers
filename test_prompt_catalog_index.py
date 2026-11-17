@@ -27,7 +27,7 @@ def main():
     check(all(set(p) == {"id", "title", "fipi", "hasGen"} for v in disk.values() for p in v["protos"]),
           "у прототипов поля id, title, fipi, hasGen")
     for name in sorted(p.name for p in B.ROOT.glob("catalog-index*.json")):
-        check((B.ROOT / name).stat().st_size <= B.LIMIT, f"{name} не больше 300 КБ")
+        check((B.ROOT / name).stat().st_size <= B.LIMIT, f"{name} не больше {B.LIMIT // 1024} КБ")
 
     srv = B.server()
     try:

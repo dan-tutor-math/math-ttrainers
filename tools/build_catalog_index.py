@@ -10,7 +10,7 @@
 с пометкой в выводе — скрипт перезапускают после слияния этапа 2.
 
 Формат (у страниц ОГЭ ч. 1 без номера в адресе n пустой: "oge9|"): { "<slug>|<n>": { "title": "...", "protos": [ { "id", "title", "fipi": [...], "hasGen" } ] } }
-Порядок fipi — как в банке (тот же, что у openAt). Больше 300 КБ — делим по экзаменам:
+Порядок fipi — как в банке (тот же, что у openAt). Больше 400 КБ (LIMIT) — делим по экзаменам:
 catalog-index-oge.json, catalog-index-ege.json (общий файл тогда удаляется).
 --check — ничего не писать, вернуть 1, если файлы на диске отстали от страниц."""
 import argparse, http.client, json, subprocess, sys, time
@@ -18,15 +18,27 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 PORT = 9140
-LIMIT = 300 * 1024
+# было 300 КБ; с русским (этап 10б, ~3000 мест ФИПИ) общий файл ~316 КБ. Деление по
+# экзаменам works.html пока не читает (берёт только catalog-index.json) — порог подняли,
+# чтобы предпросмотр не сломался; учить works.html двум файлам — когда упрёмся в 400 КБ
+LIMIT = 400 * 1024
 # страницы, где каталог есть или появится на этапе 2 (демоверсии и работы не нужны)
+# адрес страницы без номера уводит русский на главную (index.html) — открываем с номером
+QUERY = {'rus_oge': '?n=2', 'rus_ege': '?n=1'}
 PAGES = ['ege_prof', 'ege_base', 'soc_ege', 'soc_ege_long', 'soc_oge', 'eng_oge', 'phys_oge',
-         'inf_oge', 'oge_part2', 'oge1_5', 'oge6', 'oge7', 'oge9', 'oge10', 'oge11', 'oge13', 'oge14',
-         'oge15_18', 'oge19']
+         'inf_oge', 'oge_part2', 'oge1_5', 'oge6', 'oge7', 'oge8', 'oge9', 'oge10', 'oge11', 'oge12', 'oge13',
+         'oge14', 'oge15_18', 'oge19', 'rus_oge', 'rus_ege']
 
 # в странице: все номера банка с названием и список прототипов из каталога
 JS = """async () => {
   const out = {};
+  // у русского номера в замыкании страницы — каталог сам отдаёт их списком nums()
+  if (__trainerCatalog.nums) {
+    for (const m of __trainerCatalog.nums()) {
+      out[m.n] = { title: m.title, label: m.label, protos: await __trainerCatalog.list(m.n) };
+    }
+    return out;
+  }
   // страницы ЕГЭ-семейства держат несколько номеров (NUMS, номер в адресе);
   // у страниц ОГЭ ч. 1 номер один на страницу — ключ «slug|» с пустым n
   if (typeof NUMS === 'undefined') {
@@ -77,7 +89,7 @@ def extract_page(browser, slug):
     errors = []
     page.on('pageerror', lambda e: errors.append(str(e)))
     try:
-        page.goto(f'http://127.0.0.1:{PORT}/{slug}.html')
+        page.goto(f'http://127.0.0.1:{PORT}/{slug}.html' + QUERY.get(slug, ''))
         try:
             page.wait_for_function('() => window.__trainerCatalog', timeout=8000)
         except Exception:

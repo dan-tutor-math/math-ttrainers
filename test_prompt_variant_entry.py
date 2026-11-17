@@ -238,7 +238,8 @@ def run():
         check("F4 отметка не уводит со страницы, плашка «Выбрано 2 номера · 3 задания»",
               ip.url.endswith("index.html") and "Выбрано 2 номера · 3 задания" in ip.inner_text("#vbPlate"), ip.inner_text("#vbPlate") + " " + ip.url)
         off = ip.evaluate("() => document.querySelector('a.topic-item[href=\"oge8.html\"]').classList.contains('vb-off')")
-        check("F5 номер без каталога (oge8) отмечать нельзя", off)
+        # до этапа 10б у oge8 каталога не было и его нельзя было отметить; теперь — можно
+        check("F5 номер с каталогом (oge8, этап 10б) отмечать можно", not off)
         ip.click("#vbFull")
         n_full = ip.evaluate("() => document.querySelectorAll('.topic-item.vb-sel').length")
         check("F6 «Полный вариант» отмечает все номера с каталогом (больше двух)", n_full > 2, str(n_full))
@@ -249,8 +250,9 @@ def run():
         check("F7 «Собрать работу» открыла works.html#/build", "works.html" in ip.url and "#/build" in ip.url, ip.url)
         rows = ip.evaluate("() => window.VariantSet.all()")
         by = {r["slug"]: r for r in rows}
-        check("F8 в Наборе строки «весь номер»: oge9 ×2, oge6 ×1, oge1_5 нет, oge8 нет",
-              by.get("oge9", {}).get("count") == 2 and by.get("oge6", {}).get("count") == 1 and "oge1_5" not in by and "oge8" not in by
+        check("F8 в Наборе строки «весь номер»: oge9 ×2, oge6 ×1, oge1_5 нет, oge8 ×1",
+              by.get("oge9", {}).get("count") == 2 and by.get("oge6", {}).get("count") == 1 and "oge1_5" not in by
+              and by.get("oge8", {}).get("count") == 1
               and all(not r["proto"] and r["pos"] is None for r in rows), json.dumps([(r["slug"], r["count"]) for r in rows]))
         tree = ip.evaluate("() => [...document.querySelectorAll('#bdTree .bd-num-t')].map(e => e.textContent)")
         check("F9 строки видны в дереве сборки", any("ОГЭ №9" in t for t in tree) and any("ОГЭ №6" in t for t in tree), str(tree))
