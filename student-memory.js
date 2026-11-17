@@ -673,8 +673,25 @@
       document.head.appendChild(st);
     }
   }
+  /* внизу слева на «Досках» уже стоит плашка входа («Даниил · доступ · выйти»
+     или кружок «⋯»). Плашку сессии ставим правее неё; не влезает (телефон) —
+     над ней. Меряем при каждом проходе: плашку входа сворачивают и разворачивают */
+  function placeBar(){
+    if (!bar) return;
+    let pill = null;
+    ['authUserPill', 'agPillHandle'].forEach(id => { const e = document.getElementById(id); if (e && e.offsetWidth) pill = e; });
+    let left = '12px', bottom = '12px';
+    if (pill) {
+      const r = pill.getBoundingClientRect(), w = bar.offsetWidth;
+      if (window.innerWidth - r.right - 8 >= w + 8) { left = Math.round(r.right + 8) + 'px'; bottom = Math.max(12, Math.round(window.innerHeight - r.bottom)) + 'px'; }
+      else bottom = Math.round(window.innerHeight - r.top + 8) + 'px';
+    }
+    if (bar.style.left !== left) bar.style.left = left;
+    if (bar.style.bottom !== bottom) bar.style.bottom = bottom;
+  }
   function renderBar(){
     if (!IN_TOP || !document.body) return;
+    placeBar();
     const s = isFollower() ? null : current();
     if (s) { ensureStudents(); trackBoard(s); }
     markBoards(s);
@@ -693,6 +710,7 @@
     if (!bar){ bar = document.createElement('div'); bar.id = 'smBar'; bar.setAttribute('role', 'status'); document.body.appendChild(bar); }
     bar.classList.toggle('paused', !!(s && s.paused));
     bar.classList.toggle('mini', mini);
+    setTimeout(placeBar, 0);
     const HIDE = '<button type="button" class="sm-hide" data-sm="mini" title="Свернуть в точку" aria-label="Свернуть">–</button>';
     if (mini){
       const t = s ? 'Сессия: ' + (s.name || 'ученик') + (s.paused ? ' (на паузе)' : '') + ' — развернуть' : 'Начать сессию с учеником — развернуть';

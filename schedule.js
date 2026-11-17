@@ -1625,7 +1625,7 @@
         (s.note ? '<div class="sc-sp-note">' + esc(String(s.note).slice(0, 300)) + (String(s.note).length > 300 ? '…' : '') + '</div>' : '') + '</div>' +
         '<div class="sc-sp-btns">' +
           '<a class="btn quiet" id="spCard" href="#/students/' + esc(s.id) + '">Открыть карточку</a>' +
-          (board ? '<a class="btn quiet" id="spBoard" target="_blank" rel="noopener" href="boards.html#board=' + encodeURIComponent(board) + '" title="' + esc(boardWhere) + '">Открыть доску</a>'
+          (board ? '<a class="btn quiet" id="spBoard" href="boards.html#board=' + encodeURIComponent(board) + '" title="' + esc(boardWhere) + '">Открыть доску</a>'
                  : '<button type="button" class="btn quiet" id="spPin" title="К занятию и ученику доска не привязана">Закрепить доску</button>') +
           '<button type="button" class="btn" id="spSession"' + (s.archived_at ? ' disabled title="Ученик в архиве"' : '') + '>' + (mine ? 'Закончить сессию' : 'Начать сессию') + '</button>' +
         '</div>' +

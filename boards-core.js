@@ -12059,6 +12059,14 @@ if (!window.__hasCloudGate) window.boardsAppBoot();
 // «Вставка и вид доски»: rememberView(true) — вид сразу в localStorage, синхронно: запись
 // в IndexedDB при закрытии вкладки браузер дождаться не обязан. pagehide —
 // для Safari и закрытия на телефоне, где beforeunload приходит не всегда
+// ссылка «на доску» из плашки сессии ведёт на boards.html#board=<id>; если мы уже
+// на списке досок, страница не перезагружается, старт приложения не срабатывает —
+// без этого слушателя показывался бы просто список
+window.addEventListener('hashchange', () => {
+  if (boardActive || !DB || !DB.boards) return;
+  const m = /board=([^&]+)/.exec(location.hash);
+  if (m && DB.boards.some(b => b.id === m[1] && !b.trashedAt)) openBoard(m[1]);
+});
 window.addEventListener('beforeunload', () => { if (B) { rememberView(true); idbSaveDB(); } });
 window.addEventListener('pagehide', () => { if (B) rememberView(true); });
 document.addEventListener('visibilitychange', () => { if (document.hidden && B) { rememberView(true); idbSaveDB(); } });
