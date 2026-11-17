@@ -226,14 +226,17 @@ def test_ege_prof(browser):
     page.wait_for_timeout(300)
     page.fill('input[data-fid="main"]', '-98765')
     page.click('#answerArea .check-btn')
-    page.wait_for_timeout(150)
+    page.wait_for_timeout(300)
     ans2 = page.evaluate("String(curProto.answer)").replace('.', ',')
     page.fill('input[data-fid="main"]', ans2)
     page.click('#answerArea .check-btn')
     page.wait_for_timeout(300)
     q = queue(page)
-    check("ege_prof: после ошибки — bad", len(q) == 2 and q[1]["event"] == "bad", str(q))
-    check("ege_prof: у второго задания другой ключ", len(q) == 2 and q[0]["task_key"] != q[1]["task_key"], str(q))
+    # задача 56: ошибка пишется сразу (bad), верный ответ после неё — ok с тем же ключом
+    check("ege_prof: неверно, потом верно — bad, затем ok",
+          len(q) == 3 and q[1]["event"] == "bad" and q[2]["event"] == "ok", str(q))
+    check("ege_prof: у второго задания другой ключ", len(q) == 3 and q[0]["task_key"] != q[1]["task_key"], str(q))
+    check("ege_prof: bad и ok — один ключ", len(q) == 3 and q[1]["task_key"] == q[2]["task_key"], str(q))
     check("ege_prof: без ошибок JS", not errors, str(errors[:1]))
     ctx.close()
 
