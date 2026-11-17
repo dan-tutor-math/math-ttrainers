@@ -149,13 +149,13 @@
 .confirm{margin-top:12px;text-align:center;}
 .confirm p{margin-bottom:10px;font-weight:600;}
 .confirm .actions{margin-top:4px;}
-.net{position:fixed;left:50%;top:12px;transform:translateX(-50%);background:var(--warn-tint);color:var(--warn);border:1px solid var(--warn);
+.net{position:fixed;left:50%;top:58px;transform:translateX(-50%);background:var(--warn-tint);color:var(--warn);border:1px solid var(--warn);
   font-size:13px;font-weight:600;padding:6px 12px;border-radius:10px;z-index:300;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
-/* таймер работы (settings.timeLimit): плашка сверху справа, за 5 минут — красная */
-.wtimer{position:fixed;right:12px;top:12px;z-index:290;background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:12px;
+/* таймер работы (settings.timeLimit): плашка сверху по центру (справа — кнопка темы), за 5 минут — красная */
+.wtimer{position:fixed;left:50%;transform:translateX(-50%);top:12px;z-index:290;background:var(--glass-strong);border:1px solid var(--glass-border);border-radius:12px;
   padding:6px 12px;font-weight:700;font-size:15px;font-variant-numeric:tabular-nums;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);}
 .wtimer.warn{background:#D70015;color:#fff;border-color:#D70015;animation:wtPulse 1s ease-in-out 3;}
-@keyframes wtPulse{50%{transform:scale(1.08)}}
+@keyframes wtPulse{50%{transform:translateX(-50%) scale(1.08)}}
 @media (prefers-reduced-motion: reduce){.wtimer.warn{animation:none}}
 .who{text-align:center;color:var(--muted-2);font-size:13.5px;margin-top:26px;}
 .who button{background:none;border:none;color:var(--ink);font:inherit;text-decoration:underline;cursor:pointer;}

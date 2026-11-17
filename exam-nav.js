@@ -862,7 +862,7 @@ html[data-theme="dark"] .exam-vb-pop{background:#1e2540;box-shadow:inset 0 1px 0
 .vb-t{font-weight:650}
 .vb-h{font-size:12px;opacity:.7;overflow-wrap:anywhere}
 .vb-step{display:flex;align-items:center;gap:4px;flex:none}
-.vb-sb{width:32px;height:32px;padding:0;border:1px solid var(--glass-border);border-radius:50%;background:transparent}
+.vb-sb{width:40px;height:40px;padding:0;border:1px solid var(--glass-border);border-radius:50%;background:transparent}
 .vb-sb:disabled{opacity:.35;cursor:default}
 .vb-n{min-width:34px;text-align:center;font-weight:650}
 .vb-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:8px;padding-top:10px;border-top:1px solid var(--glass-border)}
