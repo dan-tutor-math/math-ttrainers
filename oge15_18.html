@@ -1536,9 +1536,11 @@ function submitInputAnswer() {
     taskAnswered = true;
     syncKeypadVisibility();
     if (!isRandomMode(curMode)) { curProg.answered = true; saveProg(curMode, curProg); }
-    finishTask(true);
+    finishTask(true, false); // вторая ошибка — ответ показан, итог bad
   } else {
     hadWrongPick = true;
+    // задача 56: ошибка — сразу в память ученика
+    if (window.StudentMemory) StudentMemory.recordAttempt(curTask, { ok: false, mode: curMode });
     streak = 0; totalErrors++;
     els.stErrors.textContent = totalErrors;
     els.stStreak.textContent = streak;
@@ -1555,7 +1557,7 @@ function submitInputAnswer() {
 els.checkAnswerBtn.onclick = submitInputAnswer;
 els.answerInput.addEventListener('keydown', e => { if (e.key === 'Enter') submitInputAnswer(); });
 
-function finishTask(isFreshSolve) {
+function finishTask(isFreshSolve, solvedOk) {
   els.solBtnRow.style.display = 'none';
   if (isFreshSolve === undefined) isFreshSolve = true;
   els.mainPanel.style.display = 'block';
@@ -1568,7 +1570,9 @@ function finishTask(isFreshSolve) {
 
   if (isFreshSolve && !isRandomMode(curMode)) recordSolve();
   // кабинет (Б2): итог в журнал ученика; вне сессии, на паузе и у follower модуль молчит
-  if (isFreshSolve && window.StudentMemory) StudentMemory.recordTask(curTask, { mode: curMode, clean: !hadWrongPick });
+  // задача 56: верный ответ — ok (даже после ошибки); solvedOk===false — показали ответ после
+  // второй ошибки, там итог тоже bad (повтор в течение 10 минут отсекает StudentMemory)
+  if (isFreshSolve && window.StudentMemory) StudentMemory.recordAttempt(curTask, { ok: solvedOk !== false, mode: curMode });
 }
 els.nextBtn.onclick = newTask;
 

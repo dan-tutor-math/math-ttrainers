@@ -1,15 +1,15 @@
 """
 Кабинет, задача Б2: запись событий памяти заданий из тренажёров.
 
-Страница решает задание, а StudentMemory.recordTask кладёт строку в очередь
-записи (localStorage studentMem:queue:v1) с ключом из task-key.js и итогом:
-ok — с первого раза, bad — после ошибки. Сеть закрыта (Supabase недоступен),
+Страница решает задание, а StudentMemory.recordAttempt (задача 56) кладёт строку
+в очередь записи (localStorage studentMem:queue:v1) с ключом из task-key.js:
+bad — в момент ошибки, ok — при верном ответе (в том числе после ошибки). Сеть закрыта (Supabase недоступен),
 поэтому очередь не уходит и её можно читать. Живая база и совместный режим
 перепроверяются на сайте руками.
 
 Проверяет:
   A. ОГЭ №6 и №9: задание с первого раза — строка ok с ключом fipi:oge:<номер>
-     или gen:<страница>:<вид>; после неверного ответа — bad; в «вперемешку»
+     или gen:<страница>:<вид>; неверно, потом верно — bad, затем ok; в «вперемешку»
      ключ тоже есть (genKind);
   B. ege_prof: решено с первого раза — ok, ключ fipi:ege:<номер> (или gen:ege_prof:<id>);
      после ошибки — bad;
@@ -100,6 +100,12 @@ def solve_input(page, wrong_first=False):
     page.wait_for_timeout(300)
 
 
+def skip_throttle(page):
+    """Демо-задания подряд имеют один ключ; сдвигаем часы на 11 минут, чтобы
+    ограничение «одно событие в 10 минут» не мешало проверять следующее задание."""
+    page.evaluate("(() => { const o = Date.now; Date.now = () => o() + 11 * 60 * 1000; })()")
+
+
 def test_oge(browser, page_name):
     ctx, page, errors = new_page(browser, f"{BASE}/{page_name}.html")
     check(f"{page_name}: до решения очередь пуста", queue(page) == [])
@@ -113,18 +119,57 @@ def test_oge(browser, page_name):
     fipi = page.evaluate("curTask.fipi || null")
     if fipi and q:
         check(f"{page_name}: у задания ФИПИ ключ содержит номер", q[0]["task_key"] == f"fipi:oge:{fipi}", q[0]["task_key"])
-    # второе задание: сначала ошибка, потом верный ответ — bad
+    # второе задание: сначала ошибка, потом верный ответ — bad, затем ok (задача 56)
     page.click('#nextBtn')
     page.wait_for_timeout(300)
+    skip_throttle(page)
     solve_input(page, wrong_first=True)
     q = queue(page)
-    check(f"{page_name}: после ошибки — строка bad", len(q) == 2 and q[1]["event"] == "bad", str(q))
+    check(f"{page_name}: неверно → bad, потом верно → ok, ключ тот же",
+          len(q) == 3 and [e["event"] for e in q[1:]] == ["bad", "ok"] and q[1]["task_key"] == q[2]["task_key"], str(q))
     # пауза: ничего не пишется
     page.evaluate("StudentMemory.pause(true)")
     page.click('#nextBtn')
     page.wait_for_timeout(300)
     solve_input(page)
-    check(f"{page_name}: на паузе очередь не растёт", len(queue(page)) == 2)
+    check(f"{page_name}: на паузе очередь не растёт", len(queue(page)) == 3)
+    check(f"{page_name}: без ошибок JS", not errors, str(errors[:1]))
+    ctx.close()
+
+
+def pick(page, page_name, right):
+    """Выбор ответа на страницах без поля ввода: oge7 — кнопки вариантов, oge19 — утверждения."""
+    if page_name == "oge7":
+        page.evaluate("""r => { const b = [...document.querySelectorAll('.mcq-btn')];
+            b[r ? curTask.correctIndex : b.findIndex((_, k) => k !== curTask.correctIndex)].click(); }""", right)
+    else:
+        page.evaluate("""r => { const el = [...document.querySelectorAll('.stmt')]; const ok = correctIndexSet();
+            el.forEach((e, i) => { if (r ? ok.has(i) : (!ok.has(i) && !el.some((x, j) => !ok.has(j) && x.classList.contains('picked')))) e.click(); });
+            document.getElementById('checkBtn').click(); }""", right)
+    page.wait_for_timeout(300)
+
+
+def test_oge_pick(browser, page_name):
+    """oge7 (варианты ответа) и oge19 (выбор утверждений): задача 56, этап 2а."""
+    ctx, page, errors = new_page(browser, f"{BASE}/{page_name}.html")
+    check(f"{page_name}: до решения очередь пуста", queue(page) == [])
+    start_oge_mode(page)
+    pick(page, page_name, True)
+    q = queue(page)
+    check(f"{page_name}: сразу верно — только ok", len(q) == 1 and q[0]["event"] == "ok", str(q))
+    page.click('#nextBtn')
+    page.wait_for_timeout(300)
+    skip_throttle(page)
+    pick(page, page_name, False)
+    q = queue(page)
+    check(f"{page_name}: неверный ответ — bad сразу, в момент ошибки",
+          len(q) == 2 and q[1]["event"] == "bad", str(q))
+    page.click('#changeAnswerBtn')
+    page.wait_for_timeout(200)
+    pick(page, page_name, True)
+    q = queue(page)
+    check(f"{page_name}: неверно → bad, потом верно → ok, ключ тот же",
+          len(q) == 3 and [e["event"] for e in q[1:]] == ["bad", "ok"] and q[1]["task_key"] == q[2]["task_key"], str(q))
     check(f"{page_name}: без ошибок JS", not errors, str(errors[:1]))
     ctx.close()
 
@@ -231,6 +276,8 @@ def main():
         browser = pw.chromium.launch()
         for name in ("oge6", "oge9", "oge15_18", "oge1_5"):
             test_oge(browser, name)
+        for name in ("oge7", "oge19"):
+            test_oge_pick(browser, name)
         test_oge_random(browser)
         test_no_session(browser)
         test_follower(browser)
