@@ -200,7 +200,8 @@ def run():
         sp.click(f".titem[data-i='1'] .tc-opt[data-i='{t1['correct']}']"); sp.wait_for_timeout(300)
         check("C14 ответ в списке засчитан", "Верно" in sp.inner_text(".titem[data-i='1'] .wmsg"))
         sp.click('#wView button[data-v="one"]'); sp.wait_for_timeout(200)
-        check("C15 обратно «по одному» — одно задание, текущее", sp.locator(".titem").count() == 1 and sp.inner_text(".titem.cur .tnum").startswith("Задание 2"))
+        # следующее задание грузится заранее и лежит спрятанным (.parked) — считаем видимые
+        check("C15 обратно «по одному» — одно задание, текущее", sp.locator(".titem:not(.parked)").count() == 1 and sp.inner_text(".titem.cur .tnum").startswith("Задание 2"))
 
         # ═══ D ═══
         print("\n— D. заметки")

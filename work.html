@@ -92,6 +92,16 @@
    Пока грузится — невидим и сжат (не раздвигает страницу), видна картинка */
 .live-box iframe{display:block;width:100%;height:100%;border:0;background:transparent;color-scheme:normal;}
 .live-box.loading{visibility:hidden;pointer-events:none;transform:scale(.05)!important;}
+/* пока кадр живого задания грузится — место под него, а не картинка: снимок
+   свёрстан иначе, чем кадр, и его подмена кадром дёргала вид и высоту */
+.tc-wait{display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-size:15px;}
+.tc-wait::after{content:'Загружаю задание…';animation:tcWait 1.2s ease-in-out infinite alternate;}
+@keyframes tcWait{from{opacity:.35}to{opacity:1}}
+/* «По одному»: уже открытые задания не пересоздаются, а прячутся — кадр
+   тренажёра в них живёт (перенос iframe в другое место DOM перезагрузил бы
+   его). Не display:none: следующее задание грузится заранее, а тренажёру
+   нужна настоящая вёрстка, чтобы найти узел задания */
+.titem.parked{position:fixed!important;left:-300vw!important;top:0!important;visibility:hidden!important;pointer-events:none!important;}
 .vseg.zoom button{min-width:38px;}
 .tc-resize{position:absolute;right:-9px;bottom:-9px;width:22px;height:22px;border-radius:7px;background:var(--glass-strong);border:1px solid var(--glass-border);
   box-shadow:0 1px 5px rgba(0,0,0,.2);cursor:nwse-resize;z-index:4;touch-action:none;display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-size:11px;}
@@ -284,7 +294,7 @@ applyTheme(curTheme(), false);
 themeBtn.addEventListener('click', () => {
   applyTheme(curTheme() === 'dark' ? 'light' : 'dark', true);
   if (!S.blocks || $('scrTask').hidden) return;
-  VIEWS.forEach(v => {
+  allViews().forEach(v => {
     if (v.theory){ const im = imgOf(v.b.theory); const ti = v.theory.box.querySelector('img'); if (im && ti) ti.src = im.url; }
     if (liveReady(v)) setLiveTheme(v);
     else if (!(v.live && v.live.state === 'loading')){ renderCard(v); applyState(v); }
@@ -611,20 +621,59 @@ function showTask(){
   $('wConfirm').hidden = true;
   renderTasks();
 }
+// «По одному»: построенные блоки по номеру задания, текущий — в VIEWS, прочие
+// спрятаны (.parked) вместе со своими кадрами
+const ONE = new Map();
+const allViews = () => S.view === 'list' ? VIEWS : [...ONE.values()];
 function renderTasks(){
   const blocks = taskBlocks();
   if (!blocks.length){ fail('В работе пока нет заданий', 'Напиши учителю.'); return; }
-  VIEWS.forEach(v => { closeTrainer(v); liveUnwatch(v); });
+  new Set([...VIEWS, ...ONE.values()]).forEach(v => { closeTrainer(v); liveUnwatch(v); });
+  ONE.clear(); VIEWS = [];
   const host = $('wHost');
   host.innerHTML = '';
   host.className = S.view === 'list' ? 'list' : 'one';
   document.body.classList.toggle('notes-on', S.notesOn);
   $('wNotes').classList.toggle('on', S.notesOn);
   $('wView').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.v === S.view));
-  VIEWS = (S.view === 'list' ? blocks.map((b, i) => i) : [S.cur]).map(i => buildView(blocks[i], i));
+  if (S.view !== 'list'){ showOne(S.cur); return; }
+  VIEWS = blocks.map((b, i) => buildView(b, i));
   VIEWS.forEach(v => { host.appendChild(v.root); });
   VIEWS.forEach(v => { fitView(v); applyState(v); liveWatch(v); });
   renderNums();
+}
+// «По одному»: показать задание i. Блок уже открытого задания берётся как
+// есть — с живым кадром, без повторной загрузки; следующее грузится заранее,
+// чтобы «Дальше →» открывало готовое задание, а не «Загружаю…»
+function oneView(i){
+  let v = ONE.get(i);
+  if (!v){
+    const blocks = taskBlocks();
+    if (i < 0 || i >= blocks.length) return null;
+    v = buildView(blocks[i], i);
+    v.root.classList.add('parked');
+    ONE.set(i, v);
+    $('wHost').appendChild(v.root);
+    liveWatch(v);
+  }
+  return v;
+}
+function showOne(i){
+  VIEWS.forEach(x => { if (x.i !== i){ closeTrainer(x); x.root.classList.add('parked'); x.root.classList.remove('cur'); } });
+  const v = oneView(i);
+  v.root.classList.remove('parked'); v.root.classList.add('cur'); v.root.style.width = '';
+  VIEWS = [v];
+  fitView(v); applyState(v);
+  liveLoad(v);
+  const nx = oneView(i + 1);
+  if (nx){ parkFit(nx); liveLoad(nx); }
+  renderNums();
+}
+// спрятанный блок — той же ширины, что и показанный: кадр следующего задания
+// сразу верстается по ширине карточки, и при показе высота не прыгает
+function parkFit(v){
+  v.root.style.width = $('wHost').clientWidth + 'px';
+  fitView(v);
 }
 function viewOf(i){ return VIEWS.find(v => v.i === i) || null; }
 function setCur(i){
@@ -641,7 +690,7 @@ function goTo(i){
   if (i === S.cur) return;
   bankAndSave();
   S.cur = i; lsSet(LS.idx(), i);
-  renderTasks();
+  showOne(i);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 function scrollToTask(i){
@@ -748,6 +797,15 @@ function renderCard(v){
   const hot = b.hot && im ? b.hot : null;
   const W = (hot && hot.w) || (b.css && b.css.w) || 480;
   const H = (hot && hot.h) || (b.css && b.css.h) || 300;
+  v.wait = liveWanted(b) && !(v.live && v.live.state === 'failed');
+  if (v.wait){
+    // живое задание показывается только живым: пока кадр грузится — место
+    // под него (высота — по снимку), картинка — только если кадр не открылся
+    const box = el('div', 'tc-box tc-wait');
+    wrap.appendChild(box);
+    v.box = box; v.W = W; v.H = H; v.snapH = H;
+    return;
+  }
   const box = el('div', 'tc-box');
   box.style.width = W + 'px'; box.style.height = H + 'px';
   const img = el('img');
@@ -864,11 +922,20 @@ function fitView(v){
   if (!v.box || !v.root.isConnected) return;
   const avail = availOf(v);
   let k = kFor(avail, v.W);
-  if (liveReady(v)){
-    // живое: ширина кадра (вёрстка тренажёра) = LIVE_W / масштаб, и кадр
-    // растягивается до той же доли колонки, что и картинка. «+» делает текст
-    // крупнее, и задание переносится по строкам, а не уезжает вбок
-    const wl = Math.max(LIVE_MIN, Math.round(LIVE_W / S.lzoom));
+  if (v.wait){
+    // заглушка: ширина как у будущего кадра, высота — снимок, пересчитанный
+    // на эту ширину (текст в кадре переносится реже, чем на узком снимке)
+    const wl = Math.max(LIVE_MIN, Math.round(avail * S.fill / S.lzoom));
+    v.W = wl; v.H = Math.max(160, Math.round(v.snapH * Math.sqrt(LIVE_W / wl)));
+    v.box.style.width = wl + 'px';
+    v.box.style.height = v.H + 'px';
+    k = Math.max(0.25, avail * S.fill / wl);
+  } else if (liveReady(v)){
+    // живое: кадр верстается по настоящей ширине карточки (доля колонки
+    // S.fill), как сам тренажёр, а не растягивается картинкой с 440 px.
+    // «A+» делает текст крупнее: кадр уже во столько же раз и масштаб больше,
+    // задание переносится по строкам, а не уезжает вбок
+    const wl = Math.max(LIVE_MIN, Math.round(avail * S.fill / S.lzoom));
     v.W = wl;
     v.box.style.width = wl + 'px';
     v.box.style.height = v.H + 'px';
@@ -951,7 +1018,9 @@ function canonJ(x){
 const liveIO = 'IntersectionObserver' in window ? new IntersectionObserver(entries => {
   entries.forEach(en => {
     const v = VIEWS.find(x => x.root === en.target);
-    if (!v || !v.live) return;
+    // в «По одному» кадрами управляет showOne: спрятанное задание «не на
+    // экране», но его кадр нужен — к нему вернутся или оно следующее
+    if (!v || !v.live || S.view !== 'list') return;
     v.live.inView = en.isIntersecting;
     if (en.isIntersecting) liveLoad(v);
     else if (v.live.state !== 'idle' && v.live.state !== 'failed') liveDrop(v);
@@ -971,8 +1040,13 @@ function liveUnwatch(v){
 function liveLoad(v){
   if (!v.live || v.live.state !== 'idle' || !v.root.isConnected) return;
   // лишние кадры — у заданий, ушедших с экрана
-  const busy = VIEWS.filter(x => x !== v && x.live && (x.live.state === 'loading' || x.live.state === 'ready'));
-  if (busy.length >= LIVE_MAX) busy.filter(x => !x.live.inView).slice(0, busy.length - LIVE_MAX + 1).forEach(liveDrop);
+  const busy = allViews().filter(x => x !== v && x.live && (x.live.state === 'loading' || x.live.state === 'ready'));
+  if (busy.length >= LIVE_MAX){
+    // «По одному» — отдаём кадры самых далёких от текущего заданий
+    const free = S.view === 'list' ? busy.filter(x => !x.live.inView)
+      : busy.filter(x => x.i !== S.cur && x.i !== S.cur + 1).sort((a, b) => Math.abs(b.i - S.cur) - Math.abs(a.i - S.cur));
+    free.slice(0, busy.length - LIVE_MAX + 1).forEach(liveDrop);
+  }
   const fr = el('iframe', 'live-frame');
   fr.title = 'Задание ' + (v.i + 1);
   fr.setAttribute('scrolling', 'no');
@@ -1018,8 +1092,13 @@ async function liveBoot(v, my){
     my.win = w; my.keep = keep;
     // картинка больше не нужна; поля и форма — заново, уже в кадре
     if (v.box && v.box !== my.lbox) v.box.remove();
-    v.box = my.lbox;
+    v.box = my.lbox; v.wait = false;
     my.lbox.classList.remove('loading');
+    if (!v.wrap.querySelector('.tc-resize')){
+      const rz = el('div', 'tc-resize');
+      rz.title = 'Потяните, чтобы сузить или растянуть задание; двойной щелчок — во всю ширину';
+      wireResize(rz, v); v.wrap.appendChild(rz);
+    }
     v.below.innerHTML = ''; v.below.hidden = true;
     v.inputs = []; v.opts = []; v.check = null; v.belowMode = false;
     liveMap(v, w, keep);
@@ -1027,10 +1106,11 @@ async function liveBoot(v, my){
     fitView(v); applyState(v);
   } catch (e) {
     if (v.live !== my) return;
-    console.warn('[работа] живое задание не открылось — остаётся картинка', e);
+    console.warn('[работа] живое задание не открылось — показываем картинку', e);
     my.lbox.remove();
     if (my.fr) my.fr.src = 'about:blank';
     v.live = { state: 'failed', inView: my.inView };
+    if (v.root.isConnected){ renderCard(v); fitView(v); applyState(v); }
   }
 }
 /* В кадре видно только задание: его панель (.panel вокруг узла) и в ней
@@ -1039,6 +1119,9 @@ async function liveBoot(v, my){
    удаления узлов: тренажёр продолжает работать как ни в чём не бывало. */
 const LIVE_CSS = `
 html,body{min-height:0!important;height:auto!important;overflow:hidden!important;background:transparent!important;}
+/* фон-сетка тренажёра (bg-style.js) ставится «html body … !important» —
+   перебиваем правилом сильнее, иначе за заданием видна подложка-рамка */
+html:root body{background:transparent!important;background-image:none!important;background-color:transparent!important;}
 body::before,body::after{display:none!important;}
 body{margin:0!important;padding:0!important;}
 body > :not([data-wl-up]):not([data-wl-root]),
@@ -1049,7 +1132,9 @@ body > :not([data-wl-up]):not([data-wl-root]),
   {display:none!important;}
 [data-wl-up]{margin:0!important;padding:0!important;border:0!important;box-shadow:none!important;transform:none!important;
   max-width:none!important;width:auto!important;min-width:0!important;min-height:0!important;height:auto!important;display:block!important;position:static!important;}
-[data-wl-root]{margin:0!important;max-width:none!important;width:auto!important;display:block!important;}
+[data-wl-root]{margin:0!important;max-width:none!important;width:auto!important;display:block!important;
+  background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important;padding:0!important;
+  -webkit-backdrop-filter:none!important;backdrop-filter:none!important;}
 .wl-below [data-wl-root] :is(.input-answer-row, .p2-field, .sym-bar, .check-btn){display:none!important;}
 .wl-c.picked{outline:3px solid #2e7de0!important;outline-offset:1px;}
 .wl-c.good{outline:3px solid #248a3d!important;outline-offset:1px;}
@@ -1321,7 +1406,7 @@ function applyState(v){
   // своя «Проверить» есть на самой карточке — вторая под ней не нужна.
   // «В конце» обе подписаны «Ответить»: «Проверить» обещало бы вердикт
   const label = end ? (a && a.value ? 'Изменить ответ' : 'Ответить') : null;
-  v.bCheck.hidden = fin || t.kind === 'choice' || !!v.check;
+  v.bCheck.hidden = fin || t.kind === 'choice' || !!v.check || !!v.wait;
   v.bCheck.textContent = label || 'Проверить';
   if (v.check) v.check.textContent = label || v.checkText;
   v.bSkip.hidden = fin;
