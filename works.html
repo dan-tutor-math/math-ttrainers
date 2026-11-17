@@ -2589,7 +2589,7 @@ $('rsClose').addEventListener('click', async () => {
    один раз при выборе; места с заданиями ФИПИ, ключ которых fipi:<экзамен>:<номер>
    есть в журнале, при сборке пропускаются. */
 const VS = window.VariantSet;
-const BD = { target: null, gridOpen: false, busy: false, student: '', solved: null };   // solved — ключи журнала выбранного ученика   // target: null — новая работа, 'cur' — открытая в редакторе
+const BD = { target: null, gridOpen: false, busy: false, student: '', solved: null };   // target: null — новая работа, 'cur' — открытая в редакторе; solved — ключи журнала выбранного ученика
 let catIndexP = null;
 function catIndex(){
   if (!catIndexP){
