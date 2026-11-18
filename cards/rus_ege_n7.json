@@ -1,0 +1,2389 @@
+{
+ "v": 1,
+ "slug": "rus_ege_n7",
+ "exam": "rus_ege",
+ "family": "b_rus",
+ "src": {
+  "exam-spec.js": "f690d93f5a76b45620942c08a3ae7d9aa3661bc3",
+  "rus-ege-fipi.js": "460a1cb71a4005a88bc8ef3f94460d68a8f2f680",
+  "rus_ege.html": "363f1f6daf993a16c48ac755b32fcde733e76edf"
+ },
+ "cards": [
+  {
+   "v": 1,
+   "id": "fipi:2A3746",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 0,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>СЕМИСТАМИ жителями</p><p>нет ТУФЕЛЬ</p><p>мягких КРЕСЕЛ</p><p>ДВУМСТАМ пятидесяти рублям</p><p>без САПОГ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "СЕМЬЮСТАМИ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "СЕМЬЮСТАМИ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 2A3746"
+  },
+  {
+   "v": 1,
+   "id": "fipi:247443",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 1,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>много ВАФЛЕЙ</p><p>цепь ОБЛАКОВ</p><p>ДЕВЯТЬЮСТАМИ отдыхающими</p><p>опытные ДОКТОРА</p><p>ВЫЛОЖИ на сайт</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ВАФЕЛЬ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ВАФЕЛЬ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 247443"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5D5744",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 2,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>опытные КОНСТРУКТОРЫ</p><p>ЗАМЁРЗ на снегу</p><p>к ДВУХ тысячи двадцать первому году</p><p>килограмм БАКЛАЖАНОВ</p><p>выглядел ВЕСЕЛЕЕ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ДВЕ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ДВЕ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 5D5744"
+  },
+  {
+   "v": 1,
+   "id": "fipi:ED6747",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 3,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>ПРИОБРЁВ мебель</p><p>ПОЛОЖИ на полку</p><p>КЛАДИ в сумку</p><p>нет СПЛЕТЕН</p><p>ИСПЕКИ пирог</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПРИОБРЕТЯ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПРИОБРЕТЯ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание ED6747"
+  },
+  {
+   "v": 1,
+   "id": "fipi:F23DF9",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 4,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>КЛАСТЬ на стол</p><p>с ТРЕМЯСТАМИ пассажирами</p><p>в ПОЛУТОРА метрах</p><p>томатные СОУСА</p><p>золочёные КУПОЛА</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "СОУСЫ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "СОУСЫ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание F23DF9"
+  },
+  {
+   "v": 1,
+   "id": "fipi:BCCEFC",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 5,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>нет ТУФЕЛЬ</p><p>свыше ТРЁХСОТ человек</p><p>ДВУМЯСТА журналами</p><p>ПРИЛЯГТЕ на кровать</p><p>не ЕЗДИ туда</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ДВУМЯСТАМИ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ДВУМЯСТАМИ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание BCCEFC"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2F7CFF",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 6,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>и запишите слово правильно.</p><p>на ширине ПЛЕЧ</p><p>ВОСЕМЬЮСОТЫЙ экземпляр</p><p>ЛЯГТЕ на бок</p><p>НЕЛЕПЕЙШИЙ наряд</p><p>между НИМИ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ВОСЬМИСОТЫЙ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ВОСЬМИСОТЫЙ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 2F7CFF"
+  },
+  {
+   "v": 1,
+   "id": "fipi:D754F9",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 7,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>ЧЕТВЕРО ножниц</p><p>МЯГЧАЙШИЙ хлеб</p><p>ПОЕЗЖАЙ быстрее</p><p>пить из БЛЮДЦЕВ</p><p>самый ВАЖНЫЙ день</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "БЛЮДЕЦ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "БЛЮДЕЦ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание D754F9"
+  },
+  {
+   "v": 1,
+   "id": "fipi:AA8707",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 8,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>с ПЯТИСТА рублями</p><p>ваши ПАСПОРТА</p><p>в ДВУХТЫСЯЧНОМ году</p><p>КЛАДИ на место</p><p>о ЧЕТЫРЁХСТАХ городах</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПЯТЬЮСТАМИ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПЯТЬЮСТАМИ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание AA8707"
+  },
+  {
+   "v": 1,
+   "id": "fipi:A4cB01",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 9,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><div>1)<p>к ОБЕИМ подругам</p></div><div>2)<p>выйти из УЩЕЛИЙ</p></div><div>3)<p>бабушка ПЕКЁТ пироги</p></div><div>4)<p>лучшие ПОВАРА</p></div><div>5)<p>много МАНДАРИНОВ</p></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПЕЧЁТ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПЕЧЁТ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание A4cB01"
+  },
+  {
+   "v": 1,
+   "id": "fipi:BE9871",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 10,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>на ширине ПЛЕЧ</p><p>ВОСЬМЬЮСОТЫЙ экземпляр</p><p>в ДВЕ тысячи третьем году</p><p>НЕЛЕПЕЙШИЙ наряд</p><p>между НИМИ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ВОСЬМИСОТЫЙ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ВОСЬМИСОТЫЙ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание BE9871"
+  },
+  {
+   "v": 1,
+   "id": "fipi:1F3478",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 11,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена грамматическая ошибка. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>пришла ИЗ школы</p><p>ПОКЛАЛ здесь</p><p>с ПОВИДЛОМ</p><p>воспользоваться ШАМПУНЕМ</p><p>в ДВУХСТАХ метрах</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПОЛОЖИЛ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПОЛОЖИЛ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 1F3478"
+  },
+  {
+   "v": 1,
+   "id": "fipi:AE0374",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 12,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>золочёные КУПОЛА</p><p>ПОЕЗЖАЙ вперёд</p><p>с ПОВИДЛОЙ</p><p>более СТРОГО</p><p>пара ПОЛОТЕНЕЦ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПОВИДЛОМ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПОВИДЛОМ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание AE0374"
+  },
+  {
+   "v": 1,
+   "id": "fipi:CA147A",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 13,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>томатные СОУСА</p><p>ДЛИННЕЕ всех</p><p>у наших ВОРОТ</p><p>ТРОЕ друзей</p><p>ЛЯГТЕ на пол</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "СОУСЫ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "СОУСЫ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание CA147A"
+  },
+  {
+   "v": 1,
+   "id": "fipi:c88373",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 14,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><div>1)<p>я ЕЗЖУ на метро</p></div><div>2)<p>накрыть ТЮЛЬЮ</p></div><div>3)<p>НЕЖНЕЙШИЙ бисквит</p></div><div>4)<p>проект СПАЛЕН</p></div><div>5)<p>к СОРОКА четырём квартирам</p></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ТЮЛЕМ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ТЮЛЕМ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание c88373"
+  },
+  {
+   "v": 1,
+   "id": "fipi:944170",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 15,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><div>1)<p>к ОБЕИМ подругам</p></div><div>2)<p>выйти из УЩЕЛИЙ</p></div><div>3)<p>бабушка ПЕЧЁТ пироги</p></div><div>4)<p>лучшие ПОВАРЫ</p></div><div>5)<p>без САПОГ</p></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПОВАРА",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПОВАРА"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 944170"
+  },
+  {
+   "v": 1,
+   "id": "fipi:32E17B",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 16,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>более ВОСЕМЬСОТ миллионов</p><p>в романах Александра ДЮМА</p><p>опытные ТРЕНЕРЫ</p><p>килограмм ЯБЛОК</p><p>около ПОЛУТОРА ящиков</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ВОСЬМИСОТ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ВОСЬМИСОТ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 32E17B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:E60EB4",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 17,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>он более МОЛОЖЕ</p><p>после БУДНЕЙ</p><p>нет СВЕЧЕЙ</p><p>пять ОЛАДИЙ</p><p>ИХ тетрадей</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "МОЛОДОЙ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "МОЛОДОЙ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание E60EB4"
+  },
+  {
+   "v": 1,
+   "id": "fipi:890AB3",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 18,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку</b> и запишите слово правильно.</p><p>МОКЛА под дождём</p><p>пить чай с ПОВИДЛОЙ</p><p>из жарких ПУСТЫНЬ</p><p>все ДИРЕКТОРА школ</p><p>у ДЕВЯТИСОТ жителей</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПОВИДЛОМ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПОВИДЛОМ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 890AB3"
+  },
+  {
+   "v": 1,
+   "id": "fipi:B1C91E",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 19,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>ЛЯЖЬТЕ на спину</p><p>в ПОЛУТОРА метрах</p><p>пара САПОГ</p><p>ШЕСТЬЮСТАМИ учебниками</p><p>отряд ПАРТИЗАН</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ЛЯГТЕ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ЛЯГТЕ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание B1C91E"
+  },
+  {
+   "v": 1,
+   "id": "fipi:187C1A",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 20,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>и запишите слово правильно.</p><p>ПРИОБРЁВ мебель</p><p>ДИРЕКТОРА школ</p><p>КЛАДИ в сумку</p><p>нет СПЛЕТЕН</p><p>ИСПЕКИ пирог</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПРИОБРЕТЯ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПРИОБРЕТЯ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 187C1A"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2B1518",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 21,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена грамматическая ошибка. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>ПОСКОЛЬЗНУЛСЯ и упал</p><p>две пары ТУФЛЕЙ</p><p>не купил АНАНАСОВ</p><p>РАСТУЩЕЕ алоэ</p><p>собрались все ТРЕНЕРЫ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ТУФЕЛЬ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ТУФЕЛЬ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 2B1518"
+  },
+  {
+   "v": 1,
+   "id": "fipi:D05218",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 22,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>СОЖЖЁШЬ бумагу</p><p>килограмм ЯБЛОКОВ</p><p>в ТЫСЯЧА пятидесятом году</p><p>опытные РЕДАКТОРЫ</p><p>более МОЛОДОЙ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ЯБЛОК",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ЯБЛОК"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание D05218"
+  },
+  {
+   "v": 1,
+   "id": "fipi:56EC13",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 23,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>НЕЛЕПЕЙШИЙ наряд</p><p>ПРИЕЗЖАЙТЕ завтра</p><p>пачка МАКАРОН</p><p>в ДВУХТЫСЯЧНОМ году</p><p>без ЗНАМЯ полка</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ЗНАМЕНИ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ЗНАМЕНИ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 56EC13"
+  },
+  {
+   "v": 1,
+   "id": "fipi:A42414",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 24,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку</b> и запишите слово правильно.</p><p>пара САПОГ</p><p>ПОЕЗЖАЙ домой</p><p>НАИБОЛЬШЕ красивый</p><p>две СЕДЬМЫХ</p><p>нет ПОЛУТОРА метров</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "НАИБОЛЕЕ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "НАИБОЛЕЕ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание A42414"
+  },
+  {
+   "v": 1,
+   "id": "fipi:98BE1B",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 25,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>нет ПОЛУТОРАСТА рублей</p><p>рота СОЛДАТОВ</p><p>НАПОИ меня водой</p><p>ДЕВЯТИСОТ девяноста девяти тетрадей</p><p>ЗАЕЗЖАЙ завтра</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "СОЛДАТ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "СОЛДАТ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 98BE1B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:617D1E",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 26,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>ПОЕЗЖАЙТЕ вперёд</p><p>нет ТУФЕЛЬ</p><p>по ОБОИМ сторонам</p><p>звучит не менее ГРОМКО</p><p>опытные ТРЕНЕРЫ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ОБЕИМ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ОБЕИМ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 617D1E"
+  },
+  {
+   "v": 1,
+   "id": "fipi:F26529",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 27,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>более ТРЁХСОТ книг</p><p>пять ЯБЛОК</p><p>подобно ЕМУ</p><p>у ЗНАМЕНИ полка</p><p>КРАСИВШЕ других</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "КРАСИВЕЕ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "КРАСИВЕЕ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание F26529"
+  },
+  {
+   "v": 1,
+   "id": "fipi:41D6D8",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 28,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>самый МОЛОДОЙ сотрудник</p><p>следы на СНЕГУ</p><p>он более УГРЮМЕЕ</p><p>много спелых ВИШЕН</p><p>нет ЗАМОРОЗКОВ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "УГРЮМЫЙ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "УГРЮМЫЙ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 41D6D8"
+  },
+  {
+   "v": 1,
+   "id": "fipi:C542DC",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 29,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>мало ВРЕМЯ</p><p>около ПЯТИСОТ человек</p><p>нет ТУФЕЛЬ</p><p>много ВАФЕЛЬ</p><p>ПОПРОБУЕМ помочь</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ВРЕМЕНИ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ВРЕМЕНИ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание C542DC"
+  },
+  {
+   "v": 1,
+   "id": "fipi:F43551",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 30,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена грамматическая ошибка. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>нет пары ТУФЛЕЙ</p><p>ОБЕРНУВШИСЬ к залу</p><p>ВКУСНОЕ повидло</p><p>ЧИТАЕМАЯ книга</p><p>около ПОЛУТОРА метров</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ТУФЕЛЬ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ТУФЕЛЬ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание F43551"
+  },
+  {
+   "v": 1,
+   "id": "fipi:FE285C",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 31,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><div>1)<p>ЛЯЖЬТЕ на спину</p></div><div>2)<p>в ПОЛУТОРА километрах</p></div><div>3)<p>ПОДСТРИГЛИ куст</p></div><div>4)<p>в ОДНОЙ кроссовке</p></div><div>5)<p>выдать ДВУМСТАМ сотрудникам</p></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ЛЯГТЕ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ЛЯГТЕ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание FE285C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:B95F57",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 32,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>открытие ЯРМАРОК</p><p>прошло ПОЛТОРА месяца</p><p>прыгал более ВЫСОКО</p><p>детских РУЧОНОК</p><p>пара БОТИНКОВ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "БОТИНОК",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "БОТИНОК"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание B95F57"
+  },
+  {
+   "v": 1,
+   "id": "fipi:18355B",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 33,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена грамматическая ошибка. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>ЛЯГТЕ поудобнее</p><p>на ширине ПЛЕЧЕЙ</p><p>много АПЕЛЬСИНОВ</p><p>работаете в СОЧИ</p><p>больной МОЗОЛЬЮ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПЛЕЧ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПЛЕЧ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 18355B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5C0D5E",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 34,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>детские ДОКТОРА</p><p>БЛИЖАЙШАЯ станция</p><p>урожай ПОМИДОРОВ</p><p>у наших ВОРОТ</p><p>нет ПОЛТОРАСТА рублей</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПОЛУТОРАСТА",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПОЛУТОРАСТА"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 5C0D5E"
+  },
+  {
+   "v": 1,
+   "id": "fipi:99D255",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 35,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>крыжовник более СПЕЛЫЙ</p><p>ПЯТИДЕСЯТИ СЕМИ заявлений</p><p>нет ТУФЕЛЬ</p><p>языки ПЛАМЕНИ</p><p>ВЫЕДЬ пораньше</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ВЫЕЗЖАЙ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ВЫЕЗЖАЙ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 99D255"
+  },
+  {
+   "v": 1,
+   "id": "fipi:6C3050",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 36,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>ПОПРОБУЕМ решить</p><p>ПОЛОЖИ на стол</p><p>ТРЁХСТАМИ дисками</p><p>много СВАДЕБ</p><p>голос более ЗВУЧНЫЙ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ТРЕМЯСТАМИ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ТРЕМЯСТАМИ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 6C3050"
+  },
+  {
+   "v": 1,
+   "id": "fipi:69CA59",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 37,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>с ОБЕИМИ подругами</p><p>ПОЕЗЖАЙ в Подмосковье</p><p>свыше СТА километров</p><p>несколько ПРЕТЕНЗИЙ</p><p>ПРОМОКНУЛ до нитки</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПРОМОК",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПРОМОК"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 69CA59"
+  },
+  {
+   "v": 1,
+   "id": "fipi:848e52",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 38,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><div>1)<p>ребёнок ОКРЕП</p></div><div>2)<p>в ОБОИХ стёклах</p></div><div>3)<p>городские АДРЕСЫ</p></div><div>4)<p>нет ДЫНЬ</p></div><div>5)<p>дождаться ЗАМОРОЗКОВ</p></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "АДРЕСА",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "АДРЕСА"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 848e52"
+  },
+  {
+   "v": 1,
+   "id": "fipi:4B38A8",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 39,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>с ПЯТЬЮДЕСЯТЬЮ двумя тетрадями</p><p>БОГАЧЕ всех</p><p>ДЕВЯТИСОТ девяноста девяти экземпляров</p><p>более ДВЕ тысяч человек</p><p>несколько ПЛАТЬЕВ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ДВУХ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ДВУХ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 4B38A8"
+  },
+  {
+   "v": 1,
+   "id": "fipi:729EAA",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 40,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>много СВАДЕБ</p><p>в романах Александра ДЮМА</p><p>нет ТУФЕЛЬ</p><p>удобная КРОССОВКА</p><p>нет БОТИНКОВ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "БОТИНОК",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "БОТИНОК"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 729EAA"
+  },
+  {
+   "v": 1,
+   "id": "fipi:A704Ae",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 41,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><div>1)<p>ребёнок ОКРЕП</p></div><div>2)<p>в ОБЕИХ стёклах</p></div><div>3)<p>городские АДРЕСА</p></div><div>4)<p>нет ДЫНЬ</p></div><div>5)<p>дождаться ЗАМОРОЗКОВ</p></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ОБОИХ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ОБОИХ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание A704Ae"
+  },
+  {
+   "v": 1,
+   "id": "fipi:FB76CB",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 42,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>около ШЕСТИСОТ рублей</p><p>модных САПОГОВ</p><p>ДЕВЯТЬЮСТАМИ отдыхающими</p><p>нет ТУФЕЛЬ</p><p>уважаемые ПРОФЕССОРА</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "САПОГ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "САПОГ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание FB76CB"
+  },
+  {
+   "v": 1,
+   "id": "fipi:74EFC9",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 43,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>ЧЕТВЕРО студентов</p><p>постоянно КЛАДЁТ на стол</p><p>отдых в СОЧИ</p><p>ШЕСТИСТАМИ книгами</p><p>разговор ОТКРОВЕНЕН</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ШЕСТЬЮСТАМИ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ШЕСТЬЮСТАМИ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 74EFC9"
+  },
+  {
+   "v": 1,
+   "id": "fipi:20ECC0",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 44,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку</b> и запишите слово правильно.</p><p>ЕЗДЯТ по городам</p><p>молодые БУХГАЛТЕРА</p><p>пара НОСКОВ</p><p>напротив НЕГО</p><p>килограмм ВАФЕЛЬ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "БУХГАЛТЕРЫ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "БУХГАЛТЕРЫ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 20ECC0"
+  },
+  {
+   "v": 1,
+   "id": "fipi:86D4CC",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 45,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>у ИХ знакомых</p><p>скоро ВЫЗДОРОВЕЕШЬ</p><p>все ПОВАРÁ</p><p>ЕДЬ вперёд</p><p>с СЕМЬЮ тысячами</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПОЕЗЖАЙ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПОЕЗЖАЙ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 86D4CC"
+  },
+  {
+   "v": 1,
+   "id": "fipi:730999",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 46,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>около ШЕСТИСТА рублей</p><p>подбросить УГЛЕЙ в костёр</p><p>мало ВРЕМЕНИ</p><p>ЛЕГЧЕ всего выполнить</p><p>нет ТУФЕЛЬ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ШЕСТИСОТ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ШЕСТИСОТ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 730999"
+  },
+  {
+   "v": 1,
+   "id": "fipi:D8BE94",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 47,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>отдыхал в СОЧИ</p><p>ПОПРОБОВАЕМ решить</p><p>разговор ОТКРОВЕНЕН</p><p>СЖЁГШИЙ рукопись</p><p>ПОЕЗЖАЙТЕ вперёд</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПОПРОБУЕМ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПОПРОБУЕМ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание D8BE94"
+  },
+  {
+   "v": 1,
+   "id": "fipi:93AE9E",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 48,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>ЗАЕХАЙ завтра</p><p>ДЛИННЕЕ перрона</p><p>РАЗОЖЖЁТ огонь</p><p>нет БОТИНОК</p><p>нет ТУФЕЛЬ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ЗАЕЗЖАЙ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ЗАЕЗЖАЙ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 93AE9E"
+  },
+  {
+   "v": 1,
+   "id": "fipi:3F1F92",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 49,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>и запишите слово правильно.</p><p>профессиональные ДОКТОРА</p><p>около ДВУХСОТ человек</p><p>нет ТУФЕЛЬ</p><p>пел ГРОМЧЕ</p><p>в ПЯТИСТА километрах</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПЯТИСТАХ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПЯТИСТАХ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 3F1F92"
+  },
+  {
+   "v": 1,
+   "id": "fipi:0BB6E7",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 50,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>банка ТОМАТОВ</p><p>ПРИВЕДШИЙ к победе</p><p>БЕСЕДУЮ с коллегой</p><p>спортсмены БЕЖАТ</p><p>ягоды СПЕЛЫ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "БЕГУТ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "БЕГУТ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 0BB6E7"
+  },
+  {
+   "v": 1,
+   "id": "fipi:09D8E7",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 51,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>и запишите слово правильно.</p><p>с ПЯТЬЮДЕСЯТЬЮ двумя тетрадями</p><p>БОГАЧЕ всех</p><p>связка БАНАНОВ</p><p>более ДВЕ тысяч человек</p><p>несколько ПЛАТЬЕВ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ДВУХ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ДВУХ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 09D8E7"
+  },
+  {
+   "v": 1,
+   "id": "fipi:7D35EA",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 52,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>в ТРЁХСТАХ экземплярах</p><p>воздержаться от КОММЕНТАРИЕВ</p><p>более РЕШИТЕЛЬНЫЙ, чем другие</p><p>СЕМЬЮДЕСЯТЬЮ процентами</p><p>ЛЯЖЬТЕ на пол</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ЛЯГТЕ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ЛЯГТЕ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 7D35EA"
+  },
+  {
+   "v": 1,
+   "id": "fipi:B3DAe9",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 53,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена грамматическая ошибка. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>к ДВЕ тысячи пятнадцатому году</p><p>СЪЕЗДИЙ на дачу</p><p>ДВУМСТАМ школьникам</p><p>пять ВАФЕЛЬ</p><p>встреча МАТРОСОВ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "СЪЕЗДИ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "СЪЕЗДИ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание B3DAe9"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2850E4",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 54,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>ТРОЕ друзей</p><p>выглядел МОЛОДЕЕ</p><p>более СЕМИСОТ человек</p><p>в ДВЕ тысячи пятом году</p><p>ТОНЬШЕ нитки</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "МОЛОЖЕ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "МОЛОЖЕ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 2850E4"
+  },
+  {
+   "v": 1,
+   "id": "fipi:DD4AE3",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 55,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>ИСПЕКЁТ пирожок</p><p>ОБОИМИ столами</p><p>известные КОНСТРУКТОРЫ</p><p>СКОРЕЙШЕГО выздоровления</p><p>КОЛЫШЕТСЯ листва</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ИСПЕЧЁТ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ИСПЕЧЁТ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание DD4AE3"
+  },
+  {
+   "v": 1,
+   "id": "fipi:E97CE0",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 56,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>около ПОЛУТОРА часов</p><p>значение ИМЕНИ</p><p>выглядел более УГРЮМО</p><p>много ЯБЛОКОВ</p><p>нет ТУФЕЛЬ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ЯБЛОК",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ЯБЛОК"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание E97CE0"
+  },
+  {
+   "v": 1,
+   "id": "fipi:ECF2E7",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 57,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>нет ТУФЕЛЬ</p><p>смотрится намного КРАСИВЕЕ</p><p>ПРОМОК до нитки</p><p>в ШКАФЕ</p><p>килограмм ЯБЛОК</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ШКАФУ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ШКАФУ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание ECF2E7"
+  },
+  {
+   "v": 1,
+   "id": "fipi:E7D8E1",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 58,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>почти в СТА странах</p><p>несколько АБЗАЦЕВ</p><p>НАПОИ меня водой</p><p>навстречу ИМ</p><p>СОЖГЁШЬ письмо</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "СОЖЖЁШЬ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "СОЖЖЁШЬ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание E7D8E1"
+  },
+  {
+   "v": 1,
+   "id": "fipi:3282E5",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 59,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>и запишите слово правильно.</p><p>прыгал более ВЫШЕ</p><p>ящик АБРИКОСОВ</p><p>уважаемые ДОКТОРА</p><p>ПЯТИСОТЫЙ заказ</p><p>ПОЛОЖИ на место</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ВЫСОКО",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ВЫСОКО"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 3282E5"
+  },
+  {
+   "v": 1,
+   "id": "fipi:F5ED6D",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 60,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>наперекор НЕМУ</p><p>модных САПОГ</p><p>КРАСИВЕЕ всех</p><p>около ста СЕМИДЕСЯТИ</p><p>в романах Александра ДЮМА</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ЕМУ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ЕМУ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание F5ED6D"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2BD565",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 61,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>с ДВУМЯСТАМИ тоннами</p><p>ПОПРОБУЕМ помочь</p><p>нет ВРЕМЕНИ</p><p>голос более ЗВУЧНЕЕ</p><p>медицинские ПОЛИСЫ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ЗВУЧНЫЙ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ЗВУЧНЫЙ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 2BD565"
+  },
+  {
+   "v": 1,
+   "id": "fipi:84916e",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 62,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><div>1)<p>у ДЕВЯНОСТА восьми фирм</p></div><div>2)<p>наши ШОФЁРЫ</p></div><div>3)<p>пользоваться ШАМПУНЕМ</p></div><div>4)<p>наиболее УМНОГО ребёнка</p></div><div>5)<p>ЕХАЙТЕ в лагерь</p></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПОЕЗЖАЙТЕ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПОЕЗЖАЙТЕ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 84916e"
+  },
+  {
+   "v": 1,
+   "id": "fipi:F05133",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 63,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку</b> и запишите слово правильно.</p><p>более ПОЛУТОРА часов</p><p>МЯГЧАЙШИЙ зефир</p><p>в ДВУХ тысячи десятом году</p><p>воспользоваться АЭРОЗОЛЕМ</p><p>строгие ДИРЕКТОРА</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ДВЕ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ДВЕ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание F05133"
+  },
+  {
+   "v": 1,
+   "id": "fipi:7C773B",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 64,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>ЕХАЙ прямо</p><p>нет ТУФЕЛЬ</p><p>СЛАДЧАЙШИЙ виноград</p><p>КРАСИВЕЕ других</p><p>с ПОЛУТОРАСТА тысячами людей</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПОЕЗЖАЙ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПОЕЗЖАЙ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 7C773B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:27713B",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 65,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена грамматическая ошибка. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>несколько ПОЛОТЕНЕЦ</p><p>ВЫИГРАВШИЙСЯ приз</p><p>в ОБОИХ примерах</p><p>ЕЗДИТЕ аккуратно</p><p>ЗАБАВНЫЙ шимпанзе</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ВЫИГРАВШИЙ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ВЫИГРАВШИЙ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 27713B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2AD233",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 66,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>ПОПРОБУЕМ решить</p><p>это более ВАЖНО</p><p>свежие ТОРТА</p><p>ПЯТИСОТЫЙ заказ</p><p>нет ТУФЕЛЬ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ТОРТЫ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ТОРТЫ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 2AD233"
+  },
+  {
+   "v": 1,
+   "id": "fipi:810334",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 67,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>навстречу ЕЙ</p><p>ПОЕЗЖАЙТЕ</p><p>ВЗГЛЯНИ на картину</p><p>более ШЕСТИСТА лет</p><p>нет ТУФЕЛЬ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ШЕСТИСОТ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ШЕСТИСОТ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 810334"
+  },
+  {
+   "v": 1,
+   "id": "fipi:F61987",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 68,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>много ПЛАТИЙ</p><p>ИХ друзья</p><p>золочёные КУПОЛА</p><p>нарисовал КРАСИВЕЕ</p><p>модных ДЖИНСОВ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ПЛАТЬЕВ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ПЛАТЬЕВ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание F61987"
+  },
+  {
+   "v": 1,
+   "id": "fipi:521887",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 69,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>он более УГРЮМЕЕ</p><p>с ДЕВЯНОСТА тетрадями</p><p>ГЛОЖУТ сомнения</p><p>много спелых ВИШЕН</p><p>до ДВЕ тысячи пятого года</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "УГРЮМЫЙ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "УГРЮМЫЙ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 521887"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5CFD83",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 70,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>в ТРЁХСТА книгах</p><p>нет ТУФЕЛЬ</p><p>ЖЁСТЧЕ дерева</p><p>ЧЕТЫРЁМСТАМ ученикам</p><p>крыжовник СПЕЛ</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ТРЁХСТАХ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ТРЁХСТАХ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 5CFD83"
+  },
+  {
+   "v": 1,
+   "id": "fipi:A7C780",
+   "exam": "rus_ege",
+   "slug": "rus_ege_n7",
+   "n": 7,
+   "proto": "all",
+   "pos": 71,
+   "math": "html",
+   "text": "<p>В одном из выделенных ниже слов допущена ошибка в образовании формы слова. <b>Исправьте ошибку </b>изапишите слово правильно.</p><p>нет САПОГ</p><p>ТРОЕ друзей</p><p>по ИХНИМ расчётам</p><p>около СТА семидесяти</p><p>свыше ДВУХСОТ шестидесяти тысяч</p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ИХ",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ИХ"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание A7C780"
+  }
+ ]
+}

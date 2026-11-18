@@ -44,11 +44,12 @@ def check(n, c, x=""):
 def main():
     errors = []
     from tools.cards import validate, build
+    from tools.cards.split import load_page, canon
     rc = validate.main([])
     check("1 валидатор зелёный", rc == 0)
     cards = {}
     for slug, total in SLUGS.items():
-        cards[slug] = json.load(open(os.path.join(HERE, "cards", slug + ".json"), encoding="utf-8"))
+        cards[slug] = load_page(slug)   # soc_ege_long лежит частями по номерам (split.py)
         n = len(cards[slug]["cards"])
         check(f"1 {slug}: {n} карточек из {total}", n == total - SKIP_OK[slug], str(n))
         check(f"1 {slug}: не partial", not cards[slug].get("partial"))
@@ -61,9 +62,9 @@ def main():
         r = subprocess.run([sys.executable, os.path.join(HERE, "tools", "cards", "build.py"), "--family", "c_soc_ege", "--out", tmp],
                            cwd=HERE, capture_output=True, text=True, timeout=900)
         for slug in SLUGS:
-            a = open(os.path.join(tmp, slug + ".json"), "rb").read()
-            b = open(os.path.join(HERE, "cards", slug + ".json"), "rb").read()
-            check(f"2 {slug}: свежая сборка = cards/{slug}.json", a == b, r.stdout[-600:] + r.stderr[-600:])
+            a = canon(json.load(open(os.path.join(tmp, slug + ".json"), encoding="utf-8"))["cards"])
+            b = canon(load_page(slug)["cards"])   # части: slug карточки другой, остальное — как у сборки
+            check(f"2 {slug}: свежая сборка = cards/{slug}*.json", a == b, r.stdout[-600:] + r.stderr[-600:])
             ok, why = dircmp_equal(os.path.join(tmp, "img", slug), os.path.join(HERE, "cards", "img", slug)) \
                 if os.path.isdir(os.path.join(tmp, "img", slug)) else (False, "нет img")
             check(f"2 {slug}: рисунки свежей сборки = cards/img/{slug}", ok, why)

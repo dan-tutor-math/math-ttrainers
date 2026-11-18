@@ -67,14 +67,24 @@ function a_figsMarkup(root){
 # Раскладка таблиц в живом узле страницы (в кадре harness). Возвращает
 # {cellFig: n} — сколько таблиц с данными держат рисунок в ячейке.
 _PREP_JS = r"""
-([sel, hide]) => {
+async ([sel, hide, inline]) => {
   """ + _MARKUP_JS + r"""
   const d = document.getElementById('f').contentWindow.document;
   const root = d.querySelector(sel);
   if (!root) return { err: 'нет узла ' + sel };
   a_figsMarkup(root);
   // строчный рисунок ФИПИ (обозначение ABC картинкой посреди фразы): карточка ставит
-  // любой рисунок блоком — фраза рвётся, вид не совпадает с живым заданием
+  // любой рисунок блоком — фраза рвётся. Известные картинки (INLINE_TEXT: узнаём по sha1
+  // файла) заменяем текстом — буквы курсивом, как в задании; неизвестная — отказ ниже
+  for (const im of [...root.querySelectorAll('img.fipi-inline')]) {
+    const buf = await (await fetch(im.src)).arrayBuffer();
+    const h = [...new Uint8Array(await crypto.subtle.digest('SHA-1', buf))].map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 10);
+    const t = inline[h];
+    if (!t) continue;
+    const e = d.createElement(t.i ? 'i' : 'span');
+    e.textContent = t.s;
+    im.replaceWith(e);
+  }
   if (root.querySelector('img.fipi-inline')) return { inlineFig: true };
   (hide || []).forEach(s => root.querySelectorAll(s).forEach(x => { x.style.display = 'none'; }));
   const media = 'img,canvas,svg';
@@ -186,8 +196,22 @@ _GRAB_STORY_JS = r"""
 """
 
 
+# Строчные картинки ОГЭ №18 (клетчатая бумага): GIF 31–43 × 18–21 px с обозначением посреди фразы
+# («треугольник ABC», «отрезок BM», «размер клетки 1 × 1»). Шесть разных файлов на 58 вхождений в
+# 25 заданиях; прочитаны глазами (увеличенные, на белом фоне), ключ — первые 10 знаков sha1 файла.
+# Новая картинка, которой здесь нет, — по-прежнему отказ в отчёте: схема не знает вида «в строке»
+INLINE_TEXT = {
+    "4572eb7a6b": {"s": "ABC", "i": True},
+    "82d1fef9c4": {"s": "BM", "i": True},
+    "35e3fed226": {"s": "CM", "i": True},
+    "626aceb751": {"s": "AM", "i": True},
+    "1c3b1e6dde": {"s": "AB", "i": True},
+    "90a4d7a943": {"s": "1 \u00d7 1", "i": False},
+}
+
+
 def _prep(page, sel, hide=None):
-    r = page.evaluate(_PREP_JS, [sel, hide or []])
+    r = page.evaluate(_PREP_JS, [sel, hide or [], INLINE_TEXT])
     if r.get("err"):
         raise Skip(r["err"])
     if r.get("inlineFig"):

@@ -67,7 +67,8 @@ def squash(s):
 
 
 def load(slug):
-    return json.load(open(os.path.join(HERE, "cards", slug + ".json"), encoding="utf-8"))
+    from tools.cards.split import load_page   # rus_oge / rus_ege лежат частями по номерам (split.py)
+    return load_page(slug)
 
 
 def skips(slug):
@@ -192,9 +193,10 @@ def main():
             args += ["--slug", s]
         r = subprocess.run(args, cwd=HERE, capture_output=True, text=True, timeout=900)
         for s in ("oge18", "oge19", "rus_oge01", "rus_oge13"):
-            a = open(os.path.join(tmp, s + ".json"), "rb").read()
-            b = open(os.path.join(HERE, "cards", s + ".json"), "rb").read()
-            check(f"3 {s}: свежая полная сборка = cards/{s}.json", a == b)
+            from tools.cards.split import canon
+            a = canon(json.load(open(os.path.join(tmp, s + ".json"), encoding="utf-8"))["cards"])
+            b = canon(load(s)["cards"])
+            check(f"3 {s}: свежая полная сборка = cards/{s}*.json", a == b)
     check("6 нет ошибок JavaScript", not errors, "; ".join(errors[:5]))
     print("готово" if not FAILS else f"ПРОВАЛЕНО: {len(FAILS)}")
     sys.exit(1 if FAILS else 0)

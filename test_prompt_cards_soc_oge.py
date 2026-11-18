@@ -1,5 +1,5 @@
 """
-Задача 63, S2c1: карточки ФИПИ — обществознание ОГЭ (cards/soc_oge.json (№1–16) и cards/soc_oge_text.json (№18–21), семья c_soc_oge).
+Задача 63, S2c1: карточки ФИПИ — обществознание ОГЭ (cards/soc_oge_n1…n21.json по номерам + cards/index.json; build.py отдаёт soc_oge №1–16 и soc_oge_text №18–21, их режет split.py; семья c_soc_oge).
 
   1. валидатор tools/cards/validate.py зелёный;
   2. карточек столько, сколько заданий ФИПИ в каталоге страницы (по номерам 1–21), id не
@@ -38,21 +38,21 @@ def main():
     errors = []
     from tools.cards import validate
     check("1 валидатор зелёный", validate.main([]) == 0)
-    cards, parts = [], {}
-    for slug in ("soc_oge", "soc_oge_text"):
-        with open(os.path.join(HERE, "cards", slug + ".json"), encoding="utf-8") as fh:
-            parts[slug] = json.load(fh)
-        cards += parts[slug]["cards"]
-    check("2 два файла: №1–16 и №18–21, slug карточки = файл",
-          {c["n"] for c in parts["soc_oge"]["cards"]} <= set(range(1, 17)) and {c["n"] for c in parts["soc_oge_text"]["cards"]} == {18, 19, 20, 21}
-          and all(c["slug"] == s for s, d in parts.items() for c in d["cards"]))
-    check("2 каждый файл до ~3 МБ", all(os.path.getsize(os.path.join(HERE, "cards", s + ".json")) < 3.3 * 1024 * 1024 for s in parts))
-    data = parts["soc_oge"]
+    # страница разбита по номерам (tools/cards/split.py): soc_oge_n1…n21, список — cards/index.json
+    from tools.cards.split import load_page, canon
+    page = load_page("soc_oge")
+    cards = page["cards"]
+    parts = ("soc_oge", "soc_oge_text")   # файлы, которые отдаёт build.py (сборка до разбиения)
+    idx = json.load(open(os.path.join(HERE, "cards", "index.json"), encoding="utf-8"))["pages"]["soc_oge"]
+    check("2 части по номерам: №1–16 и №18–21, slug карточки = файл части",
+          [p["n"] for p in idx] == [[n] for n in list(range(1, 17)) + [18, 19, 20, 21]]
+          and all(c["slug"] == "soc_oge_n%d" % c["n"] for c in cards))
+    check("2 каждая часть до 1,2 МБ (сжатый размер проверяет validate.py)", all(os.path.getsize(os.path.join(HERE, "cards", p["slug"] + ".json")) < 1.2 * 1024 * 1024 for p in idx))
     byn = {}
     for c in cards:
         byn.setdefault(c["n"], []).append(c)
     check("2 id не повторяются", len({c["id"] for c in cards}) == len(cards))
-    check("2 файлы — не пилот", not any(d.get("partial") for d in parts.values()))
+    check("2 файлы — не пилот", not page.get("partial"))
 
     # 3. свежая сборка (подмножество) = лежащая
     with tempfile.TemporaryDirectory() as tmp:
@@ -60,8 +60,8 @@ def main():
                             "--limit", "63", "--out", tmp], cwd=HERE, capture_output=True, text=True, timeout=900)
         check("3 сборка прошла без необработанных", r.returncode == 0, r.stdout[-800:] + r.stderr[-800:])
         fresh = [c for sl in parts for c in json.load(open(os.path.join(tmp, sl + ".json"), encoding="utf-8"))["cards"]]
-        mine = {c["id"]: c for c in cards}
-        diff = [c["id"] for c in fresh if mine.get(c["id"]) != c]
+        mine = canon(cards)   # slug у частей свой, остальное — байт в байт
+        diff = [c["id"] for c in fresh if mine.get(c["id"]) != canon([c])[c["id"]]]
         check(f"3 свежих {len(fresh)}, все как в лежащих файлах", fresh and not diff, str(diff[:5]))
         bad = []
         for c in fresh:
@@ -173,7 +173,7 @@ def main():
         check("5 у коротких нет критериев и «long»", all(c["answer"]["kind"] in ("fields", "choice", "multi") and not c["answer"].get("criteria") for c in cards if c["answer"]["kind"] != "long"))
         # 6. предпросмотр
         shown = 0
-        for sl in parts:
+        for sl in ("soc_oge",):   # slug страницы: предпросмотр собирает её из частей по index.json
             pv = br.new_page()
             pv.on("pageerror", lambda e: errors.append(str(e)))
             pv.goto(f"{BASE}/tools/cards/preview.html?slug={sl}&answer=1&solution=1")

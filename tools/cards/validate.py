@@ -15,9 +15,13 @@
 - ответ — тот же, что умеет проверить work.html: поля известных видов,
   choice/multi с номерами в пределах n, число вариантов = n;
 - текста интерфейса нет («Проверить», «Источник:», «Показать решение»…);
-- id карточек не повторяются между файлами; лишних файлов в cards/img нет.
+- id карточек не повторяются между файлами; лишних файлов в cards/img нет;
+- cards/index.json (части страниц, tools/cards/split.py): каждая часть есть, её номера
+  совпали с номерами карточек в файле, id не повторяются по всей странице, часть не
+  тяжелее LIMIT_GZ (в сжатом виде) — иначе страницу надо разбить по номеру.
 """
 import glob
+import gzip
 import json
 import os
 import re
@@ -27,6 +31,8 @@ from html.parser import HTMLParser
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 CARDS = os.path.join(ROOT, "cards")
+INDEX = os.path.join(CARDS, "index.json")
+LIMIT_GZ = 300 * 1024    # часть файла страницы тяжелее (в сжатом виде) — страницу надо резать по номеру (split.py режет с запасом, от 250 КБ)
 with open(os.path.join(CARDS, "_schema.json"), encoding="utf-8") as _f:
     SCHEMA = json.load(_f)
 
@@ -34,6 +40,7 @@ TAGS = {"b", "strong", "i", "em", "u", "s", "sub", "sup", "br", "p", "div", "spa
 CLASSES = {"c-eq", "c-frac", "c-num", "c-den", "c-op", "c-line"}
 UI_WORDS = ["Проверить", "Показать решение", "Источник:", "В подборку", "Ответить", "Следующий шаг",
             "Изменить ответ", "Следующее задание", "отметьте", "Отметьте", "нажмите", "Нажмите"]
+SENTENCE_WORDS = {"Проверить", "Ответить"}    # встречаются в самих заданиях русского языка: бьём только отдельным узлом
 FIELD_TYPES = {"plain", "num", "nums", "set", "yesno", "pairs", "word", "term"}
 
 
@@ -133,7 +140,15 @@ def html_errors(src, where, math):
     for w in UI_WORDS:
         # «Следующий шаг» — подпись кнопки, а не фраза в середине предложения (в тексте ФИПИ
         # №17–20 обществознания: «Следующий шаг – выявление специфики…»): только целиком в узле
-        hit = re.search(r"(^|>)\s*Следующий шаг\s*(<|$)", text) if w == "Следующий шаг" else w in text
+        if w == "Следующий шаг":
+            hit = re.search(r"(^|>)\s*Следующий шаг\s*(<|$)", text)
+        elif w in SENTENCE_WORDS:
+            # то же для глаголов, которые бывают и в тексте задания («(15)Ответить на это сложнее» —
+            # абзац сочинения ЕГЭ, «Проверить горизонтальность пола по уровню» — пример в словарной
+            # статье): подпись кнопки — это весь текстовый узел, а не слово посреди фразы
+            hit = any(c.strip(" \u00a0.:!") == w for c in p.text)
+        else:
+            hit = w in text
         if hit:
             errs.append(f"{where}: текст интерфейса «{w}»")
     return errs
@@ -235,16 +250,63 @@ def check_file(path, seen):
             errs.append(f"{c.get('id')}: id уже есть в {seen[c['id']]}")
         seen[c.get("id")] = name
         files |= {f["file"] for f in c.get("figs", [])}
-    img_dir = os.path.join(CARDS, "img", name)
-    if os.path.isdir(img_dir):
-        for fn in sorted(os.listdir(img_dir)):
-            if f"img/{name}/{fn}" not in files:
-                errs.append(f"{name}: файл img/{name}/{fn} не нужен ни одной карточке")
+    # лишние рисунки ищет main по всем файлам сразу: у разбитой страницы рисунки
+    # лежат в img/<страница>/, а карточки — в частях <страница>_n<N>
+    USED_FIGS.update(files)
     return errs, len(d.get("cards", []))
 
 
+USED_FIGS = set()
+
+
+def check_index(paths):
+    """cards/index.json и части страниц; лишние файлы в cards/img."""
+    errs = []
+    if os.path.isfile(INDEX):
+        with open(INDEX, encoding="utf-8") as fh:
+            idx = json.load(fh)
+        if idx.get("v") != 1 or not isinstance(idx.get("pages"), dict):
+            errs.append("index.json: нужен вид {v: 1, pages: {страница: [{slug, n}]}}")
+            idx = {"pages": {}}
+        for page, parts in idx["pages"].items():
+            ids = {}
+            for part in parts:
+                slug, ns = part.get("slug"), part.get("n")
+                path = os.path.join(CARDS, f"{slug}.json")
+                if not os.path.isfile(path):
+                    errs.append(f"index.json: {page}: части {slug} нет в cards/")
+                    continue
+                with open(path, encoding="utf-8") as fh:
+                    d = json.load(fh)
+                got = sorted({c.get("n") for c in d.get("cards", [])})
+                if got != sorted(ns or []):
+                    errs.append(f"index.json: {slug}: номера {ns}, а в файле {got}")
+                for c in d.get("cards", []):
+                    if c["id"] in ids:
+                        errs.append(f"{page}: {c['id']} есть и в {ids[c['id']]}, и в {slug}")
+                    ids[c["id"]] = slug
+                if os.path.getsize(path) and len(gzip.compress(open(path, "rb").read(), 9)) > LIMIT_GZ:
+                    errs.append(f"{slug}: тяжелее {LIMIT_GZ // 1024} КБ в сжатом виде — режь страницу по номеру")
+    elif any(re.search(r"_n\d+\.json$", p) for p in paths):
+        errs.append("есть части *_n<N>.json, а cards/index.json нет (tools/cards/split.py)")
+    img = os.path.join(CARDS, "img")
+    if os.path.isdir(img) and not ARGV_PARTIAL:
+        for sub in sorted(os.listdir(img)):
+            d = os.path.join(img, sub)
+            if os.path.isdir(d):
+                for fn in sorted(os.listdir(d)):
+                    if f"img/{sub}/{fn}" not in USED_FIGS:
+                        errs.append(f"{sub}: файл img/{sub}/{fn} не нужен ни одной карточке")
+    return errs
+
+
+ARGV_PARTIAL = False
+
+
 def main(argv):
-    paths = argv or sorted(p for p in glob.glob(os.path.join(CARDS, "*.json")) if not os.path.basename(p).startswith("_"))
+    global ARGV_PARTIAL
+    ARGV_PARTIAL = bool(argv)    # проверка одного файла — лишние рисунки не ищем (остальных файлов не видно)
+    paths = argv or sorted(p for p in glob.glob(os.path.join(CARDS, "*.json")) if not os.path.basename(p).startswith("_") and os.path.basename(p) != "index.json")
     seen, bad, total = {}, 0, 0
     for p in paths:
         errs, n = check_file(p, seen)
@@ -253,6 +315,10 @@ def main(argv):
         for e in errs:
             print("  " + e)
         bad += len(errs)
+    errs = check_index(paths)
+    for e in errs:
+        print("  " + e)
+    bad += len(errs)
     print("готово" if not bad else f"ошибок: {bad}")
     return 1 if bad else 0
 

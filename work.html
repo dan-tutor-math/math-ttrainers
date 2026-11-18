@@ -1043,12 +1043,22 @@ function wireResize(rz, v, side){
 const CARD_MIN = 300;      // уже карточку не верстаем (как LIVE_MIN у кадра)
 const CARD_PH = 220;       // резерв высоты до загрузки карточки, в единицах карточки
 const cardFiles = new Map();   // slug → { p: Promise, byId: Map | null }
+function cardPages(slug){
+  return fetch('cards/index.json', { cache: 'no-cache' }).then(r => r.ok ? r.json() : null).then(ix => {
+    const parts = ix && ix.pages && ix.pages[slug];
+    if (!parts) return null;
+    return Promise.all(parts.map(p => fetch('cards/' + p.slug + '.json').then(r => r.json())))
+      .then(ds => ({ cards: [].concat(...ds.map(d => d.cards)) }));
+  }).catch(() => null);
+}
 function cardFile(slug){
   let f = cardFiles.get(slug);
   if (!f){
     f = { byId: null };
     f.p = fetch('cards/' + encodeURIComponent(slug) + '.json', { cache: 'no-cache' })
-      .then(r => { if (!r.ok) throw new Error('cards/' + slug + '.json: ' + r.status); return r.json(); })
+      // slug страницы, которую потом разбили на части (cards/index.json): блок, сделанный
+      // до разбиения, собираем из всех её частей; у новых блоков slug — сама часть
+      .then(r => r.ok ? r.json() : cardPages(slug).then(d => { if (!d) throw new Error('cards/' + slug + '.json: ' + r.status); return d; }))
       .then(d => {
         if (!d || !Array.isArray(d.cards)) throw new Error('cards/' + slug + '.json: нет карточек');
         f.byId = new Map(d.cards.map(c => [c.id, c]));

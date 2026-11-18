@@ -184,7 +184,13 @@
   const cardBase = () => (window.WorkPrint && window.WorkPrint.cardBase) || (BASE + 'cards/');
   function cardFile(slug) {
     const u = cardBase() + slug + '.json';
-    if (!CARD_FILES[u]) CARD_FILES[u] = fetch(u).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    // slug страницы, разбитой на части (cards/index.json): блок до разбиения собираем из всех частей
+    const pages = () => fetch(cardBase() + 'index.json').then(r => r.ok ? r.json() : null).then(ix => {
+      const parts = ix && ix.pages && ix.pages[slug];
+      return parts ? Promise.all(parts.map(p => fetch(cardBase() + p.slug + '.json').then(r => r.json())))
+        .then(ds => ({ cards: [].concat(...ds.map(d => d.cards)) })) : null;
+    });
+    if (!CARD_FILES[u]) CARD_FILES[u] = fetch(u).then(r => r.ok ? r.json() : pages().then(d => { if (!d) throw new Error('HTTP ' + r.status); return d; }))
       .catch(e => { delete CARD_FILES[u]; console.warn('[печать] нет файла карточек', u, e); return null; });
     return CARD_FILES[u];
   }

@@ -126,7 +126,8 @@ def run():
               str([x["tkey"] for x in s]))
         tot = sum(x["size"] for x in s)
         check("A6 вариант весит меньше 5 КБ (снимки были ~300 КБ на задание)", tot < 5000, str(tot))
-        check("A7 файл карточек — по одному запросу на страницу", sorted(cardreq) == ["ege_prof.json", "oge19.json", "oge9.json"], str(cardreq))
+        # index.json (список частей разбитых страниц, S7) — один запрос на сессию; сами страницы без разбиения — по файлу
+        check("A7 файл карточек — по одному запросу на страницу", sorted(x for x in cardreq if x != "index.json") == ["ege_prof.json", "oge19.json", "oge9.json"] and cardreq.count("index.json") <= 1, str(cardreq))
         pg.wait_for_function("() => document.querySelectorAll('#wkTasks .ti-card .cr').length === 6", timeout=15000)
         r = pg.evaluate("""() => { const c = [...document.querySelectorAll('#wkTasks .ti-card')];
           return { tex: !!c[4].querySelector('.katex'), txt: c[0].textContent, opts: c[1].querySelectorAll('.cr-opt').length, fig: !!c[4].querySelector('.cr-fig img'),

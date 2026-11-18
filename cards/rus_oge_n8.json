@@ -1,0 +1,3005 @@
+{
+ "v": 1,
+ "slug": "rus_oge_n8",
+ "exam": "rus_oge",
+ "family": "b_rus",
+ "src": {
+  "exam-spec.js": "f690d93f5a76b45620942c08a3ae7d9aa3661bc3",
+  "rus-oge-fipi.js": "d73f9e0b4b1efdb5642b771452deecea8f0b245b",
+  "rus_oge.html": "b93fecd2961a52baf35c4b1153e54e1ebfc3b10b"
+ },
+ "cards": [
+  {
+   "v": 1,
+   "id": "fipi:A07E4F",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 0,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«пламя»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Бледный язычок (пламя) костра светился в темноте.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "пламени",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "пламени"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание A07E4F"
+  },
+  {
+   "v": 1,
+   "id": "fipi:0D6CFB",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 1,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«абрикосы»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Для приготовления десерта понадобится банка консервированных (абрикосы).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "абрикосов",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "абрикосов"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 0D6CFB"
+  },
+  {
+   "v": 1,
+   "id": "fipi:9CE3F5",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 2,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«платье»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>В магазине представлен широкий выбор модных (платье) и костюмов.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "платьев",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "платьев"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 9CE3F5"
+  },
+  {
+   "v": 1,
+   "id": "fipi:9FDF00",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 3,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«носки»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Собираясь в поход, положите в рюкзак несколько пар запасных (носки).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "носков",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "носков"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 9FDF00"
+  },
+  {
+   "v": 1,
+   "id": "fipi:9C7608",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 4,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«бананы»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>В магазине мы купили связку (бананы).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "бананов",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "бананов"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 9C7608"
+  },
+  {
+   "v": 1,
+   "id": "fipi:C3A37F",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 5,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«месяц»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Летние (месяц): июнь, июль, август – самые тёплые в году.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "месяцы",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "месяцы"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание C3A37F"
+  },
+  {
+   "v": 1,
+   "id": "fipi:96F17B",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 6,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«Власов»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Мы с Пашей (Власов) прошлым летом вместе отдыхали в лагере.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "Власовым",
+      "alts": [
+       "власовым"
+      ],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "Власовым"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 96F17B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:E47B1E",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 7,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«сотня»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Исследование опирается на содержание нескольких (сотня) архивных документов.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "сотен",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "сотен"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание E47B1E"
+  },
+  {
+   "v": 1,
+   "id": "fipi:415D28",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 8,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«мускулы»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Бывает, что за лёгким движением лицевых (мускулы) скрывается множество различных эмоций.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "мускулов",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "мускулов"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 415D28"
+  },
+  {
+   "v": 1,
+   "id": "fipi:4844DF",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 9,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«катер»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>У пристани стояли небольшие прогулочные (катер).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "катера",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "катера"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 4844DF"
+  },
+  {
+   "v": 1,
+   "id": "fipi:34CAD3",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 10,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«помидоры»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>На ужин мама приготовила салат из огурцов и (помидоры).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "помидоров",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "помидоров"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 34CAD3"
+  },
+  {
+   "v": 1,
+   "id": "fipi:F7A4AC",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 11,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«вафли»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Бабушка купила две пачки (вафли) по цене одной.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "вафель",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "вафель"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание F7A4AC"
+  },
+  {
+   "v": 1,
+   "id": "fipi:7E3EA9",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 12,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«аэрозоль»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Перед тем как отправиться в лес, обработайте одежду (аэрозоль) для защиты от насекомых.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "аэрозолем",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "аэрозолем"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 7E3EA9"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5EABAD",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 13,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«башни»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Московский Кремль имеет двадцать (башни).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "башен",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "башен"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 5EABAD"
+  },
+  {
+   "v": 1,
+   "id": "fipi:6E63C0",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 14,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«джинсы»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>В новом магазине был большой выбор модных (джинсы).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "джинсов",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "джинсов"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 6E63C0"
+  },
+  {
+   "v": 1,
+   "id": "fipi:B73096",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 15,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«плечи»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Во время выполнения упражнения поставьте ноги на ширине (плечи).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "плеч",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "плеч"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание B73096"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2F9C9D",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 16,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«тюль»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Окно было занавешено (тюль).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "тюлем",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "тюлем"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 2F9C9D"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2A6F93",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 17,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«сиденья»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Для изготовления плетёных (сиденья) используют капроновые полоски, имитирующие ротанговую соломку.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "сидений",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "сидений"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 2A6F93"
+  },
+  {
+   "v": 1,
+   "id": "fipi:7CDDEC",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 18,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«гулянья»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Мне памятны звуки народных (гулянья) на улицах старой Москвы.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "гуляний",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "гуляний"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 7CDDEC"
+  },
+  {
+   "v": 1,
+   "id": "fipi:3AF7EB",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 19,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«туфли»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>К новому учебному году мне купили две пары (туфли).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "туфель",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "туфель"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 3AF7EB"
+  },
+  {
+   "v": 1,
+   "id": "fipi:0C723D",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 20,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«соленья»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>На даче был небольшой погребок для хранения овощей, (соленья)<br> и маринованных грибов.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "солений",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "солений"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 0C723D"
+  },
+  {
+   "v": 1,
+   "id": "fipi:7D4031",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 21,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«чипсы»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Врачи предупреждают о вреде неумеренного употребления (чипсы) и газированной воды.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "чипсов",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "чипсов"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 7D4031"
+  },
+  {
+   "v": 1,
+   "id": "fipi:AF523B",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 22,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«директор»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>(Директор) нескольких школ нашего района столкнулись с проблемой нехватки компьютеров для проведения уроков информатики.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "директора",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "директора"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание AF523B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:C99934",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 23,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«контейнер»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Мы купили новые (контейнер) для хранения продуктов.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "контейнеры",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "контейнеры"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание C99934"
+  },
+  {
+   "v": 1,
+   "id": "fipi:B1B78D",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 24,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«басни»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Мой брат знает наизусть много (басни) И.А. Крылова.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "басен",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "басен"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание B1B78D"
+  },
+  {
+   "v": 1,
+   "id": "fipi:44F3F1",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 25,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«герб»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Древние (герб) часто содержали изображения животных и растений.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "гербы",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "гербы"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 44F3F1"
+  },
+  {
+   "v": 1,
+   "id": "fipi:57ACFD",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 26,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«кондитер»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>(Кондитер) использовали свежие фрукты для украшения тортов.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "кондитеры",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "кондитеры"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 57ACFD"
+  },
+  {
+   "v": 1,
+   "id": "fipi:CD40FB",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 27,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«варежки»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>На улице похолодало, руки замёрзли, а у меня не было с собой (варежки).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "варежек",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "варежек"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание CD40FB"
+  },
+  {
+   "v": 1,
+   "id": "fipi:658515",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 28,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«бухгалтер»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Новому предприятию требуются опытные (бухгалтер).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "бухгалтеры",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "бухгалтеры"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 658515"
+  },
+  {
+   "v": 1,
+   "id": "fipi:076424",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 29,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«черешня»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>После обеда я съел несколько (черешня).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "черешен",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "черешен"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 076424"
+  },
+  {
+   "v": 1,
+   "id": "fipi:83CB2A",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 30,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«предгорье»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>В последнее время места кавказских (предгорье) всё больше вызывают интерес у туристов.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "предгорий",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "предгорий"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 83CB2A"
+  },
+  {
+   "v": 1,
+   "id": "fipi:A2A9DE",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 31,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«стог»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>На поле стояли высокие (стог) сена.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "стога",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "стога"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание A2A9DE"
+  },
+  {
+   "v": 1,
+   "id": "fipi:3769DF",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 32,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«макароны»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>В магазине мама купила пачку (макароны).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "макарон",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "макарон"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 3769DF"
+  },
+  {
+   "v": 1,
+   "id": "fipi:E3D6A8",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 33,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«побережья»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Мониторинг состояния морских (побережья) страны осуществляется под надзором экологических организаций.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "побережий",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "побережий"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание E3D6A8"
+  },
+  {
+   "v": 1,
+   "id": "fipi:C5A585",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "noun",
+   "pos": 34,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«статья»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Для подготовки к семинару нам необходимо было прочитать несколько научных (статья).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "статей",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "статей"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание C5A585"
+  },
+  {
+   "v": 1,
+   "id": "fipi:DDB21C",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "adj",
+   "pos": 0,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«крутой» </b>в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Правый берег реки (крутой), чем левый.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "круче",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "круче"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание DDB21C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:A3D111",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "adj",
+   "pos": 1,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«звонкий»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Голос у девочки был (звонкий), чем у других участниц конкурса.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "звонче",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "звонче"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание A3D111"
+  },
+  {
+   "v": 1,
+   "id": "fipi:3A0BD4",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "adj",
+   "pos": 2,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«сильный»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>И маленькая победа над собой делает человека намного (сильный).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "сильнее",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "сильнее"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 3A0BD4"
+  },
+  {
+   "v": 1,
+   "id": "fipi:002650",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "adj",
+   "pos": 3,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«мелкий»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Лесная малина ароматнее и (мелкий), чем садовая.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "мельче",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "мельче"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 002650"
+  },
+  {
+   "v": 1,
+   "id": "fipi:3C15AC",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "adj",
+   "pos": 4,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«глубокий»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>В этом месте река (глубокий), чем ниже по течению.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "глубже",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "глубже"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 3C15AC"
+  },
+  {
+   "v": 1,
+   "id": "fipi:610465",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "adj",
+   "pos": 5,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«яркий»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Окраска осенних бабочек гораздо (яркий), чем весенних.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ярче",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ярче"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 610465"
+  },
+  {
+   "v": 1,
+   "id": "fipi:BAD281",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "adj",
+   "pos": 6,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«тонкий»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Бумага (тонкий) картона, поэтому её используют для оригами.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "тоньше",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "тоньше"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание BAD281"
+  },
+  {
+   "v": 1,
+   "id": "fipi:00290C",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "adj",
+   "pos": 7,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«твёрдый»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Алмаз гораздо (твёрдый) других минералов.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "твёрже",
+      "alts": [
+       "тверже"
+      ],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "твёрже"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 00290C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2A590E",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "adj",
+   "pos": 8,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«короткий»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Чем дальше на запад от Енисея, тем зима (короткий).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "короче",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "короче"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 2A590E"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5CB704",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "adj",
+   "pos": 9,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«клубничный»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>К чаю подали (клубничный) желе.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "клубничное",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "клубничное"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 5CB704"
+  },
+  {
+   "v": 1,
+   "id": "fipi:B0BC2A",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "adj",
+   "pos": 10,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«низко»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Для входа в пещеру мы должны были спуститься на два метра (низко) уровня моря.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ниже",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ниже"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание B0BC2A"
+  },
+  {
+   "v": 1,
+   "id": "fipi:4CB348",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 0,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«пятьдесят»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>(Пятьдесят) километрами ниже по реке находилась сторожка лесника.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "пятьюдесятью",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "пятьюдесятью"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 4CB348"
+  },
+  {
+   "v": 1,
+   "id": "fipi:278E49",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 1,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«обе»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>По (обе) сторонам дороги цвели яблони.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "обеим",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "обеим"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 278E49"
+  },
+  {
+   "v": 1,
+   "id": "fipi:1D3EF9",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 2,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«шестьсот»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Самому древнему маяку из действующих до наших дней более (шестьсот) лет.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "шестисот",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "шестисот"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 1D3EF9"
+  },
+  {
+   "v": 1,
+   "id": "fipi:D7FAF0",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 3,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«шестьдесят»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Более (шестьдесят) процентов территории России занимают леса.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "шестидесяти",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "шестидесяти"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание D7FAF0"
+  },
+  {
+   "v": 1,
+   "id": "fipi:0CD9B8",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 4,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«семьсот»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Сердце синего кита весит около (семьсот) килограммов.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "семисот",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "семисот"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 0CD9B8"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2DE2BC",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 5,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«полтораста»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Крупный город располагался в (полтораста) километрах от нашей деревни.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "полутораста",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "полутораста"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 2DE2BC"
+  },
+  {
+   "v": 1,
+   "id": "fipi:EFC7B6",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 6,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«двести»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>(Двести) студентам за отличную учёбу назначили повышенную стипендию.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "двумстам",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "двумстам"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание EFC7B6"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2AD521",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 7,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«полтора»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Подготовка к конкурсу заняла у нас чуть больше (полтора) месяцев.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "полутора",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "полутора"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 2AD521"
+  },
+  {
+   "v": 1,
+   "id": "fipi:B42DDA",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 8,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«сто»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Добрый пример лучше (сто) слов.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ста",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ста"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание B42DDA"
+  },
+  {
+   "v": 1,
+   "id": "fipi:D498D4",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 9,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«четыреста»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Организатор обратился с речью к (четыреста) участникам форума.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "четырёмстам",
+      "alts": [
+       "четыремстам"
+      ],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "четырёмстам"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание D498D4"
+  },
+  {
+   "v": 1,
+   "id": "fipi:B14254",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 10,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«семьдесят»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Разность между (семьдесят) и двадцатью семью равна сорока трём.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "семьюдесятью",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "семьюдесятью"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание B14254"
+  },
+  {
+   "v": 1,
+   "id": "fipi:C8DEC3",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 11,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«обе»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Посёлок расположен с (обе) сторон железной дороги.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "обеих",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "обеих"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание C8DEC3"
+  },
+  {
+   "v": 1,
+   "id": "fipi:D0D6E1",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 12,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«двести»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Длина ста́да мигрирующих северных оленей может достигать более (двести) километров.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "двухсот",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "двухсот"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание D0D6E1"
+  },
+  {
+   "v": 1,
+   "id": "fipi:CB2E69",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 13,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«триста»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>В (триста) метрах от моря расположились туристы.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "трёхстах",
+      "alts": [
+       "трехстах"
+      ],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "трёхстах"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание CB2E69"
+  },
+  {
+   "v": 1,
+   "id": "fipi:AF223C",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 14,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«пятьсот»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Средний срок жизни дуба составляет около (пятьсот) лет. </i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "пятисот",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "пятисот"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание AF223C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:E8553C",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 15,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«оба»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Санкт-Петербург расположен на (оба) берегах Невы.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "обоих",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "обоих"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание E8553C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:15AE47",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 16,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«четыреста»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>В (четыреста) метрах от дома находилась школа.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "четырёхстах",
+      "alts": [
+       "четырехстах"
+      ],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "четырёхстах"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 15AE47"
+  },
+  {
+   "v": 1,
+   "id": "fipi:1A1149",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 17,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«девятьсот»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Блокада Ленинграда длилась с 8 сентября 1941 года по 27 января 1944 года – около (девятьсот) мучительных дней.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "девятисот",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "девятисот"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 1A1149"
+  },
+  {
+   "v": 1,
+   "id": "fipi:9C5C0A",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 18,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«триста»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>За одну ночь крот может вырыть тоннель длиной до (триста) метров.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "трёхсот",
+      "alts": [
+       "трехсот"
+      ],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "трёхсот"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 9C5C0A"
+  },
+  {
+   "v": 1,
+   "id": "fipi:090715",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 19,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«семьсот»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>В документе сообщалась информация о (семьсот) участниках спортивного марафона.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "семистах",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "семистах"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 090715"
+  },
+  {
+   "v": 1,
+   "id": "fipi:0ED8A9",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 20,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«полтора»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Вес самой маленькой птички – колибри-пчёлки – колеблется от (полтора) до двух граммов.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "полутора",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "полутора"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 0ED8A9"
+  },
+  {
+   "v": 1,
+   "id": "fipi:B882A8",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 21,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«семьдесят»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Учёные установили, что более (семьдесят) процентов видов животных на нашей планете относится к насекомым.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "семидесяти",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "семидесяти"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание B882A8"
+  },
+  {
+   "v": 1,
+   "id": "fipi:D09BAD",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 22,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«четыреста»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>В зале, где должен был выступать известный артист, собралось около (четыреста) человек.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "четырёхсот",
+      "alts": [
+       "четырехсот"
+      ],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "четырёхсот"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание D09BAD"
+  },
+  {
+   "v": 1,
+   "id": "fipi:504BC9",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 23,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«пятьсот»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Из (пятьсот) миллилитров молока можно получить 150 граммов творога.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "пятисот",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "пятисот"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 504BC9"
+  },
+  {
+   "v": 1,
+   "id": "fipi:9348EE",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 24,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«двести»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>В порт прибыл корабль с (двести) пассажирами на борту.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "двумястами",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "двумястами"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 9348EE"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5D4A61",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "num",
+   "pos": 25,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«двести»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>(Двести) волонтёрами была организована масштабная благотворительная акция.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "двумястами",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "двумястами"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 5D4A61"
+  },
+  {
+   "v": 1,
+   "id": "fipi:0EE9F1",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 0,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«сберечь»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Установка оборудования для фильтрации воды в будущем (сберечь) здоровье жителей города.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "сбережёт",
+      "alts": [
+       "сбережет"
+      ],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "сбережёт"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 0EE9F1"
+  },
+  {
+   "v": 1,
+   "id": "fipi:3D0BF6",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 1,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«лечь»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>(Лечь) на спину и вытяни левую ногу, а правую согни в колене и потяни на себя.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ляг",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ляг"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 3D0BF6"
+  },
+  {
+   "v": 1,
+   "id": "fipi:07920D",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 2,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«хлестать»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Я смотрю, как мокрые от дождя ветви деревьев (хлестать) по стёклам окон и оставляют на них следы.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "хлещут",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "хлещут"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 07920D"
+  },
+  {
+   "v": 1,
+   "id": "fipi:BF440A",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 3,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«жечься»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Собирайте крапиву в перчатках: она обычно очень больно (жечься).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "жжётся",
+      "alts": [
+       "жжется"
+      ],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "жжётся"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание BF440A"
+  },
+  {
+   "v": 1,
+   "id": "fipi:E64802",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 4,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«заглохнуть»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Автомобиль внезапно (заглохнуть) на дороге, потому что в баке закончился бензин.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "заглох",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "заглох"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание E64802"
+  },
+  {
+   "v": 1,
+   "id": "fipi:D8D7B0",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 5,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«промокнуть»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Вчера я (промокнуть) под дождём, потому что забыл зонт.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "промок",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "промок"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание D8D7B0"
+  },
+  {
+   "v": 1,
+   "id": "fipi:AE905F",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 6,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«исчезнуть»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Вчера из-за тумана город на время (исчезнуть) из вида.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "исчез",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "исчез"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание AE905F"
+  },
+  {
+   "v": 1,
+   "id": "fipi:81ABA2",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 7,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«попробовать»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Завтра мы (попробовать) торт, который испекла мама.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "попробуем",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "попробуем"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 81ABA2"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2EBCC1",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 8,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«засохнуть»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Цветок (засохнуть), но остался по-прежнему прекрасен.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "засох",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "засох"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 2EBCC1"
+  },
+  {
+   "v": 1,
+   "id": "fipi:C30E3F",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 9,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«ездить»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>В пункте проката висело объявление «Осторожно (ездить) на самокате по улицам города».</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "ездите",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "ездите"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание C30E3F"
+  },
+  {
+   "v": 1,
+   "id": "fipi:8333FD",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 10,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«бодрствовать»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Во время сна у дельфина отдыхает только половина мозга: другая половина (бодрствовать).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "бодрствует",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "бодрствует"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 8333FD"
+  },
+  {
+   "v": 1,
+   "id": "fipi:31EB2B",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 11,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«пылесосить»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Каждую неделю я убираю квартиру: протираю пыль и (пылесосить).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "пылесошу",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "пылесошу"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 31EB2B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:C86BD6",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 12,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«плакать»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Когда малыши сильно расстраиваются, они, не стесняясь, (плакать)<br> в полный голос.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "плачут",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "плачут"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание C86BD6"
+  },
+  {
+   "v": 1,
+   "id": "fipi:B30AA5",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 13,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«прятаться»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Играя, дети обычно так ловко (прятаться), что их приходится долго искать.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "прячутся",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "прячутся"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание B30AA5"
+  },
+  {
+   "v": 1,
+   "id": "fipi:084397",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 14,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«стрекотать»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>В густой траве прячется кузнечик и неутомимо (стрекотать).</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "стрекочет",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "стрекочет"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 084397"
+  },
+  {
+   "v": 1,
+   "id": "fipi:7FB693",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 15,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«солгать»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Если вы ещё раз (солгать), вам больше не поверят.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "солжёте",
+      "alts": [
+       "солжете"
+      ],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "солжёте"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 7FB693"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5A2198",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 16,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«проникнуть»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Через открытое окно холодный воздух без труда (проникнуть) в комнату,<br> и температура там существенно понизилась.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "проник",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "проник"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 5A2198"
+  },
+  {
+   "v": 1,
+   "id": "fipi:52EEEE",
+   "exam": "rus_oge",
+   "slug": "rus_oge_n8",
+   "n": 8,
+   "proto": "verb",
+   "pos": 17,
+   "math": "html",
+   "text": "<p>Раскройте скобки и запишите слово <b>«стереть»</b> в соответствующей форме, соблюдая нормы современного русского литературного языка.</p><p><i>Давайте (стереть) неудачный карандашный набросок.</i></p>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "word",
+      "value": "сотрём",
+      "alts": [
+       "сотрем"
+      ],
+      "seq": false,
+      "anyOrder": false,
+      "unit": "",
+      "norm": "ru"
+     }
+    ],
+    "value": "сотрём"
+   },
+   "solution": null,
+   "source": "Открытый банк заданий ФИПИ, задание 52EEEE"
+  }
+ ]
+}

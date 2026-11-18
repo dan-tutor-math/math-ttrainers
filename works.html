@@ -792,6 +792,17 @@ async function openEditor(id){
   $('wkSaved').textContent = E.id ? 'Сохранено' : '';
   loadWas();
   if (!$('catList').childElementCount) renderCatalog('');
+  noteNewCards();
+}
+// Задача 63: один раз объясняем учителю, что ФИПИ-задания теперь карточки. Ключ ставим
+// до показа тоста: если localStorage недоступен, тост не показываем вовсе — иначе он
+// повторялся бы на каждом открытии конструктора.
+function noteNewCards(){
+  try {
+    if (localStorage.getItem('works:newsCards')) return;
+    localStorage.setItem('works:newsCards', '1');
+  } catch (e) { return; }
+  toast('ФИПИ-задания теперь собираются мгновенно и печатаются как в КИМ; ранее созданные работы не меняются', 7000);
 }
 function renderSettings(){
   $('wkKind').querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.k === E.kind));
@@ -1750,42 +1761,59 @@ function plainTitle(html){
    cards/_schema.json), встаёт в работу блоком type:'card' — ссылкой на id
    карточки, без кадра тренажёра и без снимка: полный вариант ОГЭ открывал
    ~36 страниц по 10–17 МБ и весил ~5 МБ картинок. Формат блока — memory/works.md.
-   Файл карточек — один на страницу-экзамен, грузится лениво при первом
-   обращении и кэшируется на всю сессию; нет файла (наши генераторы, ещё не
+   Файл карточек — на страницу-экзамен или, у больших банков, на её номер
+   (cards/index.json, ниже); грузится лениво при первом обращении и кэшируется на всю сессию; нет файла (наши генераторы, ещё не
    собранные семьи) — путь как раньше, кадр и снимок. Карточка берётся, только
    если её номер ФИПИ совпадает с номером на этом месте каталога: банк
    перевыгрузят — сдвинутое место не подменится чужим заданием. */
 // works:noCards = '1' — в конструкторе не брать карточки, всё через кадр и снимок: тесты пути снимков
 // (наши генераторы и необработанные страницы идут им же) и запасной выход, если карточки где-то подведут
 const NO_CARDS = (() => { try { return localStorage.getItem('works:noCards') === '1'; } catch (e) { return false; } })();
-const cardFiles = new Map();   // slug → Promise<{ slug, at: Map proto|pos → [карточки], byId } | null>
+const cardFiles = new Map();   // slug файла → Promise<{ cards: […] } | null>
 const slugOfHref = href => String(href || '').split('?')[0].split('#')[0].replace(/^.*\//, '').replace(/\.html$/, '');
-function cardsOf(slug){
-  if (!slug || NO_CARDS) return Promise.resolve(null);
+const nOfHref = href => { const m = /[?&]n=(\d+)/.exec(String(href || '')); return m ? Number(m[1]) : null; };
+/* Страница с большим банком лежит частями «<страница>_n<N>» (tools/cards/split.py), список —
+   cards/index.json: {pages:{rus_ege:[{slug:'rus_ege_n19', n:[19]}, …]}}. Берём только части
+   нужного номера: rus_ege.html?n=19 — один файл ~40 КБ вместо мегабайта. Нет номера
+   (старый блок со slug страницы, «все задания страницы») — все части. Страницы нет в списке —
+   один файл cards/<slug>.json, как раньше. Нет самого списка — тоже, а файла нет — кадр. */
+let cardIdxP = null;
+function cardIndex(){
+  if (!cardIdxP) cardIdxP = fetch('cards/index.json', { cache: 'no-cache' })
+    .then(r => r.ok ? r.json() : null)
+    .then(d => (d && d.v === 1 && d.pages) || {})
+    .catch(() => { cardIdxP = null; return {}; });
+  return cardIdxP;
+}
+function cardFile(slug){
   if (!cardFiles.has(slug)){
     const p = fetch('cards/' + slug + '.json', { cache: 'no-cache' })
       .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (!d || d.v !== 1 || !Array.isArray(d.cards) || !d.cards.length) return null;
-        const at = new Map(), byId = new Map();
-        d.cards.forEach(c => {
-          const k = c.proto + '|' + c.pos;
-          if (!at.has(k)) at.set(k, []);
-          at.get(k).push(c);
-          byId.set(c.id, c);
-        });
-        return { slug, at, byId, partial: !!d.partial };
-      })
+      .then(d => (!d || d.v !== 1 || !Array.isArray(d.cards) || !d.cards.length) ? null : d)
       // сбой сети не должен ломать сборку: без карточек — старый путь через кадр
-      .catch(() => null);
+      .catch(() => { cardFiles.delete(slug); return null; });
     cardFiles.set(slug, p);
   }
   return cardFiles.get(slug);
 }
+async function cardsOf(slug, n){
+  if (!slug || NO_CARDS) return null;
+  const parts = ((await cardIndex())[slug] || [{ slug }]).filter(p => n == null || !p.n || p.n.includes(Number(n)));
+  const files = (await Promise.all(parts.map(p => cardFile(p.slug)))).filter(Boolean);
+  if (!files.length) return null;
+  const at = new Map(), byId = new Map();
+  files.forEach(d => d.cards.forEach(c => {
+    const k = c.proto + '|' + c.pos;
+    if (!at.has(k)) at.set(k, []);
+    at.get(k).push(c);
+    byId.set(c.id, c);
+  }));
+  return { slug, at, byId, partial: files.some(d => !!d.partial) };
+}
 const sameFipi = (a, b) => !!a && !!b && String(a).toUpperCase() === String(b).toUpperCase();
 // карточка для места группы at = { proto, pos, n } или null
 async function cardFor(href, at){
-  const cs = await cardsOf(slugOfHref(href));
+  const cs = await cardsOf(slugOfHref(href), at.n != null ? at.n : nOfHref(href));
   if (!cs) return null;
   const list = cs.at.get(at.proto + '|' + at.pos) || [];
   const c = list.find(x => at.n == null || x.n === Number(at.n));
@@ -1799,7 +1827,7 @@ async function cardFor(href, at){
 async function cardByKey(href, tkey, info){
   const m = /^fipi:[a-z]+:([0-9A-Za-z]+)$/.exec(tkey || '');
   if (!m) return null;
-  const cs = await cardsOf(slugOfHref(href));
+  const cs = await cardsOf(slugOfHref(href), nOfHref(href));
   const c = cs && cs.byId.get('fipi:' + m[1]);
   // ответ карточки снят тем же trainerTaskInfo: не совпал — на экране не то
   // задание (например, наше «на основе ФИПИ» с номером задания-образца), берём снимок
@@ -1865,7 +1893,7 @@ function catalogOf(href, n){
       genQ = p.catch(() => {});
       return p;
     };
-    const p = cardsOf(slugOfHref(href)).then(cs => !cs ? viaFrame()
+    const p = cardsOf(slugOfHref(href), n != null ? n : nOfHref(href)).then(cs => !cs ? viaFrame()
       : catIndex().then(ix => {
           const e = ix && ix[slugOfHref(href) + '|' + (n == null ? '' : n)];
           return e && e.protos && e.protos.length ? e.protos : viaFrame();
@@ -3463,7 +3491,7 @@ async function tplAdvance(){
   TPL.loaded = false;
 }
 
-window.__works = { E, renderTasks, addSeries, openBuild, renderBuild, planRow, buildGo, applyPreset, loadTemplates, tplOpen, tplAdvance, TPL, seriesNext, seriesPrev, seriesShuffle, seriesMore, seriesSetOne, seriesMove, seriesRemove, addFromFrame, openTrainer, openVideos, addVideo, save, route, gens, canon, openResults, openReview, closeReview };   // для тестов и отладки из консоли
+window.__works = { E, renderTasks, addSeries, openBuild, renderBuild, planRow, buildGo, applyPreset, loadTemplates, tplOpen, tplAdvance, TPL, seriesNext, seriesPrev, seriesShuffle, seriesMore, seriesSetOne, seriesMove, seriesRemove, addFromFrame, openTrainer, openVideos, addVideo, save, route, gens, canon, openResults, openReview, closeReview, cardsOf, cardFor, cardByKey };   // для тестов и отладки из консоли
 boot();
 })();
 </script>

@@ -1,0 +1,477 @@
+{
+ "v": 1,
+ "pages": {
+  "eng_oge": [
+   {
+    "slug": "eng_oge_n1",
+    "n": [
+     1
+    ]
+   },
+   {
+    "slug": "eng_oge_n5",
+    "n": [
+     5
+    ]
+   },
+   {
+    "slug": "eng_oge_n6",
+    "n": [
+     6
+    ]
+   },
+   {
+    "slug": "eng_oge_n12",
+    "n": [
+     12
+    ]
+   },
+   {
+    "slug": "eng_oge_n13",
+    "n": [
+     13
+    ]
+   },
+   {
+    "slug": "eng_oge_n20",
+    "n": [
+     20
+    ]
+   },
+   {
+    "slug": "eng_oge_n29",
+    "n": [
+     29
+    ]
+   },
+   {
+    "slug": "eng_oge_n35",
+    "n": [
+     35
+    ]
+   },
+   {
+    "slug": "eng_oge_n36",
+    "n": [
+     36
+    ]
+   },
+   {
+    "slug": "eng_oge_n37",
+    "n": [
+     37
+    ]
+   },
+   {
+    "slug": "eng_oge_n38",
+    "n": [
+     38
+    ]
+   }
+  ],
+  "rus_ege": [
+   {
+    "slug": "rus_ege_n1",
+    "n": [
+     1
+    ]
+   },
+   {
+    "slug": "rus_ege_n2",
+    "n": [
+     2
+    ]
+   },
+   {
+    "slug": "rus_ege_n3",
+    "n": [
+     3
+    ]
+   },
+   {
+    "slug": "rus_ege_n4",
+    "n": [
+     4
+    ]
+   },
+   {
+    "slug": "rus_ege_n5",
+    "n": [
+     5
+    ]
+   },
+   {
+    "slug": "rus_ege_n6",
+    "n": [
+     6
+    ]
+   },
+   {
+    "slug": "rus_ege_n7",
+    "n": [
+     7
+    ]
+   },
+   {
+    "slug": "rus_ege_n8",
+    "n": [
+     8
+    ]
+   },
+   {
+    "slug": "rus_ege_n9",
+    "n": [
+     9
+    ]
+   },
+   {
+    "slug": "rus_ege_n10",
+    "n": [
+     10
+    ]
+   },
+   {
+    "slug": "rus_ege_n11",
+    "n": [
+     11
+    ]
+   },
+   {
+    "slug": "rus_ege_n12",
+    "n": [
+     12
+    ]
+   },
+   {
+    "slug": "rus_ege_n13",
+    "n": [
+     13
+    ]
+   },
+   {
+    "slug": "rus_ege_n14",
+    "n": [
+     14
+    ]
+   },
+   {
+    "slug": "rus_ege_n15",
+    "n": [
+     15
+    ]
+   },
+   {
+    "slug": "rus_ege_n16",
+    "n": [
+     16
+    ]
+   },
+   {
+    "slug": "rus_ege_n17",
+    "n": [
+     17
+    ]
+   },
+   {
+    "slug": "rus_ege_n18",
+    "n": [
+     18
+    ]
+   },
+   {
+    "slug": "rus_ege_n19",
+    "n": [
+     19
+    ]
+   },
+   {
+    "slug": "rus_ege_n20",
+    "n": [
+     20
+    ]
+   },
+   {
+    "slug": "rus_ege_n21",
+    "n": [
+     21
+    ]
+   },
+   {
+    "slug": "rus_ege_n22",
+    "n": [
+     22
+    ]
+   },
+   {
+    "slug": "rus_ege_n23",
+    "n": [
+     23
+    ]
+   },
+   {
+    "slug": "rus_ege_n24",
+    "n": [
+     24
+    ]
+   },
+   {
+    "slug": "rus_ege_n25",
+    "n": [
+     25
+    ]
+   },
+   {
+    "slug": "rus_ege_n26",
+    "n": [
+     26
+    ]
+   }
+  ],
+  "rus_oge": [
+   {
+    "slug": "rus_oge_n2",
+    "n": [
+     2
+    ]
+   },
+   {
+    "slug": "rus_oge_n3",
+    "n": [
+     3
+    ]
+   },
+   {
+    "slug": "rus_oge_n4",
+    "n": [
+     4
+    ]
+   },
+   {
+    "slug": "rus_oge_n5",
+    "n": [
+     5
+    ]
+   },
+   {
+    "slug": "rus_oge_n6",
+    "n": [
+     6
+    ]
+   },
+   {
+    "slug": "rus_oge_n7",
+    "n": [
+     7
+    ]
+   },
+   {
+    "slug": "rus_oge_n8",
+    "n": [
+     8
+    ]
+   },
+   {
+    "slug": "rus_oge_n9",
+    "n": [
+     9
+    ]
+   },
+   {
+    "slug": "rus_oge_n10",
+    "n": [
+     10
+    ]
+   },
+   {
+    "slug": "rus_oge_n11",
+    "n": [
+     11
+    ]
+   },
+   {
+    "slug": "rus_oge_n12",
+    "n": [
+     12
+    ]
+   }
+  ],
+  "soc_ege_long": [
+   {
+    "slug": "soc_ege_long_n17",
+    "n": [
+     17
+    ]
+   },
+   {
+    "slug": "soc_ege_long_n18",
+    "n": [
+     18
+    ]
+   },
+   {
+    "slug": "soc_ege_long_n19",
+    "n": [
+     19
+    ]
+   },
+   {
+    "slug": "soc_ege_long_n20",
+    "n": [
+     20
+    ]
+   },
+   {
+    "slug": "soc_ege_long_n21",
+    "n": [
+     21
+    ]
+   },
+   {
+    "slug": "soc_ege_long_n22",
+    "n": [
+     22
+    ]
+   },
+   {
+    "slug": "soc_ege_long_n23",
+    "n": [
+     23
+    ]
+   },
+   {
+    "slug": "soc_ege_long_n24",
+    "n": [
+     24
+    ]
+   },
+   {
+    "slug": "soc_ege_long_n25",
+    "n": [
+     25
+    ]
+   }
+  ],
+  "soc_oge": [
+   {
+    "slug": "soc_oge_n1",
+    "n": [
+     1
+    ]
+   },
+   {
+    "slug": "soc_oge_n2",
+    "n": [
+     2
+    ]
+   },
+   {
+    "slug": "soc_oge_n3",
+    "n": [
+     3
+    ]
+   },
+   {
+    "slug": "soc_oge_n4",
+    "n": [
+     4
+    ]
+   },
+   {
+    "slug": "soc_oge_n5",
+    "n": [
+     5
+    ]
+   },
+   {
+    "slug": "soc_oge_n6",
+    "n": [
+     6
+    ]
+   },
+   {
+    "slug": "soc_oge_n7",
+    "n": [
+     7
+    ]
+   },
+   {
+    "slug": "soc_oge_n8",
+    "n": [
+     8
+    ]
+   },
+   {
+    "slug": "soc_oge_n9",
+    "n": [
+     9
+    ]
+   },
+   {
+    "slug": "soc_oge_n10",
+    "n": [
+     10
+    ]
+   },
+   {
+    "slug": "soc_oge_n11",
+    "n": [
+     11
+    ]
+   },
+   {
+    "slug": "soc_oge_n12",
+    "n": [
+     12
+    ]
+   },
+   {
+    "slug": "soc_oge_n13",
+    "n": [
+     13
+    ]
+   },
+   {
+    "slug": "soc_oge_n14",
+    "n": [
+     14
+    ]
+   },
+   {
+    "slug": "soc_oge_n15",
+    "n": [
+     15
+    ]
+   },
+   {
+    "slug": "soc_oge_n16",
+    "n": [
+     16
+    ]
+   },
+   {
+    "slug": "soc_oge_n18",
+    "n": [
+     18
+    ]
+   },
+   {
+    "slug": "soc_oge_n19",
+    "n": [
+     19
+    ]
+   },
+   {
+    "slug": "soc_oge_n20",
+    "n": [
+     20
+    ]
+   },
+   {
+    "slug": "soc_oge_n21",
+    "n": [
+     21
+    ]
+   }
+  ]
+ }
+}

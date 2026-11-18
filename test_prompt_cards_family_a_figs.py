@@ -85,11 +85,14 @@ LIVE = """([tid, story]) => {
   hid.forEach(([x]) => { x.style.display = 'none'; });
   const nodes = (story ? [d.getElementById('theoryContent')] : []).concat([el]);
   const text = nodes.map(n => n.innerText).join('\\n');
-  const imgs = nodes.flatMap(n => [...n.querySelectorAll('img')]).filter(i => i.offsetParent !== null)
-    .map(i => i.currentSrc || i.src);
+  // строчные картинки-обозначения (ABC, AB, «1 × 1») карточка ставит текстом (a_figs.INLINE_TEXT) —
+  // в рисунки живого задания они не входят, а в тексте их у живого нет: считаем отдельно
+  const all = nodes.flatMap(n => [...n.querySelectorAll('img')]).filter(i => i.offsetParent !== null);
+  const imgs = all.filter(i => !i.classList.contains('fipi-inline')).map(i => i.currentSrc || i.src);
+  const inline = all.length - imgs.length;
   const width = Math.round(el.getBoundingClientRect().width);
   hid.forEach(([x, dd]) => { x.style.display = dd; });
-  return { text, imgs, width };
+  return { text, imgs, inline, width };
 }"""
 
 RENDER = """async ([card, width]) => {
@@ -235,7 +238,17 @@ def main():
                     pg.evaluate(a_figs._SHOW_STORY_JS, st["html"])
                 live = pg.evaluate(LIVE, [meta["tid"], story])
                 card = pg.evaluate(RENDER, [c, live["width"]])
-                if squash(live["text"]) == squash(card["text"]):
+                ct = squash(card["text"])
+                if live.get("inline"):
+                    # подставленные картинкой-текстом обозначения — из текста карточки долой, по одному на картинку
+                    subs = sorted((squash(v["s"]) for v in a_figs.INLINE_TEXT.values()), key=len, reverse=True)
+                    removed = 0
+                    for sub in subs:
+                        while sub in ct and removed < live["inline"]:
+                            ct = ct.replace(sub, "", 1); removed += 1
+                    if removed != live["inline"]:
+                        bad["text"].append(f"{fid}: строчных картинок {live['inline']}, подставлено {removed}")
+                if squash(live["text"]) == ct:
                     res["text"] += 1
                 else:
                     bad["text"].append(f"{fid}:\n   живой:    {squash(live['text'])[:240]}\n   карточка: {squash(card['text'])[:240]}")

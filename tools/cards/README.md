@@ -10,7 +10,9 @@
 | Файл | Что |
 |---|---|
 | `cards/<slug>.json` | карточки одной страницы-экзамена (slug — имя страницы без .html: `oge9`, `ege_prof`) |
-| `cards/img/<slug>/<ФИПИ>_<k>.png\|svg` | рисунки |
+| `cards/<страница>_n<N>.json` | у больших страниц (rus_ege, rus_oge, soc_oge, soc_ege_long, eng_oge) — часть по номеру КИМ; slug = имя файла |
+| `cards/index.json` | список частей по страницам: `{"v":1,"pages":{"rus_ege":[{"slug":"rus_ege_n19","n":[19]},…]}}` |
+| `cards/img/<slug>/<ФИПИ>_<k>.png\|svg` | рисунки (у разбитой страницы — в папке страницы, не части) |
 | `tools/cards/build.py` | сборщик (Playwright + локальный сервер) |
 | `tools/cards/validate.py` | валидатор: схема, разметка, ответ, файлы рисунков |
 | `tools/cards/core.py` | общие помощники для плагинов |
@@ -25,10 +27,26 @@
 ```
 python tools/cards/build.py --family a_simple          # одна семья целиком
 python tools/cards/build.py --slug oge9 --limit 10     # пилот: 10 заданий, разные прототипы
+python tools/cards/split.py                            # после build.py: режет большие страницы на части, пишет index.json
 python tools/cards/validate.py                         # все cards/*.json
 python test_prompt_cards_pilot.py                      # пилот S0
 ```
 Нужен Python с Playwright и Pillow (как у тестов `test_prompt*.py`).
+
+## Разбиение на части (split.py)
+
+build.py по-прежнему отдаёт файл на страницу (`cards/rus_ege.json`). Если страница тяжелее
+250 КБ в сжатом виде и у неё несколько номеров КИМ, `split.py` режет её на `<страница>_n<N>.json`
+(slug карточки = slug части), стирает исходный файл и обновляет `cards/index.json`. После каждой
+пересборки такой страницы — `build.py`, затем `split.py` (`--check` скажет, если забыли).
+Почему по номеру и по сжатому размеру: замер (Chromium, gzip, 4G 1,6 Мбит/с, процессор ×4) — разбор
+JSON 15 мс даже у 5 МБ, всё время уходит на скачивание (rus_ege целиком 1,05 МБ → 5,8 с,
+одна часть ~40 КБ → ~0,3 с). Работа из одного номера тянет одну часть; блок хранит slug части и
+грузит `cards/<slug>.json` напрямую, поэтому ученику и печати список не нужен. Конструктор по
+`index.json` берёт части нужного `?n=`; старый блок со slug страницы (сделан до разбиения)
+собирается из всех её частей (works.html, work.html, work-print.js). `validate.py` бьёт, если
+часть тяжелее 300 КБ в сжатом виде или index.json разошёлся с файлами. Для тестов —
+`tools.cards.split.load_page(страница)` (все карточки) и `canon(cards)` (сравнение без slug).
 
 ## Плагин семьи: `tools/cards/families/<семья>.py`
 

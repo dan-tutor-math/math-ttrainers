@@ -19,7 +19,12 @@ h1{font-size:18px;margin:8px 0 16px;}
 (async function () {
   const q = new URLSearchParams(location.search);
   const slug = q.get('slug') || 'oge9';
-  const d = await (await fetch('../../cards/' + slug + '.json')).json();
+  // страница, разбитая на части (cards/index.json) — собираем из частей; slug части открывается как есть
+  const ix = await fetch('../../cards/index.json').then(r => r.ok ? r.json() : null).catch(() => null);
+  const parts = ix && ix.pages && ix.pages[slug];
+  const d = parts
+    ? { cards: [].concat(...(await Promise.all(parts.map(p => fetch('../../cards/' + p.slug + '.json').then(r => r.json())))).map(x => x.cards)) }
+    : await (await fetch('../../cards/' + slug + '.json')).json();
   await CardRender.ready(d.cards, { root: '../../' });
   document.getElementById('h').textContent = 'cards/' + slug + '.json — ' + d.cards.length + ' карточек';
   const opts = { base: '../../cards/', answer: q.get('answer') === '1', solution: q.get('solution') === '1',

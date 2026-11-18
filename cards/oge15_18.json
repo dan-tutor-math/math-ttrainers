@@ -6,7 +6,7 @@
  "src": {
   "oge15_18-fipi-bank.js": "0a1672c879fcd5dfa169faa9361dcfc412933dbc",
   "oge15_18-kinds.js": "d0ea9fee065f36d74e44843c7f9feb17356f4c6e",
-  "oge15_18.html": "6cd2f58f63aed9b42ebca6e70f94359bf2db5424",
+  "oge15_18.html": "6b278ef7b14876babc5335edb013ee54e320aac6",
   "oge18-fipi-bank.js": "33f94e0eca272d00f31491d5fdede0503feaef5a"
  },
  "cards": [
@@ -31588,6 +31588,294 @@
   },
   {
    "v": 1,
+   "id": "fipi:0049B8",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_triangle_ratio",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге изображён треугольник <i>ABC</i>. Во сколько раз отрезок <i>BM</i> короче отрезка <i>CM</i>?</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/0049B8_1.png",
+     "w": 156,
+     "h": 157,
+     "alt": "рисунок ФИПИ",
+     "maxw": 156
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2"
+     }
+    ],
+    "value": "2"
+   },
+   "solution": "<div><div class=\"c-line\">Координаты в клетках от верхнего левого узла рамки (x вправо, y вниз): A(1; 5), B(3; 1), C(6; 6), M(4; <span class=\"c-frac\"><span class=\"c-num\">8</span><span class=\"c-den\">3</span></span>).</div><div class=\"c-line\">Точка M лежит на одной стороне треугольника. Сравниваем отрезки CM и BM, лежащие на одной прямой.</div><div class=\"c-line\">Их проекции на горизонтальную линию имеют то же отношение, что и сами отрезки.</div><div class=\"c-line\">Проекция CM: |6 − 4| = 2 клетки.</div><div class=\"c-line\">Проекция BM: |3 − 4| = 1 клетки.</div><div class=\"c-line\">CM : BM = 2 : 1 = 2.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 0049B8"
+  },
+  {
+   "v": 1,
+   "id": "fipi:053E7E",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_triangle_ratio",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге изображён треугольник <i>ABC</i>. Во сколько раз отрезок <i>AM</i> длиннее отрезка <i>CM</i>?</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/053E7E_1.png",
+     "w": 156,
+     "h": 157,
+     "alt": "рисунок ФИПИ",
+     "maxw": 156
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.5"
+     }
+    ],
+    "value": "1,5"
+   },
+   "solution": "<div><div class=\"c-line\">Координаты в клетках от верхнего левого узла рамки (x вправо, y вниз): A(1; 5), B(3; 1), C(6; 6), M(4; 5,6).</div><div class=\"c-line\">Точка M лежит на одной стороне треугольника. Сравниваем отрезки AM и CM, лежащие на одной прямой.</div><div class=\"c-line\">Их проекции на горизонтальную линию имеют то же отношение, что и сами отрезки.</div><div class=\"c-line\">Проекция AM: |1 − 4| = 3 клетки.</div><div class=\"c-line\">Проекция CM: |6 − 4| = 2 клетки.</div><div class=\"c-line\">AM : CM = 3 : 2 = 1,5.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 053E7E"
+  },
+  {
+   "v": 1,
+   "id": "fipi:054F96",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_triangle_ratio",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге изображён треугольник <i>ABC</i>. Во сколько раз отрезок <i>AM</i> длиннее отрезка <i>CM</i>?</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/054F96_1.png",
+     "w": 156,
+     "h": 157,
+     "alt": "рисунок ФИПИ",
+     "maxw": 156
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "4"
+     }
+    ],
+    "value": "4"
+   },
+   "solution": "<div><div class=\"c-line\">Координаты в клетках от верхнего левого узла рамки (x вправо, y вниз): A(1; 5), B(3; 1), C(6; 6), M(5; 5,8).</div><div class=\"c-line\">Точка M лежит на одной стороне треугольника. Сравниваем отрезки AM и CM, лежащие на одной прямой.</div><div class=\"c-line\">Их проекции на горизонтальную линию имеют то же отношение, что и сами отрезки.</div><div class=\"c-line\">Проекция AM: |1 − 5| = 4 клетки.</div><div class=\"c-line\">Проекция CM: |6 − 5| = 1 клетки.</div><div class=\"c-line\">AM : CM = 4 : 1 = 4.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 054F96"
+  },
+  {
+   "v": 1,
+   "id": "fipi:0FD2F4",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_triangle_ratio",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге изображён треугольник <i>ABC</i>. Во сколько раз отрезок <i>BM</i> длиннее отрезка <i>CM</i>?</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/0FD2F4_1.png",
+     "w": 156,
+     "h": 157,
+     "alt": "рисунок ФИПИ",
+     "maxw": 156
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2"
+     }
+    ],
+    "value": "2"
+   },
+   "solution": "<div><div class=\"c-line\">Координаты в клетках от верхнего левого узла рамки (x вправо, y вниз): A(1; 5), B(3; 1), C(6; 6), M(5; <span class=\"c-frac\"><span class=\"c-num\">13</span><span class=\"c-den\">3</span></span>).</div><div class=\"c-line\">Точка M лежит на одной стороне треугольника. Сравниваем отрезки BM и CM, лежащие на одной прямой.</div><div class=\"c-line\">Их проекции на горизонтальную линию имеют то же отношение, что и сами отрезки.</div><div class=\"c-line\">Проекция BM: |3 − 5| = 2 клетки.</div><div class=\"c-line\">Проекция CM: |6 − 5| = 1 клетки.</div><div class=\"c-line\">BM : CM = 2 : 1 = 2.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 0FD2F4"
+  },
+  {
+   "v": 1,
+   "id": "fipi:3B3742",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_triangle_ratio",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге изображён треугольник <i>ABC</i>. Во сколько раз отрезок <i>AM</i> короче отрезка <i>CM</i>?</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/3B3742_1.png",
+     "w": 156,
+     "h": 157,
+     "alt": "рисунок ФИПИ",
+     "maxw": 156
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "4"
+     }
+    ],
+    "value": "4"
+   },
+   "solution": "<div><div class=\"c-line\">Координаты в клетках от верхнего левого узла рамки (x вправо, y вниз): A(1; 5), B(3; 1), C(6; 6), M(2; 5,2).</div><div class=\"c-line\">Точка M лежит на одной стороне треугольника. Сравниваем отрезки CM и AM, лежащие на одной прямой.</div><div class=\"c-line\">Их проекции на горизонтальную линию имеют то же отношение, что и сами отрезки.</div><div class=\"c-line\">Проекция CM: |6 − 2| = 4 клетки.</div><div class=\"c-line\">Проекция AM: |1 − 2| = 1 клетки.</div><div class=\"c-line\">CM : AM = 4 : 1 = 4.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 3B3742"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5561E0",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_triangle_ratio",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге изображён треугольник <i>ABC</i>. Во сколько раз отрезок <i>AM</i> короче отрезка <i>BM</i>?</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/5561E0_1.png",
+     "w": 156,
+     "h": 157,
+     "alt": "рисунок ФИПИ",
+     "maxw": 156
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "3"
+     }
+    ],
+    "value": "3"
+   },
+   "solution": "<div><div class=\"c-line\">Координаты в клетках от верхнего левого узла рамки (x вправо, y вниз): A(1; 5), B(3; 1), C(6; 6), M(1,5; 4).</div><div class=\"c-line\">Точка M лежит на одной стороне треугольника. Сравниваем отрезки BM и AM, лежащие на одной прямой.</div><div class=\"c-line\">Их проекции на вертикальную линию имеют то же отношение, что и сами отрезки.</div><div class=\"c-line\">Проекция BM: |1 − 4| = 3 клетки.</div><div class=\"c-line\">Проекция AM: |5 − 4| = 1 клетки.</div><div class=\"c-line\">BM : AM = 3 : 1 = 3.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 5561E0"
+  },
+  {
+   "v": 1,
+   "id": "fipi:59FC06",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_triangle_ratio",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге изображён треугольник <i>ABC</i>. Во сколько раз отрезок <i>AM</i> короче отрезка <i>CM</i>?</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/59FC06_1.png",
+     "w": 156,
+     "h": 157,
+     "alt": "рисунок ФИПИ",
+     "maxw": 156
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.5"
+     }
+    ],
+    "value": "1,5"
+   },
+   "solution": "<div><div class=\"c-line\">Координаты в клетках от верхнего левого узла рамки (x вправо, y вниз): A(1; 5), B(3; 1), C(6; 6), M(3; 5,4).</div><div class=\"c-line\">Точка M лежит на одной стороне треугольника. Сравниваем отрезки CM и AM, лежащие на одной прямой.</div><div class=\"c-line\">Их проекции на горизонтальную линию имеют то же отношение, что и сами отрезки.</div><div class=\"c-line\">Проекция CM: |6 − 3| = 3 клетки.</div><div class=\"c-line\">Проекция AM: |1 − 3| = 2 клетки.</div><div class=\"c-line\">CM : AM = 3 : 2 = 1,5.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 59FC06"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5C8D8B",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_triangle_ratio",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге изображён треугольник <i>ABC</i>. Во сколько раз отрезок <i>AM</i> длиннее отрезка <i>BM</i>?</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/5C8D8B_1.png",
+     "w": 156,
+     "h": 157,
+     "alt": "рисунок ФИПИ",
+     "maxw": 156
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "3"
+     }
+    ],
+    "value": "3"
+   },
+   "solution": "<div><div class=\"c-line\">Координаты в клетках от верхнего левого узла рамки (x вправо, y вниз): A(1; 5), B(3; 1), C(6; 6), M(2,5; 2).</div><div class=\"c-line\">Точка M лежит на одной стороне треугольника. Сравниваем отрезки AM и BM, лежащие на одной прямой.</div><div class=\"c-line\">Их проекции на вертикальную линию имеют то же отношение, что и сами отрезки.</div><div class=\"c-line\">Проекция AM: |5 − 2| = 3 клетки.</div><div class=\"c-line\">Проекция BM: |1 − 2| = 1 клетки.</div><div class=\"c-line\">AM : BM = 3 : 1 = 3.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 5C8D8B"
+  },
+  {
+   "v": 1,
    "id": "fipi:0275CC",
    "exam": "oge",
    "slug": "oge15_18",
@@ -32884,6 +33172,150 @@
   },
   {
    "v": 1,
+   "id": "fipi:085583",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/085583_1.png",
+     "w": 133,
+     "h": 178,
+     "alt": "рисунок ФИПИ",
+     "maxw": 133
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.5"
+     }
+    ],
+    "value": "1,5"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные вертикальные отрезки. Q и R лежат в узлах сетки, длина QR — 6 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 1 клеток, до QR — 4 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 1 : 4 = 0,25.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">4</span></span> = 6 · 0,25 = 1,5.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 085583"
+  },
+  {
+   "v": 1,
+   "id": "fipi:169C2C",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/169C2C_1.png",
+     "w": 133,
+     "h": 178,
+     "alt": "рисунок ФИПИ",
+     "maxw": 133
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "3"
+     }
+    ],
+    "value": "3"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные вертикальные отрезки. Q и R лежат в узлах сетки, длина QR — 6 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 2 клеток, до QR — 4 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 2 : 4 = 0,5.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">4</span></span> = 6 · 0,5 = 3.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 169C2C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:1ACC27",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/1ACC27_1.png",
+     "w": 111,
+     "h": 178,
+     "alt": "рисунок ФИПИ",
+     "maxw": 111
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2"
+     }
+    ],
+    "value": "2"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные горизонтальные отрезки. Q и R лежат в узлах сетки, длина QR — 3 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 4 клеток, до QR — 6 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 4 : 6 = <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">3</span></span>.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">4</span><span class=\"c-den\">6</span></span> = 3 · <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">3</span></span> = 2.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 1ACC27"
+  },
+  {
+   "v": 1,
+   "id": "fipi:1E7CCE",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/1E7CCE_1.png",
+     "w": 178,
+     "h": 133,
+     "alt": "рисунок ФИПИ",
+     "maxw": 178
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "4.5"
+     }
+    ],
+    "value": "4,5"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные горизонтальные отрезки. Q и R лежат в узлах сетки, длина QR — 6 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 3 клеток, до QR — 4 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 3 : 4 = 0,75.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">4</span></span> = 6 · 0,75 = 4,5.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 1E7CCE"
+  },
+  {
+   "v": 1,
    "id": "fipi:220D31",
    "exam": "oge",
    "slug": "oge15_18",
@@ -32920,6 +33352,114 @@
   },
   {
    "v": 1,
+   "id": "fipi:25DCEF",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/25DCEF_1.png",
+     "w": 178,
+     "h": 178,
+     "alt": "рисунок ФИПИ",
+     "maxw": 178
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "5"
+     }
+    ],
+    "value": "5"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные вертикальные отрезки. Q и R лежат в узлах сетки, длина QR — 6 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 5 клеток, до QR — 6 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 5 : 6 = <span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">6</span></span>.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">6</span></span> = 6 · <span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">6</span></span> = 5.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 25DCEF"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2A0F74",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/2A0F74_1.png",
+     "w": 180,
+     "h": 112,
+     "alt": "рисунок ФИПИ",
+     "maxw": 180
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.5"
+     }
+    ],
+    "value": "1,5"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные вертикальные отрезки. Q и R лежат в узлах сетки, длина QR — 3 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 3 клеток, до QR — 6 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 3 : 6 = 0,5.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">6</span></span> = 3 · 0,5 = 1,5.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 2A0F74"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2B322B",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/2B322B_1.png",
+     "w": 111,
+     "h": 112,
+     "alt": "рисунок ФИПИ",
+     "maxw": 111
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1"
+     }
+    ],
+    "value": "1"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные горизонтальные отрезки. Q и R лежат в узлах сетки, длина QR — 3 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 1 клеток, до QR — 3 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 1 : 3 = <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">3</span></span>.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">3</span></span> = 3 · <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">3</span></span> = 1.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 2B322B"
+  },
+  {
+   "v": 1,
    "id": "fipi:3F5819",
    "exam": "oge",
    "slug": "oge15_18",
@@ -32953,6 +33493,222 @@
    },
    "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные вертикальные отрезки. Q и R лежат в узлах сетки, длина QR — 4 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 1 клеток, до QR — 4 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 1 : 4 = 0,25.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">4</span></span> = 4 · 0,25 = 1.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
    "source": "Открытый банк заданий ФИПИ, задание 3F5819"
+  },
+  {
+   "v": 1,
+   "id": "fipi:46A552",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/46A552_1.png",
+     "w": 133,
+     "h": 133,
+     "alt": "рисунок ФИПИ",
+     "maxw": 133
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2"
+     }
+    ],
+    "value": "2"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные горизонтальные отрезки. Q и R лежат в узлах сетки, длина QR — 4 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 2 клеток, до QR — 4 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 2 : 4 = 0,5.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">4</span></span> = 4 · 0,5 = 2.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 46A552"
+  },
+  {
+   "v": 1,
+   "id": "fipi:54FAB2",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 10,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/54FAB2_1.png",
+     "w": 133,
+     "h": 90,
+     "alt": "рисунок ФИПИ",
+     "maxw": 133
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2"
+     }
+    ],
+    "value": "2"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные горизонтальные отрезки. Q и R лежат в узлах сетки, длина QR — 4 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 1 клеток, до QR — 2 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 1 : 2 = 0,5.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">2</span></span> = 4 · 0,5 = 2.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 54FAB2"
+  },
+  {
+   "v": 1,
+   "id": "fipi:65903C",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 11,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/65903C_1.png",
+     "w": 89,
+     "h": 157,
+     "alt": "рисунок ФИПИ",
+     "maxw": 89
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2.5"
+     }
+    ],
+    "value": "2,5"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные вертикальные отрезки. Q и R лежат в узлах сетки, длина QR — 5 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 1 клеток, до QR — 2 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 1 : 2 = 0,5.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">2</span></span> = 5 · 0,5 = 2,5.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 65903C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:666E2D",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 12,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/666E2D_1.png",
+     "w": 178,
+     "h": 178,
+     "alt": "рисунок ФИПИ",
+     "maxw": 178
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "4"
+     }
+    ],
+    "value": "4"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные вертикальные отрезки. Q и R лежат в узлах сетки, длина QR — 6 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 4 клеток, до QR — 6 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 4 : 6 = <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">3</span></span>.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">4</span><span class=\"c-den\">6</span></span> = 6 · <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">3</span></span> = 4.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 666E2D"
+  },
+  {
+   "v": 1,
+   "id": "fipi:6B7C84",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 13,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/6B7C84_1.png",
+     "w": 111,
+     "h": 178,
+     "alt": "рисунок ФИПИ",
+     "maxw": 111
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1"
+     }
+    ],
+    "value": "1"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные горизонтальные отрезки. Q и R лежат в узлах сетки, длина QR — 3 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 2 клеток, до QR — 6 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 2 : 6 = <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">3</span></span>.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">6</span></span> = 3 · <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">3</span></span> = 1.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 6B7C84"
+  },
+  {
+   "v": 1,
+   "id": "fipi:6BF7BE",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 14,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/6BF7BE_1.png",
+     "w": 156,
+     "h": 133,
+     "alt": "рисунок ФИПИ",
+     "maxw": 156
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2.5"
+     }
+    ],
+    "value": "2,5"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные горизонтальные отрезки. Q и R лежат в узлах сетки, длина QR — 5 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 2 клеток, до QR — 4 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 2 : 4 = 0,5.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">4</span></span> = 5 · 0,5 = 2,5.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 6BF7BE"
   },
   {
    "v": 1,
@@ -33028,6 +33784,114 @@
   },
   {
    "v": 1,
+   "id": "fipi:B754B5",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 17,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/B754B5_1.png",
+     "w": 111,
+     "h": 112,
+     "alt": "рисунок ФИПИ",
+     "maxw": 111
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2"
+     }
+    ],
+    "value": "2"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные горизонтальные отрезки. Q и R лежат в узлах сетки, длина QR — 3 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 2 клеток, до QR — 3 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 2 : 3 = <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">3</span></span>.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">3</span></span> = 3 · <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">3</span></span> = 2.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание B754B5"
+  },
+  {
+   "v": 1,
+   "id": "fipi:BF9D29",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 18,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/BF9D29_1.png",
+     "w": 133,
+     "h": 133,
+     "alt": "рисунок ФИПИ",
+     "maxw": 133
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "3"
+     }
+    ],
+    "value": "3"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные вертикальные отрезки. Q и R лежат в узлах сетки, длина QR — 4 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 3 клеток, до QR — 4 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 3 : 4 = 0,75.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">4</span></span> = 4 · 0,75 = 3.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание BF9D29"
+  },
+  {
+   "v": 1,
+   "id": "fipi:C07243",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 19,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/C07243_1.png",
+     "w": 178,
+     "h": 178,
+     "alt": "рисунок ФИПИ",
+     "maxw": 178
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1"
+     }
+    ],
+    "value": "1"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные вертикальные отрезки. Q и R лежат в узлах сетки, длина QR — 6 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 1 клеток, до QR — 6 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 1 : 6 = <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">6</span></span>.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">6</span></span> = 6 · <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">6</span></span> = 1.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание C07243"
+  },
+  {
+   "v": 1,
    "id": "fipi:C4C564",
    "exam": "oge",
    "slug": "oge15_18",
@@ -33097,6 +33961,42 @@
    },
    "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные горизонтальные отрезки. Q и R лежат в узлах сетки, длина QR — 6 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 3 клеток, до QR — 6 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 3 : 6 = 0,5.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">6</span></span> = 6 · 0,5 = 3.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
    "source": "Открытый банк заданий ФИПИ, задание D8A536"
+  },
+  {
+   "v": 1,
+   "id": "fipi:FE6B22",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 18,
+   "proto": "fipi18_figure_length",
+   "pos": 22,
+   "math": "html",
+   "text": "<div>[[fig:0]]<p>На клетчатой бумаге с размером клетки 1 × 1 изображена фигура. Найдите длину отрезка <i>AB</i> по данным чертежа.</p></div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/FE6B22_1.png",
+     "w": 178,
+     "h": 178,
+     "alt": "рисунок ФИПИ",
+     "maxw": 178
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2"
+     }
+    ],
+    "value": "2"
+   },
+   "solution": "<div><div class=\"c-line\">На рисунке QR и AB — параллельные горизонтальные отрезки. Q и R лежат в узлах сетки, длина QR — 6 клеток.</div><div class=\"c-line\">По направлению, перпендикулярному этим отрезкам, от общей вершины P до AB — 2 клеток, до QR — 6 клеток.</div><div class=\"c-line\">Точная поперечная координата P не нужна: треугольники с общей вершиной P и основаниями AB, QR подобны.</div><div class=\"c-line\">Коэффициент подобия: 2 : 6 = <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">3</span></span>.</div><div class=\"c-line\">AB = QR · <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">6</span></span> = 6 · <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">3</span></span> = 2.</div><div class=\"c-line\">Размер клетки 1 × 1, поэтому полученное число — длина AB в единицах чертежа.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание FE6B22"
   },
   {
    "v": 1,

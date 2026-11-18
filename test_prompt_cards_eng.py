@@ -85,8 +85,8 @@ def main():
     # 1. валидатор и состав
     rc = validate.main([])
     check("1 валидатор зелёный", rc == 0)
-    path = os.path.join(HERE, "cards", "eng_oge.json")
-    d = json.load(open(path, encoding="utf-8"))
+    from tools.cards.split import load_page, canon   # eng_oge лежит частями по номерам (split.py)
+    d = load_page("eng_oge")
     cards = d["cards"]
     check("1 458 карточек", len(cards) == 458, str(len(cards)))
     by_n = {}
@@ -96,15 +96,15 @@ def main():
     check("1 id уникальны", len({c["id"] for c in cards}) == len(cards))
     check("1 partial нет (собрана вся страница)", not d.get("partial"))
     # 9. размер
-    size = os.path.getsize(path)
-    check(f"9 eng_oge.json {size / 1024:.0f} КБ не больше 3 МБ", size <= 3 * 1024 * 1024)
+    size = sum(os.path.getsize(os.path.join(HERE, "cards", f)) for f in os.listdir(os.path.join(HERE, "cards")) if re.fullmatch(r"eng_oge_n\d+\.json", f))
+    check(f"9 eng_oge_n*.json {size / 1024:.0f} КБ не больше 3 МБ", size <= 3 * 1024 * 1024)
     # 2. свежая сборка = лежащая
     with tempfile.TemporaryDirectory() as tmp:
         r = subprocess.run([sys.executable, os.path.join(HERE, "tools", "cards", "build.py"), "--family", "c_eng", "--out", tmp],
                            cwd=HERE, capture_output=True, text=True, timeout=600)
         check("2 сборка прошла без необработанных", r.returncode == 0, r.stdout[-800:] + r.stderr[-800:])
-        a = open(os.path.join(tmp, "eng_oge.json"), "rb").read()
-        check("2 свежая сборка = cards/eng_oge.json", a == open(path, "rb").read())
+        a = canon(json.load(open(os.path.join(tmp, "eng_oge.json"), encoding="utf-8"))["cards"])
+        check("2 свежая сборка = cards/eng_oge_n*.json", a == canon(cards))
     # 8. схема и валидатор про audio
     base = next(c for c in cards if c.get("audio"))
     import copy
