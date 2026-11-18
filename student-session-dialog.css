@@ -1,0 +1,48 @@
+#smEndDialog {
+  --sm-surface: var(--bg, #f5f6fa);
+  --sm-text: var(--pencil, #20232b);
+  --sm-muted: var(--muted-3, #545966);
+  --sm-edge: var(--grid, #d9dfe9);
+  --sm-accent: var(--ink, #004c99);
+  box-sizing: border-box;
+  inset: 0;
+  margin: auto;
+  width: min(420px, calc(100% - 32px));
+  max-width: none;
+  max-height: calc(100% - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--sm-surface);
+  color: var(--sm-text);
+  border: 1px solid var(--sm-edge);
+  border-radius: 20px;
+  padding: 22px;
+  box-shadow: 0 16px 60px #12182938;
+  text-align: left;
+  font: 15px/1.4 var(--font-ui, system-ui), sans-serif;
+}
+#smEndDialog::backdrop { background: rgb(12 16 28 / .48); }
+#smEndDialog h2, #smEndDialog h3, #smEndDialog p, #smEndDialog ul { margin: 0; }
+#smEndDialog h2 { font: inherit; font-size: 20px; font-weight: 700; line-height: 1.25; overflow-wrap: anywhere; }
+#smEndDialog h3 { font: inherit; font-weight: 650; }
+#smEndDialog .sm-end-actions { display: grid; gap: 6px; margin: 16px 0 20px; }
+#smEndDialog button {
+  min-height: 40px;
+  padding: 8px 12px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--sm-accent);
+  background: transparent;
+  border: 1px solid var(--sm-edge);
+  border-radius: 10px;
+  cursor: pointer;
+}
+#smEndDialog button:focus-visible { outline: 2px solid var(--sm-accent); outline-offset: 2px; }
+#smEndDialog [data-scope="here"] { color: white; background: var(--sm-accent); border-color: transparent; }
+#smEndDialog ul { list-style: none; padding: 0; }
+#smEndDialog li { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--sm-edge); }
+#smEndDialog li div { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+#smEndDialog li button { font-size: 13px; }
+#smEndDialog p, #smEndDialog small { font-size: 13px; color: var(--sm-muted); }
+#smEndDialog [data-cancel] { display: block; margin: 14px 0 0 auto; }

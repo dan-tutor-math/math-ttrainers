@@ -92,8 +92,8 @@
     return s && s.sessionBind === 'tab' ? 'tab' : 'browser';
   }
 
-  if (document.currentScript?.hasAttribute('data-group-only') &&
-      (bindMode() !== 'tab' || (!new URL(location.href).searchParams.has('sm') && !ssGet(SS_GID)))) return;
+  if (document.currentScript?.hasAttribute('data-group-only') && !new URL(location.href).searchParams.has('sm') &&
+      (bindMode() !== 'tab' || !ssGet(SS_GID))) return;
 
   /* ── роль в совместной сессии ──
      Смотрим сразу несколько признаков, а не один TrainerSession.isLeader():
@@ -146,6 +146,10 @@
   function registry(){
     const now = Date.now(), keys = allKeys().sort(), active = {}, reserved = new Set();
     for (const k of keys){
+      if (k.startsWith(MOVE_ACK)){
+        const receipt = parse(lsGet(k), null);
+        if (!receipt || now - receipt.at >= MAX_AGE) lsDel(k);
+      }
       if (!k.startsWith(MEMBER)) continue;
       const [gid, id] = k.slice(MEMBER.length).split(':');
       const stamp = Number(lsGet(k));
@@ -266,15 +270,21 @@
     ssDel(SS_GID); ssDel(SS_CODE);
     if (target && groupData(target)){
       explicitJoin = !!gid || !!duplicate;
-      if (join(target) && move){
-        lsSet(MOVE_ACK + move, target);
-        lsDel(MOVE_ACK + move);
-      }
+      if (join(target) && move) lsSet(MOVE_ACK + move, JSON.stringify({ gid: target, at: Date.now() }));
     } else if (!gid && !split && !mismatch && !isFollower() && old?.student?.id){
       createGroup(old);
     }
     ssDel(SS_TAB);
+    finishMove();
     registry();
+  }
+  function finishMove(){
+    const token = ssGet(SS_MOVE);
+    if (!token || !IN_TOP || bindMode() !== 'tab') return;
+    const receipt = parse(lsGet(MOVE_ACK + token), null);
+    if (!receipt || receipt.gid !== ssGet(SS_GID)) return;
+    lsDel(MOVE_ACK + token);
+    end();
   }
   document.addEventListener('click', e => {
     const link = e.target.closest?.('a.bl-tabs-link, a[target="_blank"][href*="deck-guide.html"], a#wkOpen');
@@ -286,6 +296,7 @@
   });
   function heartbeat(){
     if (!IN_TOP || suspended || bindMode() !== 'tab' || isFollower()) return;
+    finishMove();
     const gid = ssGet(SS_GID);
     if (!gid) return;
     if (!readTab() && !registry()[gid]) { clearMember(); return; }
@@ -755,6 +766,95 @@
     scheduleFlush(0);
   }
 
+  const tabPlural = new Intl.PluralRules('ru');
+  function tabCount(n){
+    const word = { one: 'вкладка', few: 'вкладки', many: 'вкладок' }[tabPlural.select(n)] || 'вкладки';
+    return n + ' ' + word;
+  }
+  function sessionHint(){
+    const n = (groups().find(g => g.here)?.tabs || 1) - 1;
+    return 'Идёт сессия с этим учеником' + (n ? ' (ещё в ' + n + (tabPlural.select(n) === 'one' ? ' вкладке)' : ' вкладках)') : '');
+  }
+  function askEnd(){
+    const s = current();
+    if (!s || isFollower()) return;
+    const list = groups(), initial = list.find(g => g.here);
+    if (s.mode === 'browser' || (list.length === 1 && initial?.tabs === 1)) { end(); return; }
+    if (!initial || document.getElementById('smEndDialog')) return;
+    if (!document.getElementById('smEndCss')){
+      const link = document.createElement('link');
+      link.id = 'smEndCss'; link.rel = 'stylesheet';
+      link.href = new URL('student-session-dialog.css', SCRIPT?.src || location.href).href;
+      document.head.appendChild(link);
+    }
+    const dialog = document.createElement('dialog');
+    dialog.id = 'smEndDialog';
+    dialog.setAttribute('aria-labelledby', 'smEndTitle');
+    dialog.innerHTML = '<h2 id="smEndTitle"></h2><div class="sm-end-actions">' +
+      '<button type="button" data-scope="here">Закончить здесь</button><button type="button" data-scope="all"></button></div>' +
+      '<h3>Идущие сессии</h3><ul></ul><button type="button" data-cancel autofocus>Отмена</button>';
+    const labels = new Map(), requested = new Set();
+    // Старые сессии содержат только lessonId. Для них читаем расписание,
+    // как в кабинете; обычный старт уже передаёт подпись занятия.
+    async function loadLabels(rows){
+      const ids = [...new Set(rows.map(g => !g.lessonLabel && g.lessonId).filter(id => id && !requested.has(id)))];
+      const c = client();
+      if (!ids.length || !c) return;
+      ids.forEach(id => requested.add(id));
+      try {
+        const { data } = await c.from('lessons').select('id,day,start_min').in('id', ids);
+        for (const l of data || []){
+          if (!l.day) continue;
+          const day = new Date(l.day + 'T12:00:00').toLocaleDateString('ru-RU', { month:'long', day:'numeric' });
+          const time = l.start_min == null ? '' : ', ' + Math.floor(l.start_min / 60) + ':' + String(l.start_min % 60).padStart(2, '0');
+          labels.set(l.id, day + time);
+        }
+        if (dialog.open) paint();
+      } catch (e) { /* без сети остаются имя ученика и начало сессии */ }
+    }
+    let lastList = '';
+    function paint(){
+      const rows = groups(), here = rows.find(g => g.here);
+      if (here?.gid !== initial.gid) { if (dialog.open) dialog.close(); return; }
+      dialog.querySelector('h2').textContent = 'Закончить сессию с ' + here.name + '?';
+      dialog.querySelector('[data-scope="all"]').textContent = 'Закончить везде (' + tabCount(here.tabs) + ')';
+      const html = rows.sort((a, b) => Number(b.here) - Number(a.here) || a.startedAt - b.startedAt).map(g => {
+        const since = new Date(g.startedAt).toLocaleTimeString('ru-RU', { hour:'2-digit', minute:'2-digit' });
+        const meta = [g.lessonLabel || labels.get(g.lessonId) || (g.lessonId ? 'Занятие' : ''), tabCount(g.tabs), 'идёт с ' + since, g.paused ? 'пауза' : ''].filter(Boolean);
+        return '<li><div><strong>' + esc(g.name) + '</strong>' + (g.here ? ' <small>эта вкладка</small>' : '') +
+          '<p>' + esc(meta.join(' · ')) + '</p></div><button type="button" data-group="' + esc(g.gid) +
+          '" aria-label="Закончить сессию с ' + esc(g.name) + '">Закончить</button></li>';
+      }).join('');
+      if (lastList !== html) { dialog.querySelector('ul').innerHTML = html; lastList = html; }
+      loadLabels(rows);
+    }
+    dialog.addEventListener('keydown', e => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); dialog.close(); }
+    });
+    dialog.addEventListener('click', e => {
+      const b = e.target.closest('button');
+      if (!b){
+        const r = dialog.getBoundingClientRect();
+        if (e.target === dialog && (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom)) dialog.close();
+        return;
+      }
+      if (b.hasAttribute('data-cancel')) { dialog.close(); return; }
+      if (bindMode() !== 'tab' || ssGet(SS_GID) !== initial.gid || !current()) { dialog.close(); return; }
+      const target = b.dataset.group;
+      if (target && target !== initial.gid) {
+        end({ scope:target });
+        dialog.querySelector('[data-cancel]').focus();
+        return;
+      }
+      dialog.close();
+      end({ scope:target || b.dataset.scope });
+    });
+    const off = onChange(paint);
+    dialog.addEventListener('close', () => { off(); dialog.remove(); }, { once:true });
+    document.body.appendChild(dialog);
+    paint(); dialog.showModal();
+  }
+
   async function listStudents(){
     const c = client();
     if (!c) throw new Error('Нет подключения к серверу');
@@ -998,7 +1098,7 @@
     }
     const a = b.getAttribute('data-sm');
     if (a === 'pause') pause();
-    else if (a === 'end') end();
+    else if (a === 'end') askEnd();
     else if (a === 'pick') openMenu();
     else if (a === 'mini') setMini(true);
     else if (a === 'expand') setMini(false);
@@ -1007,9 +1107,7 @@
 
   /* ── события браузера ── */
   window.addEventListener('storage', e => {
-    if (IN_TOP && e.newValue && e.key === MOVE_ACK + ssGet(SS_MOVE) && ssGet(SS_GID) === e.newValue){
-      end(); return;
-    }
+    if (e.newValue && e.key === MOVE_ACK + ssGet(SS_MOVE)) { finishMove(); return; }
     if (e.key === REGISTRY && bindMode() === 'tab'){
       const currentGroup = ssGet(SS_GID);
       if (currentGroup && !lsGet(INFO + currentGroup) && IN_TOP) clearMember();
@@ -1095,7 +1193,7 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', undoInit); else undoInit();
 
   window.StudentMemory = {
-    current, groups, start, end, pause, record, recordTask, recordAttempt, summary, kindSummary, keys, logState, forget, fetchLog, loadLog,
+    current, groups, start, end, askEnd, sessionHint, pause, record, recordTask, recordAttempt, summary, kindSummary, keys, logState, forget, fetchLog, loadLog,
     listStudents, onChange, flush, isFollower, bindMode, setPickerContext, goHome, handoffUrl, openBoardTab,
     queue: () => readQueue().slice(), deadLetters: () => parse(lsGet(LS_DEAD), []),
     THROTTLE_MS,

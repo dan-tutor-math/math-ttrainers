@@ -529,12 +529,12 @@ function bindSessionBtn(s){
     const cur = SM.current();
     const mine = !!(cur && cur.id === String(s.id));
     btn.textContent = mine ? 'Закончить сессию' : 'Начать сессию';
-    $('cSessionHint').textContent = mine ? 'Идёт сессия с этим учеником' + (cur.paused ? ' (пауза)' : '') + '.'
+    $('cSessionHint').textContent = mine ? SM.sessionHint() + (cur.paused ? ' (пауза)' : '') + '.'
       : (cur ? 'Сейчас идёт сессия с учеником «' + cur.name + '» — она сменится.' : 'Задания, выданные и решённые в сессии, запомнятся за учеником.');
   };
   btn.addEventListener('click', async () => {
     const cur = SM.current();
-    if (cur && cur.id === String(s.id)) { SM.end(); return; }
+    if (cur && cur.id === String(s.id)) { SM.askEnd(); return; }
     btn.disabled = true;
     let ok = false;
     try { await SM.start({ id: s.id, name: $('cName').textContent || s.name }); ok = true; }

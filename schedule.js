@@ -1769,7 +1769,7 @@
     const SM = window.StudentMemory, s = st.byId[panel.sid];
     if (!SM || !s) return;
     const cur = SM.current();
-    if (cur && cur.id === String(s.id) && cur.lessonId === l.id) { SM.end(); return; }
+    if (cur && cur.id === String(s.id) && cur.lessonId === l.id) { SM.askEnd(); return; }
     const btn = panel.el.querySelector('#spSession');
     if (btn) btn.disabled = true;
     let ok = false;
@@ -1811,7 +1811,7 @@
           api.sessionButtons('sp', mine ? 'Закончить сессию' : 'Начать сессию', s.archived_at, board) +
         '</div>' +
         (panel.pick && !board ? pinPickHtml() : '') +
-        '<div class="hint" id="spHint">' + (mine ? 'Идёт сессия с этим учеником' + (cur.paused ? ' (пауза)' : '') + ': задания запишутся на это занятие.'
+        '<div class="hint" id="spHint">' + (mine ? SM.sessionHint() + (cur.paused ? ' (пауза)' : '') + ': задания запишутся на это занятие.'
           : cur ? 'Сейчас идёт сессия с учеником «' + esc(cur.name) + '» — она сменится.' : 'Задания сессии запишутся на это занятие.') +
           (board ? ' Доска: ' + esc(boardWhere) + '.' : '') + '</div>';
     } else if (!l.is_event) {

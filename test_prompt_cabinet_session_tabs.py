@@ -10,7 +10,7 @@ from test_prompt_rus_board_check import BOOT_JS, LITE, SEED_JS
 
 WEEK = f"{BASE}/cabinet.html#/schedule/2026-11-16"
 SETTINGS = f"{BASE}/cabinet.html#/settings"
-HANDOFF_KEYS = "Object.keys(localStorage).filter(k => k.startsWith('studentMem:handoff:'))"
+HANDOFF_KEYS = "Object.keys(localStorage).filter(k => k.startsWith('studentMem:received:') || k.startsWith('studentMem:handoff:'))"
 
 
 def schedule(page, lesson):
