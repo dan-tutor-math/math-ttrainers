@@ -96,6 +96,9 @@
    свёрстан иначе, чем кадр, и его подмена кадром дёргала вид и высоту */
 .tc-wait{display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-size:15px;}
 .tc-wait::after{content:'Загружаю задание…';animation:tcWait 1.2s ease-in-out infinite alternate;}
+.tc-card{--card-muted:var(--muted-2);}
+.tc-card.tc-wait{width:100%;}
+.tc-err{padding:24px 12px;text-align:center;color:var(--muted-2);font-size:15px;display:flex;flex-direction:column;gap:10px;align-items:center;}
 @keyframes tcWait{from{opacity:.35}to{opacity:1}}
 /* «По одному»: уже открытые задания не пересоздаются, а прячутся — кадр
    тренажёра в них живёт (перенос iframe в другое место DOM перезагрузил бы
@@ -277,6 +280,7 @@
 <script src="lazy-libs.js"></script>
 <script src="blank-forms.js"></script>
 <script src="work-print.js"></script>
+<script src="card-render.js"></script>
 <script src="works-cloud.js"></script>
 <script>
 (function(){
@@ -301,7 +305,8 @@ themeBtn.addEventListener('click', () => {
   if (!S.blocks || $('scrTask').hidden) return;
   allViews().forEach(v => {
     if (v.theory){ const im = imgOf(v.b.theory); const ti = v.theory.box.querySelector('img'); if (im && ti) ti.src = im.url; }
-    if (liveReady(v)) setLiveTheme(v);
+    if (isCardBlock(v.b)){ /* карточка красится цветами страницы (CSS-переменные) — перерисовка не нужна */ }
+    else if (liveReady(v)) setLiveTheme(v);
     else if (!(v.live && v.live.state === 'loading')){ renderCard(v); applyState(v); }
     v.barEl.querySelectorAll('.pen').forEach(b => { const p = PENS[Number(b.dataset.k)]; b.querySelector('.dot').style.background = curTheme() === 'dark' ? p.d : p.c; });
   });
@@ -342,7 +347,11 @@ $('wPrint') && $('wPrint').addEventListener('click', () => WorkPrint.ask(() => {
   if (!blocks.length) return 'В работе нет заданий';
   return { key: code, title: (S.work && S.work.title) || C.kindLabel(S.work.kind, S.settings), variants: [{ num: 1, blocks }] };
 }, { student: true }));
-const taskBlocks = () => (S.blocks || []).filter(b => (b.type || 'task') === 'task');
+// задание — снимок тренажёра (task) или карточка ФИПИ (card, задача 63): ответ и
+// проверка у обоих одни (поле task), отличается только, как рисуется условие
+const isTaskBlock = b => { const t = (b && b.type) || 'task'; return t === 'task' || t === 'card'; };
+const isCardBlock = b => !!b && b.type === 'card';
+const taskBlocks = () => (S.blocks || []).filter(isTaskBlock);
 const curBlock = () => taskBlocks()[S.cur];
 const videoBlocks = () => (S.blocks || []).filter(b => b.type === 'video');
 const isVideoId = id => videoBlocks().some(b => b.id === id);
@@ -542,6 +551,7 @@ async function boot(){
     return;
   }
   S.blocks = (opened.variant && opened.variant.blocks) || [];
+  prefetchCards();
   if (rec && await tryResume(rec, false)) return;
   showStart();
 }
@@ -801,6 +811,7 @@ function buildView(b, i){
 }
 
 function renderCard(v){
+  if (isCardBlock(v.b)) return renderFipiCard(v);
   const b = v.b, wrap = v.wrap, below = v.below;
   wrap.innerHTML = ''; below.innerHTML = ''; below.hidden = true;
   v.inputs = []; v.opts = []; v.check = null; v.belowMode = false;
@@ -951,6 +962,16 @@ function fitViewRaw(v){
     v.box.style.width = wl + 'px';
     v.box.style.height = v.H + 'px';
     k = Math.max(0.25, avail * S.fill / wl);
+  } else if (isCardBlock(v.b)){
+    // карточка ФИПИ — обычная вёрстка условия (CardRender), а не снимок: ширина —
+    // доля колонки, «A+» делает текст крупнее (вёрстка уже, масштаб больше),
+    // высота — по содержимому, как у живого кадра
+    const wl = Math.max(CARD_MIN, Math.round(avail * S.fill / S.lzoom));
+    v.W = wl;
+    v.box.style.width = wl + 'px';
+    if (v.cardEl && v.cardEl.isConnected){ const h = v.cardEl.offsetHeight; if (h > 20) v.H = h; }
+    v.box.style.height = v.H + 'px';
+    k = Math.max(0.25, avail * S.fill / wl);
   } else if (liveReady(v)){
     // живое: кадр верстается по настоящей ширине карточки (доля колонки
     // S.fill), как сам тренажёр, а не растягивается картинкой с 440 px.
@@ -1009,6 +1030,98 @@ function wireResize(rz, v, side){
   rz.addEventListener('pointerup', end);
   rz.addEventListener('pointercancel', end);
   rz.addEventListener('dblclick', () => { S.fill = 1; lsSet(LS.fill, 1); fitAll(); });
+}
+
+/* ── карточка ФИПИ (задача 63, S4a) ──
+   Блок type:'card' — ссылка на карточку cards/<slug>.json (формат — memory/works.md,
+   cards/_schema.json): условие рисует CardRender.render, без снимка и без кадра
+   тренажёра. Ответ, проверка, попытки, черновик, заметки — как у снимка (поле task).
+   Файл карточек — один на страницу-экзамен: грузится лениво при первом блоке этого
+   slug (вся работа ждёт один файл, а не 17 страниц по 10–17 МБ) и кэшируется в
+   памяти. Пока файла нет — «Загружаю задание…» с резервом высоты. Карточка не
+   нашлась или файл не загрузился — сообщение и «Повторить», а не пустое место. */
+const CARD_MIN = 300;      // уже карточку не верстаем (как LIVE_MIN у кадра)
+const CARD_PH = 220;       // резерв высоты до загрузки карточки, в единицах карточки
+const cardFiles = new Map();   // slug → { p: Promise, byId: Map | null }
+function cardFile(slug){
+  let f = cardFiles.get(slug);
+  if (!f){
+    f = { byId: null };
+    f.p = fetch('cards/' + encodeURIComponent(slug) + '.json', { cache: 'no-cache' })
+      .then(r => { if (!r.ok) throw new Error('cards/' + slug + '.json: ' + r.status); return r.json(); })
+      .then(d => {
+        if (!d || !Array.isArray(d.cards)) throw new Error('cards/' + slug + '.json: нет карточек');
+        f.byId = new Map(d.cards.map(c => [c.id, c]));
+        return f;
+      })
+      // сбой — не запоминаем: «Повторить» попробует снова
+      .catch(e => { if (cardFiles.get(slug) === f) cardFiles.delete(slug); throw e; });
+    cardFiles.set(slug, f);
+  }
+  return f;
+}
+const cardNow = b => { const f = cardFiles.get(b.slug); return f && f.byId ? f.byId.get(b.card) || null : null; };
+// файлы карточек всей работы — заранее, до того как ученик дойдёт до заданий
+function prefetchCards(){
+  new Set((S.blocks || []).filter(isCardBlock).map(b => b.slug).filter(Boolean)).forEach(slug => { cardFile(slug).p.catch(() => {}); });
+}
+function renderFipiCard(v){
+  const b = v.b;
+  v.wrap.innerHTML = ''; v.below.innerHTML = ''; v.below.hidden = true;
+  v.inputs = []; v.opts = []; v.check = null; v.belowMode = false;
+  v.cardEl = null; v.cstate = 'loading';
+  const tok = v.ctok = (v.ctok || 0) + 1;
+  const box = el('div', 'tc-box tc-card tc-wait');
+  v.wrap.appendChild(box);
+  v.box = box; v.W = CARD_MIN; v.H = CARD_PH;
+  const done = c => { if (v.ctok === tok && v.box === box) cardFill(v, c); };
+  const fail = e => {
+    if (v.ctok !== tok || v.box !== box) return;
+    console.warn('[работа] карточка не открылась', e);
+    v.cstate = 'failed';
+    box.classList.remove('tc-wait');
+    const msg = el('div', 'tc-err', '<div>Не удалось загрузить задание.</div>');
+    const retry = el('button', 'btn quiet small', 'Повторить');
+    retry.type = 'button';
+    retry.addEventListener('click', () => { renderFipiCard(v); fitView(v); applyState(v); });
+    msg.appendChild(retry);
+    box.appendChild(msg);
+    v.cardEl = msg;
+    fitView(v); applyState(v);
+  };
+  const c0 = cardNow(b);
+  if (c0 && (!CardRender.needsTex(c0) || window.katex)) { done(c0); return; }   // всё уже в памяти — без «Загружаю…»
+  cardFile(b.slug).p
+    .then(f => {
+      const c = f.byId.get(b.card);
+      if (!c) throw new Error('в cards/' + b.slug + '.json нет карточки ' + b.card);
+      return CardRender.ready([c], { root: '' }).then(() => c);
+    })
+    .then(done, fail);
+}
+function cardFill(v, c){
+  const box = v.box;
+  v.cstate = 'ready';
+  box.classList.remove('tc-wait');
+  box.innerHTML = '';
+  const root = CardRender.render(c, { base: 'cards/' });
+  box.appendChild(root);
+  v.cardEl = root;
+  // поля и варианты — под условием, как у снимка без мест под поля (по v.b.task)
+  buildBelow(v);
+  if (!v.wrap.querySelector('.tc-resize')) addResizeHandles(v, v.wrap);
+  // картинки, шрифты и стили KaTeX дорисовываются позже — высота по содержимому
+  try { new ResizeObserver(() => { if (v.cardEl === root && root.isConnected) fitView(v); }).observe(root); } catch (e) {}
+  if (v.root.isConnected){ fitView(v); applyState(v); }
+}
+// «Тренировка»: тот же номер ФИПИ в тренажёре — по месту в каталоге (series.proto/pos/n)
+async function openCardInTrainer(w, series){
+  const t0 = Date.now();
+  while (!(w.__trainerCatalog && typeof w.__trainerCatalog.openAt === 'function')){
+    if (Date.now() - t0 > 8000) return;
+    await wait(100);
+  }
+  await w.__trainerCatalog.openAt(series.proto, series.pos, series.n);
 }
 
 /* ── живое задание ──
@@ -1296,12 +1409,14 @@ function setLiveTheme(v){
 }
 // масштаб «− / +»: у живых — крупность текста (кадр перестраивается), у
 // картинок — доля колонки (картинку крупнее не сделать, только шире)
+// у живых кадров и карточек «A±» — крупность текста, у картинок — доля колонки
+const scaledView = v => liveReady(v) || isCardBlock(v.b);
 function zoomStep(dir){
-  if (VIEWS.some(liveReady)){
+  if (VIEWS.some(scaledView)){
     S.lzoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(S.lzoom * (dir > 0 ? 1.15 : 1 / 1.15) * 100) / 100));
     lsSet(LS.lzoom, S.lzoom);
   }
-  if (VIEWS.some(v => !liveReady(v))){ S.fill = clampFill(S.fill + dir * 0.1); lsSet(LS.fill, S.fill); }
+  if (VIEWS.some(v => !scaledView(v))){ S.fill = clampFill(S.fill + dir * 0.1); lsSet(LS.fill, S.fill); }
   fitAll();
 }
 $('wZoomOut').addEventListener('click', () => zoomStep(-1));
@@ -1463,7 +1578,7 @@ function applyState(v){
   // своя «Проверить» есть на самой карточке — вторая под ней не нужна.
   // «В конце» обе подписаны «Ответить»: «Проверить» обещало бы вердикт
   const label = end ? (a && a.value ? 'Изменить ответ' : 'Ответить') : null;
-  v.bCheck.hidden = fin || t.kind === 'choice' || !!v.check || !!v.wait;
+  v.bCheck.hidden = fin || t.kind === 'choice' || !!v.check || !!v.wait || v.cstate === 'loading';
   v.bCheck.textContent = label || 'Проверить';
   if (v.check) v.check.textContent = label || v.checkText;
   v.bSkip.hidden = fin;
@@ -1625,6 +1740,7 @@ function openTrainer(v){
           try {
             if (b.exact) w.tsApplyState(JSON.parse(JSON.stringify(b.exact)));
             else if (b.gen) await genShowSameInFrame(w, b.gen);
+            else if (isCardBlock(b) && b.series && b.series.proto != null) await openCardInTrainer(w, b.series);
           } catch (e) { console.warn('[работа] не открыли то же задание в тренажёре', e); }
           try {
             w.document.addEventListener('click', ev => {
@@ -1686,7 +1802,7 @@ function videosAround(task){
   const bl = S.blocks || [];
   const at = bl.indexOf(task);
   const before = [];
-  for (let k = at - 1; k >= 0 && (bl[k].type || 'task') !== 'task'; k--) if (bl[k].type === 'video') before.unshift(bl[k]);
+  for (let k = at - 1; k >= 0 && !isTaskBlock(bl[k]); k--) if (bl[k].type === 'video') before.unshift(bl[k]);
   const after = [];
   const last = taskBlocks()[taskBlocks().length - 1] === task;
   if (last) for (let k = at + 1; k < bl.length; k++) if (bl[k].type === 'video') after.push(bl[k]);

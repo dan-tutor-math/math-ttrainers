@@ -11,10 +11,16 @@
    - build / print / download / ask — печать и PDF: задания по вариантам,
      бланк ответов, ключ. Одна вёрстка листов А4 (книжная или альбомная; в
      альбомной — две колонки, как КИМ) идёт и в печать (window.print и
-     @media print), и в PDF-файл (html2canvas + jsPDF, каждый лист — страница).
-     На экране блок #wpPrint скрыт, при печати скрыто всё, кроме него. Стили —
-     здесь же, чтобы не раздувать works.html. Задания пока снимками (текст и
-     формулы вектором — после задачи 63).
+     @media print), и в PDF-файл. На экране блок #wpPrint скрыт, при печати
+     скрыто всё, кроме него. Стили — здесь же, чтобы не раздувать works.html.
+   - Задание ФИПИ из карточки (блок type:'card', задача 63) печатается текстом
+     и формулами (card-render.js), рисунки — файлами cards/img/…; длинное
+     условие режется по абзацам/рисункам между колонками и листами. Задание-
+     снимок — картинкой, как раньше.
+   - «Скачать PDF» — вектором (work-pdf.js: браузер верстает листы, текст
+     переписывается в PDF со встроенными шрифтами — выделяется и ищется).
+     Не собрался вектор (нет библиотеки, сбой) — прежний путь html2canvas +
+     jsPDF картинками. Официальные бланки (blank-forms.js) — картинкой всегда.
 
    Нужны раньше: trainer-tasks.js (taPlainLabel), subjects-catalog.js
    (страница тренажёра по tid), exam-spec.js. Без них работает с запасными
@@ -25,7 +31,19 @@
 
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const plain = l => (typeof window.taPlainLabel === 'function' ? window.taPlainLabel(l) : String(l || '').replace(/<[^>]*>/g, '').trim());
-  const isTask = b => (b.type || 'task') === 'task';
+  // задание — снимок (task) или карточка ФИПИ (card); текст, видео, разделитель — нет
+  const isTask = b => { const t = b.type || 'task'; return t === 'task' || t === 'card'; };
+  // папка этого файла: отсюда же card-render.js, work-pdf.js, cards/, fonts/
+  const BASE = (() => { const s = document.currentScript; return s && s.src ? s.src.replace(/[^/]*$/, '') : ''; })();
+  function script(src, ok) {
+    if (ok()) return Promise.resolve();
+    return new Promise((res, rej) => {
+      const s = document.createElement('script'); s.src = src;
+      s.onload = () => ok() ? res() : rej(new Error('не загрузился ' + src));
+      s.onerror = () => rej(new Error('не загрузился ' + src));
+      document.head.appendChild(s);
+    });
+  }
 
   function correctText(t) {
     if (!t) return '';
@@ -161,6 +179,43 @@
     if (im) im.style.width = Math.round(cssW(b) * ZOOM) + 'px';
     return it;
   }
+  /* ── карточки ФИПИ (задача 63): блок {type:'card', card:'fipi:…', slug} → cards/<slug>.json ── */
+  const CARD_FILES = {};
+  const cardBase = () => (window.WorkPrint && window.WorkPrint.cardBase) || (BASE + 'cards/');
+  function cardFile(slug) {
+    const u = cardBase() + slug + '.json';
+    if (!CARD_FILES[u]) CARD_FILES[u] = fetch(u).then(r => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .catch(e => { delete CARD_FILES[u]; console.warn('[печать] нет файла карточек', u, e); return null; });
+    return CARD_FILES[u];
+  }
+  // блок → карточка; не нашлась — блока в Map нет (печатается заглушкой с названием)
+  async function cardsOf(blocks) {
+    const out = new Map();
+    const cb = blocks.filter(b => b.type === 'card' && b.slug && b.card);
+    if (!cb.length) return out;
+    await script(BASE + 'card-render.js', () => !!window.CardRender);
+    const files = {};
+    await Promise.all([...new Set(cb.map(b => b.slug))].map(async sl => { files[sl] = await cardFile(sl); }));
+    cb.forEach(b => { const f = files[b.slug]; const c = f && (f.cards || []).find(x => x.id === b.card); if (c) out.set(b, c); });
+    try { await window.CardRender.ready([...out.values()], { root: BASE }); }
+    catch (e) { console.warn('[печать] KaTeX не загрузился — формулы останутся TeX', e); }
+    return out;
+  }
+  // рисунки карточки: maxw — ширина на экране тренажёра при шрифте 18 px; на листе шрифт
+  // 14 px, рисунок уменьшаем в той же доле, чтобы подписи на нём были соразмерны тексту
+  const FIGK = 14 / 18;
+  function cardItem(b, i, card) {
+    const it = mk('<div class="wp-task wp-card"><div class="wp-n">' + (i + 1) + '</div><div class="wp-body"></div></div>');
+    const body = it.querySelector('.wp-body');
+    if (!card) {
+      body.appendChild(mk('<div class="wp-noimg">' + esc(b.name || 'Задание') + ' — условие не загрузилось (карточка ' + esc(b.card || '?') + ')</div>'));
+      return it;
+    }
+    const el = window.CardRender.render(card, { base: cardBase(), print: true });
+    el.querySelectorAll('.cr-fig').forEach(f => { const w = parseFloat(f.style.maxWidth); if (w) f.style.maxWidth = Math.round(w * FIGK) + 'px'; });
+    body.appendChild(el);
+    return it;
+  }
   function blankItems(v) {
     const list = (v.blocks || []).filter(isTask);
     const cells = '<span class="wp-cells">' + '<i></i>'.repeat(14) + '</span>';
@@ -185,18 +240,85 @@
       + '<div class="wp-cols">' + '<div class="wp-col"></div>'.repeat(cols) + '</div><div class="wp-foot"></div></section>');
   }
   const over = c => c.scrollHeight > c.clientHeight + 1;
+  /* Разрез длинного задания между колонками. Куски — «атомы»: абзац, строка
+     формулы, рисунок, таблица, вариант ответа; строки одного абзаца не делим.
+     Атом, который не влез, и всё после него переносятся (не копируются) в
+     хвост — новый кусок задания без номера в следующей колонке. */
+  const ATOM = 'p, table, img, li, .cr-fig, .cr-opt, .c-eq, .c-line, .katex-display, .wp-noimg';
+  const isInline = n => n.nodeType === 3 ? /\S/.test(n.data) : (n.nodeType === 1 && /^inline/.test(getComputedStyle(n).display) && getComputedStyle(n).display !== 'none');
+  function atoms(el, out) {
+    const kids = [...el.childNodes];
+    const blocks = kids.filter(n => n.nodeType === 1 && !isInline(n) && getComputedStyle(n).display !== 'none');
+    if (!blocks.length) return;
+    // текст вперемешку с блоками: строчные куски — в обёртку-блок (браузер и так
+    // кладёт их в безымянный блок, вёрстка та же), чтобы и их можно было перенести
+    let run = [];
+    const flush = () => {
+      if (run.some(n => n.nodeType === 1 || /\S/.test(n.data))) {
+        const w = document.createElement('span'); w.className = 'wp-inl';
+        run[0].parentNode.insertBefore(w, run[0]); run.forEach(n => w.appendChild(n));
+      }
+      run = [];
+    };
+    kids.forEach(n => { if (n.nodeType === 3 || isInline(n) || (n.nodeType === 1 && n.tagName === 'BR')) run.push(n); else flush(); });
+    flush();
+    for (const ch of el.children) {
+      if (getComputedStyle(ch).display === 'none') continue;
+      const deep = ch.matches(ATOM) || ch.classList.contains('wp-inl') ? false : [...ch.children].some(k => !isInline(k));
+      if (deep) atoms(ch, out); else out.push(ch);
+    }
+  }
+  function cutBefore(root, node) {
+    let el = node, carry = null;
+    while (el !== root) {
+      const p = el.parentNode, pc = p.cloneNode(false);
+      let sib = el.nextSibling;
+      pc.appendChild(carry || el);
+      while (sib) { const nx = sib.nextSibling; pc.appendChild(sib); sib = nx; }
+      carry = pc; el = p;
+    }
+    return carry;
+  }
+  // minHead — сколько задания (px) должно остаться в колонке: огрызок в одну строку
+  // внизу листа хуже, чем перенос задания целиком
+  function splitItem(it, col, minHead) {
+    const body = it.querySelector('.wp-body');
+    if (!body) return null;
+    const limit = col.getBoundingClientRect().bottom;
+    const list = []; atoms(body, list);
+    const idx = list.findIndex(a => a.getBoundingClientRect().bottom > limit + 0.5);
+    if (idx <= 0) return null;          // первый же кусок не влезает — резать нечего
+    if (minHead && list[idx].getBoundingClientRect().top - it.getBoundingClientRect().top < minHead) return null;
+    const tail = cutBefore(it, list[idx]);
+    tail.classList.add('wp-cont');
+    tail.insertBefore(mk('<div class="wp-n wp-ncont" aria-hidden="true"></div>'), tail.firstChild);
+    return tail;
+  }
   function flowSection(root, sec, orient) {
     let sheet, cols, ci;
     const open = first => { sheet = mkSheet(sec, orient, first); root.appendChild(sheet); cols = [...sheet.querySelectorAll('.wp-col')]; ci = 0; };
     const advance = () => { if (ci + 1 < cols.length) ci++; else open(false); };
     open(true);
-    sec.items.forEach(it => {
-      cols[ci].appendChild(it);
-      if (over(cols[ci]) && cols[ci].children.length > 1) { advance(); cols[ci].appendChild(it); }
-      if (over(cols[ci])) {
-        // одно не влезает в целую колонку — уменьшаем картинки до её высоты
-        const mh = Math.max(80, cols[ci].clientHeight - 24) + 'px';
-        it.querySelectorAll('img').forEach(im => { im.style.width = 'auto'; im.style.maxHeight = mh; });
+    sec.items.forEach(first => {
+      let it = first;
+      while (it) {
+        cols[ci].appendChild(it);
+        if (over(cols[ci]) && cols[ci].children.length > 1) {
+          // в начатой колонке не влезло: длинное задание (больше половины колонки) режем
+          // здесь же, короткое переносим целиком — как в КИМ
+          const tall = it.offsetHeight > cols[ci].clientHeight / 2;
+          const tail = tall ? splitItem(it, cols[ci], cols[ci].clientHeight / 4) : null;
+          if (tail) { advance(); it = tail; continue; }
+          advance(); cols[ci].appendChild(it);
+        }
+        if (over(cols[ci])) {
+          const tail = splitItem(it, cols[ci]);
+          if (tail) { advance(); it = tail; continue; }
+          // один кусок не влезает в целую колонку — уменьшаем картинки до её высоты
+          const mh = Math.max(80, cols[ci].clientHeight - 24) + 'px';
+          it.querySelectorAll('img').forEach(im => { im.style.width = 'auto'; im.style.maxHeight = mh; });
+        }
+        it = null;
       }
     });
   }
@@ -224,9 +346,11 @@
     const many = vs.length > 1;
     const secs = [];
     const prep = new Map();
-    if (what.tasks) await Promise.all(vs.flatMap(v => (v.blocks || []).filter(isTask)).map(async b => { prep.set(b, await prepImg(b)); }));
+    const all = vs.flatMap(v => (v.blocks || []).filter(isTask));
+    if (what.tasks) await Promise.all(all.filter(b => b.type !== 'card').map(async b => { prep.set(b, await prepImg(b)); }));
+    const cards = what.tasks ? await cardsOf(all) : new Map();
     if (what.tasks) vs.forEach(v => secs.push({ cls: 'wp-tasks', head: head(work.title, v, many) + who, run: runT(work.title, v, many),
-      items: (v.blocks || []).filter(isTask).map((b, i) => taskItem(b, i, prep.get(b))) }));
+      items: (v.blocks || []).filter(isTask).map((b, i) => b.type === 'card' ? cardItem(b, i, cards.get(b)) : taskItem(b, i, prep.get(b))) }));
     const off = what.blank ? officialSet(work) : null;
     if (what.blank && (!off || off.some(x => x[0] === 'table'))) vs.forEach(v => secs.push({ cls: 'wp-blank', head: head(work.title, v, many) + '<div class="wp-sub">Бланк ответов</div>' + who,
       run: runT(work.title, v, many) + ' · бланк ответов', items: blankItems(v) }));
@@ -234,6 +358,20 @@
       run: (work.title || 'Работа') + ' · ключ', items: vs.map(keyItem) });
     // картинки грузим до вёрстки: высоты нужны сразу
     await Promise.all([].concat(...secs.map(sc => sc.items.map(it => [...it.querySelectorAll('img')])), []).flat().map(im => loadImg(im.src)));
+    // шрифты (Onest нужного веса, KaTeX, 'WP Sym') браузер грузит, только когда свёрстан
+    // текст с ними: ставим всё во временный лист и ждём, иначе высоты замерятся по запасному шрифту
+    if (cards.size) {
+      const stage = mkSheet({ cls: 'wp-stage', head: '', run: '' }, orient, true);
+      root.appendChild(stage);
+      secs.forEach(sc => sc.items.forEach(it => stage.querySelector('.wp-col').appendChild(it)));
+      void stage.offsetHeight;
+      if (document.fonts) {
+        await Promise.all(['400', '700'].map(w => document.fonts.load(w + ' 14px Onest', 'Аа Aa 1').catch(() => {}))
+          .concat([document.fonts.load('14px "WP Sym"', '∠√').catch(() => {})]));
+        await document.fonts.ready;
+      }
+      stage.remove();
+    }
     secs.forEach(sc => flowSection(root, sc, orient));
     // «Страница i из N» — только у наших листов; официальные бланки без правок
     const own = [...root.querySelectorAll('.wp-sheet')];
@@ -255,7 +393,7 @@
   const CSS = `
 #wpPrint{display:none}
 #wpPrint.wp-measure{display:block;position:fixed;left:-99999px;top:0;pointer-events:none}
-.wp-sheet{box-sizing:border-box;position:relative;background:#fff;color:#000;overflow:hidden;display:flex;flex-direction:column;font:13px/1.35 'Onest',Arial,sans-serif}
+.wp-sheet{box-sizing:border-box;position:relative;background:#fff;color:#000;overflow:hidden;display:flex;flex-direction:column;font:13px/1.35 'Onest','WP Sym',Arial,sans-serif}
 .wp-sheet.p{width:210mm;height:296.4mm;padding:14mm 15mm 10mm}
 .wp-sheet.l{width:297mm;height:209.4mm;padding:11mm 13mm 8mm}
 .wp-sheet.wp-off{width:210mm;height:296.4mm;padding:0;page:wpo}
@@ -273,6 +411,11 @@
 .wp-n{flex:none;width:26px;height:26px;border:1.5px solid #000;border-radius:50%;text-align:center;line-height:23px;font-weight:700}
 .wp-body{flex:1;min-width:0}
 .wp-body img{display:block;max-width:100%}
+.wp-body .cr{--card-size:14px;--card-font:'Onest','WP Sym',sans-serif;--card-ink:#000;--card-line:#888}
+.wp-card .wp-n{margin-top:-1px}
+.wp-task.wp-cont{margin-top:0}
+.wp-n.wp-ncont{visibility:hidden}
+.wp-inl{display:block}
 .wp-theory{margin-bottom:6px}
 .wp-brow{display:flex;gap:8px;align-items:center;border:1px solid #000;margin:-1px 0 0;padding:4px 8px;min-height:28px}
 .wp-brow .n{width:26px;text-align:center;font-weight:700}
@@ -307,9 +450,12 @@
   #wpPrint .wp-sheet{break-after:page;page-break-after:always;margin:0}
   #wpPrint .wp-sheet:last-child{break-after:auto;page-break-after:auto}
 }`;
+  // символы, которых нет в Onest (∠ √ ∞ ⇒ ∥ ⩽ π α): один шрифт и в вёрстке листа, и в PDF
+  const FONTS_CSS = ['400', '700'].map(w => "@font-face{font-family:'WP Sym';font-style:normal;font-weight:" + w
+    + ";src:url(" + BASE + 'fonts/print/print-sym-' + w + ".ttf) format('truetype')}").join('\n');
   function ensureStyle() {
     if (document.getElementById('wpStyle')) return;
-    const st = document.createElement('style'); st.id = 'wpStyle'; st.textContent = CSS;
+    const st = document.createElement('style'); st.id = 'wpStyle'; st.textContent = FONTS_CSS + '\n' + CSS;
     document.head.appendChild(st);
   }
   async function print(work, what, orient) {
@@ -323,15 +469,40 @@
     window.print();
   }
   const safeName = s => String(s || 'Работа').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) || 'Работа';
-  // PDF-файл: каждый лист — страница А4 нужной ориентации
+  function saveBytes(bytes, name) {
+    const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.rel = 'noopener'; a.style.display = 'none';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  }
+  // библиотеки векторного PDF — заранее, пока открыто окно печати
+  function preloadPdf() {
+    return script(BASE + 'work-pdf.js', () => !!window.WorkPDF).then(() => window.WorkPDF.libs());
+  }
+  // PDF-файл: каждый лист — страница А4 нужной ориентации. Вектором (work-pdf.js);
+  // не вышло — прежним путём, картинками (html2canvas + jsPDF), чтобы файл всё равно был.
+  // Как собран последний PDF — WorkPrint.lastPdf (для тестов и разбора жалоб)
   async function download(work, what, orient) {
     orient = orient === 'landscape' ? 'landscape' : 'portrait';
     const L = window.MathhLibs;
-    if (!L) throw new Error('нет lazy-libs.js');
-    const [h2c, lib] = await Promise.all([L.load('html2canvas'), L.load('jspdf')]);
     const sheets = await build(work, what, orient);
     const root = document.getElementById('wpPrint');
+    const vs = (work.variants || []).filter(v => (v.blocks || []).some(isTask));
+    const name = safeName(work.title) + (vs.length > 1 ? '' : (vs[0] && vs[0].num > 1 ? ' — вариант ' + vs[0].num : '')) + '.pdf';
+    const shot = async sh => { const h2c = await L.load('html2canvas'); return h2c(sh, { scale: 2, backgroundColor: '#ffffff', useCORS: true, logging: false }); };
     try {
+      let vecErr = null;
+      try {
+        await preloadPdf();
+        const out = await window.WorkPDF.make(sheets, { title: work.title || 'Работа', rasterize: shot });
+        saveBytes(out.bytes, name);
+        WorkPrint.lastPdf = { mode: 'vector', pages: out.pages, sheets: sheets.length, missing: out.missing, images: out.images, size: out.bytes.length };
+        if (out.missing.length) console.warn('[печать] в PDF нет шрифта для символов:', out.missing.join(' '));
+        return sheets.length;
+      } catch (e) { vecErr = e; console.error('[печать] векторный PDF не собрался — собираю картинками', e); }
+      if (!L) throw new Error('нет lazy-libs.js');
+      const [h2c, lib] = await Promise.all([L.load('html2canvas'), L.load('jspdf')]);
       const ori = sh => sh.classList.contains('wp-off') ? 'portrait' : orient;
       const doc = new lib.jsPDF({ orientation: ori(sheets[0]), unit: 'mm', format: 'a4', compress: true });
       for (let i = 0; i < sheets.length; i++) {
@@ -341,8 +512,8 @@
         if (i) doc.addPage('a4', o);
         doc.addImage(cv.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, W, H, undefined, 'FAST');
       }
-      const vs = (work.variants || []).filter(v => (v.blocks || []).some(isTask));
-      doc.save(safeName(work.title) + (vs.length > 1 ? '' : (vs[0] && vs[0].num > 1 ? ' — вариант ' + vs[0].num : '')) + '.pdf');
+      doc.save(name);
+      WorkPrint.lastPdf = { mode: 'raster', pages: sheets.length, sheets: sheets.length, error: String((vecErr && vecErr.message) || vecErr) };
       return sheets.length;
     } finally { root.innerHTML = ''; root.className = ''; }
   }
@@ -393,7 +564,8 @@
   function ask(getWork, opts) {
     opts = opts || {};
     ensureStyle();
-    if (window.MathhLibs) { window.MathhLibs.load('html2canvas').catch(() => {}); window.MathhLibs.load('jspdf').catch(() => {}); }
+    preloadPdf().catch(() => {});
+    if (window.MathhLibs) window.MathhLibs.load('html2canvas').catch(() => {});   // бланки-объекты в PDF — картинкой
     const old = document.querySelector('.wp-dlg'); if (old) old.remove();
     const d = document.createElement('div'); d.className = 'wp-dlg'; d.id = 'wpDlg';
     const cur = lsGet();
@@ -452,5 +624,6 @@
     return d;
   }
 
-  window.WorkPrint = { correctText, info, specOf, examOf, officialSet, build, render, print, download, ask, fill, blankState };
+  const WorkPrint = { correctText, info, specOf, examOf, officialSet, build, render, print, download, ask, fill, blankState, isTask, lastPdf: null, cardBase: null };
+  window.WorkPrint = WorkPrint;
 })();

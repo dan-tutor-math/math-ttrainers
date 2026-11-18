@@ -222,6 +222,7 @@ def check_file(path, seen):
     if d.get("slug") != name:
         errs.append(f"{name}: slug {d.get('slug')} не совпал с именем файла")
     files = set()
+    seen = {}   # id уникален внутри файла страницы: конструктор и ученик ищут карточку по (slug, id); ФИПИ-номера у разных экзаменов совпадают случайно, а ОГЭ №18 есть и на oge18, и на oge15_18
     for c in d.get("cards", []):
         for e in check_card(c):
             errs.append(f"{c.get('id')}: {e}")

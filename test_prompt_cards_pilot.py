@@ -40,8 +40,8 @@ from test_prompt15_works_stage1 import BASE, local_server, sync_playwright
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 FAILS = []
-# oge9 из пилота ушёл: собран целиком (S1b), его проверяет test_prompt_cards_family_a_simple.py
-PILOT = {"oge19": "oge19.html", "ege_prof": "ege_prof.html?n=1"}
+# в пилоте остаются страницы, не собранные целиком: oge9 (S1b), ege_prof (S2e) ушли в свои тесты; oge19 — S1a
+PILOT = {"oge19": "oge19.html"}
 SHOTS = os.environ.get("CARDS_SHOTS")
 
 
@@ -233,8 +233,9 @@ def main():
             check(f"4 {slug}: value — запись для бланка (запятая, номера подряд)",
                   all(re.fullmatch(r"-?\d+(,\d+)?", v) for v in vals), str(vals))
         # 8. опции рендера
-        c = cards["ege_prof"]["cards"][0]
-        r = pg.evaluate("""([c]) => { const el = CardRender.render(c, { base: '../../cards/', num: 3, source: true, answer: true, solution: true, print: true });
+        with open(os.path.join(HERE, "cards", "ege_prof.json"), encoding="utf-8") as fh:
+            c = next(x for x in json.load(fh)["cards"] if x["id"] == "fipi:2933FB")
+        r = pg.evaluate("""async ([c]) => { await CardRender.ready(c, { root: '../../' }); const el = CardRender.render(c, { base: '../../cards/', num: 3, source: true, answer: true, solution: true, print: true });
             document.body.appendChild(el); const o = { num: (el.querySelector('.cr-num') || {}).textContent, src: (el.querySelector('.cr-src') || {}).textContent,
             ans: (el.querySelector('.cr-ans') || {}).textContent, sol: !!el.querySelector('.cr-sol .katex'), print: el.classList.contains('cr-print'),
             dollars: /\\$/.test(el.querySelector('.cr-sol').innerText) }; el.remove(); return o; }""", [c])
