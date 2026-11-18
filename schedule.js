@@ -1729,6 +1729,10 @@
     else if (t.id === 'spPinX') { panel.pick = null; paintPanel(); }
     else if (t.id === 'spWhy' || t.id === 'spPaid' || t.dataset.flag) onPanelPay(t, l);
     else if (t.id === 'spSession') toggleSession(l);
+    else if (t.id === 'spSessionBoard'){
+      const s = st.byId[panel.sid];
+      if (s) api.startOnBoard(s, lessonBoard(l, s), l.id);
+    }
   }
   /* «Закрепить доску»: вместо серой кнопки — список досок преподавателя;
      выбранная привязывается к ученику (students.boards), как в его карточке */
@@ -1760,6 +1764,7 @@
     } catch (e) { api.toast('Не сохранилось: ' + (e.message || e)); }
     if (panel) { panel.pick = null; paintPanel(); }
   }
+  function lessonBoard(l, s){ return l.board_id || (s.boards || [])[0]; }
   async function toggleSession(l){
     const SM = window.StudentMemory, s = st.byId[panel.sid];
     if (!SM || !s) return;
@@ -1794,7 +1799,7 @@
     }
     if (s) {
       const meta = [s.grade ? s.grade + ' класс' : '', s.exam ? (EXAM_SHORT[s.exam] || s.exam) : ''].filter(Boolean).join(' · ');
-      const board = l.board_id || ((s.boards || [])[0] || null);
+      const board = lessonBoard(l, s);
       const boardWhere = l.board_id ? 'доска занятия' : 'доска ученика';
       h += '<div class="sc-sp-card"><div class="sc-sp-name">' + esc(s.name) + (s.archived_at ? ' <span class="badge">архив</span>' : '') + '</div>' +
         (meta ? '<div class="hint">' + esc(meta) + '</div>' : '') +
@@ -1803,7 +1808,7 @@
           '<a class="btn quiet" id="spCard" href="#/students/' + esc(s.id) + '">Открыть карточку</a>' +
           (board ? '<a class="btn quiet" id="spBoard" href="boards.html#board=' + encodeURIComponent(board) + '" title="' + esc(boardWhere) + '">Открыть доску</a>'
                  : '<button type="button" class="btn quiet" id="spPin" title="К занятию и ученику доска не привязана">Закрепить доску</button>') +
-          '<button type="button" class="btn" id="spSession"' + (s.archived_at ? ' disabled title="Ученик в архиве"' : '') + '>' + (mine ? 'Закончить сессию' : 'Начать сессию') + '</button>' +
+          api.sessionButtons('sp', mine ? 'Закончить сессию' : 'Начать сессию', s.archived_at, board) +
         '</div>' +
         (panel.pick && !board ? pinPickHtml() : '') +
         '<div class="hint" id="spHint">' + (mine ? 'Идёт сессия с этим учеником' + (cur.paused ? ' (пауза)' : '') + ': задания запишутся на это занятие.'

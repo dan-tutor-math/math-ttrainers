@@ -66,6 +66,10 @@ textarea.field{min-height:90px;resize:vertical;}
 .slot{border:1.5px dashed var(--glass-border);border-radius:14px;padding:16px;color:var(--muted-2);font-size:14px;margin-bottom:12px;}
 .slot b{display:block;color:var(--muted-3);margin-bottom:3px;}
 .row-btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.session-buttons{display:inline-flex;align-items:stretch;}
+.session-buttons .btn:first-child{flex:1;}
+.session-buttons:has(.session-board:not([hidden])) .btn:first-child{border-radius:14px 0 0 14px;}
+.session-buttons .session-board{border-radius:0 14px 14px 0;border-inline-start:1px solid var(--glass-border);padding-inline:12px;}
 
 .set-group{margin-bottom:18px;}
 .set-group h3{font-size:16px;margin-bottom:4px;}
@@ -251,6 +255,8 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
           </div>
           <label class="chk"><input type="checkbox" id="setGoHome"> После «Начать сессию» переходить на главную</label>
           <div class="hint">На главной сессия уже идёт, а сверху висит «Отменить» — до первого нажатия на что-нибудь другое. Он закончит сессию и вернёт в кабинет.</div>
+          <label class="chk"><input type="checkbox" id="setBoardNewTab" aria-describedby="setBoardHint"> Открывать доску в новой вкладке</label>
+          <div class="hint" id="setBoardHint"></div>
         </div>
         <div class="set-group">
           <h3>Подписи заданий</h3>
@@ -433,6 +439,34 @@ async function openCard(id){
   renderCard(s, boards);
 }
 let memOff = null;   // отписка «Памяти заданий» предыдущей карточки
+function sessionButtons(prefix, label, archived, board){
+  const disabled = archived ? ' disabled title="Ученик в архиве"' : '';
+  const title = 'Начать сессию и открыть доску в новой вкладке';
+  return '<span class="session-buttons"><button type="button" class="btn" id="' + prefix + 'Session"' + disabled + '>' + label + '</button>' +
+    '<button type="button" class="btn session-board" id="' + prefix + 'SessionBoard" title="' + title + '" aria-label="' + title + '"' +
+    (board ? '' : ' hidden') + (archived ? ' disabled' : '') + '>↗</button></span>';
+}
+function openBoardTab(id){
+  try { window.StudentMemory.openBoardTab(id); } catch (e) { toast(e.message); }
+}
+document.addEventListener('click', e => {
+  const link = e.target.closest('a[href^="boards.html#board="]');
+  if (!link || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || !TS.get().boardNewTab) return;
+  e.preventDefault();
+  openBoardTab(decodeURIComponent(link.hash.slice('#board='.length)));
+});
+async function startOnBoard(s, board, lessonId){
+  if (!board || s.archived_at) return;
+  const SM = window.StudentMemory, cur = SM.current();
+  const mine = cur && cur.id === String(s.id) && (!lessonId || cur.lessonId === lessonId);
+  try {
+    // start сразу ставит ученика, затем асинхронно загружает журнал.
+    // Доску открываем, пока браузер ещё обрабатывает нажатие.
+    const started = mine ? null : SM.start(s, { lessonId });
+    openBoardTab(board);
+    await started;
+  } catch (e) { toast('Сессия не началась: ' + e.message); }
+}
 function renderCard(s, boards){
   const box = $('cardBox');
   const def = TS.get().lessonMin;
@@ -447,7 +481,7 @@ function renderCard(s, boards){
       '<h2 id="cName">' + esc(s.name) + '</h2>' +
       (s.archived_at ? '<span class="badge">архив</span>' : '') + '</div>' +
     '<div class="row-btns" style="margin-bottom:14px">' +
-      '<button class="btn" id="cSession"' + (s.archived_at ? ' disabled title="Ученик в архиве"' : '') + '>Начать сессию</button>' +
+      sessionButtons('c', 'Начать сессию', s.archived_at, (s.boards || [])[0]) +
       '<span class="hint" id="cSessionHint">Задания, выданные и решённые в сессии, запомнятся за учеником.</span></div>' +
     '<div class="fld"><label class="label" for="cName_in">Имя</label><input class="field" id="cName_in" maxlength="80" value="' + esc(s.name) + '"></div>' +
     '<div class="grid2">' +
@@ -507,6 +541,7 @@ function bindSessionBtn(s){
     finally { btn.disabled = !!s.archived_at; paint(); }
     if (ok && TS.get().sessionGoHome && SM.goHome) SM.goHome();
   });
+  $('cSessionBoard').addEventListener('click', () => startOnBoard(s, (s.boards || [])[0]));
   off = SM.onChange(paint);
   paint();
 }
@@ -522,6 +557,8 @@ async function saveCard(s){
     });
     students = null;
     s.name = fresh.name; $('cName').textContent = fresh.name;
+    s.boards = fresh.boards || [];
+    $('cSessionBoard').hidden = !s.boards.length;
     $('cMsg').textContent = 'Сохранено';
   } catch (e) { $('cMsg').textContent = e.message; }
   finally { $('cSave').disabled = false; }
@@ -555,6 +592,10 @@ function paintSettings(){
     if (document.activeElement !== inp) inp.value = (s.formatLabels || {})[inp.dataset.fmt] || '';
   });
   $('setGoHome').checked = !!s.sessionGoHome;
+  $('setBoardNewTab').checked = s.boardNewTab;
+  $('setBoardHint').textContent = s.sessionBind === 'tab'
+    ? 'Если идёт сессия, она перейдёт в новую вкладку, а здесь закончится'
+    : 'В режиме «Весь браузер» сессия продолжится в обеих вкладках.';
   $('setDates').checked = s.labelDates;
   $('setCount').checked = s.labelCount;
   const custom = [45, 60, 90].indexOf(s.lessonMin) < 0 || $('segMin').dataset.custom === '1';
@@ -583,6 +624,7 @@ async function renderSettings(){
       save({ [key]: b.dataset.v });
     }));
     $('setGoHome').addEventListener('change', e => save({ sessionGoHome: e.target.checked }));
+    $('setBoardNewTab').addEventListener('change', e => save({ boardNewTab: e.target.checked }));
     $('setDates').addEventListener('change', e => save({ labelDates: e.target.checked }));
     document.querySelectorAll('#fmtNames input').forEach(inp => inp.addEventListener('change', () => {
       const fl = Object.assign({}, TS.get().formatLabels);
@@ -612,6 +654,7 @@ Schedule.init({
   addStudent: async name => { const s = await C.addStudent({ name }); students = null; return s; },
   settings: () => TS.get(),
   settingsChanged: f => TS.onChange(f),
+  sessionButtons, startOnBoard,
   weekHref: mon => '#/schedule' + (mon ? '/' + mon : ''),
   toast,
 });

@@ -50,6 +50,9 @@
   if (window.StudentMemory) return;
 
   const SS_TAB = 'studentMem:tab';              // сессия вкладки (режим «вкладка»)
+  const SS_OUTGOING = 'studentMem:outgoing';    // какую передачу должна подтвердить доска
+  const LS_HANDOFF = 'studentMem:handoff:';
+  const HANDOFF_TTL = 60000;
   const LS_BROWSER = 'studentMem:browser';      // сессия браузера (режим «браузер»)
   const LS_QUEUE = 'studentMem:queue:v1';       // неотправленные события
   const LS_DEAD = 'studentMem:dead:v1';         // отвергнутые сервером навсегда — не теряем, откладываем
@@ -74,7 +77,7 @@
 
   /* ── хранилища ── */
   function ssGet(k){ try { return sessionStorage.getItem(k); } catch (e) { return null; } }
-  function ssSet(k, v){ try { sessionStorage.setItem(k, v); } catch (e) {} }
+  function ssSet(k, v){ try { sessionStorage.setItem(k, v); return true; } catch (e) { return false; } }
   function ssDel(k){ try { sessionStorage.removeItem(k); } catch (e) {} }
   function lsGet(k){ try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v){ try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
@@ -138,7 +141,7 @@
   }
   function writeSession(s){
     if (bindMode() === 'tab'){
-      if (s) { s.code = ssGet('tsTab:code') || null; ssSet(SS_TAB, JSON.stringify(s)); }
+      if (s) { s.code = ssGet('tsTab:code') || null; return ssSet(SS_TAB, JSON.stringify(s)); }
       else ssDel(SS_TAB);
     } else {
       if (s) lsSet(LS_BROWSER, JSON.stringify(s)); else lsDel(LS_BROWSER);
@@ -150,6 +153,104 @@
     if (!s) return null;
     return { id: String(s.student.id), name: String(s.student.name || ''), paused: !!s.paused,
              lessonId: s.lessonId || null, startedAt: s.startedAt || null, mode: bindMode() };
+  }
+
+  function cancelHandoff(){
+    const key = ssGet(SS_OUTGOING);
+    if (key && key.startsWith(LS_HANDOFF)) { ssDel(SS_OUTGOING); lsDel(key); }
+  }
+  function handoffUrl(url){
+    const cur = current();
+    if (!cur || cur.mode !== 'tab') return url;
+    const dest = new URL(url, location.href);
+    if (dest.origin !== location.origin) return url;
+    cancelHandoff();
+    // Таймер мог исчезнуть вместе с закрытой вкладкой расписания.
+    for (const key of Object.keys(localStorage)){
+      if (key.startsWith(LS_HANDOFF) && !(parse(lsGet(key), {}).until > Date.now())) lsDel(key);
+    }
+    const id = Array.from(crypto.getRandomValues(new Uint8Array(16)), n => n.toString(16).padStart(2, '0')).join('');
+    const key = LS_HANDOFF + id;
+    if (!lsSet(key, JSON.stringify({ session: readTab(), until: Date.now() + HANDOFF_TTL })))
+      throw new Error('Не удалось сохранить сессию для переноса на доску.');
+    if (!ssSet(SS_OUTGOING, key)){
+      lsDel(key);
+      throw new Error('Не удалось сохранить метку переноса в этой вкладке.');
+    }
+    setTimeout(() => { if (ssGet(SS_OUTGOING) === key && lsGet(key)) cancelHandoff(); }, HANDOFF_TTL);
+    dest.searchParams.set('sm', id);
+    return dest.href;
+  }
+  function receiveHandoff(){
+    if (!IN_TOP) return;
+    const url = new URL(location.href);
+    if (!url.searchParams.has('sm')) return;
+    const key = LS_HANDOFF + url.searchParams.get('sm');
+    url.searchParams.delete('sm');
+    history.replaceState(history.state, '', url.href);
+    // Новое окно получает копию sessionStorage открывшего. Просроченная или
+    // отозванная ссылка не должна запустить урок из этой копии.
+    if (ssGet(SS_OUTGOING) === key) { ssDel(SS_OUTGOING); ssDel(SS_TAB); }
+    // Одну и ту же ссылку могут одновременно открыть в двух окнах.
+    if (navigator.locks) navigator.locks.request(key, () => takeHandoff(key));
+    else takeHandoff(key);
+  }
+  function takeHandoff(key){
+    const transfer = parse(lsGet(key), null);
+    if (!transfer || !(transfer.until > Date.now())) { lsDel(key); return; }
+    if (bindMode() !== 'tab' || isFollower() || !transfer.session?.student?.id) return;
+    if (!writeSession(transfer.session)) return;
+    // Отдельное подтверждение отличает приём от удаления по таймеру.
+    lsSet(key, 'received');
+    lsDel(key);
+    emit(true);
+  }
+  const boardTabs = new Map();
+  // После перезагрузки закреплённого кабинета ссылки на окна уже нет.
+  // Запоминаем их действующие имена перед уходом со страницы.
+  window.addEventListener('pagehide', () => {
+    for (const [id, tab] of boardTabs){
+      try {
+        const name = !tab.closed && tab.location.origin === location.origin && tab.name;
+        if (name) ssSet('studentMem:boardWindow:' + id, name);
+        else ssDel('studentMem:boardWindow:' + id);
+      } catch (e) { ssDel('studentMem:boardWindow:' + id); }
+    }
+  });
+  function openBoardTab(boardId){
+    const url = handoffUrl('boards.html#board=' + encodeURIComponent(boardId));
+    let tab = boardTabs.get(boardId);
+    const dest = new URL(url, location.href);
+    // Кабинет мог открыться сразу после доски. Новому окну нельзя
+    // наследовать её признак аварийной перезагрузки при явном щелчке.
+    if (ssGet('boardsAutoOpenAttempt') === boardId) ssDel('boardsAutoOpenAttempt');
+    try {
+      // Совместный урок меняет имя окна на tsSess:<код>. Ссылка на то же
+      // окно позволяет вернуть фокус, даже если имя уже сменилось.
+      if (tab && !tab.closed && tab.location.origin === location.origin){
+        if (tab.location.href !== dest.href){
+          if (tab.sessionStorage.getItem('boardsAutoOpenAttempt') === boardId) tab.sessionStorage.removeItem('boardsAutoOpenAttempt');
+          const old = tab.getCurrentBoard?.();
+          const samePage = tab.location.pathname === dest.pathname && tab.location.search === dest.search;
+          tab.location.href = dest.href;
+          // Учитель мог перейти на другую доску. Уже открытый редактор
+          // игнорирует смену одного хеша, поэтому заново открываем нужную.
+          if (samePage && old && old.id !== boardId && old.cloudBoardId !== boardId) tab.location.reload();
+        }
+      } else tab = null;
+    } catch (e) { tab = null; }
+    if (!tab){
+      const name = ssGet('studentMem:boardWindow:' + boardId);
+      // Браузер понимает _self и _top как команды. Допустимы только имена доски и сессии.
+      const target = /^tsSess:[A-Z0-9]+$/.test(name) ? name : 'mathhBoard:' + boardId;
+      try { tab = window.open(url, target); } catch (e) {}
+    }
+    if (!tab){
+      cancelHandoff();
+      throw new Error('Разрешите открытие всплывающих окон для этого сайта и нажмите ещё раз.');
+    }
+    boardTabs.set(boardId, tab);
+    tab.focus();
   }
 
   /* ── подписчики ── */
@@ -523,6 +624,7 @@
     if (!student || !student.id) throw new Error('Не выбран ученик');
     if (isFollower()) return null;
     opts = opts || {};
+    cancelHandoff();
     writeSession({ student: { id: String(student.id), name: String(student.name || '') }, paused: false,
                    lessonId: opts.lessonId || null, startedAt: Date.now() });
     emit(true);
@@ -538,6 +640,7 @@
     emit(true);
   }
   function end(){
+    cancelHandoff();
     writeSession(null);
     emit(true);
     scheduleFlush(0);
@@ -795,6 +898,12 @@
 
   /* ── события браузера ── */
   window.addEventListener('storage', e => {
+    if (IN_TOP && e.key && e.key.startsWith(LS_HANDOFF) && e.newValue === 'received' && e.key === ssGet(SS_OUTGOING)){
+      ssDel(SS_OUTGOING);
+      const sent = parse(e.oldValue, {}).session, cur = current();
+      if (cur && cur.mode === 'tab' && sent && cur.id === sent.student.id && cur.startedAt === sent.startedAt) end();
+      return;
+    }
     if (e.key === LS_MINI) { barSig = null; renderBar(); return; }
     if (e.key === LS_BROWSER || e.key === SETTINGS_KEY || e.key === 'tsSessions:v1') emit(false);
     else if (e.key && e.key.indexOf(LS_LOG) === 0) emit(true);
@@ -825,6 +934,7 @@
       try { const c = client(); if (c) c.auth.onAuthStateChange(() => { checkAuth(); scheduleFlush(0); }); } catch (e) {}
     }
   }
+  receiveHandoff();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 
 
@@ -862,7 +972,7 @@
 
   window.StudentMemory = {
     current, start, end, pause, record, recordTask, recordAttempt, summary, kindSummary, keys, logState, forget, fetchLog, loadLog,
-    listStudents, onChange, flush, isFollower, bindMode, setPickerContext, goHome,
+    listStudents, onChange, flush, isFollower, bindMode, setPickerContext, goHome, handoffUrl, openBoardTab,
     queue: () => readQueue().slice(), deadLetters: () => parse(lsGet(LS_DEAD), []),
     THROTTLE_MS,
   };
