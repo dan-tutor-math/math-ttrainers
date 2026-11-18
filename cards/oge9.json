@@ -7,7 +7,6 @@
   "oge9-fipi-bank.js": "935df24dc02cb5af815c503237602934906064f6",
   "oge9.html": "f6161995d5bf21975fe9916e4ed2168f70d2a375"
  },
- "partial": true,
  "cards": [
   {
    "v": 1,
@@ -39,6 +38,258 @@
   },
   {
    "v": 1,
+   "id": "fipi:1C4217",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p1",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">−2<i>x</i> − 4 = 3<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-0.8"
+     }
+    ],
+    "value": "-0,8"
+   },
+   "solution": "<div><div class=\"c-line\">−2<i>x</i> − 4 = 3<i>x</i></div><div class=\"c-line\">−2<i>x</i> − 3<i>x</i> = 4</div><div class=\"c-line\">−5<i>x</i> = 4</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">4</span><span class=\"c-den\">−5</span></span> = −0,8</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 1C4217"
+  },
+  {
+   "v": 1,
+   "id": "fipi:BEC321",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p1",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">3<i>x</i> + 3 = 5<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.5"
+     }
+    ],
+    "value": "1,5"
+   },
+   "solution": "<div><div class=\"c-line\">3<i>x</i> + 3 = 5<i>x</i></div><div class=\"c-line\">3<i>x</i> − 5<i>x</i> = −3</div><div class=\"c-line\">−2<i>x</i> = −3</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">−3</span><span class=\"c-den\">−2</span></span> = 1,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание BEC321"
+  },
+  {
+   "v": 1,
+   "id": "fipi:0EDF5F",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p1",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">−3<i>x</i> − 9 = 2<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-1.8"
+     }
+    ],
+    "value": "-1,8"
+   },
+   "solution": "<div><div class=\"c-line\">−3<i>x</i> − 9 = 2<i>x</i></div><div class=\"c-line\">−3<i>x</i> − 2<i>x</i> = 9</div><div class=\"c-line\">−5<i>x</i> = 9</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">−5</span></span> = −1,8</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 0EDF5F"
+  },
+  {
+   "v": 1,
+   "id": "fipi:C0F8C9",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p1",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\"><i>x</i> + 3 = −9<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-0.3"
+     }
+    ],
+    "value": "-0,3"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i> + 3 = −9<i>x</i></div><div class=\"c-line\"><i>x</i> + 9<i>x</i> = −3</div><div class=\"c-line\">10<i>x</i> = −3</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">−3</span><span class=\"c-den\">10</span></span> = −0,3</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание C0F8C9"
+  },
+  {
+   "v": 1,
+   "id": "fipi:A8926E",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p1",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">−8<i>x</i> − 3 = −6<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-1.5"
+     }
+    ],
+    "value": "-1,5"
+   },
+   "solution": "<div><div class=\"c-line\">−8<i>x</i> − 3 = −6<i>x</i></div><div class=\"c-line\">−8<i>x</i> + 6<i>x</i> = 3</div><div class=\"c-line\">−2<i>x</i> = 3</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">−2</span></span> = −1,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание A8926E"
+  },
+  {
+   "v": 1,
+   "id": "fipi:70E537",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p1",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">−2<i>x</i> − 7 = −4<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "3.5"
+     }
+    ],
+    "value": "3,5"
+   },
+   "solution": "<div><div class=\"c-line\">−2<i>x</i> − 7 = −4<i>x</i></div><div class=\"c-line\">−2<i>x</i> + 4<i>x</i> = 7</div><div class=\"c-line\">2<i>x</i> = 7</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">2</span></span> = 3,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 70E537"
+  },
+  {
+   "v": 1,
+   "id": "fipi:DA0135",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p1",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">6<i>x</i> + 1 = −4<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-0.1"
+     }
+    ],
+    "value": "-0,1"
+   },
+   "solution": "<div><div class=\"c-line\">6<i>x</i> + 1 = −4<i>x</i></div><div class=\"c-line\">6<i>x</i> + 4<i>x</i> = −1</div><div class=\"c-line\">10<i>x</i> = −1</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">−1</span><span class=\"c-den\">10</span></span> = −0,1</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание DA0135"
+  },
+  {
+   "v": 1,
+   "id": "fipi:E1A33F",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p1",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\"><i>x</i> − 2 = −3<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0.5"
+     }
+    ],
+    "value": "0,5"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i> − 2 = −3<i>x</i></div><div class=\"c-line\"><i>x</i> + 3<i>x</i> = 2</div><div class=\"c-line\">4<i>x</i> = 2</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">4</span></span> = 0,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание E1A33F"
+  },
+  {
+   "v": 1,
+   "id": "fipi:C9BA83",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p1",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">−<i>x</i> − 7 = <i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-3.5"
+     }
+    ],
+    "value": "-3,5"
+   },
+   "solution": "<div><div class=\"c-line\">−<i>x</i> − 7 = <i>x</i></div><div class=\"c-line\">−<i>x</i> − <i>x</i> = 7</div><div class=\"c-line\">−2<i>x</i> = 7</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">−2</span></span> = −3,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание C9BA83"
+  },
+  {
+   "v": 1,
    "id": "fipi:D6F84B",
    "exam": "oge",
    "slug": "oge9",
@@ -64,6 +315,258 @@
    },
    "solution": "<div><div class=\"c-line\">7<i>x</i> − 7 = 19 + 5<i>x</i></div><div class=\"c-line\">7<i>x</i> − 5<i>x</i> = 19 + 7</div><div class=\"c-line\">2<i>x</i> = 26</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">26</span><span class=\"c-den\">2</span></span> = 13</div></div>",
    "source": "Открытый банк заданий ФИПИ, задание D6F84B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:4760F5",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p2",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">10<i>x</i> − 10 = 22 + 8<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "16"
+     }
+    ],
+    "value": "16"
+   },
+   "solution": "<div><div class=\"c-line\">10<i>x</i> − 10 = 22 + 8<i>x</i></div><div class=\"c-line\">10<i>x</i> − 8<i>x</i> = 22 + 10</div><div class=\"c-line\">2<i>x</i> = 32</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">32</span><span class=\"c-den\">2</span></span> = 16</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 4760F5"
+  },
+  {
+   "v": 1,
+   "id": "fipi:E0D7FE",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p2",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">12<i>x</i> − 12 = 24 + 10<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "18"
+     }
+    ],
+    "value": "18"
+   },
+   "solution": "<div><div class=\"c-line\">12<i>x</i> − 12 = 24 + 10<i>x</i></div><div class=\"c-line\">12<i>x</i> − 10<i>x</i> = 24 + 12</div><div class=\"c-line\">2<i>x</i> = 36</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">36</span><span class=\"c-den\">2</span></span> = 18</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание E0D7FE"
+  },
+  {
+   "v": 1,
+   "id": "fipi:320006",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p2",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">8<i>x</i> − 8 = 20 + 6<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "14"
+     }
+    ],
+    "value": "14"
+   },
+   "solution": "<div><div class=\"c-line\">8<i>x</i> − 8 = 20 + 6<i>x</i></div><div class=\"c-line\">8<i>x</i> − 6<i>x</i> = 20 + 8</div><div class=\"c-line\">2<i>x</i> = 28</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">28</span><span class=\"c-den\">2</span></span> = 14</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 320006"
+  },
+  {
+   "v": 1,
+   "id": "fipi:EB3EB9",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p2",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">9<i>x</i> − 9 = 21 + 7<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "15"
+     }
+    ],
+    "value": "15"
+   },
+   "solution": "<div><div class=\"c-line\">9<i>x</i> − 9 = 21 + 7<i>x</i></div><div class=\"c-line\">9<i>x</i> − 7<i>x</i> = 21 + 9</div><div class=\"c-line\">2<i>x</i> = 30</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">30</span><span class=\"c-den\">2</span></span> = 15</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание EB3EB9"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5CFC25",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p2",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">11<i>x</i> − 11 = 23 + 9<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "17"
+     }
+    ],
+    "value": "17"
+   },
+   "solution": "<div><div class=\"c-line\">11<i>x</i> − 11 = 23 + 9<i>x</i></div><div class=\"c-line\">11<i>x</i> − 9<i>x</i> = 23 + 11</div><div class=\"c-line\">2<i>x</i> = 34</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">34</span><span class=\"c-den\">2</span></span> = 17</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 5CFC25"
+  },
+  {
+   "v": 1,
+   "id": "fipi:C2DECC",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p2",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">6<i>x</i> − 6 = 18 + 4<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "12"
+     }
+    ],
+    "value": "12"
+   },
+   "solution": "<div><div class=\"c-line\">6<i>x</i> − 6 = 18 + 4<i>x</i></div><div class=\"c-line\">6<i>x</i> − 4<i>x</i> = 18 + 6</div><div class=\"c-line\">2<i>x</i> = 24</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">24</span><span class=\"c-den\">2</span></span> = 12</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание C2DECC"
+  },
+  {
+   "v": 1,
+   "id": "fipi:A9E790",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p2",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">5<i>x</i> − 5 = 17 + 3<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "11"
+     }
+    ],
+    "value": "11"
+   },
+   "solution": "<div><div class=\"c-line\">5<i>x</i> − 5 = 17 + 3<i>x</i></div><div class=\"c-line\">5<i>x</i> − 3<i>x</i> = 17 + 5</div><div class=\"c-line\">2<i>x</i> = 22</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">22</span><span class=\"c-den\">2</span></span> = 11</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание A9E790"
+  },
+  {
+   "v": 1,
+   "id": "fipi:9E8A39",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p2",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">13<i>x</i> − 13 = 25 + 11<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "19"
+     }
+    ],
+    "value": "19"
+   },
+   "solution": "<div><div class=\"c-line\">13<i>x</i> − 13 = 25 + 11<i>x</i></div><div class=\"c-line\">13<i>x</i> − 11<i>x</i> = 25 + 13</div><div class=\"c-line\">2<i>x</i> = 38</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">38</span><span class=\"c-den\">2</span></span> = 19</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 9E8A39"
+  },
+  {
+   "v": 1,
+   "id": "fipi:F78286",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p2",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">4<i>x</i> − 4 = 16 + 2<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "10"
+     }
+    ],
+    "value": "10"
+   },
+   "solution": "<div><div class=\"c-line\">4<i>x</i> − 4 = 16 + 2<i>x</i></div><div class=\"c-line\">4<i>x</i> − 2<i>x</i> = 16 + 4</div><div class=\"c-line\">2<i>x</i> = 20</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">20</span><span class=\"c-den\">2</span></span> = 10</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание F78286"
   },
   {
    "v": 1,
@@ -95,6 +598,398 @@
   },
   {
    "v": 1,
+   "id": "fipi:AB4778",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p3",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">−1 − 3<i>x</i> = 2<i>x</i> + 1</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-0.4"
+     }
+    ],
+    "value": "-0,4"
+   },
+   "solution": "<div><div class=\"c-line\">−1 − 3<i>x</i> = 2<i>x</i> + 1</div><div class=\"c-line\">−3<i>x</i> − 2<i>x</i> = 1 + 1</div><div class=\"c-line\">−5<i>x</i> = 2</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">−5</span></span> = −0,4</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание AB4778"
+  },
+  {
+   "v": 1,
+   "id": "fipi:B55A23",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p3",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">7 + 8<i>x</i> = −2<i>x</i> − 5</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-1.2"
+     }
+    ],
+    "value": "-1,2"
+   },
+   "solution": "<div><div class=\"c-line\">7 + 8<i>x</i> = −2<i>x</i> − 5</div><div class=\"c-line\">8<i>x</i> + 2<i>x</i> = −5 − 7</div><div class=\"c-line\">10<i>x</i> = −12</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">−12</span><span class=\"c-den\">10</span></span> = −1,2</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание B55A23"
+  },
+  {
+   "v": 1,
+   "id": "fipi:11F251",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p3",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">−5 + 2<i>x</i> = −2<i>x</i> − 3</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0.5"
+     }
+    ],
+    "value": "0,5"
+   },
+   "solution": "<div><div class=\"c-line\">−5 + 2<i>x</i> = −2<i>x</i> − 3</div><div class=\"c-line\">2<i>x</i> + 2<i>x</i> = −3 + 5</div><div class=\"c-line\">4<i>x</i> = 2</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">4</span></span> = 0,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 11F251"
+  },
+  {
+   "v": 1,
+   "id": "fipi:F18DC8",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p3",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">1 − 10<i>x</i> = 5<i>x</i> + 10</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-0.6"
+     }
+    ],
+    "value": "-0,6"
+   },
+   "solution": "<div><div class=\"c-line\">1 − 10<i>x</i> = 5<i>x</i> + 10</div><div class=\"c-line\">−10<i>x</i> − 5<i>x</i> = 10 − 1</div><div class=\"c-line\">−15<i>x</i> = 9</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">−15</span></span> = −0,6</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание F18DC8"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5B34C1",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p3",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">−4 + 7<i>x</i> = 8<i>x</i> + 1</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-5"
+     }
+    ],
+    "value": "-5"
+   },
+   "solution": "<div><div class=\"c-line\">−4 + 7<i>x</i> = 8<i>x</i> + 1</div><div class=\"c-line\">7<i>x</i> − 8<i>x</i> = 1 + 4</div><div class=\"c-line\">−<i>x</i> = 5</div><div class=\"c-line\"><i>x</i> = −5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 5B34C1"
+  },
+  {
+   "v": 1,
+   "id": "fipi:BD7E95",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p3",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">−4 − 6<i>x</i> = 4<i>x</i> − 3</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-0.1"
+     }
+    ],
+    "value": "-0,1"
+   },
+   "solution": "<div><div class=\"c-line\">−4 − 6<i>x</i> = 4<i>x</i> − 3</div><div class=\"c-line\">−6<i>x</i> − 4<i>x</i> = −3 + 4</div><div class=\"c-line\">−10<i>x</i> = 1</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">−10</span></span> = −0,1</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание BD7E95"
+  },
+  {
+   "v": 1,
+   "id": "fipi:BD19E5",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p3",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">9 + 8<i>x</i> = 6<i>x</i> − 2</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-5.5"
+     }
+    ],
+    "value": "-5,5"
+   },
+   "solution": "<div><div class=\"c-line\">9 + 8<i>x</i> = 6<i>x</i> − 2</div><div class=\"c-line\">8<i>x</i> − 6<i>x</i> = −2 − 9</div><div class=\"c-line\">2<i>x</i> = −11</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">−11</span><span class=\"c-den\">2</span></span> = −5,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание BD19E5"
+  },
+  {
+   "v": 1,
+   "id": "fipi:1BF2E1",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p3",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">8 + 7<i>x</i> = 9<i>x</i> + 4</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2"
+     }
+    ],
+    "value": "2"
+   },
+   "solution": "<div><div class=\"c-line\">8 + 7<i>x</i> = 9<i>x</i> + 4</div><div class=\"c-line\">7<i>x</i> − 9<i>x</i> = 4 − 8</div><div class=\"c-line\">−2<i>x</i> = −4</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">−4</span><span class=\"c-den\">−2</span></span> = 2</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 1BF2E1"
+  },
+  {
+   "v": 1,
+   "id": "fipi:06A484",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p3",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">−5 + 9<i>x</i> = 10<i>x</i> + 4</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-9"
+     }
+    ],
+    "value": "-9"
+   },
+   "solution": "<div><div class=\"c-line\">−5 + 9<i>x</i> = 10<i>x</i> + 4</div><div class=\"c-line\">9<i>x</i> − 10<i>x</i> = 4 + 5</div><div class=\"c-line\">−<i>x</i> = 9</div><div class=\"c-line\"><i>x</i> = −9</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 06A484"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5572B4",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p4",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">5(<i>x</i> + 4) = −9</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-5.8"
+     }
+    ],
+    "value": "-5,8"
+   },
+   "solution": "<div><div class=\"c-line\">5(<i>x</i> + 4) = −9</div><div class=\"c-line\">5<i>x</i> + 20 = −9</div><div class=\"c-line\">5<i>x</i> = −9 − 20</div><div class=\"c-line\">5<i>x</i> = −29</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">−29</span><span class=\"c-den\">5</span></span> = −5,8</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 5572B4"
+  },
+  {
+   "v": 1,
+   "id": "fipi:AA49DF",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p4",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">10(<i>x</i> + 2) = −7</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-2.7"
+     }
+    ],
+    "value": "-2,7"
+   },
+   "solution": "<div><div class=\"c-line\">10(<i>x</i> + 2) = −7</div><div class=\"c-line\">10<i>x</i> + 20 = −7</div><div class=\"c-line\">10<i>x</i> = −7 − 20</div><div class=\"c-line\">10<i>x</i> = −27</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">−27</span><span class=\"c-den\">10</span></span> = −2,7</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание AA49DF"
+  },
+  {
+   "v": 1,
+   "id": "fipi:D61E68",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p4",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">4(<i>x</i> + 10) = −1</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-10.25"
+     }
+    ],
+    "value": "-10,25"
+   },
+   "solution": "<div><div class=\"c-line\">4(<i>x</i> + 10) = −1</div><div class=\"c-line\">4<i>x</i> + 40 = −1</div><div class=\"c-line\">4<i>x</i> = −1 − 40</div><div class=\"c-line\">4<i>x</i> = −41</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">−41</span><span class=\"c-den\">4</span></span> = −10,25</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание D61E68"
+  },
+  {
+   "v": 1,
+   "id": "fipi:636D61",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p4",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">4(<i>x</i> + 1) = 9</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.25"
+     }
+    ],
+    "value": "1,25"
+   },
+   "solution": "<div><div class=\"c-line\">4(<i>x</i> + 1) = 9</div><div class=\"c-line\">4<i>x</i> + 4 = 9</div><div class=\"c-line\">4<i>x</i> = 9 − 4</div><div class=\"c-line\">4<i>x</i> = 5</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">4</span></span> = 1,25</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 636D61"
+  },
+  {
+   "v": 1,
+   "id": "fipi:01DB8F",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p4",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">5(<i>x</i> + 9) = −8</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-10.6"
+     }
+    ],
+    "value": "-10,6"
+   },
+   "solution": "<div><div class=\"c-line\">5(<i>x</i> + 9) = −8</div><div class=\"c-line\">5<i>x</i> + 45 = −8</div><div class=\"c-line\">5<i>x</i> = −8 − 45</div><div class=\"c-line\">5<i>x</i> = −53</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">−53</span><span class=\"c-den\">5</span></span> = −10,6</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 01DB8F"
+  },
+  {
+   "v": 1,
    "id": "fipi:AEA848",
    "exam": "oge",
    "slug": "oge9",
@@ -120,6 +1015,118 @@
    },
    "solution": "<div><div class=\"c-line\">10(<i>x</i> − 9) = 7</div><div class=\"c-line\">10<i>x</i> − 90 = 7</div><div class=\"c-line\">10<i>x</i> = 7 + 90</div><div class=\"c-line\">10<i>x</i> = 97</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">97</span><span class=\"c-den\">10</span></span> = 9,7</div></div>",
    "source": "Открытый банк заданий ФИПИ, задание AEA848"
+  },
+  {
+   "v": 1,
+   "id": "fipi:483ABF",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p5",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">4(<i>x</i> − 6) = 5</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "7.25"
+     }
+    ],
+    "value": "7,25"
+   },
+   "solution": "<div><div class=\"c-line\">4(<i>x</i> − 6) = 5</div><div class=\"c-line\">4<i>x</i> − 24 = 5</div><div class=\"c-line\">4<i>x</i> = 5 + 24</div><div class=\"c-line\">4<i>x</i> = 29</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">29</span><span class=\"c-den\">4</span></span> = 7,25</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 483ABF"
+  },
+  {
+   "v": 1,
+   "id": "fipi:33EA1C",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p5",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">4(<i>x</i> − 8) = −5</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "6.75"
+     }
+    ],
+    "value": "6,75"
+   },
+   "solution": "<div><div class=\"c-line\">4(<i>x</i> − 8) = −5</div><div class=\"c-line\">4<i>x</i> − 32 = −5</div><div class=\"c-line\">4<i>x</i> = −5 + 32</div><div class=\"c-line\">4<i>x</i> = 27</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">27</span><span class=\"c-den\">4</span></span> = 6,75</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 33EA1C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:4994D3",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p5",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">4(<i>x</i> − 2) = −1</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.75"
+     }
+    ],
+    "value": "1,75"
+   },
+   "solution": "<div><div class=\"c-line\">4(<i>x</i> − 2) = −1</div><div class=\"c-line\">4<i>x</i> − 8 = −1</div><div class=\"c-line\">4<i>x</i> = −1 + 8</div><div class=\"c-line\">4<i>x</i> = 7</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">4</span></span> = 1,75</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 4994D3"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2808DC",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p5",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">5(<i>x</i> − 6) = 2</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "6.4"
+     }
+    ],
+    "value": "6,4"
+   },
+   "solution": "<div><div class=\"c-line\">5(<i>x</i> − 6) = 2</div><div class=\"c-line\">5<i>x</i> − 30 = 2</div><div class=\"c-line\">5<i>x</i> = 2 + 30</div><div class=\"c-line\">5<i>x</i> = 32</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">32</span><span class=\"c-den\">5</span></span> = 6,4</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 2808DC"
   },
   {
    "v": 1,
@@ -151,6 +1158,538 @@
   },
   {
    "v": 1,
+   "id": "fipi:0F0B20",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p6",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 5) = <i>x</i> + 5</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "15"
+     }
+    ],
+    "value": "15"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 5) = <i>x</i> + 5</div><div class=\"c-line\">2<i>x</i> − 10 = <i>x</i> + 5</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 5 + 10</div><div class=\"c-line\"><i>x</i> = 15</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 0F0B20"
+  },
+  {
+   "v": 1,
+   "id": "fipi:9CC3DA",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p6",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 2) = <i>x</i> + 2</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "6"
+     }
+    ],
+    "value": "6"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 2) = <i>x</i> + 2</div><div class=\"c-line\">2<i>x</i> − 4 = <i>x</i> + 2</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 2 + 4</div><div class=\"c-line\"><i>x</i> = 6</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 9CC3DA"
+  },
+  {
+   "v": 1,
+   "id": "fipi:E35E5D",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p6",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 6) = <i>x</i> + 6</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "18"
+     }
+    ],
+    "value": "18"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 6) = <i>x</i> + 6</div><div class=\"c-line\">2<i>x</i> − 12 = <i>x</i> + 6</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 6 + 12</div><div class=\"c-line\"><i>x</i> = 18</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание E35E5D"
+  },
+  {
+   "v": 1,
+   "id": "fipi:DC54A5",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p6",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 7) = <i>x</i> + 7</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "21"
+     }
+    ],
+    "value": "21"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 7) = <i>x</i> + 7</div><div class=\"c-line\">2<i>x</i> − 14 = <i>x</i> + 7</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 7 + 14</div><div class=\"c-line\"><i>x</i> = 21</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание DC54A5"
+  },
+  {
+   "v": 1,
+   "id": "fipi:97E2A4",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p6",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 9) = <i>x</i> + 9</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "27"
+     }
+    ],
+    "value": "27"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 9) = <i>x</i> + 9</div><div class=\"c-line\">2<i>x</i> − 18 = <i>x</i> + 9</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 9 + 18</div><div class=\"c-line\"><i>x</i> = 27</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 97E2A4"
+  },
+  {
+   "v": 1,
+   "id": "fipi:F69995",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p6",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 10) = <i>x</i> + 10</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "30"
+     }
+    ],
+    "value": "30"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 10) = <i>x</i> + 10</div><div class=\"c-line\">2<i>x</i> − 20 = <i>x</i> + 10</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 10 + 20</div><div class=\"c-line\"><i>x</i> = 30</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание F69995"
+  },
+  {
+   "v": 1,
+   "id": "fipi:58BD92",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p6",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 4) = <i>x</i> + 4</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "12"
+     }
+    ],
+    "value": "12"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 4) = <i>x</i> + 4</div><div class=\"c-line\">2<i>x</i> − 8 = <i>x</i> + 4</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 4 + 8</div><div class=\"c-line\"><i>x</i> = 12</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 58BD92"
+  },
+  {
+   "v": 1,
+   "id": "fipi:7AD665",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p6",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 3) = <i>x</i> + 3</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "9"
+     }
+    ],
+    "value": "9"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 3) = <i>x</i> + 3</div><div class=\"c-line\">2<i>x</i> − 6 = <i>x</i> + 3</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 3 + 6</div><div class=\"c-line\"><i>x</i> = 9</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 7AD665"
+  },
+  {
+   "v": 1,
+   "id": "fipi:B71768",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p6",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 1) = <i>x</i> + 1</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "3"
+     }
+    ],
+    "value": "3"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 1) = <i>x</i> + 1</div><div class=\"c-line\">2<i>x</i> − 2 = <i>x</i> + 1</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 1 + 2</div><div class=\"c-line\"><i>x</i> = 3</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание B71768"
+  },
+  {
+   "v": 1,
+   "id": "fipi:FF7B0B",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p7",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 6) − <i>x</i> = 6</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "18"
+     }
+    ],
+    "value": "18"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 6) − <i>x</i> = 6</div><div class=\"c-line\">2<i>x</i> − 12 − <i>x</i> = 6</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 6 + 12</div><div class=\"c-line\"><i>x</i> = 18</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание FF7B0B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:C2A209",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p7",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 1) − <i>x</i> = 1</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "3"
+     }
+    ],
+    "value": "3"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 1) − <i>x</i> = 1</div><div class=\"c-line\">2<i>x</i> − 2 − <i>x</i> = 1</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 1 + 2</div><div class=\"c-line\"><i>x</i> = 3</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание C2A209"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2A8212",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p7",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 5) − <i>x</i> = 5</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "15"
+     }
+    ],
+    "value": "15"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 5) − <i>x</i> = 5</div><div class=\"c-line\">2<i>x</i> − 10 − <i>x</i> = 5</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 5 + 10</div><div class=\"c-line\"><i>x</i> = 15</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 2A8212"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5D9C2C",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p7",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 3) − <i>x</i> = 3</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "9"
+     }
+    ],
+    "value": "9"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 3) − <i>x</i> = 3</div><div class=\"c-line\">2<i>x</i> − 6 − <i>x</i> = 3</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 3 + 6</div><div class=\"c-line\"><i>x</i> = 9</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 5D9C2C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:F7FFDC",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p7",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 10) − <i>x</i> = 10</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "30"
+     }
+    ],
+    "value": "30"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 10) − <i>x</i> = 10</div><div class=\"c-line\">2<i>x</i> − 20 − <i>x</i> = 10</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 10 + 20</div><div class=\"c-line\"><i>x</i> = 30</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание F7FFDC"
+  },
+  {
+   "v": 1,
+   "id": "fipi:3FBAD5",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p7",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 2) − <i>x</i> = 2</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "6"
+     }
+    ],
+    "value": "6"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 2) − <i>x</i> = 2</div><div class=\"c-line\">2<i>x</i> − 4 − <i>x</i> = 2</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 2 + 4</div><div class=\"c-line\"><i>x</i> = 6</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 3FBAD5"
+  },
+  {
+   "v": 1,
+   "id": "fipi:532B5B",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p7",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 7) − <i>x</i> = 7</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "21"
+     }
+    ],
+    "value": "21"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 7) − <i>x</i> = 7</div><div class=\"c-line\">2<i>x</i> − 14 − <i>x</i> = 7</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 7 + 14</div><div class=\"c-line\"><i>x</i> = 21</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 532B5B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:402D98",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p7",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 8) − <i>x</i> = 8</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "24"
+     }
+    ],
+    "value": "24"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 8) − <i>x</i> = 8</div><div class=\"c-line\">2<i>x</i> − 16 − <i>x</i> = 8</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 8 + 16</div><div class=\"c-line\"><i>x</i> = 24</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 402D98"
+  },
+  {
+   "v": 1,
+   "id": "fipi:4787EB",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p7",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 9) − <i>x</i> = 9</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "27"
+     }
+    ],
+    "value": "27"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 9) − <i>x</i> = 9</div><div class=\"c-line\">2<i>x</i> − 18 − <i>x</i> = 9</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 9 + 18</div><div class=\"c-line\"><i>x</i> = 27</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 4787EB"
+  },
+  {
+   "v": 1,
+   "id": "fipi:AB1E6B",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p7",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2(<i>x</i> − 4) − <i>x</i> = 4</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "12"
+     }
+    ],
+    "value": "12"
+   },
+   "solution": "<div><div class=\"c-line\">2(<i>x</i> − 4) − <i>x</i> = 4</div><div class=\"c-line\">2<i>x</i> − 8 − <i>x</i> = 4</div><div class=\"c-line\">2<i>x</i> − <i>x</i> = 4 + 8</div><div class=\"c-line\"><i>x</i> = 12</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание AB1E6B"
+  },
+  {
+   "v": 1,
    "id": "fipi:811946",
    "exam": "oge",
    "slug": "oge9",
@@ -176,6 +1715,258 @@
    },
    "solution": "<div><div class=\"c-line\">3(<i>x</i> + 8) − 2(<i>x</i> − 8) = 8</div><div class=\"c-line\">3<i>x</i> + 24 − 2<i>x</i> + 16 = 8</div><div class=\"c-line\">3<i>x</i> − 2<i>x</i> = 8 − 24 − 16</div><div class=\"c-line\"><i>x</i> = −32</div></div><div>Минус перед второй скобкой меняет знаки обоих слагаемых в ней: −2(x − 8) = −2x + 16.</div>",
    "source": "Открытый банк заданий ФИПИ, задание 811946"
+  },
+  {
+   "v": 1,
+   "id": "fipi:1610FB",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p8",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">3(<i>x</i> + 7) − 2(<i>x</i> − 7) = 7</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-28"
+     }
+    ],
+    "value": "-28"
+   },
+   "solution": "<div><div class=\"c-line\">3(<i>x</i> + 7) − 2(<i>x</i> − 7) = 7</div><div class=\"c-line\">3<i>x</i> + 21 − 2<i>x</i> + 14 = 7</div><div class=\"c-line\">3<i>x</i> − 2<i>x</i> = 7 − 21 − 14</div><div class=\"c-line\"><i>x</i> = −28</div></div><div>Минус перед второй скобкой меняет знаки обоих слагаемых в ней: −2(x − 7) = −2x + 14.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 1610FB"
+  },
+  {
+   "v": 1,
+   "id": "fipi:18672C",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p8",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">3(<i>x</i> + 9) − 2(<i>x</i> − 9) = 9</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-36"
+     }
+    ],
+    "value": "-36"
+   },
+   "solution": "<div><div class=\"c-line\">3(<i>x</i> + 9) − 2(<i>x</i> − 9) = 9</div><div class=\"c-line\">3<i>x</i> + 27 − 2<i>x</i> + 18 = 9</div><div class=\"c-line\">3<i>x</i> − 2<i>x</i> = 9 − 27 − 18</div><div class=\"c-line\"><i>x</i> = −36</div></div><div>Минус перед второй скобкой меняет знаки обоих слагаемых в ней: −2(x − 9) = −2x + 18.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 18672C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:40F559",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p8",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">3(<i>x</i> + 4) − 2(<i>x</i> − 4) = 4</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-16"
+     }
+    ],
+    "value": "-16"
+   },
+   "solution": "<div><div class=\"c-line\">3(<i>x</i> + 4) − 2(<i>x</i> − 4) = 4</div><div class=\"c-line\">3<i>x</i> + 12 − 2<i>x</i> + 8 = 4</div><div class=\"c-line\">3<i>x</i> − 2<i>x</i> = 4 − 12 − 8</div><div class=\"c-line\"><i>x</i> = −16</div></div><div>Минус перед второй скобкой меняет знаки обоих слагаемых в ней: −2(x − 4) = −2x + 8.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 40F559"
+  },
+  {
+   "v": 1,
+   "id": "fipi:DE7DAD",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p8",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">3(<i>x</i> + 3) − 2(<i>x</i> − 3) = 3</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-12"
+     }
+    ],
+    "value": "-12"
+   },
+   "solution": "<div><div class=\"c-line\">3(<i>x</i> + 3) − 2(<i>x</i> − 3) = 3</div><div class=\"c-line\">3<i>x</i> + 9 − 2<i>x</i> + 6 = 3</div><div class=\"c-line\">3<i>x</i> − 2<i>x</i> = 3 − 9 − 6</div><div class=\"c-line\"><i>x</i> = −12</div></div><div>Минус перед второй скобкой меняет знаки обоих слагаемых в ней: −2(x − 3) = −2x + 6.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание DE7DAD"
+  },
+  {
+   "v": 1,
+   "id": "fipi:13C49E",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p8",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">3(<i>x</i> + 10) − 2(<i>x</i> − 10) = 10</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-40"
+     }
+    ],
+    "value": "-40"
+   },
+   "solution": "<div><div class=\"c-line\">3(<i>x</i> + 10) − 2(<i>x</i> − 10) = 10</div><div class=\"c-line\">3<i>x</i> + 30 − 2<i>x</i> + 20 = 10</div><div class=\"c-line\">3<i>x</i> − 2<i>x</i> = 10 − 30 − 20</div><div class=\"c-line\"><i>x</i> = −40</div></div><div>Минус перед второй скобкой меняет знаки обоих слагаемых в ней: −2(x − 10) = −2x + 20.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 13C49E"
+  },
+  {
+   "v": 1,
+   "id": "fipi:EB54EB",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p8",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">3(<i>x</i> + 6) − 2(<i>x</i> − 6) = 6</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-24"
+     }
+    ],
+    "value": "-24"
+   },
+   "solution": "<div><div class=\"c-line\">3(<i>x</i> + 6) − 2(<i>x</i> − 6) = 6</div><div class=\"c-line\">3<i>x</i> + 18 − 2<i>x</i> + 12 = 6</div><div class=\"c-line\">3<i>x</i> − 2<i>x</i> = 6 − 18 − 12</div><div class=\"c-line\"><i>x</i> = −24</div></div><div>Минус перед второй скобкой меняет знаки обоих слагаемых в ней: −2(x − 6) = −2x + 12.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание EB54EB"
+  },
+  {
+   "v": 1,
+   "id": "fipi:826CE7",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p8",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">3(<i>x</i> + 5) − 2(<i>x</i> − 5) = 5</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-20"
+     }
+    ],
+    "value": "-20"
+   },
+   "solution": "<div><div class=\"c-line\">3(<i>x</i> + 5) − 2(<i>x</i> − 5) = 5</div><div class=\"c-line\">3<i>x</i> + 15 − 2<i>x</i> + 10 = 5</div><div class=\"c-line\">3<i>x</i> − 2<i>x</i> = 5 − 15 − 10</div><div class=\"c-line\"><i>x</i> = −20</div></div><div>Минус перед второй скобкой меняет знаки обоих слагаемых в ней: −2(x − 5) = −2x + 10.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 826CE7"
+  },
+  {
+   "v": 1,
+   "id": "fipi:28F766",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p8",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">3(<i>x</i> + 2) − 2(<i>x</i> − 2) = 2</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-8"
+     }
+    ],
+    "value": "-8"
+   },
+   "solution": "<div><div class=\"c-line\">3(<i>x</i> + 2) − 2(<i>x</i> − 2) = 2</div><div class=\"c-line\">3<i>x</i> + 6 − 2<i>x</i> + 4 = 2</div><div class=\"c-line\">3<i>x</i> − 2<i>x</i> = 2 − 6 − 4</div><div class=\"c-line\"><i>x</i> = −8</div></div><div>Минус перед второй скобкой меняет знаки обоих слагаемых в ней: −2(x − 2) = −2x + 4.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 28F766"
+  },
+  {
+   "v": 1,
+   "id": "fipi:EE4E3E",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p8",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">3(<i>x</i> + 11) − 2(<i>x</i> − 11) = 11</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-44"
+     }
+    ],
+    "value": "-44"
+   },
+   "solution": "<div><div class=\"c-line\">3(<i>x</i> + 11) − 2(<i>x</i> − 11) = 11</div><div class=\"c-line\">3<i>x</i> + 33 − 2<i>x</i> + 22 = 11</div><div class=\"c-line\">3<i>x</i> − 2<i>x</i> = 11 − 33 − 22</div><div class=\"c-line\"><i>x</i> = −44</div></div><div>Минус перед второй скобкой меняет знаки обоих слагаемых в ней: −2(x − 11) = −2x + 22.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание EE4E3E"
   },
   {
    "v": 1,
@@ -207,6 +1998,258 @@
   },
   {
    "v": 1,
+   "id": "fipi:E85401",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p9",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 16 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите больший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "4"
+     }
+    ],
+    "value": "4"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 16 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 16</div><div class=\"c-line\"><i>x</i> = −4 или <i>x</i> = 4</div></div><div>Больший корень: 4. Корней два — и 4, и −4 в квадрате дают 16.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание E85401"
+  },
+  {
+   "v": 1,
+   "id": "fipi:E51F08",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p9",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 121 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите больший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "11"
+     }
+    ],
+    "value": "11"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 121 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 121</div><div class=\"c-line\"><i>x</i> = −11 или <i>x</i> = 11</div></div><div>Больший корень: 11. Корней два — и 11, и −11 в квадрате дают 121.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание E51F08"
+  },
+  {
+   "v": 1,
+   "id": "fipi:3F6407",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p9",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 4 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите больший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2"
+     }
+    ],
+    "value": "2"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 4 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 4</div><div class=\"c-line\"><i>x</i> = −2 или <i>x</i> = 2</div></div><div>Больший корень: 2. Корней два — и 2, и −2 в квадрате дают 4.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 3F6407"
+  },
+  {
+   "v": 1,
+   "id": "fipi:EBB379",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p9",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 49 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите больший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "7"
+     }
+    ],
+    "value": "7"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 49 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 49</div><div class=\"c-line\"><i>x</i> = −7 или <i>x</i> = 7</div></div><div>Больший корень: 7. Корней два — и 7, и −7 в квадрате дают 49.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание EBB379"
+  },
+  {
+   "v": 1,
+   "id": "fipi:E46411",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p9",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 36 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите больший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "6"
+     }
+    ],
+    "value": "6"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 36 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 36</div><div class=\"c-line\"><i>x</i> = −6 или <i>x</i> = 6</div></div><div>Больший корень: 6. Корней два — и 6, и −6 в квадрате дают 36.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание E46411"
+  },
+  {
+   "v": 1,
+   "id": "fipi:E4CE6B",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p9",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 81 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите больший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "9"
+     }
+    ],
+    "value": "9"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 81 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 81</div><div class=\"c-line\"><i>x</i> = −9 или <i>x</i> = 9</div></div><div>Больший корень: 9. Корней два — и 9, и −9 в квадрате дают 81.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание E4CE6B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:36E26B",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p9",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 144 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите больший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "12"
+     }
+    ],
+    "value": "12"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 144 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 144</div><div class=\"c-line\"><i>x</i> = −12 или <i>x</i> = 12</div></div><div>Больший корень: 12. Корней два — и 12, и −12 в квадрате дают 144.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 36E26B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:46C337",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p9",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 25 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите больший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "5"
+     }
+    ],
+    "value": "5"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 25 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 25</div><div class=\"c-line\"><i>x</i> = −5 или <i>x</i> = 5</div></div><div>Больший корень: 5. Корней два — и 5, и −5 в квадрате дают 25.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 46C337"
+  },
+  {
+   "v": 1,
+   "id": "fipi:D61334",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p9",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 64 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите больший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "8"
+     }
+    ],
+    "value": "8"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 64 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 64</div><div class=\"c-line\"><i>x</i> = −8 или <i>x</i> = 8</div></div><div>Больший корень: 8. Корней два — и 8, и −8 в квадрате дают 64.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание D61334"
+  },
+  {
+   "v": 1,
    "id": "fipi:B0D648",
    "exam": "oge",
    "slug": "oge9",
@@ -232,6 +2275,538 @@
    },
    "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 144 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 144</div><div class=\"c-line\"><i>x</i> = −12 или <i>x</i> = 12</div></div><div>Меньший корень: −12. Корней два — и 12, и −12 в квадрате дают 144.</div>",
    "source": "Открытый банк заданий ФИПИ, задание B0D648"
+  },
+  {
+   "v": 1,
+   "id": "fipi:69EC44",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p10",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 9 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-3"
+     }
+    ],
+    "value": "-3"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 9 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 9</div><div class=\"c-line\"><i>x</i> = −3 или <i>x</i> = 3</div></div><div>Меньший корень: −3. Корней два — и 3, и −3 в квадрате дают 9.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 69EC44"
+  },
+  {
+   "v": 1,
+   "id": "fipi:3A067C",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p10",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 81 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-9"
+     }
+    ],
+    "value": "-9"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 81 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 81</div><div class=\"c-line\"><i>x</i> = −9 или <i>x</i> = 9</div></div><div>Меньший корень: −9. Корней два — и 9, и −9 в квадрате дают 81.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 3A067C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:828071",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p10",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 49 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-7"
+     }
+    ],
+    "value": "-7"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 49 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 49</div><div class=\"c-line\"><i>x</i> = −7 или <i>x</i> = 7</div></div><div>Меньший корень: −7. Корней два — и 7, и −7 в квадрате дают 49.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 828071"
+  },
+  {
+   "v": 1,
+   "id": "fipi:DB4EB4",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p10",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 36 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-6"
+     }
+    ],
+    "value": "-6"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 36 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 36</div><div class=\"c-line\"><i>x</i> = −6 или <i>x</i> = 6</div></div><div>Меньший корень: −6. Корней два — и 6, и −6 в квадрате дают 36.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание DB4EB4"
+  },
+  {
+   "v": 1,
+   "id": "fipi:CC13D8",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p10",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 4 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-2"
+     }
+    ],
+    "value": "-2"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 4 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 4</div><div class=\"c-line\"><i>x</i> = −2 или <i>x</i> = 2</div></div><div>Меньший корень: −2. Корней два — и 2, и −2 в квадрате дают 4.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание CC13D8"
+  },
+  {
+   "v": 1,
+   "id": "fipi:05EE5C",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p10",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 121 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-11"
+     }
+    ],
+    "value": "-11"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 121 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 121</div><div class=\"c-line\"><i>x</i> = −11 или <i>x</i> = 11</div></div><div>Меньший корень: −11. Корней два — и 11, и −11 в квадрате дают 121.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 05EE5C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:F932CB",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p10",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 64 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-8"
+     }
+    ],
+    "value": "-8"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 64 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 64</div><div class=\"c-line\"><i>x</i> = −8 или <i>x</i> = 8</div></div><div>Меньший корень: −8. Корней два — и 8, и −8 в квадрате дают 64.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание F932CB"
+  },
+  {
+   "v": 1,
+   "id": "fipi:32029B",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p10",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 25 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-5"
+     }
+    ],
+    "value": "-5"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 25 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 25</div><div class=\"c-line\"><i>x</i> = −5 или <i>x</i> = 5</div></div><div>Меньший корень: −5. Корней два — и 5, и −5 в квадрате дают 25.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 32029B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5BEE8E",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p10",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 16 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-4"
+     }
+    ],
+    "value": "-4"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 16 = 0</div><div class=\"c-line\"><i>x</i><sup>2</sup> = 16</div><div class=\"c-line\"><i>x</i> = −4 или <i>x</i> = 4</div></div><div>Меньший корень: −4. Корней два — и 4, и −4 в квадрате дают 16.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 5BEE8E"
+  },
+  {
+   "v": 1,
+   "id": "fipi:CA994A",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p11",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">10<i>x</i><sup>2</sup> = 80<i>x</i></div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0"
+     }
+    ],
+    "value": "0"
+   },
+   "solution": "<div><div class=\"c-line\">10<i>x</i><sup>2</sup> = 80<i>x</i></div><div class=\"c-line\">10<i>x</i><sup>2</sup> − 80<i>x</i> = 0</div><div class=\"c-line\">10<i>x</i>(<i>x</i> − 8) = 0</div><div class=\"c-line\"><i>x</i> = 0 или <i>x</i> = 8</div></div><div>Меньший корень: 0.</div><div>Делить обе части на x нельзя — так теряется корень x = 0.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание CA994A"
+  },
+  {
+   "v": 1,
+   "id": "fipi:27B2F1",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p11",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">9<i>x</i><sup>2</sup> = 54<i>x</i></div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0"
+     }
+    ],
+    "value": "0"
+   },
+   "solution": "<div><div class=\"c-line\">9<i>x</i><sup>2</sup> = 54<i>x</i></div><div class=\"c-line\">9<i>x</i><sup>2</sup> − 54<i>x</i> = 0</div><div class=\"c-line\">9<i>x</i>(<i>x</i> − 6) = 0</div><div class=\"c-line\"><i>x</i> = 0 или <i>x</i> = 6</div></div><div>Меньший корень: 0.</div><div>Делить обе части на x нельзя — так теряется корень x = 0.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 27B2F1"
+  },
+  {
+   "v": 1,
+   "id": "fipi:286CF5",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p11",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">4<i>x</i><sup>2</sup> = 20<i>x</i></div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0"
+     }
+    ],
+    "value": "0"
+   },
+   "solution": "<div><div class=\"c-line\">4<i>x</i><sup>2</sup> = 20<i>x</i></div><div class=\"c-line\">4<i>x</i><sup>2</sup> − 20<i>x</i> = 0</div><div class=\"c-line\">4<i>x</i>(<i>x</i> − 5) = 0</div><div class=\"c-line\"><i>x</i> = 0 или <i>x</i> = 5</div></div><div>Меньший корень: 0.</div><div>Делить обе части на x нельзя — так теряется корень x = 0.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 286CF5"
+  },
+  {
+   "v": 1,
+   "id": "fipi:9937FD",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p11",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> = 5<i>x</i></div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0"
+     }
+    ],
+    "value": "0"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> = 5<i>x</i></div><div class=\"c-line\"><i>x</i><sup>2</sup> − 5<i>x</i> = 0</div><div class=\"c-line\"><i>x</i>(<i>x</i> − 5) = 0</div><div class=\"c-line\"><i>x</i> = 0 или <i>x</i> = 5</div></div><div>Меньший корень: 0.</div><div>Делить обе части на x нельзя — так теряется корень x = 0.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 9937FD"
+  },
+  {
+   "v": 1,
+   "id": "fipi:BD7B08",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p11",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">7<i>x</i><sup>2</sup> = 42<i>x</i></div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0"
+     }
+    ],
+    "value": "0"
+   },
+   "solution": "<div><div class=\"c-line\">7<i>x</i><sup>2</sup> = 42<i>x</i></div><div class=\"c-line\">7<i>x</i><sup>2</sup> − 42<i>x</i> = 0</div><div class=\"c-line\">7<i>x</i>(<i>x</i> − 6) = 0</div><div class=\"c-line\"><i>x</i> = 0 или <i>x</i> = 6</div></div><div>Меньший корень: 0.</div><div>Делить обе части на x нельзя — так теряется корень x = 0.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание BD7B08"
+  },
+  {
+   "v": 1,
+   "id": "fipi:8A6326",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p11",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">3<i>x</i><sup>2</sup> = 9<i>x</i></div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0"
+     }
+    ],
+    "value": "0"
+   },
+   "solution": "<div><div class=\"c-line\">3<i>x</i><sup>2</sup> = 9<i>x</i></div><div class=\"c-line\">3<i>x</i><sup>2</sup> − 9<i>x</i> = 0</div><div class=\"c-line\">3<i>x</i>(<i>x</i> − 3) = 0</div><div class=\"c-line\"><i>x</i> = 0 или <i>x</i> = 3</div></div><div>Меньший корень: 0.</div><div>Делить обе части на x нельзя — так теряется корень x = 0.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 8A6326"
+  },
+  {
+   "v": 1,
+   "id": "fipi:257FDE",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p11",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">8<i>x</i><sup>2</sup> = 72<i>x</i></div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0"
+     }
+    ],
+    "value": "0"
+   },
+   "solution": "<div><div class=\"c-line\">8<i>x</i><sup>2</sup> = 72<i>x</i></div><div class=\"c-line\">8<i>x</i><sup>2</sup> − 72<i>x</i> = 0</div><div class=\"c-line\">8<i>x</i>(<i>x</i> − 9) = 0</div><div class=\"c-line\"><i>x</i> = 0 или <i>x</i> = 9</div></div><div>Меньший корень: 0.</div><div>Делить обе части на x нельзя — так теряется корень x = 0.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 257FDE"
+  },
+  {
+   "v": 1,
+   "id": "fipi:6BA8ED",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p11",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">6<i>x</i><sup>2</sup> = 36<i>x</i></div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0"
+     }
+    ],
+    "value": "0"
+   },
+   "solution": "<div><div class=\"c-line\">6<i>x</i><sup>2</sup> = 36<i>x</i></div><div class=\"c-line\">6<i>x</i><sup>2</sup> − 36<i>x</i> = 0</div><div class=\"c-line\">6<i>x</i>(<i>x</i> − 6) = 0</div><div class=\"c-line\"><i>x</i> = 0 или <i>x</i> = 6</div></div><div>Меньший корень: 0.</div><div>Делить обе части на x нельзя — так теряется корень x = 0.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 6BA8ED"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5E9E64",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p11",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2<i>x</i><sup>2</sup> = 8<i>x</i></div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0"
+     }
+    ],
+    "value": "0"
+   },
+   "solution": "<div><div class=\"c-line\">2<i>x</i><sup>2</sup> = 8<i>x</i></div><div class=\"c-line\">2<i>x</i><sup>2</sup> − 8<i>x</i> = 0</div><div class=\"c-line\">2<i>x</i>(<i>x</i> − 4) = 0</div><div class=\"c-line\"><i>x</i> = 0 или <i>x</i> = 4</div></div><div>Меньший корень: 0.</div><div>Делить обе части на x нельзя — так теряется корень x = 0.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 5E9E64"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5FA26E",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p11",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">5<i>x</i><sup>2</sup> = 35<i>x</i></div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0"
+     }
+    ],
+    "value": "0"
+   },
+   "solution": "<div><div class=\"c-line\">5<i>x</i><sup>2</sup> = 35<i>x</i></div><div class=\"c-line\">5<i>x</i><sup>2</sup> − 35<i>x</i> = 0</div><div class=\"c-line\">5<i>x</i>(<i>x</i> − 7) = 0</div><div class=\"c-line\"><i>x</i> = 0 или <i>x</i> = 7</div></div><div>Меньший корень: 0.</div><div>Делить обе части на x нельзя — так теряется корень x = 0.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 5FA26E"
   },
   {
    "v": 1,
@@ -263,6 +2838,118 @@
   },
   {
    "v": 1,
+   "id": "fipi:02AAF8",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p12",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 12<i>x</i> + 20 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите больший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "10"
+     }
+    ],
+    "value": "10"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 12<i>x</i> + 20 = 0</div><div class=\"c-line\">D = (−12)<sup>2</sup> − 4 · 1 · 20 = 144 − 80 = 64</div><div class=\"c-line\"><i>x</i><sub>1</sub> = <span class=\"c-frac\"><span class=\"c-num\">12 − 8</span><span class=\"c-den\">2</span></span> = 2</div><div class=\"c-line\"><i>x</i><sub>2</sub> = <span class=\"c-frac\"><span class=\"c-num\">12 + 8</span><span class=\"c-den\">2</span></span> = 10</div></div><div>Больший корень: 10.</div><div>Проверка по теореме Виета: 2 + 10 = 12, 2 · 10 = 20.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 02AAF8"
+  },
+  {
+   "v": 1,
+   "id": "fipi:7A8250",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p12",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 8<i>x</i> + 12 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите больший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "6"
+     }
+    ],
+    "value": "6"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 8<i>x</i> + 12 = 0</div><div class=\"c-line\">D = (−8)<sup>2</sup> − 4 · 1 · 12 = 64 − 48 = 16</div><div class=\"c-line\"><i>x</i><sub>1</sub> = <span class=\"c-frac\"><span class=\"c-num\">8 − 4</span><span class=\"c-den\">2</span></span> = 2</div><div class=\"c-line\"><i>x</i><sub>2</sub> = <span class=\"c-frac\"><span class=\"c-num\">8 + 4</span><span class=\"c-den\">2</span></span> = 6</div></div><div>Больший корень: 6.</div><div>Проверка по теореме Виета: 2 + 6 = 8, 2 · 6 = 12.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 7A8250"
+  },
+  {
+   "v": 1,
+   "id": "fipi:D06250",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p12",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 9<i>x</i> + 8 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите больший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "8"
+     }
+    ],
+    "value": "8"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 9<i>x</i> + 8 = 0</div><div class=\"c-line\">D = (−9)<sup>2</sup> − 4 · 1 · 8 = 81 − 32 = 49</div><div class=\"c-line\"><i>x</i><sub>1</sub> = <span class=\"c-frac\"><span class=\"c-num\">9 − 7</span><span class=\"c-den\">2</span></span> = 1</div><div class=\"c-line\"><i>x</i><sub>2</sub> = <span class=\"c-frac\"><span class=\"c-num\">9 + 7</span><span class=\"c-den\">2</span></span> = 8</div></div><div>Больший корень: 8.</div><div>Проверка по теореме Виета: 1 + 8 = 9, 1 · 8 = 8.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание D06250"
+  },
+  {
+   "v": 1,
+   "id": "fipi:94925B",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p12",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 10<i>x</i> + 21 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите больший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "7"
+     }
+    ],
+    "value": "7"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 10<i>x</i> + 21 = 0</div><div class=\"c-line\">D = (−10)<sup>2</sup> − 4 · 1 · 21 = 100 − 84 = 16</div><div class=\"c-line\"><i>x</i><sub>1</sub> = <span class=\"c-frac\"><span class=\"c-num\">10 − 4</span><span class=\"c-den\">2</span></span> = 3</div><div class=\"c-line\"><i>x</i><sub>2</sub> = <span class=\"c-frac\"><span class=\"c-num\">10 + 4</span><span class=\"c-den\">2</span></span> = 7</div></div><div>Больший корень: 7.</div><div>Проверка по теореме Виета: 3 + 7 = 10, 3 · 7 = 21.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 94925B"
+  },
+  {
+   "v": 1,
    "id": "fipi:EA4046",
    "exam": "oge",
    "slug": "oge9",
@@ -288,6 +2975,146 @@
    },
    "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 9<i>x</i> + 18 = 0</div><div class=\"c-line\">D = (−9)<sup>2</sup> − 4 · 1 · 18 = 81 − 72 = 9</div><div class=\"c-line\"><i>x</i><sub>1</sub> = <span class=\"c-frac\"><span class=\"c-num\">9 − 3</span><span class=\"c-den\">2</span></span> = 3</div><div class=\"c-line\"><i>x</i><sub>2</sub> = <span class=\"c-frac\"><span class=\"c-num\">9 + 3</span><span class=\"c-den\">2</span></span> = 6</div></div><div>Меньший корень: 3.</div><div>Проверка по теореме Виета: 3 + 6 = 9, 3 · 6 = 18.</div>",
    "source": "Открытый банк заданий ФИПИ, задание EA4046"
+  },
+  {
+   "v": 1,
+   "id": "fipi:30344D",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p13",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 6<i>x</i> + 5 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1"
+     }
+    ],
+    "value": "1"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 6<i>x</i> + 5 = 0</div><div class=\"c-line\">D = (−6)<sup>2</sup> − 4 · 1 · 5 = 36 − 20 = 16</div><div class=\"c-line\"><i>x</i><sub>1</sub> = <span class=\"c-frac\"><span class=\"c-num\">6 − 4</span><span class=\"c-den\">2</span></span> = 1</div><div class=\"c-line\"><i>x</i><sub>2</sub> = <span class=\"c-frac\"><span class=\"c-num\">6 + 4</span><span class=\"c-den\">2</span></span> = 5</div></div><div>Меньший корень: 1.</div><div>Проверка по теореме Виета: 1 + 5 = 6, 1 · 5 = 5.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 30344D"
+  },
+  {
+   "v": 1,
+   "id": "fipi:540ABC",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p13",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 11<i>x</i> + 30 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "5"
+     }
+    ],
+    "value": "5"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 11<i>x</i> + 30 = 0</div><div class=\"c-line\">D = (−11)<sup>2</sup> − 4 · 1 · 30 = 121 − 120 = 1</div><div class=\"c-line\"><i>x</i><sub>1</sub> = <span class=\"c-frac\"><span class=\"c-num\">11 − 1</span><span class=\"c-den\">2</span></span> = 5</div><div class=\"c-line\"><i>x</i><sub>2</sub> = <span class=\"c-frac\"><span class=\"c-num\">11 + 1</span><span class=\"c-den\">2</span></span> = 6</div></div><div>Меньший корень: 5.</div><div>Проверка по теореме Виета: 5 + 6 = 11, 5 · 6 = 30.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 540ABC"
+  },
+  {
+   "v": 1,
+   "id": "fipi:121FA3",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p13",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 10<i>x</i> + 24 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "4"
+     }
+    ],
+    "value": "4"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 10<i>x</i> + 24 = 0</div><div class=\"c-line\">D = (−10)<sup>2</sup> − 4 · 1 · 24 = 100 − 96 = 4</div><div class=\"c-line\"><i>x</i><sub>1</sub> = <span class=\"c-frac\"><span class=\"c-num\">10 − 2</span><span class=\"c-den\">2</span></span> = 4</div><div class=\"c-line\"><i>x</i><sub>2</sub> = <span class=\"c-frac\"><span class=\"c-num\">10 + 2</span><span class=\"c-den\">2</span></span> = 6</div></div><div>Меньший корень: 4.</div><div>Проверка по теореме Виета: 4 + 6 = 10, 4 · 6 = 24.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 121FA3"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5AA665",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p13",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\"><i>x</i><sup>2</sup> − 7<i>x</i> + 10 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2"
+     }
+    ],
+    "value": "2"
+   },
+   "solution": "<div><div class=\"c-line\"><i>x</i><sup>2</sup> − 7<i>x</i> + 10 = 0</div><div class=\"c-line\">D = (−7)<sup>2</sup> − 4 · 1 · 10 = 49 − 40 = 9</div><div class=\"c-line\"><i>x</i><sub>1</sub> = <span class=\"c-frac\"><span class=\"c-num\">7 − 3</span><span class=\"c-den\">2</span></span> = 2</div><div class=\"c-line\"><i>x</i><sub>2</sub> = <span class=\"c-frac\"><span class=\"c-num\">7 + 3</span><span class=\"c-den\">2</span></span> = 5</div></div><div>Меньший корень: 2.</div><div>Проверка по теореме Виета: 2 + 5 = 7, 2 · 5 = 10.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 5AA665"
+  },
+  {
+   "v": 1,
+   "id": "fipi:0E99DD",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p14",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>Решите уравнение:<div class=\"c-eq\">2<i>x</i><sup>2</sup> − 3<i>x</i> + 1 = 0</div><div>Если уравнение имеет более одного корня, в ответ запишите меньший из корней.</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0.5"
+     }
+    ],
+    "value": "0,5"
+   },
+   "solution": "<div><div class=\"c-line\">2<i>x</i><sup>2</sup> − 3<i>x</i> + 1 = 0</div><div class=\"c-line\">D = (−3)<sup>2</sup> − 4 · 2 · 1 = 9 − 8 = 1</div><div class=\"c-line\"><i>x</i><sub>1</sub> = <span class=\"c-frac\"><span class=\"c-num\">3 − 1</span><span class=\"c-den\">2 · 2</span></span> = 0,5</div><div class=\"c-line\"><i>x</i><sub>2</sub> = <span class=\"c-frac\"><span class=\"c-num\">3 + 1</span><span class=\"c-den\">2 · 2</span></span> = 1</div></div><div>Меньший корень: 0,5.</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 0E99DD"
   }
  ]
 }

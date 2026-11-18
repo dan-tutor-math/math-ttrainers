@@ -1,0 +1,2280 @@
+{
+ "v": 1,
+ "slug": "oge6",
+ "exam": "oge",
+ "family": "a_simple",
+ "src": {
+  "oge6-fipi-bank.js": "32db23f8c2ee60edf0082a16d98cc027e22b57ba",
+  "oge6.html": "07f79b914f01c13eda384535a4b7a9afd702f8e4"
+ },
+ "cards": [
+  {
+   "v": 1,
+   "id": "fipi:33FBF3",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p1",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">4</span></span><span class=\"c-op\">+</span><span class=\"c-frac\"><span class=\"c-num\">37</span><span class=\"c-den\">20</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2.1"
+     }
+    ],
+    "value": "2,1"
+   },
+   "solution": "<div>Общий знаменатель — 20.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">4</span></span> + <span class=\"c-frac\"><span class=\"c-num\">37</span><span class=\"c-den\">20</span></span> = <span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">20</span></span> + <span class=\"c-frac\"><span class=\"c-num\">37</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">42</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= 2,1</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 33FBF3"
+  },
+  {
+   "v": 1,
+   "id": "fipi:3BAEFA",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p1",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">2</span></span><span class=\"c-op\">+</span><span class=\"c-frac\"><span class=\"c-num\">11</span><span class=\"c-den\">10</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.6"
+     }
+    ],
+    "value": "1,6"
+   },
+   "solution": "<div>Общий знаменатель — 10.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">2</span></span> + <span class=\"c-frac\"><span class=\"c-num\">11</span><span class=\"c-den\">10</span></span> = <span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">10</span></span> + <span class=\"c-frac\"><span class=\"c-num\">11</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">16</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">8</span><span class=\"c-den\">5</span></span></div><div class=\"c-line\">= 1,6</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 3BAEFA"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5233A3",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p1",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">5</span></span><span class=\"c-op\">+</span><span class=\"c-frac\"><span class=\"c-num\">17</span><span class=\"c-den\">10</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.9"
+     }
+    ],
+    "value": "1,9"
+   },
+   "solution": "<div>Общий знаменатель — 10.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">5</span></span> + <span class=\"c-frac\"><span class=\"c-num\">17</span><span class=\"c-den\">10</span></span> = <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">10</span></span> + <span class=\"c-frac\"><span class=\"c-num\">17</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">19</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= 1,9</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 5233A3"
+  },
+  {
+   "v": 1,
+   "id": "fipi:54924B",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p1",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">5</span></span><span class=\"c-op\">+</span><span class=\"c-frac\"><span class=\"c-num\">53</span><span class=\"c-den\">50</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.26"
+     }
+    ],
+    "value": "1,26"
+   },
+   "solution": "<div>Общий знаменатель — 50.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">5</span></span> + <span class=\"c-frac\"><span class=\"c-num\">53</span><span class=\"c-den\">50</span></span> = <span class=\"c-frac\"><span class=\"c-num\">10</span><span class=\"c-den\">50</span></span> + <span class=\"c-frac\"><span class=\"c-num\">53</span><span class=\"c-den\">50</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">63</span><span class=\"c-den\">50</span></span></div><div class=\"c-line\">= 1,26</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 54924B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:945291",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p1",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">10</span></span><span class=\"c-op\">+</span><span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">50</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0.52"
+     }
+    ],
+    "value": "0,52"
+   },
+   "solution": "<div>Общий знаменатель — 50.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">10</span></span> + <span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">50</span></span> = <span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">50</span></span> + <span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">50</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">26</span><span class=\"c-den\">50</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">13</span><span class=\"c-den\">25</span></span></div><div class=\"c-line\">= 0,52</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 945291"
+  },
+  {
+   "v": 1,
+   "id": "fipi:A76D9D",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p1",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">25</span></span><span class=\"c-op\">+</span><span class=\"c-frac\"><span class=\"c-num\">43</span><span class=\"c-den\">50</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0.9"
+     }
+    ],
+    "value": "0,9"
+   },
+   "solution": "<div>Общий знаменатель — 50.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">25</span></span> + <span class=\"c-frac\"><span class=\"c-num\">43</span><span class=\"c-den\">50</span></span> = <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">50</span></span> + <span class=\"c-frac\"><span class=\"c-num\">43</span><span class=\"c-den\">50</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">45</span><span class=\"c-den\">50</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= 0,9</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание A76D9D"
+  },
+  {
+   "v": 1,
+   "id": "fipi:D5ED33",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p1",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">5</span></span><span class=\"c-op\">+</span><span class=\"c-frac\"><span class=\"c-num\">19</span><span class=\"c-den\">20</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.15"
+     }
+    ],
+    "value": "1,15"
+   },
+   "solution": "<div>Общий знаменатель — 20.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">5</span></span> + <span class=\"c-frac\"><span class=\"c-num\">19</span><span class=\"c-den\">20</span></span> = <span class=\"c-frac\"><span class=\"c-num\">4</span><span class=\"c-den\">20</span></span> + <span class=\"c-frac\"><span class=\"c-num\">19</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">23</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= 1,15</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание D5ED33"
+  },
+  {
+   "v": 1,
+   "id": "fipi:EA1574",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p1",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">2</span></span><span class=\"c-op\">+</span><span class=\"c-frac\"><span class=\"c-num\">31</span><span class=\"c-den\">20</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2.05"
+     }
+    ],
+    "value": "2,05"
+   },
+   "solution": "<div>Общий знаменатель — 20.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">2</span></span> + <span class=\"c-frac\"><span class=\"c-num\">31</span><span class=\"c-den\">20</span></span> = <span class=\"c-frac\"><span class=\"c-num\">10</span><span class=\"c-den\">20</span></span> + <span class=\"c-frac\"><span class=\"c-num\">31</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">41</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= 2,05</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание EA1574"
+  },
+  {
+   "v": 1,
+   "id": "fipi:ED8DF8",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p1",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">10</span></span><span class=\"c-op\">+</span><span class=\"c-frac\"><span class=\"c-num\">29</span><span class=\"c-den\">20</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.55"
+     }
+    ],
+    "value": "1,55"
+   },
+   "solution": "<div>Общий знаменатель — 20.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">10</span></span> + <span class=\"c-frac\"><span class=\"c-num\">29</span><span class=\"c-den\">20</span></span> = <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">20</span></span> + <span class=\"c-frac\"><span class=\"c-num\">29</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">31</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= 1,55</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание ED8DF8"
+  },
+  {
+   "v": 1,
+   "id": "fipi:FBDAD3",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p1",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">2</span></span><span class=\"c-op\">+</span><span class=\"c-frac\"><span class=\"c-num\">33</span><span class=\"c-den\">50</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.16"
+     }
+    ],
+    "value": "1,16"
+   },
+   "solution": "<div>Общий знаменатель — 50.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">2</span></span> + <span class=\"c-frac\"><span class=\"c-num\">33</span><span class=\"c-den\">50</span></span> = <span class=\"c-frac\"><span class=\"c-num\">25</span><span class=\"c-den\">50</span></span> + <span class=\"c-frac\"><span class=\"c-num\">33</span><span class=\"c-den\">50</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">58</span><span class=\"c-den\">50</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">29</span><span class=\"c-den\">25</span></span></div><div class=\"c-line\">= 1,16</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание FBDAD3"
+  },
+  {
+   "v": 1,
+   "id": "fipi:097E41",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p2",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">5</span></span><span class=\"c-op\">−</span><span class=\"c-frac\"><span class=\"c-num\">41</span><span class=\"c-den\">50</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-0.62"
+     }
+    ],
+    "value": "-0,62"
+   },
+   "solution": "<div>Общий знаменатель — 50.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">5</span></span> − <span class=\"c-frac\"><span class=\"c-num\">41</span><span class=\"c-den\">50</span></span> = <span class=\"c-frac\"><span class=\"c-num\">10</span><span class=\"c-den\">50</span></span> − <span class=\"c-frac\"><span class=\"c-num\">41</span><span class=\"c-den\">50</span></span></div><div class=\"c-line\">= −<span class=\"c-frac\"><span class=\"c-num\">31</span><span class=\"c-den\">50</span></span></div><div class=\"c-line\">= −0,62</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 097E41"
+  },
+  {
+   "v": 1,
+   "id": "fipi:1FC3AA",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p2",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">10</span></span><span class=\"c-op\">−</span><span class=\"c-frac\"><span class=\"c-num\">23</span><span class=\"c-den\">20</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-1.05"
+     }
+    ],
+    "value": "-1,05"
+   },
+   "solution": "<div>Общий знаменатель — 20.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">10</span></span> − <span class=\"c-frac\"><span class=\"c-num\">23</span><span class=\"c-den\">20</span></span> = <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">20</span></span> − <span class=\"c-frac\"><span class=\"c-num\">23</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= −<span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= −1,05</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 1FC3AA"
+  },
+  {
+   "v": 1,
+   "id": "fipi:27DDD8",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p2",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">10</span></span><span class=\"c-op\">−</span><span class=\"c-frac\"><span class=\"c-num\">39</span><span class=\"c-den\">50</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-0.68"
+     }
+    ],
+    "value": "-0,68"
+   },
+   "solution": "<div>Общий знаменатель — 50.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">10</span></span> − <span class=\"c-frac\"><span class=\"c-num\">39</span><span class=\"c-den\">50</span></span> = <span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">50</span></span> − <span class=\"c-frac\"><span class=\"c-num\">39</span><span class=\"c-den\">50</span></span></div><div class=\"c-line\">= −<span class=\"c-frac\"><span class=\"c-num\">34</span><span class=\"c-den\">50</span></span></div><div class=\"c-line\">= −<span class=\"c-frac\"><span class=\"c-num\">17</span><span class=\"c-den\">25</span></span></div><div class=\"c-line\">= −0,68</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 27DDD8"
+  },
+  {
+   "v": 1,
+   "id": "fipi:3CC449",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p2",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">4</span></span><span class=\"c-op\">−</span><span class=\"c-frac\"><span class=\"c-num\">51</span><span class=\"c-den\">20</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-2.3"
+     }
+    ],
+    "value": "-2,3"
+   },
+   "solution": "<div>Общий знаменатель — 20.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">4</span></span> − <span class=\"c-frac\"><span class=\"c-num\">51</span><span class=\"c-den\">20</span></span> = <span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">20</span></span> − <span class=\"c-frac\"><span class=\"c-num\">51</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= −<span class=\"c-frac\"><span class=\"c-num\">46</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= −<span class=\"c-frac\"><span class=\"c-num\">23</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= −2,3</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 3CC449"
+  },
+  {
+   "v": 1,
+   "id": "fipi:54576D",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p2",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">5</span></span><span class=\"c-op\">−</span><span class=\"c-frac\"><span class=\"c-num\">47</span><span class=\"c-den\">10</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-4.5"
+     }
+    ],
+    "value": "-4,5"
+   },
+   "solution": "<div>Общий знаменатель — 10.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">5</span></span> − <span class=\"c-frac\"><span class=\"c-num\">47</span><span class=\"c-den\">10</span></span> = <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">10</span></span> − <span class=\"c-frac\"><span class=\"c-num\">47</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= −<span class=\"c-frac\"><span class=\"c-num\">45</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= −<span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">2</span></span></div><div class=\"c-line\">= −4,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 54576D"
+  },
+  {
+   "v": 1,
+   "id": "fipi:7A2A9D",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p2",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">25</span></span><span class=\"c-op\">−</span><span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">50</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-0.1"
+     }
+    ],
+    "value": "-0,1"
+   },
+   "solution": "<div>Общий знаменатель — 50.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">25</span></span> − <span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">50</span></span> = <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">50</span></span> − <span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">50</span></span></div><div class=\"c-line\">= −<span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">50</span></span></div><div class=\"c-line\">= −<span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= −0,1</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 7A2A9D"
+  },
+  {
+   "v": 1,
+   "id": "fipi:7B1530",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p2",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">5</span></span><span class=\"c-op\">−</span><span class=\"c-frac\"><span class=\"c-num\">27</span><span class=\"c-den\">20</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-1.15"
+     }
+    ],
+    "value": "-1,15"
+   },
+   "solution": "<div>Общий знаменатель — 20.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">5</span></span> − <span class=\"c-frac\"><span class=\"c-num\">27</span><span class=\"c-den\">20</span></span> = <span class=\"c-frac\"><span class=\"c-num\">4</span><span class=\"c-den\">20</span></span> − <span class=\"c-frac\"><span class=\"c-num\">27</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= −<span class=\"c-frac\"><span class=\"c-num\">23</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= −1,15</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 7B1530"
+  },
+  {
+   "v": 1,
+   "id": "fipi:98802B",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p2",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">2</span></span><span class=\"c-op\">−</span><span class=\"c-frac\"><span class=\"c-num\">49</span><span class=\"c-den\">20</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-1.95"
+     }
+    ],
+    "value": "-1,95"
+   },
+   "solution": "<div>Общий знаменатель — 20.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">2</span></span> − <span class=\"c-frac\"><span class=\"c-num\">49</span><span class=\"c-den\">20</span></span> = <span class=\"c-frac\"><span class=\"c-num\">10</span><span class=\"c-den\">20</span></span> − <span class=\"c-frac\"><span class=\"c-num\">49</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= −<span class=\"c-frac\"><span class=\"c-num\">39</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= −1,95</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 98802B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:E70E95",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p2",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">2</span></span><span class=\"c-op\">−</span><span class=\"c-frac\"><span class=\"c-num\">13</span><span class=\"c-den\">50</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0.24"
+     }
+    ],
+    "value": "0,24"
+   },
+   "solution": "<div>Общий знаменатель — 50.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">2</span></span> − <span class=\"c-frac\"><span class=\"c-num\">13</span><span class=\"c-den\">50</span></span> = <span class=\"c-frac\"><span class=\"c-num\">25</span><span class=\"c-den\">50</span></span> − <span class=\"c-frac\"><span class=\"c-num\">13</span><span class=\"c-den\">50</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">12</span><span class=\"c-den\">50</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">6</span><span class=\"c-den\">25</span></span></div><div class=\"c-line\">= 0,24</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание E70E95"
+  },
+  {
+   "v": 1,
+   "id": "fipi:EA0419",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p2",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">2</span></span><span class=\"c-op\">−</span><span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">10</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-0.4"
+     }
+    ],
+    "value": "-0,4"
+   },
+   "solution": "<div>Общий знаменатель — 10.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">2</span></span> − <span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">10</span></span> = <span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">10</span></span> − <span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= −<span class=\"c-frac\"><span class=\"c-num\">4</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= −<span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">5</span></span></div><div class=\"c-line\">= −0,4</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание EA0419"
+  },
+  {
+   "v": 1,
+   "id": "fipi:264CC0",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p3",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">4</span></span><span class=\"c-op\">·</span><span class=\"c-frac\"><span class=\"c-num\">6</span><span class=\"c-den\">5</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0.9"
+     }
+    ],
+    "value": "0,9"
+   },
+   "solution": "<div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">4</span></span> · <span class=\"c-frac\"><span class=\"c-num\">6</span><span class=\"c-den\">5</span></span> = <span class=\"c-frac\"><span class=\"c-num\">3 · 6</span><span class=\"c-den\">4 · 5</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">18</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= 0,9</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 264CC0"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2EC590",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p3",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">5</span></span><span class=\"c-op\">·</span><span class=\"c-frac\"><span class=\"c-num\">25</span><span class=\"c-den\">4</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "3.75"
+     }
+    ],
+    "value": "3,75"
+   },
+   "solution": "<div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">5</span></span> · <span class=\"c-frac\"><span class=\"c-num\">25</span><span class=\"c-den\">4</span></span> = <span class=\"c-frac\"><span class=\"c-num\">3 · 25</span><span class=\"c-den\">5 · 4</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">75</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">15</span><span class=\"c-den\">4</span></span></div><div class=\"c-line\">= 3,75</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 2EC590"
+  },
+  {
+   "v": 1,
+   "id": "fipi:35B3A3",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p3",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">5</span></span><span class=\"c-op\">·</span><span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">8</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0.45"
+     }
+    ],
+    "value": "0,45"
+   },
+   "solution": "<div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">5</span></span> · <span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">8</span></span> = <span class=\"c-frac\"><span class=\"c-num\">2 · 9</span><span class=\"c-den\">5 · 8</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">18</span><span class=\"c-den\">40</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= 0,45</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 35B3A3"
+  },
+  {
+   "v": 1,
+   "id": "fipi:3D6EE6",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p3",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">5</span></span><span class=\"c-op\">·</span><span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">3</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.2"
+     }
+    ],
+    "value": "1,2"
+   },
+   "solution": "<div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">5</span></span> · <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">3</span></span> = <span class=\"c-frac\"><span class=\"c-num\">9 · 2</span><span class=\"c-den\">5 · 3</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">18</span><span class=\"c-den\">15</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">6</span><span class=\"c-den\">5</span></span></div><div class=\"c-line\">= 1,2</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 3D6EE6"
+  },
+  {
+   "v": 1,
+   "id": "fipi:4413AF",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p3",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">3</span></span><span class=\"c-op\">·</span><span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">2</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "7.5"
+     }
+    ],
+    "value": "7,5"
+   },
+   "solution": "<div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">3</span></span> · <span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">2</span></span> = <span class=\"c-frac\"><span class=\"c-num\">5 · 9</span><span class=\"c-den\">3 · 2</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">45</span><span class=\"c-den\">6</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">15</span><span class=\"c-den\">2</span></span></div><div class=\"c-line\">= 7,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 4413AF"
+  },
+  {
+   "v": 1,
+   "id": "fipi:683285",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p3",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">5</span></span><span class=\"c-op\">·</span><span class=\"c-frac\"><span class=\"c-num\">12</span><span class=\"c-den\">35</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0.48"
+     }
+    ],
+    "value": "0,48"
+   },
+   "solution": "<div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">5</span></span> · <span class=\"c-frac\"><span class=\"c-num\">12</span><span class=\"c-den\">35</span></span> = <span class=\"c-frac\"><span class=\"c-num\">7 · 12</span><span class=\"c-den\">5 · 35</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">84</span><span class=\"c-den\">175</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">12</span><span class=\"c-den\">25</span></span></div><div class=\"c-line\">= 0,48</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 683285"
+  },
+  {
+   "v": 1,
+   "id": "fipi:711640",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p3",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">5</span></span><span class=\"c-op\">·</span><span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">7</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.8"
+     }
+    ],
+    "value": "1,8"
+   },
+   "solution": "<div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">5</span></span> · <span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">7</span></span> = <span class=\"c-frac\"><span class=\"c-num\">21 · 3</span><span class=\"c-den\">5 · 7</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">63</span><span class=\"c-den\">35</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">5</span></span></div><div class=\"c-line\">= 1,8</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 711640"
+  },
+  {
+   "v": 1,
+   "id": "fipi:85B5E0",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p3",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">15</span><span class=\"c-den\">4</span></span><span class=\"c-op\">·</span><span class=\"c-frac\"><span class=\"c-num\">6</span><span class=\"c-den\">5</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "4.5"
+     }
+    ],
+    "value": "4,5"
+   },
+   "solution": "<div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">15</span><span class=\"c-den\">4</span></span> · <span class=\"c-frac\"><span class=\"c-num\">6</span><span class=\"c-den\">5</span></span> = <span class=\"c-frac\"><span class=\"c-num\">15 · 6</span><span class=\"c-den\">4 · 5</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">90</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">2</span></span></div><div class=\"c-line\">= 4,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 85B5E0"
+  },
+  {
+   "v": 1,
+   "id": "fipi:94FE12",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p3",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">6</span></span><span class=\"c-op\">·</span><span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">5</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2.1"
+     }
+    ],
+    "value": "2,1"
+   },
+   "solution": "<div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">6</span></span> · <span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">5</span></span> = <span class=\"c-frac\"><span class=\"c-num\">7 · 9</span><span class=\"c-den\">6 · 5</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">63</span><span class=\"c-den\">30</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= 2,1</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 94FE12"
+  },
+  {
+   "v": 1,
+   "id": "fipi:C609C4",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p3",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">15</span><span class=\"c-den\">2</span></span><span class=\"c-op\">·</span><span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">5</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "10.5"
+     }
+    ],
+    "value": "10,5"
+   },
+   "solution": "<div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">15</span><span class=\"c-den\">2</span></span> · <span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">5</span></span> = <span class=\"c-frac\"><span class=\"c-num\">15 · 7</span><span class=\"c-den\">2 · 5</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">105</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">2</span></span></div><div class=\"c-line\">= 10,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание C609C4"
+  },
+  {
+   "v": 1,
+   "id": "fipi:06AC29",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p4",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">2</span></span><span class=\"c-op\">:</span><span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">5</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "17.5"
+     }
+    ],
+    "value": "17,5"
+   },
+   "solution": "<div>Деление на дробь — умножение на обратную ей дробь.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">2</span></span> : <span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">5</span></span> = <span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">2</span></span> · <span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">3</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">21 · 5</span><span class=\"c-den\">2 · 3</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">105</span><span class=\"c-den\">6</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">35</span><span class=\"c-den\">2</span></span></div><div class=\"c-line\">= 17,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 06AC29"
+  },
+  {
+   "v": 1,
+   "id": "fipi:0C275B",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p4",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">15</span><span class=\"c-den\">4</span></span><span class=\"c-op\">:</span><span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">7</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "8.75"
+     }
+    ],
+    "value": "8,75"
+   },
+   "solution": "<div>Деление на дробь — умножение на обратную ей дробь.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">15</span><span class=\"c-den\">4</span></span> : <span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">7</span></span> = <span class=\"c-frac\"><span class=\"c-num\">15</span><span class=\"c-den\">4</span></span> · <span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">3</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">15 · 7</span><span class=\"c-den\">4 · 3</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">105</span><span class=\"c-den\">12</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">35</span><span class=\"c-den\">4</span></span></div><div class=\"c-line\">= 8,75</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 0C275B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:1527C7",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p4",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">8</span></span><span class=\"c-op\">:</span><span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">6</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.05"
+     }
+    ],
+    "value": "1,05"
+   },
+   "solution": "<div>Деление на дробь — умножение на обратную ей дробь.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">8</span></span> : <span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">6</span></span> = <span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">8</span></span> · <span class=\"c-frac\"><span class=\"c-num\">6</span><span class=\"c-den\">5</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">7 · 6</span><span class=\"c-den\">8 · 5</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">42</span><span class=\"c-den\">40</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= 1,05</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 1527C7"
+  },
+  {
+   "v": 1,
+   "id": "fipi:418E22",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p4",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">12</span><span class=\"c-den\">5</span></span><span class=\"c-op\">:</span><span class=\"c-frac\"><span class=\"c-num\">15</span><span class=\"c-den\">2</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0.32"
+     }
+    ],
+    "value": "0,32"
+   },
+   "solution": "<div>Деление на дробь — умножение на обратную ей дробь.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">12</span><span class=\"c-den\">5</span></span> : <span class=\"c-frac\"><span class=\"c-num\">15</span><span class=\"c-den\">2</span></span> = <span class=\"c-frac\"><span class=\"c-num\">12</span><span class=\"c-den\">5</span></span> · <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">15</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">12 · 2</span><span class=\"c-den\">5 · 15</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">24</span><span class=\"c-den\">75</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">8</span><span class=\"c-den\">25</span></span></div><div class=\"c-line\">= 0,32</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 418E22"
+  },
+  {
+   "v": 1,
+   "id": "fipi:79A9AD",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p4",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">5</span></span><span class=\"c-op\">:</span><span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">15</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "4.5"
+     }
+    ],
+    "value": "4,5"
+   },
+   "solution": "<div>Деление на дробь — умножение на обратную ей дробь.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">5</span></span> : <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">15</span></span> = <span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">5</span></span> · <span class=\"c-frac\"><span class=\"c-num\">15</span><span class=\"c-den\">2</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">3 · 15</span><span class=\"c-den\">5 · 2</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">45</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">2</span></span></div><div class=\"c-line\">= 4,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 79A9AD"
+  },
+  {
+   "v": 1,
+   "id": "fipi:9B37E4",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p4",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">5</span></span><span class=\"c-op\">:</span><span class=\"c-frac\"><span class=\"c-num\">6</span><span class=\"c-den\">7</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "4.9"
+     }
+    ],
+    "value": "4,9"
+   },
+   "solution": "<div>Деление на дробь — умножение на обратную ей дробь.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">5</span></span> : <span class=\"c-frac\"><span class=\"c-num\">6</span><span class=\"c-den\">7</span></span> = <span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">5</span></span> · <span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">6</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">21 · 7</span><span class=\"c-den\">5 · 6</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">147</span><span class=\"c-den\">30</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">49</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= 4,9</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 9B37E4"
+  },
+  {
+   "v": 1,
+   "id": "fipi:A81C2A",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p4",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">5</span></span><span class=\"c-op\">:</span><span class=\"c-frac\"><span class=\"c-num\">4</span><span class=\"c-den\">35</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "5.25"
+     }
+    ],
+    "value": "5,25"
+   },
+   "solution": "<div>Деление на дробь — умножение на обратную ей дробь.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">5</span></span> : <span class=\"c-frac\"><span class=\"c-num\">4</span><span class=\"c-den\">35</span></span> = <span class=\"c-frac\"><span class=\"c-num\">3</span><span class=\"c-den\">5</span></span> · <span class=\"c-frac\"><span class=\"c-num\">35</span><span class=\"c-den\">4</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">3 · 35</span><span class=\"c-den\">5 · 4</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">105</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">21</span><span class=\"c-den\">4</span></span></div><div class=\"c-line\">= 5,25</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание A81C2A"
+  },
+  {
+   "v": 1,
+   "id": "fipi:AA2745",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p4",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">14</span><span class=\"c-den\">5</span></span><span class=\"c-op\">:</span><span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">2</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "0.8"
+     }
+    ],
+    "value": "0,8"
+   },
+   "solution": "<div>Деление на дробь — умножение на обратную ей дробь.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">14</span><span class=\"c-den\">5</span></span> : <span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">2</span></span> = <span class=\"c-frac\"><span class=\"c-num\">14</span><span class=\"c-den\">5</span></span> · <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">7</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">14 · 2</span><span class=\"c-den\">5 · 7</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">28</span><span class=\"c-den\">35</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">4</span><span class=\"c-den\">5</span></span></div><div class=\"c-line\">= 0,8</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание AA2745"
+  },
+  {
+   "v": 1,
+   "id": "fipi:E023CC",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p4",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">4</span><span class=\"c-den\">5</span></span><span class=\"c-op\">:</span><span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">7</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2.8"
+     }
+    ],
+    "value": "2,8"
+   },
+   "solution": "<div>Деление на дробь — умножение на обратную ей дробь.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">4</span><span class=\"c-den\">5</span></span> : <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">7</span></span> = <span class=\"c-frac\"><span class=\"c-num\">4</span><span class=\"c-den\">5</span></span> · <span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">2</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">4 · 7</span><span class=\"c-den\">5 · 2</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">28</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">14</span><span class=\"c-den\">5</span></span></div><div class=\"c-line\">= 2,8</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание E023CC"
+  },
+  {
+   "v": 1,
+   "id": "fipi:F8CA9A",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p4",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">6</span><span class=\"c-den\">5</span></span><span class=\"c-op\">:</span><span class=\"c-frac\"><span class=\"c-num\">4</span><span class=\"c-den\">11</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "3.3"
+     }
+    ],
+    "value": "3,3"
+   },
+   "solution": "<div>Деление на дробь — умножение на обратную ей дробь.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">6</span><span class=\"c-den\">5</span></span> : <span class=\"c-frac\"><span class=\"c-num\">4</span><span class=\"c-den\">11</span></span> = <span class=\"c-frac\"><span class=\"c-num\">6</span><span class=\"c-den\">5</span></span> · <span class=\"c-frac\"><span class=\"c-num\">11</span><span class=\"c-den\">4</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">6 · 11</span><span class=\"c-den\">5 · 4</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">66</span><span class=\"c-den\">20</span></span></div><div class=\"c-line\">= <span class=\"c-frac\"><span class=\"c-num\">33</span><span class=\"c-den\">10</span></span></div><div class=\"c-line\">= 3,3</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание F8CA9A"
+  },
+  {
+   "v": 1,
+   "id": "fipi:21014E",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p5",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">6,9<span class=\"c-op\">+</span>7,4</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "14.3"
+     }
+    ],
+    "value": "14,3"
+   },
+   "solution": "<div>Складываем поразрядно: запятая под запятой.</div><div><div class=\"c-line\">6,9 + 7,4 = 14,3</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 21014E"
+  },
+  {
+   "v": 1,
+   "id": "fipi:408A76",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p5",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">8,4<span class=\"c-op\">+</span>3,7</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "12.1"
+     }
+    ],
+    "value": "12,1"
+   },
+   "solution": "<div>Складываем поразрядно: запятая под запятой.</div><div><div class=\"c-line\">8,4 + 3,7 = 12,1</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 408A76"
+  },
+  {
+   "v": 1,
+   "id": "fipi:4C4EBF",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p5",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">5,6<span class=\"c-op\">+</span>9,7</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "15.3"
+     }
+    ],
+    "value": "15,3"
+   },
+   "solution": "<div>Складываем поразрядно: запятая под запятой.</div><div><div class=\"c-line\">5,6 + 9,7 = 15,3</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 4C4EBF"
+  },
+  {
+   "v": 1,
+   "id": "fipi:5719EA",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p5",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">8,8<span class=\"c-op\">+</span>5,9</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "14.7"
+     }
+    ],
+    "value": "14,7"
+   },
+   "solution": "<div>Складываем поразрядно: запятая под запятой.</div><div><div class=\"c-line\">8,8 + 5,9 = 14,7</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 5719EA"
+  },
+  {
+   "v": 1,
+   "id": "fipi:7D3079",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p5",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">8,3<span class=\"c-op\">+</span>5,4</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "13.7"
+     }
+    ],
+    "value": "13,7"
+   },
+   "solution": "<div>Складываем поразрядно: запятая под запятой.</div><div><div class=\"c-line\">8,3 + 5,4 = 13,7</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 7D3079"
+  },
+  {
+   "v": 1,
+   "id": "fipi:9570E3",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p5",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">7,9<span class=\"c-op\">+</span>2,2</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "10.1"
+     }
+    ],
+    "value": "10,1"
+   },
+   "solution": "<div>Складываем поразрядно: запятая под запятой.</div><div><div class=\"c-line\">7,9 + 2,2 = 10,1</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 9570E3"
+  },
+  {
+   "v": 1,
+   "id": "fipi:99D38E",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p5",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">8,7<span class=\"c-op\">+</span>4,6</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "13.3"
+     }
+    ],
+    "value": "13,3"
+   },
+   "solution": "<div>Складываем поразрядно: запятая под запятой.</div><div><div class=\"c-line\">8,7 + 4,6 = 13,3</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 99D38E"
+  },
+  {
+   "v": 1,
+   "id": "fipi:A594B5",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p5",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">9,8<span class=\"c-op\">+</span>8,6</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "18.4"
+     }
+    ],
+    "value": "18,4"
+   },
+   "solution": "<div>Складываем поразрядно: запятая под запятой.</div><div><div class=\"c-line\">9,8 + 8,6 = 18,4</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание A594B5"
+  },
+  {
+   "v": 1,
+   "id": "fipi:C1231C",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p5",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">9,3<span class=\"c-op\">+</span>7,8</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "17.1"
+     }
+    ],
+    "value": "17,1"
+   },
+   "solution": "<div>Складываем поразрядно: запятая под запятой.</div><div><div class=\"c-line\">9,3 + 7,8 = 17,1</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание C1231C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:C3738C",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p5",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">6,8<span class=\"c-op\">+</span>2,6</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "9.4"
+     }
+    ],
+    "value": "9,4"
+   },
+   "solution": "<div>Складываем поразрядно: запятая под запятой.</div><div><div class=\"c-line\">6,8 + 2,6 = 9,4</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание C3738C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:0F5B83",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p6",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">5,7<span class=\"c-op\">−</span>7,6</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-1.9"
+     }
+    ],
+    "value": "-1,9"
+   },
+   "solution": "<div>Вычитаемое больше уменьшаемого — ответ отрицательный.</div><div><div class=\"c-line\">5,7 − 7,6 = −(7,6 − 5,7)</div><div class=\"c-line\">= −1,9</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 0F5B83"
+  },
+  {
+   "v": 1,
+   "id": "fipi:2909BF",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p6",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">4,4<span class=\"c-op\">−</span>1,7</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2.7"
+     }
+    ],
+    "value": "2,7"
+   },
+   "solution": "<div>Вычитаем поразрядно: запятая под запятой.</div><div><div class=\"c-line\">4,4 − 1,7 = 2,7</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 2909BF"
+  },
+  {
+   "v": 1,
+   "id": "fipi:314D07",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p6",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">9,2<span class=\"c-op\">−</span>2,4</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "6.8"
+     }
+    ],
+    "value": "6,8"
+   },
+   "solution": "<div>Вычитаем поразрядно: запятая под запятой.</div><div><div class=\"c-line\">9,2 − 2,4 = 6,8</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 314D07"
+  },
+  {
+   "v": 1,
+   "id": "fipi:510AB3",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p6",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">3,9<span class=\"c-op\">−</span>7,3</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-3.4"
+     }
+    ],
+    "value": "-3,4"
+   },
+   "solution": "<div>Вычитаемое больше уменьшаемого — ответ отрицательный.</div><div><div class=\"c-line\">3,9 − 7,3 = −(7,3 − 3,9)</div><div class=\"c-line\">= −3,4</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 510AB3"
+  },
+  {
+   "v": 1,
+   "id": "fipi:6B40A0",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p6",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">3,6<span class=\"c-op\">−</span>4,1</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-0.5"
+     }
+    ],
+    "value": "-0,5"
+   },
+   "solution": "<div>Вычитаемое больше уменьшаемого — ответ отрицательный.</div><div><div class=\"c-line\">3,6 − 4,1 = −(4,1 − 3,6)</div><div class=\"c-line\">= −0,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 6B40A0"
+  },
+  {
+   "v": 1,
+   "id": "fipi:76FB33",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p6",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">4,7<span class=\"c-op\">−</span>8,2</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-3.5"
+     }
+    ],
+    "value": "-3,5"
+   },
+   "solution": "<div>Вычитаемое больше уменьшаемого — ответ отрицательный.</div><div><div class=\"c-line\">4,7 − 8,2 = −(8,2 − 4,7)</div><div class=\"c-line\">= −3,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 76FB33"
+  },
+  {
+   "v": 1,
+   "id": "fipi:7E16BF",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p6",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">3,3<span class=\"c-op\">−</span>1,9</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.4"
+     }
+    ],
+    "value": "1,4"
+   },
+   "solution": "<div>Вычитаем поразрядно: запятая под запятой.</div><div><div class=\"c-line\">3,3 − 1,9 = 1,4</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 7E16BF"
+  },
+  {
+   "v": 1,
+   "id": "fipi:95FFBA",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p6",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">6,4<span class=\"c-op\">−</span>4,8</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "1.6"
+     }
+    ],
+    "value": "1,6"
+   },
+   "solution": "<div>Вычитаем поразрядно: запятая под запятой.</div><div><div class=\"c-line\">6,4 − 4,8 = 1,6</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 95FFBA"
+  },
+  {
+   "v": 1,
+   "id": "fipi:A10E69",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p6",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">6,1<span class=\"c-op\">−</span>2,5</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "3.6"
+     }
+    ],
+    "value": "3,6"
+   },
+   "solution": "<div>Вычитаем поразрядно: запятая под запятой.</div><div><div class=\"c-line\">6,1 − 2,5 = 3,6</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание A10E69"
+  },
+  {
+   "v": 1,
+   "id": "fipi:BDCC81",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p6",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">4,9<span class=\"c-op\">−</span>9,4</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-4.5"
+     }
+    ],
+    "value": "-4,5"
+   },
+   "solution": "<div>Вычитаемое больше уменьшаемого — ответ отрицательный.</div><div><div class=\"c-line\">4,9 − 9,4 = −(9,4 − 4,9)</div><div class=\"c-line\">= −4,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание BDCC81"
+  },
+  {
+   "v": 1,
+   "id": "fipi:003CC0",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p7",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">7,7<span class=\"c-op\">·</span>5,3</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "40.81"
+     }
+    ],
+    "value": "40,81"
+   },
+   "solution": "<div>Умножаем как целые, не глядя на запятые. В множителях вместе два знака после запятой — в произведении отделяем запятой две цифры справа.</div><div><div class=\"c-line\">77 · 53 = 4081</div><div class=\"c-line\">7,7 · 5,3 = 40,81</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 003CC0"
+  },
+  {
+   "v": 1,
+   "id": "fipi:12AD6B",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p7",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">8,1<span class=\"c-op\">·</span>7,2</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "58.32"
+     }
+    ],
+    "value": "58,32"
+   },
+   "solution": "<div>Умножаем как целые, не глядя на запятые. В множителях вместе два знака после запятой — в произведении отделяем запятой две цифры справа.</div><div><div class=\"c-line\">81 · 72 = 5832</div><div class=\"c-line\">8,1 · 7,2 = 58,32</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 12AD6B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:214904",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p7",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">8,9<span class=\"c-op\">·</span>4,3</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "38.27"
+     }
+    ],
+    "value": "38,27"
+   },
+   "solution": "<div>Умножаем как целые, не глядя на запятые. В множителях вместе два знака после запятой — в произведении отделяем запятой две цифры справа.</div><div><div class=\"c-line\">89 · 43 = 3827</div><div class=\"c-line\">8,9 · 4,3 = 38,27</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 214904"
+  },
+  {
+   "v": 1,
+   "id": "fipi:3A4787",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p7",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">3,2<span class=\"c-op\">·</span>6,2</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "19.84"
+     }
+    ],
+    "value": "19,84"
+   },
+   "solution": "<div>Умножаем как целые, не глядя на запятые. В множителях вместе два знака после запятой — в произведении отделяем запятой две цифры справа.</div><div><div class=\"c-line\">32 · 62 = 1984</div><div class=\"c-line\">3,2 · 6,2 = 19,84</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 3A4787"
+  },
+  {
+   "v": 1,
+   "id": "fipi:52251A",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p7",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">2,1<span class=\"c-op\">·</span>9,6</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "20.16"
+     }
+    ],
+    "value": "20,16"
+   },
+   "solution": "<div>Умножаем как целые, не глядя на запятые. В множителях вместе два знака после запятой — в произведении отделяем запятой две цифры справа.</div><div><div class=\"c-line\">21 · 96 = 2016</div><div class=\"c-line\">2,1 · 9,6 = 20,16</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 52251A"
+  },
+  {
+   "v": 1,
+   "id": "fipi:8F6C3D",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p7",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">5,2<span class=\"c-op\">·</span>3,1</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "16.12"
+     }
+    ],
+    "value": "16,12"
+   },
+   "solution": "<div>Умножаем как целые, не глядя на запятые. В множителях вместе два знака после запятой — в произведении отделяем запятой две цифры справа.</div><div><div class=\"c-line\">52 · 31 = 1612</div><div class=\"c-line\">5,2 · 3,1 = 16,12</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 8F6C3D"
+  },
+  {
+   "v": 1,
+   "id": "fipi:AFE6DF",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p7",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">1,6<span class=\"c-op\">·</span>5,1</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "8.16"
+     }
+    ],
+    "value": "8,16"
+   },
+   "solution": "<div>Умножаем как целые, не глядя на запятые. В множителях вместе два знака после запятой — в произведении отделяем запятой две цифры справа.</div><div><div class=\"c-line\">16 · 51 = 816</div><div class=\"c-line\">1,6 · 5,1 = 8,16</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание AFE6DF"
+  },
+  {
+   "v": 1,
+   "id": "fipi:C702ED",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p7",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">6,7<span class=\"c-op\">·</span>5,5</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "36.85"
+     }
+    ],
+    "value": "36,85"
+   },
+   "solution": "<div>Умножаем как целые, не глядя на запятые. В множителях вместе два знака после запятой — в произведении отделяем запятой две цифры справа.</div><div><div class=\"c-line\">67 · 55 = 3685</div><div class=\"c-line\">6,7 · 5,5 = 36,85</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание C702ED"
+  },
+  {
+   "v": 1,
+   "id": "fipi:D09E3C",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p7",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">2,3<span class=\"c-op\">·</span>7,5</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "17.25"
+     }
+    ],
+    "value": "17,25"
+   },
+   "solution": "<div>Умножаем как целые, не глядя на запятые. В множителях вместе два знака после запятой — в произведении отделяем запятой две цифры справа.</div><div><div class=\"c-line\">23 · 75 = 1725</div><div class=\"c-line\">2,3 · 7,5 = 17,25</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание D09E3C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:DE80C5",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p7",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\">9,9<span class=\"c-op\">·</span>7,1</div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "70.29"
+     }
+    ],
+    "value": "70,29"
+   },
+   "solution": "<div>Умножаем как целые, не глядя на запятые. В множителях вместе два знака после запятой — в произведении отделяем запятой две цифры справа.</div><div><div class=\"c-line\">99 · 71 = 7029</div><div class=\"c-line\">9,9 · 7,1 = 70,29</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание DE80C5"
+  },
+  {
+   "v": 1,
+   "id": "fipi:4609FA",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p8",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">9,6</span><span class=\"c-den\">1,6</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "6"
+     }
+    ],
+    "value": "6"
+   },
+   "solution": "<div>Умножаем числитель и знаменатель на 10 — запятые уходят, значение дроби не меняется.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">9,6</span><span class=\"c-den\">1,6</span></span> = <span class=\"c-frac\"><span class=\"c-num\">96</span><span class=\"c-den\">16</span></span></div><div class=\"c-line\">= 6</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 4609FA"
+  },
+  {
+   "v": 1,
+   "id": "fipi:6AB97E",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p8",
+   "pos": 1,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">8,7</span><span class=\"c-den\">2,9</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "3"
+     }
+    ],
+    "value": "3"
+   },
+   "solution": "<div>Умножаем числитель и знаменатель на 10 — запятые уходят, значение дроби не меняется.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">8,7</span><span class=\"c-den\">2,9</span></span> = <span class=\"c-frac\"><span class=\"c-num\">87</span><span class=\"c-den\">29</span></span></div><div class=\"c-line\">= 3</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 6AB97E"
+  },
+  {
+   "v": 1,
+   "id": "fipi:7545EE",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p8",
+   "pos": 2,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">4,8</span><span class=\"c-den\">0,4</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "12"
+     }
+    ],
+    "value": "12"
+   },
+   "solution": "<div>Умножаем числитель и знаменатель на 10 — запятые уходят, значение дроби не меняется.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">4,8</span><span class=\"c-den\">0,4</span></span> = <span class=\"c-frac\"><span class=\"c-num\">48</span><span class=\"c-den\">4</span></span></div><div class=\"c-line\">= 12</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 7545EE"
+  },
+  {
+   "v": 1,
+   "id": "fipi:76122A",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p8",
+   "pos": 3,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">6,8</span><span class=\"c-den\">1,7</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "4"
+     }
+    ],
+    "value": "4"
+   },
+   "solution": "<div>Умножаем числитель и знаменатель на 10 — запятые уходят, значение дроби не меняется.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">6,8</span><span class=\"c-den\">1,7</span></span> = <span class=\"c-frac\"><span class=\"c-num\">68</span><span class=\"c-den\">17</span></span></div><div class=\"c-line\">= 4</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 76122A"
+  },
+  {
+   "v": 1,
+   "id": "fipi:83F40D",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p8",
+   "pos": 4,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">8,2</span><span class=\"c-den\">4,1</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "2"
+     }
+    ],
+    "value": "2"
+   },
+   "solution": "<div>Умножаем числитель и знаменатель на 10 — запятые уходят, значение дроби не меняется.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">8,2</span><span class=\"c-den\">4,1</span></span> = <span class=\"c-frac\"><span class=\"c-num\">82</span><span class=\"c-den\">41</span></span></div><div class=\"c-line\">= 2</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 83F40D"
+  },
+  {
+   "v": 1,
+   "id": "fipi:91AB0C",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p8",
+   "pos": 5,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">9,6</span><span class=\"c-den\">1,2</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "8"
+     }
+    ],
+    "value": "8"
+   },
+   "solution": "<div>Умножаем числитель и знаменатель на 10 — запятые уходят, значение дроби не меняется.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">9,6</span><span class=\"c-den\">1,2</span></span> = <span class=\"c-frac\"><span class=\"c-num\">96</span><span class=\"c-den\">12</span></span></div><div class=\"c-line\">= 8</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 91AB0C"
+  },
+  {
+   "v": 1,
+   "id": "fipi:A830FB",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p8",
+   "pos": 6,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">13,2</span><span class=\"c-den\">1,2</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "11"
+     }
+    ],
+    "value": "11"
+   },
+   "solution": "<div>Умножаем числитель и знаменатель на 10 — запятые уходят, значение дроби не меняется.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">13,2</span><span class=\"c-den\">1,2</span></span> = <span class=\"c-frac\"><span class=\"c-num\">132</span><span class=\"c-den\">12</span></span></div><div class=\"c-line\">= 11</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание A830FB"
+  },
+  {
+   "v": 1,
+   "id": "fipi:DB17DA",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p8",
+   "pos": 7,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">6,5</span><span class=\"c-den\">1,3</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "5"
+     }
+    ],
+    "value": "5"
+   },
+   "solution": "<div>Умножаем числитель и знаменатель на 10 — запятые уходят, значение дроби не меняется.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">6,5</span><span class=\"c-den\">1,3</span></span> = <span class=\"c-frac\"><span class=\"c-num\">65</span><span class=\"c-den\">13</span></span></div><div class=\"c-line\">= 5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание DB17DA"
+  },
+  {
+   "v": 1,
+   "id": "fipi:EA23F7",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p8",
+   "pos": 8,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">8,1</span><span class=\"c-den\">0,9</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "9"
+     }
+    ],
+    "value": "9"
+   },
+   "solution": "<div>Умножаем числитель и знаменатель на 10 — запятые уходят, значение дроби не меняется.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">8,1</span><span class=\"c-den\">0,9</span></span> = <span class=\"c-frac\"><span class=\"c-num\">81</span><span class=\"c-den\">9</span></span></div><div class=\"c-line\">= 9</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание EA23F7"
+  },
+  {
+   "v": 1,
+   "id": "fipi:FD4058",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p8",
+   "pos": 9,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">8,4</span><span class=\"c-den\">1,2</span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "7"
+     }
+    ],
+    "value": "7"
+   },
+   "solution": "<div>Умножаем числитель и знаменатель на 10 — запятые уходят, значение дроби не меняется.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">8,4</span><span class=\"c-den\">1,2</span></span> = <span class=\"c-frac\"><span class=\"c-num\">84</span><span class=\"c-den\">12</span></span></div><div class=\"c-line\">= 7</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание FD4058"
+  },
+  {
+   "v": 1,
+   "id": "fipi:D39BF5",
+   "exam": "oge",
+   "slug": "oge6",
+   "n": 6,
+   "proto": "p9",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>Найдите значение выражения:<div class=\"c-eq\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">30</span></span><span class=\"c-op\">+</span><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">42</span></span></span></span></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "17.5"
+     }
+    ],
+    "value": "17,5"
+   },
+   "solution": "<div>Сначала знаменатель большой дроби, потом делим на него единицу.</div><div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">30</span></span> + <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">42</span></span> = <span class=\"c-frac\"><span class=\"c-num\">7</span><span class=\"c-den\">210</span></span> + <span class=\"c-frac\"><span class=\"c-num\">5</span><span class=\"c-den\">210</span></span> = <span class=\"c-frac\"><span class=\"c-num\">12</span><span class=\"c-den\">210</span></span> = <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">35</span></span></div><div class=\"c-line\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\"><span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">30</span></span> + <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">42</span></span></span></span> = 1 : <span class=\"c-frac\"><span class=\"c-num\">2</span><span class=\"c-den\">35</span></span> = <span class=\"c-frac\"><span class=\"c-num\">35</span><span class=\"c-den\">2</span></span></div><div class=\"c-line\">= 17,5</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание D39BF5"
+  }
+ ]
+}

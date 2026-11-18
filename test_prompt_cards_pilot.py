@@ -40,7 +40,8 @@ from test_prompt15_works_stage1 import BASE, local_server, sync_playwright
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 FAILS = []
-PILOT = {"oge9": "oge9.html", "oge19": "oge19.html", "ege_prof": "ege_prof.html?n=1"}
+# oge9 из пилота ушёл: собран целиком (S1b), его проверяет test_prompt_cards_family_a_simple.py
+PILOT = {"oge19": "oge19.html", "ege_prof": "ege_prof.html?n=1"}
 SHOTS = os.environ.get("CARDS_SHOTS")
 
 
@@ -137,7 +138,7 @@ def main():
     check("9 README описывает интерфейс плагина", all(w in readme for w in ("collect(page, slug", "normalize(raw)", "Skip", "families/")))
     # 2. свежая сборка = лежащая
     with tempfile.TemporaryDirectory() as tmp:
-        r = subprocess.run([sys.executable, os.path.join(HERE, "tools", "cards", "build.py"), "--limit", "10", "--out", tmp],
+        r = subprocess.run([sys.executable, os.path.join(HERE, "tools", "cards", "build.py"), "--limit", "10", "--out", tmp, "--slug", "oge19", "--slug", "ege_prof"],
                            cwd=HERE, capture_output=True, text=True, timeout=600)
         check("2 сборка прошла без необработанных", r.returncode == 0, r.stdout[-800:] + r.stderr[-800:])
         for slug in PILOT:
