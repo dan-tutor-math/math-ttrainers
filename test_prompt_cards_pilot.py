@@ -123,6 +123,10 @@ def main():
     for slug in PILOT:
         with open(os.path.join(HERE, "cards", slug + ".json"), encoding="utf-8") as fh:
             cards[slug] = json.load(fh)
+        if slug == "oge19":   # S1a: файл теперь полный (150), полное покрытие — в test_prompt_cards_family_b.py
+            check("1 oge19: 150 карточек (полная сборка S1a)", len(cards[slug]["cards"]) == 150)
+            cards[slug]["cards"] = cards[slug]["cards"][:10]
+            continue
         check(f"1 {slug}: 10 карточек", len(cards[slug]["cards"]) == 10, str(len(cards[slug]["cards"])))
     # 9. плагины
     from tools.cards import build
@@ -137,11 +141,15 @@ def main():
                            cwd=HERE, capture_output=True, text=True, timeout=600)
         check("2 сборка прошла без необработанных", r.returncode == 0, r.stdout[-800:] + r.stderr[-800:])
         for slug in PILOT:
+            if slug == "oge19":
+                continue
             a = open(os.path.join(tmp, slug + ".json"), "rb").read()
             b = open(os.path.join(HERE, "cards", slug + ".json"), "rb").read()
             check(f"2 {slug}: свежая сборка = cards/{slug}.json", a == b)
-        ok, why = dircmp_equal(os.path.join(tmp, "img"), os.path.join(HERE, "cards", "img"))
-        check("2 рисунки свежей сборки = cards/img", ok, why)
+        for slug in PILOT:   # рисунки только страниц пилота: у других семей свои папки и полные сборки
+            if os.path.isdir(os.path.join(tmp, "img", slug)):
+                ok, why = dircmp_equal(os.path.join(tmp, "img", slug), os.path.join(HERE, "cards", "img", slug))
+                check(f"2 рисунки {slug} свежей сборки = cards/img/{slug}", ok, why)
 
     with local_server(), sync_playwright() as p:
         br = p.chromium.launch()
@@ -215,7 +223,7 @@ def main():
             for k, title in (("same", "3 то же задание ФИПИ"), ("ans", "4 ответ = живой"), ("text", "5 текст = живой"),
                              ("tex", "6 формулы = живые"), ("fig", "7 рисунки файлом, пиксели и ширина те же"),
                              ("ui", "8 без интерфейса")):
-                check(f"{title}: {slug} {res[k]} из 10", res[k] == 10, "\n  " + "\n  ".join(bad[k][:6]))
+                check(f"{title}: {slug} {res[k]} из 10", res[k] == len(cards[slug]["cards"]), "\n  " + "\n  ".join(bad[k][:6]))
             # value — запись для бланка
             vals = [c["answer"]["value"] for c in cards[slug]["cards"]]
             check(f"4 {slug}: value — запись для бланка (запятая, номера подряд)",
@@ -245,7 +253,7 @@ def main():
             pv.goto(f"{BASE}/tools/cards/preview.html?slug={slug}&answer=1&solution=1")
             pv.wait_for_function("() => document.documentElement.dataset.ready === '1'", timeout=15000)
             n = pv.evaluate("() => document.querySelectorAll('.cr').length")
-            check(f"8 preview.html {slug}: {n} карточек", n == 10)
+            check(f"8 preview.html {slug}: {n} карточек", n == (150 if slug == "oge19" else 10))
             pv.close()
         br.close()
     if SHOTS and sheets:
