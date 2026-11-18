@@ -344,11 +344,12 @@ begin
   tid := p_answer->>'task_id';
   -- ответ только на блок, который есть в варианте этого захода: иначе
   -- через функцию можно было бы набить захода сколько угодно строк.
-  -- Блок — задание ('task') или видео ('video', «видео в работах»): у видео
+  -- Блок — задание ('task'), карточка ФИПИ ('card', задача 63: то же задание,
+  -- только без снимка) или видео ('video', «видео в работах»): у видео
   -- в той же строке хранится, сколько ученик посмотрел
   select coalesce(e->>'type', 'task') into bt
     from jsonb_array_elements(a.blocks) e
-   where e->>'id' = tid and coalesce(e->>'type', 'task') in ('task', 'video')
+   where e->>'id' = tid and coalesce(e->>'type', 'task') in ('task', 'card', 'video')
    limit 1;
   if tid is null or bt is null then raise exception 'task_not_found'; end if;
 
