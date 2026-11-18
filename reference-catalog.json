@@ -1,0 +1,178 @@
+[
+  {
+    "subject": "Математика",
+    "exams": [
+      {
+        "exam": "ОГЭ",
+        "year": 2027,
+        "materials": [
+          {
+            "id": "oge-math-2027-reference",
+            "title": "Справочные материалы",
+            "source": "ФИПИ, демоверсия ОГЭ 2027, страницы 3–6",
+            "pages": [
+              {
+                "src": "reference-img/oge-math-2027-3.webp",
+                "alt": "Математика, ОГЭ 2027, страница 3"
+              },
+              {
+                "src": "reference-img/oge-math-2027-4.webp",
+                "alt": "Математика, ОГЭ 2027, страница 4"
+              },
+              {
+                "src": "reference-img/oge-math-2027-5.webp",
+                "alt": "Математика, ОГЭ 2027, страница 5"
+              },
+              {
+                "src": "reference-img/oge-math-2027-6.webp",
+                "alt": "Математика, ОГЭ 2027, страница 6"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "subject": "Физика",
+    "exams": [
+      {
+        "exam": "ОГЭ",
+        "year": 2027,
+        "materials": [
+          {
+            "id": "oge-physics-2027-reference",
+            "title": "Справочные данные",
+            "source": "ФИПИ, демоверсия ОГЭ 2027, страницы 4–5",
+            "pages": [
+              {
+                "src": "reference-img/oge-physics-2027-4.webp",
+                "alt": "Физика, ОГЭ 2027, страница 4"
+              },
+              {
+                "src": "reference-img/oge-physics-2027-5.webp",
+                "alt": "Физика, ОГЭ 2027, страница 5"
+              }
+            ]
+          },
+          {
+            "id": "oge-physics-2027",
+            "title": "Демоверсия",
+            "source": "ФИПИ, демоверсия ОГЭ 2027",
+            "pdf": "reference-pdf/oge-physics-2027.pdf"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "subject": "Информатика",
+    "exams": [
+      {
+        "exam": "ОГЭ",
+        "year": 2027,
+        "materials": [
+          {
+            "id": "oge-informatics-2027",
+            "title": "Демоверсия",
+            "source": "ФИПИ, демоверсия ОГЭ 2027",
+            "pdf": "reference-pdf/oge-informatics-2027.pdf"
+          }
+        ]
+      },
+      {
+        "exam": "ЕГЭ",
+        "year": 2027,
+        "materials": [
+          {
+            "id": "ege-informatics-2027",
+            "title": "Демоверсия",
+            "source": "ФИПИ, демоверсия ЕГЭ 2027",
+            "pdf": "reference-pdf/ege-informatics-2027.pdf"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "subject": "Обществознание",
+    "exams": [
+      {
+        "exam": "ОГЭ",
+        "year": 2027,
+        "materials": [
+          {
+            "id": "oge-social-2027",
+            "title": "Демоверсия",
+            "source": "ФИПИ, демоверсия ОГЭ 2027",
+            "pdf": "reference-pdf/oge-social-2027.pdf"
+          }
+        ]
+      },
+      {
+        "exam": "ОГЭ",
+        "year": 2026,
+        "materials": [
+          {
+            "id": "oge-social-2026",
+            "title": "Демоверсия",
+            "source": "ФИПИ, демоверсия ОГЭ 2026",
+            "pdf": "reference-pdf/oge-social-2026.pdf"
+          }
+        ]
+      },
+      {
+        "exam": "ЕГЭ",
+        "year": 2027,
+        "materials": [
+          {
+            "id": "ege-social-2027",
+            "title": "Демоверсия",
+            "source": "ФИПИ, демоверсия ЕГЭ 2027",
+            "pdf": "reference-pdf/ege-social-2027.pdf"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "subject": "Русский язык",
+    "exams": [
+      {
+        "exam": "ЕГЭ",
+        "year": 2027,
+        "materials": [
+          {
+            "id": "ege-russian-2027",
+            "title": "Демоверсия",
+            "source": "ФИПИ, демоверсия ЕГЭ 2027",
+            "pdf": "reference-pdf/ege-russian-2027.pdf"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "subject": "Английский язык",
+    "exams": [
+      {
+        "exam": "ОГЭ",
+        "year": 2027,
+        "materials": [
+          {
+            "id": "oge-english-2027-written",
+            "title": "Демоверсия, письменная часть",
+            "source": "ФИПИ, демоверсия ОГЭ 2027",
+            "pdf": "reference-pdf/oge-english-2027-written.pdf"
+          },
+          {
+            "id": "oge-english-2027-speaking",
+            "title": "Демоверсия, устная часть",
+            "source": "ФИПИ, демоверсия ОГЭ 2027",
+            "pdf": "reference-pdf/oge-english-2027-speaking.pdf"
+          }
+        ]
+      }
+    ]
+  }
+]

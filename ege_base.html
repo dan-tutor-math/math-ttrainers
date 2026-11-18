@@ -510,6 +510,16 @@ html:is([data-subject="soc"],[data-subject="phys"],[data-subject="inf"]) .nav-bt
 html:is([data-subject="soc"],[data-subject="phys"],[data-subject="inf"]) .nav-btn:hover{border-color:var(--ink);}
 html:is([data-subject="soc"],[data-subject="phys"],[data-subject="inf"]) .nav-btn:active{transform:scale(.96);}
 html:is([data-subject="soc"],[data-subject="phys"],[data-subject="inf"]) .nav-btn:focus-visible{outline:3px solid var(--ink);outline-offset:2px;}
+/* задача 54: та же пагинация при EXAM.taskPager (ОГЭ ч. 2 математики, без data-subject);
+   отступ справа под колонку «+» остаётся */
+html[data-task-pager]:not([data-focus="on"]) #pageSub{max-height:none;}
+html[data-task-pager] .corner{margin-left:auto;}
+html[data-task-pager] .task-pagination{display:flex;align-items:center;gap:8px;}
+html[data-task-pager] .task-pagination .task-title{white-space:nowrap;}
+html[data-task-pager] .nav-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 12px;min-width:40px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s,border-color .15s;}
+html[data-task-pager] .nav-btn:hover{border-color:var(--ink);}
+html[data-task-pager] .nav-btn:active{transform:scale(.96);}
+html[data-task-pager] .nav-btn:focus-visible{outline:3px solid var(--ink);outline-offset:2px;}
 html[data-theme="dark"][data-subject="soc"]{--ink:#2F8F70;--ink-active:#3FA584;--hl-10:rgba(58,158,126,.16);--hl-35:rgba(58,158,126,.5);--blob-1:rgba(58,158,126,.22)}
 html[data-theme="dark"][data-subject="soc"] .submode-tab.active,html[data-theme="dark"][data-subject="soc"] .check-btn,html[data-theme="dark"][data-subject="soc"] .yn-btn.sel,html[data-theme="dark"][data-subject="soc"] .proof-score-btn.active,html[data-theme="dark"][data-subject="soc"] .board-visibility-toggle.active{background:#1E7A5C;border-color:#1E7A5C;}
 html[data-theme="dark"][data-subject="soc"] .next-btn{background:#1F7A36;}
@@ -882,6 +892,8 @@ html[data-theme="dark"][data-subject="inf"] :is(.submode-tab.active,.check-btn,.
 <script src="exam-spec.js"></script>
 <script src="variant-set.js"></script>
 <script src="exam-nav.js"></script>
+<script src="reference-panel.js"></script>
+<script src="task-nav.js"></script>
 <script src="lazy-libs.js" data-preload="html2canvas jspdf"></script>
 <script src="lesson-history.js"></script>
 <script src="ege-base-figs.js"></script>
@@ -1112,7 +1124,11 @@ if (EXAM.backLabel) document.getElementById('backBtn').textContent = EXAM.backLa
 if (EXAM.subject) document.documentElement.setAttribute('data-subject', EXAM.subject);
 /* физика и информатика устроены как обществознание: банк ФИПИ по темам КЭС, выбор
    нажатием на вариант, компактные стрелки заданий рядом со счётчиком */
-const SOC_LIKE = ['soc', 'phys', 'inf'].indexOf(EXAM.subject) >= 0;
+// задача 54: taskPager — листание как в обществознании («◀ задание N из M ▶» у
+// счётчика, «◀ тип ▶» слева) и «Все типы» в углу; включено в ОГЭ ч. 2 математики
+const SOC_LIKE = ['soc', 'phys', 'inf'].indexOf(EXAM.subject) >= 0 || !!EXAM.taskPager;
+if (EXAM.taskPager) document.documentElement.setAttribute('data-task-pager', '');
+if (EXAM.referencePanel && window.ReferencePanel) ReferencePanel.mountTrainer();
 if (EXAM.noKeypad) document.documentElement.setAttribute('data-no-keypad', '');
 if (EXAM.noAddRail) document.documentElement.setAttribute('data-no-add-rail', '');
 /* Обществознание ОГЭ (soc_oge.html):
@@ -2120,7 +2136,9 @@ function openTask(n, pid){
   // демоверсии ОГЭ 2027»), тогда в шапке оно, а не порядковый номер; номер
   // задания и так стоит в заголовке страницы
   const grp = p.group ? groupById(n, p.group) : null;
-  if (SOC_LIKE) {
+  // задача 54: при taskPager счётчик — только у заданий внутри вида (группы ФИПИ);
+  // у одиночного прототипа в шапке остаётся его название, иначе оно пропало бы с экрана
+  if (SOC_LIKE && !(EXAM.taskPager && !grp)) {
     const sl = sibs(p.id);
     els.taskTitle.textContent = 'задание ' + (sl.findIndex(x => x.id === p.id) + 1) + ' из ' + sl.length;
   } else if (grp) {
@@ -2463,6 +2481,8 @@ els.nextBtn.onclick = guard('switchTask', () => {
   else showPicker();
 });
 els.backBtn.onclick = guard('switchTask', showPicker);
+// задача 54: «Все типы» в левом верхнем углу (task-nav.js); листание — своё, ◀ ▶ у счётчика
+if (EXAM.taskPager && window.TaskNav) TaskNav.mountCorner();
 els.extraTaskBtn.onclick = guard('switchTask', () => {
   const x = curProto.extra;
   if (x) ensureFipi(x.n, () => openTask(x.n, x.pid));

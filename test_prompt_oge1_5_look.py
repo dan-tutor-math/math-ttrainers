@@ -3,8 +3,8 @@
 
   1. таблицы условия: линии видны на светлой теме (не белые, как раньше
      --glass-border), на тёмной — свои светлые;
-  2. «Все задания» и «← Назад» — в левом верхнем углу, одной ширины;
-     «Назад» есть только в задании, ведёт к выбору тем и снова прячется;
+  2. «Все задания» и «← Все типы» — в левом верхнем углу, одной ширины;
+     «Все типы» есть только в задании, ведёт к выбору тем и снова прячется;
      в шапке задания её больше нет;
   3. на телефоне 375 px кнопки угла не налезают на кнопки справа, страница
      не едет вбок;
@@ -93,7 +93,7 @@ def test_tables(browser):
 
 def test_corner(browser):
     ctx, page, errors = new_page(browser)
-    check("выбор тем: «Назад» спрятана", not page.is_visible("#backBtn"))
+    check("выбор тем: «Все типы» спрятана", not page.is_visible("#backBtn"))
     check("«Все задания» в левом верхнем углу, со значком выхода",
           rect(page, "#homeBtn")[:2] == [16, 16] and page.inner_text("#homeBtn").strip() == "Все задания"
           and page.locator("#homeBtn svg").count() == 1, str(rect(page, "#homeBtn")))
@@ -101,12 +101,12 @@ def test_corner(browser):
     page.wait_for_selector("#taskArea", state="visible")
     page.wait_for_timeout(100)
     h, b = rect(page, "#homeBtn"), rect(page, "#backBtn")
-    check("задание: «Назад» под «Все задания», той же ширины",
+    check("задание: «Все типы» под «Все задания», той же ширины",
           page.is_visible("#backBtn") and b[0] == h[0] and b[1] > h[1] and abs(b[2] - h[2]) < 0.5, f"{h} {b}")
-    check("в шапке задания «Назад» больше нет", page.locator("#taskArea .back-btn").count() == 0)
+    check("в шапке задания «Все типы» больше нет", page.locator("#taskArea .back-btn").count() == 0)
     page.click("#backBtn")
     page.wait_for_timeout(100)
-    check("«Назад» ведёт к выбору тем и прячется",
+    check("«Все типы» ведёт к выбору тем и прячется",
           page.is_visible("#pickerArea") and not page.is_visible("#taskArea") and not page.is_visible("#backBtn"))
     check("угол: без ошибок JS", not errors, str(errors[:1]))
     ctx.close()

@@ -221,6 +221,11 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
    сжимаются, и на телефоне их ряд вылезал за край экрана, давая
    горизонтальную прокрутку. С переносом лишнее уходит на следующую строку */
 .task-head{display:flex;flex-wrap:wrap;row-gap:8px;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px;}
+/* задача 54: ряд «← все типы / ◀ тип ▶ / ◀ задание ▶» — те же правила, что в oge9.html */
+.type-nav{display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;gap:8px;}
+.type-nav-btn{height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-family:var(--font-ui);font-weight:600;font-size:12px;line-height:1;cursor:pointer;padding:0 10px;display:inline-flex;align-items:center;justify-content:center;gap:4px;white-space:nowrap;transition:transform .12s, border-color .12s;}
+.type-nav-btn:hover{border-color:var(--ink)}
+.type-nav-btn:active{transform:scale(.9)}
 /* экран выбора типа — как в остальных тренажёрах ОГЭ (Промпт №61: до него
    тип здесь был один, и страница сразу открывала задание) */
 .modes{display:flex;flex-direction:column;gap:8px;margin-bottom:6px}
@@ -451,7 +456,13 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 
   <div id="taskArea" style="display:none">
     <div class="task-head">
-      <button class="back-btn" id="backBtn">← все типы</button>
+      <!-- задача 54: как в №9 — кнопки типов рядом с «← все типы»; пару
+           «◀ Предыдущее / Следующее задание ▶» сюда же ставит task-nav.js -->
+      <div class="type-nav">
+        <button class="back-btn" id="backBtn">← все типы</button>
+        <button class="type-nav-btn" id="prevTypeBtn" title="Предыдущий тип">◀ Предыдущий тип</button>
+        <button class="type-nav-btn" id="nextTypeBtn" title="Следующий тип">Следующий тип ▶</button>
+      </div>
       <div class="corner">
         <div class="task-title" id="taskTitle"></div>
         <button class="basket-add-btn" id="basketAddBtn" title="В подборку">📥</button>
@@ -530,6 +541,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="exam-spec.js"></script>
 <script src="variant-set.js"></script>
 <script src="exam-nav.js"></script>
+<script src="reference-panel.js" data-oge-reference></script>
+<script src="task-nav.js"></script>
 <script src="trainer-multi.js"></script>
 <script src="oge19-fipi-bank.js"></script>
 <script>
@@ -773,6 +786,8 @@ els.tabLearn.onclick = () => switchSubMode('learn');
 els.tabPractice.onclick = () => switchSubMode('practice');
 els.tabExam.onclick = () => switchSubMode('exam');
 els.refreshBtn.onclick = () => { if (curSubMode !== 'learn') newTask(); };
+// задача 54: «◀ Предыдущее / Следующее задание ▶» рядом с типами и «Все типы» в углу
+if (window.TaskNav) TaskNav.mount({ key: () => curMode, next: () => newTask(), current: () => curTask });
 
 els.basketAddBtn = document.getElementById('basketAddBtn');
 els.basketAddBtn.onclick = () => {
@@ -817,6 +832,18 @@ function openMode(id){
   switchSubMode(curSubMode === 'practice' ? 'practice' : 'exam', true);
 }
 els.backBtn.onclick = showPicker;
+// задача 54: соседний тип по кругу, как стрелки типов в №9. Кнопки — только
+// если типов больше одного (правило AGENTS.md); без банка ФИПИ их два
+function navigateType(delta){
+  const i = MODES.findIndex(m => m.id === curMode);
+  openMode(MODES[(i + delta + MODES.length) % MODES.length].id);
+}
+document.getElementById('prevTypeBtn').onclick = () => navigateType(-1);
+document.getElementById('nextTypeBtn').onclick = () => navigateType(1);
+if (MODES.length < 2) {
+  document.getElementById('prevTypeBtn').style.display = 'none';
+  document.getElementById('nextTypeBtn').style.display = 'none';
+}
 
 function renderPrompt(){
   els.questionPromptText.textContent = (curTask && curTask.prompt) || STMT_PROMPT;
@@ -839,7 +866,11 @@ function newTask() {
   // совпавшее с недавним (целиком или ответом подряд), перегенерируется
   // (no-repeat.js); avoid — заменяемое задание на экране
   const m = modeById(curMode);
-  curTask = NoRepeat.pick('oge19:' + curMode, () => m.gen(), { avoid: [curTask] });
+  // задача 54: «◀ Предыдущее задание» отдаёт задание из истории (task-nav.js) —
+  // его показываем тем же путём, но не выбираем заново и не пишем в память ФИПИ
+  const back = window.TaskNav ? TaskNav.take() : null;
+  curTask = back || NoRepeat.pick('oge19:' + curMode, () => m.gen(), { avoid: [curTask] });
+  if (window.TaskNav) TaskNav.seen(curTask);
   taskAnswered = false;
   checked = false;
   hadWrongPick = false;

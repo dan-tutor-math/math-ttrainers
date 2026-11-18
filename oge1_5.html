@@ -318,12 +318,22 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .basket-add-btn.ok{background:var(--ok, #34c759);border-color:var(--ok, #34c759);color:#fff;}
 
 /* ─── навигация по заданиям внутри темы ─── */
-.taskset-nav{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.taskset-nav{display:flex;align-items:center;justify-content:space-between;gap:8px;max-width:100%;flex-wrap:wrap;}
 .taskset-nav-btn{font-family:var(--font-ui);font-weight:600;font-size:13.5px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:9px 14px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);transition:transform .15s, border-color .12s, opacity .12s;}
 .taskset-nav-btn:active{transform:scale(.96)}
 .taskset-nav-btn:hover:not(:disabled){border-color:var(--ink)}
 .taskset-nav-btn:disabled{opacity:.35;cursor:default;}
 .taskset-nav-label{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--muted-2);flex:0 0 auto;}
+/* На широком экране используем место слева, сохраняя правый край под клавиатуру. */
+@media(min-width:1240px){
+  .task-head{margin-inline:-112px 0;flex-wrap:nowrap;}
+  .type-nav{flex:none;column-gap:6px;}
+  .type-nav-btn,.taskset-nav .taskset-nav-btn{padding-inline:8px;}
+  .taskset-nav{flex-wrap:nowrap;column-gap:6px;}
+  .task-head .corner{min-width:0;flex-wrap:nowrap;}
+  .task-head .task-title{min-width:0;overflow-wrap:anywhere;}
+}
+
 
 /* ─── панель ─── */
 .panel{background:var(--glass);backdrop-filter:blur(24px) saturate(180%);-webkit-backdrop-filter:blur(24px) saturate(180%);border:1px solid var(--glass-border);border-radius:22px;box-shadow:inset 0 1px 0 var(--glass-inset), var(--shadow);padding:20px;margin-bottom:14px;}
@@ -525,7 +535,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <nav class="corner-nav" id="cornerNav">
   <a class="home-btn" id="homeBtn" href="index.html" title="Ко всем тренажёрам" aria-label="Ко всем тренажёрам"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l-5-5 5-5"/><path d="M11 12h10"/></svg>Все задания</a>
   <!-- показывается, только пока открыто задание (#taskArea), см. syncBackBtn -->
-  <button class="back-btn" id="backBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>Назад</button>
+  <button class="back-btn" id="backBtn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>Все типы</button>
 </nav>
 <button class="theme-toggle" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
 <button class="theme-toggle board-visibility-toggle" id="boardVisibilityToggle" title="Показать доску" aria-label="Показать/скрыть доску">🖊️</button>
@@ -667,6 +677,11 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       <div class="type-nav">
         <button class="type-nav-btn" id="prevTypeBtn" title="Предыдущий тип">◀ Предыдущий тип</button>
         <button class="type-nav-btn" id="nextTypeBtn" title="Следующий тип">Следующий тип ▶</button>
+        <div class="taskset-nav" id="tasksetNav" style="display:none">
+          <button class="taskset-nav-btn" id="prevTaskBtn">◀ Предыдущее задание</button>
+          <div class="taskset-nav-label" id="tasksetNavLabel"></div>
+          <button class="taskset-nav-btn" id="nextTaskBtn">Следующее задание ▶</button>
+        </div>
       </div>
       <div class="corner">
         <div class="task-title" id="taskTitle"></div>
@@ -680,12 +695,6 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
       <button class="submode-tab" id="tabLearn">Обучение</button>
       <button class="submode-tab" id="tabPractice">Тренировка</button>
       <button class="submode-tab active" id="tabExam">Экзамен</button>
-    </div>
-
-    <div class="taskset-nav" id="tasksetNav" style="display:none">
-      <button class="taskset-nav-btn" id="prevTaskBtn">◀ Предыдущее задание</button>
-      <div class="taskset-nav-label" id="tasksetNavLabel"></div>
-      <button class="taskset-nav-btn" id="nextTaskBtn">Следующее задание ▶</button>
     </div>
 
     <div class="video-row" id="videoRow" hidden>
@@ -786,6 +795,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="exam-spec.js"></script>
 <script src="variant-set.js"></script>
 <script src="exam-nav.js"></script>
+<script src="reference-panel.js" data-oge-reference></script>
 <script src="oge1_5-fipi-bank.js"></script>
 <script src="trainer-multi.js"></script>
 <script src="video-links.js"></script>
@@ -1861,38 +1871,43 @@ function navigateTaskset(delta) {
   setCurMode(curTasksetRef.tasks[newIdx].id);
   openTask(); // теория и заводская шина не пересчитываются — сохраняются на весь сеанс
 }
-els.prevTaskBtn.onclick = () => navigateTaskset(-1);
-els.nextTaskBtn.onclick = () => navigateTaskset(1);
+function guardTaskNavigation(fn) {
+  return window.TrainerSession ? TrainerSession.guardStudentAction('switchTask', fn) : fn;
+}
+els.prevTaskBtn.onclick = guardTaskNavigation(() => navigateTaskset(-1));
+els.nextTaskBtn.onclick = guardTaskNavigation(() => navigateTaskset(1));
 
 /* переход «следующий/предыдущий тип» — листает соседние прототипы внутри той же
    тематической группы (например, между «Стоимость связи» и «Сравнение тарифов»).
-   Внутри «Шины» (taskset) кнопки скрыты — там уже есть своя навигация по заданиям. */
+   В наборе тип определяется по всему набору, листание заданий идёт отдельно. */
 function findGroupOf(modeId) {
   return GROUPS.find(g => g.modes.some(m => m.id === modeId));
 }
 function updateTypeNav() {
-  const group = (curMode === 'random' || curTasksetRef) ? null : findGroupOf(curMode);
+  const group = curMode === 'random' ? null : findGroupOf(curTasksetRef ? curTasksetRef.id : curMode);
   const showNav = !!group && group.modes.length > 1;
   els.prevTypeBtn.style.display = showNav ? 'inline-flex' : 'none';
   els.nextTypeBtn.style.display = showNav ? 'inline-flex' : 'none';
 }
 function navigateType(delta) {
-  if (curTasksetRef) return;
-  const group = findGroupOf(curMode);
+  const typeId = curTasksetRef ? curTasksetRef.id : curMode;
+  const group = findGroupOf(typeId);
   if (!group) return;
-  const idx = group.modes.findIndex(m => m.id === curMode);
+  const idx = group.modes.findIndex(m => m.id === typeId);
   if (idx === -1) return;
   const newIdx = (idx + delta + group.modes.length) % group.modes.length;
   const target = group.modes[newIdx];
   if (target.kind === 'taskset') {
     enterTaskset(target);
   } else {
+    curTasksetRef = null;
+    curTasksetTheory = null;
     setCurMode(target.id);
     openTask();
   }
 }
-els.prevTypeBtn.onclick = () => navigateType(-1);
-els.nextTypeBtn.onclick = () => navigateType(1);
+els.prevTypeBtn.onclick = guardTaskNavigation(() => navigateType(-1));
+els.nextTypeBtn.onclick = guardTaskNavigation(() => navigateType(1));
 
 function switchSubMode(mode, isEntering) {
   curSubMode = mode;

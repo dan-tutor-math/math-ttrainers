@@ -140,7 +140,9 @@ def test_picker_and_task(browser, F):
     page.click('.mode-card[data-gid="par_lin"]')
     page.wait_for_timeout(400)
     head = page.inner_text('#taskTitle')
-    check("задание: шапка «группа · задание 1 из N»", head == f"{g['title']} · задание 1 из {len(items)}", head)
+    # задача 54: как в обществознании — счётчик в шапке, название вида в подзаголовке
+    check("задание: шапка «задание 1 из N», вид — в подзаголовке",
+          head == f"задание 1 из {len(items)}" and g['title'] in page.inner_text('#pageSub'), head)
     m = SRC_RE.search(page.inner_text('#egeQuestion'))
     check("задание: подпись источника", m and m.group(1) == items[0]["fipi"])
     page.fill('#answerArea input.answer-input', items[0]["fields"][0]["value"])

@@ -804,6 +804,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="hard-toggle.js"></script>
 <script src="exam-spec.js"></script>
 <script src="exam-nav.js"></script>
+<script src="reference-panel.js" data-oge-reference></script>
+<script src="task-nav.js"></script>
 <script src="lazy-libs.js" data-preload="html2canvas jspdf"></script>
 <script src="lesson-history.js"></script>
 <script src="video-links.js"></script>
@@ -2167,6 +2169,8 @@ function navigateType(delta){
 els.prevTypeBtn.onclick = guardStudentAction('switchTask', ()=>navigateType(-1));
 els.nextTypeBtn.onclick = guardStudentAction('switchTask', ()=>navigateType(1));
 els.refreshBtn.onclick = guardStudentAction('refreshAll', () => { if (curSubMode === 'exam' || curSubMode === 'practice') nextBatchAll(); });
+// задача 54: «◀ Предыдущее / Следующее задание ▶» рядом с типами и «Все типы» в углу
+if (window.TaskNav) TaskNav.mount({ key: () => curMode, next: () => newTask(), current: () => curTask });
 
 els.basketAddBtn = document.getElementById('basketAddBtn');
 els.basketAddBtn.onclick = () => {
@@ -2241,7 +2245,11 @@ function newTask(opts) {
   // страницы), чтобы не задваивать снимок/очистку одного и того же задания
   if (!opts.skipSnapshot) snapshotAndClear('single', document.getElementById('card1Wrapper'));
   const m = curMode === 'random' ? pick(RANDOM_MODES.filter(m=>!m.fipiOnly || !window.FipiMix || FipiMix.filter().fipi)) : ALL_MODES.find(x => x.id === curMode);
-  curTask = genUnique(m);
+  // задача 54: «◀ Предыдущее задание» отдаёт задание из истории (task-nav.js) —
+  // его показываем тем же путём, но не выбираем заново и не пишем в память ФИПИ
+  const back = window.TaskNav ? TaskNav.take() : null;
+  curTask = back || genUnique(m);
+  if (window.TaskNav) TaskNav.seen(curTask);
   taskAnswered = false;
   hadWrongPick = false;
 

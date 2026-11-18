@@ -178,12 +178,15 @@ def test_picker_and_task(browser, F):
     page.click('.mode-card[data-gid="sys_add"]')
     page.wait_for_timeout(400)
     head = page.inner_text('#taskTitle')
-    check("задание: шапка «группа · задание 1 из N»", head == f"{g['title']} · задание 1 из {len(items)}", head)
+    # задача 54: как в обществознании — счётчик в шапке, название вида в подзаголовке
+    check("задание: шапка «задание 1 из N», вид — в подзаголовке",
+          head == f"задание 1 из {len(items)}" and g['title'] in page.inner_text('#pageSub'), head)
     note = page.inner_text('#egeQuestion')
     m = SRC_RE.search(note)
     check("задание: подпись источника с номером ФИПИ первого задания группы", m and m.group(1) == items[0]["fipi"], note[-80:])
-    check("задание: кнопки «Предыдущее/Следующее задание»",
-          page.inner_text('#nextProtoBtn') == 'Следующее задание ▶' and page.inner_text('#prevProtoBtn') == '◀ Предыдущее задание')
+    check("задание: стрелки «◀ ▶» у счётчика",
+          page.inner_text('#nextProtoBtn') == '▶' and page.inner_text('#prevProtoBtn') == '◀'
+          and page.evaluate("!!document.querySelector('.task-pagination #nextProtoBtn')"))
     seen = []
     for _ in range(len(items)):
         seen.append(page.evaluate("curProto.fipi"))
@@ -207,7 +210,8 @@ def test_picker_and_task(browser, F):
     page.click('#nextTypeBtn')
     page.wait_for_timeout(200)
     check("Следующий тип ▶: открывает следующую группу с первого задания",
-          page.evaluate("curProto.group") == nxt["id"] and page.inner_text('#taskTitle').startswith(nxt["title"] + ' · задание 1 из'),
+          page.evaluate("curProto.group") == nxt["id"] and page.inner_text('#taskTitle').startswith('задание 1 из')
+          and nxt["title"] in page.inner_text('#pageSub'),
           page.inner_text('#taskTitle'))
     page.click('#prevTypeBtn')
     page.wait_for_timeout(200)
@@ -268,7 +272,7 @@ def test_picker_and_task(browser, F):
     page.wait_for_timeout(500)
     note = page.inner_text('#egeQuestion')
     check("сессия: у ученика то же задание ФИПИ с подписью",
-          page.evaluate("S.pid") == pid and SRC_RE.search(note) and page.inner_text('#taskTitle').startswith(g['title']), note[-60:])
+          page.evaluate("S.pid") == pid and SRC_RE.search(note) and g['title'] in page.inner_text('#pageSub'), note[-60:])
     check("сессия: карточки «+» той же группы и у ученика",
           page.evaluate("S.cards.length === 3 && S.cards.every(c => protoById(20, c.pid).group === 'sys_add')"))
     check("сессия: без ошибок JS", not errors, str(errors[:1]))

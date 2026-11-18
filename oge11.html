@@ -596,6 +596,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="exam-spec.js"></script>
 <script src="variant-set.js"></script>
 <script src="exam-nav.js"></script>
+<script src="reference-panel.js" data-oge-reference></script>
+<script src="task-nav.js"></script>
 <script src="trainer-multi.js"></script>
 <script>
 /* ═══════════════ утилиты ═══════════════ */
@@ -1085,6 +1087,8 @@ function navigateType(delta){
 els.prevTypeBtn.onclick = ()=>navigateType(-1);
 els.nextTypeBtn.onclick = ()=>navigateType(1);
 els.refreshBtn.onclick = () => { if (curSubMode !== 'learn') newTask(); };
+// задача 54: «◀ Предыдущее / Следующее задание ▶» рядом с типами и «Все типы» в углу
+if (window.TaskNav) TaskNav.mount({ key: () => curMode, next: () => newTask(), current: () => curTask });
 
 els.basketAddBtn = document.getElementById('basketAddBtn');
 els.basketAddBtn.onclick = () => {
@@ -1183,7 +1187,11 @@ function newTask() {
   // Промпт №18 нового списка: без повторов — тот же генератор, но задание,
   // совпавшее с недавним (целиком или ответом подряд), перегенерируется
   // (no-repeat.js); avoid — заменяемое задание на экране
-  curTask = NoRepeat.pick('oge11:' + curMode, () => m.gen(), { avoid: [curTask] });
+  // задача 54: «◀ Предыдущее задание» отдаёт задание из истории (task-nav.js) —
+  // его показываем тем же путём, но не выбираем заново и не пишем в память ФИПИ
+  const back = window.TaskNav ? TaskNav.take() : null;
+  curTask = back || NoRepeat.pick('oge11:' + curMode, () => m.gen(), { avoid: [curTask] });
+  if (window.TaskNav) TaskNav.seen(curTask);
   taskAnswered = false;
   optionsLocked = false;
   hadWrongPick = false;
