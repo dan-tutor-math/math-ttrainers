@@ -44,7 +44,10 @@
     if (/^egeb\d+$/.test(s)) return 'ege_base';
     if (/^oge2[0-5]$/.test(s)) return 'oge_part2';
     if (/^soc\d+$/.test(s)) return 'soc_oge';
+    if (/^soce\d+$/.test(s)) return +s.slice(4) <= 16 ? 'soc_ege' : 'soc_ege_long';
     if (/^eng\d+$/.test(s)) return 'eng_oge';
+    if (/^phys\d+$/.test(s)) return 'phys_oge';
+    if (/^inf\d+$/.test(s)) return 'inf_oge';
     // русский: id тренажёра на доске rus<номер>; №1 и №13 — свои страницы
     if (s === 'rus1') return 'rus_oge01';
     if (s === 'rus13') return 'rus_oge13';
@@ -60,7 +63,10 @@
     if (p === 'ege_prof') return 'ege';
     if (p === 'ege_base') return 'egeb';
     if (p === 'soc_oge') return 'soc';
+    if (p === 'soc_ege' || p === 'soc_ege_long') return 'soce';
     if (p === 'eng_oge') return 'eng';
+    if (p === 'phys_oge') return 'phys';
+    if (p === 'inf_oge') return 'inf';
     if (/^rus_oge/.test(p)) return 'rus';
     // свой экзамен, а не 'rus': id ОГЭ и ЕГЭ — из разных банков ФИПИ и могут совпасть
     if (/^rus_ege/.test(p)) return 'ruse';
@@ -68,7 +74,7 @@
     return null;
   }
   // страницы с моделью ЕГЭ: задание — прототип с id вида «<n>.fipi.<НОМЕР>»
-  function isEgeLike(p) { return /^(ege_prof|ege_base|oge_part2|soc_oge|eng_oge)$/.test(p); }
+  function isEgeLike(p) { return /^(ege_prof|ege_base|oge_part2|soc_oge|soc_ege|soc_ege_long|eng_oge|phys_oge|inf_oge)$/.test(p); }
 
   function fromTask(page, task) {
     const p = canonPage(page), exam = examOf(p);
@@ -80,7 +86,7 @@
       if (m) id = m[1];
     }
     // русский и обществознание: id задания и есть номер ФИПИ
-    if (!id && (exam === 'rus' || exam === 'ruse' || exam === 'soc') && task.id != null && ID_RE.test(String(task.id))) id = String(task.id);
+    if (!id && /^(rus|ruse|soc|soce|phys|inf)$/.test(exam) && task.id != null && ID_RE.test(String(task.id))) id = String(task.id);
     if (id) return 'fipi:' + exam + ':' + id;
     // не из банка: вид задания
     let kind = task.genKind || null;

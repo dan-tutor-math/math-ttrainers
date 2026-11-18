@@ -1656,6 +1656,21 @@ function protoPeek(p){
    Вне сессии и у ученика TaskCaptions.active() — false, и всё это молчит */
 function capKey(p){ return window.TaskCaptions ? TaskCaptions.keyOfTask(p) : null; }
 function capSkip(p){ return !!(window.TaskCaptions && TaskCaptions.skip(capKey(p))); }
+function pickerKeys(p){
+  const key = capKey(p);
+  // У английского наборы КИМ в журнале могут быть записаны по id набора
+  // с доски или по номеру ФИПИ из тренажёра.
+  return EXAM.slug === 'eng_oge' && p.fipi ? [key, capKey({ id: p.id })] : [key];
+}
+function pickerSolved(p){
+  return window.TaskCaptions && TaskCaptions.active() ? pickerKeys(p).some(TaskCaptions.solved) : isSolved(p.id);
+}
+function fromFipi(p){ return p.fipi || /^демоверсия/i.test(p.src || ''); }
+function pickerProgress(list){
+  if (!window.TaskCaptions || !TaskCaptions.active()) return null;
+  // Демоверсии — фиксированные задания ФИПИ, хотя у них свой ключ в журнале.
+  return TaskCaptions.progress(list.filter(fromFipi).map(pickerKeys));
+}
 function leftLabel(list){
   if (!window.TaskCaptions || TaskCaptions.mode() !== 'hide_solved') return '';
   const fp = list.filter(p => (capKey(p) || '').indexOf('fipi:') === 0);
@@ -1693,19 +1708,22 @@ function renderPicker(){
     ensureFipi(n, () => { if (S.n === n && S.screen === 'picker') renderPicker(); });
   }
   const list = protos(S.n);
+  const grouped = groupsOf(S.n).length > 0;
+  const progress = !grouped && pickerProgress(list);
   // источники всех заданий номера: «демоверсия ОГЭ 2027 и открытый банк заданий ФИПИ»
   const srcs = list.map(p => p.src || '').filter((x, i, all) => x && all.indexOf(x) === i);
-  els.pickerTitle.textContent = (groupsOf(S.n).length ? 'Задания ' : 'Прототипы задания ') + numLabel(S.n) + ' · ' + list.length + ' ' +
+  els.pickerTitle.textContent = (grouped ? 'Задания ' : 'Прототипы задания ') + numLabel(S.n) + ' · ' + list.length + ' ' +
     plural(list.length, 'штука', 'штуки', 'штук') +
     // строчной делаем только первую букву: «демоверсия ФИПИ 2027», а не «фипи»
-    (srcs.length ? ' · ' + srcs.map(x => x.charAt(0).toLowerCase() + x.slice(1)).join(' и ') : '') + leftLabel(list);
-  if (groupsOf(S.n).length) { renderGroupedPicker(list); return; }
+    (srcs.length ? ' · ' + srcs.map(x => x.charAt(0).toLowerCase() + x.slice(1)).join(' и ') : '') +
+    (progress ? ' · ' + progress.label : '') + leftLabel(list);
+  if (grouped) { renderGroupedPicker(list); return; }
   /* отметку «решено» держим слева, рядом с номером: правый край карточки на
      обычном экране уходит под кнопки темы и подсказок в углу страницы */
   els.protoList.innerHTML = list.map((p, i) => `
     <div class="mode-card" data-pid="${p.id}"${fipiAttr([p])}>
       <div class="mtitle">${p.title ? p.title : 'Прототип ' + (i + 1)}</div>
-      ${isSolved(p.id) ? '<div class="mdone">✓ решено</div>' : ''}
+      ${pickerSolved(p) ? '<div class="mdone">✓ решено</div>' : ''}
       <div class="mpeek">${protoPeek(p)}</div>
     </div>`).join('');
   els.protoList.querySelectorAll('.mode-card').forEach(card => {
@@ -1727,7 +1745,7 @@ function renderPicker(){
    задания из банка. В ЕГЭ флага нет, и список остаётся одним, как был */
 function fipiAttr(items){
   if (!EXAM.fipiSplit) return '';
-  return items.length && items.every(p => p.fipi || /^демоверсия/i.test(p.src || '')) ? ' data-fipi="1"' : '';
+  return items.length && items.every(fromFipi) ? ' data-fipi="1"' : '';
 }
 function splitPicker(){
   if (EXAM.fipiSplit && window.FipiSplit) FipiSplit.apply(els.protoList, {
@@ -1740,7 +1758,7 @@ function renderGroupedPicker(list){
   let html = loose.map((p, i) => `
     <div class="mode-card" data-pid="${p.id}"${fipiAttr([p])}>
       <div class="mtitle">${p.title ? p.title : 'Прототип ' + (i + 1)}</div>
-      ${isSolved(p.id) ? '<div class="mdone">✓ решено</div>' : ''}
+      ${pickerSolved(p) ? '<div class="mdone">✓ решено</div>' : ''}
       <div class="mpeek">${protoPeek(p)}</div>
     </div>`).join('');
   let section = null;
@@ -1752,12 +1770,14 @@ function renderGroupedPicker(list){
       const sec = (t.sections || []).find(x => x.id === section);
       if (sec) html += '<div class="proto-section">' + sec.title + '</div>';
     }
-    const done = items.filter(p => isSolved(p.id)).length;
+    const progress = pickerProgress(items);
+    const done = progress ? 0 : items.filter(pickerSolved).length;
+    const count = progress ? progress.label : done ? '✓ ' + done + ' из ' + items.length
+      : items.length + ' ' + plural(items.length, 'задание', 'задания', 'заданий');
     html += `
     <div class="mode-card" data-gid="${g.id}"${fipiAttr(items)}>
       <div class="mtitle">${rich(g.title)}</div>
-      ${done ? '<div class="mdone">✓ ' + done + ' из ' + items.length + '</div>'
-             : '<div class="mcount">' + items.length + ' ' + plural(items.length, 'задание', 'задания', 'заданий') + '</div>'}
+      <div class="${progress?.allDone || done ? 'mdone' : 'mcount'}">${count}</div>
       <div class="mpeek">${protoPeek(items[0])}</div>
     </div>`;
   });
@@ -1784,10 +1804,10 @@ function showPicker(){
 // сменилось — список перерисовываем (точки, «осталось N из M»)
 if (window.TaskCaptions) {
   TaskCaptions.mountToggle(document.getElementById('tcBar'));
-  TaskCaptions.onChange(() => {
+  TaskCaptions.onChange((_, progressOnly) => {
     if (S.screen === 'picker') renderPicker();
-    else if (curProto) TaskCaptions.showCurrent(els.pageSub, curProto);
-  });
+    else if (!progressOnly && curProto) TaskCaptions.showCurrent(els.pageSub, curProto);
+  }, { progress: true });
 }
 
 const FIELD_HINTS = {
