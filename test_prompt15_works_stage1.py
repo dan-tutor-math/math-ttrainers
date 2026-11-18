@@ -317,8 +317,11 @@ def handle_db(route, request):
         route.fulfill(status=204, headers=CORS)
 
 
-def new_context(browser, live=False, **kw):
+def new_context(browser, live=False, cards=False, **kw):
     ctx = browser.new_context(**kw)
+    # старые тесты проверяют путь «кадр → снимок»; карточки (задача 63) — тестам с cards=True
+    if not cards:
+        ctx.add_init_script("try { localStorage.setItem('works:noCards', '1'); } catch (e) {}")
     # тесты этапов 1–3 проверяют задание-картинку; живое задание (кадр
     # тренажёра) — в test_prompt_work_live.py, ему live=True
     if not live:

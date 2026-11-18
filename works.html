@@ -1755,10 +1755,13 @@ function plainTitle(html){
    собранные семьи) — путь как раньше, кадр и снимок. Карточка берётся, только
    если её номер ФИПИ совпадает с номером на этом месте каталога: банк
    перевыгрузят — сдвинутое место не подменится чужим заданием. */
+// works:noCards = '1' — в конструкторе не брать карточки, всё через кадр и снимок: тесты пути снимков
+// (наши генераторы и необработанные страницы идут им же) и запасной выход, если карточки где-то подведут
+const NO_CARDS = (() => { try { return localStorage.getItem('works:noCards') === '1'; } catch (e) { return false; } })();
 const cardFiles = new Map();   // slug → Promise<{ slug, at: Map proto|pos → [карточки], byId } | null>
 const slugOfHref = href => String(href || '').split('?')[0].split('#')[0].replace(/^.*\//, '').replace(/\.html$/, '');
 function cardsOf(slug){
-  if (!slug) return Promise.resolve(null);
+  if (!slug || NO_CARDS) return Promise.resolve(null);
   if (!cardFiles.has(slug)){
     const p = fetch('cards/' + slug + '.json', { cache: 'no-cache' })
       .then(r => r.ok ? r.json() : null)

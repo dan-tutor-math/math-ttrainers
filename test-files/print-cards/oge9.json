@@ -1,0 +1,41 @@
+{
+ "v": 1,
+ "slug": "oge9",
+ "exam": "oge",
+ "family": "a_simple",
+ "src": {
+  "oge9-fipi-bank.js": "935df24dc02cb5af815c503237602934906064f6",
+  "oge9.html": "f6161995d5bf21975fe9916e4ed2168f70d2a375"
+ },
+ "partial": true,
+ "cards": [
+  {
+   "v": 1,
+   "id": "fipi:4F57B2",
+   "exam": "oge",
+   "slug": "oge9",
+   "n": 9,
+   "proto": "p1",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>Найдите корень уравнения:<div class=\"c-eq\">−4<i>x</i> − 9 = 6<i>x</i></div></div>",
+   "figs": [],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "-0.9"
+     }
+    ],
+    "value": "-0,9"
+   },
+   "solution": "<div><div class=\"c-line\">−4<i>x</i> − 9 = 6<i>x</i></div><div class=\"c-line\">−4<i>x</i> − 6<i>x</i> = 9</div><div class=\"c-line\">−10<i>x</i> = 9</div><div class=\"c-line\"><i>x</i> = <span class=\"c-frac\"><span class=\"c-num\">9</span><span class=\"c-den\">−10</span></span> = −0,9</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 4F57B2"
+  }
+ ]
+}

@@ -1,0 +1,87 @@
+{
+ "v": 1,
+ "slug": "oge15_18",
+ "exam": "oge",
+ "family": "a_figs",
+ "src": {
+  "oge15_18-fipi-bank.js": "0a1672c879fcd5dfa169faa9361dcfc412933dbc",
+  "oge15_18-kinds.js": "d0ea9fee065f36d74e44843c7f9feb17356f4c6e",
+  "oge15_18.html": "6cd2f58f63aed9b42ebca6e70f94359bf2db5424",
+  "oge18-fipi-bank.js": "33f94e0eca272d00f31491d5fdede0503feaef5a"
+ },
+ "cards": [
+  {
+   "v": 1,
+   "id": "fipi:760E4B",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 15,
+   "proto": "t_hyp",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>Катеты прямоугольного треугольника равны 8 и 15. Найдите гипотенузу этого треугольника.[[fig:0]]</div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/760E4B_1.png",
+     "w": 191,
+     "h": 85,
+     "alt": "чертёж к заданию",
+     "maxw": 191
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "17"
+     }
+    ],
+    "value": "17"
+   },
+   "solution": "<div><div class=\"c-line\">По теореме Пифагора гипотенуза c = √(a² + b²).</div><div class=\"c-line\">c = √(8² + 15²) = √(64 + 225) = √289 = 17.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 760E4B"
+  },
+  {
+   "v": 1,
+   "id": "fipi:86F9F5",
+   "exam": "oge",
+   "slug": "oge15_18",
+   "n": 15,
+   "proto": "t_area_sin",
+   "pos": 0,
+   "math": "html",
+   "text": "<div>В треугольнике ABC известно, что AB = 12, BC = 15, sin ∠ABC = <span class=\"c-frac\"><span class=\"c-num\">4</span><span class=\"c-den\">9</span></span>. Найдите площадь треугольника ABC.[[fig:0]]</div>",
+   "figs": [
+    {
+     "file": "img/oge15_18/86F9F5_1.png",
+     "w": 156,
+     "h": 126,
+     "alt": "чертёж к заданию",
+     "maxw": 156
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "num",
+      "value": "40"
+     }
+    ],
+    "value": "40"
+   },
+   "solution": "<div><div class=\"c-line\">Площадь треугольника — половина произведения двух сторон на синус угла между ними:</div><div class=\"c-line\">S = <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">2</span></span> · AB · BC · sin ∠ABC = <span class=\"c-frac\"><span class=\"c-num\">1</span><span class=\"c-den\">2</span></span> · 12 · 15 · <span class=\"c-frac\"><span class=\"c-num\">4</span><span class=\"c-den\">9</span></span> = 40.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 86F9F5"
+  }
+ ],
+ "partial": true
+}

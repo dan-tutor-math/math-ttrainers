@@ -1,0 +1,93 @@
+{
+ "v": 1,
+ "slug": "ege_prof",
+ "exam": "ege_prof",
+ "family": "ege_prof",
+ "src": {
+  "ege-prof-fipi1.js": "be7c5dd49cb6b3e09d4220147d5da8f6870b4065",
+  "ege_prof.html": "3a71293abbef233645010511fdf949462c84ed76"
+ },
+ "partial": true,
+ "cards": [
+  {
+   "v": 1,
+   "id": "fipi:2933FB",
+   "exam": "ege_prof",
+   "slug": "ege_prof",
+   "n": 1,
+   "proto": "triangle",
+   "pos": 0,
+   "math": "tex",
+   "text": "<div>В треугольнике $ABC$ стороны $AC$ и $BC$ равны, угол $C$ равен $168^\\circ$, угол $CBD$ внешний. Найдите величину угла $CBD$. Ответ дайте в градусах.[[fig:0]]</div>",
+   "figs": [
+    {
+     "file": "img/ege_prof/2933FB_1.png",
+     "w": 312,
+     "h": 104,
+     "alt": "Рисунок к заданию",
+     "maxw": 420
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "plain",
+      "value": "174",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": ""
+     }
+    ],
+    "value": "174"
+   },
+   "solution": "<div class=\"c-line\">Углы при основании равны: $$\\angle B = \\dfrac{180^\\circ - 168^\\circ}{2} = 6^\\circ$$</div><div class=\"c-line\">Внешний угол: $$180^\\circ - 6^\\circ = 174^\\circ$$</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 2933FB"
+  },
+  {
+   "v": 1,
+   "id": "fipi:84E9F2",
+   "exam": "ege_prof",
+   "slug": "ege_prof",
+   "n": 1,
+   "proto": "circle",
+   "pos": 1,
+   "math": "tex",
+   "text": "<div>Найдите величину угла $ACO$, если его сторона $CA$ касается окружности с центром $O$, отрезок $CO$ пересекает окружность в точке $B$ (см. рисунок), а дуга $AB$ окружности, заключённая внутри этого угла, равна $66^\\circ$. Ответ дайте в градусах.[[fig:0]]</div>",
+   "figs": [
+    {
+     "file": "img/ege_prof/84E9F2_1.png",
+     "w": 213,
+     "h": 147,
+     "alt": "Рисунок к заданию",
+     "maxw": 420
+    }
+   ],
+   "table": null,
+   "opts": null,
+   "answer": {
+    "kind": "fields",
+    "fields": [
+     {
+      "id": "main",
+      "label": "Ответ:",
+      "type": "plain",
+      "value": "24",
+      "alts": [],
+      "seq": false,
+      "anyOrder": false,
+      "unit": ""
+     }
+    ],
+    "value": "24"
+   },
+   "solution": "<div class=\"c-line\">Радиус $OA$ перпендикулярен касательной: $\\angle OAC = 90^\\circ$. Центральный угол $AOB$ равен дуге: $66^\\circ$.</div><div class=\"c-line\">$$\\angle ACO = 90^\\circ - 66^\\circ = 24^\\circ$$</div>",
+   "source": "Открытый банк заданий ФИПИ, задание 84E9F2"
+  }
+ ]
+}

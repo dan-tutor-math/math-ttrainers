@@ -1,0 +1,48 @@
+{
+ "v": 1,
+ "slug": "oge7",
+ "exam": "oge",
+ "family": "a_simple",
+ "src": {
+  "oge7-fipi-bank.js": "bfa5f7c02b2e96015939f8d0f0e5c20887cf1e39",
+  "oge7.html": "be3bc2bb8d82c9330898c0b2ec61fd94c871de7f"
+ },
+ "cards": [
+  {
+   "v": 1,
+   "id": "fipi:60DA89",
+   "exam": "oge",
+   "slug": "oge7",
+   "n": 7,
+   "proto": "point_on_line_int",
+   "pos": 0,
+   "math": "tex",
+   "text": "<div>Одно из чисел $\\dfrac{73}{22}$, $\\dfrac{83}{22}$, $\\dfrac{93}{22}$ и $\\dfrac{113}{22}$ отмечено на числовой прямой точкой <b>A</b>. Какое это число?</div>[[fig:0]]<div>Варианты ответа:</div>[[opts]]",
+   "figs": [
+    {
+     "file": "img/oge7/60DA89_1.svg",
+     "w": 748,
+     "h": 84,
+     "alt": "Числовая прямая",
+     "maxw": 748
+    }
+   ],
+   "table": null,
+   "opts": [
+    "$\\dfrac{73}{22}$",
+    "$\\dfrac{83}{22}$",
+    "$\\dfrac{93}{22}$",
+    "$\\dfrac{113}{22}$"
+   ],
+   "answer": {
+    "kind": "choice",
+    "n": 4,
+    "correct": 1,
+    "value": "2"
+   },
+   "solution": "<div><div class=\"c-line\">По подписанным делениям и середине единичного отрезка на рисунке: $3,5\\lt A\\lt 4$.</div><div class=\"c-line\">Вариант 1: $73=22\\cdot 3+7$</div><div class=\"c-line\">$\\dfrac{73}{22}$ = 3 + $\\dfrac{7}{22}$ ≈ 3,31818182. Не попадает в отмеченный участок.</div><div class=\"c-line\">Вариант 2: $83=22\\cdot 3+17$</div><div class=\"c-line\">$\\dfrac{83}{22}$ = 3 + $\\dfrac{17}{22}$ ≈ 3,77272727. Попадает в отмеченный участок.</div><div class=\"c-line\">Вариант 3: $93=22\\cdot 4+5$</div><div class=\"c-line\">$\\dfrac{93}{22}$ = 4 + $\\dfrac{5}{22}$ ≈ 4,22727273. Не попадает в отмеченный участок.</div><div class=\"c-line\">Вариант 4: $113=22\\cdot 5+3$</div><div class=\"c-line\">$\\dfrac{113}{22}$ = 5 + $\\dfrac{3}{22}$ ≈ 5,13636364. Не попадает в отмеченный участок.</div><div class=\"c-line\">Единственный верный вариант — 2.</div></div>",
+   "source": "Открытый банк заданий ФИПИ, задание 60DA89"
+  }
+ ],
+ "partial": true
+}

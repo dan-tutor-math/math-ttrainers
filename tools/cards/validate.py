@@ -131,7 +131,10 @@ def html_errors(src, where, math):
             errs.append(f"{where}: непарные $")
     text = "".join(p.text)
     for w in UI_WORDS:
-        if w in text:
+        # «Следующий шаг» — подпись кнопки, а не фраза в середине предложения (в тексте ФИПИ
+        # №17–20 обществознания: «Следующий шаг – выявление специфики…»): только целиком в узле
+        hit = re.search(r"(^|>)\s*Следующий шаг\s*(<|$)", text) if w == "Следующий шаг" else w in text
+        if hit:
             errs.append(f"{where}: текст интерфейса «{w}»")
     return errs
 

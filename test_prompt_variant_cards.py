@@ -24,6 +24,8 @@
 Запуск: python3 test_prompt_variant_cards.py
 """
 import json
+import os
+HERE = os.path.dirname(os.path.abspath(__file__))
 import sys
 
 import test_prompt15_works_stage1 as t15
@@ -68,7 +70,14 @@ def run():
     errors = []
     with local_server(), sync_playwright() as p:
         browser = p.chromium.launch()
-        ctx = new_context(browser, viewport={"width": 1440, "height": 950})
+        ctx = new_context(browser, cards=True, viewport={"width": 1440, "height": 950})
+        # oge9 собран целиком (S1b), а тест проверяет «место без карточки»: отдаём урезанный файл —
+        # только места 0 (как в пилоте), остальное идёт старым путём — кадр и снимок
+        def part_oge9(route):
+            d = json.load(open(os.path.join(HERE, "cards", "oge9.json"), encoding="utf-8"))
+            d["cards"] = [c for c in d["cards"] if c.get("pos") == 0]; d["partial"] = True
+            route.fulfill(status=200, content_type="application/json", body=json.dumps(d, ensure_ascii=False))
+        ctx.route("**/cards/oge9.json", part_oge9)
         pg = ctx.new_page()
         pg.on("dialog", lambda d: d.accept())
         watch_errors(pg, errors, "works")
