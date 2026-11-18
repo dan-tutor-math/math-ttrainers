@@ -96,6 +96,17 @@
     try { return skip(window.TaskKey.fromTask(page, { fipi })); } catch (e) { return false; }
   }
 
+  // решено ли задание ФИПИ у ученика сессии: в журнале есть верный итог (ok) —
+  // по правилам памяти (задача 56) это и «верно с первого раза», и «верно после ошибки».
+  // Считаем разные задания, а не попытки: ключ задания один, сколько бы раз его ни решали
+  function solvedFipi(page, fipi){
+    if (!active() || !window.TaskKey) return false;
+    try {
+      const s = summaryOf(window.TaskKey.fromTask(page, { fipi }));
+      return !!(s && s.ok && s.ok.n > 0);
+    } catch (e) { return false; }
+  }
+
   /* ── текст всплывашки ── */
   const NAMES = [['hw', 'В ДЗ'], ['board', 'На доске'], ['ok', 'Верно'], ['bad', 'Неверно']];
   function fmtDate(t){
@@ -372,5 +383,5 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 
-  window.TaskCaptions = { active, mode, setMode, keyOfTask, skip, skipFipi, dot, decorate, showCurrent, mountToggle, onChange, summaryOf };
+  window.TaskCaptions = { active, mode, setMode, keyOfTask, skip, skipFipi, solvedFipi, dot, decorate, showCurrent, mountToggle, onChange, summaryOf };
 })();

@@ -143,6 +143,16 @@
     delete shownFipi[page + ':' + mode];
     const f = filter(), n = list.length;
     if (!f.fipi && hasOwn) return 'на основе ФИПИ';
+    // идёт сессия с учеником: «Решено K из N» — по памяти ЭТОГО ученика (task-captions.js
+    // → student-memory.js), а не по общему на устройство fipiMix:done. Без сессии чужой
+    // прогресс не показываем — работает прежняя подпись ниже
+    if (window.TaskCaptions && TaskCaptions.active && TaskCaptions.active() && TaskCaptions.solvedFipi) {
+      const k = list.filter(x => TaskCaptions.solvedFipi(page, x.fipi)).length;
+      let t = (f.own && hasOwn ? `${n}+ ${plural(n)}` : `${n} ${plural(n)} ФИПИ`) + ` · Решено ${k} из ${n}`;
+      // кабинет (Б4): «скрывать решённые» — ещё и сколько заданий ФИПИ у ученика не было
+      if (TaskCaptions.mode() === 'hide_solved') t += ` · осталось ${list.filter(x => !skipSeen(page, x.fipi)).length} из ${n}`;
+      return t;
+    }
     // кабинет (Б4): «скрывать решённые» — считаем, сколько заданий ФИПИ у ученика ещё не было
     if (window.TaskCaptions && TaskCaptions.mode() === 'hide_solved') {
       const left = list.filter(x => !skipSeen(page, x.fipi)).length;
@@ -231,5 +241,22 @@
     };
     mark();
   }
+  // Экран выбора открыт, а сессия началась/сменилась или ученик решил задание
+  // (панель тренажёров на доске, кадр) — подписи «Решено K из N» перерисовываем сами,
+  // без правок в каждой странице: страницы ОГЭ отдают глобальный renderPicker()
+  let repaintT = 0;
+  function repaintPicker() {
+    clearTimeout(repaintT);
+    repaintT = setTimeout(() => {
+      const g = document.getElementById('modesGrid');
+      if (!g || !g.offsetParent || !g.querySelector('.fipi-count, .mode-card') || typeof window.renderPicker !== 'function') return;
+      try { window.renderPicker(); } catch (e) {}
+    }, 150);
+  }
+  function watchMemory() {
+    try { if (window.StudentMemory && StudentMemory.onChange) StudentMemory.onChange(repaintPicker); } catch (e) {}
+    try { if (window.TaskCaptions && TaskCaptions.onChange) TaskCaptions.onChange(repaintPicker); } catch (e) {}
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watchMemory); else watchMemory();
   window.FipiMix = { filter, next, at, commit, markDone, countLabel, sourceText, mountFilter, injectCss };
 })();
