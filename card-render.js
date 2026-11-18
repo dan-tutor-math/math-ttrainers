@@ -17,6 +17,7 @@
        opts.source   — подпись источника под условием (по умолчанию нет)
        opts.answer   — строка «Ответ: …» (для учителя / ключа)
        opts.solution — разбор
+       opts.root     — путь к корню сайта для аудио ('' по умолчанию)
        opts.print    — печать: чёрный текст, без фона, рисунок не рвётся листом
      CardRender.ready(cards, opts) → Promise: подгружает KaTeX, если он нужен
        карточкам и его нет на странице (opts.root — путь к корню сайта, '' )
@@ -49,6 +50,8 @@
 .cr-opt{display:flex;gap:.6em;align-items:flex-start;}
 .cr-text>.cr-opts{margin-bottom:.7em;}
 .cr-optn{font-weight:700;flex:0 0 auto;}
+.cr-audio{display:block;width:100%;margin:0 0 .7em;}
+.cr-crit{margin-top:.6em;font-size:.92em;}
 .cr-src{font-size:.7em;color:var(--card-muted,#6e6e73);margin-top:.7em;}
 .cr-ans{margin-top:.7em;}
 .cr-sol{margin-top:.8em;padding-top:.6em;border-top:1px solid var(--card-line,rgba(127,127,127,.35));}
@@ -119,6 +122,14 @@
     root.className = 'cr' + (opts.print ? ' cr-print' : '');
     root.dataset.card = card.id;
 
+    // аудиозапись (английский): плеер перед условием, файл — по пути от корня сайта (opts.root)
+    if (!opts.print) (card.audio || []).forEach(a => {
+      const au = document.createElement('audio');
+      au.className = 'cr-audio'; au.controls = true; au.preload = 'none';
+      au.src = (opts.root || '') + a;
+      root.appendChild(au);
+    });
+
     // условие: метки [[fig:k]] / [[table:k]] → заглушки, после разметки — настоящие узлы
     const text = document.createElement('div');
     text.className = 'cr-text';
@@ -178,6 +189,13 @@
       if (card.answer.kind === 'long') a.querySelector('b').outerHTML = '<div>' + rich(card.answer.value, card) + '</div>';
       else a.querySelector('b').textContent = card.answer.value;
       root.appendChild(a);
+      // критерии оценивания развёрнутого ответа (письмо, устная часть)
+      if (card.answer.criteria) {
+        const c = document.createElement('div');
+        c.className = 'cr-crit';
+        c.innerHTML = '<b>Критерии</b>' + rich(card.answer.criteria, card);
+        root.appendChild(c);
+      }
     }
     if (opts.solution && card.solution) {
       const s = document.createElement('div');
