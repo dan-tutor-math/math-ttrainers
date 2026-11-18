@@ -207,6 +207,10 @@ def check_card(c, check_files=True):
                 with Image.open(path) as im:
                     if (im.width, im.height) != (f["w"], f["h"]):
                         errs.append(f"рисунок {f['file']}: {im.width}×{im.height}, а в карточке {f['w']}×{f['h']}")
+        for a in c.get("audio") or []:
+            path = os.path.join(ROOT, a)
+            if not os.path.isfile(path) or os.path.getsize(path) == 0:
+                errs.append(f"аудио {a}: файла нет или он пустой")
     return errs
 
 
