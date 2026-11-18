@@ -421,6 +421,9 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .add-qty-btn:active{transform:scale(.92)}
 .tasks-columns{display:grid;grid-auto-flow:column;gap:14px;align-items:start;}
 .work-zone{position:relative;left:50%;transform:translateX(-50%);max-width:calc(100vw - 24px);width:var(--work-w, 100%);}
+/* не уже ряда режимов: ширина из памяти читается, пока экран задания скрыт, и
+   JS-проверка (clampWorkW) тогда ещё не знает ширину ряда */
+.work-zone{min-width:100%;}
 .work-resize-handle{position:absolute;top:0;bottom:0;width:10px;cursor:ew-resize;touch-action:none;z-index:5;}
 .work-resize-handle.left{left:0;}
 .work-resize-handle.right{right:0;}
@@ -2768,8 +2771,12 @@ function workZoneBaseW(){
   } catch (e) { return 0; }
 }
 function clampWorkW(w){
-  const min = 380;
+  // Зону можно только расширить: уже ряда «Обучение … Нулевые и отрицательные
+  // степени» (ширина по умолчанию) она не бывает. Иначе старая ширина из
+  // localStorage или с узкого экрана собеседника (state.workW) сжимала
+  // условие посередине, а ряд режимов торчал по бокам
   let max = window.innerWidth - 24;
+  const min = Math.min(Math.max(380, workZoneBaseW()), max);
   try {
     const kp = document.getElementById('keypadFloat');
     if (kp && getComputedStyle(kp).display !== 'none') {
@@ -3009,8 +3016,10 @@ function tsApplyState(state){
   // если она реально отличается (иначе на каждый push() дёргали бы CSS зря)
   if (state.workW) {
     const curW = parseFloat(getComputedStyle(els.workZone).width);
-    if (Math.abs(curW - state.workW) > 1) {
-      const w = clampWorkW(state.workW);
+    const w = clampWorkW(state.workW);
+    // сравниваем с уже обрезанной шириной: узкая ширина собеседника
+    // поднимается до нашей, и без этого перерисовка шла бы на каждый push()
+    if (Math.abs(curW - w) > 1) {
       els.workZone.style.setProperty('--work-w', w + 'px');
       try { localStorage.setItem(WORK_W_KEY, String(w)); } catch(e){}
       setTimeout(forceRepaintWorkArea, 30);

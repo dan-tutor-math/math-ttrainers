@@ -1,6 +1,7 @@
 /* Экран задания в тренажёрах ОГЭ математики — как в русском и обществознании
    (задача 54 в планы.md):
-   - «◀ Предыдущее задание / Следующее задание ▶» рядом с кнопками типов;
+   - «◀ тема · задание N ▶»: стрелки заданий по бокам темы (#taskTitle),
+     кнопки типов короткие — «◀ Тип / Тип ▶»;
    - «Все типы» в левом верхнем углу под «Все задания» (как в oge1_5.html).
 
    Страница зовёт:
@@ -27,7 +28,7 @@
   const LIMIT = 30;                       // глубина истории одного типа
   const IS_CARD = new URLSearchParams(location.search).get('card') === '1';
   const hist = Object.create(null);       // тип → { list: [копии], pos }
-  let opts = null, prevBtn = null, nextBtn = null, pending = null, restoring = false;
+  let opts = null, prevBtn = null, nextBtn = null, countEl = null, pending = null, restoring = false;
 
   const copy = t => JSON.parse(JSON.stringify(t));
   const ok = t => !!t && typeof t === 'object';
@@ -85,6 +86,9 @@
     const on = (!refresh || refresh.style.display !== 'none') && (!opts.enabled || opts.enabled());
     prevBtn.style.display = nextBtn.style.display = on ? 'inline-flex' : 'none';
     prevBtn.disabled = rec().pos <= 0;
+    // счётчик — номер задания в истории этого типа (общего числа нет:
+    // задания генерируются); до первого перехода — «задание 1»
+    if (countEl) countEl.textContent = on ? 'задание ' + (Math.max(rec().pos, 0) + 1) : '';
   }
 
   const ICON_HOME = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l-5-5 5-5"/><path d="M11 12h10"/></svg>';
@@ -101,15 +105,22 @@
   .corner-nav{position:relative;top:0;left:0;z-index:3;width:max-content;max-width:100%;grid-auto-flow:column;grid-auto-columns:1fr;justify-content:start;margin:0 0 12px;}
 }
 @media(max-width:599px){.corner-nav{grid-auto-flow:row;grid-auto-columns:auto}}
-/* На широком экране используем место слева от условия. Правый край
-   шапки остаётся на месте, чтобы не попасть под плавающую клавиатуру. */
-@media(min-width:1240px){
-  #taskArea .task-head:has(#tnNextTask){margin-inline:-152px 0;flex-wrap:nowrap;}
-  #taskArea .type-nav:has(#tnNextTask){flex:none;column-gap:6px;}
-  #taskArea .type-nav:has(#tnNextTask) .type-nav-btn{padding-inline:7px;}
-  #taskArea .task-head:has(#tnNextTask) .corner{min-width:0;flex-wrap:nowrap;column-gap:6px;}
-  #taskArea .task-head:has(#tnNextTask) .task-title{min-width:0;overflow-wrap:anywhere;}
-}
+/* Шапка задания — ровно по ширине условия (раньше на широком экране она
+   уезжала влево за край карточки). Слева — типы, справа — «◀ тема ▶». */
+/* Две строки: типы — по левому краю условия; «◀ тема ▶» — отдельной строкой
+   по центру (в одну строку с типами длинная тема не влезает и переносилась
+   как попало), 📥 ⟳ — у правого края */
+#taskArea .task-head:has(#tnPager){justify-content:flex-start;}
+#taskArea .task-head:has(#tnPager) .corner{flex:1 1 100%;flex-wrap:nowrap;gap:6px;min-width:0;}
+#taskArea .task-head:has(#tnPager) .tn-pager{margin-inline:auto;}
+.tn-pager{display:flex;align-items:center;gap:6px;min-width:0;}
+.tn-pager .tn-arrow{width:28px;padding:0;flex:none;}
+.tn-topic{display:flex;align-items:baseline;gap:8px;min-width:0;}
+.tn-topic .task-title{min-width:0;}
+.tn-count{font-family:var(--font-ui);font-weight:500;font-size:12px;color:var(--muted-6, var(--muted-3));white-space:nowrap;}
+.tn-count:empty{display:none}
+/* на компьютере тема в одну строку */
+@media(min-width:1024px){.tn-topic .task-title{white-space:nowrap;}}
 .type-nav-btn:disabled{opacity:.45;cursor:default;transform:none}
 .type-nav-btn:disabled:hover{border-color:var(--glass-border)}
 `;
@@ -158,19 +169,42 @@
     const row = document.querySelector('#taskArea .type-nav');
     if (!row) return;
     injectCss();
+    // «◀ Тип / Тип ▶» — коротко: рядом стоит тема, и так ясно, что листаем типы
+    const pt = document.getElementById('prevTypeBtn'), nt = document.getElementById('nextTypeBtn');
+    if (pt) pt.textContent = '◀ Тип';
+    if (nt) nt.textContent = 'Тип ▶';
     prevBtn = document.createElement('button');
     prevBtn.type = 'button';
-    prevBtn.className = 'type-nav-btn';
+    prevBtn.className = 'type-nav-btn tn-arrow';
     prevBtn.id = 'tnPrevTask';
     prevBtn.title = 'Предыдущее задание этого типа';
-    prevBtn.textContent = '◀ Предыдущее задание';
+    prevBtn.setAttribute('aria-label', 'Предыдущее задание');
+    prevBtn.textContent = '◀';
     nextBtn = document.createElement('button');
     nextBtn.type = 'button';
-    nextBtn.className = 'type-nav-btn';
+    nextBtn.className = 'type-nav-btn tn-arrow';
     nextBtn.id = 'tnNextTask';
     nextBtn.title = 'Следующее задание этого типа';
-    nextBtn.textContent = 'Следующее задание ▶';
-    row.append(prevBtn, nextBtn);
+    nextBtn.setAttribute('aria-label', 'Следующее задание');
+    nextBtn.textContent = '▶';
+    countEl = document.createElement('span');
+    countEl.className = 'tn-count';
+    countEl.id = 'tnCount';
+    // стрелки — по бокам темы, как «◀ Задание 1 из 80 ▶» в русском;
+    // #taskTitle переносим целиком (страница пишет в него по id)
+    const title = document.querySelector('#taskArea .task-head #taskTitle');
+    if (title) {
+      const pager = document.createElement('div');
+      pager.className = 'tn-pager';
+      pager.id = 'tnPager';
+      const topic = document.createElement('div');
+      topic.className = 'tn-topic';
+      title.before(pager);
+      topic.append(title, countEl);
+      pager.append(prevBtn, topic, nextBtn);
+    } else {
+      row.append(prevBtn, nextBtn);
+    }
     prevBtn.addEventListener('click', guard(() => go(-1)));
     nextBtn.addEventListener('click', guard(() => go(1)));
     // ⟳ и «Следующий пример →» дают новое задание мимо пары — до их

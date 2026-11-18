@@ -7,8 +7,10 @@
   const styles = `
     .rp-trigger{padding:0;touch-action:manipulation;user-select:none;-webkit-user-select:none;}
     .rp-trigger svg{width:20px;height:20px;}
-    /* 208px — следующий ряд после темы, доски, фокуса и клавиатуры. */
-    .theme-toggle.rp-trigger{top:208px;}
+    /* 160px — ряд сразу под фокусом; клавиатура (её кнопка и само окно) уходит
+       на ряд ниже (.rp-kp-low), иначе открытая клавиатура накрывает книжку. */
+    .theme-toggle.rp-trigger{top:160px;}
+    .rp-kp-low{top:208px;}  /* без !important: перетащенная клавиатура (top в style) главнее */
     .rp-dialog{box-sizing:border-box;inset:16px 0 66px;margin:auto;width:min(820px,calc(100% - 32px));max-width:none;
       height:min(780px,calc(100dvh - 82px));max-height:none;
       padding:0;border:1px solid var(--glass-border,#cfd7e0);border-radius:20px;color:var(--pencil,#17263b);
@@ -133,6 +135,26 @@
     trigger.id = 'ogeReferenceToggle';
     trigger.classList.add('theme-toggle');
     board.after(trigger);
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', lowerKeypad);
+    else lowerKeypad();
+  }
+
+  /* Клавиатура на широком экране висит справа сверху на 160px — ровно там, где
+     теперь книжка. Сдвигаем вниз только в этом положении: на узком экране
+     страница сама уводит клавиатуру к нижнему краю (порог у страниц разный —
+     720 или 1250px, поэтому проверяем по факту, а не своим media), а
+     перетащенную рукой (top в style) не трогаем. */
+  function lowerKeypad() {
+    const els = ['keypadFloat', 'kpToggle'].map(id => document.getElementById(id)).filter(Boolean);
+    if (!els.length) return;
+    const place = () => els.forEach(el => {
+      el.classList.remove('rp-kp-low');
+      if (el.style.top) return;
+      if (Math.round(parseFloat(getComputedStyle(el).top)) === 160) el.classList.add('rp-kp-low');
+    });
+    place();
+    let t = 0;
+    window.addEventListener('resize', () => { clearTimeout(t); t = setTimeout(place, 80); });
   }
 
   window.ReferencePanel = { button, open, images, mountTrainer };

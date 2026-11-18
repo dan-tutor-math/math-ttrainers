@@ -207,7 +207,14 @@ def test_wide(browser):
         page.click(f'.mode-card[data-id="{card}"]')
         page.wait_for_timeout(500)
         h = page.eval_on_selector('#taskArea .task-head', 'e => e.getBoundingClientRect().height')
-        check(f"широкий экран, {slug}: шапка задания в одну строку", h < 50, str(h))
+        # с 18.11 у страниц на task-nav.js шапка осознанно в две строки:
+        # типы, ниже «◀ тема ▶» (тема — в одну строку)
+        two = page.evaluate("!!document.getElementById('tnPager')")
+        if two:
+            th = page.eval_on_selector('#taskTitle', 'e => e.getBoundingClientRect().height')
+            check(f"широкий экран, {slug}: шапка в две строки, тема без переноса", h < 80 and th < 26, f"{h} / {th}")
+        else:
+            check(f"широкий экран, {slug}: шапка задания в одну строку", h < 50, str(h))
         ctx.close()
 
 
