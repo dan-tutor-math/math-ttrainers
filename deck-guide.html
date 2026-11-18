@@ -154,5 +154,6 @@ themeBtn.onclick = () => applyTheme(curTheme() === 'dark' ? 'light' : 'dark', tr
 // тему сменили в соседней вкладке (на досках) — гайд следом
 addEventListener('storage', (e) => { if (e.key === 'theme' && (e.newValue === 'dark' || e.newValue === 'light')) applyTheme(e.newValue, false); });
 </script>
+<script src="student-memory.js" data-group-only></script>
 </body>
 </html>

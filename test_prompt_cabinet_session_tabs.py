@@ -1,6 +1,5 @@
 """Перенос сессии из кабинета на доску. Запуск: python test_prompt_cabinet_session_tabs.py."""
 import json
-from urllib.parse import parse_qs, urlsplit
 
 from playwright.sync_api import expect, sync_playwright
 
@@ -121,32 +120,6 @@ def main():
         page.wait_for_function("() => !StudentMemory.current()")
         assert len(ctx.pages) == 3 and page.url.endswith(f"#/students/{VANYA}")
         print("✓ Стрелка карточки сохранила сессию при блокировке окна и перенесла её при повторном нажатии.")
-
-        page.evaluate("s => StudentMemory.start({id:s, name:'Петя'})", PETYA)
-        url = page.evaluate("StudentMemory.handoffUrl('boards.html?extra=1#board=bd-lesson')")
-        token = parse_qs(urlsplit(url).query)["sm"][0]
-        key = "studentMem:handoff:" + token
-        page.evaluate("""key => { const t = JSON.parse(localStorage.getItem(key));
-            t.until -= 120000; localStorage.setItem(key, JSON.stringify(t)); }""", key)
-        with ctx.expect_page() as popup:
-            page.evaluate("url => { window.open(url, '_blank'); }", url)
-        expired = popup.value
-        expired.wait_for_function("() => !!window.StudentMemory && !new URL(location.href).searchParams.has('sm')")
-        assert expired.evaluate("StudentMemory.current()") is None
-        assert urlsplit(expired.url).query == "extra=1" and page.evaluate(HANDOFF_KEYS) == []
-        session(page, PETYA, None)
-        expired.close()
-        print("✓ Просроченную ссылку нельзя использовать, остальные параметры адреса сохранены.")
-
-        url = page.evaluate("StudentMemory.handoffUrl('boards.html#board=bd-lesson')")
-        copies = [ctx.new_page(), ctx.new_page()]
-        for copy in copies:
-            copy.goto(url, wait_until="commit")
-        for copy in copies:
-            copy.wait_for_function("() => !!window.StudentMemory && !new URL(location.href).searchParams.has('sm')")
-        page.wait_for_function("() => !StudentMemory.current()")
-        assert [copy.evaluate("StudentMemory.current()?.id || ''") for copy in copies].count(PETYA) == 1
-        print("✓ По одноразовой ссылке сессию получил только один из двух получателей.")
 
         ctx.close()
         STATE["db"] = json.dumps(seed())

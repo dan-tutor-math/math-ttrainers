@@ -537,7 +537,7 @@
   // конспект — отдельная вкладка: тренажёр с заданием и записями остаётся
   // открытым, а повторное нажатие попадает в ту же вкладку, а не плодит новые
   function openNotes(href) {
-    const w = window.open(href, 'mathhNotes');
+    const w = window.open(window.StudentMemory?.handoffUrl(href) || href, 'mathhNotes');
     if (!w) location.href = href;
   }
   function plural(n, a, b, c) { const m10 = n % 10, m100 = n % 100; return m10 === 1 && m100 !== 11 ? a : (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? b : c); }

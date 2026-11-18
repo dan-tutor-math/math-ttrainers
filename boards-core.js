@@ -2700,7 +2700,8 @@ function blOpenSelectedInTabs(){
   const blocked = [];
   ids.forEach(id => {
     let w = null;
-    try { w = window.open(base + '#board=' + encodeURIComponent(id), '_blank'); } catch (e) {}
+    const href = base + '#board=' + encodeURIComponent(id);
+    try { w = window.open(window.StudentMemory?.handoffUrl(href) || href, '_blank'); } catch (e) {}
     if (!w) { blocked.push(id); return; }
     // не 'noopener' в самом window.open: с ним он всегда возвращает null, и
     // заблокированную вкладку было бы не отличить от открытой
@@ -8298,7 +8299,8 @@ document.getElementById('linkChangeCode').addEventListener('click', () => { if (
 function openPanelElsewhere(asWindow){
   if (!boardLink) return;
   boardLink.linkLocalPanel();
-  const url = boardLinkPanelUrl('');
+  const href = boardLinkPanelUrl('');
+  const url = window.StudentMemory?.handoffUrl(href) || href;
   // окно — компьютерного размера: на широком панель показывает тренажёр
   // «по-компьютерному» (boards-panel.html, DESKTOP_MIN_W)
   if (asWindow) window.open(url, 'bdTrainersPanelWin', 'popup=yes,width=1100,height=900');

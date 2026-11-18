@@ -1731,7 +1731,7 @@
     else if (t.id === 'spSession') toggleSession(l);
     else if (t.id === 'spSessionBoard'){
       const s = st.byId[panel.sid];
-      if (s) api.startOnBoard(s, lessonBoard(l, s), l.id);
+      if (s) api.startOnBoard(s, lessonBoard(l, s), l.id, dayText(l.day) + ', ' + timeText(l));
     }
   }
   /* «Закрепить доску»: вместо серой кнопки — список досок преподавателя;
@@ -1773,7 +1773,7 @@
     const btn = panel.el.querySelector('#spSession');
     if (btn) btn.disabled = true;
     let ok = false;
-    try { await SM.start({ id: s.id, name: s.name }, { lessonId: l.id }); ok = true; }
+    try { await SM.start({ id: s.id, name: s.name }, { lessonId: l.id, lessonLabel: dayText(l.day) + ', ' + timeText(l) }); ok = true; }
     catch (er) { api.toast('Сессия не началась: ' + (er.message || er)); }
     paintPanel();
     // настройка «переходить на главную»: сессия уже идёт, там висит «Отменить»

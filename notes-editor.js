@@ -933,11 +933,19 @@
   /* ── «Сохранить как доску» ── */
   async function saveAsBoard() {
     if (!pages.length) { toast('В конспекте нет страниц'); return; }
-    commitText(); await flushSave();
-    const board = NS.boardFromSession(session, pages);
-    await NS.putOutbox({ id: board.id, board, createdAt: Date.now() });
-    const href = 'boards.html#board=' + encodeURIComponent(board.id);
-    const w = window.open(href, '_blank');
+    // До записи в IndexedDB щелчок ещё разрешает открытие окна.
+    const w = window.open('about:blank', '_blank');
+    let board;
+    try {
+      commitText(); await flushSave();
+      board = NS.boardFromSession(session, pages);
+      await NS.putOutbox({ id: board.id, board, createdAt: Date.now() });
+      const href = new URL('boards.html#board=' + encodeURIComponent(board.id), location.href).href;
+      if (w && !w.closed) w.location.replace(window.StudentMemory?.handoffUrl(href) || href);
+    } catch (err) {
+      if (w && !w.closed) w.close();
+      toast('Не удалось сохранить доску'); return;
+    }
     toast(w ? 'Доска создаётся во вкладке досок' : 'Доска сохранена — откройте «Доски»');
     window.__lastBoardId = board.id;   // для теста
   }

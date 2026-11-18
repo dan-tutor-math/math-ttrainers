@@ -455,14 +455,14 @@ document.addEventListener('click', e => {
   e.preventDefault();
   openBoardTab(decodeURIComponent(link.hash.slice('#board='.length)));
 });
-async function startOnBoard(s, board, lessonId){
+async function startOnBoard(s, board, lessonId, lessonLabel){
   if (!board || s.archived_at) return;
   const SM = window.StudentMemory, cur = SM.current();
   const mine = cur && cur.id === String(s.id) && (!lessonId || cur.lessonId === lessonId);
   try {
     // start сразу ставит ученика, затем асинхронно загружает журнал.
     // Доску открываем, пока браузер ещё обрабатывает нажатие.
-    const started = mine ? null : SM.start(s, { lessonId });
+    const started = mine ? null : SM.start(s, { lessonId, lessonLabel });
     openBoardTab(board);
     await started;
   } catch (e) { toast('Сессия не началась: ' + e.message); }
