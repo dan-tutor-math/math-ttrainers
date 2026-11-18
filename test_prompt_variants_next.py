@@ -48,7 +48,9 @@ def idle(page, timeout=180000):
 # места, номера ФИПИ и готовность заданий по вариантам
 VARS = """() => window.__works.E.variants.map(v => v.blocks.map(b => ({ id: b.id, key: b.series ? b.series.key : null,
   pos: b.series ? b.series.pos : null, fipi: b.series ? b.series.fipi : null, total: b.series ? b.series.total : null,
-  img: !!(b.img && b.img.light && b.img.light.url), url: b.img && b.img.light ? b.img.light.url : null, gen: b._gen || null })))"""
+  // задание создано: снимок с картинкой или карточка ФИПИ (задача 63, у карточки картинок нет)
+  img: !!(b.img && b.img.light && b.img.light.url) || b.type === 'card', url: b.img && b.img.light ? b.img.light.url : null,
+  card: b.card || null, gen: b._gen || null })))"""
 
 # заглушка памяти ученика: подменяем методы в момент, когда student-memory.js кладёт модуль
 STUB_SM = """(() => {
@@ -90,6 +92,13 @@ def save(page, title):
     page.click("#wkSave")
     page.wait_for_function("() => document.getElementById('wkSaved').textContent.indexOf('Сохранено ') === 0", timeout=120000)
     return page.evaluate("() => window.__works.E.id")
+
+
+def same_single(x, saved):
+    """то же задание: у снимка — та же картинка, у карточки ФИПИ — та же карточка"""
+    if saved.get("type") == "card":
+        return x["card"] == saved.get("card")
+    return x["url"] == saved["img"]["light"]["url"]
 
 
 def run():
@@ -187,7 +196,7 @@ def run():
               and tp.evaluate("() => location.hash") == "#/new" and tp.evaluate("() => window.__works.E.dirty"))
         check("D2 группа сдвинута на следующие 2: места 2, 3", [b["pos"] for b in after[:2]] == [2, 3], str([b["pos"] for b in after]))
         check("D3 одиночное задание то же (id и картинка)", len(after) == 3 and after[2]["id"] == "tsingle1" and after[2]["key"] is None
-              and after[2]["url"] == [b for b in db()["work_variants"] if b["work_id"] == wid_b][0]["blocks"][2]["img"]["light"]["url"],
+              and same_single(after[2], [b for b in db()["work_variants"] if b["work_id"] == wid_b][0]["blocks"][2]),
               json.dumps(after, ensure_ascii=False)[:300])
         check("D4 в базе по-прежнему одна «Работа Б»", len([w for w in db()["works"] if w["title"].startswith("Работа Б")]) == 1)
         tp.evaluate("() => { window.__works.E.dirty = false; }")

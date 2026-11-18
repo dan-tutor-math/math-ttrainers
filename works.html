@@ -88,6 +88,11 @@ body.editing .corner-btn{position:absolute;}
 .ti-num{font-weight:700;color:var(--muted-2);text-align:center;padding-top:4px;}
 .ti-img{border-radius:10px;overflow:hidden;background:var(--glass);}
 .ti-img img{display:block;max-width:100%;max-height:130px;margin:0 auto;}   /* превью поменьше — меньше листать при проверке */
+/* карточка ФИПИ в превью: текстом, мельче, той же высоты, что снимок (длинное условие обрезается) */
+.ti-card{padding:10px 14px;min-height:60px;max-height:190px;overflow:hidden;--card-size:14.5px;--card-muted:var(--muted-2);}
+.ti-card .cr-fig{max-width:240px!important;margin:.4em auto .1em;}
+.ti-card .cr-fig img{max-height:120px;width:auto;}
+.rv-cardbox{padding:16px 18px;border:1.5px solid var(--glass-border);border-radius:14px;--card-muted:var(--muted-2);}
 .ti-theory{font-size:12px;color:var(--ink);font-weight:600;margin-top:6px;}
 .add-pos{display:flex;gap:2px;padding:3px;border-radius:12px;background:var(--glass);border:1px solid var(--glass-border);flex:0 0 auto;}
 .add-pos button{font-family:var(--font-ui);font-weight:700;font-size:13px;color:var(--muted-3);background:none;border:none;border-radius:9px;padding:0 9px;cursor:pointer;}
@@ -551,6 +556,7 @@ html.rv-on{overflow:hidden;}
 <script src="exam-spec.js"></script>
 <script src="blank-forms.js"></script>
 <script src="work-print.js"></script>
+<script src="card-render.js"></script>
 <script src="variant-set.js"></script>
 <script src="video-links.js"></script>
 <script src="video-player.js"></script>
@@ -601,7 +607,10 @@ function trainerName(tid){
    запись из video-links.js уберут. from/to — отрывок (глава): учитель даёт
    не весь часовой разбор, а только нужное задание. Ответа у видео нет; что
    ученик посмотрел, пишется той же work_save_answer (works-schema.sql). */
-const isTask = b => (b.type || 'task') === 'task';
+// задание — снимок тренажёра (task) или карточка ФИПИ (card, задача 63): у обоих
+// ответ и проверка одинаковые (поле task), отличается только, как рисуется условие
+const isTask = b => { const t = b.type || 'task'; return t === 'task' || t === 'card'; };
+const isCard = b => !!b && b.type === 'card';
 const isVideo = b => !!b && b.type === 'video';
 function platformVideos(){
   const db = window.VIDEO_LINKS;
@@ -1012,10 +1021,13 @@ function taskRow(b, i, tasks, isMaster, num, inSeries){
     else if (b._up && !inSeries) note = '<div class="ti-up">Картинка ещё загружается…</div>';
     if (b.theory) note = '<div class="ti-theory">📘 с теорией к заданию</div>' + note;
     if (b.series && !busy) note += seriesSrcNote(b, inSeries);
-    el.innerHTML = '<div class="ti-num">' + num + '</div><div><div class="ti-img">' + (im.url ? '<img alt="Задание ' + num + '">' : '<div class="ti-ph">' + (busy ? 'Создаётся…' : 'Нет картинки') + '</div>') + '</div>'
+    const cardUi = isCard(b) && !busy;
+    el.innerHTML = '<div class="ti-num">' + num + '</div><div><div class="ti-img">' + (cardUi ? '<div class="ti-card" title="Карточка ФИПИ — условие текстом, без снимка"></div>'
+      : im.url ? '<img alt="Задание ' + num + '">' : '<div class="ti-ph">' + (busy ? 'Создаётся…' : 'Нет картинки') + '</div>') + '</div>'
       + '<div class="ti-row"><span class="ti-name">' + esc(b.name || trainerName(b.tid)) + '</span>' + modeUi + posUi
       + '<div class="ti-btns">' + btns + '</div></div>' + note + '</div>';
-    const img = el.querySelector('img');
+    if (cardUi) fillCardBox(el.querySelector('.ti-card'), b);
+    const img = cardUi ? null : el.querySelector('.ti-img img');
     if (img){
       // место под превью резервируем по размеру снимка (max-height 130 из CSS):
       // пока картинка не загрузилась, карточка не 0 px высотой, и длина листа
@@ -1336,6 +1348,12 @@ async function shootBlock(win, tid, href, el, info){
   // вёрстка задания для перестройки на доске здесь не нужна, а весит до 300 КБ
   if (gen) delete gen.html;
   const exact = exactSnap(win, el);
+  // задание банка ФИПИ, для которого есть карточка, — блок-карточка вместо снимка
+  // (пачка «N за раз», «другие числа»): тот же текст, но без картинок на ~200 КБ.
+  // gen и exact остаются — по ним «⟳» и сверка повторов в пачке работают как раньше
+  const tkey = trainerTaskKey(win, tid, gen);
+  const card = await cardByKey(href, tkey, info).catch(() => null);
+  if (card) return Object.assign(cardParts(card, tid, href), { gen, exact, tkey });
   const w0 = el.getBoundingClientRect().width;
   // строку ответа у столбиков доска ставит справа от записи (снизу учитель
   // решает ручкой); в работе её смотрят с телефона, и карточка стала бы шире
@@ -1344,7 +1362,7 @@ async function shootBlock(win, tid, href, el, info){
   const L = shots.light;
   return {
     tid, href, gen, exact,
-    tkey: trainerTaskKey(win, tid, gen),   // ключ задания для журнала кабинета (task-key.js)
+    tkey,   // ключ задания для журнала кабинета (task-key.js)
     live: liveOf(el, exact),
     task: Object.assign({}, info),
     hot: L.hot ? { w: L.hot.w, h: L.hot.h, fields: L.hot.fields, opts: L.hot.opts, check: L.hot.check, checkText: L.hot.checkText || null, style: { font: (L.hot.style || {}).font || null } } : null,
@@ -1617,7 +1635,7 @@ function regenInto(b, recipe, compareWith){
   const p = fresh().then(parts => {
     // старая картинка ещё могла грузиться — её загрузка больше не нужна
     uploads.delete(b.id);
-    const keep = { id: b.id, src: b.src, type: 'task', mode: b.mode, name: b.name };
+    const keep = { id: b.id, src: b.src, type: parts.type || 'task', mode: b.mode, name: b.name };
     Object.keys(b).forEach(k => delete b[k]);
     Object.assign(b, parts, keep);
     // других чисел нет (Демоверсия, номер ЕГЭ с одним прототипом) — честно
@@ -1727,7 +1745,105 @@ function plainTitle(html){
   });
   return d.textContent.replace(/\s+/g, ' ').trim();
 }
-// каталог прототипов тренажёра — из невидимого кадра, один раз на tid|n
+/* ── карточки ФИПИ (задача 63, S3) ──
+   Задание ФИПИ, для которого собрана карточка (cards/<slug>.json, схема
+   cards/_schema.json), встаёт в работу блоком type:'card' — ссылкой на id
+   карточки, без кадра тренажёра и без снимка: полный вариант ОГЭ открывал
+   ~36 страниц по 10–17 МБ и весил ~5 МБ картинок. Формат блока — memory/works.md.
+   Файл карточек — один на страницу-экзамен, грузится лениво при первом
+   обращении и кэшируется на всю сессию; нет файла (наши генераторы, ещё не
+   собранные семьи) — путь как раньше, кадр и снимок. Карточка берётся, только
+   если её номер ФИПИ совпадает с номером на этом месте каталога: банк
+   перевыгрузят — сдвинутое место не подменится чужим заданием. */
+const cardFiles = new Map();   // slug → Promise<{ slug, at: Map proto|pos → [карточки], byId } | null>
+const slugOfHref = href => String(href || '').split('?')[0].split('#')[0].replace(/^.*\//, '').replace(/\.html$/, '');
+function cardsOf(slug){
+  if (!slug) return Promise.resolve(null);
+  if (!cardFiles.has(slug)){
+    const p = fetch('cards/' + slug + '.json', { cache: 'no-cache' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (!d || d.v !== 1 || !Array.isArray(d.cards) || !d.cards.length) return null;
+        const at = new Map(), byId = new Map();
+        d.cards.forEach(c => {
+          const k = c.proto + '|' + c.pos;
+          if (!at.has(k)) at.set(k, []);
+          at.get(k).push(c);
+          byId.set(c.id, c);
+        });
+        return { slug, at, byId, partial: !!d.partial };
+      })
+      // сбой сети не должен ломать сборку: без карточек — старый путь через кадр
+      .catch(() => null);
+    cardFiles.set(slug, p);
+  }
+  return cardFiles.get(slug);
+}
+const sameFipi = (a, b) => !!a && !!b && String(a).toUpperCase() === String(b).toUpperCase();
+// карточка для места группы at = { proto, pos, n } или null
+async function cardFor(href, at){
+  const cs = await cardsOf(slugOfHref(href));
+  if (!cs) return null;
+  const list = cs.at.get(at.proto + '|' + at.pos) || [];
+  const c = list.find(x => at.n == null || x.n === Number(at.n));
+  if (!c) return null;
+  const units = await catalogOf(href, at.n);
+  const u = (units || []).find(x => x.id === at.proto);
+  const f = u && (u.fipi || [])[at.pos];
+  return sameFipi(f, c.id.replace(/^fipi:/, '')) ? c : null;
+}
+// карточка по ключу задания fipi:<экзамен>:<номер> (кадр уже открыт: пачка, «другие числа»)
+async function cardByKey(href, tkey, info){
+  const m = /^fipi:[a-z]+:([0-9A-Za-z]+)$/.exec(tkey || '');
+  if (!m) return null;
+  const cs = await cardsOf(slugOfHref(href));
+  const c = cs && cs.byId.get('fipi:' + m[1]);
+  // ответ карточки снят тем же trainerTaskInfo: не совпал — на экране не то
+  // задание (например, наше «на основе ФИПИ» с номером задания-образца), берём снимок
+  return c && sameAnswer(c.answer, info) ? c : null;
+}
+function sameAnswer(a, info){
+  if (!a || !info || a.kind !== info.kind) return false;
+  if (a.kind === 'fields'){
+    const v = x => (x || []).map(f => String(f.value)).join('\u0001');
+    return (a.fields || []).length === (info.fields || []).length && v(a.fields) === v(info.fields);
+  }
+  if (a.kind === 'choice' || a.kind === 'multi') return a.n === info.n && JSON.stringify(a.correct) === JSON.stringify(info.correct);
+  return true;
+}
+// блок работы из карточки: task — ответ в том же виде, что у снимка (проверка та же)
+function cardParts(card, tid, href){
+  const a = card.answer || {}, task = {};
+  ['kind', 'fields', 'n', 'correct'].forEach(k => { if (a[k] !== undefined) task[k] = JSON.parse(JSON.stringify(a[k])); });
+  const fipi = card.id.replace(/^fipi:/, '');
+  let tkey = null;
+  try { tkey = window.TaskKey ? TaskKey.fromTask(card.slug, { fipi }) : null; } catch (e) {}
+  return { type: 'card', card: card.id, slug: card.slug, tid, href, task, tkey };
+}
+// место группы → блок-карточка: id, вариант-образец, режим, имя и группа остаются свои
+function applySeriesCard(b, card, at, tid, href){
+  uploads.delete(b.id);
+  const keep = { id: b.id, src: b.src, mode: b.mode, name: b.name, series: b.series };
+  Object.keys(b).forEach(k => delete b[k]);
+  Object.assign(b, cardParts(card, tid, href), keep);
+  if (b.src == null) delete b.src;
+  b.series = Object.assign({}, b.series, { pos: at.pos, fipi: card.id.replace(/^fipi:/, '') });
+}
+// условие карточки в превью редактора и в просмотре ответов (CardRender — общий
+// с учеником и печатью). Файл карточек ещё не загружен — догружаем и рисуем
+async function fillCardBox(box, b, opts){
+  const cs = await cardsOf(b.slug);
+  const c = cs && cs.byId.get(b.card);
+  if (!c){ box.innerHTML = '<div class="ti-ph">Карточка ' + esc(b.card || '') + ' не найдена</div>'; return; }
+  try { await CardRender.ready([c], { root: '' }); } catch (e) {}
+  box.innerHTML = '';
+  box.appendChild(CardRender.render(c, Object.assign({ base: 'cards/' }, opts || {})));
+}
+
+// каталог прототипов тренажёра — из невидимого кадра, один раз на tid|n.
+// У страницы с карточками — из catalog-index.json (тот же список, собран
+// с каталогов страниц): иначе ради списка пришлось бы открыть кадр, а
+// карточки как раз и нужны, чтобы кадров не открывать
 const catalogCache = new Map();
 function catalogOf(href, n){
   const k = href + '|' + n;
@@ -1741,8 +1857,16 @@ function catalogOf(href, n){
     // через общую очередь кадров (genQ): кадров не больше трёх, и новый кадр
     // каталога, открытый в обход очереди, выкидывал кадр, в котором как раз
     // снималось задание другого тренажёра, — «в тренажёре не нашлось задания»
-    const p = genQ.then(load, load);
-    genQ = p.catch(() => {});
+    const viaFrame = () => {
+      const p = genQ.then(load, load);
+      genQ = p.catch(() => {});
+      return p;
+    };
+    const p = cardsOf(slugOfHref(href)).then(cs => !cs ? viaFrame()
+      : catIndex().then(ix => {
+          const e = ix && ix[slugOfHref(href) + '|' + (n == null ? '' : n)];
+          return e && e.protos && e.protos.length ? e.protos : viaFrame();
+        }, viaFrame));
     catalogCache.set(k, p);
     p.catch(() => catalogCache.delete(k));
   }
@@ -1783,6 +1907,12 @@ async function seriesPump(){
 async function seriesRun(job){
   const { b, tid, href, at } = job;
   if (seriesTok.get(b.id) !== job.tok) return;   // уже поставлено другое место
+  // есть карточка ФИПИ на этом месте — без кадра и снимка
+  const card = await cardFor(href, at).catch(() => null);
+  if (card){
+    if (seriesTok.get(b.id) === job.tok) applySeriesCard(b, card, at, tid, href);
+    return;
+  }
   const ck = seriesKeyOf(tid, at.proto, at.pos);
   let hit = seriesCache.get(ck);
   if (!hit){
@@ -1809,12 +1939,14 @@ async function seriesRun(job){
 function applySeriesParts(b, hit, at){
   const { parts, res } = hit;
   uploads.delete(b.id);
-  const keep = { id: b.id, src: b.src, type: 'task', mode: b.mode, name: b.name, series: b.series };
+  // снимок мог оказаться карточкой (shootBlock нашёл её по номеру ФИПИ) — тип от снимка
+  const keep = { id: b.id, src: b.src, type: parts.type || 'task', mode: b.mode, name: b.name, series: b.series };
   Object.keys(b).forEach(k => delete b[k]);
   // картинки — общие с кэшем: загрузил один блок — у кэша тоже уже адрес, не data:
   const img = parts.img, theory = parts.theory;
   const copy = JSON.parse(JSON.stringify(Object.assign({}, parts, { img: null, theory: null })));
-  Object.assign(b, copy, keep, { img });
+  Object.assign(b, copy, keep);
+  if (img) b.img = img; else delete b.img;
   if (theory) b.theory = theory; else delete b.theory;
   b._up = Object.values(img || {}).some(x => x && /^data:/.test(x.url)) || !!(theory && Object.values(theory.img || {}).some(x => x && /^data:/.test(x.url)));
   if (!b._up) delete b._up;
@@ -2263,6 +2395,8 @@ const TCAP = () => (window.TaskCaptions && TaskCaptions.active()) ? window.TaskC
 function blockKey(b){
   if (!b) return null;
   if (b.tkey) return b.tkey;
+  // карточка ФИПИ: ключ однозначен по карточке (tkey мог не посчитаться, если task-key.js не загрузился)
+  if (isCard(b) && b.card && window.TaskKey) try { return TaskKey.fromTask(b.slug, { fipi: b.card.replace(/^fipi:/, '') }); } catch (e) {}
   try { return (window.TaskKey && b.gen) ? TaskKey.fromRecipe(b.gen) : null; } catch (e) { return null; }
 }
 function memCaption(b){
@@ -2600,6 +2734,8 @@ function rvPlace(e, r){
   e.style.width = (r.w * 100) + '%'; e.style.height = (r.h * 100) + '%';
 }
 function rvBox(b, a){
+  // карточка ФИПИ — условие текстом; ответ ученика и верный — строкой под ним (rv-ans)
+  if (isCard(b)){ const box = document.createElement('div'); box.className = 'rv-cardbox'; fillCardBox(box, b); return box; }
   const set = b.img || {}, im = set[curTheme()] || set.light || set.dark;
   if (!im || !im.url){ const no = document.createElement('div'); no.className = 'rv-noimg'; no.textContent = 'Картинки этого задания нет'; return no; }
   const t = b.task || {}, hot = b.hot || null;
