@@ -109,6 +109,7 @@ a.mode-card{text-decoration:none;box-sizing:border-box}
 .mode-card .mtitle{font-weight:600;font-size:15px;line-height:1.3;flex:1 1 260px;}
 .mode-card .msub{font-size:13px;font-weight:500;color:var(--muted-3);flex:1 1 100%;}
 .mode-card .mprog{font-size:13px;font-weight:600;color:var(--ok);}
+.mode-card .mprog.progress-pending{color:var(--muted-2);}
 .mode-card .mbad{font-size:13px;font-weight:600;color:var(--teacher);}
 .mode-card.all-card .mtitle{font-weight:700}
 .picker-head{display:flex;margin-bottom:4px}
@@ -279,6 +280,9 @@ a.mode-card{text-decoration:none;box-sizing:border-box}
 <script src="rus-oge-fipi.js"></script>
 <script src="exam-spec.js"></script>
 <script src="exam-nav.js"></script>
+<script src="task-key.js"></script>
+<script src="task-captions.js"></script>
+<script src="student-memory.js"></script>
 <script>
 (function(){
 'use strict';
@@ -317,9 +321,8 @@ const params = new URLSearchParams(location.search);
 // не подтвердил. Ученику по умолчанию — только подтверждённые: неверный ключ хуже,
 // чем меньше заданий.
 const SHOW_ALL = params.get('all') === '1';
-// Список номеров у ученика один — на главной (index.html, вкладка «Русский»). Свой
-// экран выбора номера у этой страницы остался только для предпросмотра ?all=1:
-// иначе «← все задания» вёл на вторую, похожую, но другую копию главной.
+// Без ученика сессии список номеров обычно на главной (вкладка «Русский»).
+// Локальный список нужен для предпросмотра и прогресса на уроке.
 const HOME = 'index.html?subject=rus';
 const POOL = {};
 DATA.tasks.forEach(t => {
@@ -398,7 +401,6 @@ function renderPicker(){
   let html = '<div class="section-title">Часть 2 — краткий ответ</div>';
   NUMS.forEach(m => {
     const list = POOL[m.n] || [];
-    const solved = list.filter(t => results[t.id] === 'ok').length;
     const all = DATA.tasks.filter(t => t.n === m.n).length;
     let sub;
     if (!list.length) sub = all ? `${all} заданий · ответы ещё сверяются с сайтом ФИПИ` : 'скоро';
@@ -407,7 +409,7 @@ function renderPicker(){
     if (list.length && tc) sub += ` · ${tc} ${plural(tc, 'тема', 'темы', 'тем')}`;
     html += `<button class="mode-card" data-n="${m.n}"${list.length ? '' : ' disabled'}>
       <span class="mtitle">№${m.n}. ${m.title}</span>
-      ${solved ? `<span class="mprog">✓ ${solved} из ${list.length}</span>` : ''}
+      ${progSpans(list, false)}
       <span class="msub">${sub}</span></button>`;
   });
   // №1 и №13 живут на своих страницах (там аудио или темы, черновик и образцы), отсюда — ссылки
@@ -434,13 +436,25 @@ function plural(k, one, few, many){
 // и есть подсказка репетитору, что повторять с учеником
 function tally(list){
   let ok = 0, bad = 0;
-  list.forEach(t => { if (results[t.id] === 'ok') ok++; else if (results[t.id] === 'bad') bad++; });
+  if (window.TaskCaptions?.active()) {
+    list.forEach(t => {
+      const s = TaskCaptions.summaryOf(TaskCaptions.keyOfTask(t));
+      if (s?.ok?.n) ok++;
+      else if (s?.bad?.n) bad++;
+    });
+  } else {
+    list.forEach(t => { if (results[t.id] === 'ok') ok++; else if (results[t.id] === 'bad') bad++; });
+  }
   return {ok, bad};
 }
-function progSpans(list){
+function progSpans(list, showBad = true){
+  if (window.TaskCaptions?.active()) {
+    const progress = TaskCaptions.progress(list.map(t => TaskCaptions.keyOfTask(t)));
+    return progress ? `<span class="mprog${progress.allDone ? '' : ' progress-pending'}">${progress.label}</span>` : '';
+  }
   const c = tally(list);
   return (c.ok ? `<span class="mprog">✓ ${c.ok} из ${list.length}</span>` : '') +
-    (c.bad ? `<span class="mbad">✗ ${c.bad}</span>` : '');
+    (showBad && c.bad ? `<span class="mbad">✗ ${c.bad}</span>` : '');
 }
 
 // ── Экран подтем номера ─────────────────────────────────────────────────────
@@ -723,13 +737,16 @@ function renderStats(){
   $('statOk').textContent = ok;
   $('statBad').textContent = bad;
   $('statDoneL').textContent = S.topic ? 'решено в теме' : 'решено в номере';
-  $('statDone').textContent = `${list.filter(t => results[t.id]).length} из ${list.length}`;
+  const done = window.TaskCaptions?.active() ? ok : list.filter(t => results[t.id]).length;
+  $('statDone').textContent = `${done} из ${list.length}`;
 }
 
 // ── Кнопки ──────────────────────────────────────────────────────────────────
 function goPicker(){
-  if (!SHOW_ALL) { location.href = HOME; return; }
+  const inSession = window.TaskCaptions?.active();
+  if (!SHOW_ALL && !inSession) { location.href = HOME; return; }
   S.screen = 'picker'; S.topic = null;
+  if (inSession) S.n = null;
   const url = new URL(location.href);
   url.searchParams.delete('n'); url.searchParams.delete('t'); url.searchParams.delete('tp');
   history.replaceState(null, '', url);
@@ -766,11 +783,17 @@ if (startN && (POOL[startN] || []).length) {
   if (!params.get('t') && topicsOf(startN).length) renderTopics(startN);
   else openNumber(startN, params.get('t'), params.get('tp'));
 }
-// в невидимом кадре конструктора вариантов (works.html) без номера — не уводить на
-// главную: кадру нужен каталог этой страницы, а не index.html
-else if (SHOW_ALL || window.parent !== window) renderPicker();
+// В сессии здесь доступны счётчики всех номеров. Кадру конструктора без
+// номера нужна эта же страница, чтобы получить каталог для вариантов.
+else if (SHOW_ALL || window.parent !== window || window.TaskCaptions?.active()) renderPicker();
 // старая закладка на rus_oge.html без номера — на главную, к номерам русского
 else location.replace(HOME);
+
+if (window.TaskCaptions) TaskCaptions.onChange(() => {
+  if (S.screen === 'topics') renderTopics(S.n);
+  else if (S.screen === 'task') renderStats();
+  else renderPicker();
+}, { progress: true });
 
 // ── Задание на доске живое ──────────────────────────────────────────────────
 // Доска (trainer-tasks.js, trainerTaskInfo) берёт отсюда, что верно в открытом
@@ -864,7 +887,5 @@ window.__trainerCatalog = {
 window.__rusOge = { S, POOL, TOPICS, topicsOf, checkAnswer, answerText, normDigits, normText, EXAM_ATTEMPTS };
 })();
 </script>
-<script src="task-key.js"></script>
-<script src="student-memory.js"></script>
 </body>
 </html>

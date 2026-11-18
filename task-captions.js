@@ -96,15 +96,26 @@
     try { return skip(window.TaskKey.fromTask(page, { fipi })); } catch (e) { return false; }
   }
 
-  // решено ли задание ФИПИ у ученика сессии: в журнале есть верный итог (ok) —
+  // решено ли задание у ученика сессии: в журнале есть верный итог (ok) —
   // по правилам памяти (задача 56) это и «верно с первого раза», и «верно после ошибки».
-  // Считаем разные задания, а не попытки: ключ задания один, сколько бы раз его ни решали
+  function solved(key){
+    return active() && (summaryOf(key)?.ok?.n || 0) > 0;
+  }
   function solvedFipi(page, fipi){
     if (!active() || !window.TaskKey) return false;
-    try {
-      const s = summaryOf(window.TaskKey.fromTask(page, { fipi }));
-      return !!(s && s.ok && s.ok.n > 0);
-    } catch (e) { return false; }
+    try { return solved(window.TaskKey.fromTask(page, { fipi })); } catch (e) { return false; }
+  }
+  function progress(keys){
+    if (!active()) return null;
+    const unique = new Map();
+    for (const key of keys) {
+      // Для задания с прежним ключом учитываем оба ключа, но считаем его один раз.
+      const aliases = Array.isArray(key) ? key : [key];
+      if (aliases[0]) unique.set(aliases[0], aliases);
+    }
+    if (!unique.size) return null;
+    const done = [...unique.values()].filter(aliases => aliases.some(solved)).length;
+    return { done, allDone: done === unique.size, label: 'Решено ' + done + ' из ' + unique.size };
   }
 
   /* ── текст всплывашки ── */
@@ -362,26 +373,39 @@
 
   /* ── подписка ── */
   const listeners = [];
-  function onChange(fn){ listeners.push(fn); return () => { const i = listeners.indexOf(fn); if (i >= 0) listeners.splice(i, 1); }; }
+  function onChange(fn, { progress = false } = {}){
+    const listener = { fn, progress };
+    listeners.push(listener);
+    return () => { const i = listeners.indexOf(listener); if (i >= 0) listeners.splice(i, 1); };
+  }
+  function notify(userMove, progressOnly){
+    listeners.slice().forEach(({ fn, progress }) => {
+      if (!progressOnly || progress) { try { fn(userMove, progressOnly); } catch (e) {} }
+    });
+  }
   function fire(userMove){
     for (let i = toggles.length - 1; i >= 0; i--) if (!toggles[i].host.isConnected) toggles.splice(i, 1);
     toggles.forEach(renderToggle);
     refresh();
-    listeners.slice().forEach(f => { try { f(userMove); } catch (e) {} });
+    notify(userMove, false);
   }
-  // страница перерисовывает списки при смене сессии или положения; запись
-  // события на самом уроке (журнал растёт) перерисовки не требует
+  // Списки со счётчиком подписываются и на изменения журнала. Точкам на
+  // прочих страницах достаточно обновить подписи на месте.
   function sigNow(){ const s = student(); return (s ? s.id : '') + '|' + mode(); }
   function boot(){
     sig = sigNow();
     const m = SM();
     if (m && m.onChange) m.onChange(() => {
       const n = sigNow();
-      if (n !== sig) { sig = n; fire(false); } else refresh();
+      if (n !== sig) { sig = n; fire(false); }
+      else {
+        refresh();
+        if (active()) notify(false, true);
+      }
     });
     window.addEventListener('storage', e => { if (e.key === 'teacher:settings:v1') { sig = sigNow(); fire(false); } });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 
-  window.TaskCaptions = { active, mode, setMode, keyOfTask, skip, skipFipi, solvedFipi, dot, decorate, showCurrent, mountToggle, onChange, summaryOf };
+  window.TaskCaptions = { active, mode, setMode, keyOfTask, skip, skipFipi, solved, solvedFipi, progress, dot, decorate, showCurrent, mountToggle, onChange, summaryOf };
 })();

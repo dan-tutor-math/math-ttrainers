@@ -450,6 +450,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .fipi-ctx{font-size:14px;margin:0 0 10px;padding-bottom:8px;border-bottom:1px dashed var(--glass-border);}
 .source-note{font-family:var(--font-ui);font-weight:500;font-size:12.5px;color:var(--muted-3);margin:12px 0 0;}
 .mode-card .msub{font-family:var(--font-ui);font-weight:500;font-size:13px;color:var(--muted-2);white-space:nowrap;}
+.mode-card .picker-progress{font-size:12px;font-weight:600;color:var(--muted-2);flex:0 0 auto;}
+.mode-card .picker-progress.complete{color:var(--ok);}
 .next-btn{font-family:var(--font-ui);font-weight:600;font-size:16px;background:var(--ok);color:#fff;border:none;border-radius:14px;padding:13px 26px;cursor:pointer;width:100%;margin-top:14px;box-shadow:0 6px 18px var(--ok-shadow);transition:transform .15s;}
 .next-btn:active{transform:scale(.98)}
 
@@ -1278,6 +1280,7 @@ if (TIRE_FIPI.length) {
   const n = TIRE_FIPI.length;
   GROUPS[0].modes.splice(1, 0, { id: 'tire_fipi', title: 'Шины · задания ФИПИ', kind: 'taskset', fipi: true,
     sub: `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'текст' : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? 'текста' : 'текстов'} ФИПИ`,
+    fipiTasks: TIRE_FIPI.flatMap(v => v.tasks),
     tasks: TIRE_KINDS.map((k, i) => ({ id: 'tirefipi_t' + (i + 1), title: 'Задание ' + (i + 1),
       gen: () => gen_tire_fipi(k) })),
     theory: () => buildTireTheoryHTML(tireOf(tireFipiVar().factory)) });
@@ -1376,6 +1379,7 @@ PLOT_FIPI.forEach(p => {
   const vs = plotVars(p.plot);
   const mode = { id: p.plot + '_fipi', title: p.title, kind: 'taskset', fipi: true,
     sub: `${vis.length} заданий ФИПИ` + (vs ? `, ${vs.length} ${vs.length < 5 ? 'текста' : 'текстов'}` : ''),
+    fipiTasks: vis,
     tasks: nums.map(n => ({ id: p.plot + 'fipi_t' + n, title: 'Задание ' + n, gen: () => plotFipiTask(p.plot, n) })),
     theory: () => `<div class="fipi-plot-text">${vs ? plotVarOf(p.plot).theory : FIPI15.plots[p.plot].theory}</div>` };
   if (vs) mode.varPlot = p.plot;
@@ -1616,7 +1620,10 @@ function renderPicker() {
     <div class="modes">
       ${g.modes.map(m => {
         const badges = pickerBadgeFor(m);
-        return `<div class="mode-card${m.demo ? ' demo' : ''}" data-id="${m.id}"><div class="mtitle">${m.title}</div>${m.sub ? `<div class="msub">${m.sub}</div>` : ''}${badges ? `<div class="mode-medals">${badges}</div>` : ''}</div>`;
+        const progress = m.fipiTasks && window.TaskCaptions?.active()
+          ? TaskCaptions.progress(m.fipiTasks.map(t => TaskCaptions.keyOfTask(t))) : null;
+        const progressBadge = progress ? `<div class="picker-progress${progress.allDone ? ' complete' : ''}">${progress.label}</div>` : '';
+        return `<div class="mode-card${m.demo ? ' demo' : ''}" data-id="${m.id}"><div class="mtitle">${m.title}</div>${m.sub ? `<div class="msub">${m.sub}</div>` : ''}${progressBadge}${badges ? `<div class="mode-medals">${badges}</div>` : ''}</div>`;
       }).join('')}
     </div>
   `).join('');
@@ -2872,5 +2879,11 @@ document.getElementById('homeBtn').addEventListener('click', function (e) {
 });
 </script>
 <script src="task-key.js"></script>
+<script src="task-captions.js"></script>
 <script src="student-memory.js"></script>
+<script>
+if (window.TaskCaptions) TaskCaptions.onChange(() => {
+  if (els.picker.style.display !== 'none') renderPicker();
+}, { progress: true });
+</script>
 </body></html>
