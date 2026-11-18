@@ -16,6 +16,27 @@
 -- назовёт мусором. Только чтение — сама ничего не удаляет.
 -- ============================================================
 
+-- Картинки, которые держит у себя браузер (буфер досок, версии досок,
+-- библиотека картинок доски, панель заметок): этих ссылок в базе нет, и
+-- уборка с ДРУГОГО устройства приняла бы такой файл за мусор. Каждое
+-- устройство раз в сутки отмечает здесь свои ссылки (image-store.js,
+-- syncKeep) и стирает свои устаревшие строки. Строка старше 60 дней не
+-- в счёт: устройство, которое два месяца не открывали, файл не держит.
+create table if not exists public.board_image_keep (
+  user_id uuid not null default auth.uid(),
+  device text not null,
+  name text not null,
+  seen_at timestamptz not null default now(),
+  primary key (user_id, device, name)
+);
+create index if not exists board_image_keep_name_idx on public.board_image_keep (name);
+alter table public.board_image_keep enable row level security;
+drop policy if exists board_image_keep_own on public.board_image_keep;
+create policy board_image_keep_own on public.board_image_keep
+  for all to authenticated
+  using (user_id = (select auth.uid()))
+  with check (user_id = (select auth.uid()));
+
 create or replace function public.board_images_garbage(min_age_days int default 30)
 returns table (name text)
 language sql
@@ -37,6 +58,12 @@ as $$
     and not exists (
       select 1 from public.deck_templates t
       where position(('img:' || o.name) in t.data::text) > 0
+    )
+    -- картинки, которые держит браузер какого-то устройства (таблица выше;
+    -- строки любого пользователя: картинку из чужой папки тоже могли скопировать)
+    and not exists (
+      select 1 from public.board_image_keep k
+      where k.name = o.name and k.seen_at > now() - interval '60 days'
     )
   limit 500;
 $$;

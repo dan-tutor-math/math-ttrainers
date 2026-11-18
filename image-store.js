@@ -182,9 +182,112 @@
      storage.objects Supabase запрещает), поэтому это делает сайт, а не
      задание в базе. Запускаем, только когда ВСЕ доски этого браузера уже на
      сервере: иначе картинка доски, которая ещё не переехала, выглядела бы
-     для сервера мусором. Картинки панели заметок (они только в браузере)
-     из списка вычёркиваем сами */
+     для сервера мусором.
+
+     Ссылки, которых в базе нет вовсе, живут только в браузере: буфер досок
+     (вставка через месяц), версии досок (откат), библиотека картинок доски,
+     панель заметок. Без защиты уборка стёрла бы такой файл, и вместо
+     картинки было бы пустое место. Поэтому каждое устройство раз в сутки
+     отмечает свои ссылки на сервере (board_image_keep, syncKeep) — их не
+     тронет уборка с ЛЮБОГО устройства, — а перед своей уборкой ещё и
+     вычёркивает их из списка сама (на случай, если таблицы нет). */
   const GC_KEY = 'boardsImgGcAt', GC_EVERY_MS = 24 * 3600 * 1000;
+  const KEEP_TABLE = 'board_image_keep';
+  const KEEP_SIG = 'boardsImgKeepSig', KEEP_AT = 'boardsImgKeepAt', KEEP_CLIP = 'boardsImgKeepClip';
+  const KEEP_EVERY_MS = 20 * 3600 * 1000;      // меньше суток: окно для уборки с другого устройства узкое
+  const KEEP_TTL_MS = 60 * 24 * 3600 * 1000;   // как в board_images_garbage
+  const DEV_KEY = 'boardsImgDevice';
+
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+  // строки устройства отдельно от строк того же учителя на другом устройстве:
+  // иначе одно устройство, стирая «свои» устаревшие строки, стёрло бы чужие
+  function deviceId() {
+    let d = lsGet(DEV_KEY);
+    if (!d) { d = 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10); lsSet(DEV_KEY, d); }
+    return d;
+  }
+  function idbRead(key) {
+    return typeof window.idbGet === 'function' ? Promise.resolve(window.idbGet(key)).catch(() => null) : Promise.resolve(null);
+  }
+
+  // все ключи картинок, которые держит этот браузер вне базы
+  async function localRefs() {
+    const names = new Set();
+    const add = (s) => { if (typeof s === 'string' && s.startsWith('img:')) names.add(s.slice(4)); };
+    const addObj = (o) => { if (o) { add(o.src); if (o.sol) add(o.sol.src); } };
+    const clip = await idbRead('clipboard');                    // буфер досок (boards-core.js, CLIP_KEY)
+    ((clip && clip.objects) || []).forEach(addObj);
+    const boards = (typeof getDB === 'function' && getDB() && getDB().boards) || [];
+    for (const b of boards) {
+      ((b.refPanel && b.refPanel.imageObjects) || []).forEach(addObj);
+      // библиотека картинок лежит в тяжёлой части доски — у выгруженной доски
+      // читаем её с диска (по одной доске, раз в сутки)
+      let lib = b.imageLib;
+      if (lib === undefined) { const h = await idbRead('boarddata:' + b.id); lib = h && h.imageLib; }
+      (lib || []).forEach(addObj);
+      // версии доски (boards-cloud.js, saveVersion): ключи img: короткие и
+      // лежат прямо в снимке. Имена ключей — как там: cloudver:<доска>[:<слот>]
+      const cb = b.cloudBoardId;
+      if (!cb) continue;
+      const meta = await idbRead('cloudver:' + cb);
+      for (const v of ((meta && meta.list) || [])) {
+        const snap = await idbRead('cloudver:' + cb + ':' + v.slot);
+        ((snap && snap.objects) || []).forEach(addObj);
+      }
+    }
+    return names;
+  }
+
+  function sigOf(list) {
+    let a = 0x811c9dc5;
+    const t = list.join('|');
+    for (let i = 0; i < t.length; i++) a = Math.imul(a ^ t.charCodeAt(i), 0x01000193);
+    return list.length + ':' + (a >>> 0).toString(36);
+  }
+
+  // отметить ссылки этого устройства на сервере; false — таблицы нет или нет сети
+  async function syncKeep(names, force) {
+    const sb = client(), uid = userId();
+    if (off || !sb || !uid || typeof sb.from !== 'function') return false;
+    const list = Array.from(names).sort();
+    const sig = sigOf(list);
+    if (!force && lsGet(KEEP_SIG) === sig && Date.now() - (+lsGet(KEEP_AT) || 0) < KEEP_EVERY_MS) return true;
+    const dev = deviceId(), now = new Date().toISOString();
+    try {
+      for (let i = 0; i < list.length; i += 500) {
+        const rows = list.slice(i, i + 500).map(name => ({ user_id: uid, device: dev, name, seen_at: now }));
+        const r = await sb.from(KEEP_TABLE).upsert(rows, { onConflict: 'user_id,device,name' });
+        if (r && r.error) throw r.error;
+      }
+      // всё, что это устройство больше не держит, — не обновлено сейчас; плюс
+      // строки устройств, которых не открывали дольше срока
+      let r = await sb.from(KEEP_TABLE).delete().eq('user_id', uid).eq('device', dev).lt('seen_at', now);
+      if (r && r.error) throw r.error;
+      r = await sb.from(KEEP_TABLE).delete().eq('user_id', uid).lt('seen_at', new Date(Date.now() - KEEP_TTL_MS).toISOString());
+      if (r && r.error) throw r.error;
+    } catch (err) {
+      console.warn('[картинки] не удалось отметить картинки этого устройства:', (err && err.message) || err);
+      return false;
+    }
+    lsSet(KEEP_SIG, sig);
+    lsSet(KEEP_AT, String(Date.now()));
+    return true;
+  }
+
+  // раз в час: дёшево смотрим, не менялся ли буфер; полный обход — только
+  // если буфер новый или прошлая отметка старше KEEP_EVERY_MS
+  async function keepTick(force) {
+    if (off || !client() || !userId()) return false;
+    const clip = await idbRead('clipboard');
+    const clipAt = String((clip && clip.at) || '');
+    const fresh = Date.now() - (+lsGet(KEEP_AT) || 0) < KEEP_EVERY_MS;
+    if (!force && fresh && clipAt === (lsGet(KEEP_CLIP) || '')) return true;
+    const ok = await syncKeep(await localRefs(), force);
+    if (ok) lsSet(KEEP_CLIP, clipAt);
+    return ok;
+  }
+
   async function gc(force) {
     const sb = client();
     if (off || !sb || !userId() || typeof getDB !== 'function') return { skipped: 'нет входа или хранилища' };
@@ -193,22 +296,26 @@
     if (!force && Date.now() - last < GC_EVERY_MS) return { skipped: 'рано' };
     const boards = getDB().boards || [];
     if (boards.some(b => !b.cloudBoardId)) return { skipped: 'не все доски на сервере' };
+    // сначала свои ссылки — на сервер (их увидят уборки других устройств) и в
+    // свой список «не трогать»; не вышло отметить — уборка всё равно идёт,
+    // как до этого: свои ссылки защищены вычёркиванием ниже
+    const keep = await localRefs();
+    const kept = await syncKeep(keep);
     const res = await sb.rpc('board_images_garbage', { min_age_days: 30 });
     if (res.error) { console.warn('[картинки] уборка недоступна:', res.error.message || res.error); return { skipped: 'нет функции' }; }
-    const keep = new Set();
-    boards.forEach(b => ((b.refPanel && b.refPanel.imageObjects) || []).forEach(o => {
-      if (typeof o.src === 'string' && o.src.startsWith('img:')) keep.add(o.src.slice(4));
-    }));
     const names = (res.data || []).map(r => (typeof r === 'string' ? r : r.name)).filter(n => n && !keep.has(n));
     for (let i = 0; i < names.length; i += 100) {
       const r = await sb.storage.from(BUCKET).remove(names.slice(i, i + 100));
-      if (r.error) { console.warn('[картинки] не удалось удалить:', r.error.message || r.error); return { removed: i }; }
+      if (r.error) { console.warn('[картинки] не удалось удалить:', r.error.message || r.error); return { removed: i, kept }; }
     }
     try { localStorage.setItem(GC_KEY, String(Date.now())); } catch (e) {}
-    return { removed: names.length };
+    return { removed: names.length, kept };
   }
-  setTimeout(() => { gc().catch(() => {}); setInterval(() => { gc().catch(() => {}); }, 3600 * 1000); }, 30000);
+  setTimeout(() => {
+    keepTick().catch(() => {}).then(() => gc()).catch(() => {});
+    setInterval(() => { keepTick().catch(() => {}).then(() => gc()).catch(() => {}); }, 3600 * 1000);
+  }, 30000);
 
   // для переноса досок, тестов и консоли
-  window.ImageStore = { pending: () => holders().length, isOff: () => off, tick, convertBoard, gc };
+  window.ImageStore = { pending: () => holders().length, isOff: () => off, tick, convertBoard, gc, localRefs, keepTick };
 })();
