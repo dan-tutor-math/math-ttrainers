@@ -133,6 +133,7 @@
     return window.matchMedia && window.matchMedia('(max-width: 700px)').matches ? 'list' : 'grid';
   }
   function setView(v){
+    if (v === st.view) return;
     st.view = v;
     try { localStorage.setItem(VIEW_KEY, v); } catch (e) {}
     if (!applyWin()) render();
@@ -743,14 +744,17 @@
           '<a class="btn quiet small sc-arrow" id="scNext" href="' + esc(api.weekHref(addDays(st.week, 7))) + '" aria-label="Следующая неделя">›</a>' +
           '<a class="btn quiet small" id="scToday" href="' + esc(api.weekHref(null)) + '"' + (mondayOf(today()) === st.week ? ' aria-current="true"' : '') + '>Сегодня</a>' +
         '</div>';
-    return modesHtml() + '<div class="sc-head">' + nav +
-        // в списке недель у каждой недели свои «Шаблон» и «Очистить» — в шапке они лишние
-        (mm ? '' : TPL().weekMenuHtml() + weekClearHtml('week:')) +
+    return modesHtml() + '<div class="sc-head">' +
         '<div class="seg sc-views" role="group" aria-label="Вид расписания">' +
           '<button type="button" data-v="list" class="' + (st.view === 'list' ? 'on' : '') + '">Строки</button>' +
           '<button type="button" data-v="grid" class="' + (st.view === 'grid' ? 'on' : '') + '">Планер</button>' +
         '</div>' +
-        '<button type="button" class="btn quiet small sc-lookbtn" id="scLook" aria-haspopup="menu" title="Как показывать время, пары и группы">Вид <span aria-hidden="true">▾</span></button>' +
+        '<div class="sc-head-main">' + nav +
+          // В месяце действия принадлежат каждой неделе. В шапке они идут
+          // после переключателя, чтобы двойное нажатие не открыло очистку.
+          (mm ? '' : '<div class="sc-week-actions">' + TPL().weekMenuHtml() + weekClearHtml('week:') + '</div>') +
+        '</div>' +
+        '<button type="button" class="btn quiet small sc-lookbtn" id="scLook" aria-haspopup="menu" aria-expanded="false" title="Как показывать время, пары и группы">Вид <span aria-hidden="true">▾</span></button>' +
       '</div>' + (st.loading || st.err || !INS() ? '' : INS().monthHtml());
   }
 
@@ -2081,7 +2085,12 @@
     host.querySelectorAll('.sc-views button').forEach(b => b.addEventListener('click', () => { rows.cancel(); setView(b.dataset.v); }));
     host.querySelectorAll('.sc-modes button').forEach(b => b.addEventListener('click', () => { rows.cancel(); st.mode = b.dataset.mode; closeModal(); closePanel(); closeStudentCard(); render(); }));
     const lookBtn = host.querySelector('#scLook');
-    if (lookBtn) lookBtn.addEventListener('click', () => R.openMenu(lookBtn, lookItems(), { checks: true, cls: 'gm-look' }));
+    if (lookBtn) {
+      lookBtn.setAttribute('aria-expanded', String(R.menuOpenFor(lookBtn)));
+      lookBtn.addEventListener('click', () => R.openMenu(lookBtn, lookItems(), {
+        checks: true, cls: 'gm-look', followAnchor: () => host.querySelector('#scLook')
+      }));
+    }
     const retry = host.querySelector('#scRetry');
     if (retry) retry.addEventListener('click', load);
     paintClip();

@@ -79,20 +79,25 @@
   /* ══ своё выпадающее меню в стиле стекла (никаких браузерных select) ══
      items: [{ head }, { label, act, on, danger, hint, html }]; act(item) —
      действие; keep: true — меню не закрывается (переключатели). */
-  let menuEl = null, menuOff = null;
+  let menuEl = null, menuOff = null, menuAnchor = null;
+  const menuOpenFor = anchor => !!menuEl && menuAnchor() === anchor;
   function closeMenu(){
     if (!menuEl) return;
     const el = menuEl;
     menuEl = null;
     if (menuOff) menuOff();
     menuOff = null;
+    menuAnchor = null;
     el.classList.remove('on');
     el.style.pointerEvents = 'none';       // гаснущее меню не должно ловить щелчки
     setTimeout(() => el.remove(), 180);
   }
   function openMenu(anchor, items, opts){
     opts = opts || {};
+    if (opts.followAnchor && menuOpenFor(anchor)) { closeMenu(); return; }
     closeMenu();
+    // «Вид» остаётся открытым при перерисовке шапки и следует за её новой кнопкой.
+    const getAnchor = opts.followAnchor || (() => anchor);
     const el = document.createElement('div');
     el.className = 'gm-menu' + (opts.cls ? ' ' + opts.cls : '');
     el.setAttribute('role', 'menu');
@@ -106,14 +111,26 @@
     };
     paint();
     document.body.appendChild(el);
-    const r = anchor.getBoundingClientRect(), w = el.offsetWidth, h = el.offsetHeight;
-    let x = opts.alignLeft ? r.left : r.right - w;
-    x = Math.max(8, Math.min(x, window.innerWidth - w - 8));
-    let y = r.bottom + 6;
-    if (y + h > window.innerHeight - 8 && r.top - h - 6 > 8) { y = r.top - h - 6; el.classList.add('up'); }
-    el.style.left = x + 'px';
-    el.style.top = y + 'px';
-    requestAnimationFrame(() => el.classList.add('on'));
+    function position(){
+      const button = getAnchor();
+      if (!button) { closeMenu(); return; }
+      const r = button.getBoundingClientRect();
+      const above = r.top - 14, below = window.innerHeight - r.bottom - 14;
+      const visible = r.bottom > 0 && r.top < window.innerHeight;
+      // Длинное меню прокручивается внутри, оставляя кнопку «Вид» доступной.
+      if (opts.followAnchor) el.style.maxHeight = visible ? Math.max(above, below) + 'px' : '';
+      const w = el.offsetWidth, h = el.offsetHeight;
+      const x = opts.alignLeft ? r.left : r.right - w;
+      const up = h > below && (opts.followAnchor ? above > below : above > h);
+      let y = up ? r.top - h - 6 : r.bottom + 6;
+      if (opts.followAnchor) y = Math.max(8, Math.min(y, window.innerHeight - h - 8));
+      el.classList.toggle('up', up);
+      el.style.left = Math.max(8, Math.min(x, window.innerWidth - w - 8)) + 'px';
+      el.style.top = y + 'px';
+    }
+    position();
+    if (opts.followAnchor) anchor.setAttribute('aria-expanded', 'true');
+    requestAnimationFrame(() => { if (menuEl === el) el.classList.add('on'); });
     el.addEventListener('click', e => {
       const b = e.target.closest('.gm-item');
       if (!b) return;
@@ -123,14 +140,28 @@
       const r2 = it.act(it);
       if (r2 && r2.items) items = r2.items;
       paint();
+      if (opts.followAnchor) position();
     });
-    const onDown = e => { if (!el.contains(e.target) && !anchor.contains(e.target)) closeMenu(); };
+    const onDown = e => { if (!el.contains(e.target) && !getAnchor()?.contains(e.target)) closeMenu(); };
     const onKey = e => { if (e.key === 'Escape') closeMenu(); };
-    const onScroll = e => { if (!el.contains(e.target)) closeMenu(); };
+    const onScroll = e => {
+      if (el.contains(e.target)) return;
+      if (opts.followAnchor) position(); else closeMenu();
+    };
     document.addEventListener('pointerdown', onDown, true);
     document.addEventListener('keydown', onKey);
     window.addEventListener('scroll', onScroll, true);
-    menuOff = () => { document.removeEventListener('pointerdown', onDown, true); document.removeEventListener('keydown', onKey); window.removeEventListener('scroll', onScroll, true); };
+    if (opts.followAnchor) window.addEventListener('resize', position);
+    menuOff = () => {
+      document.removeEventListener('pointerdown', onDown, true);
+      document.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', onScroll, true);
+      if (opts.followAnchor) {
+        window.removeEventListener('resize', position);
+        getAnchor()?.setAttribute('aria-expanded', 'false');
+      }
+    };
+    menuAnchor = getAnchor;
     menuEl = el;
     return el;
   }
@@ -582,5 +613,5 @@
     return C;
   }
 
-  window.ScheduleRows = { create, parseTime, clusters, icon, aggStatus, NEXT, ST_NAME, openMenu, closeMenu, hm };
+  window.ScheduleRows = { create, parseTime, clusters, icon, aggStatus, NEXT, ST_NAME, openMenu, closeMenu, menuOpenFor, hm };
 })();

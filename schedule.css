@@ -44,13 +44,15 @@
 }
 
 .wrap.sc-wide{max-width:1280px;}
-.sc-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.sc-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;gap:8px;margin-bottom:14px;}
+.sc-head-main,.sc-week-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.sc-nav,.sc-week-actions,.sc-head>.sc-lookbtn{min-height:40px;}
 .sc-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .sc-nav .btn{text-decoration:none;}
 .sc-arrow{font-size:20px;line-height:1;padding:5px 13px;}
 .sc-range{font-weight:700;font-size:19px;min-width:0;padding:0 4px;letter-spacing:-.01em;}
 #scToday[aria-current]{background:var(--hl-10);}
-.sc-head .seg{margin-top:0;}
+.sc-head .seg{margin-top:0;flex-wrap:nowrap;}
 .sc-lookbtn{display:inline-flex;align-items:center;gap:6px;}
 
 /* ── значок статуса: круг 18px (в строке пары — 15px), мягкий цвет статуса ── */
@@ -469,9 +471,12 @@ html[data-theme="dark"] .sc-day.today{background:color-mix(in srgb,var(--glass) 
 @media (max-width:620px){
   .sc-modes{display:grid;grid-template-columns:repeat(3,1fr);width:100%;margin:0 0 8px;}
   .sc-modes button{padding:7px 2px;font-size:13px;white-space:nowrap;}
-  .sc-head{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px;}
-  .sc-head>*{width:100%;min-width:0;justify-content:center;}
-  .sc-nav{grid-column:1 / -1;display:grid;grid-template-columns:34px 1fr 34px auto;grid-template-areas:"p r n t" "p s n t";gap:0 6px;align-items:center;}
+  .sc-head{grid-template-columns:1fr auto;grid-template-areas:"modes look" "nav nav" "actions actions";gap:6px;margin-bottom:8px;}
+  .sc-head-main{display:contents;}
+  .sc-head .sc-views{grid-area:modes;}
+  .sc-head .sc-lookbtn{grid-area:look;}
+  .sc-head .sc-week-actions{grid-area:actions;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:max-content;max-width:100%;}
+  .sc-nav{grid-area:nav;display:grid;grid-template-columns:34px 1fr 34px auto;grid-template-areas:"p r n t" "p s n t";gap:0 6px;align-items:center;}
   #scPrev{grid-area:p;} #scNext{grid-area:n;} #scToday{grid-area:t;}
   #scPrev,#scNext{padding:7px 0;text-align:center;}
   .sc-range{grid-area:r;text-align:center;font-size:15.5px;padding:0;}
@@ -513,7 +518,6 @@ html[data-theme="dark"] .sc-day.today{background:color-mix(in srgb,var(--glass) 
   .si-box>summary{font-size:14px;}
   .si-stu{margin-left:0;}
 }
-@media (max-width:620px){ .sc-head .sc-views,.sc-head .sc-lookbtn,.sc-head .sc-tplbtn,.sc-head .sc-wclear{width:100%;} }
 @media (max-width:620px){
   .sc-tplbar .btn.sc-wclear,.sc-tplbar .btn#tplDel{grid-column:span 3;}
   .sc-tplbar .seg.sc-views{width:100%;}

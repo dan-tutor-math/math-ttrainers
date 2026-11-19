@@ -23,6 +23,7 @@ import json
 import sys
 
 from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect
 
 from test_prompt_cabinet_payments import B1, FIXED_NOW_JS, norm, wait_db
 from test_prompt_cabinet_stats import stats_seed
@@ -111,6 +112,42 @@ def main():
         p.get_by_text("Весь месяц").click()
         p.wait_for_selector(".sc-weeks .sc-wk", timeout=8000)
         check("F3 «Весь месяц» вернул список недель", p.locator(".sc-wk").count() >= 5)
+        look_button = p.locator("#scLook")
+        look_menu = p.locator(".gm-look.on")
+        look_button.click()
+        expect(look_menu).to_have_count(0)
+        look_button.click()
+        expect(look_button).to_have_attribute("aria-expanded", "true")
+        p.evaluate("window.scrollBy(0, 550)")
+        p.wait_for_function("window.scrollY > 0")
+        expect(look_menu).to_be_in_viewport()
+        p.evaluate("window.scrollTo(0, 0)")
+        look_button.click()
+        expect(look_button).to_have_attribute("aria-expanded", "false")
+        expect(look_menu).to_have_count(0)
+
+        # Двойной щелчок в прежнюю точку не должен вызвать очистку недели.
+        grid_button = p.locator('.sc-views button[data-v="grid"]')
+        list_button = p.locator('.sc-views button[data-v="list"]')
+        for width in (1280, 820, 375, 320):
+            p.set_viewport_size({"width": width, "height": 900})
+            grid_button.scroll_into_view_if_needed()
+            before = grid_button.bounding_box()
+            before_look = look_button.bounding_box()
+            lesson_ids = [x["id"] for x in db()["lessons"]]
+            p.mouse.dblclick(before["x"] + before["width"] / 2, before["y"] + before["height"] / 2, delay=90)
+            expect(p.locator(".sc-gwrap")).to_be_visible()
+            after = grid_button.bounding_box()
+            after_look = look_button.bounding_box()
+            assert abs(before["x"] - after["x"]) < 1 and abs(before["y"] - after["y"]) < 1, (width, before, after)
+            assert abs(before_look["x"] - after_look["x"]) < 1, (width, before_look, after_look)
+            expect(p.locator(".sc-ask-btns")).to_have_count(0)
+            assert [x["id"] for x in db()["lessons"]] == lesson_ids
+            assert p.evaluate("document.documentElement.scrollWidth <= innerWidth"), width
+            list_button.click()
+            expect(p.locator(".sc-weeks")).to_be_visible()
+        print("[OK] Меню «Вид» закрывается повторным нажатием и остаётся при прокрутке")
+        print("[OK] Переключатель на месте при двойном щелчке на ширинах 320–1280")
         check("G нет ошибок JavaScript", not errors, "; ".join(errors))
         browser.close()
     sys.exit(1 if B1.FAILS else 0)
