@@ -284,9 +284,18 @@ def main():
               and pt.get("left") is None, str(pt))
         check("N3 Ваня без оплат — долга нет", v.get("debt") == 0 and v.get("debtLessons") == 0, str(v))
         p.goto(f"{BASE}/cabinet.html#/payments")
-        p.wait_for_selector(f'.pay-row[data-sid="{MASHA}"]', timeout=10000)
-        mrow = norm(p.inner_text(f'.pay-row[data-sid="{MASHA}"]'))
-        check("N4 вкладка «Оплаты»: Маша — осталось 3 из 8, должников нет", "осталось 3 из 8" in mrow and "никто" in p.inner_text("#payDebt"), mrow + " | " + p.inner_text("#payDebt"))
+        mrow = p.locator(f'.pay-row[data-sid="{MASHA}"]').first
+        mrow.wait_for(timeout=10000)
+        meter = mrow.get_by_role("progressbar")
+        hidden_debt = p.locator("#payDebt").is_hidden()
+        p.locator("#payView summary").click()
+        p.get_by_role("checkbox", name="Показывать просрочку при нуле").check()
+        p.locator("#payView summary").click()
+        p.locator("#payDebt summary").click()
+        check("N4 вкладка «Оплаты»: шкала Маши 5 из 8, закончившийся абонемент без долга не считается просрочкой",
+              meter.get_attribute("aria-valuenow") == "5" and meter.get_attribute("aria-valuemax") == "8"
+              and hidden_debt and p.inner_text("#payDebt b") == "0" and "Просроченных оплат нет" in p.inner_text("#payDebt"),
+              mrow.inner_text() + " | " + p.inner_text("#payDebt"))
         idle(p)
         p.goto(f"{BASE}/cabinet.html#/settings")
         p.wait_for_selector("#syncBox")

@@ -13,7 +13,7 @@ test_prompt_cabinet_links.py). «Сегодня» — среда 18.11.2026, 12:
 
 Проверяет:
   A. список: «Должны 2 500 ₽», «Скоро кончится 1», «Получено в ноябре
-     11 500 ₽»; у Вани «осталось 1 из 5 · до 18.11» и напоминание, у Пети —
+     10 000 ₽» по абонементам и 1 500 ₽ по разовым; у Вани шкала 4 из 5 и напоминание, у Пети —
      долг; должник выше;
   B. ученик Петя: долг и число неоплаченных, выписка объясняет — флаг
      «пробное», «оплачено за занятие», «без оплаты» с суммой;
@@ -215,10 +215,17 @@ def check_payment_controls(browser):
     p.goto(f"{BASE}/cabinet.html#/stats")
     expect(p.locator("#stDebt")).to_contain_text("2 000")
     p.goto(f"{BASE}/cabinet.html#/payments")
+    p.locator("#payDebt summary").click()
     expect(p.locator("#payDebt")).to_contain_text("2 000")
-    expect(p.locator("#payGot")).to_contain_text("12 500")
+    expect(p.locator("#payGot b")).to_have_text("10 000 ₽")
     p.set_viewport_size({"width": 375, "height": 812})
+    panel = p.locator(".pay-overdue-list")
+    rect = panel.bounding_box()
+    assert rect is not None and rect["x"] >= 0 and rect["x"] + rect["width"] <= 375
+    assert rect["y"] + rect["height"] <= p.locator("#paySoon").bounding_box()["y"]
+    p.locator("#payDebt summary").click()
     filters.get_by_text("Разовые").click()
+    expect(p.locator("#payGot b")).to_have_text("2 500 ₽")
     rows.locator("a.nm").first.click()
     expect(p.locator("#psDebt")).to_have_text("Долги за разовые занятия не учитываются")
     expect(p.locator(".pay-line-action")).to_have_count(1)
@@ -231,7 +238,11 @@ def check_payment_controls(browser):
     toggle.check()
     assert wait_db(p, lambda data: data["teacher_settings"][0]["settings"]["pay"].get("trackSingleDebt") is True)
     p.goto(f"{BASE}/cabinet.html#/payments")
+    p.locator("#payDebt summary").click()
     expect(p.locator("#payDebt")).to_contain_text("3 500")
+    expect(p.locator("#payDebt b")).to_have_text("2")
+    expect(panel.get_by_role("listitem")).to_have_count(2)
+    expect(panel.get_by_role("link", name="Петя")).to_be_visible()
     assert not errors, errors
     ctx.close()
     print("[OK] Фильтры, разовые долги, абонементы и оплата из выписки на телефоне")
@@ -256,8 +267,22 @@ def check_new_payment_layout(browser):
     pack = page.locator('[data-pay-pack="pk1"]')
     meter = pack.get_by_role("progressbar")
     expect(meter).to_have_attribute("aria-valuenow", "4")
+    expect(pack.locator(".pay-remaining")).to_have_count(0)
+    def assert_inputs_aligned(fields):
+        positions = [pack.locator(f'[data-pay-edit="{field}"]').bounding_box()["y"] for field in fields]
+        assert max(positions) - min(positions) < 1, positions
+
+    assert_inputs_aligned(["payer", "amount", "lessons", "used"])
     total = page.locator("#payGot b").inner_text()
     page.locator("#payView summary").click()
+    remainder = page.get_by_role("checkbox", name="Остаток занятий")
+    remainder.check()
+    expect(pack.locator(".pay-remaining")).to_have_text("осталось 1 из 5")
+    assert_inputs_aligned(["payer", "amount", "lessons", "used"])
+    page.reload()
+    expect(pack.locator(".pay-remaining")).to_be_visible()
+    page.locator("#payView summary").click()
+    remainder.uncheck()
     page.get_by_role("checkbox", name="Подпись родителя", exact=True).uncheck()
     expect(pack.locator(".pay-payer")).to_be_hidden()
     page.get_by_role("checkbox", name="Подпись родителя", exact=True).check()
@@ -338,6 +363,7 @@ def check_new_payment_layout(browser):
     page.locator('[data-pay-filter="pack"]').click()
     page.set_viewport_size({"width": 320, "height": 740})
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    assert_inputs_aligned(["amount", "lessons", "used"])
     pack.locator('[data-pay-period="pk1"]').click()
     expect(calendar.get_by_role("button", name="Готово")).to_be_visible()
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
@@ -375,10 +401,15 @@ def check_archived_pack_keeps_lessons(browser):
     expect(date_sort).to_have_attribute("aria-sort", "descending")
     date_sort.get_by_role("button").click()
     expect(date_sort).to_have_attribute("aria-sort", "ascending")
+    arrow = date_sort.locator("span")
+    expect(arrow).to_have_text("↑")
+    expect(date_sort.get_by_role("button")).to_have_css("background-color", "rgba(0, 0, 0, 0)")
+    expect(date_sort.get_by_role("button")).not_to_be_focused()
     expect(pack_table.locator("[data-pay-pack]").first).to_have_attribute("data-pay-pack", "next-pack")
     pack_table.get_by_role("button", name="Сумма, ₽").click()
     expect(pack_table.locator("[data-pay-pack]").first).to_have_attribute("data-pay-pack", "next-pack")
     pack_table.get_by_role("button", name="Сумма, ₽").press("Enter")
+    expect(pack_table.get_by_role("button", name="Сумма, ₽")).to_be_focused()
     expect(pack_table.locator("[data-pay-pack]").first).to_have_attribute("data-pay-pack", "newer-receipt")
 
     page.locator("#payArchive summary").click()
@@ -429,11 +460,13 @@ def main():
         # ── A. список ──
         p.goto(f"{BASE}/cabinet.html#/payments")
         p.wait_for_selector(".pay-row", timeout=10000)
+        p.locator("#payDebt summary").click()
         check("A1 «Должны 2 500 ₽», Петя", "2 500 ₽" in norm(p.inner_text("#payDebt")) and "Петя" in p.inner_text("#payDebt"), norm(p.inner_text("#payDebt")))
+        p.locator("#payDebt summary").click()
         check("A2 «Скоро кончится» — 1 (Ваня)", "1" in p.inner_text("#paySoon b") and "Ваня" in p.inner_text("#paySoon"), p.inner_text("#paySoon"))
-        check("A3 «Получено в ноябре 11 500 ₽»", "ноябре" in p.inner_text("#payGot") and "11 500 ₽" in norm(p.inner_text("#payGot")), norm(p.inner_text("#payGot")))
+        check("A3 «Получено в ноябре 10 000 ₽» по абонементам", "ноябре" in p.inner_text("#payGot") and "10 000 ₽" in norm(p.inner_text("#payGot")), norm(p.inner_text("#payGot")))
         vrow = norm(p.inner_text(f'.pay-row[data-sid="{VANYA}"]'))
-        check("A4 Ваня: прошло 4 из 5, осталось 1", "осталось 1 из 5" in vrow and p.locator('[data-pay-pack="pk1"] .pay-bar').get_attribute("aria-valuenow") == "4", vrow)
+        check("A4 Ваня: шкала 4 из 5 и подпись остатка скрыта", "осталось 1 из 5" not in vrow and p.locator('[data-pay-pack="pk1"] .pay-bar').get_attribute("aria-valuenow") == "4", vrow)
         p.locator('[data-pay-filter="lesson"]').click()
         prow = norm(p.inner_text(f'.pay-row[data-sid="{PETYA}"]'))
         check("A5 Петя: разовая оплата, долг 2 500 ₽", "1 500 ₽" in prow and "долг 2 500 ₽" in prow, prow)

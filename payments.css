@@ -182,7 +182,7 @@
 }
 
 /* Список оплат использует те же поверхности кабинета, что и расписание. */
-#payHost .pay-top{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
+#payHost .pay-top{position:relative;display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px;}
 #payHost .pay-stat{display:flex;flex-direction:row;align-items:baseline;flex-wrap:wrap;gap:4px 7px;padding:5px 9px;font-size:12px;color:var(--muted-3);}
 #payHost .pay-stat b{font-size:14px;font-variant-numeric:tabular-nums;}
 #payHost .pay-stat small{max-width:200px;}
@@ -192,6 +192,16 @@
 .pay-view-menu{position:absolute;z-index:5;right:0;top:calc(100% + 6px);width:max-content;max-width:calc(100vw - 32px);padding:8px 11px;border:1px solid var(--glass-border);border-radius:12px;background:var(--card);backdrop-filter:blur(20px);box-shadow:var(--shadow);}
 .pay-view:not([open]) .pay-view-menu{display:none;}
 .pay-view-menu .chk{margin:4px 0;}
+.pay-overdue{position:relative;min-width:0;}
+.pay-overdue summary{cursor:pointer;list-style:none;}
+.pay-overdue summary::-webkit-details-marker{display:none;}
+.pay-overdue summary::after{content:"";width:5px;height:5px;border:solid currentColor;border-width:0 1px 1px 0;transform:translateY(-2px) rotate(45deg);}
+.pay-overdue[open] summary::after{transform:translateY(1px) rotate(225deg);}
+.pay-overdue-list{position:absolute;z-index:4;top:calc(100% + 6px);left:0;width:max-content;max-width:min(320px,calc(100vw - 40px));max-height:260px;overflow:auto;padding:9px 11px;border:1px solid var(--glass-border);border-radius:12px;background:var(--card);backdrop-filter:blur(20px);box-shadow:var(--shadow);}
+.pay-overdue-list ul{list-style:none;padding:0;margin:0;}
+.pay-overdue-list li{display:flex;justify-content:space-between;gap:12px;padding:4px 0;}
+.pay-overdue-list a{color:var(--ink);font-weight:650;overflow-wrap:anywhere;text-underline-offset:2px;}
+.pay-overdue-list li span{white-space:nowrap;font-variant-numeric:tabular-nums;}
 .pay-overview{display:grid;grid-template-columns:minmax(0,1fr) minmax(205px,224px);align-items:start;gap:12px;}
 .pay-main{min-width:0;}
 .pay-reminders{padding:10px;border-radius:14px;background:var(--card);border:1px solid var(--glass-border);}
@@ -205,6 +215,8 @@
 .pay-ledger{background:var(--card);border:1px solid var(--glass-border);border-radius:14px;}
 .pay-ledger .pay-row{display:block;padding:0;border:0;background:none;border-radius:0;}
 .pay-ledger .pay-entry{display:grid;align-items:center;gap:8px;padding:8px 10px;border-top:1px solid var(--grid);}
+.pay-ledger.pack{--pay-control-height:30px;}
+.pay-ledger [data-pay-pack]{align-items:start;}
 .pay-ledger.pack .pay-entry{grid-template-columns:minmax(0,1.23fr) minmax(0,.83fr) minmax(0,.6fr) minmax(0,1fr) minmax(0,.78fr) minmax(0,.57fr) minmax(0,.95fr) minmax(0,1.3fr);}
 .pay-ledger.single .pay-entry{grid-template-columns:minmax(0,1.5fr) repeat(3,minmax(0,1fr));}
 .pay-ledger.hide-payer .pay-payer{display:none;}
@@ -212,7 +224,6 @@
 .pay-ledger.single.hide-payer .pay-entry{grid-template-columns:minmax(0,1.5fr) repeat(2,minmax(0,1fr));}
 .pay-ledger .pay-thead{border-top:0;color:var(--muted-2);font-size:11px;font-weight:650;}
 .pay-sort{border:0;border-radius:6px;padding:4px 3px;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;max-width:100%;}
-.pay-sort:hover,.pay-sort:focus-visible,.pay-thead [aria-sort] .pay-sort{color:var(--ink);background:var(--hl-10);}
 .pay-sort span{white-space:nowrap;}
 .pay-archive-ledger{margin-top:7px;}
 .pay-archive-ledger .pay-entry{grid-template-columns:minmax(0,1.5fr) repeat(3,minmax(0,1fr)) minmax(0,.85fr) minmax(0,.9fr);}
@@ -222,13 +233,14 @@
 .pay-ledger .pay-row .nm{min-width:0;font-size:14px;color:var(--pencil);}
 .pay-identity .btn{font-size:12px;padding:4px 7px;}
 .pay-entry .hint{font-size:11.5px;}
-.pay-cell-input.field{height:auto;min-height:30px;font-size:13px;padding:4px 6px;border-radius:8px;min-width:0;}
+.pay-cell-input.field{height:auto;min-height:var(--pay-control-height,30px);font-size:13px;padding:4px 6px;border-radius:8px;min-width:0;}
+.pay-paid-on{display:flex;align-items:center;min-height:var(--pay-control-height);}
 .pay-cell-input[type=number]{appearance:textfield;text-align:right;}
 .pay-cell-input::-webkit-inner-spin-button{appearance:none;}
 .pay-count{display:flex;align-items:center;gap:4px;white-space:nowrap;font-size:12px;}
 .pay-count input{max-width:45px;}
 .pay-entry .pay-bar{display:block;width:100%;height:6px;margin:4px 0;}
-.pay-entry .pay-period-btn{width:max-content;max-width:100%;padding:5px 6px;font-size:12px;}
+.pay-entry .pay-period-btn{width:max-content;max-width:100%;min-height:var(--pay-control-height);padding:5px 6px;font-size:12px;}
 .pay-state .pay-chip{display:inline-block;font-size:11px;padding:2px 6px;}
 .pay-state .row-btns{gap:4px;margin-top:4px;}
 .pay-state .btn{font-size:11px;padding:5px 6px;}
@@ -277,6 +289,9 @@
   .pay-remind-row{padding:4px 0;}
 }
 @media (max-width:750px){
+  #payHost .pay-top{align-items:flex-start;}
+  .pay-overdue{position:static;}
+  .pay-overdue-list{position:static;margin-top:6px;}
   .pay-ledger.pack .pay-entry,.pay-ledger.single .pay-entry,.pay-archive-ledger .pay-entry,
   .pay-ledger.pack.hide-payer .pay-entry,.pay-ledger.single.hide-payer .pay-entry{grid-template-columns:repeat(3,minmax(0,1fr));}
   .pay-ledger .pay-thead{display:flex;flex-wrap:wrap;gap:3px;padding:5px 8px;}
@@ -284,8 +299,11 @@
   .pay-entry>div[data-col]::before{content:attr(data-col);display:block;color:var(--muted-2);font-size:11px;margin-bottom:2px;}
   .pay-entry>div[data-col=""]::before{display:none;}
   .pay-entry .pay-identity{grid-column:span 2;}
+  .pay-ledger.pack.hide-payer [data-pay-pack] .pay-identity{grid-column:1/-1;}
+  .pay-entry .pay-paid-on{display:block;}
+  .pay-entry .pay-range{grid-column:span 2;}
   .pay-entry .pay-state{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:5px;}
-  .pay-entry .pay-state::before{display:none;}
+  .pay-entry .pay-state[data-col]::before{display:none;}
   .pay-archive-action{grid-column:span 2;}
 }
 @media (max-width:500px){
@@ -293,6 +311,7 @@
   .pay-period-months>section:nth-child(2){display:none;}
 }
 @media (pointer:coarse){
-  .pay-day,.pay-entry .btn,.pay-cell-input.field,.pay-sort{min-height:44px;}
+  .pay-ledger.pack{--pay-control-height:44px;}
+  .pay-day,.pay-entry .btn,.pay-sort{min-height:44px;}
   .pay-cell-input.field{font-size:16px;}
 }

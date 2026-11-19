@@ -169,8 +169,11 @@
   function listHtml(){
     const now = P().today(), mon = now.slice(0, 7);
     const rows = st.students.filter(s => !s.archived_at).map(s => ({ s, c: calcFor(s.id) }));
-    const got = st.data.payments.filter(p => String(p.paid_on).slice(0,7) === mon).reduce((a,p) => a+Number(p.amount || 0),0);
-    const debtors = rows.filter(r => r.c.debt>0), debtSum = debtors.reduce((a,r)=>a+r.c.debt,0);
+    const kind = st.filter==='pack' ? 'pack' : 'single';
+    const got = st.data.payments.filter(p=>p.kind===kind && p.paid_on?.startsWith(mon))
+      .reduce((sum,p)=>sum+Number(p.amount||0),0);
+    const debtors = rows.filter(r=>r.c.debt>0)
+      .sort((a,b)=>b.c.debt-a.c.debt || alphabetical.compare(a.s.name,b.s.name));
     const ps = P().paySettings(settings());
     const reminders = rows.flatMap(({s,c}) => {
       const k = c.active.find(pack=>!pack.pay.archived_at) || c.packs.findLast(pack=>!pack.pay.archived_at);
@@ -178,19 +181,16 @@
       const end = periodPreview(s,k).end;
       return end && ps.remindedPacks?.[k.pay.id] !== end ? [{s,k,end}] : [];
     });
-    const overdue = reminders.filter(r=>r.end<now);
-    const overdueCount = new Set([...overdue,...debtors].map(r=>r.s.id)).size;
     const soon = reminders.filter(r=>r.end>=now && P().daysBetween(now,r.end)<7).sort((a,b)=>a.end.localeCompare(b.end));
-    const names = list => list.slice(0,3).map(r=>r.s.name).join(', ') + (list.length>3?'…':'');
-    const visible = rows.filter(({s,c}) => c.mode===st.filter || recordsFor(s.id).some(p =>
-      !p.archived_at && p.kind===(st.filter==='pack'?'pack':'single')));
+    const visible = rows.filter(({s,c})=>c.mode===st.filter || recordsFor(s.id).some(p=>!p.archived_at && p.kind===kind));
     const header = '<div class="pay-top">' +
-      '<div class="pay-stat" id="payGot"><span>Получено в ' + MONTHS_IN[Number(mon.slice(5))-1] + '</span><b>'+P().money(got)+'</b></div>' +
-      '<div class="pay-stat'+(overdueCount?' bad':'')+'" id="payDebt"'+(!view.showOverdue&&!overdueCount?' hidden':'')+
-      '><span>Просрочено</span><b>'+overdueCount+'</b><small>'+esc(debtSum ? 'Долг '+P().money(debtSum)+' · '+names(debtors) : 'Должники: никто')+'</small></div>' +
+      '<div class="pay-stat" id="payGot"><span>Получено в ' + MONTHS_IN[Number(mon.slice(5))-1] + '</span><b>'+P().money(got)+
+      '</b><small>'+filters[st.filter]+'</small></div>' + overdueHtml(debtors) +
       '<details class="pay-view" id="payView"'+(st.open.has('payView')?' open':'')+'><summary class="btn quiet small">Вид</summary>' +
       '<div class="pay-view-menu"><label class="chk"><input type="checkbox" data-pay-view="showPayer"'+(view.showPayer!==false?' checked':'')+
-      '> Подпись родителя</label><label class="chk"><input type="checkbox" data-pay-view="showOverdue"'+(view.showOverdue?' checked':'')+'> Показывать просрочку при нуле</label></div></details></div>';
+      '> Подпись родителя</label><label class="chk"><input type="checkbox" data-pay-view="showRemaining"'+(view.showRemaining?' checked':'')+
+      '> Остаток занятий</label><label class="chk"><input type="checkbox" data-pay-view="showOverdue"'+(view.showOverdue?' checked':'')+
+      '> Показывать просрочку при нуле</label></div></details></div>';
     const filter = '<div class="seg pay-filters" role="group" aria-label="Виды оплат">'+Object.entries(filters).map(([key,label]) =>
       '<button type="button" data-pay-filter="'+key+'" class="'+(st.filter===key?'on':'')+'" aria-pressed="'+(st.filter===key)+'">'+label+'</button>').join('')+'</div>';
     const remind = '<aside class="pay-reminders" id="paySoon"><div class="pay-remind-head"><h3>Напомнить об оплате</h3><small><b>'+soon.length+
@@ -202,6 +202,17 @@
       (visible.length ? ledgerRows(visible) : '<div class="empty">Таких оплат пока нет.</div>')+'</div>';
     return header+'<div class="pay-overview"><div class="pay-main">'+filter+table+'</div>'+remind+'</div>'+
       archiveHtml(new Map(rows.map(({s,c})=>[s.id,c])));
+  }
+
+  function overdueHtml(debtors){
+    const count = debtors.length;
+    const total = debtors.reduce((sum,{c})=>sum+c.debt,0);
+    const contents = count ? '<ul>'+debtors.map(({s,c})=>'<li>'+studentLink(s)+'<span>'+P().money(c.debt)+'</span></li>').join('')+
+      '</ul>' : '<div class="hint">Просроченных оплат нет</div>';
+    return '<details class="pay-overdue" id="payDebt"'+(!view.showOverdue&&!count?' hidden':'')+(st.open.has('payDebt')?' open':'')+
+      '><summary class="pay-stat'+(count?' bad':'')+'"><span>Просрочено</span><b>'+count+'</b>'+
+      (count?'<small>Долг '+P().money(total)+'</small>':'')+'</summary>'+
+      '<div class="pay-overdue-list">'+contents+'</div></details>';
   }
 
   function packStatus(k,queued){
@@ -221,17 +232,18 @@
     const {k,p,end:expected,status} = row, used = effectiveUsed(k);
     const range = P().dm(k.start)+' – '+(expected?P().dm(expected):'…');
     const adjustment = Number(p.adjust)||0;
+    const remaining = view.showRemaining ? '<div class="hint pay-remaining">осталось '+k.left+' из '+k.cap+
+      (adjustment?' · вручную '+(adjustment>0?'+':'')+adjustment:'')+'</div>' : '';
     return '<div role="row" class="pay-entry" data-pay-pack="'+esc(p.id)+'">'+
       paymentCell(0,identity,'pay-identity')+
       paymentCell(1,paymentInput(p,'payer','Подпись родителя',p.payer || '','maxlength="80" placeholder="Не указана"'),'pay-payer')+
-      paymentCell(2,P().dm(p.paid_on))+
-      paymentCell(3,paymentButton(range,'pay-period',p.id,'pay-period-btn'))+
+      paymentCell(2,P().dm(p.paid_on),'pay-paid-on')+
+      paymentCell(3,paymentButton(range,'pay-period',p.id,'pay-period-btn'),'pay-range')+
       paymentCell(4,paymentInput(p,'amount','Сумма абонемента, ₽',p.amount,'type="number" min="0" step="0.01" inputmode="decimal"'))+
       paymentCell(5,paymentInput(p,'lessons','Занятий в абонементе',k.cap,'type="number" min="1" max="500" inputmode="numeric"'))+
       paymentCell(6,'<div class="pay-count">'+paymentInput(p,'used','Прошло занятий',Math.max(0,k.used),'type="number" min="0" max="1000" inputmode="numeric"')+
         '<span>/ '+k.cap+'</span></div><div class="pay-bar" role="progressbar" aria-label="Прошло занятий" aria-valuemin="0" aria-valuemax="'+k.cap+
-        '" aria-valuenow="'+used+'"><i style="width:'+Math.round(used*100/Math.max(1,k.cap))+'%"></i></div><div class="hint">осталось '+k.left+' из '+k.cap+
-        (adjustment?' · вручную '+(adjustment>0?'+':'')+adjustment:'')+'</div>')+
+        '" aria-valuenow="'+used+'"><i style="width:'+Math.round(used*100/Math.max(1,k.cap))+'%"></i></div>'+remaining)+
       paymentCell(7,controlsHtml(k,status),'pay-state')+'</div>';
   }
 
@@ -737,13 +749,13 @@
   }
 
   function bindOverview(){
-    host.querySelectorAll('[data-pay-sort]').forEach(button=>button.addEventListener('click',()=>{
+    host.querySelectorAll('[data-pay-sort]').forEach(button=>button.addEventListener('click',event=>{
       const {paySort:key,sortScope:scope} = button.dataset;
       const previous = orderBy[scope];
       orderBy[scope] = {key,direction:previous.key===key ? -previous.direction :
         (key==='student'||key==='payer'||key==='status' ? 1 : -1)};
       render();
-      host.querySelector('[data-sort-scope="'+scope+'"][data-pay-sort="'+key+'"]')?.focus();
+      if (event.detail===0) host.querySelector('[data-sort-scope="'+scope+'"][data-pay-sort="'+key+'"]')?.focus();
     }));
     host.querySelectorAll('[data-pay-view]').forEach(input=>input.addEventListener('change',()=>{
       view[input.dataset.payView]=input.checked;
