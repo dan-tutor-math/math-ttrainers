@@ -1643,6 +1643,8 @@
      главную»; код и роль из его браузера стираются. */
   async function endSession() {
     if (!isLeaderFlag || !code) return false;
+    const report = window.StudentMemory?.reportContext?.();
+    const reportEndedAt = Date.now();
     const old = code;
     clearTimeout(saveTimer);
     // Промпт №21 нового списка: пока идут паузы ниже, code ещё старый, и
@@ -1669,6 +1671,7 @@
     regRemove(old);
     dropBasket(old);
     applyTitle();
+    window.StudentMemory?.offerReport?.(report, reportEndedAt);
     return true;
   }
   // стереть этот код из браузера: вкладка, общий ключ, роль, последний

@@ -331,6 +331,7 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 <script src="schedule-insights.js"></script>
 <script src="schedule.js"></script>
 <script src="student-memory.js" data-picker></script>
+<script src="lesson-reports.js"></script>
 <script src="cabinet-log.js"></script>
 <script src="schedule-sync.js"></script>
 <script>
@@ -504,7 +505,7 @@ function renderCard(s, boards){
       '<button class="btn danger" id="cArch">' + (s.archived_at ? 'Вернуть из архива' : 'В архив') + '</button>' +
       '<span class="save-note" id="cMsg" role="status"></span></div>' +
     '<div id="memBox" style="margin-top:16px"></div>' +
-    '<div id="lesBox"></div>';
+    '<div id="lesBox"></div><div id="lessonReportsBox"></div>';
   bindSessionBtn(s);
   if (memOff) memOff();
   memOff = window.CabinetLog ? window.CabinetLog.mount($('memBox'), s) : null;
@@ -512,6 +513,11 @@ function renderCard(s, boards){
   if (window.CabinetLog && window.CabinetLog.mountLessons) {
     const offMem = memOff, offLes = window.CabinetLog.mountLessons($('lesBox'), s);
     memOff = () => { if (offMem) offMem(); offLes(); };
+  }
+  if (user && window.LessonReports) {
+    const offPrevious = memOff;
+    const offReports = window.LessonReports.mountHistory($('lessonReportsBox'), s, user.id);
+    memOff = () => { if (offPrevious) offPrevious(); offReports(); };
   }
   $('cSave').addEventListener('click', () => saveCard(s));
   $('cArch').addEventListener('click', () => archiveCard(s, boards));
@@ -537,7 +543,7 @@ function bindSessionBtn(s){
     if (cur && cur.id === String(s.id)) { SM.askEnd(); return; }
     btn.disabled = true;
     let ok = false;
-    try { await SM.start({ id: s.id, name: $('cName').textContent || s.name }); ok = true; }
+    try { await SM.start({ id:s.id, name:$('cName').textContent || s.name, grade:s.grade, exam:s.exam }); ok = true; }
     finally { btn.disabled = !!s.archived_at; paint(); }
     if (ok && TS.get().sessionGoHome && SM.goHome) SM.goHome();
   });

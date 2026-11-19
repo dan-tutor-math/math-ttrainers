@@ -528,7 +528,10 @@
         await NS.startNew();
         refreshUI();
       } else if (act === 'end') {
+        const memory = window.StudentMemory, report = memory?.reportContext?.();
+        const endedAt = Date.now();
         await NS.endCurrent();
+        memory?.offerReport?.(report, endedAt);
         refreshUI();
       }
     });

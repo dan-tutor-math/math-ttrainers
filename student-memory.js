@@ -56,6 +56,7 @@
   const PAUSED = 'studentMem:paused:', LESSON = 'studentMem:lesson:';
   const HEARTBEAT = 15000, MAX_AGE = 45000;
   const LS_BROWSER = 'studentMem:browser';      // сессия браузера (режим «браузер»)
+  const LS_REPORT_OWNER = 'studentMem:reportOwner';
   const LS_QUEUE = 'studentMem:queue:v1';       // неотправленные события
   const LS_DEAD = 'studentMem:dead:v1';         // отвергнутые сервером навсегда — не теряем, откладываем
   const LS_LOG = 'studentMem:log:';             // + id ученика: сжатая копия журнала
@@ -223,6 +224,35 @@
     if (!s) return null;
     return { id: String(s.student.id), name: String(s.student.name || ''), paused: !!s.paused,
              lessonId: s.lessonId || null, startedAt: s.startedAt || null, mode: bindMode() };
+  }
+  function reportOwner(){ return lsGet(LS_REPORT_OWNER); }
+  function reportContext(s = readSessionRaw()){
+    const owner = reportOwner();
+    if (!IN_TOP || isFollower() || !s?.student?.id || !(s.startedAt > 0) ||
+        !owner || (s.reportOwner && s.reportOwner !== owner)) return null;
+    const student = studentsCache?.find(item => item.id === String(s.student.id));
+    return { owner, reportId:s.reportId, studentId:String(s.student.id), studentName:s.student.name || '',
+      startedAt:s.startedAt, lessonId:s.lessonId || null, grade:student?.grade ?? s.student.grade,
+      exam:student?.exam ?? s.student.exam };
+  }
+
+  let reportsLoad;
+  function loadReports(){
+    if (window.LessonReports) return Promise.resolve(window.LessonReports);
+    if (!reportsLoad) reportsLoad = new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = new URL('lesson-reports.js', SCRIPT?.src || location.href).href;
+      script.onload = () => resolve(window.LessonReports);
+      script.onerror = () => { reportsLoad = null; script.remove(); reject(new Error()); };
+      document.head.appendChild(script);
+    });
+    return reportsLoad;
+  }
+
+  function offerReport(context, endedAt){
+    if (context && endedAt - context.startedAt > 10000) {
+      loadReports().then(reports => reports.offer({ ...context, endedAt })).catch(() => {});
+    }
   }
   function handoffUrl(url, opts){
     const cur = current();
@@ -723,7 +753,8 @@
     if (isFollower()) return null;
     opts = opts || {};
     ssDel(SS_MOVE);
-    const next = { student: { id: String(student.id), name: String(student.name || '') }, paused: false,
+    const next = { student: { id: String(student.id), name: String(student.name || ''), grade:student.grade, exam:student.exam },
+                   paused: false, reportOwner:reportOwner(), reportId:uuid(),
                    lessonId: opts.lessonId || null, lessonLabel: opts.lessonLabel || '', startedAt: Date.now() };
     if (bindMode() === 'tab'){
       if (!ssGet(SS_ID)) ssSet(SS_ID, uuid());
@@ -753,17 +784,27 @@
     emit(true);
   }
   function end(opts){
+    const endedAt = Date.now(), canOffer = opts?.report !== false;
+    let report = null;
     if (bindMode() === 'tab'){
       const gid = ssGet(SS_GID), scope = typeof opts === 'string' ? opts : opts?.scope || 'here';
+      const target = scope === 'all' || scope === 'here' ? gid : scope;
+      // Выход из одной вкладки оставляет урок открытым, пока есть другая.
+      if (canOffer && target && (scope !== 'here' || Object.keys(registry()[gid]?.tabs || {}).length <= 1)) {
+        report = reportContext(groupData(target));
+      }
       if (scope !== 'here'){
-        const target = scope === 'all' ? gid : scope;
         if (target && lsGet(INFO + target)) forgetGroup(target);
       }
       if (scope === 'here' || scope === 'all' || scope === gid) clearMember();
       registry();
-    } else lsDel(LS_BROWSER);
+    } else {
+      if (canOffer) report = reportContext();
+      lsDel(LS_BROWSER);
+    }
     emit(true);
     scheduleFlush(0);
+    offerReport(report, endedAt);
   }
 
   const tabPlural = new Intl.PluralRules('ru');
@@ -859,10 +900,11 @@
     const c = client();
     if (!c) throw new Error('Нет подключения к серверу');
     if (!(await signedIn(c))) { const e = new Error('Нужен вход'); e.code = 'auth'; throw e; }
-    const r = await c.from('students').select('id, name, boards, archived_at').order('name', { ascending: true });
+    const r = await c.from('students').select('id, name, boards, archived_at, grade, exam').order('name', { ascending: true });
     if (r.error) throw new Error(errText(r.error));
     const list = (r.data || []).filter(s => !s.archived_at)
-      .map(s => ({ id: String(s.id), name: s.name, boards: Array.isArray(s.boards) ? s.boards.map(String) : [] }));
+      .map(s => ({ id:String(s.id), name:s.name, boards:Array.isArray(s.boards) ? s.boards.map(String) : [],
+        grade:s.grade, exam:s.exam }));
     studentsCache = list;
     return list;
   }
@@ -908,7 +950,18 @@
   async function checkAuth(){
     const c = client();
     const was = authed;
-    authed = !!(c && await signedIn(c));
+    if (c) {
+      try {
+        const result = await c.auth.getSession();
+        const session = result?.data?.session;
+        authed = !!session;
+        const owner = session?.user?.id || null;
+        if (owner !== reportOwner()){
+          if (owner) lsSet(LS_REPORT_OWNER, owner); else lsDel(LS_REPORT_OWNER);
+          window.LessonReports?.accountChanged(owner);
+        }
+      } catch (e) { authed = false; }
+    }
     if (authed !== was) renderBar();
   }
   let bar = null, barSig = null, menuOpen = false;
@@ -1044,7 +1097,8 @@
     const tb = s ? sessionBoard(s) : null, ctxB = s && pickCtx ? ctxNow() : null;
     const goBoard = tb && !(ctxB && ctxB.boards && ctxB.boards.indexOf(tb) >= 0) ? tb : null;
     let sig = s ? 'S|' + s.id + '|' + s.name + '|' + s.paused + '|' + (goBoard || '') : (picker ? 'P|' + (bound ? bound.id + '|' + bound.name : '') : '');
-    if (sig) sig += '|' + (mini ? 'm' : '');
+    const report = s && reportContext();
+    if (sig) sig += '|' + (mini ? 'm' : '') + '|' + (report?.owner || '');
     if (sig === barSig) return;
     barSig = sig; menuOpen = false;
     if (!sig){ if (bar) { bar.remove(); bar = null; } return; }
@@ -1063,6 +1117,7 @@
       bar.innerHTML = '<span class="sm-name">Сессия: <b>' + esc(s.name || 'ученик') + '</b>' + (s.paused ? ' · на паузе' : '') + '</span>' +
         '<button type="button" data-sm="pause">' + (s.paused ? 'продолжить' : 'пауза') + '</button>' +
         (goBoard ? '<span class="sm-dot">·</span><a class="sm-board" href="boards.html#board=' + encodeURIComponent(goBoard) + '" title="Вернуться на доску ученика">на доску</a>' : '') +
+        (report ? '<span class="sm-dot">·</span><button type="button" data-sm="report">Отчёт</button>' : '') +
         '<span class="sm-dot">·</span><button type="button" data-sm="end">закончить</button>' + HIDE;
     } else {
       bar.innerHTML = bound
@@ -1099,6 +1154,10 @@
     const a = b.getAttribute('data-sm');
     if (a === 'pause') pause();
     else if (a === 'end') askEnd();
+    else if (a === 'report') {
+      const context = reportContext();
+      if (context) loadReports().then(reports => reports.open(context, b)).catch(() => {});
+    }
     else if (a === 'pick') openMenu();
     else if (a === 'mini') setMini(true);
     else if (a === 'expand') setMini(false);
@@ -1107,6 +1166,7 @@
 
   /* ── события браузера ── */
   window.addEventListener('storage', e => {
+    if (e.key === LS_REPORT_OWNER) { window.LessonReports?.accountChanged(reportOwner()); renderBar(); return; }
     if (e.newValue && e.key === MOVE_ACK + ssGet(SS_MOVE)) { finishMove(); return; }
     if (e.key === REGISTRY && bindMode() === 'tab'){
       const currentGroup = ssGet(SS_GID);
@@ -1188,12 +1248,13 @@
     const onAny = e => { if (e.target !== b) drop(); };
     document.addEventListener('pointerdown', onAny, true);
     document.addEventListener('keydown', onAny, true);
-    b.addEventListener('click', () => { drop(); end(); location.href = u.back; });
+    b.addEventListener('click', () => { drop(); end({ report:false }); location.href = u.back; });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', undoInit); else undoInit();
 
   window.StudentMemory = {
     current, groups, start, end, askEnd, sessionHint, pause, record, recordTask, recordAttempt, summary, kindSummary, keys, logState, forget, fetchLog, loadLog,
+    reportContext, reportOwner, offerReport,
     listStudents, onChange, flush, isFollower, bindMode, setPickerContext, goHome, handoffUrl, openBoardTab,
     queue: () => readQueue().slice(), deadLetters: () => parse(lsGet(LS_DEAD), []),
     THROTTLE_MS,
