@@ -72,7 +72,7 @@
     { id: 'practice', name: 'тренировочное', free: true },
   ];
   const REASONS = ['болезнь', 'предупредил заранее', 'не пришёл', 'семейные обстоятельства'];
-  const PAY_DEFAULTS = { skipRule: 'free', outside: 'free', trackSingleDebt: true, reason: 'болезнь', remindLeft: 1, remindDays: 3, flags: [], monthMode: 'x4' };
+  const PAY_DEFAULTS = { skipRule: 'free', outside: 'free', trackSingleDebt: true, remindLeft: 1, remindDays: 3, flags: [], monthMode: 'x4' };
   function paySettings(s){
     const raw = (s && s.pay) || {};
     return Object.assign({}, PAY_DEFAULTS, raw, { flags: Array.isArray(raw.flags) ? raw.flags : [] });
@@ -94,7 +94,7 @@
     if (p.status === 'move') return { pay: false, why: 'перенос' };
     return { pay: false, why: 'запланировано', plan: true };
   }
-  const reasonOf = (p, ps) => (p.status === 'skip' || p.status === 'move' || p.by_teacher) ? (p.reason || ps.reason || '') : '';
+  const reasonOf = p => (p.status === 'skip' || p.status === 'move' || p.by_teacher) ? (p.reason || '') : '';
 
   /* ── ставка на дату ── */
   function rateOn(rates, day, format){
@@ -198,7 +198,7 @@
       }
     });
     rows.forEach(r => {
-      const p = r.x.p, rs = reasonOf(p, ps);
+      const p = r.x.p, rs = reasonOf(p);
       const sign = { done: '✓', skip: '✕', move: '↷', plan: '○' }[p.status];
       const what = ST_WORD[p.status] + (rs ? ', ' + rs : '') + (p.makeup ? ' · отработка' : '');
       let text, right = '', cls = 'les';

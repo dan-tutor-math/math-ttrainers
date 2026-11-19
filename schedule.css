@@ -91,7 +91,6 @@ button.rw-ic:hover{filter:brightness(1.08);border-color:var(--ink);}
   border:1px solid var(--glass-border);border-radius:22px;padding:14px 10px 10px;box-shadow:inset 0 1px 0 var(--glass-inset),var(--shadow);min-width:0;
   /* карточки строки тянутся по самой высокой, а итог дня прижат вниз — суммы на одном уровне */
   display:flex;flex-direction:column;}
-.sc-day.today{box-shadow:inset 0 0 0 1.5px color-mix(in srgb,var(--ink) 40%,transparent),var(--shadow);}
 .sc-dh{display:flex;align-items:baseline;gap:8px;padding:0 8px 10px;font-size:18px;}
 .sc-dh b{font-weight:700;letter-spacing:-.01em;}
 .sc-dh span{color:var(--muted-2);font-size:15px;font-variant-numeric:tabular-nums;}
@@ -214,7 +213,6 @@ button.rw-ic:hover{filter:brightness(1.08);border-color:var(--ink);}
 /* линии часов — фон колонки, то есть самый нижний слой, под плашками */
 .sc-col{position:relative;border-radius:16px;background-color:color-mix(in srgb,var(--card) 45%,transparent);border:1px solid var(--glass-border);
   background-image:linear-gradient(to bottom,transparent calc(100% - 1px),var(--grid) calc(100% - 1px));background-size:100% 80px;}
-.sc-col.today{background-color:color-mix(in srgb,var(--ink) 5%,var(--card) 45%);}
 .sc-hv{position:absolute;left:4px;right:4px;display:none;align-items:center;padding-left:10px;border-radius:12px;pointer-events:none;z-index:0;
   background:rgba(80,140,255,.08);box-shadow:inset 0 0 0 1px rgba(80,140,255,.22);font-size:13px;color:var(--ink);font-variant-numeric:tabular-nums;}
 .sc-gl{position:absolute;left:0;right:0;height:2px;margin-top:-1px;background:var(--grab);display:none;pointer-events:none;z-index:0;border-radius:1px;}
@@ -399,13 +397,15 @@ button.rw-ic:hover{filter:brightness(1.08);border-color:var(--ink);}
 .rw-vrow{border:1px dashed var(--glass-border);margin:1px 0;}
 .rw-vrow .rw-time{color:var(--muted-2);cursor:pointer;}
 .rw-vrow:hover{border-color:color-mix(in srgb,var(--ink) 45%,transparent);background:none;}
-/* «Сегодня» заметнее: день — чуть подсвеченное стекло с синей каймой;
+/* «Сегодня» выделяем более светлым фоном, цвет остаётся в рамке и шапке;
    по кнопке «Сегодня» — мягкая вспышка, чтобы глаз сразу нашёл день */
-.sc-day.today{background:color-mix(in srgb,var(--ink) 6%,var(--glass));
+.sc-day.today{background:color-mix(in srgb,var(--glass) 82%,white);
   box-shadow:inset 0 0 0 2px color-mix(in srgb,var(--ink) 55%,transparent),var(--shadow);}
+html[data-theme="dark"] .sc-day.today{background:color-mix(in srgb,var(--glass) 95%,white);}
 .sc-day.today .sc-dh b,.sc-day.today .sc-dh span{color:var(--ink);}
-.sc-col.today{background-color:color-mix(in srgb,var(--ink) 9%,var(--card) 45%);border-color:color-mix(in srgb,var(--ink) 35%,transparent);}
+.sc-col.today{background-color:color-mix(in srgb,var(--card) 45%,white 7%);border-color:color-mix(in srgb,var(--ink) 35%,transparent);}
 .sc-gday.today b{background:var(--ink);color:#fff;border-radius:8px;padding:1px 7px;}
+#pcCustom{flex:1;min-width:0;}
 @keyframes sc-flash{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--ink) 55%,transparent);}100%{box-shadow:0 0 0 14px transparent;}}
 .sc-flash{animation:sc-flash 1s ease-out 2;}
 @media (prefers-reduced-motion:reduce){ .sc-flash{animation:none;} }

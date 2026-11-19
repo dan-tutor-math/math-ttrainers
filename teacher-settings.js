@@ -35,7 +35,7 @@
   const FORMAT_LABELS = { single: 'Индивидуальное', pair: 'Пара', group: 'Группа', semi: 'Полупараллелка' };
   const DEFAULTS = { sessionBind: 'browser', sessionGoHome: false, boardNewTab: false, labels: 'show', labelDates: true, labelCount: true, lessonMin: 60,
                      formatLabels: Object.assign({}, FORMAT_LABELS),
-                     pay: { skipRule: 'free', outside: 'free', trackSingleDebt: true, reason: 'болезнь', remindLeft: 1, remindDays: 3, flags: [], monthMode: 'x4' },
+                     pay: { skipRule: 'free', outside: 'free', trackSingleDebt: true, remindLeft: 1, remindDays: 3, flags: [], monthMode: 'x4' },
                      incomeGroups: [] };
   const listeners = [];
   let cur = null;
@@ -75,7 +75,6 @@
     if (raw.outside === 'free' || raw.outside === 'debt') o.outside = raw.outside;
     if (typeof raw.trackSingleDebt === 'boolean') o.trackSingleDebt = raw.trackSingleDebt;
     if (raw.monthMode === 'x4' || raw.monthMode === 'tpl') o.monthMode = raw.monthMode;
-    if (typeof raw.reason === 'string') o.reason = raw.reason.trim().slice(0, 60);
     const n = Math.round(Number(raw.remindLeft));
     if (raw.remindLeft !== '' && raw.remindLeft != null && n >= 0 && n <= 20) o.remindLeft = n;
     const dd = Math.round(Number(raw.remindDays));

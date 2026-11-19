@@ -26,8 +26,9 @@ test_prompt_cabinet_links.py). «Сегодня» — среда 18.11.2026, 12:
   F. расписание: у Пети «₽ оплатил» на проведённом, у Вани (абонемент) нет;
      щелчок — разовая оплата за это участие по ставке; снять — двумя
      щелчками; флаг «(пробное)» у имени;
-  G. прогул: подпись «болезнь · без оплаты», карточка — «Оплачивается» (bill),
-     своя причина из списка (reason), «По моей вине» (by_teacher), «Назначить
+  G. перенос и отмена без причины: подпись «без оплаты», карточка —
+     «Оплачивается» (bill), причина из списка или свой текст, очистка причины,
+     «По моей вине» (by_teacher), «Назначить
      отработку» — новое занятие с пометкой makeup и ссылкой на пропуск;
   H. боковая панель: остаток ученика, флаги переключаются;
   I. настройки: правило прогула и флаг из шаблона сохраняются в
@@ -118,7 +119,9 @@ def seed():
     d = fresh_db()
     d["student_task_log"] = []
     d["students"][1]["pay_mode"] = "lesson"
-    d["teacher_settings"] = [{"owner": OWNER, "settings": {"sessionBind": "tab", "pay": {"flags": [{"id": "trial", "name": "пробное", "free": True}]}}}]
+    d["teacher_settings"] = [{"owner": OWNER, "settings": {"sessionBind": "tab", "pay": {
+        "reason": "болезнь", "flags": [{"id": "trial", "name": "пробное", "free": True}],
+    }}}]
     d["lessons"] = [lesson("L03", "2026-11-03", 900), lesson("L05", "2026-11-05", 900), lesson("L10", "2026-11-10", 900),
                     lesson("L11", "2026-11-11", 600), lesson("L12", "2026-11-12", 900), lesson("L13", "2026-11-13", 600),
                     lesson("L16", "2026-11-16", 600), lesson("L17", "2026-11-17", 900, "pair"), lesson("L18", "2026-11-18", 900),
@@ -332,19 +335,36 @@ def main():
         p.wait_for_function("() => document.querySelector('%s').classList.contains('st-done')" % st_btn)
         p.click(st_btn)                                   # проведено → перенос → отменено (порядок Даниила 14.11)
         p.wait_for_function("() => document.querySelector('%s').classList.contains('st-move')" % st_btn)
+        why = p.locator('.sc-why[data-why="v18"]')
+        expect(why).to_have_text("без оплаты")
+        why.click()
+        expect(p.locator("#pcReasons .on")).to_have_count(0)
+        p.get_by_role("button", name="Своя причина").click()
+        expect(p.locator("#pcCustom")).to_have_value("")
+        p.fill("#pcCustom", "  Совпало с олимпиадой  ")
+        p.locator("#pcCustomForm").get_by_role("button", name="Сохранить").click()
+        expect(why).to_have_text("Совпало с олимпиадой · без оплаты")
+        assert wait_db(p, lambda d: any(x["id"] == "v18" and x.get("reason") == "Совпало с олимпиадой" for x in d["lesson_students"]))
+        p.keyboard.press("Escape")
+        why.click()
+        expect(p.locator("#pcReasons .on")).to_have_text("Совпало с олимпиадой")
+        p.click("#pcClearReason")
+        expect(why).to_have_text("без оплаты")
+        assert wait_db(p, lambda d: any(x["id"] == "v18" and x.get("reason") is None for x in d["lesson_students"]))
+        p.keyboard.press("Escape")
         p.click(st_btn)
         check("G1 прогул в базе", wait_db(p, lambda d: next(x for x in d["lesson_students"] if x["id"] == "v18")["status"] == "skip"))
         p.wait_for_selector('.sc-why[data-why="v18"]')
-        check("G2 подпись по умолчанию: «болезнь · без оплаты»", p.inner_text('.sc-why[data-why="v18"]') == "болезнь · без оплаты", p.inner_text('.sc-why[data-why="v18"]'))
+        check("G2 отмена без причины: «без оплаты»", why.inner_text() == "без оплаты", why.inner_text())
         check("G3 карточка сама не открылась", p.locator(".pay-card").count() == 0)
         p.click('.sc-why[data-why="v18"]')
         p.wait_for_selector(".pay-card")
         p.click('#pcBill button[data-bill="charge"]')
         lsr = lambda: next(x for x in db()["lesson_students"] if x["id"] == "v18")
         check("G4 «Оплачивается» — bill = charge", wait_db(p, lambda d: next(x for x in d["lesson_students"] if x["id"] == "v18").get("bill") == "charge"))
-        p.click('#pcReasons button[data-reason="не пришёл"]')
-        check("G5 своя причина из списка", wait_db(p, lambda d: next(x for x in d["lesson_students"] if x["id"] == "v18").get("reason") == "не пришёл"))
-        check("G6 подпись: «не пришёл · оплачивается»", p.inner_text('.sc-why[data-why="v18"]') == "не пришёл · оплачивается", p.inner_text('.sc-why[data-why="v18"]'))
+        p.click('#pcReasons button[data-reason="болезнь"]')
+        check("G5 причина «болезнь» сохраняется только при выборе", wait_db(p, lambda d: lsr().get("reason") == "болезнь"))
+        expect(why).to_have_text("болезнь · оплачивается")
         p.click("#pcTeacher")
         check("G7 «По моей вине» — by_teacher, исключение снято", wait_db(p, lambda d: next(x for x in d["lesson_students"] if x["id"] == "v18").get("by_teacher") is True and next(x for x in d["lesson_students"] if x["id"] == "v18").get("bill") is None))
         p.wait_for_selector("#pcMakeup")
@@ -386,9 +406,7 @@ def main():
         p.click('[data-tpl="charity"]')
         check("I3 флаг «благотворительное» (бесплатно) добавлен", wait_db(p, lambda d: any(f["id"] == "charity" and f["free"] for f in settings(d).get("flags", []))))
         check("I4 прежний флаг на месте", any(f["id"] == "trial" for f in settings(db()).get("flags", [])))
-        p.fill("#psReason", "болеет")
-        p.press("#psReason", "Tab")
-        check("I5 причина по умолчанию", wait_db(p, lambda d: settings(d).get("reason") == "болеет"))
+        check("I5 общей причины в настройках нет", p.locator("#psReason").count() == 0)
 
         check("K нет ошибок JavaScript", not errors, "; ".join(errors))
 

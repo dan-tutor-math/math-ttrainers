@@ -390,8 +390,6 @@
       '<div class="seg" id="psOutside"><button type="button" data-v="free" class="' + (ps.outside !== 'debt' ? 'on' : '') + '">Не считать долгом</button>' +
         '<button type="button" data-v="debt" class="' + (ps.outside === 'debt' ? 'on' : '') + '">Считать долгом</button></div>' +
       '<div class="pay-fgrid" style="margin-top:10px">' +
-        '<label><span class="label">Причина пропуска по умолчанию</span><input class="field" id="psReason" maxlength="60" list="psReasons" value="' + esc(ps.reason) + '">' +
-          '<datalist id="psReasons">' + P().REASONS.map(r => '<option value="' + esc(r) + '">').join('') + '</datalist></label>' +
         '<label><span class="label">Напомнить, когда осталось занятий</span><input class="field" type="number" id="psLeft" min="0" max="20" value="' + ps.remindLeft + '"></label>' +
         '<label><span class="label">…или дней до конца срока</span><input class="field" type="number" id="psDays" min="0" max="60" value="' + ps.remindDays + '"></label>' +
       '</div>' +
@@ -427,7 +425,6 @@
     box.addEventListener('change', e => {
       const t = e.target;
       if (t.id === 'psSingleDebt') setPay({ trackSingleDebt: t.checked });
-      else if (t.id === 'psReason') setPay({ reason: t.value.trim() });
       else if (t.id === 'psLeft') setPay({ remindLeft: Number(t.value) });
       else if (t.id === 'psDays') setPay({ remindDays: Number(t.value) });
       else if (t.closest('.pay-flag')) {

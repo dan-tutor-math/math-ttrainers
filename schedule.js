@@ -331,7 +331,7 @@
     try { (await P.listDayTotals(st.win.from, st.win.to)).forEach(r => { out[r.day] = r; }); } catch (e) {}
     return out;
   }
-  const paySet = () => (window.Payments ? window.Payments.paySettings(settings()) : { flags: [], skipRule: 'free', reason: '' });
+  const paySet = () => (window.Payments ? window.Payments.paySettings(settings()) : { flags: [], skipRule: 'free' });
   const billOf = (p, l) => (window.Payments ? window.Payments.billOf(p, l, paySet()) : { pay: false });
   function setStudents(list){
     st.students = list || [];
@@ -363,8 +363,8 @@
 
   /* ══ оплаты на занятии (В4а) ══
      Решения Даниила 13.11 (payments-audit.md, раздел 5): пропуск по
-     умолчанию не оплачивается (как перенос), причина — по умолчанию из
-     настроек; маленькая необязательная карточка пропуска открывается по
+     умолчанию не оплачивается (как перенос); причина остаётся пустой,
+     пока её не укажет преподаватель. Карточка пропуска открывается по
      подписи у имени, а не сама — отметку ставят быстро и подряд. Отмена по
      вине преподавателя не считается, рядом — «назначить отработку».
      «Оплатил» — у учеников, которые платят за каждое занятие */
@@ -379,10 +379,8 @@
   }
   const isAbsent = p => p.status === 'skip' || p.status === 'move' || !!p.by_teacher;
   function whyText(p, l){
-    const b = billOf(p, l), ps = paySet();
     if (p.by_teacher) return 'по моей вине';
-    const r = p.reason || ps.reason;
-    return (r ? r + ' · ' : '') + (b.pay ? 'оплачивается' : 'без оплаты');
+    return (p.reason ? p.reason + ' · ' : '') + (billOf(p, l).pay ? 'оплачивается' : 'без оплаты');
   }
   function flagsHtml(p){
     const ps = paySet();
@@ -448,10 +446,14 @@
     document.addEventListener('pointerdown', onDown, true);
     payCard = { el, lessonId: l.id, pid: p.id, onKey, onDown, custom: false };
     el.addEventListener('click', onPayCardClick);
-    el.addEventListener('change', e => {
-      if (e.target.id !== 'pcCustom') return;
+    el.addEventListener('submit', e => {
+      if (e.target.id !== 'pcCustomForm') return;
+      e.preventDefault();
       const c = curCard();
-      if (c) setPart(c.l, c.p, { reason: e.target.value.trim() === paySet().reason ? null : e.target.value.trim() });
+      const reason = e.target.elements.reason.value.trim();
+      if (!c || !reason) return;
+      payCard.custom = false;
+      setPart(c.l, c.p, { reason, by_teacher: false });
     });
     paintPayCard();
   }
@@ -466,7 +468,7 @@
     if (!c || (!isAbsent(c.p) && c.p.status !== 'done')) { closePayCard(); return; }
     const { l, p } = c, ps = paySet(), b = billOf(p, l), P = window.Payments;
     const reasons = (P ? P.REASONS : []).slice();
-    const cur = p.reason || ps.reason;
+    const cur = p.reason;
     if (cur && reasons.indexOf(cur) < 0) reasons.unshift(cur);
     const ruleSkip = ps.skipRule === 'charge' ? 'оплачивается' : 'не оплачивается';
     payCard.el.innerHTML =
@@ -474,10 +476,15 @@
       '<div class="hint">' + esc(dayText(l.day) + ', ' + timeText(l)) + (p.status === 'skip' ? ' · по правилу прогул ' + ruleSkip : p.status === 'move' ? ' · перенос не оплачивается' : '') + '</div>' +
       '<div class="seg" id="pcBill"><button type="button" data-bill="free" class="' + (!b.pay ? 'on' : '') + '">Не оплачивается</button>' +
         '<button type="button" data-bill="charge" class="' + (b.pay ? 'on' : '') + '">Оплачивается</button></div>' +
-      (isAbsent(p) ? '<div class="label" style="margin-top:8px">Причина</div><div class="pc-reasons" id="pcReasons">' +
-        reasons.map(r => '<button type="button" data-reason="' + esc(r) + '" class="' + (r === cur && !p.by_teacher ? 'on' : '') + '">' + esc(r) + '</button>').join('') +
-        '<button type="button" data-own="1">своя…</button></div>' +
-        (payCard.custom ? '<input class="field" id="pcCustom" maxlength="200" placeholder="своя причина" style="margin-top:6px" value="' + esc(p.reason || '') + '">' : '') +
+      (isAbsent(p) ? '<div class="label" id="pcReasonLabel" style="margin-top:8px">Причина (необязательно)</div><div class="pc-reasons" id="pcReasons" role="group" aria-labelledby="pcReasonLabel">' +
+        reasons.map(r => {
+          const active = r === cur && !p.by_teacher;
+          return '<button type="button" data-reason="' + esc(r) + '" class="' + (active ? 'on' : '') + '" aria-pressed="' + active + '">' + esc(r) + '</button>';
+        }).join('') +
+        '<button type="button" data-own="1" aria-expanded="' + payCard.custom + '">Своя причина</button>' +
+        (cur ? '<button type="button" id="pcClearReason">Убрать причину</button>' : '') + '</div>' +
+        (payCard.custom ? '<form class="pc-row" id="pcCustomForm"><input class="field" id="pcCustom" name="reason" maxlength="200" placeholder="Введите причину" aria-label="Своя причина" value="' + esc(cur || '') + '" required>' +
+          '<button class="btn small" type="submit">Сохранить</button></form>' : '') +
         '<div class="pc-row"><button type="button" class="btn quiet small" id="pcTeacher" aria-pressed="' + (p.by_teacher ? 'true' : 'false') + '">' + (p.by_teacher ? '✓ ' : '') + 'По моей вине</button>' +
           (p.by_teacher ? '<button type="button" class="btn small" id="pcMakeup" title="Создать занятие в другой день с пометкой «отработка». В статистике ученика отработки считаются отдельно">Назначить отработку</button>' : '') +
         '</div>' + (p.by_teacher ? '<div class="hint">Отмена по вине преподавателя не считается.</div>' : '') : '');
@@ -496,7 +503,10 @@
       setPart(l, p, { bill: want === byRule ? null : t.dataset.bill, by_teacher: want ? false : p.by_teacher });
     } else if (t.dataset.reason) {
       payCard.custom = false;
-      setPart(l, p, { reason: t.dataset.reason === ps.reason ? null : t.dataset.reason, by_teacher: false });
+      setPart(l, p, { reason: t.dataset.reason, by_teacher: false });
+    } else if (t.id === 'pcClearReason') {
+      payCard.custom = false;
+      setPart(l, p, { reason: null });
     } else if (t.dataset.own) { payCard.custom = true; paintPayCard(); }
     else if (t.id === 'pcTeacher') setPart(l, p, { by_teacher: !p.by_teacher, bill: null });
     else if (t.id === 'pcMakeup') { closePayCard(); assignMakeup(l, p); }
