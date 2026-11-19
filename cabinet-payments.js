@@ -17,7 +17,9 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const MONTHS_IN = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре'];
   let ctx = null, host = null;
-  const st = { data: null, per: null, sid: null, err: '', formFor: null, tok: 0, rateOpen: false, showAll: false, tpls: [], monOpen: false };
+  const st = { data: null, per: null, sid: null, err: '', formFor: null, tok: 0, rateOpen: false, showAll: false, filter: 'all', tpls: [], monOpen: false };
+  const filters = { all: 'Все', pack: 'Абонементы', lesson: 'Разовые' };
+  const pendingPayments = new Set();
 
   const settings = () => (ctx && ctx.settings && ctx.settings()) || {};
   function calcFor(sid){
@@ -60,14 +62,18 @@
     const debtSum = debtors.reduce((a, r) => a + r.c.debt, 0);
     rows.sort((a, b) => (b.c.debt > 0) - (a.c.debt > 0) || (!!b.c.remind) - (!!a.c.remind) || !!a.s.archived_at - !!b.s.archived_at || a.s.name.localeCompare(b.s.name, 'ru'));
     const names = list => list.slice(0, 3).map(r => r.s.name).join(', ') + (list.length > 3 ? '…' : '');
+    const visible = rows.filter(r => st.filter === 'all' || r.c.mode === st.filter);
     let h = '<div class="pay-top">' +
       '<div class="pay-stat' + (debtSum ? ' bad' : '') + '" id="payDebt"><span class="label">Должны</span><b>' + P().money(debtSum) + '</b><small>' + esc(debtors.length ? names(debtors) : 'никто') + '</small></div>' +
       '<div class="pay-stat' + (soon.length ? ' warn' : '') + '" id="paySoon"><span class="label">Скоро кончится</span><b>' + soon.length + '</b><small>' + esc(soon.length ? names(soon) : 'нет') + '</small></div>' +
       '<div class="pay-stat" id="payGot"><span class="label">Получено в ' + MONTHS_IN[Number(mon.slice(5)) - 1] + '</span><b>' + P().money(got) + '</b></div>' +
       '</div>' +
-      '<div class="list-tools"><span>Учеников: ' + rows.length + '</span><label class="chk" style="margin:0"><input type="checkbox" id="payAll"' + (st.showAll ? ' checked' : '') + '> Показать архив</label></div>' +
+      '<div class="seg pay-filters" role="group" aria-label="Показать учеников по способу оплаты">' +
+        Object.entries(filters).map(([key, label]) => '<button type="button" data-pay-filter="' + key + '" class="' + (st.filter === key ? 'on' : '') + '" aria-pressed="' + (st.filter === key) + '">' + label + '</button>').join('') + '</div>' +
+      '<div class="list-tools"><span>Учеников: ' + visible.length + '</span><label class="chk" style="margin:0"><input type="checkbox" id="payAll"' + (st.showAll ? ' checked' : '') + '> Показать архив</label></div>' +
       '<div class="pay-list">';
-    h += rows.length ? rows.map(r => rowHtml(r.s, r.c)).join('') : '<div class="empty">Учеников пока нет — добавьте на вкладке «Ученики».</div>';
+    const empty = st.filter === 'pack' ? 'Учеников с абонементом пока нет.' : st.filter === 'lesson' ? 'Учеников с разовой оплатой пока нет.' : 'Учеников пока нет — добавьте на вкладке «Ученики».';
+    h += visible.length ? visible.map(r => rowHtml(r.s, r.c)).join('') : '<div class="empty">' + empty + '</div>';
     return h + '</div>';
   }
   function rowHtml(s, c){
@@ -172,6 +178,7 @@
   /* ── ученик: способ оплаты, ставка, абонементы, выписка ── */
   function studentHtml(s, c){
     const d = st.per[s.id];
+    const singleDebtOff = c.mode === 'lesson' && P().paySettings(settings()).trackSingleDebt === false;
     const rates = d.rates.slice().sort((a, b) => (a.valid_from < b.valid_from ? 1 : -1));
     const curRate = rates.find(r => r.valid_from <= P().today()) || null;
     let h = '<div class="card-head"><a class="btn quiet small" href="#/payments">← Оплаты</a><h2>' + esc(s.name) + '</h2>' +
@@ -179,7 +186,8 @@
     h += '<div class="pay-sum">' +
       (c.mode === 'pack' ? '<span class="pay-chip">' + (c.current ? 'Абонемент: ' + esc(packText(c.current)) : c.packs.length ? 'Абонемент закончился' : 'Абонемента нет') + '</span>' : '<span class="pay-chip">Платит за каждое занятие</span>') +
       (c.debt > 0 ? '<span class="pay-chip bad" id="psDebt">Долг ' + P().money(c.debt) + (c.debtLessons ? ' · ' + P().plural(c.debtLessons, 'занятие', 'занятия', 'занятий') + ' без оплаты' : '') + '</span>'
-        : c.balance > 0 ? '<span class="pay-chip good">Аванс ' + P().money(c.balance) + '</span>' : '<span class="pay-chip good" id="psDebt">Долга нет</span>') +
+        : c.balance > 0 ? '<span class="pay-chip good">Аванс ' + P().money(c.balance) + '</span>' : singleDebtOff ? '' : '<span class="pay-chip good" id="psDebt">Долга нет</span>') +
+      (singleDebtOff ? '<span class="pay-chip" id="psDebt">Долги за разовые занятия не учитываются</span>' : '') +
       (c.noRate ? '<span class="pay-chip warn">Ставка не задана — ' + P().plural(c.noRate, 'занятие', 'занятия', 'занятий') + ' без цены</span>' : '') +
       (c.remind ? '<span class="pay-chip warn" title="Напоминание видно только вам">' + esc(c.remind) + '</span>' : '') +
       '</div>';
@@ -226,9 +234,17 @@
     }
     h += '<div class="set-group"><h3>Почему столько</h3><div class="hint">Оплаты и занятия одной лентой, новые сверху: что списано, что бесплатно и почему.</div>' +
       (c.lines.length ? '<div class="pay-lines" id="psLines">' + c.lines.slice().reverse().map(ln =>
-        '<div class="pay-line ' + ln.cls + '"><span class="pay-ld">' + P().dm(ln.day) + '</span><span class="pay-ls">' + esc(ln.sign) + '</span><span class="pay-lt">' + esc(ln.text) + '</span><span class="pay-lr">' + esc(ln.right || '') + '</span></div>').join('') + '</div>'
+        '<div class="pay-line ' + ln.cls + '"><span class="pay-ld">' + P().dm(ln.day) + '</span><span class="pay-ls">' + esc(ln.sign) + '</span><span class="pay-lt">' + esc(ln.text) + '</span><div class="pay-lr">' + esc(ln.right || '') + paymentAction(ln) + '</div></div>').join('') + '</div>'
         : '<div class="hint" style="margin-top:6px">Пока ни оплат, ни отмеченных занятий.</div>') + '</div>';
     return h;
+  }
+  function paymentAction(line){
+    if (!line.canMarkPaid) return '';
+    const day = P().dmy(line.day);
+    const amount = line.price == null ? '<input class="field pay-line-amount" type="number" name="amount" min="0.01" step="0.01" placeholder="Сумма, ₽" aria-label="Сумма за занятие ' + day + ', ₽" required>' : '';
+    return '<form class="pay-line-action" data-part="' + esc(line.lsId) + '">' + amount +
+      '<button class="btn quiet small" type="submit" aria-label="Оплатил за ' + day + (line.price == null ? '' : ', ' + P().money(line.price)) + '"' +
+      (pendingPayments.has(line.lsId) ? ' disabled' : '') + '>Оплатил</button></form>';
   }
   /* ── «в месяц» (В4б): способ — в «Статистике», здесь ученику — сколько
      занятий в неделю и своя сумма. Оба поля живут в строке ставки,
@@ -247,6 +263,32 @@
   }
   function bindStudent(s){
     const q = sel => host.querySelector(sel);
+    host.querySelectorAll('.pay-line-action').forEach(f => f.addEventListener('submit', async e => {
+      e.preventDefault();
+      const id = f.dataset.part;
+      if (pendingPayments.has(id)) return;
+      const line = calcFor(s.id).lines.find(ln => ln.lsId === id && ln.canMarkPaid);
+      if (!line) return;
+      const amount = line.price == null ? f.elements.amount.valueAsNumber : line.price;
+      pendingPayments.add(id);
+      const button = f.querySelector('button');
+      button.disabled = true;
+      try {
+        await P().addPayment({ student_id: s.id, kind: 'single', paid_on: P().today(), amount, lesson_student_id: id });
+        ctx.toast('Оплата сохранена');
+      } catch (err) {
+        if (err.raw && err.raw.code === '23505') ctx.toast('Оплата уже отмечена');
+        else {
+          pendingPayments.delete(id);
+          const current = host.querySelector('[data-part="' + CSS.escape(id) + '"] button');
+          if (current) current.disabled = false;
+          ctx.toast('Не удалось сохранить оплату: ' + err.message);
+          return;
+        }
+      }
+      await load();
+      pendingPayments.delete(id);
+    }));
     host.querySelectorAll('#psMode button').forEach(b => b.addEventListener('click', async () => {
       try { await P().setMode(s.id, b.dataset.mode); await load(); }
       catch (e) { ctx.toast('Не сохранилось: ' + e.message); }
@@ -310,6 +352,12 @@
       if (f) { const a = f.querySelector('[name=amount]'); a.focus(); a.select(); }
     }));
     const all = host.querySelector('#payAll');
+    host.querySelectorAll('[data-pay-filter]').forEach(b => b.addEventListener('click', () => {
+      st.filter = b.dataset.payFilter;
+      st.formFor = null;
+      render();
+      host.querySelector('[data-pay-filter="' + st.filter + '"]').focus();
+    }));
     if (all) all.addEventListener('change', () => { st.showAll = all.checked; render(); });
     host.querySelectorAll('.pay-form').forEach(bindForm);
     if (s) bindStudent(s);
@@ -321,6 +369,9 @@
     const nsid = sid ? String(sid) : null;
     if (nsid !== st.sid) { st.formFor = null; st.rateOpen = false; st.monOpen = false; }
     st.sid = nsid;
+    // Старая выписка может ещё предлагать оплатить уже закрытое занятие.
+    st.data = null;
+    st.err = '';
     render();
     return load();
   }
@@ -330,6 +381,8 @@
     const ps = P().paySettings(settings());
     const tpls = P().FLAG_TEMPLATES.filter(t => !ps.flags.some(f => f.id === t.id || f.name === t.name));
     return '<h3>Оплаты</h3>' +
+      '<div class="pay-debt-rule"><label class="chk"><input type="checkbox" id="psSingleDebt" aria-describedby="psSingleHint"' + (ps.trackSingleDebt ? ' checked' : '') + '> Учитывать долги за разовые занятия</label>' +
+      '<div class="hint" id="psSingleHint">Если ученики платят сразу и вы редко вносите эти оплаты, снимите галочку. Занятия без отметки не попадут в долг. При желании оплату можно отметить в выписке ученика.</div></div>' +
       '<div class="hint">Прогул по умолчанию — как перенос: не оплачивается. На занятии это можно сменить.</div>' +
       '<div class="seg" id="psSkip"><button type="button" data-v="free" class="' + (ps.skipRule === 'free' ? 'on' : '') + '">Прогул не оплачивается</button>' +
         '<button type="button" data-v="charge" class="' + (ps.skipRule === 'charge' ? 'on' : '') + '">Прогул оплачивается</button></div>' +
@@ -373,7 +426,8 @@
     });
     box.addEventListener('change', e => {
       const t = e.target;
-      if (t.id === 'psReason') setPay({ reason: t.value.trim() });
+      if (t.id === 'psSingleDebt') setPay({ trackSingleDebt: t.checked });
+      else if (t.id === 'psReason') setPay({ reason: t.value.trim() });
       else if (t.id === 'psLeft') setPay({ remindLeft: Number(t.value) });
       else if (t.id === 'psDays') setPay({ remindDays: Number(t.value) });
       else if (t.closest('.pay-flag')) {

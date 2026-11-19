@@ -43,6 +43,7 @@ import re
 import sys
 
 from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect
 
 import test_prompt_b1_student_memory as B1
 from test_prompt_b1_student_memory import BASE, PETYA, STATE, TEACHER, VANYA, check, db, fresh_db, local_server
@@ -161,6 +162,75 @@ def open_lesson(p, lid):
     p.hover(sel)
     p.click(sel + " .rw-more")
     p.click(".gm-menu.on .gm-item:has-text('Открыть занятие')")
+
+def check_payment_controls(browser):
+    d = seed()
+    # Абонемент без остатка, пара в долг и занятие до первой ставки.
+    d["payments"][0]["lessons"] = 3
+    d["lessons"].append(lesson("L08", "2026-08-31", 600))
+    d["lesson_students"].append(person("p08", "L08", PETYA, "done"))
+    STATE["db"] = json.dumps(d)
+    ctx = B1.new_context(browser, bar_open=False)
+    ctx.add_init_script(FIXED_NOW_JS)
+    p = ctx.new_page()
+    errors = []
+    p.on("pageerror", lambda e: errors.append(str(e)))
+    p.goto(f"{BASE}/cabinet.html#/payments")
+    rows = p.locator(".pay-row")
+    filters = p.get_by_role("group", name="Показать учеников по способу оплаты")
+    expect(filters.get_by_role("button", name="Все", exact=True)).to_have_attribute("aria-pressed", "true")
+    filters.get_by_text("Абонементы").click()
+    expect(rows).to_have_count(1)
+    expect(rows).to_contain_text("Ваня")
+    filters.get_by_text("Разовые").click()
+    expect(rows).to_have_count(1)
+    rows.locator("a.nm").click()
+    expect(p.locator(".pay-line-action")).to_have_count(3)
+    pair = p.locator('[data-part="p17"]')
+    pair.locator("button").evaluate("(b) => { b.click(); b.click(); }")
+    expect(pair).to_have_count(0)
+    expect(p.locator("#psDebt")).to_contain_text("1 500")
+    receipts = [x for x in db()["payments"] if x.get("lesson_student_id") == "p17"]
+    assert len(receipts) == 1 and receipts[0]["amount"] == 1000
+    assert receipts[0]["paid_on"] == "2026-11-18" and receipts[0]["student_id"] == PETYA
+    p.locator('[data-part="p08"] input').fill("850")
+    p.locator('[data-part="p08"] button').click()
+    expect(p.locator('[data-part="p08"]')).to_have_count(0)
+    assert next(x for x in db()["payments"] if x.get("lesson_student_id") == "p08")["amount"] == 850
+    p.get_by_text("← Оплаты", exact=True).click()
+    expect(filters.get_by_text("Разовые")).to_have_attribute("aria-pressed", "true")
+    filters.get_by_text("Все", exact=True).click()
+    expect(rows).to_have_count(2)
+    p.goto(f"{BASE}/cabinet.html#/settings")
+    toggle = p.get_by_role("checkbox", name="Учитывать долги за разовые занятия")
+    expect(toggle).to_be_checked()
+    toggle.uncheck()
+    assert wait_db(p, lambda data: data["teacher_settings"][0]["settings"]["pay"].get("trackSingleDebt") is False)
+    p.reload()
+    expect(toggle).not_to_be_checked()
+    p.goto(f"{BASE}/cabinet.html#/stats")
+    expect(p.locator("#stDebt")).to_contain_text("2 000")
+    p.goto(f"{BASE}/cabinet.html#/payments")
+    expect(p.locator("#payDebt")).to_contain_text("2 000")
+    expect(p.locator("#payGot")).to_contain_text("13 350")
+    p.set_viewport_size({"width": 375, "height": 812})
+    filters.get_by_text("Разовые").click()
+    rows.locator("a.nm").click()
+    expect(p.locator("#psDebt")).to_have_text("Долги за разовые занятия не учитываются")
+    expect(p.locator(".pay-line-action")).to_have_count(1)
+    button = p.locator('[data-part="p13"] button')
+    button.scroll_into_view_if_needed()
+    rect = button.bounding_box()
+    assert rect["x"] >= 0 and rect["x"] + rect["width"] <= 375
+    p.goto(f"{BASE}/cabinet.html#/settings")
+    toggle.check()
+    assert wait_db(p, lambda data: data["teacher_settings"][0]["settings"]["pay"].get("trackSingleDebt") is True)
+    p.goto(f"{BASE}/cabinet.html#/payments")
+    expect(p.locator("#payDebt")).to_contain_text("3 500")
+    assert not errors, errors
+    ctx.close()
+    print("[OK] Фильтры, разовые долги, абонементы и оплата из выписки на телефоне")
+
 
 def main():
     errors = []
@@ -341,6 +411,9 @@ def main():
         q.wait_for_function("() => /cabinet-payments\\.sql/.test(document.querySelector('#payHost').innerText)", timeout=8000)
         check("J3 вкладка просит выполнить cabinet-payments.sql", True)
         check("J4 нет ошибок JavaScript", not errs2, "; ".join(errs2))
+        ctx.close()
+        ctx2.close()
+        check_payment_controls(browser)
         browser.close()
     print("\nИТОГ:", "всё зелёное" if not B1.FAILS else "есть падения: " + ", ".join(B1.FAILS))
     sys.exit(1 if B1.FAILS else 0)

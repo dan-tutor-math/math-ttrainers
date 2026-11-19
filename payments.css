@@ -11,6 +11,9 @@
 .pay-stat.warn b{color:var(--warn);}
 
 .pay-list{display:flex;flex-direction:column;gap:8px;}
+.pay-filters{margin-bottom:10px;}
+.pay-debt-rule{padding:10px 12px;margin:0 0 14px;background:var(--card);border:1px solid var(--glass-border);border-radius:12px;}
+.pay-debt-rule .chk{margin:0 0 4px;}
 .pay-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 14px;border-radius:14px;background:var(--card);border:1px solid var(--glass-border);}
 .pay-row.debt{border-color:var(--teacher);}
 .pay-row.arch{opacity:.6;}
@@ -51,7 +54,9 @@
 .pay-line:last-child{border-bottom:none;}
 .pay-ld{color:var(--muted-2);font-variant-numeric:tabular-nums;}
 .pay-ls{font-weight:700;text-align:center;}
-.pay-lr{color:var(--muted-2);font-size:12.5px;text-align:right;white-space:nowrap;}
+.pay-lr{display:flex;align-items:center;justify-content:flex-end;gap:4px 8px;flex-wrap:wrap;color:var(--muted-2);font-size:12.5px;text-align:right;}
+.pay-line-action{display:inline-flex;align-items:center;gap:6px;}
+.pay-line-amount{max-width:96px;}
 .pay-line.in .pay-ls,.pay-line.in .pay-lt{color:var(--ok);}
 .pay-line.debt .pay-lt,.pay-line.debt .pay-ls{color:var(--teacher);}
 .pay-line.free .pay-lt{color:var(--muted-2);}
@@ -84,7 +89,8 @@
 @media (max-width:620px){
   .pay-top{grid-template-columns:1fr;}
   .pay-line{grid-template-columns:42px 14px 1fr;}
-  .pay-lr{grid-column:3;text-align:left;}
+  .pay-lr{grid-column:3;justify-content:flex-start;text-align:left;}
+  .pay-lr:empty{display:none;}
   .pay-card{left:8px;right:8px;bottom:8px;width:auto;max-width:none;}
 }
 
