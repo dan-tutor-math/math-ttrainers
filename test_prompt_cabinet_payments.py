@@ -305,6 +305,9 @@ def check_new_payment_layout(browser):
     expect(page.locator("#payGot b")).to_have_text(total)
     expect(page.locator("#payArchive summary")).to_contain_text("1")
     page.locator("#payArchive summary").click()
+    archived_row = page.locator('[data-archived-payment="pk1"]')
+    expect(archived_row.locator('[data-col="Начало"]')).to_have_text("01.11.2026")
+    expect(archived_row.locator('[data-col="Окончание"]')).to_have_text("20.11.2026")
     page.locator('[data-pay-unarchive="pk1"]').click()
     expect(pack).to_be_visible()
     expect(meter).to_have_attribute("aria-valuenow", "5")
@@ -341,6 +344,73 @@ def check_new_payment_layout(browser):
     assert not errors, errors
     ctx.close()
     print("[OK] Календарь, рост шкалы, архив, разовые по дате и ставке занятия, истории и 320 px")
+
+def check_archived_pack_keeps_lessons(browser):
+    data = seed()
+    dates = ["2026-09-18", "2026-09-22", "2026-09-24", "2026-09-29", "2026-10-01", "2026-10-05", "2026-10-06", "2026-10-13"]
+    data["lessons"] = [lesson(f"archived-lesson-{i}", day, 900) for i, day in enumerate(dates)]
+    data["lesson_students"] = [person(f"archived-person-{i}", row["id"], VANYA, "done")
+                               for i, row in enumerate(data["lessons"])]
+    data["payments"] = [
+        dict(pay("archived-pack", VANYA, "pack", "2026-09-18", 14000, lessons=8, burn="count"),
+             archived_at="2026-09-25T10:00:00Z"),
+        pay("next-pack", VANYA, "pack", "2026-10-28", 16000, lessons=8, burn="count", start_on="2026-10-27"),
+        dict(pay("older-receipt", PETYA, "pack", "2026-09-10", 6000, lessons=4, burn="date",
+                 start_on="2026-10-01", end_on="2026-10-07"), archived_at="2026-10-08T10:00:00Z"),
+        pay("newer-receipt", PETYA, "pack", "2026-11-02", 8000, lessons=4, burn="count"),
+    ]
+    data["teacher_settings"][0]["settings"]["pay"]["outside"] = "debt"
+    STATE["db"] = json.dumps(data)
+    ctx = B1.new_context(browser, bar_open=False)
+    ctx.add_init_script(FIXED_NOW_JS)
+    page = ctx.new_page()
+    B1.PUMP["page"] = page
+    page.goto(f"{BASE}/cabinet.html#/payments")
+    expect(page.locator('[data-pay-pack="next-pack"]')).to_be_visible()
+    expect(page.locator("#payDebt")).to_be_hidden()
+    pack_table = page.get_by_role("table", name="Абонементы", exact=True)
+    assert pack_table.locator("[data-pay-sort]").count() == 8
+    assert pack_table.locator("[data-pay-pack]").evaluate_all("(rows) => rows.map(r => r.dataset.payPack)") == ["newer-receipt", "next-pack"]
+    date_sort = pack_table.get_by_role("columnheader", name="Дата оплаты")
+    expect(date_sort).to_have_attribute("aria-sort", "descending")
+    date_sort.get_by_role("button").click()
+    expect(date_sort).to_have_attribute("aria-sort", "ascending")
+    expect(pack_table.locator("[data-pay-pack]").first).to_have_attribute("data-pay-pack", "next-pack")
+    pack_table.get_by_role("button", name="Сумма, ₽").click()
+    expect(pack_table.locator("[data-pay-pack]").first).to_have_attribute("data-pay-pack", "next-pack")
+    pack_table.get_by_role("button", name="Сумма, ₽").press("Enter")
+    expect(pack_table.locator("[data-pay-pack]").first).to_have_attribute("data-pay-pack", "newer-receipt")
+
+    page.locator("#payArchive summary").click()
+    archive = page.get_by_role("table", name="Архив оплат", exact=True)
+    expect(archive.locator("[data-archived-payment]").first).to_have_attribute("data-archived-payment", "archived-pack")
+    archive.get_by_role("button", name="Дата оплаты").click()
+    expect(archive.locator("[data-archived-payment]").first).to_have_attribute("data-archived-payment", "older-receipt")
+    archive.get_by_role("button", name="Начало").click()
+    expect(archive.locator("[data-archived-payment]").first).to_have_attribute("data-archived-payment", "older-receipt")
+    archive.get_by_role("button", name="Начало").click()
+    expect(archive.locator("[data-archived-payment]").first).to_have_attribute("data-archived-payment", "archived-pack")
+    archive.get_by_role("button", name="Окончание").click()
+    expect(archive.locator("[data-archived-payment]").first).to_have_attribute("data-archived-payment", "archived-pack")
+    archive.get_by_role("button", name="Окончание").click()
+    expect(archive.locator("[data-archived-payment]").first).to_have_attribute("data-archived-payment", "older-receipt")
+    expect(pack_table.get_by_role("columnheader", name="Сумма, ₽")).to_have_attribute("aria-sort", "ascending")
+    page.set_viewport_size({"width":320,"height":740})
+    expect(archive.get_by_role("button", name="Дата оплаты")).to_be_visible()
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    record = archive.locator('[data-archived-payment="archived-pack"]')
+    expect(record.locator('[data-col="Дата оплаты"]')).to_have_text("18.09.2026")
+    expect(record.locator('[data-col="Начало"]')).to_have_text("18.09.2026")
+    expect(record.locator('[data-col="Окончание"]')).to_have_text("13.10.2026")
+    record.locator("a.nm").click()
+    expect(page.locator("#psDebt")).to_contain_text("Долга нет")
+    archived = page.locator('[data-pid="archived-pack"]')
+    expect(archived).to_contain_text("Период с 18.09.2026 по 13.10.2026")
+    expect(archived).to_contain_text("прошло 8")
+    expect(page.locator('[data-pid="next-pack"]')).to_contain_text("дата окончания не указана")
+    assert not page.locator(".pay-line.debt").count()
+    ctx.close()
+    print("[OK] Сортировка оплат и архива в обе стороны, три даты, карточка и отсутствие ложного долга")
 
 
 def main():
@@ -418,7 +488,7 @@ def main():
         ok = wait_db(p, lambda d: len([x for x in d["payments"] if x["student_id"] == VANYA and x["kind"] == "pack"]) == 2)
         new = [x for x in db()["payments"] if x["student_id"] == VANYA and x["id"] != "pk1"]
         check("C6 новый абонемент в базе", ok and new and new[0]["lessons"] == 5 and new[0]["burn"] == "count" and new[0]["paid_on"] == "2026-11-18" and new[0]["amount"] == 10000, str(new))
-        expect(p.locator(f'.pay-row[data-sid="{VANYA}"]')).to_contain_text("В очереди")
+        expect(p.locator(f'.pay-row[data-sid="{VANYA}"]').get_by_text("В очереди", exact=True)).to_be_visible()
 
         # ── F. расписание: «оплатил» и флаг ──
         p.goto(f"{BASE}/cabinet.html#/schedule/2026-11-16")
@@ -544,6 +614,7 @@ def main():
         ctx2.close()
         check_payment_controls(browser)
         check_new_payment_layout(browser)
+        check_archived_pack_keeps_lessons(browser)
         browser.close()
     print("\nИТОГ:", "всё зелёное" if not B1.FAILS else "есть падения: " + ", ".join(B1.FAILS))
     sys.exit(1 if B1.FAILS else 0)

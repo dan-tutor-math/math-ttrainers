@@ -211,6 +211,12 @@
 .pay-ledger.pack.hide-payer .pay-entry{grid-template-columns:minmax(0,1.23fr) minmax(0,.6fr) minmax(0,1fr) minmax(0,.78fr) minmax(0,.57fr) minmax(0,.95fr) minmax(0,1.3fr);}
 .pay-ledger.single.hide-payer .pay-entry{grid-template-columns:minmax(0,1.5fr) repeat(2,minmax(0,1fr));}
 .pay-ledger .pay-thead{border-top:0;color:var(--muted-2);font-size:11px;font-weight:650;}
+.pay-sort{border:0;border-radius:6px;padding:4px 3px;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;max-width:100%;}
+.pay-sort:hover,.pay-sort:focus-visible,.pay-thead [aria-sort] .pay-sort{color:var(--ink);background:var(--hl-10);}
+.pay-sort span{white-space:nowrap;}
+.pay-archive-ledger{margin-top:7px;}
+.pay-archive-ledger .pay-entry{grid-template-columns:minmax(0,1.5fr) repeat(3,minmax(0,1fr)) minmax(0,.85fr) minmax(0,.9fr);}
+.pay-archive-action{justify-self:end;}
 .pay-entry>div{min-width:0;}
 .pay-entry .pay-identity{display:flex;flex-direction:column;align-items:flex-start;gap:4px;overflow-wrap:anywhere;}
 .pay-ledger .pay-row .nm{min-width:0;font-size:14px;color:var(--pencil);}
@@ -271,18 +277,22 @@
   .pay-remind-row{padding:4px 0;}
 }
 @media (max-width:750px){
-  .pay-ledger .pay-thead{display:none;}
-  .pay-ledger.pack .pay-entry,.pay-ledger.single .pay-entry{grid-template-columns:repeat(3,minmax(0,1fr));}
+  .pay-ledger.pack .pay-entry,.pay-ledger.single .pay-entry,.pay-archive-ledger .pay-entry,
+  .pay-ledger.pack.hide-payer .pay-entry,.pay-ledger.single.hide-payer .pay-entry{grid-template-columns:repeat(3,minmax(0,1fr));}
+  .pay-ledger .pay-thead{display:flex;flex-wrap:wrap;gap:3px;padding:5px 8px;}
+  .pay-sort{padding:5px 6px;}
   .pay-entry>div[data-col]::before{content:attr(data-col);display:block;color:var(--muted-2);font-size:11px;margin-bottom:2px;}
+  .pay-entry>div[data-col=""]::before{display:none;}
   .pay-entry .pay-identity{grid-column:span 2;}
   .pay-entry .pay-state{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:5px;}
   .pay-entry .pay-state::before{display:none;}
+  .pay-archive-action{grid-column:span 2;}
 }
 @media (max-width:500px){
   .pay-period-months{grid-template-columns:1fr;}
   .pay-period-months>section:nth-child(2){display:none;}
 }
 @media (pointer:coarse){
-  .pay-day,.pay-entry .btn,.pay-cell-input.field{min-height:44px;}
+  .pay-day,.pay-entry .btn,.pay-cell-input.field,.pay-sort{min-height:44px;}
   .pay-cell-input.field{font-size:16px;}
 }

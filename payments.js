@@ -123,9 +123,9 @@
     const packs = pays.filter(x => x.kind === 'pack')
       .map(x => {
         const manualClose = ps.closedPacks?.[x.id] || null;
-        const archiveDate = x.archived_at && new Date(x.archived_at);
-        const stopped = archiveDate && Number.isFinite(archiveDate.getTime()) ? ymd(archiveDate) : null;
-        const end = [x.end_on, manualClose, stopped].filter(Boolean).sort()[0] || null;
+        // Архив скрывает оплату из списка. Дату окончания задаёт период
+        // или ручное закрытие, иначе архив мог превратить оплаченные уроки в долг.
+        const end = [x.end_on, manualClose].filter(Boolean).sort()[0] || null;
         return { pay: x, start: x.start_on || x.paid_on, end, manualClose, cut: null,
           cap: Number(x.lessons) || 0, used: Number(x.adjust) || 0, proj: 0, items: [], until: null };
       })
@@ -175,7 +175,7 @@
     });
     packs.forEach(k => {
       k.left = Math.max(0, k.cap - k.used);
-      k.expired = !!(k.end && (now > k.end || k.manualClose || k.pay.archived_at));
+      k.expired = !!(k.end && (now > k.end || k.manualClose));
       // оборван началом следующего — в него больше ничего не попадёт
       k.closed = k.expired || k.left <= 0 || !!(k.cut && now > k.cut);
       k.burned = k.expired ? k.left : 0;

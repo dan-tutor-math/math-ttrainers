@@ -62,11 +62,40 @@
   }
   const view = visibleOptions();
   const tableLabels = ['Ученик','Родитель','Дата оплаты','Действует','Сумма, ₽','Занятий','Прошло','Абонемент'];
+  const columns = {
+    pack: ['student','payer','paidOn','period','amount','cap','used','status'].map((key,i)=>[key,tableLabels[i]]),
+    lesson: [['student',tableLabels[0]],['payer',tableLabels[1]],['paidOn',tableLabels[2]],['amount',tableLabels[4]]],
+    archive: [['student',tableLabels[0]],['paidOn',tableLabels[2]],['start','Начало'],['end','Окончание'],['amount',tableLabels[4]]],
+  };
+  const orderBy = Object.fromEntries(Object.keys(columns).map(scope=>[scope,{key:'paidOn',direction:-1}]));
+  const alphabetical = new Intl.Collator('ru',{numeric:true,sensitivity:'base'});
   const calendarStates = { done: 'Проведено', plan: 'Запланировано', template: 'По шаблону', unmarked: 'Не отмечено', over: 'Сверх оплаченного' };
+
+  function sortingHeader(scope){
+    const sort = orderBy[scope];
+    return '<div class="pay-entry pay-thead" role="row">'+columns[scope].map(([key,label])=>{
+      const active = sort.key===key;
+      const ariaSort = active ? ' aria-sort="'+(sort.direction===1?'ascending':'descending')+'"' : '';
+      return '<div role="columnheader"'+ariaSort+(key==='payer'?' class="pay-payer"':'')+'><button type="button" class="pay-sort"'+
+        ' data-pay-sort="'+key+'" data-sort-scope="'+scope+'">'+label+(active?' <span aria-hidden="true">'+
+        (sort.direction===1?'↑':'↓')+'</span>':'')+'</button></div>';
+    }).join('')+(scope==='archive'?'<div role="columnheader" aria-label="Действия"></div>':'')+'</div>';
+  }
+
+  function sortedEntries(entries,scope){
+    const compare = (a,b,direction) => {
+      if (a == null || a==='') return b == null || b==='' ? 0 : 1;
+      if (b == null || b==='') return -1;
+      return direction*(typeof a==='number' ? a-b : alphabetical.compare(a,b));
+    };
+    const {key,direction} = orderBy[scope];
+    return entries.sort((a,b)=>compare(a[key],b[key],direction) || compare(a.paidOn,b.paidOn,-1) || compare(a.student,b.student,1));
+  }
 
   const paymentButton = (label, key, id, cls = '') => '<button type="button" class="btn quiet small ' + cls +
     '" data-' + key + '="' + esc(id) + '">' + esc(label) + '</button>';
-  const paymentCell = (i, html, cls = '') => '<div class="' + cls + '" data-col="' + tableLabels[i] + '">' + html + '</div>';
+  const cell = (label, html, cls = '') => '<div role="cell" class="'+cls+'" data-col="'+label+'">'+html+'</div>';
+  const paymentCell = (i, html, cls = '') => cell(tableLabels[i], html, cls);
   const paymentInput = (p, key, label, value, attrs = '') => '<input class="field pay-cell-input" aria-label="' + esc(label) +
     '" data-pay-edit="' + key + '" data-pid="' + esc(p.id) + '" value="' + esc(value) + '" ' + attrs + '>';
   const studentLink = s => '<a class="nm" href="#/payments/' + esc(s.id) + '">' + esc(s.name) + '</a>';
@@ -75,6 +104,16 @@
   const recordsFor = sid => st.per[sid]?.payments || [];
   const packEnd = k => firstDate(k.end, k.cut);
   const effectiveUsed = k => Math.max(0, Math.min(k.cap, k.used));
+
+  function recordedPackEnd(k){
+    if (k.end) return packEnd(k);
+    const lastCovered = k.left <= 0 ? k.items.at(-1)?.day || k.start : null;
+    return firstDate(k.cut, lastCovered);
+  }
+
+  function fullPeriod(start,end){
+    return 'Период с '+P().dmy(start)+(end?' по '+P().dmy(end):' · дата окончания не указана');
+  }
 
   function scheduleMarks(s, k){
     const d = st.per[s.id];
@@ -108,12 +147,11 @@
 
   function periodPreview(s,k){
     const now = P().today(), marks = scheduleMarks(s,k), template = templateMarks(s);
-    const explicit = packEnd(k), from = now > k.start ? now : k.start;
+    const from = now > k.start ? now : k.start;
     const filled = st.filledWeeks;
     const marksOn = day => marks.get(day) || (day >= now && !filled.has(weekStart(day)) ?
       Array(template[(new Date(day+'T12:00:00').getDay()+6)%7]).fill('template') : []);
-    let end = explicit;
-    if (!end && k.left <= 0) end = k.items.at(-1)?.day || k.start;
+    let end = recordedPackEnd(k);
     if (!end && (template.some(Boolean) || marks.size)) {
       const lastActual = [...marks.keys()].sort().at(-1);
       const anchor = lastActual && lastActual > from ? lastActual : from;
@@ -135,7 +173,7 @@
     const debtors = rows.filter(r => r.c.debt>0), debtSum = debtors.reduce((a,r)=>a+r.c.debt,0);
     const ps = P().paySettings(settings());
     const reminders = rows.flatMap(({s,c}) => {
-      const k = c.current || c.packs.filter(pack => !pack.pay.archived_at).at(-1);
+      const k = c.active.find(pack=>!pack.pay.archived_at) || c.packs.findLast(pack=>!pack.pay.archived_at);
       if (!k || k.start>now) return [];
       const end = periodPreview(s,k).end;
       return end && ps.remindedPacks?.[k.pay.id] !== end ? [{s,k,end}] : [];
@@ -146,7 +184,6 @@
     const names = list => list.slice(0,3).map(r=>r.s.name).join(', ') + (list.length>3?'…':'');
     const visible = rows.filter(({s,c}) => c.mode===st.filter || recordsFor(s.id).some(p =>
       !p.archived_at && p.kind===(st.filter==='pack'?'pack':'single')));
-    visible.sort((a,b)=>(b.c.debt>0)-(a.c.debt>0) || a.s.name.localeCompare(b.s.name,'ru'));
     const header = '<div class="pay-top">' +
       '<div class="pay-stat" id="payGot"><span>Получено в ' + MONTHS_IN[Number(mon.slice(5))-1] + '</span><b>'+P().money(got)+'</b></div>' +
       '<div class="pay-stat'+(overdueCount?' bad':'')+'" id="payDebt"'+(!view.showOverdue&&!overdueCount?' hidden':'')+
@@ -160,28 +197,31 @@
       '</b> на ближайшие 7 дней</small></div>'+soon.map(({s,k,end})=>'<div class="pay-remind-row"><div>'+studentLink(s)+'<div class="hint">'+
       (end===now?'Сегодня':P().dm(end))+'</div></div><button type="button" class="btn quiet small" data-pay-reminded="'+esc(k.pay.id)+
       '" data-due="'+end+'">Напомнил</button></div>').join('')+(soon.length?'':'<div class="hint">Напоминаний нет</div>')+'</aside>';
-    const labels = st.filter==='pack'?tableLabels:[tableLabels[0],tableLabels[1],tableLabels[2],tableLabels[4]];
-    const table = '<div class="pay-ledger '+(st.filter==='pack'?'pack':'single')+(view.showPayer===false?' hide-payer':'')+'"><div class="pay-entry pay-thead" aria-hidden="true">'+
-      labels.map((label,i)=>'<span class="'+(i===1?'pay-payer':'')+'">'+label+'</span>').join('')+'</div>'+
-      (visible.length ? visible.map(({s,c})=>rowHtml(s,c)).join('') : '<div class="empty">Таких оплат пока нет.</div>')+'</div>';
-    return header+'<div class="pay-overview"><div class="pay-main">'+filter+table+'</div>'+remind+'</div>'+archiveHtml();
+    const table = '<div role="table" aria-label="'+filters[st.filter]+'" class="pay-ledger '+(st.filter==='pack'?'pack':'single')+
+      (view.showPayer===false?' hide-payer':'')+'">'+sortingHeader(st.filter)+
+      (visible.length ? ledgerRows(visible) : '<div class="empty">Таких оплат пока нет.</div>')+'</div>';
+    return header+'<div class="pay-overview"><div class="pay-main">'+filter+table+'</div>'+remind+'</div>'+
+      archiveHtml(new Map(rows.map(({s,c})=>[s.id,c])));
   }
 
-  function controlsHtml(k,queued){
+  function packStatus(k,queued){
+    if (k.closed) return k.expired||k.left>0 ? 'Истёк' : 'Завершён';
+    return queued || k.start>P().today() ? 'В очереди' : 'Действует';
+  }
+
+  function controlsHtml(k,state){
     const id = k.pay.id, buttons = [];
-    queued = queued || k.start>P().today();
-    const state = k.closed ? (k.expired||k.left>0?'Истёк':'Завершён') : queued?'В очереди':'Действует';
     if (k.manualClose && !k.pay.archived_at) buttons.push(paymentButton('Вернуть','pay-resume',id));
     if (k.closed && !k.pay.archived_at) buttons.push(paymentButton('В архив','pay-archive',id));
-    if (!k.closed && !queued) buttons.push(paymentButton('Абонемент истёк','pay-expire',id));
+    if (state==='Действует') buttons.push(paymentButton('Абонемент истёк','pay-expire',id));
     return '<span class="pay-chip '+(k.closed?'warn':'good')+'">'+state+'</span><div class="row-btns">'+buttons.join('')+'</div>';
   }
 
-  function packEntry(s,k,identity,queued){
-    const p = k.pay, used = effectiveUsed(k), expected = periodPreview(s,k).end;
+  function packEntry(row,identity){
+    const {k,p,end:expected,status} = row, used = effectiveUsed(k);
     const range = P().dm(k.start)+' – '+(expected?P().dm(expected):'…');
     const adjustment = Number(p.adjust)||0;
-    return '<div class="pay-entry" data-pay-pack="'+esc(p.id)+'">'+
+    return '<div role="row" class="pay-entry" data-pay-pack="'+esc(p.id)+'">'+
       paymentCell(0,identity,'pay-identity')+
       paymentCell(1,paymentInput(p,'payer','Подпись родителя',p.payer || '','maxlength="80" placeholder="Не указана"'),'pay-payer')+
       paymentCell(2,P().dm(p.paid_on))+
@@ -192,38 +232,61 @@
         '<span>/ '+k.cap+'</span></div><div class="pay-bar" role="progressbar" aria-label="Прошло занятий" aria-valuemin="0" aria-valuemax="'+k.cap+
         '" aria-valuenow="'+used+'"><i style="width:'+Math.round(used*100/Math.max(1,k.cap))+'%"></i></div><div class="hint">осталось '+k.left+' из '+k.cap+
         (adjustment?' · вручную '+(adjustment>0?'+':'')+adjustment:'')+'</div>')+
-      paymentCell(7,controlsHtml(k,queued),'pay-state')+'</div>';
+      paymentCell(7,controlsHtml(k,status),'pay-state')+'</div>';
   }
 
-  function rowHtml(s,c){
-    const key = esc(s.id);
-    const identity = studentLink(s)+(c.debt>0?'<small class="pay-debt">долг '+P().money(c.debt)+'</small>':'')+
-      paymentButton('+ оплата','add',s.id,'pay-add');
-    let entries;
-    if (st.filter==='pack') {
-      const packs = c.packs.filter(k=>!k.pay.archived_at);
-      entries = packs.map((k,i)=>packEntry(s,k,i?studentLink(s):identity,c.queued.includes(k))).join('') ||
-        '<div class="pay-entry pay-entry-empty"><div class="pay-identity">'+identity+'</div><div class="hint">Абонемента нет</div></div>';
-    } else {
-      const singles = recordsFor(s.id).filter(p=>p.kind==='single'&&!p.archived_at).sort((a,b)=>b.paid_on.localeCompare(a.paid_on));
-      entries = singles.map((p,i)=>'<div class="pay-entry">'+paymentCell(0,i?studentLink(s):identity,'pay-identity')+
-        paymentCell(1,esc(p.payer||'—'),'pay-payer')+paymentCell(2,P().dmy(p.paid_on))+
-        paymentCell(4,P().money(p.amount))+'</div>').join('') ||
-        '<div class="pay-entry pay-entry-empty"><div class="pay-identity">'+identity+'</div><div class="hint">Разовых оплат нет</div></div>';
-    }
-    return '<div class="pay-row" data-sid="'+key+'">'+entries+
-      (st.formFor===String(s.id)?'<div class="pay-formbox">'+formHtml(s,c)+'</div>':'')+'</div>';
+  function sortableReceipt(p,student){
+    return {p,student,payer:p.payer,paidOn:p.paid_on,amount:Number(p.amount)};
   }
 
-  function archiveHtml(){
-    const records = st.data.payments.filter(p=>p.archived_at).sort((a,b)=>b.paid_on.localeCompare(a.paid_on));
+  function ledgerRows(students){
+    const pack = st.filter==='pack';
+    const entries = students.flatMap(({s,c})=>{
+      const base = {s,c,student:s.name};
+      const receipts = pack ? c.packs.filter(k=>!k.pay.archived_at).map(k=>{
+        const end = periodPreview(s,k).end;
+        return {...base,...sortableReceipt(k.pay,s.name),k,end,period:k.start+' '+(end||''),cap:k.cap,
+          used:Math.max(0,k.used),status:packStatus(k,c.queued.includes(k))};
+      }) : recordsFor(s.id).filter(p=>p.kind==='single'&&!p.archived_at).map(p=>({...base,...sortableReceipt(p,s.name)}));
+      return receipts.length ? receipts : [base];
+    });
+    const seen = new Set();
+    return sortedEntries(entries,st.filter).map(row=>{
+      const {s,c,p} = row, first = !seen.has(s.id);
+      seen.add(s.id);
+      const identity = studentLink(s)+(first ? (c.debt>0?'<small class="pay-debt">долг '+P().money(c.debt)+'</small>':'')+
+        paymentButton('+ оплата','add',s.id,'pay-add') : '');
+      let html;
+      if (!p) html = '<div role="row" class="pay-entry pay-entry-empty">'+paymentCell(0,identity,'pay-identity')+
+        cell('',pack?'Абонемента нет':'Разовых оплат нет','hint')+'</div>';
+      else if (pack) html = packEntry(row,identity);
+      else html = '<div role="row" class="pay-entry">'+paymentCell(0,identity,'pay-identity')+
+        paymentCell(1,esc(p.payer||'—'),'pay-payer')+paymentCell(2,P().dmy(p.paid_on))+paymentCell(4,P().money(p.amount))+'</div>';
+      return '<div role="presentation" class="pay-row" data-sid="'+esc(s.id)+'">'+html+
+        (first&&st.formFor===String(s.id)?'<div role="row"><div role="cell" class="pay-formbox">'+formHtml(s,c)+'</div></div>':'')+'</div>';
+    }).join('');
+  }
+
+  function archiveHtml(calculated){
+    const manualClosures = P().paySettings(settings()).closedPacks;
+    const receipts = st.data.payments.filter(p=>p.archived_at).map(p=>{
+      const s = st.students.find(x=>x.id===p.student_id);
+      if (s && !calculated.has(s.id)) calculated.set(s.id,calcFor(s.id));
+      const k = s && calculated.get(s.id)?.packs.find(pack=>pack.pay.id===p.id);
+      const start = p.kind==='pack' ? k?.start || p.start_on || p.paid_on : null;
+      const end = p.kind==='pack' ? (k ? recordedPackEnd(k) : firstDate(p.end_on,manualClosures?.[p.id])) : null;
+      return {...sortableReceipt(p,s?.name || p.guest_name || 'Ученик'),s,start,end};
+    });
     const students = st.students.filter(s=>s.archived_at);
-    return '<details class="pay-archive" id="payArchive"'+(st.open.has('payArchive')?' open':'')+'><summary>Архив оплат <span class="hint">'+records.length+
-      '</span></summary>'+records.map(p=>{
-        const s = st.students.find(x=>x.id===p.student_id);
-        return '<div class="pay-archive-row"><div>'+(s?studentLink(s):esc(p.guest_name||'Ученик'))+
-          ' <small class="hint">'+P().dmy(p.paid_on)+' · '+P().money(p.amount)+'</small></div>'+paymentButton('Из архива','pay-unarchive',p.id)+'</div>';
-      }).join('')+(records.length?'':'<div class="hint pay-archive-row">Оплат в архиве нет</div>')+
+    const archiveDate = date => date ? P().dmy(date) : '—';
+    const table = receipts.length ? '<div class="pay-ledger pay-archive-ledger" role="table" aria-label="Архив оплат">'+sortingHeader('archive')+
+      sortedEntries(receipts,'archive').map(({p,s,student,start,end})=>'<div role="row" class="pay-entry pay-archive-row" data-archived-payment="'+esc(p.id)+'">'+
+        paymentCell(0,s?studentLink(s):esc(student),'pay-identity')+paymentCell(2,archiveDate(p.paid_on))+
+        cell('Начало',archiveDate(start))+cell('Окончание',archiveDate(end))+paymentCell(4,P().money(p.amount))+
+        cell('',paymentButton('Из архива','pay-unarchive',p.id),'pay-archive-action')+'</div>').join('')+'</div>' :
+      '<div class="hint pay-archive-row">Оплат в архиве нет</div>';
+    return '<details class="pay-archive" id="payArchive"'+(st.open.has('payArchive')?' open':'')+'><summary>Архив оплат <span class="hint">'+receipts.length+
+      '</span></summary>'+table+
       (students.length?'<details class="pay-archive-students" id="payArchivedStudents"'+(st.open.has('payArchivedStudents')?' open':'')+'><summary>Архивные ученики <span class="hint">'+
       students.length+'</span></summary>'+students.map(s=>'<div class="pay-archive-row">'+studentLink(s)+'</div>').join('')+'</details>':'')+'</details>';
   }
@@ -391,9 +454,11 @@
     if (c.packs.length) {
       h += '<div class="set-group"><h3>Абонементы</h3><div class="pay-packs">' + c.packs.slice().reverse().map(k => {
         const state = k.expired ? (k.burned ? 'срок кончился, сгорело ' + k.burned : 'срок кончился') : k.left <= 0 ? 'использован' : k === c.current ? 'действует' : 'в очереди';
+        const end = k.pay.archived_at ? recordedPackEnd(k) : periodPreview(s,k).end;
         return '<div class="pay-pack' + (k.closed ? ' closed' : '') + '" data-pid="' + esc(k.pay.id) + '">' +
           '<div><b>от ' + P().dmy(k.pay.paid_on) + '</b> · ' + P().plural(k.cap, 'занятие', 'занятия', 'занятий') + ' · ' + P().money(k.pay.amount) +
-            ' · ' + (k.pay.burn === 'date' ? 'по сроку до ' + P().dm(k.end) : 'по числу занятий') + '</div>' +
+            ' · ' + (k.pay.burn === 'date' ? 'по сроку' : 'по числу занятий') + '</div>' +
+          '<div class="hint">' + fullPeriod(k.start,end) + '</div>' +
           '<div class="hint">прошло ' + Math.min(k.used, k.cap) + (k.pay.adjust ? ' (с правкой ' + (k.pay.adjust > 0 ? '+' : '') + k.pay.adjust + ')' : '') + ' · ' + esc(k.closed ? state : packText(k) + ' · ' + state) + '</div>' +
           '<div class="row-btns"><button type="button" class="btn quiet small" data-adj="' + esc(k.pay.id) + '">Поправить остаток</button>' +
             '<button type="button" class="btn quiet small danger" data-del="' + esc(k.pay.id) + '">Удалить</button></div>' +
@@ -672,6 +737,14 @@
   }
 
   function bindOverview(){
+    host.querySelectorAll('[data-pay-sort]').forEach(button=>button.addEventListener('click',()=>{
+      const {paySort:key,sortScope:scope} = button.dataset;
+      const previous = orderBy[scope];
+      orderBy[scope] = {key,direction:previous.key===key ? -previous.direction :
+        (key==='student'||key==='payer'||key==='status' ? 1 : -1)};
+      render();
+      host.querySelector('[data-sort-scope="'+scope+'"][data-pay-sort="'+key+'"]')?.focus();
+    }));
     host.querySelectorAll('[data-pay-view]').forEach(input=>input.addEventListener('change',()=>{
       view[input.dataset.payView]=input.checked;
       try { localStorage.setItem('cabinet:payments:view',JSON.stringify(view)); } catch (e) {}
