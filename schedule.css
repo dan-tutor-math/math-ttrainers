@@ -45,6 +45,7 @@
 
 .wrap.sc-wide{max-width:1280px;}
 .sc-head{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start;gap:8px;margin-bottom:14px;}
+.sc-head-modes{display:flex;align-items:center;gap:6px;}
 .sc-head-main,.sc-week-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .sc-nav,.sc-week-actions,.sc-head>.sc-lookbtn{min-height:40px;}
 .sc-nav{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
@@ -53,6 +54,7 @@
 .sc-range{font-weight:700;font-size:19px;min-width:0;padding:0 4px;letter-spacing:-.01em;}
 #scToday[aria-current]{background:var(--hl-10);}
 .sc-head .seg{margin-top:0;flex-wrap:nowrap;}
+#scUndo:disabled{opacity:.5;cursor:default;}
 .sc-lookbtn{display:inline-flex;align-items:center;gap:6px;}
 
 /* ── значок статуса: круг 18px (в строке пары — 15px), мягкий цвет статуса ── */
@@ -153,6 +155,13 @@ button.rw-ic:hover{filter:brightness(1.08);border-color:var(--ink);}
 /* занятия внахлёст — мягкая рамка без подписи */
 .rw-frame{display:flex;flex-direction:column;gap:2px;background:var(--frame);border:1px solid var(--frame-b);border-radius:16px;padding:3px 0;margin:2px 0;}
 .rw-frame .rw-row:hover{background:color-mix(in srgb,var(--hover-1) 70%,transparent);}
+[data-schedule-palette="custom"] .sc-days .rw-row.st-plan{--rw-tone:var(--pl-plan);}
+[data-schedule-palette="custom"] .sc-days .rw-row.st-done{--rw-tone:var(--pl-done);}
+[data-schedule-palette="custom"] .sc-days .rw-row.st-skip{--rw-tone:var(--pl-skip);}
+[data-schedule-palette="custom"] .sc-days .rw-row.st-move{--rw-tone:var(--pl-move);}
+[data-schedule-palette="custom"] .sc-days .rw-row:not(.editing,.ev){background-color:color-mix(in srgb,var(--rw-tone,transparent) 60%,transparent);}
+[data-schedule-palette="custom"] .sc-days .rw-row:not(.editing,.ev):hover{background-color:color-mix(in srgb,var(--rw-tone,transparent) 64%,var(--hover-1));}
+html[data-theme="dark"][data-schedule-palette="custom"] .sc-days .rw-row:not(.editing,.ev) .rw-time{color:color-mix(in srgb,var(--ink) 55%,var(--pencil));}
 
 /* перетаскивание */
 .rw-ghost{position:fixed;left:0;top:0;z-index:300;pointer-events:none;background:var(--pl-open);border-radius:13px;
@@ -473,7 +482,7 @@ html[data-theme="dark"] .sc-day.today{background:color-mix(in srgb,var(--glass) 
   .sc-modes button{padding:7px 2px;font-size:13px;white-space:nowrap;}
   .sc-head{grid-template-columns:1fr auto;grid-template-areas:"modes look" "nav nav" "actions actions";gap:6px;margin-bottom:8px;}
   .sc-head-main{display:contents;}
-  .sc-head .sc-views{grid-area:modes;}
+  .sc-head-modes{grid-area:modes;}
   .sc-head .sc-lookbtn{grid-area:look;}
   .sc-head .sc-week-actions{grid-area:actions;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));width:max-content;max-width:100%;}
   .sc-nav{grid-area:nav;display:grid;grid-template-columns:34px 1fr 34px auto;grid-template-areas:"p r n t" "p s n t";gap:0 6px;align-items:center;}

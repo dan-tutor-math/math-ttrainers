@@ -127,6 +127,71 @@
                // локальная копия) | none; cloud — run | ok | err
                steps: { local: 'none', cloud: 'run' } };
   let modal = null;           // открытая карточка занятия
+  const undoHistory = [];
+  let undoOrder = 0, undoWrites = 0, undoBusy = false;
+  const sameValue = (a, b) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+
+  function paintUndo(){
+    const b = host && host.querySelector('#scUndo'), last = undoHistory.at(-1);
+    if (!b) return;
+    b.disabled = !last || undoBusy || undoWrites > 0;
+    b.title = (last ? 'Отменить: ' + last.label : 'Пока нечего отменять') + ' (⌘Z / Ctrl+Z)';
+  }
+  function rememberUndo(label, restore, order = ++undoOrder){
+    undoHistory.push({ label, restore, order });
+    undoHistory.sort((a, b) => a.order - b.order);
+    if (undoHistory.length > 50) undoHistory.shift();
+    paintUndo();
+  }
+  async function undoLast(){
+    const action = undoHistory.at(-1);
+    if (!action || undoWrites || undoBusy) return;
+    undoBusy = true;
+    R.closeMenu();
+    paintUndo();
+    const forget = () => {
+      const index = undoHistory.indexOf(action);
+      if (index >= 0) undoHistory.splice(index, 1);
+    };
+    try {
+      await action.restore();
+      forget();
+      api.toast('Отменено: ' + action.label);
+    } catch (error) {
+      if (error.code === 'undo_conflict') forget();
+      api.toast('Не удалось отменить: ' + error.message);
+    } finally {
+      undoBusy = false;
+      paintUndo();
+    }
+  }
+  function editFields(row, patch){
+    return Object.fromEntries(Object.keys(patch).map(key => [key, row[key] ?? null]));
+  }
+  async function recordEdit(label, apply, changes){
+    const order = ++undoOrder, owner = api.userId();
+    undoWrites++;
+    paintUndo();
+    try {
+      const result = await apply();
+      const edits = changes(result).flatMap(edit => {
+        const fields = Object.keys(edit.after).filter(key => !sameValue(edit.before[key], edit.after[key]));
+        if (!fields.length) return [];
+        const patch = Object.fromEntries(fields.map(key => [key, edit.after[key]]));
+        return [{ ...edit, before: editFields(edit.before, patch), after: patch }];
+      });
+      if (edits.length && owner === api.userId()) rememberUndo(label, async () => {
+        try { await SC.applyEdits(edits, { reverse: true }); }
+        finally {
+          if (owner === api.userId() && st.win) { await load(); paintPayCard(); paintStudentCard(); }
+        }
+      }, order);
+      return result;
+    } finally {
+      undoWrites--;
+      paintUndo();
+    }
+  }
 
   function readView(){
     try { const v = localStorage.getItem(VIEW_KEY); if (v === 'list' || v === 'grid') return v; } catch (e) {}
@@ -343,24 +408,34 @@
 
   /* ── запись с откатом: интерфейс не ждёт сеть ── */
   async function patchLesson(l, patch){
-    const old = {};
-    Object.keys(patch).forEach(k => { old[k] = l[k]; });
+    if (undoBusy) return;
+    const old = editFields(l, patch);
     Object.assign(l, patch);
     render();
-    try { const fresh = await SC.updateLesson(l.id, patch); Object.assign(l, fresh); }
+    try {
+      const fresh = await recordEdit('параметры занятия', () => SC.updateLesson(l.id, patch),
+        row => [{ id: l.id, before: old, after: editFields(row, patch) }]);
+      Object.assign(l, fresh);
+    }
     catch (e) { Object.assign(l, old); api.toast('Не сохранилось: ' + e.message); }
     // занятие уехало в другую неделю — из этой его убираем
     if (!inWin(l.day)) st.lessons = st.lessons.filter(x => x !== l);
     render();
   }
-  async function cycleStatus(l, p){
+  async function changeStatus(l, p, status){
+    if (undoBusy) return;
     const old = p.status;
-    p.status = ST_NEXT[p.status] || 'done';
+    if (old === status) return;
+    p.status = status;
     render();
-    try { await SC.setStatus(p.id, p.status); }
+    try {
+      await recordEdit('статус занятия', () => SC.setStatus(p.id, status),
+        () => [{ part: true, id: p.id, before: { status: old }, after: { status } }]);
+    }
     catch (e) { p.status = old; api.toast('Не сохранилось: ' + e.message); render(); }
     paintPayCard();
   }
+  function cycleStatus(l, p){ return changeStatus(l, p, ST_NEXT[p.status] || 'done'); }
 
   /* ══ оплаты на занятии (В4а) ══
      Решения Даниила 13.11 (payments-audit.md, раздел 5): пропуск по
@@ -370,11 +445,15 @@
      вине преподавателя не считается, рядом — «назначить отработку».
      «Оплатил» — у учеников, которые платят за каждое занятие */
   async function setPart(l, p, patch){
-    const old = {};
-    Object.keys(patch).forEach(k => { old[k] = p[k]; });
+    if (undoBusy) return;
+    const old = editFields(p, patch);
     Object.assign(p, patch);
     render(); paintPayCard();
-    try { const fresh = await SC.setPart(p.id, patch); Object.assign(p, fresh); }
+    try {
+      const fresh = await recordEdit('отметка участника', () => SC.setPart(p.id, patch),
+        row => [{ part: true, id: p.id, before: old, after: editFields(row, patch) }]);
+      Object.assign(p, fresh);
+    }
     catch (e) { Object.assign(p, old); api.toast('Не сохранилось: ' + e.message); }
     render(); paintPayCard();
   }
@@ -745,10 +824,10 @@
           '<a class="btn quiet small" id="scToday" href="' + esc(api.weekHref(null)) + '"' + (mondayOf(today()) === st.week ? ' aria-current="true"' : '') + '>Сегодня</a>' +
         '</div>';
     return modesHtml() + '<div class="sc-head">' +
-        '<div class="seg sc-views" role="group" aria-label="Вид расписания">' +
+        '<div class="sc-head-modes"><div class="seg sc-views" role="group" aria-label="Вид расписания">' +
           '<button type="button" data-v="list" class="' + (st.view === 'list' ? 'on' : '') + '">Строки</button>' +
           '<button type="button" data-v="grid" class="' + (st.view === 'grid' ? 'on' : '') + '">Планер</button>' +
-        '</div>' +
+        '</div><button type="button" class="btn quiet small" id="scUndo" aria-keyshortcuts="Meta+Z Control+Z">Отменить</button></div>' +
         '<div class="sc-head-main">' + nav +
           // В месяце действия принадлежат каждой неделе. В шапке они идут
           // после переключателя, чтобы двойное нажатие не открыло очистку.
@@ -768,10 +847,15 @@
   // статус всей строки (пара, группа) одним нажатием: всем — следующий
   // после общего; личные статусы при этом сбрасываются (как в старом)
   async function setAllStatus(l, status){
+    if (undoBusy) return;
     const old = l.people.map(p => p.status);
+    const edits = l.people.map((p, i) => ({ part: true, id: p.id, before: { status: old[i] }, after: { status } }));
     l.people.forEach(p => { p.status = status; });
     render();
-    try { for (const p of l.people) await SC.setStatus(p.id, status); }
+    try {
+      const changes = edits.filter(edit => edit.before.status !== status);
+      await recordEdit('статус участников', () => SC.applyEdits(changes), () => changes);
+    }
     catch (e) { l.people.forEach((p, i) => { p.status = old[i]; }); api.toast('Не сохранилось: ' + e.message); render(); }
     paintPayCard();
   }
@@ -1148,10 +1232,12 @@
   }
   // тянем линию часа или край дня: на каждом шаге — перерисовка сетки
   function startEdgeDrag(e, hit, col){
+    if (undoBusy) return;
     e.preventDefault();
     // как в таблицах: час над линией растёт ровно на сдвиг мыши, а его верх
     // стоит на месте (прокрутку двигаем на рост часов выше) — линия идёт за курсором
     const y0 = e.clientY, x0 = e.clientX, hh0 = HH(), cw0 = look.cw || col.getBoundingClientRect().width;
+    const scaleKey = hit.t === 'r' ? 'hh' : 'cw', previous = { [scaleKey]: look[scaleKey] };
     const gw0 = host.querySelector('.sc-gwrap'), st0 = gw0 ? gw0.scrollTop : 0, sl0 = gw0 ? gw0.scrollLeft : 0;
     const move = ev => {
       if (hit.t === 'r') look.hh = Math.round(Math.max(40, Math.min(240, hh0 + (ev.clientY - y0))));
@@ -1168,6 +1254,7 @@
       document.removeEventListener('pointermove', move, true);
       document.removeEventListener('pointerup', up, true);
       document.removeEventListener('pointercancel', up, true);
+      rememberLook('масштаб расписания', previous, { [scaleKey]: look[scaleKey] });
       saveLook();
       showEdge(null);
     };
@@ -1372,7 +1459,7 @@
       const c = curSCard(), t = e.target.closest('button, a');
       if (!c || !t) return;
       if (t.dataset.x != null) closeStudentCard();
-      else if (t.dataset.set) { const old = c.p.status; c.p.status = t.dataset.set; render(); SC.setStatus(c.p.id, c.p.status).catch(er => { c.p.status = old; api.toast('Не сохранилось: ' + er.message); render(); }); }
+      else if (t.dataset.set) changeStatus(c.l, c.p, t.dataset.set).then(paintStudentCard);
       else if (t.dataset.paidc != null) togglePaid(c.l, c.p);
       else if (t.dataset.whyc != null) openPayCard(c.l, c.p);
       else if (t.dataset.openl != null) { closeStudentCard(); openPanel(c.l, c.p.student_id); }
@@ -1415,9 +1502,10 @@
 
   /* ── меню «Вид»: время и вид пар/групп, с живым примером плашки ── */
   const LOOK_KEY = 'cabinet:schedule:look';
+  const LOOK_DEFAULTS = { end: false, grp: 'names', hh: null, cw: null, span: 'month', pal: 'contrast' };
   // hh: null — высота часа подбирается сама (autoHH), число — своя, потянутая
   // учителем, и она запоминается на этом устройстве
-  const look = { end: false, grp: 'names', hh: null, cw: null, span: 'month', pal: 'contrast' };
+  const look = { ...LOOK_DEFAULTS };
   try { Object.assign(look, JSON.parse(localStorage.getItem(LOOK_KEY) || '{}')); } catch (e) {}
   // Вид живёт на аккаунте (TeacherSettings.planner: время, пары/группы, показ в «Строках», цвета),
   // чтобы на телефоне и ноутбуке было одинаково. Масштаб (hh, cw) — по экрану, он остаётся на устройстве.
@@ -1431,6 +1519,29 @@
     const cur = TS.get().planner;
     if (cur && ACC_KEYS.every(k => cur[k] === look[k])) return;
     Promise.resolve(TS.set({ planner: accLook() })).catch(() => {});   // нет сети — вид остаётся в копии устройства
+  }
+  function applyLook(patch){
+    const span = look.span, pal = look.pal;
+    Object.assign(look, patch);
+    if (pal !== look.pal) applyPal();
+    if (span !== look.span) applyWin();
+    saveLook();
+    render();
+  }
+  function rememberLook(label, before, after){
+    const keys = Object.keys(after).filter(key => !sameValue(before[key], after[key]));
+    if (!keys.length) return;
+    rememberUndo(label, () => {
+      if (keys.some(key => !sameValue(look[key], after[key]))) {
+        throw Object.assign(new Error('Настройки вида уже изменились в другой вкладке или на другом устройстве'), { code: 'undo_conflict' });
+      }
+      applyLook(Object.fromEntries(keys.map(key => [key, before[key]])));
+    });
+  }
+  function changeLook(label, patch){
+    if (undoBusy) return;
+    rememberLook(label, editFields(look, patch), patch);
+    applyLook(patch);
   }
   // вид с аккаунта пришёл (вход, загрузка, правка на другом устройстве)
   function pullLook(){
@@ -1462,6 +1573,7 @@
   function applyPal(){
     let el = document.getElementById('scPal');
     const pal = PALS[look.pal] || PALS.contrast;
+    document.documentElement.dataset.schedulePalette = pal === PALS.contrast ? 'contrast' : 'custom';
     if (!pal.l && !pal.d) { if (el) el.remove(); return; }
     if (!el) { el = document.createElement('style'); el.id = 'scPal'; document.head.appendChild(el); }
     el.textContent = (pal.l ? ':root{' + pal.l + '}' : '') + (pal.d ? '[data-theme="dark"]{' + pal.d + '}' : '');
@@ -1483,25 +1595,26 @@
       (grp === 'cnt' ? '<span class="sc-pc">2 из 3</span>' : '') + '</span>' + body + '</span></span>';
   }
   function lookItems(){
-    const it = (label, on, pv, fn) => ({ html: '<span class="gm-l">' + esc(label) + '</span>' + pv, on, keep: true, act: () => { fn(); saveLook(); render(); return { items: lookItems() }; } });
+    const it = (label, on, pv, patch) => ({ html: '<span class="gm-l">' + esc(label) + '</span>' + pv, on, keep: true,
+      act: () => { changeLook('вид расписания', patch); return { items: lookItems() }; } });
     return [
       { head: 'Время занятия' },
-      it('Только начало', !look.end, lookPreview(false, null), () => { look.end = false; }),
-      it('Начало и конец', look.end, lookPreview(true, null), () => { look.end = true; }),
+      it('Только начало', !look.end, lookPreview(false, null), { end: false }),
+      it('Начало и конец', look.end, lookPreview(true, null), { end: true }),
       { head: 'Показ в «Строках»' },
-      it('Весь месяц — недели списком', look.span !== 'week', '', () => { look.span = 'month'; applyWin(); }),
-      it('Только одна неделя', look.span === 'week', '', () => { look.span = 'week'; applyWin(); }),
+      it('Весь месяц — недели списком', look.span !== 'week', '', { span: 'month' }),
+      it('Только одна неделя', look.span === 'week', '', { span: 'week' }),
       { head: 'Пары и группы в «Планере»' },
-      it('Имена', look.grp === 'names', lookPreview(false, 'names'), () => { look.grp = 'names'; }),
-      it('Инициалы', look.grp === 'ini', lookPreview(false, 'ini'), () => { look.grp = 'ini'; }),
-      it('Число', look.grp === 'cnt', lookPreview(false, 'cnt'), () => { look.grp = 'cnt'; }),
-      it('Столбиком', look.grp === 'col', lookPreview(false, 'col'), () => { look.grp = 'col'; }),
+      it('Имена', look.grp === 'names', lookPreview(false, 'names'), { grp: 'names' }),
+      it('Инициалы', look.grp === 'ini', lookPreview(false, 'ini'), { grp: 'ini' }),
+      it('Число', look.grp === 'cnt', lookPreview(false, 'cnt'), { grp: 'cnt' }),
+      it('Столбиком', look.grp === 'col', lookPreview(false, 'col'), { grp: 'col' }),
       { head: 'Цвета плашек' },
       ...Object.keys(PALS).map(k => it(PALS[k].name, (look.pal || 'contrast') === k,
-        '<span class="sc-palsw">' + PALS[k].sw.map(c => '<i style="background:' + c + '"></i>').join('') + '</span>', () => { look.pal = k; applyPal(); })),
+        '<span class="sc-palsw">' + PALS[k].sw.map(c => '<i style="background:' + c + '"></i>').join('') + '</span>', { pal: k })),
       { sep: true },
-      { label: 'Масштаб по умолчанию', hint: 'все плашки без наезда имён', act: () => { look.hh = null; look.cw = null; saveLook(); render(); } },
-      { label: 'Сбросить вид', hint: 'время, показ, цвета и масштаб', act: () => { Object.assign(look, { end: false, grp: 'names', hh: null, cw: null, span: 'month', pal: 'contrast' }); applyPal(); applyWin(); saveLook(); render(); } },
+      { label: 'Масштаб по умолчанию', hint: 'все плашки без наезда имён', act: () => changeLook('сброс масштаба', { hh: null, cw: null }) },
+      { label: 'Сбросить вид', hint: 'время, показ, цвета и масштаб', act: () => changeLook('сброс вида', LOOK_DEFAULTS) },
     ];
   }
 
@@ -2083,6 +2196,8 @@
       if (mondayOf(today()) === st.week) { e.preventDefault(); if (location.hash !== tb.getAttribute('href')) history.replaceState(null, '', tb.getAttribute('href')); render(); }
     });
     host.querySelectorAll('.sc-views button').forEach(b => b.addEventListener('click', () => { rows.cancel(); setView(b.dataset.v); }));
+    const undoBtn = host.querySelector('#scUndo');
+    if (undoBtn) { paintUndo(); undoBtn.addEventListener('click', undoLast); }
     host.querySelectorAll('.sc-modes button').forEach(b => b.addEventListener('click', () => { rows.cancel(); st.mode = b.dataset.mode; closeModal(); closePanel(); closeStudentCard(); render(); }));
     const lookBtn = host.querySelector('#scLook');
     if (lookBtn) {
@@ -2150,6 +2265,13 @@
     TPL().attach(ctx);
     if (INS()) INS().attach(ctx);
     host = opts.host;
+    document.addEventListener('keydown', e => {
+      if (e.defaultPrevented || e.repeat || e.isComposing || e.altKey || e.shiftKey || !(e.metaKey || e.ctrlKey) || e.code !== 'KeyZ') return;
+      if (!host?.offsetParent || st.mode !== 'week' || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+      if (!undoHistory.length || undoWrites || undoBusy) return;
+      e.preventDefault();
+      undoLast();
+    });
     st.view = readView();
     if (window.ScheduleSync && window.ScheduleSync.onChange) window.ScheduleSync.onChange(paintSteps);
     if (api.settingsChanged) api.settingsChanged(() => { if (st.week) render(); });
@@ -2182,5 +2304,5 @@
     return load();
   }
 
-  window.Schedule = { init, show, hide: () => { closePanel(); closeStudentCard(); R.closeMenu(); if (INS()) INS().closePop(); const c = document.getElementById('scClip'); if (c) c.remove(); }, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), clearCache: () => { cacheClear(); st.week = null; st.shown = null; st.shownWin = null; st.win = null; st.lessons = []; }, setMode: m => { st.mode = m; render(); } };
+  window.Schedule = { init, show, hide: () => { closePanel(); closeStudentCard(); R.closeMenu(); if (INS()) INS().closePop(); const c = document.getElementById('scClip'); if (c) c.remove(); }, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), clearCache: () => { cacheClear(); undoHistory.length = 0; st.week = null; st.shown = null; st.shownWin = null; st.win = null; st.lessons = []; }, setMode: m => { st.mode = m; render(); } };
 })();

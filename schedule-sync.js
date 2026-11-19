@@ -1616,7 +1616,7 @@
     wrap(C, ['addStudent', 'updateStudent', 'setArchived', 'saveSettings']);
     // оплаты, ставки, способ оплаты, флаги участника (В4(в))
     wrap(window.Payments, ['addPayment', 'updatePayment', 'deletePayment', 'setRate', 'deleteRate', 'setMode', 'setRateExtra', 'setDayTotal']);
-    wrap(SC, ['setPart']);
+    wrap(SC, ['setPart', 'applyEdits']);
     clearInterval(timer);
     timer = setInterval(() => { if (document.visibilityState === 'visible' && readCfg()) sync(false); }, EVERY_MS);
     document.addEventListener('visibilitychange', () => {

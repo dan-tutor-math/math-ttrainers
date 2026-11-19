@@ -180,6 +180,41 @@
     return serial(() => runLS(cols => need().from('lesson_students').update({ lesson_id: toLessonId, pos: pos || 0 }).eq('id', personId).select(cols).single()));
   }
 
+  // Меняем только поля конкретной правки и сверяем updated_at, чтобы
+  // запись со второго устройства между чтением и обновлением не потерялась.
+  function applyEdits(edits, { reverse = false } = {}){
+    return serial(async () => {
+      const db = need();
+      const conflict = () => Object.assign(new Error('Занятие уже изменилось или было удалено'), { code: 'undo_conflict' });
+      const pending = await Promise.all(edits.map(async edit => {
+        const table = edit.part ? 'lesson_students' : 'lessons';
+        const from = reverse ? edit.after : edit.before, to = reverse ? edit.before : edit.after;
+        const keys = Object.keys(from);
+        const select = ['id', 'updated_at', ...keys].join(', ');
+        const current = await run(db.from(table).select(select).eq('id', edit.id).maybeSingle());
+        if (!current || keys.some(key => JSON.stringify(current[key] ?? null) !== JSON.stringify(from[key] ?? null))) throw conflict();
+        return { id: edit.id, from, to, table, version: current.updated_at };
+      }));
+      async function write(edit, fields, version){
+        let query = db.from(edit.table).update(fields).eq('id', edit.id);
+        if (version != null) query = query.eq('updated_at', version);
+        const row = await run(query.select('id, updated_at').maybeSingle());
+        if (!row) throw conflict();
+        return row.updated_at;
+      }
+      const applied = [];
+      try {
+        for (const edit of pending) {
+          applied.push({ edit, version: await write(edit, edit.to, edit.version) });
+        }
+      } catch (error) {
+        const rollback = await Promise.allSettled(applied.map(({ edit, version }) => write(edit, edit.from, version)));
+        if (rollback.some(result => result.status === 'rejected')) throw new Error('Часть изменений не удалось вернуть. Расписание будет обновлено.');
+        throw error;
+      }
+    });
+  }
+
   /* ══ В1б: устойчивые пары и группы ══
      student_groups + student_group_members. В группе только ученики из
      students (гостя без карточки в паре держать негде — так в схеме) */
@@ -409,7 +444,7 @@
   }
 
   window.ScheduleCloud = { FORMATS, STATUSES, GROUP_FORMATS, listRange, listForStudent, addLesson, updateLesson, deleteLesson, addPeople, setStatus, setPart, removePerson, movePerson,
-    addLessons, deleteLessons, addSlots, deleteSlots,
+    addLessons, deleteLessons, addSlots, deleteSlots, applyEdits,
     hasPayCols: () => payCols,
     writes: () => writeCount,
     listGroups, addGroup, updateGroup, setGroupMembers, deleteGroup,
