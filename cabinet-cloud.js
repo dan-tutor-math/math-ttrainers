@@ -58,10 +58,37 @@
   }
   async function signIn(email, password){
     const c = need();
-    let res;
-    try { res = await c.auth.signInWithPassword({ email, password }); } catch (e) { throw new CabinetError(e); }
-    if (res.error) throw new CabinetError(res.error);
-    return res.data.user;
+    if (!password) return signInByEmail(c, email);
+    const data = await run(c.auth.signInWithPassword({ email, password }));
+    return data.user;
+  }
+  async function signInByEmail(c, email){
+    const network = 'Не получилось связаться с сервером входа. Попробуйте ещё раз.';
+    let access;
+    try {
+      access = await run(c.functions.invoke('email-login', { body: { action: 'login', email } }));
+    } catch (e) { throw new Error(network); }
+    // Та же проверка списка доступа и тот же одноразовый токен, что на досках.
+    if (!access?.ok || !access.token_hash){
+      const messages = {
+        password_required: 'Для этой почты задан пароль. Введите его и нажмите «Войти».',
+        not_allowed: 'Эта почта не добавлена на платформу. Попросите преподавателя добавить её.',
+        bad_email: 'Похоже, в почте опечатка. Проверьте адрес.',
+      };
+      throw Object.assign(new Error(messages[access?.error] || network), { code: access?.error });
+    }
+    const token_hash = access.token_hash;
+    let result;
+    try {
+      result = await c.auth.verifyOtp({ token_hash, type: 'email' });
+      if (result.error) result = await c.auth.verifyOtp({ token_hash, type: 'magiclink' });
+    } catch (e) { throw new CabinetError(e); }
+    if (result.error) throw new CabinetError(result.error);
+    return result.data.user;
+  }
+  async function setPassword(password){
+    const data = await run(need().auth.updateUser({ password, data: { has_password: true } }));
+    return data.user;
   }
   async function signOut(){ const c = client(); if (c) await c.auth.signOut(); }
 
@@ -126,7 +153,7 @@
 
   window.CabinetCloud = {
     client, errorText, codeOf, CabinetError,
-    currentUser, signIn, signOut,
+    currentUser, signIn, signOut, setPassword,
     listStudents, getStudent, addStudent, updateStudent, setArchived, listBoards,
     getSettings, saveSettings,
   };

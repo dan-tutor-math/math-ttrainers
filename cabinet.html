@@ -19,18 +19,46 @@
 /* Кабинет преподавателя (задача А4): ученики, расписание (В1а, schedule.js),
    настройки. Оформление общее с «Работами» (works.css): тот же вход, те же
    кнопки и стекло — кабинет не должен выглядеть чужим. */
-.wrap{max-width:860px;margin:0 auto;}
-.acct{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;color:var(--muted-2);font-size:14px;margin-bottom:16px;}
-.acct b{color:var(--pencil);}
+:root{--cab-bg:#F2F3F5;--cab-tint:9%;}
+html[data-theme="dark"]{--cab-bg:#181B23;--cab-tint:20%;}
+body{
+  background:var(--cab-bg);
+  background-color:color-mix(in srgb,var(--cab-bg),var(--cab-subject,var(--cab-bg)) var(--cab-tint));
+  padding:max(8px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) 48px max(12px,env(safe-area-inset-left));
+}
+.wrap,.wrap.sc-wide{margin:0 auto;max-width:none;}
+.cab-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+.cab-head>.btn{display:grid;place-items:center;flex:0 0 auto;width:36px;height:36px;padding:0;text-decoration:none;font-size:16px;}
+.cab-head>#themeToggle{margin-left:auto;}
 .auth-card{max-width:420px;margin:0 auto;display:flex;flex-direction:column;gap:12px;}
 .auth-note{font-size:13.5px;color:var(--muted-2);line-height:1.45;}
-.auth-note a{color:var(--ink);}
 .form-msg{color:var(--teacher);font-size:13.5px;min-height:1em;}
 .empty{text-align:center;color:var(--muted-2);padding:28px 8px;font-size:15px;}
+.cab-password-dialog{width:min(420px,calc(100% - 24px));max-height:calc(100% - 24px);margin:auto;background:var(--cab-bg);}
+.cab-password-dialog::backdrop{background:rgba(9,15,28,.46);}
+.cab-password-dialog form{display:grid;gap:12px;}
+.cab-password-dialog h2{font-size:18px;}
+.cab-password-dialog .form-msg:empty{display:none;}
 
-.tabs{display:flex;gap:4px;padding:4px;border-radius:16px;background:var(--glass);border:1px solid var(--glass-border);width:max-content;max-width:100%;margin:0 auto 18px;overflow-x:auto;}
-.tabs a{font-weight:600;font-size:14.5px;color:var(--muted-3);text-decoration:none;padding:9px 18px;border-radius:12px;}
+.tabs{display:flex;align-items:center;flex:1;min-width:0;gap:3px;padding:3px;border-radius:13px;background:var(--glass);border:1px solid var(--glass-border);}
+.tabs a{display:flex;align-items:center;justify-content:center;min-height:34px;padding:4px 12px;border-radius:10px;font-weight:600;font-size:14px;color:var(--muted-3);text-decoration:none;white-space:nowrap;}
+.tabs a:last-child{margin-left:auto;}
+.tabs a:hover{background:var(--hover-1);}
 .tabs a.on{background:var(--ink);color:#fff;}
+.appearance-head{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.cab-account{position:relative;}
+.cab-account summary{list-style:none;}
+.cab-account summary::-webkit-details-marker{display:none;}
+.cab-account-summary{display:flex;align-items:center;gap:6px;}
+.cab-account-popup{
+  position:absolute;right:0;top:calc(100% + 6px);z-index:2;
+  width:max-content;max-width:min(320px,calc(100vw - 40px));margin:0;padding:12px;
+  display:grid;justify-items:start;gap:8px;background:var(--card);
+}
+.cab-account-popup p{min-width:0;font-size:14px;overflow-wrap:anywhere;}
+.cab-options{margin-top:10px;}
+.cab-colors button{display:inline-flex;align-items:center;gap:6px;}
+.cab-swatch{width:12px;height:12px;border-radius:50%;flex:none;background:var(--swatch,#878A92);border:1px solid rgba(255,255,255,.55);}
 
 .badge{font-size:11.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--muted-2);border:1px solid var(--glass-border);border-radius:8px;padding:2px 7px;}
 
@@ -80,7 +108,6 @@ textarea.field{min-height:90px;resize:vertical;}
 .save-note{font-size:13px;color:var(--muted-2);min-height:1.2em;}
 /* ── ученики таблицей (cabinet-students.js) — как «Доход / расход» старого
    приложения: строки на всю ширину, цифры моноширинным, правка в ячейке ── */
-.wrap.cs-wide{max-width:1180px;}
 .cs-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
 .cs-head h2{font-size:22px;margin:0;}
 .cs-sub{font-size:15px;font-weight:500;color:var(--muted-2);margin-left:4px;}
@@ -168,62 +195,54 @@ select.cs-in{cursor:pointer;-webkit-appearance:none;appearance:none;}
 }
 @media (max-width:620px){
   .grid2{grid-template-columns:1fr;}
-  .tabs a{padding:9px 12px;}
-}
-/* четыре вкладки (с «Оплатами», В4а) на телефоне 375 не влезают с обычными
-   отступами — ужимаем, а не прокручиваем страницу вбок */
-@media (max-width:420px){
-  .tabs a{padding:8px 9px;font-size:13.5px;}
-}
-/* ── телефон (просьба Даниила 14.11): один масштаб, без пустых полей фона по
-   краям, кнопки ровными рядами. Поля страницы и панели — по 6–8 px, а не
-   16 + 20: на 375 px ширине это треть экрана. Вкладки — пять равных ячеек
-   одной строкой, без прокрутки вбок ── */
-html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
-@media (max-width:620px){
-  body{padding:58px 6px 40px;}
-  h1{font-size:24px;}
-  .sub{font-size:13px;margin:2px 0 8px;}
-  .acct{font-size:13px;gap:8px;margin-bottom:10px;}
-  .acct .btn{padding:5px 10px;}
+  body{padding-inline:max(6px,env(safe-area-inset-left)) max(6px,env(safe-area-inset-right));padding-bottom:40px;}
+  .cab-head{gap:3px;margin-bottom:8px;}
+  .cab-head>.btn{width:30px;}
+  .tabs{justify-content:space-between;gap:1px;padding:2px;}
+  .tabs a{min-height:40px;padding-inline:3px;font-size:12px;}
+  .tabs a:last-child{margin-left:0;}
   .panel{padding:12px 8px;border-radius:18px;}
-  .tabs{display:grid;grid-template-columns:repeat(5,auto);width:100%;gap:2px;padding:3px;margin-bottom:10px;overflow:hidden;}
-  .tabs a{padding:8px 2px;font-size:12px;text-align:center;white-space:nowrap;}
 }
-@media (max-width:360px){
-  .tabs a{font-size:11px;}
+@media (max-width:380px){
+  .tabs a{padding-inline:1px;font-size:11px;}
+}
+@media (max-width:345px){
+  .cab-head{gap:2px;}
+  .tabs{gap:0;padding-inline:1px;}
+  .tabs a{padding-inline:0;font-size:10.75px;letter-spacing:-.02em;}
+}
+@media (pointer:coarse){
+  .cab-head>.btn,.tabs a{min-height:44px;}
 }
 </style>
 </head>
 <body>
-<a class="corner-btn left" href="index.html" title="К тренажёрам" aria-label="К тренажёрам">←</a>
-<button class="corner-btn right" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
 <div class="wrap">
-  <h1>Кабинет</h1>
-  <div class="sub">Ученики, расписание, оплаты и настройки преподавателя</div>
-  <div class="acct" id="acct" hidden></div>
+  <header class="cab-head">
+    <a class="btn quiet" href="index.html" title="К тренажёрам" aria-label="К тренажёрам">←</a>
+    <nav class="tabs" id="tabs" aria-label="Разделы кабинета" hidden>
+      <a href="#/schedule" data-tab="schedule">Расписание</a>
+      <a href="#/students" data-tab="students">Ученики</a>
+      <a href="#/payments" data-tab="payments">Оплаты</a>
+      <a href="#/stats" data-tab="stats">Статистика</a>
+      <a href="#/settings" data-tab="settings">Настройки</a>
+    </nav>
+    <button type="button" class="btn quiet" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+  </header>
 
   <section id="scrLoading" class="empty">Загружаем…</section>
 
   <section id="scrAuth" hidden>
     <div class="panel auth-card">
       <div><label class="label" for="auEmail">Почта</label><input class="field" id="auEmail" type="email" autocomplete="email"></div>
-      <div><label class="label" for="auPass">Пароль</label><input class="field" id="auPass" type="password" autocomplete="current-password"></div>
+      <div><label class="label" for="auPass">Пароль, если задавали</label><input class="field" id="auPass" type="password" autocomplete="current-password"></div>
       <button class="btn" id="auGo">Войти</button>
-      <div class="form-msg" id="auMsg"></div>
-      <div class="auth-note">Тот же вход, что на «Досках» и в «Работах». Если пароля ещё нет — войдите на <a href="boards.html">Досках</a> по одной почте и вернитесь сюда.</div>
+      <div class="form-msg" id="auMsg" role="status"></div>
+      <div class="auth-note">Тот же аккаунт, что на «Досках». Если пароль ещё не задан, достаточно почты из списка доступа.</div>
     </div>
   </section>
 
   <div id="scrMain" hidden>
-    <nav class="tabs" id="tabs" aria-label="Разделы кабинета">
-      <a href="#/students" data-tab="students">Ученики</a>
-      <a href="#/schedule" data-tab="schedule">Расписание</a>
-      <a href="#/payments" data-tab="payments">Оплаты</a>
-      <a href="#/stats" data-tab="stats">Статистика</a>
-      <a href="#/settings" data-tab="settings">Настройки</a>
-    </nav>
-
     <section id="tabStudents" hidden>
       <div class="panel" id="stuHost"></div>
     </section>
@@ -246,6 +265,32 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
 
     <section id="tabSettings" hidden>
       <div class="panel">
+        <div class="set-group">
+          <div class="appearance-head">
+            <h3>Внешний вид</h3>
+            <details class="cab-account" id="cabAccount">
+              <summary class="btn quiet small cab-account-summary">Аккаунт <span aria-hidden="true">▾</span></summary>
+              <div class="panel cab-account-popup">
+                <p id="acctEmail"></p>
+                <button type="button" class="btn quiet small" id="auPassword">Задать пароль</button>
+                <button type="button" class="btn quiet small" id="auOut">Выйти</button>
+              </div>
+            </details>
+          </div>
+          <div class="cab-options">
+            <div class="label" id="cabThemeLabel">Тема</div>
+            <div class="seg" id="cabThemes" role="group" aria-labelledby="cabThemeLabel">
+              <button type="button" data-theme-choice="system">Системная</button>
+              <button type="button" data-theme-choice="light">Светлая</button>
+              <button type="button" data-theme-choice="dark">Тёмная</button>
+            </div>
+          </div>
+          <div class="cab-options">
+            <div class="label" id="cabPaletteLabel">Цвет фона</div>
+            <div class="seg cab-colors" id="cabPalettes" role="group" aria-labelledby="cabPaletteLabel"></div>
+            <div class="save-note" id="cabPaletteNote" role="status"></div>
+          </div>
+        </div>
         <div class="set-group">
           <h3>Сессия с учеником</h3>
           <div class="hint">К чему привязан «текущий ученик»: ко всему браузеру или к каждой вкладке отдельно (удобно, когда несколько занятий идут в соседних вкладках).</div>
@@ -316,11 +361,25 @@ html{-webkit-text-size-adjust:100%;text-size-adjust:100%;}
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<dialog class="panel cab-password-dialog" id="cabPassword" aria-labelledby="cabPasswordTitle">
+  <form id="cabPasswordForm">
+    <h2 id="cabPasswordTitle">Задать пароль</h2>
+    <div><label class="label" for="cabPasswordNew">Новый пароль</label><input class="field" id="cabPasswordNew" type="password" autocomplete="new-password" minlength="6" required></div>
+    <div><label class="label" for="cabPasswordAgain">Повторите пароль</label><input class="field" id="cabPasswordAgain" type="password" autocomplete="new-password" required></div>
+    <p class="auth-note">Минимум 6 символов. Этот пароль будет действовать и в кабинете, и на досках.</p>
+    <div class="form-msg" id="cabPasswordMsg" role="status"></div>
+    <div class="row-btns">
+      <button type="submit" class="btn small" id="cabPasswordSave">Сохранить</button>
+      <button type="button" class="btn quiet small" id="cabPasswordCancel">Закрыть</button>
+    </div>
+  </form>
+</dialog>
 
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="cabinet-cloud.js"></script>
 <script src="teacher-settings.js"></script>
+<script src="subjects-catalog.js"></script>
 <script src="schedule-cloud.js"></script>
 <script src="schedule-rows.js"></script>
 <script src="schedule-tpl.js"></script>
@@ -343,14 +402,35 @@ const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&am
 
 /* ── тема ── */
 const themeBtn = $('themeToggle');
+const systemTheme = matchMedia('(prefers-color-scheme: dark)');
+const themeChoices = Array.from($('cabThemes').querySelectorAll('button'));
+let themeChoice = 'system';
+try {
+  const savedTheme = localStorage.getItem('theme');
+  if (savedTheme === 'light' || savedTheme === 'dark') themeChoice = savedTheme;
+} catch (e) {}
 function curTheme(){ return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
-function applyTheme(t, persist){
+function applyTheme(choice, persist){
+  themeChoice = choice;
+  const t = choice === 'system' ? (systemTheme.matches ? 'dark' : 'light') : choice;
   document.documentElement.setAttribute('data-theme', t);
   themeBtn.textContent = t === 'dark' ? '☀️' : '🌙';
-  if (persist) { try { localStorage.setItem('theme', t); } catch (e) {} }
+  themeChoices.forEach(b => {
+    const selected = b.dataset.themeChoice === choice;
+    b.classList.toggle('on', selected);
+    b.setAttribute('aria-pressed', String(selected));
+  });
+  if (persist) {
+    try {
+      if (choice === 'system') localStorage.removeItem('theme');
+      else localStorage.setItem('theme', choice);
+    } catch (e) {}
+  }
 }
-applyTheme(curTheme(), false);
+applyTheme(themeChoice, false);
 themeBtn.addEventListener('click', () => applyTheme(curTheme() === 'dark' ? 'light' : 'dark', true));
+themeChoices.forEach(b => b.addEventListener('click', () => applyTheme(b.dataset.themeChoice, true)));
+systemTheme.addEventListener('change', () => { if (themeChoice === 'system') applyTheme('system', false); });
 
 let toastT = 0;
 function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
@@ -360,56 +440,177 @@ const EXAMS = { '': 'не выбран', oge: 'ОГЭ, математика', eg
 
 /* ── вход ── */
 let user = null;
+const account = $('cabAccount');
+const passwordDialog = $('cabPassword');
+const passwordForm = $('cabPasswordForm');
+const paletteBox = $('cabPalettes');
+const palettes = [{ id: 'neutral', title: 'Нейтральный', color: '' }, ...(window.MathhCatalog?.subjects || [])];
+let settingsRequest = null;
+let paletteSave = Promise.resolve();
+
+paletteBox.innerHTML = palettes.map(({ id, title, color }) =>
+  '<button type="button" data-palette="' + esc(id) + '">' +
+  '<span class="cab-swatch" aria-hidden="true"' + (color ? ' style="--swatch:' + esc(color) + '"' : '') +
+  '></span>' + esc(title) + '</button>').join('');
+
+function currentPalette(){
+  const saved = TS.get().cabinetPalette;
+  // Локальная копия общая для вкладок, а цвет относится к вошедшему аккаунту.
+  return (saved && saved.owner === user?.id && palettes.find(p => p.id === saved.subject)) || palettes[0];
+}
+function paintPalette(){
+  const palette = currentPalette();
+  if (palette.color) document.body.style.setProperty('--cab-subject', palette.color);
+  else document.body.style.removeProperty('--cab-subject');
+  paletteBox.querySelectorAll('button').forEach(b => {
+    const selected = b.dataset.palette === palette.id;
+    b.classList.toggle('on', selected);
+    b.setAttribute('aria-pressed', String(selected));
+  });
+}
+TS.onChange(paintPalette);
+
+function loadSettings(){
+  const owner = user.id;
+  if (settingsRequest?.owner === owner) return settingsRequest.result;
+  // При быстром возврате в настройки не подставляем серверную копию до записи фона.
+  const request = { owner };
+  request.result = paletteSave.then(() => user?.id === owner && TS.load()).finally(() => {
+    if (settingsRequest === request) settingsRequest = null;
+  });
+  settingsRequest = request;
+  return request.result;
+}
+
+paletteBox.addEventListener('click', async e => {
+  const subject = e.target.closest('button')?.dataset.palette;
+  const owner = user?.id;
+  if (!subject || !owner) return;
+  await settingsRequest?.result;
+  if (user?.id !== owner || subject === currentPalette().id) return;
+  paletteSave = save({ cabinetPalette: { owner, subject } }, 'cabPaletteNote');
+});
+
 function show(id){
   ['scrLoading', 'scrAuth', 'scrMain'].forEach(x => { $(x).hidden = x !== id; });
+  $('tabs').hidden = id !== 'scrMain';
+  themeBtn.hidden = id === 'scrMain';
+}
+function hasPassword(){ return !!user?.user_metadata?.has_password; }
+function paintAccount(){
+  $('acctEmail').textContent = user?.email || '';
+  $('auPassword').textContent = hasPassword() ? 'Сменить пароль' : 'Задать пароль';
+}
+function updateUser(next){
+  const changed = next?.id !== user?.id;
+  user = next;
+  paintAccount();
+  if (changed){
+    if (passwordDialog.open) passwordDialog.close();
+    route();
+    if (user) loadSettings();
+  }
 }
 async function boot(){
   if (!C.client()){ show('scrAuth'); $('auMsg').textContent = C.errorText({ message: 'no_config' }); $('auGo').disabled = true; return; }
   user = await C.currentUser();
-  C.client().auth.onAuthStateChange((ev, session) => {
-    const u = session ? session.user : null;
-    if (!!u !== !!user){ user = u; route(); }
-    user = u;
-  });
+  C.client().auth.onAuthStateChange((ev, session) => updateUser(session?.user || null));
   // синхронизация со старым приложением читает всё расписание (около
   // десяти запросов) — при открытии она отнимала сеть у недели и потом
   // перегружала её второй раз. Теперь — после того как неделя загрузилась
   const first = route();
-  TS.load();
+  if (user) loadSettings();
   if (user) Promise.resolve(first).catch(() => {}).then(() => setTimeout(() => { if (user) SY.syncAuto(); }, 1500));
 }
-function renderAcct(){
-  const a = $('acct');
-  if (!user){ a.hidden = true; return; }
-  a.innerHTML = 'Вы вошли: <b>' + esc(user.email || '') + '</b> <button class="btn quiet small" id="auOut">Выйти</button>';
-  a.hidden = false;
-  $('auOut').addEventListener('click', async () => { await C.signOut(); user = null; students = null; Schedule.clearCache(); route(); });
+document.addEventListener('click', e => {
+  if (account.open && !account.contains(e.target)) account.open = false;
+});
+account.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && account.open){
+    account.open = false;
+    account.querySelector('summary').focus();
+  }
+});
+function openPassword(){
+  if (!user || passwordDialog.open) return;
+  $('cabPasswordTitle').textContent = $('auPassword').textContent;
+  passwordDialog.showModal();
 }
+$('auPassword').addEventListener('click', openPassword);
+$('cabPasswordCancel').addEventListener('click', () => passwordDialog.close());
+passwordDialog.addEventListener('close', () => {
+  passwordForm.reset();
+  $('cabPasswordMsg').textContent = '';
+});
+passwordForm.addEventListener('submit', async e => {
+  e.preventDefault();
+  const password = $('cabPasswordNew').value;
+  const message = $('cabPasswordMsg');
+  const submit = $('cabPasswordSave');
+  const owner = user?.id;
+  if (!owner || submit.disabled) return;
+  if (password.trim().length < 6){ message.textContent = 'Пароль должен быть не короче 6 символов.'; return; }
+  if (password !== $('cabPasswordAgain').value){ message.textContent = 'Пароли не совпадают.'; return; }
+  submit.disabled = true;
+  try {
+    const updated = await C.setPassword(password);
+    if (user?.id !== owner) return;
+    updateUser(updated);
+    if (passwordDialog.open) passwordDialog.close();
+    toast('Пароль сохранён');
+  } catch (e) {
+    message.textContent = e.message;
+  } finally {
+    submit.disabled = false;
+  }
+});
+$('auOut').addEventListener('click', async () => {
+  await paletteSave;
+  await C.signOut();
+  user = null;
+  students = null;
+  Schedule.clearCache();
+  route();
+});
 $('auGo').addEventListener('click', async () => {
   const email = $('auEmail').value.trim(), pw = $('auPass').value;
-  if (!email || !pw){ $('auMsg').textContent = 'Введите почту и пароль'; return; }
+  if (!email){ $('auMsg').textContent = 'Введите почту'; return; }
   $('auGo').disabled = true; $('auMsg').textContent = '';
-  try { user = await C.signIn(email, pw); route(); }
-  catch (e) { $('auMsg').textContent = e.message; }
+  try {
+    updateUser(await C.signIn(email, pw));
+    $('auPass').value = '';
+    if (!pw && user?.app_metadata?.mathh_role === 'teacher' && !hasPassword()) openPassword();
+  } catch (e) {
+    $('auMsg').textContent = e.message;
+    if (e.code === 'password_required') $('auPass').focus();
+  }
   finally { $('auGo').disabled = false; }
 });
-$('auPass').addEventListener('keydown', e => { if (e.key === 'Enter') $('auGo').click(); });
+['auEmail', 'auPass'].forEach(id => $(id).addEventListener('keydown', e => {
+  if (e.key === 'Enter') $('auGo').click();
+}));
 
 /* ── маршруты: #/students, #/students/<id>, #/schedule, #/settings ── */
 window.addEventListener('hashchange', () => route());
 let students = null;      // кэш списка: открыть карточку и вернуться без сети
 async function route(){
-  renderAcct();
+  account.open = false;
+  paintAccount();
+  paintPalette();
   if (!user){ show('scrAuth'); return; }
   const [tab, id] = location.hash.replace(/^#\/?/, '').split('/');
   // без вкладки в адресе — «Расписание»: в кабинет заходят прежде всего за ним (просьба Даниила 14.11)
   const t = ['students', 'schedule', 'payments', 'stats', 'settings'].indexOf(tab) >= 0 ? tab : 'schedule';
   show('scrMain');
-  // сетке недели нужна ширина: семь колонок дней в 860px не читаются
+  // Классы режима оставляем у внешней обёртки для расписания и списка.
   document.querySelector('.wrap').classList.toggle('sc-wide', t === 'schedule');
-  // таблица учеников — девять столбцов, в 860 px не помещается
   document.querySelector('.wrap').classList.toggle('cs-wide', t === 'students' && !id);
-  document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.tab === t));
+  document.querySelectorAll('#tabs a').forEach(a => {
+    const selected = a.dataset.tab === t;
+    a.classList.toggle('on', selected);
+    if (selected) a.setAttribute('aria-current', 'page');
+    else a.removeAttribute('aria-current');
+  });
   ['tabStudents', 'tabCard', 'tabSchedule', 'tabPayments', 'tabStats', 'tabSettings'].forEach(x => { $(x).hidden = true; });
   // боковая панель занятия висит поверх страницы — с вкладки «Расписание» её уносим
   if (t !== 'schedule' && window.Schedule && Schedule.hide) Schedule.hide();
@@ -608,10 +809,11 @@ function paintSettings(){
   $('customMinRow').hidden = !custom;
   if (custom && document.activeElement !== $('customMin')) $('customMin').value = s.lessonMin;
 }
-async function save(patch){
-  $('saveNote').textContent = 'Сохраняем…';
-  try { await TS.set(patch); $('saveNote').textContent = 'Сохранено'; }
-  catch (e) { $('saveNote').textContent = 'Не сохранилось на сервере: ' + e.message; }
+async function save(patch, noteId = 'saveNote'){
+  const note = $(noteId);
+  note.textContent = 'Сохраняем…';
+  try { await TS.set(patch); note.textContent = 'Сохранено'; }
+  catch (e) { note.textContent = 'Не сохранилось на сервере: ' + e.message; }
 }
 async function renderSettings(){
   paintSettings();
@@ -647,7 +849,7 @@ async function renderSettings(){
       if (n >= 5 && n <= 720) save({ lessonMin: n }); else $('saveNote').textContent = 'От 5 до 720 минут';
     });
   }
-  await TS.load();
+  await loadSettings();
   paintSettings();
 }
 

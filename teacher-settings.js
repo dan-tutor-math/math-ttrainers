@@ -26,6 +26,7 @@
                    flags [{id, name, free}] — свои флаги преподавателя;
                    monthMode 'x4'|'tpl' — как считать «в месяц» (В4б) }
      planner     — вид планера { end, grp, span, pal } (schedule.js); null — ещё не задан
+     cabinetPalette — фон кабинета { owner, subject }; owner отделяет локальные копии аккаунтов
      incomeGroups — группы дохода (В4б, фильтр статистики):
                    [{id, name, members [student_id], from, to, auto}];
                    auto — в группу сами попадают все ученики, кроме out
@@ -36,7 +37,7 @@
   const DEFAULTS = { sessionBind: 'browser', sessionGoHome: false, boardNewTab: false, labels: 'show', labelDates: true, labelCount: true, lessonMin: 60,
                      formatLabels: Object.assign({}, FORMAT_LABELS),
                      pay: { skipRule: 'free', outside: 'free', trackSingleDebt: true, remindLeft: 1, remindDays: 3, flags: [], monthMode: 'x4' },
-                     incomeGroups: [] };
+                     incomeGroups: [], cabinetPalette: null };
   const listeners = [];
   let cur = null;
 
@@ -65,6 +66,11 @@
     o.incomeGroups = normalizeGroups(raw.incomeGroups);
     o.studentCats = normalizeCats(raw.studentCats);
     o.planner = normalizePlanner(raw.planner);
+    const palette = raw.cabinetPalette;
+    if (palette && typeof palette.owner === 'string' && palette.owner &&
+        typeof palette.subject === 'string' && /^[a-z0-9_-]{1,24}$/.test(palette.subject)){
+      o.cabinetPalette = { owner: palette.owner, subject: palette.subject };
+    }
     return o;
   }
   // флаги правят руками на странице — id латиницей, имя до 30 знаков, не больше 20

@@ -11,7 +11,7 @@ localStorage, доказывает хранение на сервере. Пра�
 живой базе перепроверяются на сайте руками.
 
 Проверяет:
-  A. вход: без сессии — форма, неверный пароль — ошибка, вход — вкладка «Ученики»;
+  A. вход: без сессии — форма, неверный пароль — ошибка, вход — компактное «Расписание»;
   B. ученик: добавить → карточка; правка имени, класса, экзамена, заметки,
      своей длительности, привязки досок; места под «Память заданий» и
      «Занятия», кнопка «Начать сессию»; значения лежат в базе;
@@ -20,7 +20,8 @@ localStorage, доказывает хранение на сервере. Пра�
      своя) — после перезагрузки с пустым localStorage значения те же (с сервера);
   E. «Расписание» открывается (подробно — test_prompt_cabinet_schedule.py);
   F. главная: четвёртой в капсуле кнопка «Кабинет» ведёт на кабинет;
-  G. нет ошибок JavaScript.
+  G. на узком экране вкладки в одну строку, палитры разделены по аккаунтам;
+  H. первый вход по почте из списка, установка общего пароля и один вход с досками.
 
 Запуск: python3 test_prompt_cabinet_page.py (сервер поднимается сам).
 """
@@ -69,11 +70,15 @@ def local_server():
 
 TEACHER = {"id": "11111111-1111-4111-8111-111111111111", "email": "teacher@test.ru", "password": "secret1"}
 OTHER_ID = "22222222-2222-4222-8222-222222222222"
+INVITED = {"id": "33333333-3333-4333-8333-333333333333", "email": "invited@example.test",
+           "app_metadata": {"mathh_role": "teacher"}, "user_metadata": {}}
 
 FAKE_SB_JS = r"""
 (function(){
   const DB_URL = 'https://fakesb.test/db';
   const USERS = [__USERS__];
+  const INVITED = __INVITED__;
+  const invitedPassword = () => localStorage.getItem('__fakesb_invited_password');
   async function load(){ return await (await fetch(DB_URL)).json(); }
   async function store(db){ await fetch(DB_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify(db) }); }
   let chain = Promise.resolve();
@@ -140,25 +145,51 @@ FAKE_SB_JS = r"""
   }
   function createClient(){
     const listeners = [];
+    function start(user){
+      const s = { user: copy(user) };
+      localStorage.setItem('__fakesb_session', JSON.stringify(s));
+      listeners.forEach(cb => cb('SIGNED_IN', s));
+      return { data: { user: s.user, session: s }, error: null };
+    }
+    const invitedUser = () => ({ ...INVITED, user_metadata: { has_password: !!invitedPassword() } });
     const auth = {
       async getSession(){ return { data: { session: sess() }, error: null }; },
-      onAuthStateChange(cb){ listeners.push(cb); return { data: { subscription: { unsubscribe(){} } } }; },
+      async getUser(){ return { data: { user: sess()?.user }, error: null }; },
+      onAuthStateChange(cb){ listeners.push(cb); queueMicrotask(() => cb('INITIAL_SESSION', sess())); return { data: { subscription: { unsubscribe(){} } } }; },
       async signInWithPassword({ email, password }){
+        if (email === INVITED.email && password === invitedPassword()) return start(invitedUser());
         const u = USERS.find(x => x.email === email && x.password === password);
         if (!u) return { data: {}, error: { message: 'Invalid login credentials' } };
-        const s = { user: { id: u.id, email: u.email } };
+        return start({ id: u.id, email: u.email });
+      },
+      async verifyOtp({ token_hash, type }){
+        return token_hash === 'test-invite' && type === 'email' && !invitedPassword()
+          ? start(invitedUser()) : { data: {}, error: { message: 'Invalid OTP' } };
+      },
+      async updateUser({ password, data }){
+        if (sess()?.user.id !== INVITED.id || data.has_password !== true) return { error: { message: 'Cannot update' } };
+        localStorage.setItem('__fakesb_invited_password', password);
+        const s = { user: invitedUser() };
         localStorage.setItem('__fakesb_session', JSON.stringify(s));
-        listeners.forEach(cb => cb('SIGNED_IN', s));
-        return { data: { user: s.user, session: s }, error: null };
+        listeners.forEach(cb => cb('USER_UPDATED', s));
+        return { data: s, error: null };
       },
       async signOut(){ localStorage.removeItem('__fakesb_session'); listeners.forEach(cb => cb('SIGNED_OUT', null)); return { error: null }; },
     };
+    const functions = {
+      async invoke(name, { body }){
+        if (name !== 'email-login' || body.action !== 'login') throw new Error('Unexpected auth function');
+        if (body.email === INVITED.email && !invitedPassword()) return { data: { ok: true, token_hash: 'test-invite' } };
+        const protectedEmail = USERS.some(u => u.email === body.email) || body.email === INVITED.email;
+        return { data: { ok: false, error: protectedEmail ? 'password_required' : 'not_allowed' } };
+      },
+    };
     const channel = () => { const ch = { on(){ return ch; }, subscribe(cb){ if (cb) setTimeout(() => cb('CLOSED'), 0); return ch; }, send(){ return Promise.resolve('ok'); }, unsubscribe(){ return Promise.resolve(); }, track(){}, presenceState(){ return {}; } }; return ch; };
-    return { auth, from: t => new Q(t), rpc: async () => ({ data: null, error: null }), channel, removeChannel(){ return Promise.resolve(); } };
+    return { auth, functions, from: t => new Q(t), rpc: async () => ({ data: null, error: null }), channel, removeChannel(){ return Promise.resolve(); } };
   }
   window.supabase = { createClient };
 })();
-""".replace("__USERS__", json.dumps(TEACHER))
+""".replace("__USERS__", json.dumps(TEACHER)).replace("__INVITED__", json.dumps(INVITED))
 
 STATE = {"db": ""}
 CORS = {"Access-Control-Allow-Origin": "*", "Access-Control-Allow-Headers": "*", "Access-Control-Allow-Methods": "GET,POST,OPTIONS"}
@@ -228,6 +259,11 @@ def main():
         # без вкладки в адресе кабинет открывает «Расписание»
         page.wait_for_selector("#tabSchedule", state="visible")
         check("A3a вход в кабинет — сразу «Расписание»", page.locator('#tabs a[data-tab="schedule"].on').count() == 1)
+        check("A3b компактная шапка без заголовка, почты и клеток", page.evaluate("""email => {
+          const head = document.querySelector('.cab-head');
+          return head.getBoundingClientRect().bottom < 72 && !document.querySelector('.wrap > h1') &&
+            !document.body.innerText.includes(email) && getComputedStyle(document.body).backgroundImage === 'none';
+        }""", TEACHER["email"]))
         page.click('#tabs a[data-tab="students"]')
         page.wait_for_selector("#tabStudents", state="visible")
         page.wait_for_function("() => document.getElementById('csBody') && document.getElementById('csBody').textContent.trim().length > 0")
@@ -319,6 +355,33 @@ def main():
         page.wait_for_function("() => TeacherSettings.get().lessonMin === 75", timeout=5000)
         page.wait_for_function("() => document.getElementById('saveNote').textContent === 'Сохранено'", timeout=5000)
         check("D4 своя длительность 75 на сервере", [r for r in db()["teacher_settings"]][0]["settings"]["lessonMin"] == 75)
+
+        account = page.locator("#cabAccount")
+        check("D4a почта скрыта, пока аккаунт закрыт", not page.is_visible("#acctEmail"))
+        account.locator("summary").click()
+        check("D4b в аккаунте видны почта и выход", page.is_visible("#auOut") and page.inner_text("#acctEmail") == TEACHER["email"])
+        page.keyboard.press("Escape")
+        check("D4c Escape закрывает аккаунт и возвращает фокус", page.evaluate(
+            "() => !document.querySelector('#cabAccount').open && document.activeElement === document.querySelector('#cabAccount summary')"))
+        check("D4d палитры соответствуют каталогу", page.evaluate("""() => {
+          const ids = [...document.querySelectorAll('#cabPalettes button')].map(b => b.dataset.palette);
+          return ids.join() === ['neutral', ...MathhCatalog.subjects.map(s => s.id)].join();
+        }"""))
+        bg = lambda: page.evaluate("() => getComputedStyle(document.body).backgroundColor")
+        neutral = bg()
+        page.click('#cabPalettes button[data-palette="phys"]')
+        page.wait_for_function("() => document.querySelector('#cabPaletteNote').textContent === 'Сохранено'")
+        tinted = bg()
+        saved = db()["teacher_settings"][0]["settings"]
+        check("D4e предмет меняет только однотонный фон, выбор сохранён у учителя",
+              tinted != neutral and saved.get("cabinetPalette") == {"owner": TEACHER["id"], "subject": "phys"}
+              and saved["lessonMin"] == 75 and page.evaluate("() => getComputedStyle(document.body).backgroundImage === 'none'"))
+        page.click('#cabThemes button[data-theme-choice="dark"]')
+        check("D4f тёмная тема меняет фон и сохраняет предмет", bg() != tinted
+              and page.locator("html").get_attribute("data-theme") == "dark"
+              and page.locator('#cabPalettes button[data-palette="phys"]').get_attribute("aria-pressed") == "true")
+        page.click('#cabThemes button[data-theme-choice="system"]')
+        check("D4g системная тема возвращает выбор устройства", page.evaluate("() => localStorage.getItem('theme') === null"))
         # перезагрузка: сначала с копией, потом с пустой копией (значит, с сервера)
         page.reload()
         page.wait_for_selector("#tabs", state="visible")
@@ -332,6 +395,7 @@ def main():
         page.click("#tabs a[data-tab=settings]")
         page.wait_for_function("() => TeacherSettings.get().sessionBind === 'tab' && TeacherSettings.get().lessonMin === 75", timeout=5000)
         check("D6 при пустой копии настройки приходят с сервера", on("labels") == "hide_solved" and page.input_value("#customMin") == "75")
+        check("D6a фон восстановлен с сервера", page.locator('#cabPalettes button[data-palette="phys"]').get_attribute("aria-pressed") == "true")
         page.click(".seg[data-set=sessionBind] button[data-v=browser]")
         page.wait_for_function("() => document.getElementById('saveNote').textContent === 'Сохранено'")
         check("D7 нормализация: мусор в настройках отбрасывается",
@@ -343,6 +407,8 @@ def main():
         # заглушку сменило расписание (В1а); подробно — test_prompt_cabinet_schedule.py
         page.wait_for_selector("#scHost .sc-views", timeout=5000)
         check("E1 «Расписание» открывается: шапка недели и переключатель вида", page.is_visible("#scRange"))
+        page.set_viewport_size({"width": 1440, "height": 900})
+        check("E2 расписание занимает почти всю доступную ширину", page.locator("#scHost").bounding_box()["width"] >= 1408)
 
         # ── F. главная
         page2 = ctx.new_page()
@@ -369,7 +435,76 @@ def main():
         pp.click("#csBody .cs-open")
         pp.wait_for_selector("#cSave")
         check("G1 телефон 375: карточка без прокрутки вбок", pp.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth"))
-        check("G2 нет ошибок JavaScript", not errors, "; ".join(errors))
+        pp.set_viewport_size({"width": 320, "height": 800})
+        check("G2 телефон 320: все вкладки и стрелка видны в одной строке", pp.evaluate("""() => {
+          const nav = document.querySelector('#tabs');
+          const links = [...nav.querySelectorAll('a')];
+          return nav.scrollWidth === nav.clientWidth &&
+            links.every(link => link.getBoundingClientRect().top === links[0].getBoundingClientRect().top &&
+              link.getBoundingClientRect().right <= innerWidth);
+        }"""))
+        pp.click("#tabs a[data-tab=settings]")
+        pp.wait_for_function("() => document.querySelector('#cabPalettes button[data-palette=phys]').ariaPressed === 'true'")
+        pp.click("#cabAccount summary")
+        check("G3 телефон 320: аккаунт и настройки без прокрутки вбок",
+              pp.is_visible("#acctEmail") and pp.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth"))
+        pp.evaluate("id => localStorage.setItem('__fakesb_session', JSON.stringify({user:{id,email:'other@example.test'}}))", OTHER_ID)
+        pp.reload()
+        pp.wait_for_selector("#tabSettings:not([hidden])")
+        check("G4 чужой аккаунт не получает локальную палитру первого",
+              pp.locator('#cabPalettes button[data-palette="neutral"]').get_attribute("aria-pressed") == "true")
+        check("G5 нет ошибок JavaScript", not errors, "; ".join(errors))
+
+        # ── H. первый вход с той же почтой, что на досках, и общий пароль
+        invitation = new_context(browser, viewport={"width": 390, "height": 840})
+        ip = invitation.new_page()
+        ip.on("pageerror", lambda e: errors.append("auth: " + str(e)))
+        ip.goto(f"{BASE}/cabinet.html")
+        ip.fill("#auEmail", "unknown@example.test")
+        ip.press("#auEmail", "Enter")
+        ip.wait_for_function("() => document.querySelector('#auMsg').textContent.includes('не добавлена')")
+        check("H1 почта вне списка доступа не входит", ip.is_visible("#scrAuth"))
+        ip.fill("#auEmail", TEACHER["email"])
+        ip.click("#auGo")
+        ip.wait_for_function("() => document.querySelector('#auMsg').textContent.includes('задан пароль')")
+        check("H2 для защищённого аккаунта фокус переходит на пароль", ip.evaluate("document.activeElement.id") == "auPass")
+        ip.fill("#auEmail", INVITED["email"])
+        ip.click("#auGo")
+        ip.wait_for_selector("#cabPassword[open]", timeout=5000)
+        check("H3 преподаватель из списка входит по почте и может задать пароль в кабинете", ip.is_visible("#tabSchedule"))
+        ip.fill("#cabPasswordNew", "test-password")
+        ip.fill("#cabPasswordAgain", "other-password")
+        ip.click("#cabPasswordSave")
+        check("H4 разные пароли не отправляются", "не совпадают" in ip.inner_text("#cabPasswordMsg"))
+        ip.fill("#cabPasswordAgain", "test-password")
+        ip.click("#cabPasswordSave")
+        ip.wait_for_selector("#cabPassword", state="hidden")
+        dp = invitation.new_page()
+        dp.goto(f"{BASE}/boards.html")
+        dp.wait_for_function("() => window.CURRENT_USER?.user_metadata?.has_password === true")
+        check("H5 доски видят общий вход и заданный в кабинете пароль", dp.evaluate("window.CURRENT_USER.id") == INVITED["id"])
+        dp.close()
+        ip.click("#tabs a[data-tab=settings]")
+        ip.click("#cabAccount summary")
+        check("H6 пароль можно сменить из меню аккаунта", ip.inner_text("#auPassword") == "Сменить пароль")
+        ip.click("#auOut")
+        ip.wait_for_selector("#scrAuth:not([hidden])")
+        ip.click("#auGo")
+        ip.wait_for_function("() => document.querySelector('#auMsg').textContent.includes('задан пароль')")
+        ip.fill("#auPass", "test-password")
+        ip.click("#auGo")
+        ip.wait_for_selector("#tabSettings:not([hidden])")
+        check("H7 повторный вход с новым паролем открывает кабинет", not ip.is_visible("#cabPassword"))
+        from_boards = new_context(browser, viewport={"width": 900, "height": 800})
+        bp = from_boards.new_page()
+        bp.goto(f"{BASE}/boards.html")
+        bp.fill("#agEmail", INVITED["email"])
+        bp.click("#agSend")
+        bp.wait_for_function("() => window.CURRENT_USER?.id", timeout=5000)
+        bp.goto(f"{BASE}/cabinet.html")
+        bp.wait_for_selector("#tabSchedule:not([hidden])")
+        check("H8 вход по почте с досок открывает кабинет с той же сессией", bp.text_content("#acctEmail") == INVITED["email"])
+        check("H9 нет ошибок JavaScript при входе", not errors, "; ".join(errors))
         browser.close()
 
     print()

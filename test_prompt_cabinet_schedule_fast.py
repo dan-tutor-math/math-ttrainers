@@ -146,6 +146,8 @@ def main():
         # 8. Чужой аккаунт копию не видит, «Выйти» её стирает
         other = p.evaluate("() => Object.keys(localStorage).filter(k => k.indexOf('cabinet:schedule:cache:') === 0)")
         check("8 ключ копии один и с id аккаунта", other == [key], str(other))
+        p.click("#tabs a[data-tab=settings]")
+        p.click("#cabAccount summary")
         p.click("#auOut")
         p.wait_for_selector("#scrAuth:not([hidden])", timeout=5000)
         left = p.evaluate("() => Object.keys(localStorage).filter(k => k.indexOf('cabinet:schedule:cache:') === 0)")
