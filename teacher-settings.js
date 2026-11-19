@@ -95,6 +95,13 @@
         o.flags.push({ id, name, free: !!f.free });
       });
     }
+    // Дату ручного закрытия и отметку напоминания храним отдельно от
+    // периода оплаты, чтобы при возврате не потерять выбранные границы.
+    ['closedPacks', 'remindedPacks'].forEach(key => {
+      if (!raw[key] || typeof raw[key] !== 'object') return;
+      o[key] = Object.fromEntries(Object.entries(raw[key]).filter(([id, day]) =>
+        /^[a-z0-9_-]{1,64}$/i.test(id) && typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day)));
+    });
     return o;
   }
   // группы дохода: не больше 20, в составе — id учеников (не имена, как в

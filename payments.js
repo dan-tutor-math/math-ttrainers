@@ -121,7 +121,14 @@
     pays.forEach(x => { if (x.kind === 'single' && x.lesson_student_id) linked[x.lesson_student_id] = x; });
     const byCreated = (a, b) => (String(a.pay.created_at || '') < String(b.pay.created_at || '') ? -1 : 1);
     const packs = pays.filter(x => x.kind === 'pack')
-      .map(x => ({ pay: x, start: x.start_on || x.paid_on, end: x.end_on || null, cut: null, cap: Number(x.lessons) || 0, used: Number(x.adjust) || 0, proj: 0, items: [], until: null }))
+      .map(x => {
+        const manualClose = ps.closedPacks?.[x.id] || null;
+        const archiveDate = x.archived_at && new Date(x.archived_at);
+        const stopped = archiveDate && Number.isFinite(archiveDate.getTime()) ? ymd(archiveDate) : null;
+        const end = [x.end_on, manualClose, stopped].filter(Boolean).sort()[0] || null;
+        return { pay: x, start: x.start_on || x.paid_on, end, manualClose, cut: null,
+          cap: Number(x.lessons) || 0, used: Number(x.adjust) || 0, proj: 0, items: [], until: null };
+      })
       .sort((a, b) => (a.pay.paid_on < b.pay.paid_on ? -1 : a.pay.paid_on > b.pay.paid_on ? 1 : byCreated(a, b)));
     // соседи по дате оплаты — как «прошлый / следующий» в старом приложении
     packs.forEach((k, i) => {
@@ -147,7 +154,7 @@
       const row = { kind: 'lesson', day: x.l.day, x, b, price: rateOn(rates, x.l.day, x.l.format) };
       if (b.plan) {
         // будущее «запланировано»: только для даты «до какого числа»
-        if (x.l.day >= now) {
+        if (x.l.day >= now && !linked[x.p.id]) {
           const k = packs.find(k2 => fits(k2, x.l.day, k2.used + k2.proj));
           if (k) { k.proj++; if (k.used + k.proj === k.cap) k.until = x.l.day; }
         }
@@ -168,7 +175,7 @@
     });
     packs.forEach(k => {
       k.left = Math.max(0, k.cap - k.used);
-      k.expired = !!(k.end && now > k.end);
+      k.expired = !!(k.end && (now > k.end || k.manualClose || k.pay.archived_at));
       // оборван началом следующего — в него больше ничего не попадёт
       k.closed = k.expired || k.left <= 0 || !!(k.cut && now > k.cut);
       k.burned = k.expired ? k.left : 0;
@@ -192,7 +199,7 @@
           (x.burn === 'date' ? ' · по сроку с ' + dm(k.start) + ' по ' + dm(k.end) : (x.start_on && x.start_on !== x.paid_on ? ' · с ' + dm(k.start) : '')) +
           (x.payer ? ' · платил: ' + x.payer : ''), right: 'осталось ' + k.cap, pay: x });
         if (x.adjust) lines.push({ day: x.paid_on, ord: 1, sign: '±', cls: 'adj', text: 'Правка: ' + (x.adjust > 0 ? 'списано ещё ' : 'возвращено ') + plural(Math.abs(x.adjust), 'занятие', 'занятия', 'занятий') + (x.note ? ' — ' + x.note : ''), right: '' });
-        if (k.expired && k.burned) lines.push({ day: addDays(k.end, 1), ord: 0, sign: '×', cls: 'burn', text: 'Срок абонемента от ' + dm(x.paid_on) + ' кончился ' + dm(k.end) + ': сгорело ' + plural(k.burned, 'занятие', 'занятия', 'занятий'), right: '' });
+        if (k.expired && k.burned) lines.push({ day: k.manualClose ? k.end : addDays(k.end, 1), ord: 0, sign: '×', cls: 'burn', text: 'Срок абонемента от ' + dm(x.paid_on) + ' кончился ' + dm(k.end) + ': сгорело ' + plural(k.burned, 'занятие', 'занятия', 'занятий'), right: '' });
       } else if (!x.lesson_student_id) {
         lines.push({ day: x.paid_on, ord: 0, sign: '+', cls: 'in', text: 'Оплата ' + money(x.amount) + ' в счёт занятий' + (x.payer ? ' · платил: ' + x.payer : '') + (x.note ? ' · ' + x.note : ''), money: Number(x.amount) || 0, pay: x });
       }
@@ -209,7 +216,8 @@
       else if (r.outside) { text = what + ' — ' + r.outside + ', долгом не считается'; cls = 'free'; }
       else { text = what + ' — без оплаты: ' + (r.price == null ? 'ставка не задана' : money(r.price)); cls = 'debt'; r.money = -(r.price || 0); }
       const canMarkPaid = r.b.pay && !r.single && !r.pack && (mode === 'lesson' || r.debt);
-      lines.push({ day: r.day, ord: 2, sign, cls, text, right, money: r.money, lsId: p.id, canMarkPaid, price: r.price });
+      lines.push({ day: r.day, ord: 2, sign, cls, text, right, money: r.money, lsId: p.id, canMarkPaid, price: r.price,
+        history: r.single || r.pack ? 'paid' : 'unpaid', reason: rs || (!r.b.pay ? r.b.why : r.outside || 'Без отметки об оплате') });
     });
     lines.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : a.ord - b.ord));
     let balance = 0;

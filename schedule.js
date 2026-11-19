@@ -497,7 +497,7 @@
     st.edits++;
     render(); paintPanel();
     try {
-      st.pay.linked[p.id] = await P.addPayment({ student_id: p.student_id, kind: 'single', paid_on: today(), amount: price, lesson_student_id: p.id });
+      st.pay.linked[p.id] = await P.addPayment({ student_id: p.student_id, kind: 'single', paid_on: l.day, amount: price, lesson_student_id: p.id });
       api.toast('Оплачено: ' + P.money(price));
     } catch (e) { delete st.pay.linked[p.id]; api.toast('Не сохранилось: ' + e.message); }
     st.edits++;
