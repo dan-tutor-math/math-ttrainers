@@ -98,9 +98,11 @@ body.editing .ed{display:flex;}
   .pg-cap{display:none;}
 }
 </style>
+<link rel="stylesheet" href="cabinet-nav.css">
+<script defer src="cabinet-nav.js"></script>
 </head>
 <body>
-<a class="corner-btn left" href="index.html" id="homeBtn" title="К тренажёрам">←</a>
+<a class="corner-btn left" href="index.html" id="homeBtn" data-cabinet-after="corner" title="К тренажёрам">←</a>
 
 <div class="wrap" id="listView">
   <h1>Конспекты сессий</h1>
@@ -113,7 +115,7 @@ body.editing .ed{display:flex;}
 
 <div class="ed" id="edView">
   <div class="ed-top">
-    <button class="btn quiet small" id="edBack" type="button">← Все сессии</button>
+    <button class="btn quiet small" id="edBack" data-cabinet-after="" type="button">← Все сессии</button>
     <input class="ed-title" id="edTitle" type="text" maxlength="80" aria-label="Название сессии" title="Нажмите, чтобы переименовать">
     <span class="ed-count" id="edCount"></span>
     <button class="btn quiet small" id="edBoard" type="button" title="Каждая страница — отдельный лист доски">Сохранить как доску</button>

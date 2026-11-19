@@ -93,13 +93,15 @@ body.bp-desktop .bp-frame-resize{display:block;}
 .bp-toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%);z-index:5;background:var(--ink);color:#fff;padding:8px 14px;border-radius:10px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:calc(100vw - 24px);text-align:center;}
 .bp-toast.show{opacity:1;}
 </style>
+<link rel="stylesheet" href="cabinet-nav.css">
+<script defer src="cabinet-nav.js"></script>
 </head>
 <body>
 <div class="bp-head">
   <button class="bp-back" id="bpBack" title="К списку тренажёров">
     <svg viewBox="0 0 24 24" fill="none"><path d="M15 5l-7 7 7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
   </button>
-  <div class="bp-title" id="bpTitle">Тренажёры</div>
+  <div class="bp-title" id="bpTitle" data-cabinet-after="">Тренажёры</div>
   <button class="bp-status" id="bpStatus" title="Связь с доской"><span class="bp-dot" id="bpDot"></span><span class="bp-status-text" id="bpStatusText">Не подключено</span></button>
 </div>
 <div class="bp-pending" id="bpPending"></div>

@@ -1016,6 +1016,31 @@ html[data-theme="dark"] .deck-strip{box-shadow:var(--shadow),inset 0 1px 0 rgba(
 /* Промпт №85б: у презентации таблетка в верхней строке, между «Назад к
    доскам» и названием */
 html.deck-mode .bd-rail.pos-top{left:172px;right:auto}
+html.deck-mode .bd-back{font-size:0;gap:0}
+@media (min-width:1001px){
+  /* В первой свободной части шапки стоит панель масштаба и экспорта. */
+  html.deck-mode .bd-topbar-spacer:first-of-type{min-width:370px}
+}
+@media (max-width:1000px){
+  /* Узкая шапка не вмещает инструменты масштаба рядом с навигацией. */
+  #screenBoard:has(.bd-rail.pos-top){--bd-rail-row:48px}
+  #screenBoard .bd-rail.pos-top{left:8px;right:auto;top:56px;max-width:calc(100% - 16px);overflow-x:auto}
+  #screenBoard .deck-nav{top:calc(64px + var(--bd-rail-row,0px))}
+  #screenBoard .deck-strip{top:calc(70px + var(--bd-rail-row,0px))}
+}
+@media (max-width:480px){
+  .bd-topbar{gap:4px}
+  .bd-topbar-spacer{display:none}
+  .bd-name{flex:1 1 0;min-width:24px}
+}
+@media (max-width:360px){
+  /* На маленьком телефоне библиотека занимает место в ряду, меню — в углу. */
+  #screenBoard .bd-topbar:has(.rl-trigger){padding-right:56px}
+  #screenBoard .bd-topbar .rl-trigger{position:static;translate:none;width:28px;height:32px}
+  .bd-topbar{gap:2px;padding-left:4px}
+  .bd-topbar .bd-back,.bd-topbar .bd-imp-btn{padding-inline:4px;margin-right:0}
+  .bd-topbar .bd-gear,.bd-topbar a.cabinet-link{width:28px}
+}
 /* перенос миниатюры, как значка на Android: поднялась и едет за пальцем,
    соседи расступаются */
 .deck-strip-list.sorting .deck-thumb{transition:transform .18s cubic-bezier(.2,.8,.2,1)}
@@ -1195,6 +1220,8 @@ html.deck-lesson .deck-mode-btn#deckModeLesson[aria-pressed="true"]{color:var(--
   border:none;border-radius:12px;background:var(--ink);color:#fff;cursor:pointer;}
 </style>
 <script src="katex-0.18.5.js"></script>
+<link rel="stylesheet" href="cabinet-nav.css">
+<script defer src="cabinet-nav.js"></script>
 </head>
 <body>
 <div aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden;opacity:0;pointer-events:none;top:0;left:0;">
@@ -1323,7 +1350,7 @@ function resolveBasketTexInHtml(html){
     <!-- «К тренажёрам» и название раздела — самым верхним рядом: это выход со
          страницы и ответ на «где я», переключатель видов списка идёт под ними -->
     <div class="bl-head">
-      <a class="bl-btn bl-to-index" id="blToIndex" href="index.html" title="К тренажёрам">
+      <a class="bl-btn bl-to-index" id="blToIndex" data-cabinet-after="" href="index.html" title="К тренажёрам">
         <svg viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
         К тренажёрам
       </a>
@@ -1466,7 +1493,7 @@ function resolveBasketTexInHtml(html){
   <canvas id="boardCv"></canvas>
 
   <div class="bd-topbar">
-    <a class="bd-back" id="bdBack" href="boards.html">
+    <a class="bd-back" id="bdBack" data-cabinet-after="" title="Назад к доскам" href="boards.html">
       <svg viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
       Назад к доскам
     </a>

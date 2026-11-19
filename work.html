@@ -208,9 +208,11 @@
   .start-row{flex-direction:column;}
 }
 </style>
+<link rel="stylesheet" href="cabinet-nav.css">
+<script defer src="cabinet-nav.js"></script>
 </head>
 <body>
-<button class="corner-btn right" id="themeToggle" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
+<button class="corner-btn right" id="themeToggle" data-cabinet-after="left" title="Светлая/тёмная тема" aria-label="Переключить тему">🌙</button>
 <div class="wtimer" id="wTimer" hidden role="timer" aria-live="off"></div>
 <div class="net" id="netBanner" hidden>Нет связи — ответы сохранятся, когда она вернётся</div>
 <div class="wrap">

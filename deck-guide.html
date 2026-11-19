@@ -43,10 +43,12 @@ body{margin:0;background:var(--bg);color:var(--pencil);font-family:'Onest',-appl
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1D1D1F;color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;transition:opacity .2s;pointer-events:none}
 .toast.on{opacity:1}
 </style>
+<link rel="stylesheet" href="cabinet-nav.css">
+<script defer src="cabinet-nav.js"></script>
 </head>
 <body>
 <div class="top">
-  <a class="back" id="backLink" href="boards.html">← К доскам</a>
+  <a class="back" id="backLink" data-cabinet-after="" href="boards.html">← К доскам</a>
   <button class="main" id="copyBtn">Скопировать для нейросети</button>
   <button id="mdBtn">Скачать .md</button>
   <button id="sampleBtn">Скачать образец</button>

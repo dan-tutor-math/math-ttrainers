@@ -1349,6 +1349,8 @@ function dtbShowBuildBar(){
     '<button type="button" data-sh="student" class="txt" title="Что видит ученик по ссылке и предпросмотр" aria-haspopup="menu">Ученик видит</button>' +
     '<button type="button" data-sh="clear" class="txt" title="Стереть пометки на этом слайде">Очистить</button>' +
     '<button type="button" data-sh="exit" class="txt" title="Выйти из показа (Esc)">Выйти</button>';
+  const cabinet = document.querySelector('.bd-topbar .cabinet-link');
+  if (cabinet) bar.prepend(cabinet.cloneNode(true));
   (document.getElementById('screenBoard') || document.body).appendChild(bar);
   bar.addEventListener('click', (e) => {
     const b = e.target.closest('button');
