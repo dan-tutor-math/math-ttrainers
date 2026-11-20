@@ -98,6 +98,8 @@
   const paymentCell = (i, html, cls = '') => cell(tableLabels[i], html, cls);
   const paymentInput = (p, key, label, value, attrs = '') => '<input class="field pay-cell-input" aria-label="' + esc(label) +
     '" data-pay-edit="' + key + '" data-pid="' + esc(p.id) + '" value="' + esc(value) + '" ' + attrs + '>';
+  const valueHtml = value => '<span class="pay-value">' + esc(value) + '</span>';
+  const moneyHtml = sum => valueHtml(P().money(sum));
   const studentLink = s => '<a class="nm" href="#/payments/' + esc(s.id) + '">' + esc(s.name) + '</a>';
   const firstDate = (...dates) => dates.filter(Boolean).sort()[0] || null;
   const weekStart = day => P().addDays(day, -((new Date(day + 'T12:00:00').getDay()+6)%7));
@@ -207,11 +209,11 @@
   function overdueHtml(debtors){
     const count = debtors.length;
     const total = debtors.reduce((sum,{c})=>sum+c.debt,0);
-    const contents = count ? '<ul>'+debtors.map(({s,c})=>'<li>'+studentLink(s)+'<span>'+P().money(c.debt)+'</span></li>').join('')+
+    const contents = count ? '<ul>'+debtors.map(({s,c})=>'<li>'+studentLink(s)+moneyHtml(c.debt)+'</li>').join('')+
       '</ul>' : '<div class="hint">Просроченных оплат нет</div>';
     return '<details class="pay-overdue" id="payDebt"'+(!view.showOverdue&&!count?' hidden':'')+(st.open.has('payDebt')?' open':'')+
       '><summary class="pay-stat'+(count?' bad':'')+'"><span>Просрочено</span><b>'+count+'</b>'+
-      (count?'<small>Долг '+P().money(total)+'</small>':'')+'</summary>'+
+      (count?'<small>Долг '+moneyHtml(total)+'</small>':'')+'</summary>'+
       '<div class="pay-overdue-list">'+contents+'</div></details>';
   }
 
@@ -242,7 +244,7 @@
       paymentCell(4,paymentInput(p,'amount','Сумма абонемента, ₽',p.amount,'type="number" min="0" step="0.01" inputmode="decimal"'))+
       paymentCell(5,paymentInput(p,'lessons','Занятий в абонементе',k.cap,'type="number" min="1" max="500" inputmode="numeric"'))+
       paymentCell(6,'<div class="pay-count">'+paymentInput(p,'used','Прошло занятий',Math.max(0,k.used),'type="number" min="0" max="1000" inputmode="numeric"')+
-        '<span>/ '+k.cap+'</span></div><div class="pay-bar" role="progressbar" aria-label="Прошло занятий" aria-valuemin="0" aria-valuemax="'+k.cap+
+        valueHtml('/ '+k.cap)+'</div><div class="pay-bar" role="progressbar" aria-label="Прошло занятий" aria-valuemin="0" aria-valuemax="'+k.cap+
         '" aria-valuenow="'+used+'"><i style="width:'+Math.round(used*100/Math.max(1,k.cap))+'%"></i></div>'+remaining)+
       paymentCell(7,controlsHtml(k,status),'pay-state')+'</div>';
   }
@@ -266,14 +268,14 @@
     return sortedEntries(entries,st.filter).map(row=>{
       const {s,c,p} = row, first = !seen.has(s.id);
       seen.add(s.id);
-      const identity = studentLink(s)+(first ? (c.debt>0?'<small class="pay-debt">долг '+P().money(c.debt)+'</small>':'')+
+      const identity = studentLink(s)+(first ? (c.debt>0?'<small class="pay-debt">долг '+moneyHtml(c.debt)+'</small>':'')+
         paymentButton('+ оплата','add',s.id,'pay-add') : '');
       let html;
       if (!p) html = '<div role="row" class="pay-entry pay-entry-empty">'+paymentCell(0,identity,'pay-identity')+
         cell('',pack?'Абонемента нет':'Разовых оплат нет','hint')+'</div>';
       else if (pack) html = packEntry(row,identity);
       else html = '<div role="row" class="pay-entry">'+paymentCell(0,identity,'pay-identity')+
-        paymentCell(1,esc(p.payer||'—'),'pay-payer')+paymentCell(2,P().dmy(p.paid_on))+paymentCell(4,P().money(p.amount))+'</div>';
+        paymentCell(1,esc(p.payer||'—'),'pay-payer')+paymentCell(2,valueHtml(P().dmy(p.paid_on)))+paymentCell(4,moneyHtml(p.amount))+'</div>';
       return '<div role="presentation" class="pay-row" data-sid="'+esc(s.id)+'">'+html+
         (first&&st.formFor===String(s.id)?'<div role="row"><div role="cell" class="pay-formbox">'+formHtml(s,c)+'</div></div>':'')+'</div>';
     }).join('');
@@ -290,11 +292,11 @@
       return {...sortableReceipt(p,s?.name || p.guest_name || 'Ученик'),s,start,end};
     });
     const students = st.students.filter(s=>s.archived_at);
-    const archiveDate = date => date ? P().dmy(date) : '—';
+    const archiveDate = date => valueHtml(date ? P().dmy(date) : '—');
     const table = receipts.length ? '<div class="pay-ledger pay-archive-ledger" role="table" aria-label="Архив оплат">'+sortingHeader('archive')+
       sortedEntries(receipts,'archive').map(({p,s,student,start,end})=>'<div role="row" class="pay-entry pay-archive-row" data-archived-payment="'+esc(p.id)+'">'+
         paymentCell(0,s?studentLink(s):esc(student),'pay-identity')+paymentCell(2,archiveDate(p.paid_on))+
-        cell('Начало',archiveDate(start))+cell('Окончание',archiveDate(end))+paymentCell(4,P().money(p.amount))+
+        cell('Начало',archiveDate(start))+cell('Окончание',archiveDate(end))+paymentCell(4,moneyHtml(p.amount))+
         cell('',paymentButton('Из архива','pay-unarchive',p.id),'pay-archive-action')+'</div>').join('')+'</div>' :
       '<div class="hint pay-archive-row">Оплат в архиве нет</div>';
     return '<details class="pay-archive" id="payArchive"'+(st.open.has('payArchive')?' open':'')+'><summary>Архив оплат <span class="hint">'+receipts.length+
@@ -437,8 +439,8 @@
       '<a class="btn quiet small" href="#/students/' + esc(s.id) + '">Карточка ученика</a></div>';
     h += '<div class="pay-sum">' +
       (c.mode === 'pack' ? '<span class="pay-chip">' + (c.current ? 'Абонемент: ' + esc(packText(c.current)) : c.packs.length ? 'Абонемент закончился' : 'Абонемента нет') + '</span>' : '<span class="pay-chip">Платит за каждое занятие</span>') +
-      (c.debt > 0 ? '<span class="pay-chip bad" id="psDebt">Долг ' + P().money(c.debt) + (c.debtLessons ? ' · ' + P().plural(c.debtLessons, 'занятие', 'занятия', 'занятий') + ' без оплаты' : '') + '</span>'
-        : c.balance > 0 ? '<span class="pay-chip good">Аванс ' + P().money(c.balance) + '</span>' : singleDebtOff ? '' : '<span class="pay-chip good" id="psDebt">Долга нет</span>') +
+      (c.debt > 0 ? '<span class="pay-chip bad" id="psDebt">Долг ' + moneyHtml(c.debt) + (c.debtLessons ? ' · ' + P().plural(c.debtLessons, 'занятие', 'занятия', 'занятий') + ' без оплаты' : '') + '</span>'
+        : c.balance > 0 ? '<span class="pay-chip good">Аванс ' + moneyHtml(c.balance) + '</span>' : singleDebtOff ? '' : '<span class="pay-chip good" id="psDebt">Долга нет</span>') +
       (singleDebtOff ? '<span class="pay-chip" id="psDebt">Долги за разовые занятия не учитываются</span>' : '') +
       (c.noRate ? '<span class="pay-chip warn">Ставка не задана — ' + P().plural(c.noRate, 'занятие', 'занятия', 'занятий') + ' без цены</span>' : '') +
       (c.remind ? '<span class="pay-chip warn" title="Напоминание видно только вам">' + esc(c.remind) + '</span>' : '') +
@@ -448,7 +450,7 @@
       '<button type="button" data-mode="lesson" class="' + (c.mode === 'lesson' ? 'on' : '') + '">За каждое занятие</button></div>' +
       '<div class="hint">За каждое занятие — в расписании у занятия появится кнопка «оплатил».</div></div>';
     h += '<div class="set-group"><h3>Ставка</h3><div id="psRate">' +
-      (curRate ? '<b>' + P().money(curRate.price) + '</b> за занятие' + (curRate.group_price != null ? ' · в паре и группе ' + P().money(curRate.group_price) : '') + ' <span class="hint">с ' + P().dmy(curRate.valid_from) + '</span>'
+      (curRate ? moneyHtml(curRate.price) + ' за занятие' + (curRate.group_price != null ? ' · в паре и группе ' + moneyHtml(curRate.group_price) : '') + ' <span class="hint">с ' + P().dmy(curRate.valid_from) + '</span>'
         : '<span class="hint">Не задана — без неё долг по разовым занятиям не посчитать.</span>') +
       ' <button type="button" class="btn quiet small" id="psRateBtn">' + (curRate ? 'Изменить' : 'Задать') + '</button></div>' +
       (st.rateOpen ? '<form class="pay-ratef" id="psRateForm"><div class="pay-fgrid">' +
@@ -457,7 +459,7 @@
         '<label><span class="label">В паре и группе, ₽ (необязательно)</span><input class="field" type="number" min="0" name="group_price" value="' + esc(curRate && curRate.group_price != null ? Number(curRate.group_price) : '') + '"></label>' +
         '</div><div class="hint">Прошлые занятия считаются по прежней ставке. Чтобы пересчитать прошлое — поставьте дату раньше.</div>' +
         '<div class="row-btns"><button class="btn" type="submit">Сохранить ставку</button><button type="button" class="btn quiet" data-cancel>Отмена</button><span class="form-msg"></span></div></form>' : '') +
-      (rates.length > 1 ? '<div class="pay-rates">' + rates.map(r => '<div class="pay-rate">с ' + P().dmy(r.valid_from) + ' — ' + P().money(r.price) + (r.group_price != null ? ' / ' + P().money(r.group_price) : '') +
+      (rates.length > 1 ? '<div class="pay-rates">' + rates.map(r => '<div class="pay-rate">с ' + P().dmy(r.valid_from) + ' — ' + moneyHtml(r.price) + (r.group_price != null ? ' / ' + moneyHtml(r.group_price) : '') +
         ' <button type="button" class="sc-rm" data-delrate="' + esc(r.id) + '" title="Удалить ставку" aria-label="Удалить ставку">×</button></div>').join('') + '</div>' : '') +
       monthHtml(d, curRate) +
       '</div>';
@@ -468,7 +470,7 @@
         const state = k.expired ? (k.burned ? 'срок кончился, сгорело ' + k.burned : 'срок кончился') : k.left <= 0 ? 'использован' : k === c.current ? 'действует' : 'в очереди';
         const end = k.pay.archived_at ? recordedPackEnd(k) : periodPreview(s,k).end;
         return '<div class="pay-pack' + (k.closed ? ' closed' : '') + '" data-pid="' + esc(k.pay.id) + '">' +
-          '<div><b>от ' + P().dmy(k.pay.paid_on) + '</b> · ' + P().plural(k.cap, 'занятие', 'занятия', 'занятий') + ' · ' + P().money(k.pay.amount) +
+          '<div><b>от ' + P().dmy(k.pay.paid_on) + '</b> · ' + P().plural(k.cap, 'занятие', 'занятия', 'занятий') + ' · ' + moneyHtml(k.pay.amount) +
             ' · ' + (k.pay.burn === 'date' ? 'по сроку' : 'по числу занятий') + '</div>' +
           '<div class="hint">' + fullPeriod(k.start,end) + '</div>' +
           '<div class="hint">прошло ' + Math.min(k.used, k.cap) + (k.pay.adjust ? ' (с правкой ' + (k.pay.adjust > 0 ? '+' : '') + k.pay.adjust + ')' : '') + ' · ' + esc(k.closed ? state : packText(k) + ' · ' + state) + '</div>' +
@@ -483,7 +485,7 @@
     const singles = d.payments.filter(p => p.kind === 'single').sort((a, b) => b.paid_on.localeCompare(a.paid_on));
     if (singles.length) {
       h += historySection('paySingleHistory','История разовых оплат',singles.length,'<div class="pay-packs">' + singles.map(p =>
-        '<div class="pay-pack" data-pid="' + esc(p.id) + '"><div><b>' + P().dmy(p.paid_on) + '</b> · ' + P().money(p.amount) + ' · ' + (p.lesson_student_id ? 'за занятие' : 'в счёт занятий') + (p.payer ? ' · ' + esc(p.payer) : '') + '</div>' +
+        '<div class="pay-pack" data-pid="' + esc(p.id) + '"><div><b>' + P().dmy(p.paid_on) + '</b> · ' + moneyHtml(p.amount) + ' · ' + (p.lesson_student_id ? 'за занятие' : 'в счёт занятий') + (p.payer ? ' · ' + esc(p.payer) : '') + '</div>' +
         '<div class="row-btns"><button type="button" class="btn quiet small danger" data-del="' + esc(p.id) + '">Удалить</button></div></div>').join('') + '</div>');
     }
     h += statementHtml(d,c,singles);
@@ -531,7 +533,7 @@
     if (!curRate) return '';
     const ps = P().paySettings(settings());
     const m = P().monthlyOf({ rates: d.rates, tpl: (st.tpls || []).find(t => t.is_active) || null, sid: d.student.id, mode: ps.monthMode });
-    return '<div class="pay-month" id="psMonth">В месяц: <b>' + (m.sum == null ? '—' : P().money(m.sum)) + '</b> <span class="hint">' + esc(m.text) + '</span>' +
+    return '<div class="pay-month" id="psMonth">В месяц: ' + (m.sum == null ? valueHtml('—') : moneyHtml(m.sum)) + ' <span class="hint">' + esc(m.text) + '</span>' +
       ' <button type="button" class="btn quiet small" id="psMonBtn">Изменить</button></div>' +
       (st.monOpen ? '<form class="pay-ratef" id="psMonForm"><div class="pay-fgrid">' +
         '<label><span class="label">Занятий в неделю (для ×4)</span><input class="field" type="number" min="0" max="30" step="0.5" name="per_week" value="' + esc(curRate.per_week != null ? Number(curRate.per_week) : '') + '" placeholder="по шаблону"></label>' +

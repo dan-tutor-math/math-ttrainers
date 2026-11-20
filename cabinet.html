@@ -19,7 +19,12 @@
 /* Кабинет преподавателя (задача А4): ученики, расписание (В1а, schedule.js),
    настройки. Оформление общее с «Работами» (works.css): тот же вход, те же
    кнопки и стекло — кабинет не должен выглядеть чужим. */
-:root{--cab-bg:#F2F3F5;--cab-tint:9%;}
+/* Цифры у ставок и оплат используют одну ширину знаков, чтобы суммы читались по столбцу. */
+@font-face{
+  font-family:"Cabinet Nunito";src:url("fonts/nunito-latin-700-normal.woff2") format("woff2");
+  font-style:normal;font-weight:700;font-display:swap;unicode-range:U+002C-002E,U+0030-0039;
+}
+:root{--cab-bg:#F2F3F5;--cab-tint:9%;--cab-number-font:"Cabinet Nunito",var(--font-ui);}
 html[data-theme="dark"]{--cab-bg:#181B23;--cab-tint:20%;}
 body{
   background:var(--cab-bg);
@@ -107,16 +112,16 @@ textarea.field{min-height:90px;resize:vertical;}
 .chk{display:flex;align-items:center;gap:8px;font-size:14.5px;margin-top:8px;cursor:pointer;}
 .save-note{font-size:13px;color:var(--muted-2);min-height:1.2em;}
 /* ── ученики таблицей (cabinet-students.js) — как «Доход / расход» старого
-   приложения: строки на всю ширину, цифры моноширинным, правка в ячейке ── */
+   приложения: строки на всю ширину, цифры табличные, правка в ячейке ── */
 .cs-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
 .cs-head h2{font-size:22px;margin:0;}
-.cs-sub{font-size:15px;font-weight:500;color:var(--muted-2);margin-left:4px;}
+.cs-sub{font-size:1rem;font-weight:500;color:var(--muted-2);margin-left:4px;}
 .cs-cats{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;}
-.cs-chip{font-family:var(--font-ui);font-size:14px;font-weight:600;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);
+.cs-chip{font-family:var(--font-ui);font-size:.9375rem;font-weight:600;color:var(--muted-3);background:var(--glass);border:1px solid var(--glass-border);
   border-radius:11px;padding:7px 12px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
 .cs-chip:hover{border-color:var(--ink);}
 .cs-chip.on{background:var(--ok-tint);border-color:var(--ok);color:var(--pencil);}
-.cs-chip .cs-n{font-weight:500;color:var(--muted-2);font-size:12.5px;}
+.cs-chip .cs-n{color:var(--muted-2);font-size:.875rem;font-family:var(--cab-number-font);font-weight:700;}
 .cs-pen{font-size:12px;color:var(--muted-2);}
 .cs-plus{padding:7px 11px;}
 .cs-edit{border:1px solid var(--glass-border);background:var(--card);border-radius:16px;padding:14px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px;}
@@ -127,10 +132,10 @@ textarea.field{min-height:90px;resize:vertical;}
 .cs-emem .chk{margin-top:4px;}
 .cs-box{border:1px solid var(--glass-border);background:var(--card);border-radius:20px;overflow:hidden;}
 .cs-scroll{overflow-x:auto;}
-.cs-tbl{width:100%;border-collapse:collapse;font-size:15px;}
-.cs-tbl th{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);text-align:left;padding:12px 8px 10px;
+.cs-tbl{width:100%;border-collapse:collapse;font-size:1rem;}
+.cs-tbl th{font-size:.8125rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--muted-2);text-align:left;padding:12px 8px 10px;
   border-bottom:1px solid var(--grid);white-space:nowrap;}
-.cs-tbl td{padding:3px 8px;border-bottom:1px solid var(--grid);vertical-align:middle;}
+.cs-tbl td{padding:5px 8px;border-bottom:1px solid var(--grid);vertical-align:middle;}
 .cs-tbl tbody tr:last-child td{border-bottom:none;}
 .cs-tbl tbody tr:hover td{background:var(--hover-1);}
 .cs-tbl .cs-num{text-align:right;}
@@ -138,7 +143,7 @@ textarea.field{min-height:90px;resize:vertical;}
 .cs-i{width:30px;color:var(--muted-2);font-variant-numeric:tabular-nums;text-align:right;}
 .cs-sort{font:inherit;letter-spacing:inherit;text-transform:inherit;color:inherit;background:none;border:none;padding:0;cursor:pointer;display:inline-flex;}
 .cs-sort.on{color:var(--ink);}
-.cs-in{font-family:var(--font-ui);font-size:15px;color:var(--pencil);background:transparent;border:1px solid transparent;border-radius:9px;padding:7px 8px;width:100%;min-width:0;box-sizing:border-box;}
+.cs-in{font-family:var(--font-ui);font-size:1rem;color:var(--pencil);background:transparent;border:1px solid transparent;border-radius:9px;padding:7px 8px;width:100%;min-width:0;box-sizing:border-box;}
 .cs-in:hover:not(:disabled){border-color:var(--glass-border);background:var(--glass);}
 .cs-in:focus{outline:none;border-color:var(--ink);background:var(--glass-strong);}
 .cs-in:disabled{opacity:.5;}
@@ -146,17 +151,18 @@ textarea.field{min-height:90px;resize:vertical;}
 .cs-in.err{border-color:var(--teacher);}
 .cs-in.saved{border-color:var(--ok);}
 select.cs-in{cursor:pointer;-webkit-appearance:none;appearance:none;}
-.cs-nm{min-width:170px;}
-.cs-nm .cs-in{font-weight:600;}
+.cs-nm{min-width:14rem;}
+.cs-nm .cs-in,.cs-aname{font-size:1.125rem;font-weight:600;}
+.cs-nm .cs-in:not(:focus){text-overflow:ellipsis;}
 .cs-nmw{display:flex;align-items:center;gap:2px;}
 .cs-nmw .cs-open{flex:none;opacity:.55;}
 .cs-tbl tr:hover .cs-open,.cs-open:focus{opacity:1;}
 .cs-gr{width:74px;}
 .cs-ex{min-width:130px;}
-.cs-ni{font-family:var(--font-mono);text-align:right;width:92px;font-variant-numeric:tabular-nums;}
-.cs-mon::placeholder{color:var(--muted-1);opacity:1;}
+.cs-ni{font-family:var(--cab-number-font);font-size:1.125rem;font-weight:700;text-align:right;width:6.5rem;font-variant-numeric:tabular-nums;}
+.cs-ni::placeholder{color:var(--muted-2);opacity:1;}
 .cs-mon.manual{color:var(--warn);background:var(--warn-tint);font-weight:700;}
-.cs-cellbtn{font-family:var(--font-ui);font-size:14px;color:var(--muted-3);background:none;border:1px solid transparent;border-radius:9px;padding:7px 8px;cursor:pointer;
+.cs-cellbtn{font-family:var(--font-ui);font-size:1rem;color:var(--muted-3);background:none;border:1px solid transparent;border-radius:9px;padding:7px 8px;cursor:pointer;
   text-align:left;max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .cs-cellbtn:hover{border-color:var(--glass-border);background:var(--glass);}
 .cs-mute{color:var(--muted-1);}
@@ -170,14 +176,14 @@ select.cs-in{cursor:pointer;-webkit-appearance:none;appearance:none;}
 .cs-foot{display:flex;align-items:center;justify-content:flex-end;gap:16px;padding:12px 16px 14px;border-top:1px solid var(--grid);}
 .cs-ic-big{width:38px;height:38px;font-size:20px;border-color:var(--glass-border);background:var(--glass);}
 .cs-total{display:flex;flex-direction:column;align-items:flex-end;}
-.cs-tl{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted-2);}
-.cs-total b{font-family:var(--font-mono);font-size:28px;color:var(--ok);font-variant-numeric:tabular-nums;}
-.cs-note{margin:10px 4px 0;}
+.cs-tl{font-size:.8125rem;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--muted-2);}
+.cs-total b{font-family:var(--cab-number-font);font-size:1.875rem;line-height:1.2;color:var(--ok);font-variant-numeric:tabular-nums;}
+.cs-note{margin:10px 4px 0;font-size:.875rem;}
 .cs-arch{margin-top:16px;}
 .cs-arch summary{cursor:pointer;font-size:16px;padding:6px 4px;}
 .cs-arow{display:flex;align-items:center;gap:12px;padding:8px 6px;border-bottom:1px solid var(--grid);flex-wrap:wrap;}
 .cs-arow:last-child{border-bottom:none;}
-.cs-aname{font-weight:600;color:var(--pencil);text-decoration:none;}
+.cs-aname{color:var(--pencil);text-decoration:none;overflow-wrap:anywhere;}
 .cs-aname:hover{text-decoration:underline;}
 .cs-arow .btn{margin-left:auto;}
 .cs-menu{position:fixed;z-index:400;min-width:220px;max-width:calc(100vw - 16px);max-height:60vh;overflow:auto;padding:10px 14px 12px;border-radius:16px;
@@ -187,11 +193,13 @@ select.cs-in{cursor:pointer;-webkit-appearance:none;appearance:none;}
    плашки, имя прилипает слева */
 @media (max-width:620px){
   .cs-tbl td.cs-nm,.cs-tbl th.cs-nm{position:sticky;left:0;z-index:1;background:var(--card);}
-  /* имя с фамилией должно читаться целиком: «Андрей Ребров», а не «Андрей Р» */
-  .cs-nm{min-width:186px;}
-  .cs-nm .cs-in{font-size:14px;}
+  /* Справа от закреплённого имени должно помещаться хотя бы одно числовое поле. */
+  .cs-nm{min-width:clamp(11.5rem,58vw,14.25rem);}
+  .cs-nm .cs-in{font-size:1.0625rem;}
+  .cs-tbl .cs-num{padding-inline:4px;white-space:normal;}
+  .cs-ni{width:5.625rem;}
   .cs-i{display:none;}
-  .cs-total b{font-size:23px;}
+  .cs-total b{font-size:1.625rem;}
 }
 @media (max-width:620px){
   .grid2{grid-template-columns:1fr;}

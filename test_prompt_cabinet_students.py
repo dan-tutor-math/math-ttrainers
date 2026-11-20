@@ -21,7 +21,7 @@
   H. группа дохода из ячейки: снять — ученик в out группы;
   I. архив: ⇩ дважды — archived_at, в «Архиве», «Вернуть»;
   J. сортировка по столбцу «В месяц»;
-  K. телефон 375: страница не листается вбок;
+  K. телефон 320/375: крупные имена и суммы, прокручивается только таблица;
   L. нет ошибок JavaScript.
 
 Запуск: ~/.venvs/trainers/bin/python test_prompt_cabinet_students.py
@@ -29,7 +29,7 @@
 import json
 import sys
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
 import test_prompt_cabinet_stats as ST
 from test_prompt_cabinet_payments import B1, FIXED_NOW_JS, OWNER, norm, wait_db
@@ -216,8 +216,25 @@ def main():
         B1.PUMP["page"] = pp
         pp.goto(f"{BASE}/cabinet.html#/students")
         pp.wait_for_selector(cell(PETYA, "price"), timeout=10000)
-        check("K1 телефон 375: страница не листается вбок", pp.evaluate("() => document.documentElement.scrollWidth <= window.innerWidth"))
-        check("K2 итог виден", pp.is_visible("#csTotal"))
+        for width in (375, 320):
+            pp.set_viewport_size({"width": width, "height": 800})
+            check(f"K1 телефон {width}: страница не листается вбок",
+                  pp.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+            expect(pp.locator(cell(PETYA, "name"))).to_have_css("font-size", "17px")
+            expect(pp.locator("#csTotal")).to_be_visible()
+            for field in ("price", "per_week", "monthly"):
+                numeric = pp.locator(cell(PETYA, field))
+                expect(numeric).to_have_css("font-size", "18px")
+                expect(numeric).to_have_css("font-variant-numeric", "tabular-nums")
+                fits = numeric.evaluate("""input => {
+                    const scroller = input.closest('.cs-scroll');
+                    const name = input.closest('tr').querySelector('.cs-nm');
+                    scroller.scrollLeft += input.getBoundingClientRect().left - name.getBoundingClientRect().right - 2;
+                    const field = input.getBoundingClientRect();
+                    return field.left >= name.getBoundingClientRect().right &&
+                           field.right <= scroller.getBoundingClientRect().right;
+                }""")
+                check(f"K2 телефон {width}: поле {field} целиком видно рядом с именем", fits)
 
         check("L1 нет ошибок JavaScript", not errors, "; ".join(errors))
         browser.close()
