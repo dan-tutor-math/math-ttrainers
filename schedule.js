@@ -183,7 +183,7 @@
       if (edits.length && owner === api.userId()) rememberUndo(label, async () => {
         try { await SC.applyEdits(edits, { reverse: true }); }
         finally {
-          if (owner === api.userId() && st.win) { await load(); paintPayCard(); paintStudentCard(); }
+          if (owner === api.userId() && st.win) { await load(); paintPayCard(); paintStudentCards(); }
         }
       }, order);
       return result;
@@ -1470,9 +1470,9 @@
       return row.querySelector('[data-p$="|' + person + '"], .rw-p[data-pid="' + person + '"] .nm') || row;
     };
   }
-  function floatAgenda(item, anchor, motion){
+  function floatAgenda(item, anchor, motion, title, dismiss){
     item.floating = window.CabinetFloating?.attach(item.el, {
-      anchor, motion,
+      anchor, motion, title, dismiss, scroll:true, canEscape:() => !modal && !document.querySelector('.pay-card'),
       // Для планера границы дня важнее границ одной плашки: соседние записи этого дня видны.
       avoid:() => anchor()?.closest('.sc-col, .sc-day') || anchor(),
       avoidVertically:() => anchor()?.closest('.sc-plate, .rw-row') || anchor(),
@@ -1480,65 +1480,67 @@
   }
 
   const SCARD_STATUS = { plan:'План', done:'Пров.', move:'Перенос', skip:'Отмена' };
-  let sCard = null;
-  function closeStudentCard(motion = false, restoreFocus = false){
-    if (!sCard) return;
-    const card = sCard;
-    sCard = null;
-    document.removeEventListener('pointerdown', card.onDown, true);
-    document.removeEventListener('keydown', card.onKey);
+  const studentCards = new Map();
+  function dismissStudentCard(card, motion = false, restoreFocus = false){
+    if (studentCards.get(card.key) !== card) return;
+    studentCards.delete(card.key);
     detachAgenda(card, motion, restoreFocus);
   }
+  function closeStudentCards(){
+    for (const card of studentCards.values()) dismissStudentCard(card);
+  }
   function openStudentCard(l, p, source, motion = true){
-    clearRetiringAgenda();
-    closePanel();
-    closeStudentCard();
+    const key = p.student_id || l.id + '|' + p.id;
+    const existing = studentCards.get(key);
+    if (existing?.lid === l.id && existing.pid === p.id) { existing.floating?.raise(true); return; }
+    if (existing) dismissStudentCard(existing);
+    if (window.CabinetFloating && !CabinetFloating.room()) {
+      api.toast('Открыто пять окон. Закройте одно, чтобы открыть другое.');
+      return;
+    }
     const el = document.createElement('div');
     el.className = 'sc-scard';
     el.setAttribute('role', 'dialog');
     el.setAttribute('aria-label', 'Ученик на занятии');
     document.body.appendChild(el);
     const anchor = agendaAnchor(l.id, p.id, source);
-    const onDown = e => {
-      if (!el.contains(e.target) && !e.target.closest('[data-p], .rw-p .nm, .pay-card')) closeStudentCard(true);
-    };
-    const onKey = e => {
-      if (e.key === 'Escape' && !e.defaultPrevented && !modal && !document.querySelector('.pay-card, dialog[open]')) {
-        e.preventDefault();
-        closeStudentCard(false, true);
-      }
-    };
-    document.addEventListener('pointerdown', onDown, true);
-    document.addEventListener('keydown', onKey);
-    const card = sCard = { el, lid:l.id, pid:p.id, onDown, onKey };
+    const card = { el, key, lid:l.id, pid:p.id };
+    studentCards.set(key, card);
+    const dismiss = (animate, restoreFocus) => dismissStudentCard(card, animate, restoreFocus);
     el.addEventListener('click', e => {
-      const c = curSCard(), t = e.target.closest('button, a');
+      const c = curSCard(card), t = e.target.closest('button, a');
       if (!c || !t) return;
-      if (t.dataset.x != null) closeStudentCard(e.detail !== 0, true);
-      else if (t.dataset.set) changeStatus(c.l, c.p, t.dataset.set).then(paintStudentCard);
+      if (t.dataset.x != null) dismiss(e.detail !== 0, true);
+      else if (t.dataset.set) changeStatus(c.l, c.p, t.dataset.set).then(() => paintStudentCard(card));
       else if (t.dataset.paidc != null) togglePaid(c.l, c.p);
       else if (t.dataset.whyc != null) openPayCard(c.l, c.p);
-      else if (t.dataset.openl != null) openPanel(c.l, c.p.student_id, anchor(), e.detail !== 0);
-      else if (t.tagName === 'A') closeStudentCard();
+      else if (t.dataset.openl != null) {
+        dismiss();
+        openPanel(c.l, c.p.student_id, anchor(), e.detail !== 0);
+      }
     });
-    paintStudentCard();
-    if (sCard === card) floatAgenda(card, anchor, motion);
+    paintStudentCard(card);
+    if (studentCards.get(key) === card)
+      floatAgenda(card, anchor, motion, () => personName(curSCard(card)?.p || p), dismiss);
   }
-  function curSCard(){
-    if (!sCard) return null;
-    const l = findLesson(sCard.lid), p = l && l.people.find(x => x.id === sCard.pid);
+  function curSCard(card){
+    const l = findLesson(card.lid), p = l && l.people.find(x => x.id === card.pid);
     return l && p ? { l, p } : null;
   }
-  function paintStudentCard(){
-    if (!sCard) return;
-    const c = curSCard();
-    if (!c) { closeStudentCard(); return; }
+  function paintStudentCards(){
+    for (const card of studentCards.values()) paintStudentCard(card);
+  }
+  function paintStudentCard(card){
+    if (studentCards.get(card.key) !== card) return;
+    const c = curSCard(card);
+    if (!c) { dismissStudentCard(card); return; }
     const { l, p } = c, P = window.Payments;
     const gone = p.status === 'skip' || p.status === 'move';
     const price = P && p.student_id ? P.rateOn(st.pay.rates[p.student_id], l.day, l.format) : null;
     const paid = paidBtn(p, l);
-    const focus = sCard.el.contains(document.activeElement) ? document.activeElement.dataset.set : null;
-    sCard.el.innerHTML =
+    const box = card.floating?.content || card.el;
+    const focus = box.contains(document.activeElement) ? document.activeElement.dataset.set : null;
+    box.innerHTML =
       '<div class="sc-sc-top" data-cab-drag><div class="sc-sc-current">' + ic(p.status) +
         '<span class="sc-sc-time' + (gone ? ' x' : '') + '">' + esc(timeText(l).replace(' – ', '–')) + '</span>' +
         '<strong class="sc-sc-status">' + esc(R.ST_NAME[p.status]) + '</strong></div>' +
@@ -1554,7 +1556,7 @@
       (paid ? '<div class="sc-sc-pay">' + paid.replace('class="sc-paid', 'data-paidc class="sc-paid') + '</div>' : '') +
       (isAbsent(p) && P ? '<button type="button" class="btn quiet small sc-sc-why" data-whyc>' + esc(whyText(p, l)) + '</button>' : '') +
       '<div class="sc-sc-foot"><button type="button" class="btn quiet small" data-openl>Открыть занятие</button></div>';
-    if (focus) sCard.el.querySelector('[data-set="' + CSS.escape(focus) + '"]')?.focus({ preventScroll:true });
+    if (focus) box.querySelector('[data-set="' + CSS.escape(focus) + '"]')?.focus({ preventScroll:true });
   }
 
   /* ── меню «Вид»: время и вид пар/групп, с живым примером плашки ── */
@@ -1874,30 +1876,24 @@
     if (!panel) return;
     const current = panel;
     panel = null;
-    document.removeEventListener('keydown', current.onKey);
     current.off?.();
     detachAgenda(current, motion, restoreFocus);
   }
   function openPanel(l, sid, source, motion = true){
     const people = l.people.filter(p => p.student_id);
     const first = sid || (people[0] && people[0].student_id) || null;
-    if (panel && panel.lessonId === l.id && !sid) { paintPanel(); return; }
-    clearRetiringAgenda();
-    closeStudentCard();
+    if (panel && panel.lessonId === l.id && !sid) { paintPanel(); panel.floating?.raise(true); return; }
     closePanel();
+    if (window.CabinetFloating && !CabinetFloating.room()) {
+      api.toast('Открыто пять окон. Закройте одно, чтобы открыть занятие.');
+      return;
+    }
     const el = document.createElement('aside');
     el.className = 'sc-side panel';
     el.setAttribute('role', 'dialog');
     el.setAttribute('aria-label', 'Занятие');
     document.body.appendChild(el);
-    const onKey = e => {
-      if (e.key === 'Escape' && !e.defaultPrevented && !modal && !document.querySelector('dialog[open]')) {
-        e.preventDefault();
-        closePanel(false, true);
-      }
-    };
-    document.addEventListener('keydown', onKey);
-    const current = panel = { el, lessonId:l.id, sid:first, onKey, off:null };
+    const current = panel = { el, lessonId:l.id, sid:first, off:null };
     const SM = window.StudentMemory;
     if (SM && SM.onChange) panel.off = SM.onChange(() => paintPanel());
     el.addEventListener('click', onPanelClick);
@@ -1908,7 +1904,8 @@
       if (p) setPart(l, p, { makeup: e.target.checked }).then(paintPanel);
     });
     paintPanel();
-    if (panel === current) floatAgenda(current, agendaAnchor(l.id, null, source), motion);
+    if (panel === current) floatAgenda(current, agendaAnchor(l.id, null, source), motion,
+      () => st.byId[current.sid]?.name || 'Занятие', closePanel);
   }
   function onPanelClick(e){
     const t = e.target.closest('button, a');
@@ -1983,7 +1980,8 @@
     const s = panel.sid ? st.byId[panel.sid] : null;
     const SM = window.StudentMemory, cur = SM && SM.current ? SM.current() : null;
     const mine = !!(s && cur && cur.id === String(s.id) && cur.lessonId === l.id);
-    const keepScroll = panel.el.scrollTop;
+    const box = panel.floating?.content || panel.el;
+    const keepScroll = box.scrollTop;
     let h = '<div class="sc-ed-head" data-cab-drag><b>' + esc(dayText(l.day)) + ', ' + esc(timeText(l)) + '</b><button type="button" class="sc-x" data-cab-close aria-label="Закрыть">×</button></div>' +
       '<div class="hint">' + esc(l.is_event ? 'событие' : fmtLabel(l.format)) + '</div>';
     if (l.is_event) h += '<div class="sc-sp-name">' + esc(l.title || 'Событие') + '</div>';
@@ -2014,8 +2012,9 @@
     if (guests.length) h += '<div class="hint">Гость без карточки: ' + esc(guests.map(personName).join(', ')) + '</div>';
     if (s) h += panelPayHtml(l, l.people.find(p => p.student_id === s.id), s);
     h += '<div class="sc-sp-foot"><button type="button" class="btn quiet small" id="spEdit">Править занятие</button></div>';
-    panel.el.innerHTML = h;
-    panel.el.scrollTop = keepScroll;
+    box.innerHTML = h;
+    box.scrollTop = keepScroll;
+    panel.floating?.refresh();
   }
 
   /* ── оплата в боковой панели: отметки участия и остаток ученика ── */
@@ -2265,7 +2264,7 @@
     host.querySelectorAll('.sc-views button').forEach(b => b.addEventListener('click', () => { rows.cancel(); setView(b.dataset.v); }));
     const undoBtn = host.querySelector('#scUndo');
     if (undoBtn) { paintUndo(); undoBtn.addEventListener('click', undoLast); }
-    host.querySelectorAll('.sc-modes button').forEach(b => b.addEventListener('click', () => { rows.cancel(); st.mode = b.dataset.mode; closeModal(); closePanel(); closeStudentCard(); clearRetiringAgenda(); render(); }));
+    host.querySelectorAll('.sc-modes button').forEach(b => b.addEventListener('click', () => { rows.cancel(); st.mode = b.dataset.mode; closeModal(); closePanel(); closeStudentCards(); clearRetiringAgenda(); render(); }));
     const lookBtn = host.querySelector('#scLook');
     if (lookBtn) {
       lookBtn.setAttribute('aria-expanded', String(R.menuOpenFor(lookBtn)));
@@ -2300,7 +2299,7 @@
     if (st.goToday) { st.goToday = false; goToday(); }
     paintEditor();
     paintPanel();
-    paintStudentCard();
+    paintStudentCards();
   }
 
   // шаблоны, пары и группы живут в schedule-tpl.js; общие приёмы он берёт отсюда
@@ -2354,7 +2353,7 @@
     rows.cancel();
     closeModal();
     closePanel();
-    closeStudentCard();
+    closeStudentCards();
     clearRetiringAgenda();
     const nw = winOf(mon);
     st.win = nw;
@@ -2372,5 +2371,5 @@
     return load();
   }
 
-  window.Schedule = { init, show, hide: () => { closePanel(); closeStudentCard(); clearRetiringAgenda(); R.closeMenu(); if (INS()) INS().closePop(); const c = document.getElementById('scClip'); if (c) c.remove(); }, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), clearCache: () => { cacheClear(); undoHistory.length = 0; st.week = null; st.shown = null; st.shownWin = null; st.win = null; st.lessons = []; }, setMode: m => { st.mode = m; render(); } };
+  window.Schedule = { init, show, hide: () => { closePanel(); closeStudentCards(); clearRetiringAgenda(); R.closeMenu(); if (INS()) INS().closePop(); const c = document.getElementById('scClip'); if (c) c.remove(); }, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), clearCache: () => { cacheClear(); undoHistory.length = 0; st.week = null; st.shown = null; st.shownWin = null; st.win = null; st.lessons = []; }, setMode: m => { st.mode = m; render(); } };
 })();

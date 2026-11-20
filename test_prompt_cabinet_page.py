@@ -271,7 +271,7 @@ def main():
               "Учеников пока нет" in page.inner_text("#csBody") and "Чужой" not in page.inner_text("#stuHost"))
 
         # ── B. ученик
-        # таблица учеников (cabinet-students.js): добавили строкой — карточка по «→»
+        # таблица учеников: добавили строкой и открыли карточку поверх списка
         page.click("#csAdd")
         page.fill("#csNew", "Маша Иванова")
         page.press("#csNew", "Enter")
@@ -279,8 +279,9 @@ def main():
         page.click("#csBody .cs-open")
         page.wait_for_selector("#cSave", timeout=5000)
         check("B1 добавили — открылась карточка", page.input_value("#cName_in") == "Маша Иванова")
+        card = page.get_by_role("dialog", name="Карточка ученика")
         check("B2 места «Память заданий» и «Занятия» и кнопка «Начать сессию»",
-              "Память заданий" in page.inner_text("#cardBox") and "Занятия" in page.inner_text("#cardBox") and page.is_visible("#cSession"))
+              "Память заданий" in card.inner_text() and "Занятия" in card.inner_text() and page.is_visible("#cSession"))
         check("B3 доски в списке: две, удалённой нет",
               page.locator("#cBoards input").count() == 2 and "Удалённая" not in page.inner_text("#cBoards"))
         check("B4 подсказка длительности = настройка по умолчанию (60)", page.get_attribute("#cDur", "placeholder") == "60")

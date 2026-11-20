@@ -59,7 +59,7 @@
   }
   const MAX_EV = 6;
 
-  function mount(box, student){
+  function mount(box, student, prefix = ''){
     const SM = window.StudentMemory;
     const sid = String(student.id);
     let off = null, dead = false, onlyBad = false, selected = new Set(), pending = null, msg = '', loadErr = '';
@@ -132,9 +132,9 @@
         ? '<div class="mconf" role="alertdialog"><span>Забыть ' + esc(pending.what) + '? Строки журнала удалятся, это нельзя отменить.</span>' +
           '<button class="btn danger small" data-act="yes">Забыть</button><button class="btn quiet small" data-act="no">Отмена</button></div>' : '';
       box.innerHTML = '<div class="memory"><div class="mhead"><b>Память заданий</b>' +
-        '<label class="mfilt"><input type="checkbox" id="mBad"' + (onlyBad ? ' checked' : '') + '> были ошибки</label>' +
-        '<button class="btn small" id="mForgetSel"' + (selected.size ? '' : ' disabled') + '>Забыть выбранные' + (selected.size ? ' (' + selected.size + ')' : '') + '</button></div>' +
-        confirmHtml + (msg ? '<div class="hint" role="status" id="mMsg">' + esc(msg) + '</div>' : '') + html + '</div>';
+        '<label class="mfilt"><input type="checkbox" id="' + prefix + 'mBad"' + (onlyBad ? ' checked' : '') + '> были ошибки</label>' +
+        '<button class="btn small" id="' + prefix + 'mForgetSel"' + (selected.size ? '' : ' disabled') + '>Забыть выбранные' + (selected.size ? ' (' + selected.size + ')' : '') + '</button></div>' +
+        confirmHtml + (msg ? '<div class="hint" role="status" id="' + prefix + 'mMsg">' + esc(msg) + '</div>' : '') + html + '</div>';
     }
 
     async function doForget(){
@@ -148,9 +148,9 @@
     }
 
     box.addEventListener('click', ev => {
-      const t = ev.target.closest('[data-forget],[data-act],#mForgetSel');
+      const t = ev.target.closest('[data-forget],[data-act],#' + prefix + 'mForgetSel');
       if (!t) return;
-      if (t.id === 'mForgetSel'){
+      if (t.id === prefix + 'mForgetSel'){
         const keys = Array.from(selected);
         if (!keys.length) return;
         pending = { keys, what: plural(keys.length, 'выбранную строку', 'выбранные строки', 'выбранных строк') }; msg = ''; render();
@@ -161,7 +161,7 @@
     });
     box.addEventListener('change', ev => {
       const t = ev.target;
-      if (t.id === 'mBad'){ onlyBad = t.checked; pending = null; render(); }
+      if (t.id === prefix + 'mBad'){ onlyBad = t.checked; pending = null; render(); }
       else if (t.dataset && t.dataset.sel){ if (t.checked) selected.add(t.dataset.sel); else selected.delete(t.dataset.sel); pending = null; render(); }
     });
 

@@ -9,21 +9,28 @@ from threading import Thread
 from playwright.sync_api import expect, sync_playwright
 
 import test_prompt_b1_student_memory as fixture
-from test_prompt_cabinet_exam_grid import QuietHandler
+from test_prompt_cabinet_exam_grid import QuietHandler, cell, edit_mark
 from test_prompt_cabinet_links import lesson, person, seed, FIXED_NOW_JS
 
 
 TRACK_MOTION = """() => {
-  window.windowMotions = [];
-  const animate = Element.prototype.animate;
-  Element.prototype.animate = function(frames, options) {
-    if (this.classList.contains('cab-float')) {
-      windowMotions.push({ frames, options, width:this.offsetWidth, height:this.offsetHeight });
+  window.windowMotions = {};
+  const drawImage = CanvasRenderingContext2D.prototype.drawImage;
+  CanvasRenderingContext2D.prototype.drawImage = function(image, ...args) {
+    if (this.canvas.classList.contains('cab-genie') && args.length === 8) {
+      const matrix = this.getTransform();
+      const phase = this.canvas.dataset.direction;
+      const track = windowMotions[phase] ||= { bend:false, xs:[], ys:[], frames:0 };
+      track.frames += args[0] === 0 && args[1] === 0 ? 1 : 0;
+      track.bend ||= Math.abs(matrix.b) > .08 || Math.abs(matrix.c) > .08;
+      if (this.globalAlpha < .06) {
+        track.xs.push(matrix.e + args[6] * matrix.a / 2 + args[7] * matrix.c / 2);
+        track.ys.push(matrix.f + args[6] * matrix.b / 2 + args[7] * matrix.d / 2);
+      }
     }
-    return animate.call(this, frames, options);
+    return drawImage.call(this, image, ...args);
   };
 }"""
-
 
 def boot(context, base, tab):
     context.add_init_script(FIXED_NOW_JS)
@@ -42,7 +49,7 @@ def shot(target, name):
 
 
 def settled(window):
-    window.evaluate("(node) => Promise.all(node.getAnimations().map(animation => animation.finished.catch(() => {})))")
+    expect(window.page.locator(".cab-genie")).to_be_hidden()
 
 
 def drag_window(page, window, dx, dy):
@@ -60,16 +67,12 @@ def drag_window(page, window, dx, dy):
 
 
 def assert_origin(page, rect, at_start):
-    frame_index = 0 if at_start else -1
-    center = page.evaluate("""index => {
-        const animation = windowMotions.at(-1);
-        const matrix = new DOMMatrix(animation.frames.at(index).transform);
-        return [matrix.e + animation.width * matrix.a / 2,
-                matrix.f + animation.height * matrix.d / 2, matrix.a, matrix.d];
-    }""", frame_index)
-    assert center[2] < 1 or center[3] < 1, center
-    assert abs(center[0] - rect["x"] - rect["width"] / 2) < 3, (center, rect)
-    assert abs(center[1] - rect["y"] - rect["height"] / 2) < 3, (center, rect)
+    expect(page.locator(".cab-genie")).to_be_hidden()
+    track = page.evaluate("(direction) => windowMotions[direction]", "open" if at_start else "close")
+    assert track and track["frames"] > 4 and track["bend"], track
+    for axis, pos, size in (("xs", "x", "width"), ("ys", "y", "height")):
+        center = (min(track[axis]) + max(track[axis])) / 2
+        assert abs(center - rect[pos] - rect[size] / 2) < 9, (center, rect, track)
 
 
 def check_list(browser, base):
@@ -93,6 +96,13 @@ def check_list(browser, base):
         drag_window(page, card, -54, 47)
         shot(page, "student-card.png")
         card.get_by_role("button", name="Закрыть карточку").click()
+        expect(page.locator(".cab-genie")).to_be_visible()
+        link.click()
+        expect(card.locator("#cName")).to_have_text("Ваня")
+        settled(card)
+        expect(page.locator(".cab-student-window")).to_have_count(1)
+        page.evaluate("delete windowMotions.close")
+        card.get_by_role("button", name="Закрыть карточку").click()
         expect(card).to_be_hidden()
         assert_origin(page, origin, False)
         expect(link).to_be_focused()
@@ -113,6 +123,7 @@ def check_week(browser, base):
         sunday = sun.locator('[data-id="sun-early"] [data-p]')
         expect(sunday).to_be_visible()
         sunday.scroll_into_view_if_needed()
+        page.evaluate("windowMotions = {}")
         sunday.click()
         origin = sunday.bounding_box()
         small = page.get_by_role("dialog", name="Ученик на занятии")
@@ -127,6 +138,7 @@ def check_week(browser, base):
           return node.contains(document.elementFromPoint(point.x + point.width/2, point.y + point.height/2));
         }""")
         shot(page, "sunday-card.png")
+        page.evaluate("windowMotions = {}")
         small.get_by_role("button", name="Открыть занятие").click()
         panel = page.get_by_role("dialog", name="Занятие", exact=True)
         expect(panel).to_be_visible()
@@ -172,7 +184,7 @@ def check_mobile(browser, base):
         box = small.bounding_box()
         assert not overlap(box, protected), (box, protected)
         assert box["x"] >= 0 and box["x"] + box["width"] <= 375
-        assert page.evaluate("windowMotions.at(-1).frames.every(frame => !frame.transform)")
+        assert page.evaluate("Object.keys(windowMotions).length === 0")
         shot(page, "mobile-sunday.png")
         header = small.locator("[data-cab-drag]").bounding_box()
         x, y = header["x"] + 18, header["y"] + header["height"] / 2
@@ -215,9 +227,141 @@ def check_mobile(browser, base):
     print("✓ Узкий экран: перетаскивание и сокращение движения. На 320 px четыре статуса в один ряд и текущий виден после повторного открытия")
 
 
+def resize_window(page, card, edge, dx, dy):
+    lever = card.locator(f'[data-edge="{edge}"]')
+    box = lever.bounding_box()
+    x, y = box["x"] + box["width"] / 2, box["y"] + box["height"] / 2
+    page.mouse.move(x, y)
+    page.mouse.down()
+    page.mouse.move(x + dx, y + dy, steps=6)
+    page.mouse.up()
+
+
+def check_five(browser, base):
+    with fixture.new_context(browser, bar_open=False) as context:
+        page = boot(context, base, "students")
+        page.set_viewport_size({"width": 1360, "height": 1000})
+        links = page.locator("#stuHost [data-student-card]")
+        expect(links).to_have_count(6)
+        def open_id(student):
+            links.and_(page.locator(f'[data-student-card="{student}"]')).press("Enter")
+
+        open_id(fixture.VANYA)
+        first = page.locator(".cab-student-window").first
+        expect(first.get_by_label("Имя", exact=True)).to_have_value("Ваня")
+        before = first.bounding_box()
+        resize_window(page, first, "e", 58, 0)
+        widened = first.bounding_box()
+        assert abs(widened["width"] - before["width"] - 58) <= 2 and widened["x"] == before["x"], (before, widened)
+        resize_window(page, first, "nw", -35, -35)
+        expanded = first.bounding_box()
+        assert abs(expanded["x"] - widened["x"] + 35) <= 2, (widened, expanded)
+        assert abs(expanded["y"] - widened["y"] + 35) <= 2, (widened, expanded)
+        assert abs(expanded["width"] + expanded["x"] - widened["width"] - widened["x"]) <= 2
+        first.get_by_role("button", name="Изменить размер окна стрелками").press("ArrowDown")
+        assert abs(first.bounding_box()["height"] - expanded["height"] - 10) <= 2
+
+        open_id(fixture.PETYA)
+        cards = page.locator(".cab-student-window")
+        second = cards.nth(1)
+        expect(second.get_by_label("Имя", exact=True)).to_have_value("Петя")
+        first.get_by_label("Заметка").fill("Несохранённая заметка Вани")
+        tray = page.get_by_role("group", name="Открытые окна")
+        tray.get_by_role("button", name="Петя", exact=True).click()
+        second.get_by_label("Заметка").fill("Заметка Пети")
+        second.get_by_role("button", name="Сохранить", exact=True).click()
+        expect(second.get_by_role("status").filter(has_text="Сохранено")).to_be_visible()
+        expect(first.get_by_label("Заметка")).to_have_value("Несохранённая заметка Вани")
+        second_grid = second.get_by_role("region", name="Экзаменационная сетка")
+        edit_mark(second_grid, 1, 1, "2", "Только у Пети")
+        expect(cell(first.get_by_role("region", name="Экзаменационная сетка"), 1, 1)).to_be_empty()
+        mocks = second.get_by_role("region", name="Анализ пробников")
+        mocks.get_by_role("button", name="Добавить пробник").click()
+        edit = mocks.get_by_role("dialog")
+        expect(edit.get_by_label("Дата пробника")).to_be_visible()
+        edit.get_by_label("Название варианта", exact=False).fill("Пробник Пети")
+        edit.get_by_role("button", name="Сохранить", exact=True).click()
+        expect(mocks.get_by_text("Пробник Пети", exact=False)).to_be_visible()
+        expect(first.get_by_text("Пробник Пети", exact=False)).to_have_count(0)
+        assert page.evaluate("""() => {
+          const ids = [...document.querySelectorAll('.cab-student-window [id]')].map(el => el.id);
+          return new Set(ids).size === ids.length;
+        }""")
+
+        for student in ["extra-2", "extra-3", "extra-4", "extra-5"]:
+            open_id(student)
+        expect(cards).to_have_count(5)
+        expect(page.locator("#toast")).to_contain_text("Открыто пять окон")
+        tray.get_by_role("button", name="Ваня", exact=True).click()
+        expect(tray.get_by_role("button", name="Ваня", exact=True)).to_have_attribute("aria-pressed", "true")
+        assert first.evaluate("el => +el.style.zIndex") > second.evaluate("el => +el.style.zIndex")
+        tray.get_by_role("button", name="Анимация").click()
+        expect(tray.get_by_role("button", name="Анимация")).to_have_attribute("aria-pressed", "false")
+        first.get_by_role("button", name="Закрыть карточку").click()
+        expect(cards).to_have_count(4)
+        expect(page.locator(".cab-genie")).to_be_hidden()
+        page.reload()
+        expect(cards).to_have_count(0)
+        assert page.evaluate("localStorage.getItem('mathh:cabinet:window-motion') === 'off'")
+    print("✓ Пять окон, ограничение шестого, изменение размеров, фокус, отдельные записи сетки и пробников")
+
+
+def check_touch_limits(browser, base):
+    with fixture.new_context(browser, bar_open=False) as context:
+        page = boot(context, base, "schedule/2026-11-16")
+        page.set_viewport_size({"width": 1200, "height": 940})
+        context.add_init_script("localStorage.setItem('mathh:cabinet:window-motion', 'off')")
+        page.reload()
+        sun = page.locator('.sc-col[data-day="2026-11-22"]')
+        sunday = sun.locator('[data-id="sun-early"] [data-p]')
+        late = sun.locator('[data-id="sun-late"] [data-p]')
+        sunday.click()
+        late.click()
+        quick = page.locator(".sc-scard")
+        expect(quick).to_have_count(2)
+        expect(quick.first.locator(".sc-sc-name")).to_have_text("Ваня")
+        expect(quick.last.locator(".sc-sc-name")).to_have_text("Петя")
+        page.set_viewport_size({"width": 390, "height": 844})
+        expect(quick).to_have_count(1)
+        expect(quick.locator(".sc-sc-name")).to_have_text("Петя")
+
+    for width, height, expected in [(820, 1180, 2), (844, 390, 1), (390, 844, 1)]:
+        context = browser.new_context(viewport={"width": width, "height": height}, is_mobile=True, has_touch=True)
+        try:
+            context.route("https://**/*", lambda route: route.abort())
+            context.route("https://fakesb.test/db", fixture.handle_db)
+            context.route("**/supabase-js.umd.js", lambda route: route.fulfill(
+                status=200, content_type="application/javascript", body=fixture.FAKE_SB_JS))
+            context.add_init_script("localStorage.setItem('__fakesb_session', " + json.dumps(fixture.SESSION_JSON) + ")")
+            context.add_init_script("localStorage.setItem('mathh:cabinet:window-motion', 'off')")
+            page = boot(context, base, "students")
+            for student in [fixture.VANYA, fixture.PETYA]:
+                page.locator(f'#stuHost [data-student-card="{student}"]').press("Enter")
+            cards = page.locator(".cab-student-window")
+            expect(cards).to_have_count(expected)
+            expect(cards.last.get_by_label("Имя", exact=True)).to_have_value("Петя")
+            if expected == 2:
+                before = cards.last.bounding_box()
+                handle = cards.last.locator('[data-edge="se"]').bounding_box()
+                x, y = (handle["x"] + handle["width"] / 2, handle["y"] + handle["height"] / 2)
+                touch = context.new_cdp_session(page)
+                touch.send("Input.dispatchTouchEvent", {"type":"touchStart", "touchPoints":[{"x":x, "y":y}]})
+                touch.send("Input.dispatchTouchEvent", {"type":"touchMove", "touchPoints":[{"x":x - 55, "y":y - 70}]})
+                touch.send("Input.dispatchTouchEvent", {"type":"touchEnd", "touchPoints":[]})
+                after = cards.last.bounding_box()
+                assert abs(after["width"] - before["width"] + 55) <= 2, (before, after)
+                assert abs(after["height"] - before["height"] + 70) <= 2, (before, after)
+                assert after["x"] == before["x"] and after["y"] == before["y"]
+        finally:
+            context.close()
+    print("✓ Планер с двумя учениками, планшет с сенсорным растягиванием, телефон в обеих ориентациях с одним окном")
+
+
 if __name__ == "__main__":
     db = seed()
     db["students"][0]["exam"] = "ege_prof"
+    for i in range(2, 6):
+        db["students"].append({**db["students"][1], "id": f"extra-{i}", "name": f"Ученик {i}"})
     db["lessons"] += [
         lesson("mon-test", "2026-11-16", 615),
         lesson("sun-early", "2026-11-22", 615),
@@ -237,6 +381,8 @@ if __name__ == "__main__":
             check_list(browser, base)
             check_week(browser, base)
             check_mobile(browser, base)
+            check_five(browser, base)
+            check_touch_limits(browser, base)
             browser.close()
         finally:
             server.shutdown()

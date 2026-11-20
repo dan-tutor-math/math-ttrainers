@@ -303,7 +303,7 @@
         select.hidden = useNumeric;
         customScore.disabled = !useNumeric;
         find('[data-cell] label').textContent = isScore ? 'Балл задания' : 'Причина ошибки';
-        find('[data-cell] label').htmlFor = useNumeric ? 'examMockNumber' : 'examMockValue';
+        find('[data-cell] label').htmlFor = (useNumeric ? customScore : select).id;
         const options = isScore ? Array.from({ length:(slot.max ?? -1) + 1 }, (_, score) => new Option(String(score), String(score)))
           : ERRORS.map(([code, name]) => new Option(code + ' · ' + name, code));
         select.replaceChildren(new Option(isScore ? 'Балл не внесён' : 'Код не указан', ''), ...options);
