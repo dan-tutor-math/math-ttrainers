@@ -1085,6 +1085,7 @@ html[data-theme="dark"] .tile:hover{box-shadow:inset 0 1px 0 var(--glass-inset),
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="trainer-work-width.js"></script>
 <script src="keypad.js"></script>
 <script src="lazy-libs.js" data-preload="html2canvas jspdf"></script>
 <script src="lesson-history.js"></script>
@@ -1998,10 +1999,7 @@ function clampWorkW(w){
   max = Math.max(min, max);
   return Math.min(max, Math.max(min, w));
 }
-try {
-  const w = parseFloat(localStorage.getItem(WORK_W_KEY));
-  if (w) els.workZone.style.setProperty('--work-w', clampWorkW(w) + 'px');
-} catch (e) {}
+const workWidth = TrainerWorkWidth.create(els.workZone, WORK_W_KEY, clampWorkW);
 function setupWorkZoneResize(handleEl, side){
   let start = null;
   handleEl.addEventListener('pointerdown', e => {
@@ -2017,7 +2015,7 @@ function setupWorkZoneResize(handleEl, side){
   const end = () => {
     if (!start) return;
     start = null;
-    try { localStorage.setItem(WORK_W_KEY, String(parseFloat(getComputedStyle(els.workZone).width))); } catch (e) {}
+    workWidth.save();
     if (TS && TS.push) TS.push();
   };
   handleEl.addEventListener('pointerup', end);
@@ -2169,7 +2167,7 @@ function tsGetState(){
     task: S.task, answered: !!S.answered, hadWrong: !!S.hadWrong, correct: !!S.correct,
     marks: S.marks, pick: S.pick == null ? null : S.pick, wrong: S.wrong || [], sol: !!S.sol,
     cards: cardsSnapshot(),
-    workW: parseFloat(getComputedStyle(els.workZone).width) || null,
+    workW: workWidth.getWidth(),
     totalSolved, streak, totalErrors,
   };
   if (window.__boardGetState) Object.assign(base, window.__boardGetState());
@@ -2199,7 +2197,7 @@ function tsApplyState(state){
   S.pick = state.pick == null ? null : state.pick;
   S.wrong = state.wrong || [];
   S.sol = !!state.sol;
-  if (typeof state.workW === 'number' && state.workW > 0) els.workZone.style.setProperty('--work-w', clampWorkW(state.workW) + 'px');
+  if (workWidth.usesSavedWidth() && typeof state.workW === 'number' && state.workW > 0) els.workZone.style.setProperty('--work-w', clampWorkW(state.workW) + 'px');
   const incoming = (state.cards || []).filter(c => c && c.task && c.task.key).map(c => ({
     task: c.task, answered: !!c.answered, hadWrong: !!c.hadWrong, correct: !!c.correct,
     marks: c.marks || {}, pick: c.pick == null ? null : c.pick, wrong: c.wrong || [], sol: !!c.sol }));

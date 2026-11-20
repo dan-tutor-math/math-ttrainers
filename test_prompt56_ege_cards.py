@@ -308,6 +308,7 @@ def test_keypad_and_zone(browser):
           and page.eval_on_selector('#kpToggle', 'e => e.style.display') == 'flex')
     page.click('#kpToggle')
 
+    page.evaluate("localStorage.setItem('ege_prof:workZoneW', '430')")
     w0 = page.eval_on_selector('#workZone', 'e => e.getBoundingClientRect().width')
     box = page.eval_on_selector('#workResizeLeft', 'e => { const r = e.getBoundingClientRect(); return {x: r.x + r.width / 2, y: r.y + 40}; }')
     page.mouse.move(box["x"], box["y"])
@@ -317,8 +318,8 @@ def test_keypad_and_zone(browser):
     page.wait_for_timeout(150)
     w1 = page.eval_on_selector('#workZone', 'e => e.getBoundingClientRect().width')
     check("рабочая зона: тянется за край в обе стороны", w1 > w0 + 100, f"{w0} → {w1}")
-    check("рабочая зона: ширина запомнилась",
-          abs(float(page.evaluate("localStorage.getItem('ege_prof:workZoneW')") or 0) - w1) < 2)
+    check("рабочая зона: отдельная вкладка оставляет сохранённые 430 px для доски",
+          page.evaluate("localStorage.getItem('ege_prof:workZoneW')") == '430')
 
     page.goto(f"{BASE}/ege_prof.html?n=14")
     page.wait_for_timeout(1400)

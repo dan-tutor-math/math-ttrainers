@@ -4,9 +4,9 @@
 Проверяет:
   1. У задания ручки слева и справа; потянули правую на 200 — карточка
      задания шире на 400 (зона по центру), шире страницы (820).
-  2. Ширина помнится после перезагрузки (oge13:workZoneW).
-  3. Ширина — в общем снимке сессии: tsGetState().workW, а tsApplyState с
-     другой шириной её применяет.
+  2. При обычном открытии зона во всю ширину ряда режимов даже со старой настройкой.
+  3. Ширина — в общем снимке сессии: в совместном уроке применяется ширина
+     собеседника, в обычной вкладке ширина ряда сохраняется.
   4. В карточке «+» (oge13.html?card=1) ручек нет.
   5. Телефон: зона не шире экрана, горизонтальной прокрутки нет.
   6. Вкладка-панель для доски: растянутое задание снимается растянутым.
@@ -94,17 +94,23 @@ def run():
         p.wait_for_timeout(300)
         c = p.evaluate(M)
         check("1. левую внутрь на 300 — уже на 600", abs(c["zone"] - 620) <= 2, str(c))
+        p.evaluate("localStorage.setItem('oge13:workZoneW', '620')")
         p.reload()
         p.wait_for_function("() => typeof tsGetState === 'function'")
         p.evaluate(PICK)
         p.wait_for_timeout(500)
         d = p.evaluate(M)
-        check("2. ширина помнится после перезагрузки", abs(d["zone"] - c["zone"]) <= 2, f"{c['zone']} / {d['zone']}")
+        check("2. после перезагрузки зона снова равна ширине ряда", d["zone"] == 820, str(d))
         st = p.evaluate("() => tsGetState()")
         check("3. ширина в снимке сессии (workW)", abs((st.get("workW") or 0) - d["zone"]) <= 2, str(st.get("workW")))
         p.evaluate("() => tsApplyState(Object.assign(tsGetState(), { workW: 900 }))")
+        check("3. вне урока снимок сохраняет ширину ряда", p.evaluate(M)["zone"] == 820)
+        p.evaluate("""() => {
+            TrainerSession.isShared = () => true;
+            tsApplyState(Object.assign(tsGetState(), { workW: 900 }));
+        }""")
         p.wait_for_timeout(200)
-        check("3. tsApplyState применяет ширину собеседника", abs(p.evaluate(M)["zone"] - 900) <= 2, str(p.evaluate(M)))
+        check("3. в совместном уроке применяется ширина собеседника", abs(p.evaluate(M)["zone"] - 900) <= 2, str(p.evaluate(M)))
 
         cp = ctx.new_page()
         cp.on("pageerror", lambda e: ERRORS.append(f"card: {e}"))

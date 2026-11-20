@@ -779,6 +779,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="trainer-work-width.js"></script>
 <script src="mode-card-keys.js"></script>
 <script src="keypad.js"></script>
 <script src="exam-spec.js"></script>
@@ -2059,12 +2060,7 @@ function clampWorkW(w){
   max = Math.max(min, max);
   return Math.min(max, Math.max(min, w));
 }
-(function restoreWorkZoneWidth(){
-  try {
-    const w = parseFloat(localStorage.getItem(WORK_W_KEY));
-    if (w) els.workZone.style.setProperty('--work-w', clampWorkW(w) + 'px');
-  } catch(e){}
-})();
+const workWidth = TrainerWorkWidth.create(els.workZone, WORK_W_KEY, clampWorkW);
 
 function setupWorkZoneResize(handleEl, side){
   let start = null; // {x, w}
@@ -2084,10 +2080,7 @@ function setupWorkZoneResize(handleEl, side){
     if (!start) return;
     start = null;
     handleEl.classList.remove('dragging');
-    try {
-      const w = parseFloat(getComputedStyle(els.workZone).width);
-      localStorage.setItem(WORK_W_KEY, String(w));
-    } catch(e){}
+    workWidth.save();
     // после завершения растягивания форсируем перерисовку — не дожидаясь скролла
     setTimeout(forceRepaintWorkArea, 30);
     // Промпт №23: растянутая ширина рабочей зоны должна долететь до собеседника —
@@ -2242,7 +2235,7 @@ function tsGetState(){
     })),
     // Промпт №23: ширина растянутой рабочей зоны — чтобы у обоих участников
     // задания и заметки поверх них были видны в одном и том же масштабе
-    workW: parseFloat(getComputedStyle(els.workZone).width) || null,
+    workW: workWidth.getWidth(),
     // Промпт №25: статистика (решено/серия/ошибки) — учитель должен видеть
     // актуальные показатели ученика в реальном времени, а не только у себя
     totalSolved, streak, totalErrors,
@@ -2280,12 +2273,12 @@ function tsApplyState(state){
   }
   // ширина рабочей зоны — тоже независимо от picker/задачи: применяем сразу,
   // если она реально отличается (иначе на каждый push() дёргали бы CSS зря)
-  if (state.workW) {
+  if (workWidth.usesSavedWidth() && state.workW) {
     const curW = parseFloat(getComputedStyle(els.workZone).width);
     if (Math.abs(curW - state.workW) > 1) {
       const w = clampWorkW(state.workW);
       els.workZone.style.setProperty('--work-w', w + 'px');
-      try { localStorage.setItem(WORK_W_KEY, String(w)); } catch(e){}
+      workWidth.save(w);
       setTimeout(forceRepaintWorkArea, 30);
     }
   }

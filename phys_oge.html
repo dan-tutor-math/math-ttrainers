@@ -888,6 +888,7 @@ html[data-theme="dark"][data-subject="inf"] :is(.submode-tab.active,.check-btn,.
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="trainer-work-width.js"></script>
 <script src="mode-card-keys.js"></script>
 <script src="keypad.js"></script>
 <script src="task-captions.js"></script>
@@ -2760,10 +2761,7 @@ function clampWorkW(w){
   max = Math.max(min, max);
   return Math.min(max, Math.max(min, w));
 }
-try {
-  const w = parseFloat(localStorage.getItem(WORK_W_KEY));
-  if (w) els.workZone.style.setProperty('--work-w', clampWorkW(w) + 'px');
-} catch (e) {}
+const workWidth = TrainerWorkWidth.create(els.workZone, WORK_W_KEY, clampWorkW);
 function setupWorkZoneResize(handleEl, side){
   let start = null;
   handleEl.addEventListener('pointerdown', e => {
@@ -2781,7 +2779,7 @@ function setupWorkZoneResize(handleEl, side){
     if (!start) return;
     start = null;
     handleEl.classList.remove('dragging');
-    try { localStorage.setItem(WORK_W_KEY, String(parseFloat(getComputedStyle(els.workZone).width))); } catch (e) {}
+    workWidth.save();
     setTimeout(forceRepaintWorkArea, 30);
     // ширина рабочей зоны уходит собеседнику: заметки поверх заданий имеют
     // смысл только в том же масштабе, в каком их рисовали
@@ -2937,7 +2935,7 @@ function tsGetState(){
     cards: cardsSnapshot(),
     // ширина растянутой рабочей зоны: задания и заметки поверх них должны быть
     // видны обоим в одном масштабе
-    workW: parseFloat(getComputedStyle(els.workZone).width) || null,
+    workW: workWidth.getWidth(),
     totalSolved, streak, totalErrors,
   };
   if (window.__boardGetState) Object.assign(base, window.__boardGetState());
@@ -2978,7 +2976,7 @@ function tsApplyState(state){
   S.yn = state.yn || {};
   S.sol = !!state.sol;
   S.step = state.step || 0;
-  if (typeof state.workW === 'number' && state.workW > 0) {
+  if (workWidth.usesSavedWidth() && typeof state.workW === 'number' && state.workW > 0) {
     els.workZone.style.setProperty('--work-w', clampWorkW(state.workW) + 'px');
   }
   /* Карточки перерисовываем ТОЛЬКО когда их список действительно изменился:

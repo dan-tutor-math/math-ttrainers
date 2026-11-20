@@ -610,6 +610,7 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="supabase-config.js"></script>
 <script src="supabase-js.umd.js"></script>
 <script src="session-share.js"></script>
+<script src="trainer-work-width.js"></script>
 <script src="mode-card-keys.js"></script>
 <script src="exam-spec.js"></script>
 <script src="variant-set.js"></script>
@@ -1790,16 +1791,13 @@ function forceRepaintWorkArea(){
   workZoneEl.style.opacity = '0.999999';
   requestAnimationFrame(() => { workZoneEl.style.opacity = prev; });
 }
+const workWidth = TrainerWorkWidth.create(workZoneEl, WORK_W_KEY, clampWorkW, { fixed: IS_CARD });
 (function setupWorkZone(){
   if (IS_CARD){
     document.getElementById('workResizeLeft').style.display = 'none';
     document.getElementById('workResizeRight').style.display = 'none';
     return;
   }
-  try {
-    const w = parseFloat(localStorage.getItem(WORK_W_KEY));
-    if (w) workZoneEl.style.setProperty('--work-w', clampWorkW(w) + 'px');
-  } catch (e) {}
   function setup(handleEl, side){
     let start = null; // {x, w}
     handleEl.addEventListener('pointerdown', (e) => {
@@ -1816,7 +1814,7 @@ function forceRepaintWorkArea(){
     function end(){
       if (!start) return;
       start = null;
-      try { localStorage.setItem(WORK_W_KEY, String(parseFloat(getComputedStyle(workZoneEl).width))); } catch (e) {}
+      workWidth.save();
       setTimeout(forceRepaintWorkArea, 30);
       // ширина — часть общего снимка сессии (tsGetState); отправляем сразу
       if (window.TrainerSession) window.TrainerSession.push();
@@ -1841,7 +1839,7 @@ function tsGetState(){
     hadWrongPick: typeof hadWrongPick !== 'undefined' ? !!hadWrongPick : false,
     // раскрытый в «Тренировке» разбор — общий, как в ОГЭ №7
     solShown: !!solShown,
-    workW: parseFloat(getComputedStyle(workZoneEl).width) || null,
+    workW: workWidth.getWidth(),
   };
   if (window.__boardGetState) Object.assign(base, window.__boardGetState());
   if (window.__cardsGetState) Object.assign(base, window.__cardsGetState()); // Промпт №33 — добавленные примеры
@@ -1854,12 +1852,12 @@ function tsApplyState(state){
   if (window.__cardsApplyState) window.__cardsApplyState(state); // Промпт №33
   // ширина рабочей зоны — независимо от экрана и задания, как в ОГЭ №8;
   // применяем, только если реально отличается (иначе каждый push() дёргал бы CSS)
-  if (state.workW && !IS_CARD){
+  if (workWidth.usesSavedWidth() && state.workW){
     const curW = parseFloat(getComputedStyle(workZoneEl).width);
     if (Math.abs(curW - state.workW) > 1){
       const w = clampWorkW(state.workW);
       workZoneEl.style.setProperty('--work-w', w + 'px');
-      try { localStorage.setItem(WORK_W_KEY, String(w)); } catch (e) {}
+      workWidth.save(w);
       setTimeout(forceRepaintWorkArea, 30);
     }
   }
