@@ -15,8 +15,7 @@
        попадает в «9 класс» сам).
    «В месяц» считает Payments.monthlyOf — то же число, что в «Статистике»;
    вписанное вручную подсвечено. Итог внизу — по видимой сортировке.
-   Карточка ученика — кнопка «→» у имени (имя — поле ввода, по нему не
-   перейти).
+   Карточка открывается кнопкой рядом с редактируемым именем.
    ========================================================== */
 (function(){
   'use strict';
@@ -151,14 +150,13 @@
   const ARCH_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/></svg>';
   // значок статистики — svg, а не эмодзи 📊: одинаково на всех системах
   const STATS_SVG = '<svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 13V8M8 13V3M13 13V6"/></svg>';
+  const CARD_SVG = '<svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" aria-hidden="true"><rect x="2.5" y="4.5" width="15" height="11" rx="2"/><circle cx="7.2" cy="8.6" r="1.3"/><path d="M4.9 13c.4-2.3 4.3-2.3 4.7 0M11.8 8.1h3M11.8 11.2h3"/></svg>';
   const fmt = n => (n == null ? '' : Math.round(n).toLocaleString('ru-RU'));
   function rowHtml(s, i){
     return '<tr data-sid="' + esc(s.id) + '">' +
       '<td class="cs-i">' + (i + 1) + '</td>' +
-      // «→» — рядом с именем, а не в конце строки: на телефоне колонка имени
-      // прилипает слева, и переход к карточке виден без прокрутки вбок
       '<td class="cs-nm"><div class="cs-nmw"><input class="cs-in" data-f="name" maxlength="80" value="' + esc(s.name) + '" aria-label="Имя">' +
-        '<a class="cs-ic cs-open" href="#/students/' + esc(s.id) + '" title="Открыть карточку ученика" aria-label="Открыть карточку">→</a></div></td>' +
+        '<a class="cs-ic cs-open" data-student-card="' + esc(s.id) + '" href="#/students/' + esc(s.id) + '" aria-haspopup="dialog" title="Открыть карточку ученика" aria-label="Открыть карточку">' + CARD_SVG + '<span>Карточка</span></a></div></td>' +
       '<td><input class="cs-in cs-gr" data-f="grade" maxlength="20" list="csGrades" value="' + esc(s.grade || '') + '" placeholder="—" aria-label="Класс"></td>' +
       '<td><select class="cs-in cs-ex" data-f="exam" aria-label="Экзамен">' + examOpts(s.exam) + '</select></td>' +
       '<td>' + groupCell(s) + '</td>' +
@@ -193,9 +191,9 @@
       '<datalist id="csGrades">' + gradeOpts().map(g => '<option value="' + esc(g) + '">').join('') + '<option value="студент"><option value="взрослый"></datalist>' +
       '<div class="hint cs-note">Новая цена действует с сегодняшнего дня — прошлые итоги не меняются. «В месяц» считается ' +
         (P().paySettings(settings()).monthMode === 'tpl' ? 'по активному шаблону недели' : 'как цена × раз в неделю × 4') +
-        ' (способ — во вкладке «Статистика»). Впишите своё число, если у ученика особый расчёт, — оно сохранится и подсветится; сотрите — снова считается само. Пустое «раз в неделю» — по шаблону недели. → — карточка ученика.</div>' +
+        ' (способ — во вкладке «Статистика»). Впишите своё число, если у ученика особый расчёт, — оно сохранится и подсветится; сотрите — снова считается само. Пустое «раз в неделю» — по шаблону недели.</div>' +
       (arch.length ? '<details class="cs-arch" id="csArch"' + (st.archOpen ? ' open' : '') + '><summary><b>Архив</b> <span class="hint">' + P().plural(arch.length, 'ученик', 'ученика', 'учеников') + '</span></summary>' +
-        arch.map(s => '<div class="cs-arow" data-sid="' + esc(s.id) + '"><a class="cs-aname" href="#/students/' + esc(s.id) + '">' + esc(s.name) + '</a>' +
+        arch.map(s => '<div class="cs-arow" data-sid="' + esc(s.id) + '"><a class="cs-aname" aria-haspopup="dialog" data-student-card="' + esc(s.id) + '" href="#/students/' + esc(s.id) + '">' + esc(s.name) + '</a>' +
           '<span class="hint">' + esc([s.grade ? s.grade + ' класс' : '', s.exam ? exams()[s.exam] || s.exam : ''].filter(Boolean).join(' · ')) + '</span>' +
           '<button type="button" class="btn quiet small" data-act="unarch">Вернуть</button></div>').join('') + '</details>' : '');
     bind();

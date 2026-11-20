@@ -288,8 +288,13 @@ html[data-theme="dark"][data-schedule-palette="custom"] .sc-days .rw-row:not(.ed
 .sc-sc-who .btn{margin-left:auto;text-decoration:none;white-space:nowrap;}
 .sc-av{width:40px;height:40px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;background:var(--st-mv-b);color:var(--st-mv-c);}
 .sc-sc-name{font-weight:600;font-size:16px;}
-.sc-sc-st{width:100%;margin:0 0 8px;}
-.sc-sc-st button{flex:1;padding:8px 4px;font-size:12.5px;}
+.sc-sc-current{display:flex;align-items:center;flex-wrap:wrap;gap:3px 7px;min-width:0;}
+.sc-sc-time{white-space:nowrap;}
+.sc-sc-status{color:var(--pencil);font-weight:620;}
+.seg.sc-sc-st{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;margin:0 0 8px;}
+.seg.sc-sc-st button{min-width:0;min-height:34px;padding:4px 2px;font-size:12px;white-space:nowrap;}
+.seg.sc-sc-st button:focus-visible{outline:2px solid var(--ink);outline-offset:1px;}
+@media(pointer:coarse){.seg.sc-sc-st button{min-height:44px;}}
 .sc-sc-pay,.sc-sc-why{margin-bottom:8px;}
 .sc-sc-foot{display:flex;justify-content:flex-end;}
 

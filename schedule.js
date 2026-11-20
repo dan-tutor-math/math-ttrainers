@@ -1069,9 +1069,9 @@
       const l = findLesson(s.dataset.id);
       if (l) patchLesson(l, { format: s.value });
     }));
-    host.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', () => {
+    host.querySelectorAll('[data-open]').forEach(b => b.addEventListener('click', event => {
       const l = findLesson(b.dataset.open);
-      if (l) openPanel(l);
+      if (l) openPanel(l, null, b, event.detail !== 0);
     }));
   }
 
@@ -1093,7 +1093,8 @@
       days: () => weekDays().map((d, i) => ({ key: d, title: DAY_SHORT[i], sub: dm(d), today: d === today(), ref: 'week:' + d,
         money: dayMoneyHtml(d, lessonsOf(d).length) })),
       items: lessonsOf, all: () => st.lessons, find: findLesson,
-      open: l => openPanel(l), person: (l, p, el) => openStudentCard(l, p, el), status: (l, p) => rowStatus(l, p),
+      open: (l, el, motion) => openPanel(l, null, el, motion),
+      person: (l, p, el, motion) => openStudentCard(l, p, el, motion), status: (l, p) => rowStatus(l, p),
       create: (day, m) => openNew(day, m),
       patch: (l, patch) => patchLesson(l, patch),
       dayPatch: key => ({ day: key }),
@@ -1367,7 +1368,7 @@
             // плашка заодно становится «куда вписывать» двойным кликом по ученику
             if (S.pick) { S.pick(l); host.querySelectorAll('.sc-plate.picked').forEach(x => x.classList.remove('picked')); plate.classList.add('picked'); }
             const n = e.target.closest('[data-p]'), p = n && l.people.find(x => x.id === n.dataset.p.split('|')[1]);
-            if (p && S.person) S.person(l, p, n); else S.open(l);
+            if (p && S.person) S.person(l, p, n); else S.open(l, plate, true);
             return;
           }
           if (resize) {
@@ -1393,14 +1394,17 @@
         if (e.target.closest('[data-exp]')) { e.stopPropagation(); st.openPlate = st.openPlate === l.id ? null : l.id; render(); return; }
         // в раскрытом списке перетаскивания нет — имя открывает карточку здесь
         const n = plate.classList.contains('open') && e.target.closest('[data-p]');
-        if (n) { e.stopPropagation(); const p = l.people.find(x => x.id === n.dataset.p.split('|')[1]); if (p && S.person) S.person(l, p, n); else if (p) S.open(l); }
+        if (n) { e.stopPropagation(); const p = l.people.find(x => x.id === n.dataset.p.split('|')[1]); if (p && S.person) S.person(l, p, n, e.detail !== 0); else if (p) S.open(l, plate, e.detail !== 0); }
       });
       col.addEventListener('keydown', e => {
         const plate = e.target.closest('.sc-plate');
-        if (plate && e.target === plate && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); const l = S.find(plate.dataset.id); if (l) S.open(l); }
+        if (plate && e.target === plate && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); const l = S.find(plate.dataset.id); if (l) S.open(l, plate, false); }
       });
     });
-    host.querySelectorAll('[data-gopen]').forEach(b => b.addEventListener('click', () => { const l = S.find(b.dataset.gopen); if (l) S.open(l); }));
+    host.querySelectorAll('[data-gopen]').forEach(b => b.addEventListener('click', e => {
+      const l = S.find(b.dataset.gopen);
+      if (l) S.open(l, b, e.detail !== 0);
+    }));
     if (S.key === 'week') bindCommon();
   }
 
@@ -1435,37 +1439,90 @@
   /* ── карточка ученика по щелчку на имя (как в «Учительской») ──
      Коротко и рядом с именем: время и статус, тариф, оплата; подробное —
      «Открыть занятие» (боковая панель) */
-  let sCard = null;
-  function closeStudentCard(){
-    if (!sCard) return;
-    sCard.el.remove();
-    document.removeEventListener('pointerdown', sCard.onDown, true);
-    document.removeEventListener('keydown', sCard.onKey);
-    sCard = null;
+  const retiringAgenda = new Set();
+  function clearRetiringAgenda(){
+    for (const item of retiringAgenda) {
+      item.floating.dispose();
+      item.el.remove();
+    }
+    retiringAgenda.clear();
   }
-  function openStudentCard(l, p, anchor){
+  function detachAgenda(item, motion, restoreFocus){
+    if ((!motion && !restoreFocus) || !item.floating) {
+      item.floating?.dispose();
+      item.el.remove();
+      return;
+    }
+    retiringAgenda.add(item);
+    item.floating.close({ motion, restoreFocus, done:() => {
+      item.el.remove();
+      retiringAgenda.delete(item);
+    } });
+  }
+  function agendaAnchor(lid, pid, start){
+    const rowSelector = '[data-id="' + CSS.escape(String(lid)) + '"]';
+    return () => {
+      if (start?.isConnected) return start;
+      const row = host.querySelector('.sc-plate' + rowSelector + ', .rw-row' + rowSelector);
+      if (!row) return host.querySelector('[data-gopen="' + CSS.escape(String(lid)) + '"]');
+      if (!pid) return row;
+      const person = CSS.escape(String(pid));
+      return row.querySelector('[data-p$="|' + person + '"], .rw-p[data-pid="' + person + '"] .nm') || row;
+    };
+  }
+  function floatAgenda(item, anchor, motion){
+    item.floating = window.CabinetFloating?.attach(item.el, {
+      anchor, motion,
+      // Для планера границы дня важнее границ одной плашки: соседние записи этого дня видны.
+      avoid:() => anchor()?.closest('.sc-col, .sc-day') || anchor(),
+      avoidVertically:() => anchor()?.closest('.sc-plate, .rw-row') || anchor(),
+    });
+  }
+
+  const SCARD_STATUS = { plan:'План', done:'Пров.', move:'Перенос', skip:'Отмена' };
+  let sCard = null;
+  function closeStudentCard(motion = false, restoreFocus = false){
+    if (!sCard) return;
+    const card = sCard;
+    sCard = null;
+    document.removeEventListener('pointerdown', card.onDown, true);
+    document.removeEventListener('keydown', card.onKey);
+    detachAgenda(card, motion, restoreFocus);
+  }
+  function openStudentCard(l, p, source, motion = true){
+    clearRetiringAgenda();
+    closePanel();
     closeStudentCard();
     const el = document.createElement('div');
     el.className = 'sc-scard';
     el.setAttribute('role', 'dialog');
     el.setAttribute('aria-label', 'Ученик на занятии');
     document.body.appendChild(el);
-    const onDown = e => { if (!el.contains(e.target) && !e.target.closest('[data-p], .rw-p .nm') && !e.target.closest('.pay-card')) closeStudentCard(); };
-    const onKey = e => { if (e.key === 'Escape') closeStudentCard(); };
+    const anchor = agendaAnchor(l.id, p.id, source);
+    const onDown = e => {
+      if (!el.contains(e.target) && !e.target.closest('[data-p], .rw-p .nm, .pay-card')) closeStudentCard(true);
+    };
+    const onKey = e => {
+      if (e.key === 'Escape' && !e.defaultPrevented && !modal && !document.querySelector('.pay-card, dialog[open]')) {
+        e.preventDefault();
+        closeStudentCard(false, true);
+      }
+    };
     document.addEventListener('pointerdown', onDown, true);
     document.addEventListener('keydown', onKey);
-    sCard = { el, lid: l.id, pid: p.id, onDown, onKey, anchor };
+    const card = sCard = { el, lid:l.id, pid:p.id, onDown, onKey };
     el.addEventListener('click', e => {
       const c = curSCard(), t = e.target.closest('button, a');
       if (!c || !t) return;
-      if (t.dataset.x != null) closeStudentCard();
+      if (t.dataset.x != null) closeStudentCard(e.detail !== 0, true);
       else if (t.dataset.set) changeStatus(c.l, c.p, t.dataset.set).then(paintStudentCard);
       else if (t.dataset.paidc != null) togglePaid(c.l, c.p);
       else if (t.dataset.whyc != null) openPayCard(c.l, c.p);
-      else if (t.dataset.openl != null) { closeStudentCard(); openPanel(c.l, c.p.student_id); }
+      else if (t.dataset.openl != null) openPanel(c.l, c.p.student_id, anchor(), e.detail !== 0);
       else if (t.tagName === 'A') closeStudentCard();
     });
     paintStudentCard();
+    if (sCard === card) floatAgenda(card, anchor, motion);
   }
   function curSCard(){
     if (!sCard) return null;
@@ -1480,24 +1537,24 @@
     const gone = p.status === 'skip' || p.status === 'move';
     const price = P && p.student_id ? P.rateOn(st.pay.rates[p.student_id], l.day, l.format) : null;
     const paid = paidBtn(p, l);
+    const focus = sCard.el.contains(document.activeElement) ? document.activeElement.dataset.set : null;
     sCard.el.innerHTML =
-      '<div class="sc-sc-top">' + ic(p.status) + '<span class="' + (gone ? 'x' : '') + '">' + esc(timeText(l).replace(' – ', '–')) + '</span><span>' + esc(R.ST_NAME[p.status]) + '</span>' +
-        '<button type="button" class="sc-sc-x" data-x aria-label="Закрыть">×</button></div>' +
+      '<div class="sc-sc-top" data-cab-drag><div class="sc-sc-current">' + ic(p.status) +
+        '<span class="sc-sc-time' + (gone ? ' x' : '') + '">' + esc(timeText(l).replace(' – ', '–')) + '</span>' +
+        '<strong class="sc-sc-status">' + esc(R.ST_NAME[p.status]) + '</strong></div>' +
+        '<button type="button" class="sc-sc-x" data-cab-close data-x aria-label="Закрыть">×</button></div>' +
       '<div class="sc-sc-who"><div class="sc-av">' + esc(initials(personName(p))) + '</div><div><div class="sc-sc-name">' + esc(personName(p)) + '</div>' +
         '<div class="hint">' + (p.student_id ? (price != null ? 'По тарифу: ' + esc(P.money(price)) : 'Ставка не задана') : 'Гость без карточки') + '</div></div>' +
         (p.student_id ? '<a class="btn quiet small" href="#/payments/' + esc(p.student_id) + '">К оплатам</a>' : '') + '</div>' +
-      '<div class="seg sc-sc-st" role="group" aria-label="Статус">' + ['plan', 'done', 'move', 'skip'].map(s =>
-        '<button type="button" data-set="' + s + '" class="' + (p.status === s ? 'on' : '') + '">' + esc(({ plan: 'План', done: 'Проведено', move: 'Перенос', skip: 'Отменено' })[s]) + '</button>').join('') + '</div>' +
+      '<div class="seg sc-sc-st" role="group" aria-label="Статус">' + Object.entries(SCARD_STATUS).map(([value, label]) => {
+        const active = p.status === value;
+        return '<button type="button" data-set="' + value + '" class="' + (active ? 'on' : '') + '" aria-pressed="' + active +
+          '" aria-label="' + esc(R.ST_NAME[value]) + '" title="' + esc(R.ST_NAME[value]) + '">' + esc(label) + '</button>';
+      }).join('') + '</div>' +
       (paid ? '<div class="sc-sc-pay">' + paid.replace('class="sc-paid', 'data-paidc class="sc-paid') + '</div>' : '') +
       (isAbsent(p) && P ? '<button type="button" class="btn quiet small sc-sc-why" data-whyc>' + esc(whyText(p, l)) + '</button>' : '') +
       '<div class="sc-sc-foot"><button type="button" class="btn quiet small" data-openl>Открыть занятие</button></div>';
-    const r = sCard.anchor.isConnected ? sCard.anchor.getBoundingClientRect() : null;
-    if (r) {
-      const w = sCard.el.offsetWidth, h = sCard.el.offsetHeight;
-      let x = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)), y = r.bottom + 6;
-      if (y + h > window.innerHeight - 8) y = Math.max(8, r.top - h - 6);
-      sCard.el.style.left = x + 'px'; sCard.el.style.top = y + 'px';
-    }
+    if (focus) sCard.el.querySelector('[data-set="' + CSS.escape(focus) + '"]')?.focus({ preventScroll:true });
   }
 
   /* ── меню «Вид»: время и вид пар/групп, с живым примером плашки ── */
@@ -1812,26 +1869,35 @@
      удобно видеть соседние. Сессия начинается с lessonId — события журнала
      этой сессии помечаются занятием (StudentMemory.start, Б1). */
   const EXAM_SHORT = { oge: 'ОГЭ, математика', ege_prof: 'ЕГЭ, профиль', ege_base: 'ЕГЭ, база', rus_oge: 'ОГЭ, русский' };
-  let panel = null;           // { el, lessonId, sid, onKey, off }
-  function closePanel(){
+  let panel = null;
+  function closePanel(motion = false, restoreFocus = false){
     if (!panel) return;
-    panel.el.remove();
-    document.removeEventListener('keydown', panel.onKey);
-    if (panel.off) panel.off();
+    const current = panel;
     panel = null;
+    document.removeEventListener('keydown', current.onKey);
+    current.off?.();
+    detachAgenda(current, motion, restoreFocus);
   }
-  function openPanel(l, sid){
+  function openPanel(l, sid, source, motion = true){
     const people = l.people.filter(p => p.student_id);
     const first = sid || (people[0] && people[0].student_id) || null;
     if (panel && panel.lessonId === l.id && !sid) { paintPanel(); return; }
+    clearRetiringAgenda();
+    closeStudentCard();
     closePanel();
     const el = document.createElement('aside');
     el.className = 'sc-side panel';
+    el.setAttribute('role', 'dialog');
     el.setAttribute('aria-label', 'Занятие');
     document.body.appendChild(el);
-    const onKey = e => { if (e.key === 'Escape' && !modal) closePanel(); };
+    const onKey = e => {
+      if (e.key === 'Escape' && !e.defaultPrevented && !modal && !document.querySelector('dialog[open]')) {
+        e.preventDefault();
+        closePanel(false, true);
+      }
+    };
     document.addEventListener('keydown', onKey);
-    panel = { el, lessonId: l.id, sid: first, onKey, off: null };
+    const current = panel = { el, lessonId:l.id, sid:first, onKey, off:null };
     const SM = window.StudentMemory;
     if (SM && SM.onChange) panel.off = SM.onChange(() => paintPanel());
     el.addEventListener('click', onPanelClick);
@@ -1842,13 +1908,14 @@
       if (p) setPart(l, p, { makeup: e.target.checked }).then(paintPanel);
     });
     paintPanel();
+    if (panel === current) floatAgenda(current, agendaAnchor(l.id, null, source), motion);
   }
   function onPanelClick(e){
     const t = e.target.closest('button, a');
     if (!t || !panel) return;
     const l = findLesson(panel.lessonId);
     if (!l) return;
-    if (t.classList.contains('sc-x')) closePanel();
+    if (t.classList.contains('sc-x')) closePanel(e.detail !== 0, true);
     else if (t.dataset.pick) { panel.sid = t.dataset.pick; paintPanel(); }
     else if (t.id === 'spEdit') openEditor(l);
     else if (t.id === 'spPin') openPin();
@@ -1917,7 +1984,7 @@
     const SM = window.StudentMemory, cur = SM && SM.current ? SM.current() : null;
     const mine = !!(s && cur && cur.id === String(s.id) && cur.lessonId === l.id);
     const keepScroll = panel.el.scrollTop;
-    let h = '<div class="sc-ed-head"><b>' + esc(dayText(l.day)) + ', ' + esc(timeText(l)) + '</b><button type="button" class="sc-x" aria-label="Закрыть">×</button></div>' +
+    let h = '<div class="sc-ed-head" data-cab-drag><b>' + esc(dayText(l.day)) + ', ' + esc(timeText(l)) + '</b><button type="button" class="sc-x" data-cab-close aria-label="Закрыть">×</button></div>' +
       '<div class="hint">' + esc(l.is_event ? 'событие' : fmtLabel(l.format)) + '</div>';
     if (l.is_event) h += '<div class="sc-sp-name">' + esc(l.title || 'Событие') + '</div>';
     if (people.length > 1) {
@@ -2198,7 +2265,7 @@
     host.querySelectorAll('.sc-views button').forEach(b => b.addEventListener('click', () => { rows.cancel(); setView(b.dataset.v); }));
     const undoBtn = host.querySelector('#scUndo');
     if (undoBtn) { paintUndo(); undoBtn.addEventListener('click', undoLast); }
-    host.querySelectorAll('.sc-modes button').forEach(b => b.addEventListener('click', () => { rows.cancel(); st.mode = b.dataset.mode; closeModal(); closePanel(); closeStudentCard(); render(); }));
+    host.querySelectorAll('.sc-modes button').forEach(b => b.addEventListener('click', () => { rows.cancel(); st.mode = b.dataset.mode; closeModal(); closePanel(); closeStudentCard(); clearRetiringAgenda(); render(); }));
     const lookBtn = host.querySelector('#scLook');
     if (lookBtn) {
       lookBtn.setAttribute('aria-expanded', String(R.menuOpenFor(lookBtn)));
@@ -2288,6 +2355,7 @@
     closeModal();
     closePanel();
     closeStudentCard();
+    clearRetiringAgenda();
     const nw = winOf(mon);
     st.win = nw;
     // неделя из уже загруженного месяца — данные те же, перезагрузка не нужна
@@ -2304,5 +2372,5 @@
     return load();
   }
 
-  window.Schedule = { init, show, hide: () => { closePanel(); closeStudentCard(); R.closeMenu(); if (INS()) INS().closePop(); const c = document.getElementById('scClip'); if (c) c.remove(); }, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), clearCache: () => { cacheClear(); undoHistory.length = 0; st.week = null; st.shown = null; st.shownWin = null; st.win = null; st.lessons = []; }, setMode: m => { st.mode = m; render(); } };
+  window.Schedule = { init, show, hide: () => { closePanel(); closeStudentCard(); clearRetiringAgenda(); R.closeMenu(); if (INS()) INS().closePop(); const c = document.getElementById('scClip'); if (c) c.remove(); }, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), clearCache: () => { cacheClear(); undoHistory.length = 0; st.week = null; st.shown = null; st.shownWin = null; st.win = null; st.lessons = []; }, setMode: m => { st.mode = m; render(); } };
 })();

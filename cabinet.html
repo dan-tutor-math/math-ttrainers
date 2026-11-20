@@ -156,8 +156,6 @@ select.cs-in{cursor:pointer;-webkit-appearance:none;appearance:none;}
 .cs-nm .cs-in,.cs-aname{font-size:1.125rem;font-weight:600;}
 .cs-nm .cs-in:not(:focus){text-overflow:ellipsis;}
 .cs-nmw{display:flex;align-items:center;gap:2px;}
-.cs-nmw .cs-open{flex:none;opacity:.55;}
-.cs-tbl tr:hover .cs-open,.cs-open:focus{opacity:1;}
 .cs-gr{width:74px;}
 .cs-ex{min-width:130px;}
 .cs-ni{font-family:var(--cab-number-font);font-size:1.125rem;font-weight:700;text-align:right;width:6.5rem;font-variant-numeric:tabular-nums;}
@@ -172,7 +170,13 @@ select.cs-in{cursor:pointer;-webkit-appearance:none;appearance:none;}
   color:var(--muted-2);font-size:15px;font-family:var(--font-ui);cursor:pointer;text-decoration:none;box-sizing:border-box;}
 .cs-ic:hover{border-color:var(--glass-border);background:var(--glass);color:var(--ink);}
 .cs-ic.armed{color:var(--teacher);border-color:var(--teacher);font-size:12.5px;}
-.cs-open{color:var(--ink);font-weight:700;font-size:17px;}
+.cs-nmw .cs-open{flex:none;gap:5px;padding-inline:7px;font-size:12px;font-weight:650;min-height:32px;
+  color:var(--pencil);background:var(--glass-strong);border-color:var(--glass-border);}
+.cs-nmw .cs-open:focus-visible{outline:2px solid var(--ink);outline-offset:1px;}
+@media(max-width:620px){
+  .cs-nmw .cs-open{min-width:38px;padding-inline:4px;}
+  .cs-open span{display:none;}
+}
 .cs-newrow td{background:var(--hover-1);}
 .cs-foot{display:flex;align-items:center;justify-content:flex-end;gap:16px;padding:12px 16px 14px;border-top:1px solid var(--grid);}
 .cs-ic-big{width:38px;height:38px;font-size:20px;border-color:var(--glass-border);background:var(--glass);}
@@ -223,6 +227,30 @@ select.cs-in{cursor:pointer;-webkit-appearance:none;appearance:none;}
 @media (pointer:coarse){
   .cab-head>.btn,.tabs a{min-height:44px;}
 }
+/* Окно остаётся доступным рядом с планером, а его шапка служит ручкой. */
+.cab-float{position:fixed;inset:0 auto auto 0;margin:0;transform-origin:top left;overscroll-behavior:contain;
+  max-height:var(--cab-float-limit,calc(100dvh - 20px));overflow:auto;}
+.cab-float [data-cab-drag]{cursor:grab;touch-action:none;user-select:none;}
+.cab-float-moving [data-cab-drag]{cursor:grabbing;}
+.sc-side.cab-float,.sc-scard.cab-float{inset:0 auto auto 0;width:min(320px,calc(100vw - 20px));max-width:none;
+  max-height:var(--cab-float-limit,calc(100dvh - 20px));border-radius:18px;background:var(--cab-window);}
+:root{--cab-window:#fcfdff;}
+html[data-theme="dark"]{--cab-window:#232940;}
+.cab-float :is(.sc-ed-head,.sc-sc-top){gap:8px;position:sticky;top:0;z-index:2;background:var(--cab-window);}
+.cab-float :is(.sc-ed-head,.sc-sc-top) button{flex:none;position:relative;}
+#tabCard.cab-float{z-index:65;display:flex;flex-direction:column;width:min(740px,calc(100vw - 20px));
+  height:min(760px,calc(100dvh - 40px));color:var(--pencil);background:var(--cab-window);
+  border:1px solid var(--glass-border);border-radius:18px;box-shadow:0 18px 50px #10183035;overflow:hidden;}
+#tabCard.cab-float #cardBox{overflow:auto;overscroll-behavior:contain;margin:0;border:0;border-radius:0;
+  background:transparent;box-shadow:none;backdrop-filter:none;}
+.cab-float-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;flex:none;
+  min-height:46px;padding:4px 8px 4px 14px;background:var(--glass);font-size:13px;
+  border-bottom:1px solid color-mix(in srgb,var(--pencil) 13%,transparent);}
+.cab-float-bar[hidden]{display:none;}
+.cab-float-bar .btn{display:grid;place-items:center;padding:0;width:38px;height:38px;color:var(--pencil);font-size:21px;}
+@media(pointer:coarse){
+  .cab-float-bar button,.cs-nmw .cs-open,.cab-float [data-cab-close]{min-height:44px;min-width:44px;}
+}
 </style>
 </head>
 <body>
@@ -257,6 +285,10 @@ select.cs-in{cursor:pointer;-webkit-appearance:none;appearance:none;}
     </section>
 
     <section id="tabCard" hidden>
+      <div class="cab-float-bar" id="cFloatBar" data-cab-drag hidden>
+        <strong id="cFloatTitle">Карточка ученика</strong>
+        <button type="button" class="btn quiet small" id="cFloatClose" data-cab-close aria-label="Закрыть карточку">×</button>
+      </div>
       <div class="panel" id="cardBox"></div>
     </section>
 
@@ -397,6 +429,7 @@ select.cs-in{cursor:pointer;-webkit-appearance:none;appearance:none;}
 <script src="cabinet-stats.js"></script>
 <script src="cabinet-students.js"></script>
 <script src="schedule-insights.js"></script>
+<script src="cabinet-floating.js"></script>
 <script src="schedule.js"></script>
 <script src="student-memory.js" data-picker></script>
 <script src="lesson-report-topics.js"></script>
@@ -612,20 +645,64 @@ $('auGo').addEventListener('click', async () => {
 window.addEventListener('hashchange', () => route());
 let students = null;      // кэш списка: открыть карточку и вернуться без сети
 let cardRequest = 0;
+let launchCard = null, fullWindow = null, returnStudent = null;
+const studentLink = id => $('stuHost').querySelector('[data-student-card="' + CSS.escape(id) + '"]');
+
+$('stuHost').addEventListener('click', event => {
+  const link = event.target.closest('[data-student-card]');
+  if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+  const id = link.dataset.studentCard;
+  launchCard = { id, motion:event.detail !== 0 };
+  if (location.hash === link.hash) route();
+});
+
+function closeFullWindow(motion){
+  if (!fullWindow) return;
+  const { id, controller } = fullWindow;
+  controller.close({ motion, restoreFocus:false, done:() => {
+    fullWindow = null;
+    $('tabCard').hidden = true;
+    $('cFloatBar').hidden = true;
+    returnStudent = id;
+    location.hash = '#/students';
+  } });
+}
+$('cFloatClose').addEventListener('click', event => closeFullWindow(event.detail !== 0));
+document.addEventListener('click', event => {
+  if (!fullWindow || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+  const link = event.target.closest('#tabs a, #cardBox .card-head a');
+  if (link?.hash !== '#/students') return;
+  event.preventDefault();
+  closeFullWindow(event.detail !== 0);
+});
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && fullWindow && !event.defaultPrevented && !document.querySelector('dialog[open]')) closeFullWindow(false);
+});
+
 async function route(){
   const request = ++cardRequest;
+  const pending = launchCard;
+  const restore = returnStudent;
+  launchCard = returnStudent = null;
+  fullWindow?.controller.dispose();
+  fullWindow = null;
+  const card = $('tabCard');
+  card.removeAttribute('role');
+  card.removeAttribute('aria-labelledby');
+  $('cFloatBar').hidden = true;
   unmountCard();
   account.open = false;
   paintAccount();
   paintPalette();
-  if (!user){ show('scrAuth'); return; }
+  if (!user){ window.Schedule?.hide(); show('scrAuth'); return; }
   const [tab, id] = location.hash.replace(/^#\/?/, '').split('/');
   // без вкладки в адресе — «Расписание»: в кабинет заходят прежде всего за ним (просьба Даниила 14.11)
   const t = ['students', 'schedule', 'payments', 'stats', 'settings'].indexOf(tab) >= 0 ? tab : 'schedule';
+  const floating = t === 'students' && pending && pending.id === id && window.CabinetFloating;
   show('scrMain');
   // Классы режима оставляем у внешней обёртки для расписания и списка.
   document.querySelector('.wrap').classList.toggle('sc-wide', t === 'schedule');
-  document.querySelector('.wrap').classList.toggle('cs-wide', t === 'students' && !id);
+  document.querySelector('.wrap').classList.toggle('cs-wide', t === 'students' && (!id || Boolean(floating)));
   document.querySelectorAll('#tabs a').forEach(a => {
     const selected = a.dataset.tab === t;
     a.classList.toggle('on', selected);
@@ -635,8 +712,22 @@ async function route(){
   ['tabStudents', 'tabCard', 'tabSchedule', 'tabPayments', 'tabStats', 'tabSettings'].forEach(x => { $(x).hidden = true; });
   // боковая панель занятия висит поверх страницы — с вкладки «Расписание» её уносим
   if (t !== 'schedule' && window.Schedule && Schedule.hide) Schedule.hide();
-  if (t === 'students' && id){ $('tabCard').hidden = false; await openCard(id, request); }
-  else if (t === 'students'){ $('tabStudents').hidden = false; await renderList(); }
+  if (t === 'students' && id){
+    card.hidden = false;
+    if (floating) {
+      $('tabStudents').hidden = false;
+      $('cFloatBar').hidden = false;
+      card.setAttribute('role', 'dialog');
+      card.setAttribute('aria-labelledby', 'cFloatTitle');
+      const controller = CabinetFloating.attach(card, { anchor:() => studentLink(id), motion:pending.motion });
+      fullWindow = { id, controller };
+    }
+    await openCard(id, request);
+  } else if (t === 'students'){
+    $('tabStudents').hidden = false;
+    await renderList();
+    if (restore && request === cardRequest) studentLink(restore)?.focus({ preventScroll:true });
+  }
   else if (t === 'schedule'){ $('tabSchedule').hidden = false; await Schedule.show(id); }
   else if (t === 'payments'){ $('tabPayments').hidden = false; await CabinetPayments.show($('payHost'), id); }
   else if (t === 'stats'){ $('tabStats').hidden = false; await CabinetStats.show($('statsHost')); }
