@@ -227,10 +227,10 @@
 .pay-ledger.pack{--pay-control-height:36px;}
 .pay-ledger [data-pay-pack]{align-items:start;}
 .pay-ledger.pack .pay-entry{grid-template-columns:minmax(0,1.55fr) minmax(0,.76fr) minmax(78px,.68fr) minmax(112px,1fr) minmax(76px,.8fr) minmax(58px,.57fr) minmax(82px,.95fr) minmax(118px,1.26fr);}
-.pay-ledger.single .pay-entry{grid-template-columns:minmax(0,1.5fr) repeat(3,minmax(0,1fr));}
+.pay-ledger.single .pay-entry{grid-template-columns:repeat(2,minmax(0,1fr)) minmax(0,.85fr) minmax(0,.95fr);}
 .pay-ledger.hide-payer .pay-payer{display:none;}
 .pay-ledger.pack.hide-payer .pay-entry{grid-template-columns:minmax(0,1.55fr) minmax(78px,.68fr) minmax(112px,1fr) minmax(76px,.8fr) minmax(58px,.57fr) minmax(82px,.95fr) minmax(118px,1.26fr);}
-.pay-ledger.single.hide-payer .pay-entry{grid-template-columns:minmax(0,1.5fr) repeat(2,minmax(0,1fr));}
+.pay-ledger.single.hide-payer .pay-entry{grid-template-columns:minmax(0,1fr) minmax(0,.85fr) minmax(0,.95fr);}
 .pay-ledger .pay-thead{border-top:0;color:var(--muted-2);font-size:.8125rem;font-weight:650;}
 .pay-sort{border:0;border-radius:6px;padding:4px 3px;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer;max-width:100%;}
 .pay-sort span{white-space:nowrap;}
@@ -261,6 +261,28 @@
 .pay-archive summary,.pay-history summary{cursor:pointer;font-size:1rem;font-weight:650;}
 .pay-archive summary .hint,.pay-history summary .hint{font-weight:450;margin-left:4px;}
 .pay-archive .pay-archive-students{padding-top:6px;}
+.pay-single-list{border:1px solid var(--glass-border);border-radius:14px;background:var(--card);}
+.pay-row.pay-single-student{display:block;border:0;border-radius:0;padding:0;background:none;}
+.pay-single-student+.pay-single-student{border-top:1px solid var(--grid);}
+.pay-single-student>summary{padding:10px 12px;font-size:1.125rem;cursor:pointer;overflow-wrap:anywhere;}
+.pay-single-student>summary .pay-debt,.pay-single-student>summary .hint{margin-left:6px;font-size:.875rem;}
+.pay-single-student>summary:hover,.pay-single-archive>summary:hover{color:var(--pencil);}
+.pay-single-body{padding:0 12px 10px;}
+.pay-single-actions{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;margin-bottom:8px;}
+.pay-single-actions a.nm{min-width:0;margin-right:auto;font-size:.9375rem;}
+.pay-single-body>.pay-formbox{margin:0 0 8px;}
+.pay-single-archive{margin-top:6px;}
+.pay-single-archive>summary{padding:7px 0;font-size:1rem;font-weight:650;cursor:pointer;}
+.pay-single-archive>summary .hint{margin-left:4px;font-weight:450;}
+.pay-single-empty{padding:6px 0;}
+.pay-ledger.single .pay-entry>[data-col=""]{justify-self:end;}
+.pay-bulk-form{display:grid;gap:6px;margin:0 0 10px;padding:10px;border:1px solid var(--grid);border-radius:10px;}
+.pay-bulk-form p{margin:0;}
+.pay-bulk-form .form-msg:empty{display:none;}
+.pay-bulk-dates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-width:420px;}
+.pay-bulk-dates label,.pay-bulk-dates .field{display:block;min-width:0;}
+.pay-bulk-preview{font-size:.9375rem;font-weight:650;font-variant-numeric:tabular-nums;}
+.pay-single-student summary:focus-visible{outline:2px solid var(--pencil);outline-offset:-2px;border-radius:8px;}
 .pay-history .pay-history{margin:6px 0;padding:6px 8px;box-shadow:none;}
 .pay-history .pay-line:first-of-type{margin-top:6px;}
 .pay-single-choice .btn{display:block;text-align:left;}
@@ -315,13 +337,19 @@
   .pay-entry .pay-state{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:5px;}
   .pay-entry .pay-state[data-col]::before{display:none;}
   .pay-archive-action{grid-column:span 2;}
+  .pay-ledger.single .pay-entry:not(.pay-thead){grid-template-columns:repeat(2,minmax(0,1fr));}
 }
 @media (max-width:500px){
   .pay-count,.pay-count .pay-cell-input{font-size:1rem;}
   .pay-period-months{grid-template-columns:1fr;}
   .pay-period-months>section:nth-child(2){display:none;}
 }
+@media (max-width:365px){
+  .pay-bulk-dates{grid-template-columns:1fr;}
+}
 @media (pointer:coarse){
   .pay-ledger.pack{--pay-control-height:44px;}
   .pay-day,.pay-entry .btn,.pay-sort{min-height:44px;}
+  .pay-single-student>summary,.pay-single-archive>summary{min-height:44px;align-content:center;}
+  .pay-single-actions .btn,.pay-bulk-form .btn,.pay-bulk-dates .field{min-height:44px;}
 }

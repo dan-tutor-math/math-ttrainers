@@ -16,7 +16,7 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const MONTHS_IN = ['январе', 'феврале', 'марте', 'апреле', 'мае', 'июне', 'июле', 'августе', 'сентябре', 'октябре', 'ноябре', 'декабре'];
   let ctx = null, host = null;
-  const st = { data: null, per: null, sid: null, err: '', formFor: null, tok: 0, rateOpen: false, filter: 'pack', tpls: [], monOpen: false, open: new Set(), filledWeeks: new Set() };
+  const st = { data: null, per: null, sid: null, err: '', formFor: null, tok: 0, rateOpen: false, filter: 'pack', bulk: null, tpls: [], monOpen: false, open: new Set(), filledWeeks: new Set() };
   const filters = { pack: 'Абонементы', lesson: 'Разовые' };
   const pendingPayments = new Set();
 
@@ -64,11 +64,12 @@
   const tableLabels = ['Ученик','Родитель','Дата оплаты','Действует','Сумма, ₽','Занятий','Прошло','Абонемент'];
   const columns = {
     pack: ['student','payer','paidOn','period','amount','cap','used','status'].map((key,i)=>[key,tableLabels[i]]),
-    lesson: [['student',tableLabels[0]],['payer',tableLabels[1]],['paidOn',tableLabels[2]],['amount',tableLabels[4]]],
+    lesson: [['paidOn',tableLabels[2]],['payer',tableLabels[1]],['amount',tableLabels[4]]],
     archive: [['student',tableLabels[0]],['paidOn',tableLabels[2]],['start','Начало'],['end','Окончание'],['amount',tableLabels[4]]],
   };
   const orderBy = Object.fromEntries(Object.keys(columns).map(scope=>[scope,{key:'paidOn',direction:-1}]));
   const alphabetical = new Intl.Collator('ru',{numeric:true,sensitivity:'base'});
+  const singleMoney = new Intl.NumberFormat('ru-RU',{style:'currency',currency:'RUB',minimumFractionDigits:0}).format;
   const calendarStates = { done: 'Проведено', plan: 'Запланировано', template: 'По шаблону', unmarked: 'Не отмечено', over: 'Сверх оплаченного' };
 
   function sortingHeader(scope){
@@ -79,7 +80,7 @@
       return '<div role="columnheader"'+ariaSort+(key==='payer'?' class="pay-payer"':'')+'><button type="button" class="pay-sort"'+
         ' data-pay-sort="'+key+'" data-sort-scope="'+scope+'">'+label+(active?' <span aria-hidden="true">'+
         (sort.direction===1?'↑':'↓')+'</span>':'')+'</button></div>';
-    }).join('')+(scope==='archive'?'<div role="columnheader" aria-label="Действия"></div>':'')+'</div>';
+    }).join('')+(scope!=='pack'?'<div role="columnheader" aria-label="Действия"></div>':'')+'</div>';
   }
 
   function sortedEntries(entries,scope){
@@ -176,17 +177,9 @@
       .reduce((sum,p)=>sum+Number(p.amount||0),0);
     const debtors = rows.filter(r=>r.c.debt>0)
       .sort((a,b)=>b.c.debt-a.c.debt || alphabetical.compare(a.s.name,b.s.name));
-    const ps = P().paySettings(settings());
-    const reminders = rows.flatMap(({s,c}) => {
-      const k = c.active.find(pack=>!pack.pay.archived_at) || c.packs.findLast(pack=>!pack.pay.archived_at);
-      if (!k || k.start>now) return [];
-      const end = periodPreview(s,k).end;
-      return end && ps.remindedPacks?.[k.pay.id] !== end ? [{s,k,end}] : [];
-    });
-    const soon = reminders.filter(r=>r.end>=now && P().daysBetween(now,r.end)<7).sort((a,b)=>a.end.localeCompare(b.end));
-    const visible = rows.filter(({s,c})=>c.mode===st.filter || recordsFor(s.id).some(p=>!p.archived_at && p.kind===kind));
     const header = '<div class="pay-top">' +
-      '<div class="pay-stat" id="payGot"><span>Получено в ' + MONTHS_IN[Number(mon.slice(5))-1] + '</span><b>'+P().money(got)+
+      '<div class="pay-stat" id="payGot"><span>Получено в ' + MONTHS_IN[Number(mon.slice(5))-1] + '</span><b>'+
+      (kind==='single' ? singleMoney(got) : P().money(got))+
       '</b><small>'+filters[st.filter]+'</small></div>' + overdueHtml(debtors) +
       '<details class="pay-view" id="payView"'+(st.open.has('payView')?' open':'')+'><summary class="btn quiet small">Вид</summary>' +
       '<div class="pay-view-menu"><label class="chk"><input type="checkbox" data-pay-view="showPayer"'+(view.showPayer!==false?' checked':'')+
@@ -195,13 +188,30 @@
       '> Показывать просрочку при нуле</label></div></details></div>';
     const filter = '<div class="seg pay-filters" role="group" aria-label="Виды оплат">'+Object.entries(filters).map(([key,label]) =>
       '<button type="button" data-pay-filter="'+key+'" class="'+(st.filter===key?'on':'')+'" aria-pressed="'+(st.filter===key)+'">'+label+'</button>').join('')+'</div>';
+    if (st.filter==='lesson'){
+      const singles = rows.filter(({s,c})=>c.mode==='lesson' || recordsFor(s.id).some(p=>p.kind==='single'));
+      st.students.filter(s=>s.archived_at && recordsFor(s.id).some(p=>p.kind==='single'))
+        .forEach(s=>singles.push({s,c:calcFor(s.id)}));
+      singles.sort((a,b)=>Boolean(a.s.archived_at)-Boolean(b.s.archived_at) || alphabetical.compare(a.s.name,b.s.name));
+      return header+filter+'<div class="pay-single-list">'+
+        (singles.length ? singles.map(({s,c})=>singleStudentHtml(s,c)).join('') : '<div class="empty">Учеников с разовыми оплатами пока нет.</div>')+'</div>';
+    }
+    const ps = P().paySettings(settings());
+    const reminders = rows.flatMap(({s,c}) => {
+      const k = c.active.find(pack=>!pack.pay.archived_at) || c.packs.findLast(pack=>!pack.pay.archived_at);
+      if (!k || k.start>now) return [];
+      const end = periodPreview(s,k).end;
+      return end && ps.remindedPacks?.[k.pay.id] !== end ? [{s,k,end}] : [];
+    });
+    const soon = reminders.filter(r=>r.end>=now && P().daysBetween(now,r.end)<7).sort((a,b)=>a.end.localeCompare(b.end));
     const remind = '<aside class="pay-reminders" id="paySoon"><div class="pay-remind-head"><h3>Напомнить об оплате</h3><small><b>'+soon.length+
       '</b> на ближайшие 7 дней</small></div>'+soon.map(({s,k,end})=>'<div class="pay-remind-row"><div>'+studentLink(s)+'<div class="hint">'+
       (end===now?'Сегодня':P().dm(end))+'</div></div><button type="button" class="btn quiet small" data-pay-reminded="'+esc(k.pay.id)+
       '" data-due="'+end+'">Напомнил</button></div>').join('')+(soon.length?'':'<div class="hint">Напоминаний нет</div>')+'</aside>';
-    const table = '<div role="table" aria-label="'+filters[st.filter]+'" class="pay-ledger '+(st.filter==='pack'?'pack':'single')+
-      (view.showPayer===false?' hide-payer':'')+'">'+sortingHeader(st.filter)+
-      (visible.length ? ledgerRows(visible) : '<div class="empty">Таких оплат пока нет.</div>')+'</div>';
+    const visible = rows.filter(({c})=>c.mode==='pack' || c.packs.some(k=>!k.pay.archived_at));
+    const table = '<div role="table" aria-label="Абонементы" class="pay-ledger pack'+
+      (view.showPayer===false?' hide-payer':'')+'">'+sortingHeader('pack')+
+      (visible.length ? packRows(visible) : '<div class="empty">Таких оплат пока нет.</div>')+'</div>';
     return header+'<div class="pay-overview"><div class="pay-main">'+filter+table+'</div>'+remind+'</div>'+
       archiveHtml(new Map(rows.map(({s,c})=>[s.id,c])));
   }
@@ -253,37 +263,158 @@
     return {p,student,payer:p.payer,paidOn:p.paid_on,amount:Number(p.amount)};
   }
 
-  function ledgerRows(students){
-    const pack = st.filter==='pack';
+  const debtLabel = c => c.debt>0 ? '<small class="pay-debt">долг '+moneyHtml(c.debt)+'</small>' : '';
+  const openAttr = id => st.open.has(id) ? ' open' : '';
+
+  function packRows(students){
     const entries = students.flatMap(({s,c})=>{
       const base = {s,c,student:s.name};
-      const receipts = pack ? c.packs.filter(k=>!k.pay.archived_at).map(k=>{
+      const receipts = c.packs.filter(k=>!k.pay.archived_at).map(k=>{
         const end = periodPreview(s,k).end;
         return {...base,...sortableReceipt(k.pay,s.name),k,end,period:k.start+' '+(end||''),cap:k.cap,
           used:Math.max(0,k.used),status:packStatus(k,c.queued.includes(k))};
-      }) : recordsFor(s.id).filter(p=>p.kind==='single'&&!p.archived_at).map(p=>({...base,...sortableReceipt(p,s.name)}));
+      });
       return receipts.length ? receipts : [base];
     });
     const seen = new Set();
-    return sortedEntries(entries,st.filter).map(row=>{
+    return sortedEntries(entries,'pack').map(row=>{
       const {s,c,p} = row, first = !seen.has(s.id);
       seen.add(s.id);
-      const identity = studentLink(s)+(first ? (c.debt>0?'<small class="pay-debt">долг '+moneyHtml(c.debt)+'</small>':'')+
+      const identity = studentLink(s)+(first ? debtLabel(c)+
         paymentButton('+ оплата','add',s.id,'pay-add') : '');
-      let html;
-      if (!p) html = '<div role="row" class="pay-entry pay-entry-empty">'+paymentCell(0,identity,'pay-identity')+
-        cell('',pack?'Абонемента нет':'Разовых оплат нет','hint')+'</div>';
-      else if (pack) html = packEntry(row,identity);
-      else html = '<div role="row" class="pay-entry">'+paymentCell(0,identity,'pay-identity')+
-        paymentCell(1,esc(p.payer||'—'),'pay-payer')+paymentCell(2,valueHtml(P().dmy(p.paid_on)))+paymentCell(4,moneyHtml(p.amount))+'</div>';
+      const html = p ? packEntry(row,identity) : '<div role="row" class="pay-entry pay-entry-empty">'+
+        paymentCell(0,identity,'pay-identity')+cell('','Абонемента нет','hint')+'</div>';
       return '<div role="presentation" class="pay-row" data-sid="'+esc(s.id)+'">'+html+
         (first&&st.formFor===String(s.id)?'<div role="row"><div role="cell" class="pay-formbox">'+formHtml(s,c)+'</div></div>':'')+'</div>';
     }).join('');
   }
 
+  function singleReceiptsHtml(s, receipts, archived){
+    if (!receipts.length) return '<div class="hint pay-single-empty">'+(archived?'В архиве пока пусто':'Разовых оплат пока нет')+'</div>';
+    const entries = sortedEntries(receipts.map(p=>sortableReceipt(p,s.name)),'lesson');
+    return '<div class="pay-ledger single'+(view.showPayer===false?' hide-payer':'')+'" role="table" aria-label="'+
+      (archived?'Архив разовых оплат · ':'Разовые оплаты · ')+esc(s.name)+'">'+sortingHeader('lesson')+
+      entries.map(({p})=>'<div role="row" class="pay-entry" data-single-payment="'+esc(p.id)+'">'+
+        paymentCell(2,valueHtml(P().dmy(p.paid_on)))+paymentCell(1,esc(p.payer||'—'),'pay-payer')+
+        paymentCell(4,valueHtml(singleMoney(p.amount)))+
+        cell('',archived ? paymentButton('Из архива','pay-unarchive',p.id) : paymentButton('В архив','pay-single-archive',p.id))+
+        '</div>').join('')+'</div>';
+  }
+
+  function singleStudentHtml(s,c){
+    const id = esc(s.id), group = 'paySingle-'+id, history = 'paySingleArchive-'+id;
+    const receipts = recordsFor(s.id).filter(p=>p.kind==='single');
+    const active = receipts.filter(p=>!p.archived_at), archived = receipts.filter(p=>p.archived_at);
+    const draft = st.bulk?.sid===String(s.id) && st.bulk;
+    return '<details class="pay-row pay-single-student" data-sid="'+id+'" id="'+group+'"'+openAttr(group)+'>'+
+      '<summary><b>'+esc(s.name)+'</b> '+(s.archived_at ? '<span class="hint">В архиве</span>' : debtLabel(c))+'</summary>'+
+      '<div class="pay-single-body"><div class="pay-single-actions">'+studentLink({...s,name:'Карточка оплат'})+
+      (s.archived_at ? '' : paymentButton('+ оплата','add',s.id,'pay-add')+
+        '<button type="button" class="btn quiet small" data-pay-bulk="'+id+'" aria-expanded="'+Boolean(draft)+'">Засчитать за период</button>')+'</div>'+
+      (st.formFor===String(s.id)?'<div class="pay-formbox">'+formHtml(s,c)+'</div>':'')+
+      (draft?bulkFormHtml(draft):'')+singleReceiptsHtml(s,active,false)+
+      '<details class="pay-single-archive" id="'+history+'"'+openAttr(history)+'><summary>Архив разовых оплат <span class="hint">'+
+      archived.length+'</span></summary>'+singleReceiptsHtml(s,archived,true)+'</details></div></details>';
+  }
+
+  function batchPreview(sid, from, to){
+    const completed = new Set(st.per[sid].parts.filter(({p})=>p.status==='done').map(({p})=>p.id));
+    const lines = calcFor(sid).lines, now = P().today();
+    // Оплаты без привязки покрывают старые занятия по порядку.
+    // Даже частично покрытое занятие нельзя повторно отметить на полную ставку.
+    let prepaid = lines.reduce((sum,line)=>sum+(line.pay?.kind==='single'?Math.round(line.money*100):0),0);
+    const records = [];
+    let noRate = 0, covered = 0;
+    for (const line of lines){
+      if (!line.canMarkPaid || line.day>now) continue;
+      const inPeriod = line.day>=from && line.day<=to && completed.has(line.lsId);
+      if (line.price==null) { if (inPeriod) noRate++; continue; }
+      const price = Math.round(line.price*100);
+      if (prepaid>0 && price>0){
+        prepaid -= price;
+        if (inPeriod) covered++;
+        continue;
+      }
+      if (inPeriod) records.push({student_id:sid, kind:'single', paid_on:line.day, amount:line.price, lesson_student_id:line.lsId});
+    }
+    return {records,noRate,covered};
+  }
+
+  function bulkFormHtml(draft){
+    const max = P().today();
+    return '<form class="pay-bulk-form">'+
+      '<div class="pay-bulk-dates">'+
+      '<label><span class="label">С</span><input class="field" type="date" name="from" max="'+max+'" value="'+esc(draft.from)+'" required></label>'+
+      '<label><span class="label">По</span><input class="field" type="date" name="to" max="'+max+'" value="'+esc(draft.to)+'" required></label></div>'+
+      '<p class="pay-bulk-preview" role="status"></p><p class="hint">Дата оплаты — день занятия. Сумма — ставка на эту дату.</p>'+
+      '<div class="row-btns"><button class="btn small" type="submit">Засчитать оплаты</button>'+
+      '<button type="button" class="btn quiet small" data-bulk-cancel>Отмена</button></div>'+
+      '<p class="form-msg" role="alert">'+esc(draft.error||'')+'</p></form>';
+  }
+
+  function bindBulkForm(form){
+    const draft = st.bulk, {sid} = draft;
+    const {from,to} = form.elements;
+    const submit = form.querySelector('[type="submit"]'), cancel = form.querySelector('[data-bulk-cancel]');
+    const preview = form.querySelector('.pay-bulk-preview'), error = form.querySelector('.form-msg');
+    const trigger = () => host.querySelector('[data-pay-bulk="'+CSS.escape(sid)+'"]');
+    function update(){
+      from.disabled = to.disabled = cancel.disabled = Boolean(draft.pending);
+      to.setCustomValidity(from.value && to.value && to.value<from.value?'Конец периода раньше начала':'');
+      const batch = from.validity.valid && to.validity.valid ? batchPreview(sid,from.value,to.value) : null;
+      const records = batch?.records || [];
+      submit.disabled = !records.length || Boolean(draft.pending);
+      const count = P().plural(records.length,'занятие','занятия','занятий');
+      const total = singleMoney(records.reduce((sum,r)=>sum+r.amount,0));
+      preview.textContent = draft.pending ? 'Сохраняем оплаты…' : !batch ? 'Укажите период.' : (records.length ?
+        count+' · '+total : 'Нет занятий для отметки.')+
+        (batch.noRate ? ' Без ставки — '+batch.noRate+'.' : '')+
+        (batch.covered ? ' Уже есть оплата в счёт занятий — '+batch.covered+'.' : '');
+      return records;
+    }
+    update();
+    form.addEventListener('input',()=>{
+      draft.from = from.value;
+      draft.to = to.value;
+      draft.error = error.textContent = '';
+      update();
+    });
+    cancel.addEventListener('click',()=>{
+      st.bulk = null;
+      render();
+      trigger()?.focus();
+    });
+    form.addEventListener('submit',async event=>{
+      event.preventDefault();
+      if (draft.pending || !form.reportValidity()) return;
+      const records = update();
+      if (!records.length) return;
+      draft.error = error.textContent = '';
+      draft.pending = true;
+      update();
+      try {
+        await P().addPayments(records);
+        if (st.bulk===draft) st.bulk = null;
+        ctx.toast('Засчитано: '+P().plural(records.length,'занятие','занятия','занятий'));
+        await load();
+        if (st.bulk===null) trigger()?.focus();
+      } catch (e) {
+        draft.pending = false;
+        if (e.raw?.code==='23505'){
+          draft.error = 'Одно из занятий уже оплачено. Проверьте обновлённый список перед сохранением.';
+          await load();
+        } else {
+          draft.error = 'Не удалось засчитать оплаты: '+e.message;
+          if (st.bulk===draft) render();
+        }
+        if (st.bulk===draft) host.querySelector('.pay-bulk-form [name="from"]')?.focus();
+      }
+    });
+  }
+
   function archiveHtml(calculated){
     const manualClosures = P().paySettings(settings()).closedPacks;
-    const receipts = st.data.payments.filter(p=>p.archived_at).map(p=>{
+    const receipts = st.data.payments.filter(p=>p.archived_at && (p.kind==='pack' || !st.per[p.student_id])).map(p=>{
       const s = st.students.find(x=>x.id===p.student_id);
       if (s && !calculated.has(s.id)) calculated.set(s.id,calcFor(s.id));
       const k = s && calculated.get(s.id)?.packs.find(pack=>pack.pay.id===p.id);
@@ -751,13 +882,33 @@
   }
 
   function bindOverview(){
+    host.querySelectorAll('[data-pay-bulk]').forEach(button=>button.addEventListener('click',()=>{
+      const sid = button.dataset.payBulk;
+      if (st.bulk?.pending) return;
+      const now = P().today();
+      st.bulk = st.bulk?.sid===sid ? null : {sid,from:monthOf(now),to:now};
+      st.formFor = null;
+      render();
+      (st.bulk ? host.querySelector('.pay-bulk-form [name="from"]') :
+        host.querySelector('[data-pay-bulk="'+CSS.escape(sid)+'"]'))?.focus();
+    }));
+    host.querySelectorAll('.pay-bulk-form').forEach(bindBulkForm);
+    host.querySelectorAll('[data-pay-single-archive]').forEach(b=>b.addEventListener('click',()=>{
+      const id = b.dataset.paySingleArchive;
+      void runPack(b,id,()=>P().updatePayment(id,{archived_at:new Date().toISOString()}),'Добавлено в архив');
+    }));
     host.querySelectorAll('[data-pay-sort]').forEach(button=>button.addEventListener('click',event=>{
       const {paySort:key,sortScope:scope} = button.dataset;
+      const tableLabel = button.closest('[role="table"]').getAttribute('aria-label');
+      const groupId = button.closest('.pay-single-student')?.id;
       const previous = orderBy[scope];
       orderBy[scope] = {key,direction:previous.key===key ? -previous.direction :
         (key==='student'||key==='payer'||key==='status' ? 1 : -1)};
       render();
-      if (event.detail===0) host.querySelector('[data-sort-scope="'+scope+'"][data-pay-sort="'+key+'"]')?.focus();
+      if (event.detail===0){
+        const root = groupId ? document.getElementById(groupId) : host;
+        root?.querySelector('[aria-label="'+CSS.escape(tableLabel)+'"] [data-pay-sort="'+key+'"]')?.focus();
+      }
     }));
     host.querySelectorAll('[data-pay-view]').forEach(input=>input.addEventListener('change',()=>{
       view[input.dataset.payView]=input.checked;
@@ -820,6 +971,8 @@
     host.querySelectorAll('details[id]').forEach(d => { if (d.open) st.open.add(d.id); else st.open.delete(d.id); });
     host.innerHTML = s ? studentHtml(s, calcFor(s.id)) : listHtml();
     host.querySelectorAll('.pay-add').forEach(b => b.addEventListener('click', () => {
+      if (st.bulk?.pending) return;
+      st.bulk = null;
       st.formFor = st.formFor === b.dataset.add ? null : b.dataset.add;
       render();
       const f = host.querySelector('.pay-form');
@@ -839,7 +992,7 @@
   function show(box, sid){
     host = box;
     const nsid = sid ? String(sid) : null;
-    if (nsid !== st.sid) { st.formFor = null; st.rateOpen = false; st.monOpen = false; }
+    if (nsid !== st.sid) { st.bulk = null; st.formFor = null; st.rateOpen = false; st.monOpen = false; }
     st.sid = nsid;
     // Старая выписка может ещё предлагать оплатить уже закрытое занятие.
     st.data = null;

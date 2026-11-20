@@ -335,6 +335,8 @@
     return o;
   }
   const addPayment = f => run(need().from('payments').insert(cleanPay(f)).select(PAY_COLS).single());
+  // Конфликт по занятию откатывает весь INSERT за период.
+  const addPayments = records => run(need().from('payments').insert(records.map(cleanPay)));
   const updatePayment = (id, f) => run(need().from('payments').update(cleanPay(f)).eq('id', id).select(PAY_COLS).single());
   const deletePayment = id => run(need().from('payments').delete().eq('id', id));
   // ставка с даты: та же дата — правим строку (unique student_id + valid_from)
@@ -431,7 +433,7 @@
 
   window.Payments = {
     FLAG_TEMPLATES, REASONS, PAY_DEFAULTS, paySettings, billOf, reasonOf, rateOn, modeOf, calc,
-    loadAll, split, loadStudent, weekInfo, listRates, addPayment, updatePayment, deletePayment, setRate, deleteRate, setMode, missing,
+    loadAll, split, loadStudent, weekInfo, listRates, addPayment, addPayments, updatePayment, deletePayment, setRate, deleteRate, setMode, missing,
     busyHours, curRateRow, tplLoad, monthlyOf, setRateExtra, listDayTotals, setDayTotal,
     money, plural, dm, dmy, today, addDays, addMonths, daysBetween,
   };

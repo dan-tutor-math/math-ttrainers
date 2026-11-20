@@ -186,6 +186,7 @@ def check_payment_controls(browser):
     expect(rows).to_contain_text("Ваня")
     filters.get_by_text("Разовые").click()
     expect(rows).to_have_count(1)
+    rows.locator("summary").first.click()
     rows.locator("a.nm").first.click()
     expect(p.locator("#payUnpaidHistory")).to_be_visible()
     open_statement(p)
@@ -226,6 +227,7 @@ def check_payment_controls(browser):
     p.locator("#payDebt summary").click()
     filters.get_by_text("Разовые").click()
     expect(p.locator("#payGot b")).to_have_text("2 500 ₽")
+    rows.locator("summary").first.click()
     rows.locator("a.nm").first.click()
     expect(p.locator("#psDebt")).to_have_text("Долги за разовые занятия не учитываются")
     expect(p.locator(".pay-line-action")).to_have_count(1)
@@ -340,6 +342,7 @@ def check_new_payment_layout(browser):
 
     page.locator('[data-pay-filter="lesson"]').click()
     petya = page.locator(f'.pay-row[data-sid="{PETYA}"]')
+    petya.locator("summary").first.click()
     petya.locator(".pay-add").click()
     form = page.locator(".pay-form")
     expect(form.locator('[name="paid_on"]')).to_have_value("2026-11-17")
@@ -373,6 +376,113 @@ def check_new_payment_layout(browser):
     assert not errors, errors
     ctx.close()
     print("[OK] Календарь, рост шкалы, архив, разовые по дате и ставке занятия, истории и 320 px")
+
+def check_single_groups_and_batch(browser):
+    data = seed()
+    data["payments"] += [
+        pay("archived-single", PETYA, "single", "2026-11-11", 1500,
+            lesson_student_id="p11-second", archived_at="2026-11-17T00:00:00Z"),
+        pay("advance", PETYA, "single", "2026-11-01", 500),
+        pay("pack-one", PETYA, "pack", "2026-11-05", 1500, lessons=1, burn="count"),
+        pay("v-single", VANYA, "single", "2026-11-02", 2000),
+    ]
+    data["lessons"] += [lesson("L08", "2026-08-31", 600), lesson("L13second", "2026-11-13", 800),
+                        lesson("L18second", "2026-11-18", 800)]
+    data["lesson_students"] += [
+        person("p08", "L08", PETYA, "done"), person("p03", "L03", PETYA, "done"), person("p05", "L05", PETYA, "done"),
+        person("p10", "L10", PETYA, "done"), person("p11-second", "L11", PETYA, "done"),
+        person("p13-second", "L13second", PETYA, "done"), person("p18", "L18", PETYA, "plan"),
+        person("p18-second", "L18second", PETYA, "done"), person("p20", "L20", PETYA, "done"),
+    ]
+    STATE["db"] = json.dumps(data)
+    ctx = B1.new_context(browser, bar_open=False)
+    ctx.add_init_script(FIXED_NOW_JS)
+    page = ctx.new_page()
+    errors = []
+    page.on("pageerror", lambda e: errors.append(str(e)))
+    page.goto(f"{BASE}/cabinet.html#/payments")
+    page.locator('[data-pay-filter="lesson"]').click()
+    groups = page.locator(".pay-single-student")
+    expect(groups).to_have_count(2)
+    opened = page.locator(".pay-single-student[open]")
+    expect(opened).to_have_count(0)
+    petya = page.locator(f".pay-single-student[data-sid='{PETYA}']")
+    vanya = page.locator(f".pay-single-student[data-sid='{VANYA}']")
+    petya.locator(":scope > summary").press("Enter")
+    expect(vanya).not_to_have_attribute("open", "")
+    table = petya.get_by_role("table", name="Разовые оплаты · Петя", exact=True)
+    expect(table.locator("[data-single-payment]")).to_have_count(2)
+    archive = petya.locator(".pay-single-archive")
+    expect(archive).not_to_have_attribute("open", "")
+    archive.locator("summary").click()
+    expect(archive.locator('[data-single-payment="archived-single"]')).to_be_visible()
+    table.get_by_role("button", name="Дата оплаты").press("Enter")
+    expect(table.get_by_role("button", name="Дата оплаты")).to_be_focused()
+    expect(table.locator("[data-single-payment]").first).to_have_attribute("data-single-payment", "advance")
+
+    petya.get_by_role("button", name="Засчитать за период").click()
+    form = petya.locator(".pay-bulk-form")
+    since, until = form.locator('[name="from"]'), form.locator('[name="to"]')
+    submit = form.get_by_role("button", name="Засчитать оплаты")
+    expect(since).to_be_focused()
+    expect(since).to_have_value("2026-11-01")
+    expect(until).to_have_value("2026-11-18")
+    expect(form.get_by_role("status")).to_contain_text("Уже есть оплата в счёт занятий — 1")
+    since.fill("2026-08-31")
+    expect(form.get_by_role("status")).to_contain_text("Без ставки — 1")
+    since.fill("2026-11-19")
+    expect(submit).to_be_disabled()
+    since.fill("2026-11-13")
+    expect(form.get_by_role("status")).to_have_text("4 занятия · 5 500 ₽")
+    assert len(db()["payments"]) == len(data["payments"])
+
+    # Другая вкладка успела создать одну из записей после расчёта предпросмотра.
+    page.evaluate("""() => {
+      const add = Payments.addPayments;
+      Payments.addPayments = async records => {
+        Payments.addPayments = add;
+        await Payments.addPayment(records[0]);
+        throw Object.assign(new Error('duplicate'), {raw:{code:'23505'}});
+      };
+    }""")
+    submit.click()
+    expect(form.get_by_role("alert")).to_contain_text("Одно из занятий уже оплачено")
+    expect(form.get_by_role("status")).to_have_text("3 занятия · 4 000 ₽")
+    expect(since).to_have_value("2026-11-13")
+    assert len(db()["payments"]) == len(data["payments"]) + 1
+    submit.evaluate("(button) => { button.click(); button.click(); }")
+    expect(form).to_have_count(0)
+    expect(petya.get_by_role("button", name="Засчитать за период")).to_be_focused()
+    created = db()["payments"][len(data["payments"]):]
+    assert len(created) == 4 and all(x["kind"] == "single" and x["student_id"] == PETYA for x in created)
+    assert {x["lesson_student_id"]: (x["paid_on"], x["amount"]) for x in created} == {
+        "p13": ("2026-11-13", 1500), "p13-second": ("2026-11-13", 1500),
+        "p17": ("2026-11-17", 1000), "p18-second": ("2026-11-18", 1500),
+    }
+    expect(table.locator("[data-single-payment]")).to_have_count(6)
+    recorded = created[0]["id"]
+    receipt = f'[data-single-payment="{recorded}"]'
+    total = page.locator("#payGot b").inner_text()
+    table.locator(receipt).get_by_role("button", name="В архив", exact=True).click()
+    expect(archive.locator(receipt)).to_be_visible()
+    expect(page.locator("#payGot b")).to_have_text(total)
+    archive.locator(receipt).get_by_role("button", name="Из архива").click()
+    expect(table.locator(receipt)).to_be_visible()
+    expect(table.locator(receipt).locator('.pay-value').first).to_have_css("font-variant-numeric", "tabular-nums")
+    page.set_viewport_size({"width": 320, "height": 740})
+    petya.get_by_role("button", name="Засчитать за период").click()
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    fields = form.locator(".pay-bulk-dates")
+    assert len(fields.evaluate("(el) => getComputedStyle(el).gridTemplateColumns.split(' ')")) == 1
+    since.fill("2026-11-13")
+    expect(submit).to_be_disabled()
+    expect(form.get_by_role("status")).to_have_text("Нет занятий для отметки.")
+    page.reload()
+    page.locator('[data-pay-filter="lesson"]').click()
+    expect(opened).to_have_count(0)
+    assert not errors, errors
+    ctx.close()
+    print("[OK] Группы и архив по ученикам, период, дата и ставка занятия, конфликт и повторная отметка")
 
 def check_archived_pack_keeps_lessons(browser):
     data = seed()
@@ -471,6 +581,7 @@ def main():
         vrow = norm(p.inner_text(f'.pay-row[data-sid="{VANYA}"]'))
         check("A4 Ваня: шкала 4 из 5 и подпись остатка скрыта", "осталось 1 из 5" not in vrow and p.locator('[data-pay-pack="pk1"] .pay-bar').get_attribute("aria-valuenow") == "4", vrow)
         p.locator('[data-pay-filter="lesson"]').click()
+        p.locator(f'.pay-row[data-sid="{PETYA}"] > summary').click()
         prow = norm(p.inner_text(f'.pay-row[data-sid="{PETYA}"]'))
         check("A5 Петя: разовая оплата, долг 2 500 ₽", "1 500 ₽" in prow and "долг 2 500 ₽" in prow, prow)
         order = p.eval_on_selector_all(".pay-row", "els => els.map(e => e.dataset.sid)")
@@ -651,6 +762,7 @@ def main():
         check_payment_controls(browser)
         check_new_payment_layout(browser)
         check_archived_pack_keeps_lessons(browser)
+        check_single_groups_and_batch(browser)
         browser.close()
     print("\nИТОГ:", "всё зелёное" if not B1.FAILS else "есть падения: " + ", ".join(B1.FAILS))
     sys.exit(1 if B1.FAILS else 0)
