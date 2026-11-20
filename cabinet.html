@@ -401,7 +401,9 @@ select.cs-in{cursor:pointer;-webkit-appearance:none;appearance:none;}
 <script src="student-memory.js" data-picker></script>
 <script src="lesson-report-topics.js"></script>
 <script src="lesson-reports.js"></script>
+<script src="exam-spec.js"></script>
 <script src="cabinet-exam-grid.js"></script>
+<script src="cabinet-exam-mocks.js"></script>
 <script src="cabinet-log.js"></script>
 <script src="schedule-sync.js"></script>
 <script>
@@ -738,7 +740,7 @@ function renderCard(s, boards){
     '<div class="row-btns" style="margin:4px 0 6px"><button class="btn" id="cSave">Сохранить</button>' +
       '<button class="btn danger" id="cArch">' + (s.archived_at ? 'Вернуть из архива' : 'В архив') + '</button>' +
       '<span class="save-note" id="cMsg" role="status"></span></div>' +
-    '<div id="examGridBox"></div><div id="memBox"></div>' +
+    '<div id="examGridBox"></div><div id="examMockBox"></div><div id="memBox"></div>' +
     '<div id="lesBox"></div><div id="lessonReportsBox"></div>';
   cardCleanups.push(bindSessionBtn(s));
   if (window.CabinetLog) {
@@ -753,8 +755,11 @@ function renderCard(s, boards){
 }
 function mountExamGrid(s){
   examGridOff?.();
-  examGridOff = user && window.CabinetExamGrid && window.LessonReportTopics && window.MathhCatalog
-    ? CabinetExamGrid.mount($('examGridBox'), s, user.id) : null;
+  examGridOff = null;
+  if (!user || !window.LessonReportTopics) return;
+  const offGrid = window.MathhCatalog && window.CabinetExamGrid?.mount($('examGridBox'), s, user.id);
+  const offMocks = window.ExamSpec && window.CabinetExamMocks?.mount($('examMockBox'), s, user.id);
+  examGridOff = () => { if (offGrid) offGrid(); if (offMocks) offMocks(); };
 }
 /* «Начать сессию» (Б1): ученик сессии и его журнал — student-memory.js.
    Кнопка сама становится «Закончить сессию», если этот ученик уже текущий —

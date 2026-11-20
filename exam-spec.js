@@ -125,5 +125,31 @@
     return null;
   }
 
-  window.ExamSpec = { exams: exams, find: find };
+  // Таблица пробников идёт по всем номерам КИМ, включая задания без тренажёра.
+  // Письменная и устная части иностранных языков записываются отдельно.
+  // Дополнительные максимумы — из разделов об оценивании спецификаций ФИПИ 2027.
+  const withExceptions = (length, exceptions) => range(1, length).map(n => exceptions[n] ?? 1);
+  const SCORE_MAXIMA = {
+    oge:range(1, 25).map(n => n <= 19 ? 1 : 2),
+    rus_oge:withExceptions(13, { 1:6, 13:8 }),
+    phys_oge:physOge.map(task => task.points).concat(3, 2, 2, 3, 3, 3),
+    inf_oge:infOge.map(task => task.points).concat(1, 1, 2, 3, 2, 2),
+    eng_oge:withExceptions(35, { 5:5, 12:6, 35:10 }),
+    eng_oge_oral:[2, 6, 7],
+    eng_ege:withExceptions(38, { 1:2, 2:3, 10:3, 11:2, 37:6, 38:14 }),
+    eng_ege_oral:[1, 4, 5, 10],
+    phys_ege:withExceptions(26, {
+      5:2, 6:2, 9:2, 10:2, 14:2, 15:2, 17:2, 18:2,
+      21:3, 22:2, 23:2, 24:3, 25:3, 26:4,
+    }),
+    inf_ege:withExceptions(27, { 26:2, 27:2 }),
+  };
+  function scoreSlots(id, count) {
+    const maxima = SCORE_MAXIMA[id] || exams[id]?.list.map(task => task.points) || [];
+    const slots = range(1, count).map(n => ({ key:String(n), label:String(n), max:maxima[n - 1] ?? null }));
+    if (id === 'rus_oge') slots.push({ key:'literacy', label:'Грамотность', max:13 });
+    return slots;
+  }
+
+  window.ExamSpec = { exams: exams, find: find, scoreSlots: scoreSlots };
 })();

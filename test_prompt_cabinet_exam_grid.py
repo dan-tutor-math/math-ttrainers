@@ -191,6 +191,162 @@ def check_mobile_and_storage(context, base):
     print("✓ Ширина 320 px, тёмная тема и сохранение черновика при ошибке браузера")
 
 
+def mock_section(page):
+    return page.get_by_role("region", name="Анализ пробников")
+
+
+def add_mock(section, day, name=""):
+    section.get_by_role("button", name="Добавить пробник").click()
+    dialog = section.get_by_role("dialog")
+    dialog.get_by_label("Дата пробника").fill(day)
+    dialog.get_by_label("Название варианта").fill(name)
+    dialog.get_by_role("button", name="Сохранить", exact=True).click()
+    expect(dialog).to_be_hidden()
+
+
+def mock_cell(section, row, task):
+    return section.get_by_role("button", name=f"Пробник {row}, задание №{task},", exact=False)
+
+
+def grade_mock(section, row, task, value, reason=False):
+    mock_cell(section, row, task).click()
+    dialog = section.get_by_role("dialog")
+    dialog.get_by_label("Причина ошибки" if reason else "Балл задания").select_option(value)
+    dialog.get_by_role("button", name="Сохранить", exact=True).click()
+    expect(dialog).to_be_hidden()
+
+
+def check_mocks(context, base):
+    page = context.new_page()
+    errors = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    open_student(page, base)
+    select_exam(page, "ege_prof")
+    section = mock_section(page)
+    table = section.get_by_role("table", name="Баллы по пробникам")
+    expect(section.get_by_text("Добавьте пробник, чтобы записать баллы по заданиям.")).to_be_visible()
+    add_mock(section, "2026-11-04", "Вариант <1>")
+    expect(table.get_by_text("Вариант <1>", exact=True)).to_be_visible()
+    expect(table.locator("thead tr").nth(1).locator("td").nth(18)).to_have_text("4")
+    expect(table.locator("[data-maximum]")).to_have_text("32")
+    expect(table.locator("[data-sum]").first).to_have_text("—")
+    grade_mock(section, 1, 1, "0")
+    expect(table.locator("[data-sum]").first).to_have_text("0")
+    expect(table.locator("[data-test-score]").first).to_have_text("0")
+    mock_cell(section, 1, 19).click()
+    dialog = section.get_by_role("dialog")
+    expect(dialog.get_by_label("Балл задания").locator("option")).to_have_count(6)
+    dialog.get_by_role("button", name="Отмена").click()
+    grade_mock(section, 1, 19, "4")
+    expect(table.locator("[data-sum]").first).to_have_text("4")
+    expect(table.locator("[data-test-score]").first).to_have_text("22")
+    expect(table.locator("[data-percent]").first).to_have_text("12,5%")
+
+    other = context.new_page()
+    open_student(other, base)
+    second_view = mock_section(other)
+    add_mock(second_view, "2026-11-08")
+    grade_mock(section, 2, 1, "1")
+    grade_mock(second_view, 2, 19, "2")
+    add_mock(section, "2026-11-13")
+    grade_mock(section, 3, 1, "1")
+    add_mock(section, "2026-11-20")
+    grade_mock(section, 4, 1, "1")
+    grade_mock(section, 4, 2, "1")
+
+    summary = table.locator("tfoot tr")
+    expect(summary.nth(0).locator("td").first).to_have_text("0,75")
+    expect(summary.nth(1).locator("td").first).to_have_text("0,5")
+    expect(summary.nth(1).locator("td").nth(18)).to_have_text("1,41")
+    expect(summary.nth(0).locator("td").nth(19)).to_have_text("2,5")
+    expect(summary.nth(1).locator("td").nth(19)).to_have_text("1,3")
+    expect(table.locator("[data-rolling]").last).to_have_text("6,25%")
+    expect(second_view.locator("[data-sum]").last).to_have_text("2")
+    shot(section, "mocks-desktop-scores.png")
+    section.get_by_role("button", name="К итогам").click()
+    expect(section.get_by_role("button", name="К заданиям")).to_be_visible()
+    shot(section, "mocks-desktop-totals.png")
+    section.get_by_role("button", name="К заданиям").click()
+
+    section.get_by_role("button", name="Журнал ошибок").click()
+    errors_table = section.get_by_role("table", name="Ошибки по пробникам")
+    grade_mock(section, 1, 1, "А", reason=True)
+    grade_mock(section, 2, 1, "М", reason=True)
+    grade_mock(section, 2, 19, "ОДЗ", reason=True)
+    expect(errors_table.get_by_role("row", name="Всего ошибок", exact=False).locator("td").first).to_have_text("2")
+    expect(errors_table.get_by_role("row", name="А · Арифметика", exact=False).locator("td").first).to_have_text("1")
+    expect(errors_table.get_by_role("row", name="ОДЗ · Не учтена ОДЗ", exact=False).locator("td").nth(18)).to_have_text("1")
+    shot(section, "mocks-desktop-errors.png")
+
+    page.reload()
+    expect(table.locator("[data-sum]").nth(1)).to_have_text("3")
+    section.get_by_text("Перевод баллов по шкале из образца").click()
+    scale = section.get_by_role("table", name="Шкала перевода для пробников")
+    expect(scale.get_by_role("row", name="10 58", exact=True)).to_be_visible()
+    section.get_by_role("button", name="Журнал ошибок").click()
+    expect(mock_cell(section, 2, 19)).to_have_text("ОДЗ")
+    section.get_by_role("button", name="Баллы", exact=True).click()
+    expect(mock_cell(section, 2, 19)).to_have_text("2")
+
+    open_student(page, base, PETYA)
+    select_exam(page, "rus_oge")
+    expect(section.get_by_text("Добавьте пробник, чтобы записать баллы по заданиям.")).to_be_visible()
+    add_mock(section, "2026-11-16")
+    expect(table.get_by_role("columnheader", name="Грамотность")).to_have_count(1)
+    expect(table.locator("[data-maximum]")).to_have_text("38")
+    table.get_by_role("button", name="Пробник 1, грамотность,", exact=False).click()
+    expect(dialog.get_by_label("Балл задания").locator("option")).to_have_count(15)
+    dialog.get_by_label("Балл задания").select_option("13")
+    dialog.get_by_role("button", name="Сохранить", exact=True).click()
+    expect(table.locator("[data-sum]").first).to_have_text("13")
+
+    select_exam(page, "ege_prof")
+    expect(section.get_by_text("Добавьте пробник, чтобы записать баллы по заданиям.")).to_be_visible()
+    maxima = page.evaluate("""() => Object.fromEntries(LessonReportTopics.exams.map(({ id, count }) =>
+        [id, ExamSpec.scoreSlots(id, count).reduce((total, slot) => {
+            if (slot.max == null) throw new Error(id + ' ' + slot.key);
+            return total + slot.max;
+        }, 0)]))""")
+    assert maxima == {
+        "oge":31, "ege_base":21, "ege_prof":32, "rus_oge":38, "rus_ege":50,
+        "soc_oge":32, "soc_ege":58, "eng_oge":53, "eng_oge_oral":15, "eng_ege":62,
+        "eng_ege_oral":20, "phys_oge":39, "phys_ege":45, "inf_oge":21, "inf_ege":29,
+    }, maxima
+    assert not errors, errors
+    print("✓ Пробники, шкала, средний балл, σ, среднее за 3, журнал ошибок и максимумы всех экзаменов")
+
+
+def check_mocks_mobile(context, base):
+    page = context.new_page()
+    page.set_viewport_size({"width": 320, "height": 780})
+    open_student(page, base)
+    page.evaluate("document.documentElement.dataset.theme = 'dark'")
+    select_exam(page, "ege_prof")
+    section = mock_section(page)
+    add_mock(section, "2026-11-20", "Вариант" * 8)
+    grade_mock(section, 1, 1, "1")
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    table = section.get_by_role("table", name="Баллы по пробникам")
+    view = section.locator("#examMockView")
+    date = table.get_by_role("columnheader", name="Дата")
+    start = date.evaluate("(node) => node.getBoundingClientRect().left")
+    section.get_by_role("button", name="К итогам").click()
+    expect(section.get_by_role("button", name="К заданиям")).to_be_visible()
+    assert view.evaluate("(node) => node.scrollLeft > 0")
+    assert abs(date.evaluate("(node) => node.getBoundingClientRect().left") - start) <= 1
+    total = table.get_by_role("columnheader", name="Сумма")
+    assert abs(total.evaluate("(node) => node.getBoundingClientRect().left") -
+               date.evaluate("(node) => node.getBoundingClientRect().right")) <= 2
+    shot(section, "mocks-mobile-totals.png")
+    section.get_by_role("button", name="К заданиям").click()
+    mock_cell(section, 1, 1).click()
+    dialog = section.get_by_role("dialog")
+    shot(dialog, "mocks-mobile-editor.png")
+    page.keyboard.press("Escape")
+    expect(mock_cell(section, 1, 1)).to_be_focused()
+    print("✓ Анализ пробников на ширине 320 px, закреплённая дата и возврат фокуса")
+
+
 if __name__ == "__main__":
     handler = partial(QuietHandler, directory=Path(__file__).resolve().parent)
     with ThreadingHTTPServer(("127.0.0.1", 0), handler) as server, sync_playwright() as playwright:
@@ -202,6 +358,10 @@ if __name__ == "__main__":
                 check_history(context, base)
             with new_context(browser, bar_open=False) as context:
                 check_mobile_and_storage(context, base)
+            with new_context(browser, bar_open=False) as context:
+                check_mocks(context, base)
+            with new_context(browser, bar_open=False) as context:
+                check_mocks_mobile(context, base)
             browser.close()
         finally:
             server.shutdown()
