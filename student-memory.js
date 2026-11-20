@@ -990,33 +990,35 @@
     const st = document.createElement('style');
     st.id = 'smBarCss';
     st.textContent =
+      '#smBar,#smUndo{--sm-bg:var(--lesson-action-bg,#14549a)}' +
+      'html[data-theme="dark"] :is(#smBar,#smUndo),body.dark :is(#smBar,#smUndo){--sm-bg:var(--lesson-action-bg,#2361a4)}' +
       '#smBar{position:fixed;left:12px;bottom:12px;z-index:2147482000;display:flex;align-items:center;gap:2px;' +
-      'font:500 13px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;background:rgba(28,30,40,.86);' +
-      '-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);border-radius:999px;padding:4px 6px 4px 12px;' +
+      'font:500 13px/1.2 system-ui,-apple-system,"Segoe UI",sans-serif;color:#fff;background:var(--sm-bg);' +
+      'border-radius:999px;padding:4px 6px 4px 12px;' +
       'box-shadow:0 4px 18px rgba(0,0,0,.22);max-width:calc(100vw - 24px)}' +
       '#smBar .sm-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:40vw;margin-right:4px}' +
       '#smBar .sm-name b{font-weight:650}' +
-      '#smBar.paused .sm-name{opacity:.7}' +
       '#smBar button{font:inherit;color:inherit;background:transparent;border:0;border-radius:999px;padding:5px 9px;cursor:pointer}' +
       '#smBar button:hover{background:rgba(255,255,255,.14)}' +
+      '#smBar :is(button,a):focus-visible,#smUndo:focus-visible{outline:2px solid #fff;outline-offset:-2px}' +
       '#smBar.sm-move{transition:left .24s cubic-bezier(.2,.8,.2,1),bottom .24s cubic-bezier(.2,.8,.2,1)}' +
       '#smBar.sm-in{animation:smIn .24s cubic-bezier(.2,.8,.2,1) both}#smBar.sm-out{animation:smOut .22s cubic-bezier(.2,.8,.2,1) both;pointer-events:none}' +
       '@keyframes smIn{from{clip-path:inset(0 100% 0 0 round 999px);opacity:.3}to{clip-path:inset(0 0 0 0 round 999px);opacity:1}}' +
       '@keyframes smOut{from{clip-path:inset(0 0 0 0 round 999px);opacity:1}to{clip-path:inset(0 100% 0 0 round 999px);opacity:.3}}' +
       '@media (prefers-reduced-motion:reduce){#smBar.sm-move{transition:none}#smBar.sm-in,#smBar.sm-out{animation:none}}' +
       '#smBar .sm-dot{opacity:.5}' +
-      '#smBar a.sm-board{color:#9cf0b8;font-weight:650;text-decoration:none;padding:5px 9px;border-radius:999px}#smBar a.sm-board:hover{background:rgba(255,255,255,.14)}' +
-      '#smMenu{position:absolute;left:0;bottom:calc(100% + 6px);min-width:220px;max-height:50vh;overflow:auto;background:rgba(28,30,40,.95);' +
+      '#smBar a.sm-board{color:inherit;font-weight:650;text-decoration:underline;text-underline-offset:2px;padding:5px 9px;border-radius:999px}#smBar a.sm-board:hover{background:rgba(255,255,255,.14)}' +
+      '#smMenu{position:absolute;left:0;bottom:calc(100% + 6px);min-width:220px;max-height:50vh;overflow:auto;background:var(--sm-bg);' +
       'border-radius:12px;padding:6px;box-shadow:0 8px 28px rgba(0,0,0,.3)}' +
       '#smMenu button{display:block;width:100%;text-align:left;border-radius:8px}' +
-      '#smMenu .sm-note{padding:6px 9px;opacity:.75}#smMenu a{color:#9cc7ff}' +
+      '#smMenu .sm-note{padding:6px 9px}#smMenu a{color:inherit;text-decoration:underline;text-underline-offset:2px}' +
       '#smBar .sm-hide{padding:5px 8px;opacity:.65;margin-left:2px}#smBar .sm-hide:hover{opacity:1}' +
-      // свёрнутая плашка — чёрная точка; идёт сессия — внутри мигает зелёная,
+      // свёрнутая плашка — синяя точка; идёт сессия — внутри мигает зелёная,
       // на паузе зелёная горит ровно, без сессии точка пустая
-      '#smBar.mini{padding:0;background:transparent;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none}' +
-      '#smBar.mini button.sm-pip{width:22px;height:22px;padding:0;border-radius:50%;background:#16171d;' +
+      '#smBar.mini{padding:0;background:transparent;box-shadow:none}' +
+      '#smBar.mini button.sm-pip{width:22px;height:22px;padding:0;border-radius:50%;background:var(--sm-bg);' +
       'box-shadow:0 2px 8px rgba(0,0,0,.3),inset 0 0 0 1.5px rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center}' +
-      '#smBar.mini button.sm-pip:hover{background:#2a2c36}' +
+      '#smBar.mini button.sm-pip:hover,#smUndo:hover{filter:brightness(1.08)}' +
       '#smBar .sm-pip i{width:10px;height:10px;border-radius:50%;background:#2fd36b;box-shadow:0 0 6px #2fd36b}' +
       '#smBar .sm-pip i.on{animation:smBlink 1.2s ease-in-out infinite}' +
       '@keyframes smBlink{0%,100%{opacity:1}50%{opacity:.15}}' +
@@ -1239,7 +1241,7 @@
     css();
     const st = document.createElement('style');
     st.textContent = '#smUndo{position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:2147483000;font:600 15px/1 system-ui,-apple-system,"Segoe UI",sans-serif;' +
-      'color:#fff;background:rgba(28,30,40,.92);border:0;border-radius:999px;padding:12px 20px;cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.28)}#smUndo:hover{background:#000}';
+      'color:#fff;background:var(--sm-bg);border:0;border-radius:999px;padding:12px 20px;cursor:pointer;box-shadow:0 6px 24px rgba(0,0,0,.28)}';
     document.head.appendChild(st);
     const b = document.createElement('button');
     b.id = 'smUndo'; b.type = 'button'; b.textContent = '↩ Отменить начало сессии';

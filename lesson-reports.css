@@ -7,7 +7,7 @@
   --lr-soft: #eaf0f8;
   --lr-active: #dceafb;
   --lr-accent: #14549a;
-  --lr-button: #14549a;
+  --lr-button: var(--lesson-action-bg, #14549a);
   --lr-error: #9c3039;
   position: fixed;
   z-index: 2147482900;
@@ -33,7 +33,7 @@ html[data-theme="dark"] .lr-dock, body.dark .lr-dock {
   --lr-soft: #243549;
   --lr-active: #2d4664;
   --lr-accent: #a8d2ff;
-  --lr-button: #2361a4;
+  --lr-button: var(--lesson-action-bg, #2361a4);
   --lr-error: #ffadb2;
   color-scheme: dark;
 }
@@ -222,7 +222,10 @@ html[data-theme="dark"] .lr-dock, body.dark .lr-dock {
   font-weight: 650;
 }
 
-.lr-note-label { font-size: 13px; font-weight: 650; }
+.lr-rating { display: flex; align-items: center; gap: 6px; }
+.lr-rating label { margin-inline-end: 3px; }
+.lr-rating label, .lr-note-label { font-size: 13px; font-weight: 650; }
+.lr-dock .lr-rating select { padding-block: 4px; min-height: 32px; font-variant-numeric: tabular-nums; }
 .lr-note-label span { font-size: 12px; color: var(--lr-muted); font-weight: 500; }
 .lr-dock textarea { display: block; width: 100%; margin-top: 4px; min-height: 55px; max-height: 130px; resize: vertical; }
 
@@ -291,6 +294,7 @@ html[data-theme="dark"] .lr-dock, body.dark .lr-dock {
 
 @media (pointer:coarse) {
   .lr-dock :is(input, select, textarea) { font-size: 16px; }
+  .lr-dock .lr-rating select { min-height: 38px; }
   .lr-dock .lr-circle, .lr-dock .lr-favorite { width: 39px; height: 39px; }
   .lr-dock .lr-choice button[data-lr="choose"] { min-height: 39px; }
 }

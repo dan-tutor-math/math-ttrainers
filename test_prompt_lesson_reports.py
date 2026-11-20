@@ -92,6 +92,7 @@ def check_board_and_history(browser):
     choose(panel, "Добавить")
     comment = panel.get_by_role("textbox", name="Комментарий")
     comment.fill("Решили два задания. Повторить замену переменной.")
+    panel.get_by_role("combobox", name="Оценка", exact=True).select_option("4")
 
     # Доска доступна с открытым редактором, клик снаружи его не закрывает.
     count = page.evaluate("getCurrentBoard().objects.length")
@@ -130,6 +131,7 @@ def check_board_and_history(browser):
     expect(resumed.get_by_role("button", name="Убрать тему: Ещё не добавленная тема")).to_have_count(0)
     cabinet.reload()
     expect(history).to_contain_text("ОГЭ №9 · Квадратные уравнения · Решение уравнений заменой")
+    expect(history).to_contain_text("Оценка 4/5")
     expect(history.get_by_role("button", name="Открыть")).to_have_count(1)
     history.scroll_into_view_if_needed()
     shot(cabinet, "history.png")
@@ -138,6 +140,74 @@ def check_board_and_history(browser):
     assert not errors, errors
     ctx.close()
     print("✓ Доска, порог 10 секунд, номера экзаменов, темы по классам, свои темы, черновик и история.")
+
+
+def check_rating(browser):
+    ctx = new_context(browser, bind="browser")
+    page, errors = board_fixture.open_board(ctx)
+    page.emulate_media(reduced_motion="reduce")
+    bar = page.locator("#smBar")
+    blue = "rgb(20, 84, 154)"
+    expect(bar).to_have_css("background-color", blue)
+    pick = bar.get_by_role("button", name="Начать сессию с учеником")
+    pick.click()
+    expect(bar.locator("#smMenu")).to_have_css("background-color", blue)
+    shot(page, "picker.png")
+    pick.click()
+    bar.get_by_role("button", name="Свернуть").click()
+    dot = bar.get_by_role("button", name="Начать сессию с учеником — развернуть")
+    expect(dot).to_have_css("background-color", blue)
+    dot.click()
+
+    now = datetime.now(timezone.utc)
+    page.clock.set_fixed_time(now)
+    start(page)
+    expect(bar).to_have_css("background-color", blue)
+    page.clock.set_fixed_time(now + timedelta(seconds=11))
+    end_button(page).click()
+    page.get_by_role("button", name="Заполнить отчёт").click()
+    panel = report_panel(page)
+    rating = panel.get_by_role("combobox", name="Оценка", exact=True)
+    scale = panel.get_by_role("combobox", name="Шкала оценки")
+    save = panel.get_by_role("button", name="Сохранить отчёт")
+    expect(rating).to_have_value("")
+    expect(scale).to_have_value("5")
+    expect(rating.locator("option")).to_have_count(6)
+    expect(save).to_be_disabled()
+    rating.focus()
+    page.keyboard.press("Tab")
+    expect(scale).to_be_focused()
+    rating.select_option("1")
+    expect(save).to_have_css("background-color", blue)
+    scale.select_option("10")
+    expect(rating).to_have_value("1")
+    expect(rating.locator("option")).to_have_count(11)
+    rating.select_option("10")
+    scale.select_option("5")
+    expect(rating).to_have_value("")
+    expect(save).to_be_disabled()
+    scale.select_option("10")
+    rating.select_option("9")
+    expect(panel.get_by_role("status")).to_have_text("Черновик")
+    save.click()
+    expect(panel.get_by_role("status")).to_have_text("Отчёт сохранён")
+
+    cabinet = ctx.new_page()
+    cabinet.goto(f"{BASE}/cabinet.html#/students/{VANYA}")
+    history = cabinet.get_by_role("region", name="Отчёты об уроках")
+    expect(history).to_contain_text("Оценка 9/10")
+    cabinet.reload()
+    history.get_by_role("button", name="Открыть").click()
+    reopened = report_panel(cabinet)
+    expect(reopened.get_by_role("combobox", name="Шкала оценки")).to_have_value("10")
+    reopened_rating = reopened.get_by_role("combobox", name="Оценка", exact=True)
+    expect(reopened_rating).to_have_value("9")
+    reopened_rating.select_option("")
+    expect(reopened.get_by_role("button", name="Сохранить отчёт")).to_be_disabled()
+    expect(history).to_contain_text("Отчётов пока нет")
+    assert not errors, errors
+    ctx.close()
+    print("✓ Оценка без тем, шкалы 5 и 10, клавиатура, повторное открытие, снятие оценки и синяя плашка.")
 
 
 def check_tab_groups(browser):
@@ -166,6 +236,14 @@ def check_tab_groups(browser):
     choose(panel, "№6")
     choose(panel, "Сохранить отчёт")
     choose(panel, "Закрыть")
+    # Запись старого формата открывается с пустой оценкой и пятибалльной шкалой.
+    page.evaluate("""() => {
+        const key = Object.keys(localStorage).find(key => key.includes(':report:'));
+        const report = JSON.parse(localStorage.getItem(key));
+        delete report.rating;
+        delete report.ratingScale;
+        localStorage.setItem(key, JSON.stringify(report));
+    }""")
     page.wait_for_function("() => !!TrainerSession.getCode()")
     assert page.evaluate("TrainerSession.endSession()")
     page.get_by_role("button", name="Открыть отчёт").wait_for()
@@ -177,6 +255,8 @@ def check_tab_groups(browser):
     expect(page.get_by_role("button", name="Открыть отчёт")).to_have_count(1)
     page.get_by_role("button", name="Открыть отчёт").click()
     expect(panel.get_by_role("button", name="Убрать тему: ОГЭ №6")).to_be_visible()
+    expect(panel.get_by_role("combobox", name="Оценка", exact=True)).to_have_value("")
+    expect(panel.get_by_role("combobox", name="Шкала оценки")).to_have_value("5")
     assert page.evaluate("""() => Object.keys(localStorage).filter(key => key.includes(':report:'))
         .map(key => JSON.parse(localStorage.getItem(key)).lessonId)""") == ["урок-из-расписания"]
     ctx.close()
@@ -202,10 +282,21 @@ def check_mobile(browser):
     assert bounds["x"] >= rail["x"] + rail["width"]
     custom = panel.get_by_role("textbox", name="Название своей темы")
     custom.fill("Незаконченная тема")
+    rating = panel.get_by_role("combobox", name="Оценка", exact=True)
+    rating.select_option("5")
+    rating.scroll_into_view_if_needed()
+    expect(page.locator("#smBar")).to_have_css("background-color", "rgb(35, 97, 164)")
+    expect(panel.locator(".lr-save")).to_have_css("background-color", "rgb(35, 97, 164)")
     shot(page, "mobile.png")
+    page.set_viewport_size({"width": 320, "height": 640})
+    rating.scroll_into_view_if_needed()
+    row = panel.locator(".lr-rating")
+    assert row.evaluate("(row) => row.scrollWidth === row.clientWidth")
+    shot(page, "mobile320.png")
     choose(panel, "Свернуть")
     page.get_by_role("button", name="Отчёт · Ваня").click()
     expect(custom).to_have_value("Незаконченная тема")
+    expect(rating).to_have_value("5")
     choose(panel, "Свернуть")
     page.locator(".lr-panel.lr-minimized").get_by_role("button", name="Закрыть").click()
     expect(page.locator(".lr-panel")).to_be_hidden()
@@ -248,6 +339,7 @@ if __name__ == "__main__":
         try:
             browser = playwright.chromium.launch()
             check_board_and_history(browser)
+            check_rating(browser)
             check_tab_groups(browser)
             check_mobile(browser)
             check_other_end_routes(browser)

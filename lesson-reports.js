@@ -40,7 +40,7 @@
   }
 
   function blank(context){
-    return { ...context, topics:[], note:'', savedAt:null };
+    return { ...context, topics:[], note:'', rating:null, ratingScale:5, savedAt:null };
   }
 
   function loadTopics(){
@@ -233,6 +233,9 @@
       '<div class="lr-results" aria-label="Темы для выбора"></div>' +
       '<div class="lr-custom"><input name="custom" aria-label="Название своей темы" placeholder="Своя тема" maxlength="140" autocomplete="off">' +
       '<button type="submit" value="custom">Добавить</button></div>' +
+      '<div class="lr-rating"><label for="lrRating">Оценка</label>' +
+      '<select id="lrRating" name="rating"></select>' +
+      '<select name="ratingScale" aria-label="Шкала оценки"><option value="5">из 5</option><option value="10">из 10</option></select></div>' +
       '<label class="lr-note-label">Комментарий <span>необязательно</span>' +
       '<textarea name="note" maxlength="1000" rows="2" placeholder="Что важно запомнить"></textarea></label></div>' +
       '<footer class="lr-foot"><div class="lr-status" role="status"></div><button type="submit" value="save" class="lr-save">Сохранить отчёт</button></footer></form>';
@@ -297,6 +300,17 @@
     list.scrollTop = scroll;
   }
 
+  function renderRating(report){
+    const scale = report.ratingScale === 10 ? 10 : 5;
+    const rating = panel.querySelector('#lrRating');
+    if (rating.options.length !== scale + 1) {
+      rating.replaceChildren(new Option('—', ''));
+      for (let value = 1; value <= scale; value++) rating.add(new Option(value, value));
+    }
+    rating.value = report.rating ?? '';
+    panel.querySelector('[name="ratingScale"]').value = scale;
+  }
+
   function renderSelected(){
     const { report, storageError } = active;
     const area = panel.querySelector('.lr-selected');
@@ -308,11 +322,12 @@
       return '<div class="lr-chip-row"><button type="button" class="lr-chip" data-lr="remove" data-topic="' + id +
         '" aria-label="Убрать тему: ' + label + '">' + label + '</button>' + favorite + '</div>';
     }).join('') + '</div>' : '<p class="lr-empty">Выберите темы урока</p>';
+    renderRating(report);
     const save = panel.querySelector('.lr-save');
-    save.disabled = !report.topics.length;
+    save.disabled = !report.topics.length && !report.rating;
     const status = panel.querySelector('.lr-status');
     status.textContent = storageError ? 'Не удалось сохранить в браузере. Повторите попытку.' :
-      report.savedAt ? 'Отчёт сохранён' : report.topics.length || report.note ? 'Черновик' : '';
+      report.savedAt ? 'Отчёт сохранён' : report.topics.length || report.note || report.rating ? 'Черновик' : '';
     status.classList.toggle('lr-error', storageError);
   }
 
@@ -380,6 +395,20 @@
 
   function handleChange(event){
     if (!active || !allowed(active.report)) return;
+    if (event.target.name === 'ratingScale') {
+      const ratingScale = Number(event.target.value);
+      updateReport(report => {
+        const rating = report.rating ?? null;
+        return { ...report, ratingScale, rating:rating > ratingScale ? null : rating, savedAt:null };
+      });
+      return;
+    }
+    if (event.target.name === 'rating') {
+      const rating = Number(event.target.value) || null;
+      const ratingScale = Number(event.target.form.elements.ratingScale.value);
+      updateReport(report => ({ ...report, rating, ratingScale, savedAt:null }));
+      return;
+    }
     if (event.target.name === 'grade') active.grade = Number(event.target.value);
     else if (event.target.name === 'exam') active.exam = event.target.value;
     else return;
@@ -408,7 +437,7 @@
         field.value = active.customText = '';
         renderResults(true);
       }
-    } else if (active.report.topics.length) {
+    } else if (active.report.topics.length || active.report.rating) {
       updateReport(report => ({ ...report, note:report.note.trim(), savedAt:Date.now() }));
     }
   }
@@ -418,18 +447,22 @@
     function render(){
       if (!allowed({ owner })) { box.replaceChildren(); return; }
       const reports = scan(prefixForStudent)
-        .filter(report => report.topics.length || report.note.trim())
+        .filter(report => report.topics.length || report.note.trim() || report.rating)
         .sort((a, b) => b.startedAt - a.startedAt);
       const selectedKey = document.activeElement?.dataset.reportKey;
       const trigger = active?.trigger;
       const triggerKey = trigger && box.contains(trigger) ? trigger.dataset.reportKey : null;
       box.innerHTML = '<section class="memory lr-history" aria-label="Отчёты об уроках"><div class="mhead"><b>Отчёты об уроках</b></div>' +
-        (reports.length ? reports.map(report => '<div class="lr-history-row"><div><time datetime="' +
-          new Date(report.startedAt).toISOString() + '">' + esc(dateFormat.format(report.startedAt)) + '</time>' +
-          (report.savedAt ? '' : '<span class="lr-draft">Черновик</span>') +
-          '<p>' + esc(report.topics.map(topic => topic.label).join(' · ')) + '</p></div>' +
-          '<button type="button" class="btn quiet small" data-report-key="' + esc(keyFor(report)) + '">' +
-          (report.savedAt ? 'Открыть' : 'Продолжить') + '</button></div>').join('') :
+        (reports.length ? reports.map(report => {
+          const summary = report.topics.map(topic => topic.label);
+          if (report.rating) summary.push('Оценка ' + report.rating + '/' + report.ratingScale);
+          return '<div class="lr-history-row"><div><time datetime="' +
+            new Date(report.startedAt).toISOString() + '">' + esc(dateFormat.format(report.startedAt)) + '</time>' +
+            (report.savedAt ? '' : '<span class="lr-draft">Черновик</span>') +
+            (summary.length ? '<p>' + esc(summary.join(' · ')) + '</p>' : '') + '</div>' +
+            '<button type="button" class="btn quiet small" data-report-key="' + esc(keyFor(report)) + '">' +
+            (report.savedAt ? 'Открыть' : 'Продолжить') + '</button></div>';
+        }).join('') :
           '<p class="hint">Отчётов пока нет.</p>') + '</section>';
       for (const button of box.querySelectorAll('[data-report-key]')) {
         if (button.dataset.reportKey === selectedKey) button.focus();
