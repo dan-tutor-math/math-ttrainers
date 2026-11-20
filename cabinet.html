@@ -15,6 +15,7 @@
 <link rel="stylesheet" href="works.css">
 <link rel="stylesheet" href="schedule.css">
 <link rel="stylesheet" href="payments.css">
+<link rel="stylesheet" href="cabinet-exam-grid.css">
 <style>
 /* Кабинет преподавателя (задача А4): ученики, расписание (В1а, schedule.js),
    настройки. Оформление общее с «Работами» (works.css): тот же вход, те же
@@ -398,7 +399,9 @@ select.cs-in{cursor:pointer;-webkit-appearance:none;appearance:none;}
 <script src="schedule-insights.js"></script>
 <script src="schedule.js"></script>
 <script src="student-memory.js" data-picker></script>
+<script src="lesson-report-topics.js"></script>
 <script src="lesson-reports.js"></script>
+<script src="cabinet-exam-grid.js"></script>
 <script src="cabinet-log.js"></script>
 <script src="schedule-sync.js"></script>
 <script>
@@ -444,7 +447,12 @@ let toastT = 0;
 function toast(msg){ const t = $('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
 
 /* ── подписи у значений ── */
-const EXAMS = { '': 'не выбран', oge: 'ОГЭ, математика', ege_prof: 'ЕГЭ, профиль', ege_base: 'ЕГЭ, база', rus_oge: 'ОГЭ, русский' };
+const EXAMS = {
+  '': 'не выбран', oge: 'ОГЭ, математика', ege_prof: 'ЕГЭ, профиль', ege_base: 'ЕГЭ, база', rus_oge: 'ОГЭ, русский',
+};
+for (const exam of window.LessonReportTopics?.exams || []) {
+  if (!(exam.id in EXAMS)) EXAMS[exam.id] = exam.name;
+}
 
 /* ── вход ── */
 let user = null;
@@ -601,7 +609,10 @@ $('auGo').addEventListener('click', async () => {
 /* ── маршруты: #/students, #/students/<id>, #/schedule, #/settings ── */
 window.addEventListener('hashchange', () => route());
 let students = null;      // кэш списка: открыть карточку и вернуться без сети
+let cardRequest = 0;
 async function route(){
+  const request = ++cardRequest;
+  unmountCard();
   account.open = false;
   paintAccount();
   paintPalette();
@@ -622,7 +633,7 @@ async function route(){
   ['tabStudents', 'tabCard', 'tabSchedule', 'tabPayments', 'tabStats', 'tabSettings'].forEach(x => { $(x).hidden = true; });
   // боковая панель занятия висит поверх страницы — с вкладки «Расписание» её уносим
   if (t !== 'schedule' && window.Schedule && Schedule.hide) Schedule.hide();
-  if (t === 'students' && id){ $('tabCard').hidden = false; await openCard(id); }
+  if (t === 'students' && id){ $('tabCard').hidden = false; await openCard(id, request); }
   else if (t === 'students'){ $('tabStudents').hidden = false; await renderList(); }
   else if (t === 'schedule'){ $('tabSchedule').hidden = false; await Schedule.show(id); }
   else if (t === 'payments'){ $('tabPayments').hidden = false; await CabinetPayments.show($('payHost'), id); }
@@ -638,17 +649,30 @@ async function loadStudents(force){
 async function renderList(){ await CabinetStudents.show($('stuHost')); }
 
 /* ── ученики: карточка ── */
-async function openCard(id){
+async function openCard(id, request){
   const box = $('cardBox');
   box.innerHTML = '<div class="empty">Загружаем…</div>';
   let s, boards = [];
   try {
     s = await C.getStudent(id);
     try { boards = await C.listBoards(); } catch (e) { boards = []; }
-  } catch (e) { box.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; return; }
-  renderCard(s, boards);
+  } catch (e) {
+    if (request === cardRequest) box.innerHTML = '<div class="empty">' + esc(e.message) + '</div>';
+    return;
+  }
+  // Ответ предыдущего маршрута может прийти уже после открытия другой карточки или выхода.
+  if (request === cardRequest) renderCard(s, boards);
 }
-let memOff = null;   // отписка «Памяти заданий» предыдущей карточки
+const cardCleanups = [];
+let examGridOff = null;
+function unmountCard(){
+  cardCleanups.forEach(off => off?.());
+  cardCleanups.length = 0;
+  examGridOff?.();
+  examGridOff = null;
+  // Скрытая карточка может содержать личные записи после смены аккаунта.
+  $('cardBox').replaceChildren();
+}
 function sessionButtons(prefix, label, archived, board){
   const disabled = archived ? ' disabled title="Ученик в архиве"' : '';
   const title = 'Начать сессию и открыть доску в новой вкладке';
@@ -678,6 +702,7 @@ async function startOnBoard(s, board, lessonId, lessonLabel){
   } catch (e) { toast('Сессия не началась: ' + e.message); }
 }
 function renderCard(s, boards){
+  unmountCard();
   const box = $('cardBox');
   const def = TS.get().lessonMin;
   // привязанные доски, которых нет в списке (удалена или список не
@@ -713,23 +738,23 @@ function renderCard(s, boards){
     '<div class="row-btns" style="margin:4px 0 6px"><button class="btn" id="cSave">Сохранить</button>' +
       '<button class="btn danger" id="cArch">' + (s.archived_at ? 'Вернуть из архива' : 'В архив') + '</button>' +
       '<span class="save-note" id="cMsg" role="status"></span></div>' +
-    '<div id="memBox" style="margin-top:16px"></div>' +
+    '<div id="examGridBox"></div><div id="memBox"></div>' +
     '<div id="lesBox"></div><div id="lessonReportsBox"></div>';
-  bindSessionBtn(s);
-  if (memOff) memOff();
-  memOff = window.CabinetLog ? window.CabinetLog.mount($('memBox'), s) : null;
-  // «Занятия» (В2): ближайшее, последние и «что решали»; снимается вместе с журналом
-  if (window.CabinetLog && window.CabinetLog.mountLessons) {
-    const offMem = memOff, offLes = window.CabinetLog.mountLessons($('lesBox'), s);
-    memOff = () => { if (offMem) offMem(); offLes(); };
+  cardCleanups.push(bindSessionBtn(s));
+  if (window.CabinetLog) {
+    cardCleanups.push(CabinetLog.mount($('memBox'), s), CabinetLog.mountLessons?.($('lesBox'), s));
   }
   if (user && window.LessonReports) {
-    const offPrevious = memOff;
-    const offReports = window.LessonReports.mountHistory($('lessonReportsBox'), s, user.id);
-    memOff = () => { if (offPrevious) offPrevious(); offReports(); };
+    cardCleanups.push(LessonReports.mountHistory($('lessonReportsBox'), s, user.id));
   }
+  mountExamGrid(s);
   $('cSave').addEventListener('click', () => saveCard(s));
   $('cArch').addEventListener('click', () => archiveCard(s, boards));
+}
+function mountExamGrid(s){
+  examGridOff?.();
+  examGridOff = user && window.CabinetExamGrid && window.LessonReportTopics && window.MathhCatalog
+    ? CabinetExamGrid.mount($('examGridBox'), s, user.id) : null;
 }
 /* «Начать сессию» (Б1): ученик сессии и его журнал — student-memory.js.
    Кнопка сама становится «Закончить сессию», если этот ученик уже текущий —
@@ -737,10 +762,9 @@ function renderCard(s, boards){
 function bindSessionBtn(s){
   const SM = window.StudentMemory, btn = $('cSession');
   if (!SM || !btn) return;
-  let off = null;
   const paint = () => {
-    // карточку перерисовали — старая подписка больше не нужна
-    if (!document.body.contains(btn)) { if (off) off(); return; }
+    // Запуск сессии может закончиться уже после ухода из карточки.
+    if (!btn.isConnected) return;
     const cur = SM.current();
     const mine = !!(cur && cur.id === String(s.id));
     btn.textContent = mine ? 'Закончить сессию' : 'Начать сессию';
@@ -757,35 +781,48 @@ function bindSessionBtn(s){
     if (ok && TS.get().sessionGoHome && SM.goHome) SM.goHome();
   });
   $('cSessionBoard').addEventListener('click', () => startOnBoard(s, (s.boards || [])[0]));
-  off = SM.onChange(paint);
+  const off = SM.onChange(paint);
   paint();
+  return off;
 }
 async function saveCard(s){
   const name = $('cName_in').value.trim();
   if (!name){ $('cMsg').textContent = 'Имя не может быть пустым'; return; }
   const boxes = document.querySelectorAll('#cBoards input:checked');
-  $('cSave').disabled = true; $('cMsg').textContent = 'Сохраняем…';
+  const button = $('cSave');
+  button.disabled = true; $('cMsg').textContent = 'Сохраняем…';
   try {
     const fresh = await C.updateStudent(s.id, {
       name, grade: $('cGrade').value, exam: $('cExam').value, note: $('cNote').value,
       dur_min: $('cDur').value, boards: Array.from(boxes).map(x => x.value),
     });
     students = null;
+    if (!button.isConnected) return;
     s.name = fresh.name; $('cName').textContent = fresh.name;
+    s.grade = fresh.grade;
+    if (s.exam !== fresh.exam) {
+      s.exam = fresh.exam;
+      mountExamGrid(s);
+    }
     s.boards = fresh.boards || [];
     $('cSessionBoard').hidden = !s.boards.length;
     $('cMsg').textContent = 'Сохранено';
-  } catch (e) { $('cMsg').textContent = e.message; }
-  finally { $('cSave').disabled = false; }
+  } catch (e) { if (button.isConnected) $('cMsg').textContent = e.message; }
+  finally { button.disabled = false; }
 }
 async function archiveCard(s, boards){
-  $('cArch').disabled = true;
+  const button = $('cArch');
+  button.disabled = true;
   try {
     const fresh = await C.setArchived(s.id, !s.archived_at);
     students = null;
+    if (!button.isConnected) return;
     toast(fresh.archived_at ? 'Ученик в архиве' : 'Ученик возвращён из архива');
     renderCard(fresh, boards);
-  } catch (e) { $('cMsg').textContent = e.message; $('cArch').disabled = false; }
+  } catch (e) {
+    if (button.isConnected) $('cMsg').textContent = e.message;
+    button.disabled = false;
+  }
 }
 
 /* ── настройки ── */
