@@ -5,7 +5,7 @@
 
 Проверяет:
   A. порядок номеров в exam-nav.js совпадает с каталогом на главной (ОГЭ,
-     часть 1) и с банками (ЕГЭ база 1–21, профиль 1–20, ОГЭ часть 2 20–25);
+     часть 1) и с банками (ЕГЭ база 1–21, профиль 1–19, ОГЭ часть 2 20–25);
   B. на всех 14 страницах у заголовка две круглые кнопки ◀ ▶: слева и справа
      от текста, на одной высоте с ним, вид как у стрелок прототипов
      (фон, рамка, цвет, шрифт); на первом номере экзамена неактивна левая,
@@ -130,7 +130,7 @@ PAGES_B = [
     ("oge14.html", False, False), ("oge15_18.html", False, False), ("oge19.html", False, False),
     ("oge_part2.html?n=20", False, False), ("oge_part2.html?n=25", False, True),
     ("ege_base.html?n=1", True, False), ("ege_base.html?n=11", False, False), ("ege_base.html?n=21", False, True),
-    ("ege_prof.html?n=1", True, False), ("ege_prof.html?n=20", False, True),
+    ("ege_prof.html?n=1", True, False), ("ege_prof.html?n=19", False, True),
 ]
 GEOM = r"""() => {
   const h1 = document.querySelector('h1.exam-nav-h1');
@@ -354,7 +354,7 @@ def check_proto_memory(browser, failures, errors):
 
 # ────────────────────────── E ──────────────────────────
 def check_ege(browser, failures, errors):
-    for slug, last_n, exam in (("ege_base", 21, "ЕГЭ база"), ("ege_prof", 20, "ЕГЭ профиль")):
+    for slug, last_n, exam in (("ege_base", 21, "ЕГЭ база"), ("ege_prof", 19, "ЕГЭ профиль")):
         ctx = browser.new_context()
         page = t54.new_page(ctx, errors)
         page.goto(f"{BASE}/{slug}.html?n=1")

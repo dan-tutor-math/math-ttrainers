@@ -2,13 +2,13 @@
 Задача 63, S2e: карточки ФИПИ для ЕГЭ профиль (страница ege_prof, все номера).
 
   1. валидатор зелёный; карточек ровно столько, сколько заданий ФИПИ в каталоге
-     страницы (727), id те же, что в каталоге; номера без заданий ФИПИ — только
+     страницы (796), id те же, что в каталоге; номера без заданий ФИПИ — только
      пустые места каталога (49), их карточек нет;
   2. у каждой карточки с рисунком файл существует, не пуст и открывается как PNG;
-  3. развёрнутые (№14, №16): kind long, эталон и критерии на месте, разбор есть;
+  3. развёрнутые (№13, №15): kind long, эталон и критерии на месте, разбор есть;
   4. свежая сборка (build.py --slug ege_prof --out) = cards/ege_prof.json и
      cards/img/ege_prof байт в байт;
-  5. выборка 40 карточек (по 3 на номер): то же задание ФИПИ при openAt; текст,
+  5. выборка 42 карточек (по 3 на номер): то же задание ФИПИ при openAt; текст,
      формулы, рисунки (пиксели, ширина) = живое задание; ответ = живой (у
      развёрнутых — числовая часть живого поля входит в эталон);
   6. preview.html рисует все карточки без ошибок;
@@ -49,9 +49,7 @@ def sample(cards, per=3):
     for n in sorted(by):
         l = by[n]
         out += [l[int(i * len(l) / per)] for i in range(per)]
-    # 13 номеров по 3 = 39; сороковая — самый большой банк (№16, четвёртая карточка), чтобы выборка была ровно 40
-    last = [c for c in by[16] if c not in out]
-    return out + last[len(last) // 2:len(last) // 2 + 1]
+    return out
 
 
 def main():
@@ -84,8 +82,8 @@ def main():
 
     # 3. развёрнутые
     longs = [c for c in cards if c["answer"]["kind"] == "long"]
-    check("3 развёрнутые №14 и №16: все на месте", {c["n"] for c in longs} == {14, 16} and
-          all(c["n"] in (14, 16) for c in longs) and len(longs) == sum(1 for c in cards if c["n"] in (14, 16)), str(len(longs)))
+    check("3 развёрнутые №13 и №15: все на месте", {c["n"] for c in longs} == {13, 15} and
+          all(c["n"] in (13, 15) for c in longs) and len(longs) == sum(1 for c in cards if c["n"] in (13, 15)), str(len(longs)))
     check("3 у каждой: эталон, критерии с баллами, разбор",
           all(c["answer"]["value"] and "c-line" in (c["answer"].get("criteria") or "") and c["solution"] for c in longs))
 
@@ -98,21 +96,21 @@ def main():
         pg.add_script_tag(url=f"{BASE}/card-render.js")
         # 1. каталог страницы
         cat, empty, nofipi = set(), 0, []
-        for n in range(1, 21):
+        for n in range(1, 20):
             pg.evaluate("h => CardCollect.open(h)", f"ege_prof.html?n={n}")
             pr = pg.evaluate("n => CardCollect.list(n)", n)
             got = [f for q in pr for f in q["fipi"] if f]
             cat |= {"fipi:" + f for f in got}
             empty += sum(1 for q in pr for f in q["fipi"] if not f)
-            # пустые места каталога у номеров 1–5, 7–12, 14, 16 тоже есть (3 или 2 на номер)
+            # пустые места каталога у номеров 1–13 и 15 тоже есть (3 или 2 на номер)
             if not got:
                 nofipi.append(n)
-        check(f"1 обработано {len(cards)} из {len(cat)} заданий каталога", set(ids) == cat and len(cards) == len(cat) == 727, f"{len(cards)} / {len(cat)}")
-        check("1 пустых мест каталога 49, номера без заданий ФИПИ — 6, 13, 15, 17–20", empty == 49 and nofipi == [6, 13, 15, 17, 18, 19, 20], f"{empty} {nofipi}")
+        check(f"1 обработано {len(cards)} из {len(cat)} заданий каталога", set(ids) == cat and len(cards) == len(cat) == 796, f"{len(cards)} / {len(cat)}")
+        check("1 пустых мест каталога 50, номера без заданий ФИПИ — 14, 16–19", empty == 50 and nofipi == [14, 16, 17, 18, 19], f"{empty} {nofipi}")
 
         # 5. выборка
         smp = sample(cards)
-        check("5 в выборке 40 карточек, по номерам с заданиями ФИПИ", len(smp) == 40, str(len(smp)))
+        check("5 в выборке 42 карточек, по номерам с заданиями ФИПИ", len(smp) == 42, str(len(smp)))
         res = {k: 0 for k in ("same", "ans", "text", "tex", "fig", "ui")}
         bd = {k: [] for k in res}
         sheets = []

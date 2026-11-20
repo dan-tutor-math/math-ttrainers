@@ -1,21 +1,21 @@
 """
 Правка «банк ФИПИ ЕГЭ профиль, часть 2»: в ЕГЭ профиль (ege_prof.html) —
-задания №14 (уравнения) и №16 (неравенства) из открытого банка ФИПИ, номера
+задания №13 (уравнения) и №15 (неравенства) из открытого банка ФИПИ, номера
 ЕГЭ-2027 (в банке ФИПИ это прежние №13 и №15). У ФИПИ для развёрнутого ответа
 проверки нет: ответы сверены с самим условием скриптом (fipi-pilot/tools/ege/
 p2common.py), здесь проверяется, что страница их принимает.
 
 Проверяет:
-  1. данные: 60 заданий №14 и 63 задания №16; у каждого группа, условие, поле
+  1. данные: 60 заданий №13 и 63 задания №15; у каждого группа, условие, поле
      ответа с эталоном, answerTex, решение; критерии ФИПИ на номер; непарных $ нет;
   2. формулы: условия, решения, ответы и идеи групп — KaTeX без ошибок;
   3. ответы: КАЖДЫЙ эталон принят своим полем, испорченный — нет;
   4. логарифм в ответе: log_3(84), log3(84), 2log_2(8), lg, ln; промежуток
      с логарифмом; подсказка поля «log_3(5)», а у параметра — прежняя;
-  5. задание №16 с логарифмом в ответе: ученик вводит ответ — засчитан,
-     в разборе ответ и критерии; задание №14: корни б) в другом порядке —
+  5. задание №15 с логарифмом в ответе: ученик вводит ответ — засчитан,
+     в разборе ответ и критерии; задание №13: корни б) в другом порядке —
      засчитаны, пункт а) — «проверьте по решению»;
-  6. демоверсия в №14 и №16 по-прежнему первой;
+  6. демоверсия в №13 и №15 по-прежнему первой;
   7. ege_base.html и oge_part2.html не разошлись с профилем (sync_ege_pages.py);
   8. телефон 375 px — без прокрутки вбок.
 
@@ -36,7 +36,8 @@ from playwright.sync_api import sync_playwright
 PORT = 9163
 BASE = f"http://127.0.0.1:{PORT}"
 HERE = os.path.dirname(os.path.abspath(__file__))
-COUNTS = {"14": 60, "16": 63}
+ID_PREFIX = {"13": "14", "15": "16"}
+COUNTS = {"13": 60, "15": 63}
 
 
 @contextlib.contextmanager
@@ -101,7 +102,7 @@ def test_data(F):
         check(f"данные №{n}: {cnt} заданий", len(ps) == cnt, str(len(ps)))
         bad = [p["fipi"] for p in ps if not (
             p["group"] in gids and p["text"] and p["steps"] and p.get("answerTex")
-            and p["id"] == f"{n}.fipi.{p['fipi']}" and "answer" not in p
+            and p["id"] == f"{ID_PREFIX[str(n)]}.fipi.{p['fipi']}" and "answer" not in p
             and len(p["fields"]) == 1 and p["fields"][0]["value"] and p["fields"][0]["tex"])]
         check(f"данные №{n}: у каждого группа, условие, поле ответа, answerTex, решение", not bad, str(bad[:5]))
         bad = [p["fipi"] for p in ps if not dollars_ok(p["text"]) or not dollars_ok(p["answerTex"])
@@ -110,13 +111,13 @@ def test_data(F):
         check(f"данные №{n}: критерии ФИПИ на номер (2, 1, 0 баллов)",
               [c[0] for c in t.get("criteria", [])] == [2, 1, 0])
     ok14 = all("<br>б)" in p["text"] and p["fields"][0]["type"] == "nums" and p.get("manual")
-               for p in F["tasks"]["14"]["protos"])
-    check("данные №14: пункт б) с новой строки, поле «корни», пункт а) — по решению", ok14)
-    check("данные №16: поле «множество»", all(p["fields"][0]["type"] == "set" for p in F["tasks"]["16"]["protos"]))
+               for p in F["tasks"]["13"]["protos"])
+    check("данные №13: пункт б) с новой строки, поле «корни», пункт а) — по решению", ok14)
+    check("данные №15: поле «множество»", all(p["fields"][0]["type"] == "set" for p in F["tasks"]["15"]["protos"]))
 
 
 def test_katex(browser, F):
-    ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=14")
+    ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=13")
     chunks = []
     for n in COUNTS:
         t = F["tasks"][n]
@@ -146,7 +147,7 @@ def test_katex(browser, F):
 
 
 def test_answers(browser):
-    ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=14")
+    ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=13")
     for n in COUNTS:
         page.evaluate("(n) => new Promise(r => ensureFipi(n, r))", int(n))
         res = page.evaluate("""(n) => { S.n = n; return protos(n).filter(p => p.fipi).map(p => {
@@ -165,7 +166,7 @@ def test_answers(browser):
 
 
 def test_log(browser):
-    ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=16")
+    ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=15")
     v = page.evaluate("""() => [evalExpr('log_3(84)'), evalExpr('log3(84)'), evalExpr('2log_2(8)'),
         evalExpr('lg100'), evalExpr('ln(1)'), evalExpr('log_(1/2)8'), evalExpr('log_1(5)'), evalExpr('log_3(-1)')]""")
     exp = [math.log(84, 3), math.log(84, 3), 6, 2, 0, -3]
@@ -183,37 +184,37 @@ def test_log(browser):
 
 
 def open_fipi(page, n, fipi):
-    page.evaluate("(a) => window.__examNav.open(a[0], a[1])", [n, f"{n}.fipi.{fipi}"])
+    page.evaluate("(a) => window.__examNav.open(a[0], a[1])", [n, f"{ID_PREFIX[str(n)]}.fipi.{fipi}"])
     page.wait_for_timeout(700)
 
 
 def test_flow(browser, F):
-    ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=16")
+    ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=15")
     page.evaluate("localStorage.removeItem('ogeProg:ege_prof:solved')")
     first = page.inner_text('#protoList .mode-card .mtitle')
-    check("список №16: демоверсия первой", first == 'Прототип 1', first)
-    open_fipi(page, 16, "FFCBEB")
-    check("№16 FFCBEB открыто, подсказка поля про логарифм",
+    check("список №15: демоверсия первой", first == 'Прототип 1', first)
+    open_fipi(page, 15, "FFCBEB")
+    check("№15 FFCBEB открыто, подсказка поля про логарифм",
           page.evaluate("curProto.fipi") == "FFCBEB" and "log_3(5)" in page.inner_text('#answerArea'))
     page.fill('input[data-fid="ans"]', 'x<=1; 4<=x<log_3(84)')
     page.click('#answerArea .check-btn')
     page.wait_for_timeout(250)
-    check("№16: ответ с логарифмом засчитан", page.evaluate("S.answered && S.correct") is True)
-    check("№16: в разборе ответ и критерии ФИПИ",
+    check("№15: ответ с логарифмом засчитан", page.evaluate("S.answered && S.correct") is True)
+    check("№15: в разборе ответ и критерии ФИПИ",
           "log" in page.inner_html('#mainPanel') and page.eval_on_selector_all('#critTable tr', 'e => e.length') == 3)
-    page.goto(f"{BASE}/ege_prof.html?n=14")
+    page.goto(f"{BASE}/ege_prof.html?n=13")
     page.wait_for_timeout(1200)
     first = page.inner_text('#protoList .mode-card .mtitle')
-    check("список №14: демоверсия первой", first == 'Прототип 1', first)
-    open_fipi(page, 14, "A1A34D")
+    check("список №13: демоверсия первой", first == 'Прототип 1', first)
+    open_fipi(page, 13, "A1A34D")
     q = page.inner_text('#egeQuestion')
-    check("№14: условие а) и б) на разных строках, подпись источника",
+    check("№13: условие а) и б) на разных строках, подпись источника",
           "б)" in q and "задание A1A34D" in q)
     page.fill('input[data-fid="b"]', '9π/2; 7π/2; 17π/4')
     page.click('#answerArea .check-btn')
     page.wait_for_timeout(250)
-    check("№14: корни б) в другом порядке засчитаны", page.evaluate("S.answered && S.correct") is True)
-    check("№14: «пункт а — по решению» в разборе", "проверьте по решению" in page.inner_text('body'))
+    check("№13: корни б) в другом порядке засчитаны", page.evaluate("S.answered && S.correct") is True)
+    check("№13: «пункт а — по решению» в разборе", "проверьте по решению" in page.inner_text('body'))
     check("без ошибок JS", not errors, str(errors[:1]))
     ctx.close()
 
@@ -224,11 +225,11 @@ def test_sync():
 
 
 def test_phone(browser):
-    ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=16", width=375)
+    ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=15", width=375)
     over = page.evaluate("document.documentElement.scrollWidth - innerWidth")
-    open_fipi(page, 16, "259766")
+    open_fipi(page, 15, "259766")
     over2 = page.evaluate("document.documentElement.scrollWidth - innerWidth")
-    check("телефон 375: список и задание №16 без прокрутки вбок", over <= 0 and over2 <= 0, f"{over} / {over2}")
+    check("телефон 375: список и задание №15 без прокрутки вбок", over <= 0 and over2 <= 0, f"{over} / {over2}")
     ctx.close()
 
 

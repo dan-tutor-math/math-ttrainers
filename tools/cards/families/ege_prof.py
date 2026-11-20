@@ -12,11 +12,18 @@ from tools.cards.core import Skip, card_base, collect_catalog, in_page
 
 FAMILY = "ege_prof"
 # slug один на все номера: файл cards/ege_prof.json — вся страница-экзамен
+import json
+from pathlib import Path
+
+
+# Имя файла банка может отражать прежний номер. Источник для карточек
+# совпадает с тем, который лениво загружает тренажёр.
+index = Path(__file__).resolve().parents[3] / 'ege-prof-fipi.js'
+files = json.loads(index.read_text(encoding='utf-8').split('window.EGE_PROF_FIPI = ', 1)[1].strip().rstrip(';'))['files']
 PAGES = [
-    {"slug": "ege_prof", "href": "ege_prof.html?n=%d" % n,
-     "deps": ["ege_prof.html", "ege-prof-fipi.js", "ege-prof-fipi%d.js" % n]}
-    # №6, 13, 15, 17–20: у страницы нет заданий ФИПИ, только пустые места каталога
-    for n in (1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 14, 16)
+    {"slug": "ege_prof", "href": f"ege_prof.html?n={n}",
+     "deps": ["ege_prof.html", "ege-prof-fipi.js", filename]}
+    for n, filename in files.items()
 ]
 UI_TEXT = {}
 
@@ -55,7 +62,7 @@ def normalize(raw):
     card["solution"] = "".join('<div class="c-line">%s</div>' % s for s in steps) or None
     a = card["answer"]
     if b.get("criteria"):
-        # развёрнутый №14/16: сайт сам проверяет только числовую часть, а полный
+        # развёрнутый №13/15: сайт сам проверяет только числовую часть, а полный
         # ответ — эталон ФИПИ (answerTex) и критерии — оценивает человек
         if not b.get("answerTex"):
             raise Skip("у развёрнутого задания нет эталона")

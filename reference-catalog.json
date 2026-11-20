@@ -30,6 +30,18 @@
             ]
           }
         ]
+      },
+      {
+        "exam": "ЕГЭ профиль",
+        "year": 2027,
+        "materials": [
+          {
+            "id": "ege-math-profile-2027",
+            "title": "Демоверсия",
+            "source": "ФИПИ, утверждённая демоверсия ЕГЭ 2027, профильная математика",
+            "pdf": "reference-pdf/ege-math-profile-2027.pdf"
+          }
+        ]
       }
     ]
   },

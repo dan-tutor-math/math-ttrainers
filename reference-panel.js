@@ -27,6 +27,7 @@
     .rp-close:active{background:var(--hover-1,rgba(127,127,127,.16));}
     .rp-content{flex:1;min-width:0;min-height:0;overflow:auto;overscroll-behavior:contain;}
     .rp-intro{margin:12px 14px;text-align:center;color:var(--muted-3,inherit);}
+    .rp-pdf-link{color:var(--ink,#2355a0);text-underline-offset:.2em;}
     .rp-pages{box-sizing:border-box;display:flex;flex-direction:column;gap:12px;padding:12px;}
     .rp-page{flex:none;width:min(100%,680px);max-width:none;margin:0 auto;padding:0;overflow:hidden;border:0;border-radius:6px;
       background:white;cursor:zoom-in;touch-action:manipulation;}
@@ -124,15 +125,35 @@
     open(content);
   }
 
-  function mountTrainer() {
+  function openProfileReference() {
+    const content = document.createElement('div');
+    const caption = document.createElement('p');
+    caption.className = 'rp-intro';
+    const pdf = document.createElement('a');
+    pdf.className = 'rp-pdf-link';
+    pdf.href = 'reference-pdf/ege-math-profile-2027.pdf';
+    pdf.target = '_blank';
+    pdf.rel = 'noopener';
+    pdf.textContent = 'Открыть полную демоверсию ЕГЭ-2027 (PDF)';
+    caption.append(pdf);
+    content.append(caption, images([{
+      src: 'reference-img/ege-math-profile-2027-formulas.webp',
+      alt: 'Формулы из справочных материалов ФИПИ, профильная математика ЕГЭ-2027, страница 3',
+    }]));
+    open(content);
+  }
+
+  function mountTrainer(exam = 'oge-math') {
     const params = new URLSearchParams(location.search);
     if (params.get('card') === '1' || params.get('bdgen') === '1') return;
     if (window.top !== window.self && window.name !== 'tsStageFrame') return;
     const theme = document.getElementById('themeToggle');
     const board = document.getElementById('boardVisibilityToggle');
-    if (!theme || !board || document.getElementById('ogeReferenceToggle')) return;
-    const trigger = button(openMathReference);
-    trigger.id = 'ogeReferenceToggle';
+    const profile = exam === 'ege-math-profile';
+    const id = profile ? 'egeProfReferenceToggle' : 'ogeReferenceToggle';
+    if (!theme || !board || document.getElementById(id)) return;
+    const trigger = button(profile ? openProfileReference : openMathReference);
+    trigger.id = id;
     trigger.classList.add('theme-toggle');
     board.after(trigger);
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', lowerKeypad);

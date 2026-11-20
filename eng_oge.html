@@ -1150,6 +1150,7 @@ if (EXAM.noAddRail) document.documentElement.setAttribute('data-no-add-rail', ''
 if (EXAM.noBoardGrid) document.documentElement.setAttribute('data-no-board-grid', '');
 const FIGS = EXAM.figs || {};
 const NUMS = Object.keys(BANK).map(Number).sort((a, b) => a - b);
+const numberForPid = (n, pid) => EXAM.numberForPid ? EXAM.numberForPid(n, pid) : n;
 
 /* ── формулы и рисунки ──
    В банке текст обычный, формулы внутри $…$ (в строке) и $$…$$ (отдельной
@@ -1489,12 +1490,14 @@ if (EXAM.legacyKeys) (function(L){
    ключ хранения — «n7», а в истории лежат прототипы (и основное задание, и
    добавленные карточки — они такие же задания, просто рядом). */
 const PROGRESS_NS = 'ogeProg:' + EXAM.slug + ':';
+// История перенумерованных заданий сохраняется по прежнему ключу темы.
+const topicProgressKey = n => PROGRESS_NS + 'n' + (EXAM.progressKeys?.[n] ?? n);
 const SESSION_GAP_MS = 3 * 60 * 60 * 1000; // три часа без захода — считаем, что началось новое занятие
 function freshProg(){ return { solvedInBatch: 0, errorsInBatch: 0, history: [], medals: { gold: 0, silver: 0, bronze: 0 } }; }
 let curProg = freshProg(), progLoadedFor = null;
 function loadProgFor(n){
   let saved = null;
-  try { saved = JSON.parse(localStorage.getItem(PROGRESS_NS + 'n' + n) || 'null'); } catch (e) {}
+  try { saved = JSON.parse(localStorage.getItem(topicProgressKey(n)) || 'null'); } catch (e) {}
   if (!saved) return freshProg();
   // после долгой паузы обнуляем историю и прогресс к медали, но сами медали
   // не трогаем: это заслуженное достижение, а не состояние занятия
@@ -1505,7 +1508,7 @@ function loadProgFor(n){
 }
 function saveProg(){
   curProg.lastActiveAt = Date.now();
-  try { localStorage.setItem(PROGRESS_NS + 'n' + S.n, JSON.stringify(curProg)); } catch (e) {}
+  try { localStorage.setItem(topicProgressKey(S.n), JSON.stringify(curProg)); } catch (e) {}
 }
 const MEDAL_EMOJI = { gold: '🥇', silver: '🥈', bronze: '🥉' };
 const MEDAL_TITLE = { gold: 'Золото — пять примеров без ошибок', silver: 'Серебро — пять примеров, 1–2 ошибки', bronze: 'Бронза — пять примеров решено' };
@@ -2902,8 +2905,9 @@ els.kpToggle.onclick = () => { keypadOpen = true; syncKeypadVisibility(); };
 /* ═══════════════ запуск ═══════════════ */
 const URL_PARAMS = new URLSearchParams(location.search);
 const URL_N = (function(){
-  const v = parseInt(URL_PARAMS.get('n'), 10);
-  return BANK[v] ? v : null;
+  const n = parseInt(URL_PARAMS.get('n'), 10);
+  const target = numberForPid(n, URL_PARAMS.get('t')) ?? n;
+  return BANK[target] ? target : null;
 })();
 S.n = URL_N || NUMS[0];
 curProto = protos(S.n)[0];
@@ -2951,7 +2955,9 @@ function tsApplyState(state){
   if (!state) return;
   if (window.__boardApplyState) window.__boardApplyState(state);
   if (typeof state.egeN === 'undefined') return; // снимок без задания (пустая сессия)
-  if (!BANK[state.egeN]) return;
+  const n = numberForPid(state.egeN, state.egePid);
+  if (!BANK[n]) return;
+  if (n !== state.egeN) state = { ...state, egeN: n };
   // в снимке задание ФИПИ, а файл номера ещё не пришёл — применим снимок
   // целиком после загрузки, иначе вместо задания открылась бы демоверсия
   if (fipiPending(state.egeN)) { ensureFipi(state.egeN, () => tsApplyState(state)); return; }

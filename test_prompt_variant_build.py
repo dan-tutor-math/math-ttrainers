@@ -7,7 +7,7 @@
 Проверяет:
   A. VariantSet без входа и между двумя вкладками (событие variantset:change
      через storage, add / update / remove / clear);
-  B. Набор из 3 строк (ЕГЭ №9 прототип ×3, ОГЭ №20 ×2, ОГЭ №9 ×2): дерево,
+  B. Набор из 3 строк (ЕГЭ №8 прототип ×3, ОГЭ №20 ×2, ОГЭ №9 ×2): дерево,
      предпросмотр текстом «ОГЭ №9 · … · ФИПИ 1–2 из 10» → «Собрать» → в новой
      работе 3 группы, задания созданы; Набор очищен, «Вернуть набор» в тосте
      его возвращает;
@@ -55,7 +55,7 @@ def preview(page):
 
 
 THREE = """() => { const V = window.VariantSet; V.clear();
-  V.add({ exam: 'ege_prof', slug: 'ege_prof', n: 9, proto: 'tangent', count: 3 });
+  V.add({ exam: 'ege_prof', slug: 'ege_prof', n: 8, proto: 'tangent', count: 3 });
   V.add({ exam: 'oge', slug: 'oge_part2', n: 20, count: 2 });
   V.add({ exam: 'oge', slug: 'oge9', n: null, count: 2 }); }"""
 
@@ -114,12 +114,12 @@ def run():
         tp.wait_for_selector("#bdPreview .pl")
         rows = tp.locator("#bdTree .bd-row").count()
         nums = tp.evaluate("() => [...document.querySelectorAll('#bdTree .bd-num-t')].map(e => e.textContent)")
-        check("B1 дерево: 3 строки, номера ЕГЭ №9, ОГЭ №20, ОГЭ №9", rows == 3 and len(nums) == 3
-              and "ЕГЭ №9" in nums[0] and "ОГЭ №20" in nums[1] and "ОГЭ №9" in nums[2], str(nums))
+        check("B1 дерево: 3 строки, номера ЕГЭ №8, ОГЭ №20, ОГЭ №9", rows == 3 and len(nums) == 3
+              and "ЕГЭ №8" in nums[0] and "ОГЭ №20" in nums[1] and "ОГЭ №9" in nums[2], str(nums))
         check("B2 сетка номеров скрыта при непустом Наборе", tp.is_hidden("#bdGridBox"))
         pv = preview(tp)
         check("B3 предпросмотр: 3 строки, все собираются", len(pv) == 3 and all(x["ok"] for x in pv), json.dumps(pv, ensure_ascii=False))
-        check("B4 «ЕГЭ №9 · Производная по касательной · ФИПИ 1–3 из …»", pv[0]["t"].startswith("ЕГЭ №9 · Производная по касательной · ФИПИ 1–3 из "), pv[0]["t"])
+        check("B4 «ЕГЭ №8 · Производная по касательной · ФИПИ 1–3 из …»", pv[0]["t"].startswith("ЕГЭ №8 · Производная по касательной · ФИПИ 1–3 из "), pv[0]["t"])
         check("B5 «ОГЭ №9 · 1. Иксы в обеих частях · ФИПИ 1–2 из 10»", pv[2]["t"] == "ОГЭ №9 · 1. Иксы в обеих частях · ФИПИ 1–2 из 10", pv[2]["t"])
         # степпер и «с какого номера банка» меняют предпросмотр
         tp.locator("#bdTree .bd-row").nth(2).locator("[data-r='plus']").click()
@@ -143,7 +143,7 @@ def run():
         check("B11 три группы по порядку набора: 3 + 2 + 2", len(set(keys)) == 3 and keys[0] == keys[2] and keys[3] == keys[4] and keys[5] == keys[6]
               and [x["proto"] for x in s][:3] == ["tangent"] * 3 and s[5]["proto"] == "p1", str([x["proto"] for x in s]))
         h = heads(tp)
-        check("B12 заголовки групп", len(h) == 3 and h[0].startswith("ЕГЭ №9 · Производная по касательной") and h[1].startswith("ОГЭ №20 · ")
+        check("B12 заголовки групп", len(h) == 3 and h[0].startswith("ЕГЭ №8 · Производная по касательной") and h[1].startswith("ОГЭ №20 · ")
               and h[2].startswith("ОГЭ №9 · 1. Иксы в обеих частях"), str(h))
         check("B13 адрес — #/new, работа не сохранена (название подставлено)", tp.evaluate("() => location.hash") == "#/new"
               and tp.input_value("#wkTitle").startswith("Вариант"), tp.evaluate("() => location.hash"))
@@ -156,6 +156,29 @@ def run():
         wid = db()["works"][0]["id"]
         check("B15 сохранилось: в базе 7 заданий с series", len(db()["work_variants"][0]["blocks"]) == 7
               and all(b.get("series") for b in db()["work_variants"][0]["blocks"]))
+
+        # Эмулируем сохранённую группу до перенумерации: касательные были в №9.
+        tp.evaluate("""() => {
+          const W = window.__works;
+          const rows = W.E.blocks.filter(b => b.series.proto === 'tangent');
+          rows.forEach(b => {
+            b.tid = 'ege9';
+            Object.assign(b.series, { n:9, href:'ege_prof.html?n=9', title:'ЕГЭ №9 · Производная по касательной' });
+          });
+          W.seriesNext(rows[0].series.key);
+        }""")
+        idle(tp)
+        moved = tp.evaluate("""() => window.__works.E.blocks.filter(b => b.series.proto === 'tangent')
+           .map(b => [b.series.n, b.series.pos, b.tid, b.type])""")
+        check("B16 соседние задания старой группы подбираются из №8", moved == [[8, i, 'ege8', 'task'] for i in (3, 4, 5)], str(moved))
+        card_ctx = new_context(browser, cards=True)
+        card_page = card_ctx.new_page()
+        card_page.goto(f"{BASE}/works.html")
+        card_page.wait_for_function("() => window.__works && window.__works.cardFor")
+        check("B17 новая карточка №12 есть в конструкторе", card_page.evaluate("""async () =>
+          (await window.__works.cardFor('ege_prof.html?n=12', { n:12, proto:'local-max', pos:0 }))?.n === 12"""))
+        card_ctx.close()
+        tp.evaluate("() => { window.__works.E.dirty = false; }")
 
         # ═══ G. задание по номеру ФИПИ; несобираемые строки остаются в Наборе ═══
         print("\n— G. «это задание» по номеру ФИПИ, остаток Набора")

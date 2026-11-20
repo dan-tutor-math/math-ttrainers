@@ -1911,7 +1911,7 @@ function seriesQueue(b, base, pos){
   // задание переставили, пока снималось прежнее место, — прежний снимок в блок не кладём
   const tok = (seriesTok.get(b.id) || 0) + 1;
   seriesTok.set(b.id, tok);
-  const p = new Promise((done, fail) => seriesJobs.push({ b, tok, tid: base.tid, href: base.href, at, vw: base.vw || null, done, fail }));
+  const p = new Promise((done, fail) => seriesJobs.push({ b, tok, tid: base.tid, href: base.href, at, anchor: base.anchor, vw: base.vw || null, done, fail }));
   const run = p.then(() => {}, err => {
     console.error('[работы] задание группы не создалось', err);
     if (seriesTok.get(b.id) === tok){ b._gen = 'fail'; b._why = err && err.message; }
@@ -1938,12 +1938,33 @@ async function seriesPump(){
   } finally { seriesBusy = false; }
 }
 async function seriesRun(job){
-  const { b, tid, href, at } = job;
+  const { b } = job;
+  let { tid, href, at } = job;
+  let renumbered = null;
   if (seriesTok.get(b.id) !== job.tok) return;   // уже поставлено другое место
+  // Старая группа хранит прежний номер линии, но ФИПИ-идентификатор
+  // остался тем же. Находим действующий номер до выбора соседнего задания.
+  if (job.anchor && slugOfHref(href) === 'ege_prof'){
+    const ix = await catIndex();
+    if (seriesTok.get(b.id) !== job.tok) return;
+    const match = Object.entries(ix || {}).find(([key, row]) => key.startsWith('ege_prof|')
+      && row.protos.some(p => p.id === at.proto && p.fipi.some(id => sameFipi(id, job.anchor))));
+    if (!match) throw new Error('группа ЕГЭ не найдена по номеру задания ФИПИ');
+    const n = Number(match[0].split('|')[1]);
+    if (n !== at.n){
+      at = { ...at, n };
+      tid = 'ege' + n;
+      href = 'ege_prof.html?n=' + n;
+      renumbered = { n, href, title: (b.series.title || '').replace(/^ЕГЭ №\d+/, 'ЕГЭ №' + n) };
+    }
+  }
   // есть карточка ФИПИ на этом месте — без кадра и снимка
   const card = await cardFor(href, at).catch(() => null);
   if (card){
-    if (seriesTok.get(b.id) === job.tok) applySeriesCard(b, card, at, tid, href);
+    if (seriesTok.get(b.id) === job.tok){
+      if (renumbered) Object.assign(b.series, renumbered);
+      applySeriesCard(b, card, at, tid, href);
+    }
     return;
   }
   const ck = seriesKeyOf(tid, at.proto, at.pos);
@@ -1966,7 +1987,10 @@ async function seriesRun(job){
     hit = await p;
     seriesCache.set(ck, hit);
   }
-  if (seriesTok.get(b.id) === job.tok) applySeriesParts(b, hit, at);
+  if (seriesTok.get(b.id) === job.tok){
+    if (renumbered) Object.assign(b.series, renumbered);
+    applySeriesParts(b, hit, at);
+  }
 }
 // снимок → в блок: id, вариант-образец, режим, имя и группа остаются свои
 function applySeriesParts(b, hit, at){
@@ -1991,9 +2015,11 @@ function applySeriesParts(b, hit, at){
 function seriesBlocks(key){ return E.variants[0].blocks.filter(x => x.series && x.series.key === key); }
 function seriesInfo(sb){
   const s = sb[0].series;
-  return { key: s.key, title: s.title, total: s.total, proto: s.proto, n: s.n, tid: sb[0].tid, href: s.href, vw: s.vw || null, hasGen: !!s.hasGen };
+  const anchor = slugOfHref(s.href) === 'ege_prof'
+    ? sb.map(b => b.series.fipi || (b.card || '').replace(/^fipi:/, '')).find(Boolean) : undefined;
+  return { key: s.key, title: s.title, total: s.total, proto: s.proto, n: s.n, tid: sb[0].tid, href: s.href, vw: s.vw || null, hasGen: !!s.hasGen, anchor };
 }
-const seriesBase = info => ({ tid: info.tid, href: info.href, proto: info.proto, n: info.n, vw: info.vw });
+const seriesBase = info => ({ tid: info.tid, href: info.href, proto: info.proto, n: info.n, vw: info.vw, anchor: info.anchor });
 /* window.__works.addSeries — внутренний вход для этапа 5 (панель «Собрать по
    прототипам»). source: 'order' — ФИПИ по порядку с startPos (с нуля),
    'random' — вразнобой. Группа встаёт в образец (куда «Добавить» — вверх или

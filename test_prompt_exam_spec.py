@@ -25,18 +25,18 @@ BASE = f"http://127.0.0.1:{PORT}"
 
 # максимум первичного балла по спецификациям КИМ 2027 (fipi-pilot/demo); у экзаменов,
 # где наши позиции покрывают весь КИМ, сумма должна совпасть
-MAX_POINTS = {"oge": 31, "ege_base": 21, "soc_oge": 32, "soc_ege": 58, "rus_ege": 50, "eng_oge": 68}
+MAX_POINTS = {"oge": 31, "ege_base": 21, "ege_prof": 32, "soc_oge": 32, "soc_ege": 58, "rus_ege": 50, "eng_oge": 68}
 # неполные (на сайте не все номера КИМ): сумма по имеющимся позициям — физика ОГЭ №1–16
 # из 22 (23 из 39; №17–22 развёрнутые, 16 баллов), информатика ОГЭ №1–10 из 16 (10 из 21)
 PARTIAL_POINTS = {"phys_oge": 23, "inf_oge": 10}
-# экзамены без документа 2027 — баллы остаются null: ЕГЭ профиль, ОГЭ русский
-NO_DOC = {"ege_prof", "rus_oge"}
+# экзамены без документа 2027 — баллы остаются null: ОГЭ русский
+NO_DOC = {"rus_oge"}
 
 # список номеров, который exam-nav.js держал у себя до выноса в exam-spec.js
 OLD_OGE = (["oge1_5", "oge6", "oge7", "oge8", "oge9", "oge10", "oge11", "oge12", "oge13", "oge14",
             "oge15_18", "oge19"] + [f"oge_part2:{n}" for n in range(20, 26)])
 OLD_RUS = ["rus_oge01"] + [f"rus_oge:{n}" for n in range(2, 13)] + ["rus_oge13"]
-OLD_PROF = [f"ege_prof:{n}" for n in range(1, 21)]  # range в exam-nav.js включал конец
+OLD_PROF = [f"ege_prof:{n}" for n in range(1, 20)]  # утверждённый КИМ ЕГЭ-2027
 
 # страница → (экзамен, список номеров до выноса)
 NAV_PAGES = [("oge9.html", "oge", OLD_OGE), ("ege_prof.html?n=1", "ege_prof", OLD_PROF),
@@ -46,7 +46,7 @@ NAV_PAGES = [("oge9.html", "oge", OLD_OGE), ("ege_prof.html?n=1", "ege_prof", OL
              ("rus_ege.html?n=1", "rus_ege", [f"rus_ege:{n}" for n in range(1, 27)] + ["rus_ege27"])]
 
 # все экзамены, у которых до выноса были стрелки, и число их позиций
-OLD_COUNTS = {"oge": 18, "ege_base": 21, "ege_prof": 20, "soc_oge": 20, "phys_oge": 16, "inf_oge": 10,
+OLD_COUNTS = {"oge": 18, "ege_base": 21, "ege_prof": 19, "soc_oge": 20, "phys_oge": 16, "inf_oge": 10,
               "soc_ege": 25, "rus_oge": 13, "rus_ege": 27, "eng_oge": 11}
 
 

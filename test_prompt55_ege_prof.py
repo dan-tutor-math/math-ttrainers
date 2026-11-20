@@ -2,7 +2,7 @@
 Промпт №55: тренажёр «ЕГЭ профиль» (ege_prof.html) — задания демоверсии 2027.
 
 Проверяет:
-  1. каталог: вкладка «ЕГЭ профиль» больше не «скоро», в ней 20 карточек,
+  1. каталог: вкладка «ЕГЭ профиль» больше не «скоро», в ней 19 карточек,
      каждая ведёт в ege_prof.html?n=<номер>;
   2. страница открывается по номеру из адреса, переключение номера и
      прототипа работает и переписывает адрес;
@@ -97,9 +97,9 @@ def test_catalog(browser):
     page.click('.nav-subtab[data-id="ege_prof"]')
     page.wait_for_timeout(200)
     hrefs = page.eval_on_selector_all('#topics a.topic-item', 'els => els.map(e => e.getAttribute("href"))')
-    check("каталог: 20 карточек ЕГЭ профиля", len(hrefs) == 20, str(len(hrefs)))
+    check("каталог: 19 карточек ЕГЭ профиля", len(hrefs) == 19, str(len(hrefs)))
     check("каталог: ссылки с номером задания",
-          hrefs[:2] == ['ege_prof.html?n=1', 'ege_prof.html?n=2'] and hrefs[-1] == 'ege_prof.html?n=20',
+          hrefs[:2] == ['ege_prof.html?n=1', 'ege_prof.html?n=2'] and hrefs[-1] == 'ege_prof.html?n=19',
           str(hrefs[:3]))
     soon = page.eval_on_selector_all('#topics .coming-soon-tab', 'els => els.length')
     check("каталог: вкладка больше не «скоро»", soon == 0)
@@ -123,15 +123,15 @@ def open_proto(page, i=1):
 
 
 def test_navigation(browser):
-    ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=7")
-    check("адрес ?n=7 открывает №7", page.evaluate("S.n") == 7)
-    check("заголовок по номеру", "№7" in page.inner_text("#pageTitle"))
+    ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=6")
+    check("адрес ?n=6 открывает №6", page.evaluate("S.n") == 6)
+    check("заголовок по номеру", "№6" in page.inner_text("#pageTitle"))
     check("сначала открывается список прототипов",
           page.evaluate("S.screen") == "picker"
           and page.eval_on_selector('#taskArea', 'e => e.style.display') == 'none')
     # с банком ФИПИ (test_prompt_fipi_ege.py) ниже демоверсии идут карточки групп
     # (data-gid) — прототипы демоверсии считаем отдельно, по data-pid
-    check("в списке три прототипа №7", page.eval_on_selector_all('.mode-card[data-pid]', 'e => e.length') == 3)
+    check("в списке три прототипа №6", page.eval_on_selector_all('.mode-card[data-pid]', 'e => e.length') == 3)
 
     open_proto(page, 3)
     check("карточка прототипа открывает задание",
@@ -150,14 +150,23 @@ def test_navigation(browser):
     check("«← все прототипы» возвращает к списку",
           page.evaluate("S.screen") == "picker"
           and page.eval_on_selector('#pickerArea', 'e => e.style.display') != 'none')
-    check("номер задания остаётся в адресе", page.url.endswith("n=7"), page.url)
+    check("номер задания остаётся в адресе", page.url.endswith("n=6"), page.url)
 
-    page.goto(f"{BASE}/ege_prof.html?n=13")
-    page.wait_for_timeout(1200)
-    open_proto(page, 1)
-    check("у единственного прототипа переходов нет",
-          page.eval_on_selector('#nextProtoBtn', 'e => e.style.display') == 'none'
-          and page.eval_on_selector('#prevProtoBtn', 'e => e.style.display') == 'none')
+    page.goto(f"{BASE}/ege_prof.html?n=7&t=7.2")
+    page.wait_for_function('S.n === 6 && S.pid === "7.2" && S.screen === "task"')
+    check("старая ссылка открывает то же уравнение под номером 6", page.url.endswith("n=6"), page.url)
+    page.goto(f"{BASE}/ege_prof.html?n=12&t=12-extrema.2")
+    page.wait_for_function('S.n === 12 && S.pid === "12-extrema.2" && S.screen === "task"')
+    check("новый прототип №12 не путается со старыми графиками", page.evaluate('curProto.answer') == '-6')
+    # В уже открытой до обновления вкладке мог запомниться прототип другой темы.
+    page.goto(f"{BASE}/ege_prof.html?n=18")
+    page.evaluate("sessionStorage.setItem('examNav:mem:v1', JSON.stringify({'ege_prof?n=19': {pid: '19.2'}}))")
+    page.click('#examNextBtn')
+    page.wait_for_function('S.n === 19 && S.pid === "20.1"')
+    check("стрелка открывает №19 даже со старой памятью навигации", page.is_disabled('#examNextBtn'))
+    page.goto(f"{BASE}/ege_prof.html?n=20&t=20.2")
+    page.wait_for_function('S.n === 19 && S.pid === "20.2" && S.screen === "task"')
+    check("старая ссылка на №20 открывает тот же прототип в №19", page.url.endswith('n=19'))
     check("навигация: без ошибок JS", not errors, str(errors[:1]))
     ctx.close()
 
@@ -206,7 +215,7 @@ def test_part1_flow(browser):
 
 
 def test_part2_flow(browser):
-    ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=18")
+    ctx, page, errors = new_page(browser, f"{BASE}/ege_prof.html?n=17")
     # 18.2: ответ 169/5 — принимаем и дробью, и десятичной записью
     open_proto(page, 2)
     page.fill('input[data-fid="b"]', '33,8')
@@ -214,7 +223,7 @@ def test_part2_flow(browser):
     page.wait_for_timeout(200)
     check("часть 2: 33,8 засчитано вместо 169/5", page.evaluate("S.correct") is True)
 
-    page.goto(f"{BASE}/ege_prof.html?n=15")
+    page.goto(f"{BASE}/ege_prof.html?n=14")
     page.wait_for_timeout(1200)
     open_proto(page, 1)
     page.fill('input[data-fid="b"]', '72*sqrt3')
@@ -222,7 +231,7 @@ def test_part2_flow(browser):
     page.wait_for_timeout(200)
     check("часть 2: 72*sqrt3 засчитано вместо 72√3", page.evaluate("S.correct") is True)
 
-    page.goto(f"{BASE}/ege_prof.html?n=16")
+    page.goto(f"{BASE}/ege_prof.html?n=15")
     page.wait_for_timeout(1200)
     open_proto(page, 1)
     page.fill('input[data-fid="ans"]', '1<x<=4')
@@ -230,7 +239,7 @@ def test_part2_flow(browser):
     page.wait_for_timeout(200)
     check("часть 2: неравенство 1<x<=4 засчитано вместо (1;4]", page.evaluate("S.correct") is True)
 
-    page.goto(f"{BASE}/ege_prof.html?n=14")
+    page.goto(f"{BASE}/ege_prof.html?n=13")
     page.wait_for_timeout(1200)
     open_proto(page, 1)
     page.fill('input[data-fid="b"]', '-7π/2; -5π/2; -15π/4')
@@ -238,7 +247,7 @@ def test_part2_flow(browser):
     page.wait_for_timeout(200)
     check("часть 2: корни в другом порядке засчитаны", page.evaluate("S.correct") is True)
 
-    page.goto(f"{BASE}/ege_prof.html?n=20")
+    page.goto(f"{BASE}/ege_prof.html?n=19")
     page.wait_for_timeout(1200)
     open_proto(page, 1)
     page.click('.yn-group[data-fid="a"] .yn-btn[data-val="да"]')
@@ -293,9 +302,9 @@ def test_modes(browser):
 
 def test_state_bridge(browser):
     ctx1, teacher, err1 = new_page(browser, f"{BASE}/ege_prof.html?n=1")
-    ctx2, student, err2 = new_page(browser, f"{BASE}/ege_prof.html?n=12")
+    ctx2, student, err2 = new_page(browser, f"{BASE}/ege_prof.html?n=11")
 
-    teacher.goto(f"{BASE}/ege_prof.html?n=12")
+    teacher.goto(f"{BASE}/ege_prof.html?n=11")
     teacher.wait_for_timeout(1200)
     open_proto(teacher, 3)
     teacher.click('#tabPractice')
@@ -304,10 +313,11 @@ def test_state_bridge(browser):
     teacher.wait_for_timeout(200)
 
     snapshot = teacher.evaluate("JSON.parse(JSON.stringify(tsGetState()))")
+    snapshot["egeN"] = 12  # снимок до перехода на утверждённые номера
     student.evaluate("s => tsApplyState(s)", snapshot)
     student.wait_for_timeout(300)
     check("мост: номер и прототип переехали",
-          student.evaluate("S.n") == 12 and student.evaluate("S.pid") == "12.3")
+          student.evaluate("S.n") == 11 and student.evaluate("S.pid") == "12.3")
     check("мост: режим переехал", student.evaluate("S.mode") == 'practice')
     check("мост: результат проверки переехал",
           student.evaluate("S.answered") is True and student.evaluate("S.marks.main") == 'good')
@@ -364,8 +374,8 @@ def test_bank(browser):
       box.remove();
       return { protos, nums: nums.length, bad };
     }""")
-    check("банк: 20 позиций", report["nums"] == 20, str(report["nums"]))
-    check("банк: 49 прототипов демоверсии", report["protos"] == 49, str(report["protos"]))
+    check("банк: 19 позиций", report["nums"] == 19, str(report["nums"]))
+    check("банк: 50 прототипов демоверсии", report["protos"] == 50, str(report["protos"]))
     check("банк: эталонные ответы проходят проверку", not report["bad"]["answer"], str(report["bad"]["answer"]))
     check("банк: формулы рисуются без ошибок", not report["bad"]["katex"], str(report["bad"]["katex"]))
     check("банк: все рисунки на месте", not report["bad"]["figs"], str(report["bad"]["figs"]))
@@ -506,12 +516,12 @@ def test_board_capture(browser):
 def test_boards_registry(browser):
     ctx, page, errors = new_page(browser, f"{BASE}/boards.html", wait=1800)
     got = page.evaluate("""() => ({
-      capture: !!(TRAINER_CAPTURE['ege1'] && TRAINER_CAPTURE['ege20']),
+      capture: !!(TRAINER_CAPTURE['ege1'] && TRAINER_CAPTURE['ege19']),
       panel: (TRAINERS_PANEL_GROUPS.find(g => g.title === 'ЕГЭ профиль') || {items: []}).items.length,
       name: TRAINER_NAMES['ege19'] || ''
     })""")
     check("доски: снимок задания настроен для ЕГЭ", got["capture"])
-    check("доски: в панели тренажёров 20 номеров ЕГЭ", got["panel"] == 20, str(got["panel"]))
+    check("доски: в панели тренажёров 19 номеров ЕГЭ", got["panel"] == 19, str(got["panel"]))
     check("доски: подпись для подборки", "№19" in got["name"], got["name"])
     check("доски: без ошибок JS", not errors, str(errors[:1]))
     ctx.close()

@@ -93,8 +93,8 @@ const TRAINER_CAPTURE = {
   trig_equations:[ { sel:'#trigQuestion' }, { selAll:'.added-task-card .added-card-question' } ],
   powers:    [ { sel:'#questionPanel' }, { selAll:'.added-task-card .added-card-question' } ],
 };
-// Промпт №55: ЕГЭ профиль — одна страница на все 20 позиций (ege_prof.html?n=…),
-// поэтому у всех её записей один и тот же узел задания, и ставим их циклом.
+// Профильный ЕГЭ использует один узел для всех позиций. Ключ ege20
+// нужен для повторного открытия снимков с августовской нумерацией.
 // #egeQuestion — только условие, без полей ответа и кнопок; у добавленных
 // кнопкой «+» карточек ту же роль играет .added-card-question (Промпт №56).
 for (let n = 1; n <= 20; n++) {
@@ -1256,13 +1256,31 @@ function genFrameFor(href, vw){
 }
 const genWait = ms => new Promise(r => setTimeout(r, ms));
 
+// Сохранённое задание может хранить номер из проекта демоверсии.
+function ttShowEgeRecipe(win, g, advance) {
+  return win.eval(`new Promise((resolve, reject) => {
+    const recipe = ${JSON.stringify({ n: g.n, pid: g.pid })};
+    const n = numberForPid(recipe.n, recipe.pid);
+    if (!task(n)) { reject(new Error('задание больше не входит в экзамен')); return; }
+    ensureFipi(n, () => {
+      try {
+        if (!protos(n).some(p => p.id === recipe.pid)) throw new Error('прототип задания недоступен');
+        if (${advance} && S.n !== n) openTask(n, recipe.pid);
+        openTask(n, ${advance} ? pidAfter(recipe.pid) : recipe.pid);
+        render();
+        resolve();
+      } catch (error) { reject(error); }
+    });
+  })`);
+}
+
 // в кадре — новое задание того же типа и уровня
 // в кадре — то же задание, что в объекте (для перестройки под ширину):
 // экран нужного типа; само содержимое узла потом подставляется из gen.html
 async function genShowSameInFrame(win, g){
   const doc = win.document;
   if (g.kind === 'ege'){
-    win.eval('openTask(' + JSON.stringify(g.n) + ', ' + JSON.stringify(g.pid) + '); if (typeof render === "function") render();');
+    await ttShowEgeRecipe(win, g, false);
   } else if (g.kind === 'engine'){
     // задание движка до промпта №80: его вёрстку (#live, #eqLine) новый №9
     // уже не построит — пусть доска оставит снимок как был
@@ -1278,7 +1296,7 @@ async function genShowSameInFrame(win, g){
 async function genNewTaskInFrame(win, g){
   const doc = win.document;
   if (g.kind === 'ege'){
-    win.eval('openTask(' + JSON.stringify(g.n) + ', pidAfter(' + JSON.stringify(g.pid) + ')); if (typeof render === "function") render();');
+    await ttShowEgeRecipe(win, g, true);
   } else if (g.kind === 'engine'){
     // Промпт №80: движков уравнений в №9 больше нет, а на досках остались
     // задания, снятые с них. «Ещё такое же» к ним — задание №9 того же вида

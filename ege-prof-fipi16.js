@@ -2,7 +2,7 @@
    Собирается скриптом (fipi-pilot/tools/ege/export.py), руками не правится.
    Грузится страницей ege_prof.html только когда открыт этот номер (ensureFipi);
    формат и происхождение — в оглавлении ege-prof-fipi.js. */
-(window.EGE_PROF_FIPI = window.EGE_PROF_FIPI || { tasks: {} }).tasks['16'] = {
+(window.EGE_PROF_FIPI = window.EGE_PROF_FIPI || { tasks: {} }).tasks['15'] = {
  "sections": [
   {
    "id": "exp",

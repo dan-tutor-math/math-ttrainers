@@ -1,5 +1,6 @@
 """Библиотека на доске, материалы ученика и отдельное хранилище файлов."""
 
+from hashlib import sha256
 import json
 from pathlib import Path
 
@@ -9,6 +10,8 @@ import test_prompt_rus_board_check as board_support
 from test_prompt_b3_board_memory import STUB_JS, VANYA, PETYA
 
 
+PROFILE_PDF = "reference-pdf/ege-math-profile-2027.pdf"
+PROFILE_SHA = "e08ff193109ae29b7acc010c654716c8b15411a5387bbb2822ae961c62918e9c"
 MATH = '[data-material="oge-math-2027-reference"]'
 PHYSICS = '[data-material="oge-physics-2027-reference"]'
 ROOT = Path(__file__).resolve().parent
@@ -17,7 +20,7 @@ ROOT = Path(__file__).resolve().parent
 def check_catalog_assets(page):
     catalog = json.loads((ROOT / "reference-catalog.json").read_text())
     rows = [material for subject in catalog for exam in subject["exams"] for material in exam["materials"]]
-    assert len(catalog) == 6 and len(rows) == 11
+    assert len(catalog) == 6 and len(rows) == 12
     assert len({row["id"] for row in rows}) == len(rows)
     for row in rows:
         if "pdf" in row:
@@ -63,6 +66,42 @@ def upload(panel, filename, file, subject="Математика"):
     panel.get_by_role("button", name="Сохранить файл").click()
 
 
+def check_profile_trainer(browser):
+    for width, height, touch in ((1280, 820, False), (375, 812, True)):
+        with browser.new_context(viewport={"width": width, "height": height}, is_mobile=touch, has_touch=touch) as context:
+            context.route("https://**/*", lambda route: route.abort())
+            page = context.new_page()
+            errors = []
+            page.on("pageerror", lambda error: errors.append(str(error)))
+            href = f"{board_support.BASE}/ege_prof.html?n=12"
+            page.goto(href, wait_until="domcontentloaded")
+            trigger = page.get_by_role("button", name="Справочные материалы", exact=True)
+            expect(trigger).to_be_visible()
+            trigger.click()
+            panel = page.get_by_role("dialog", name="Справочные материалы")
+            expect(panel).to_be_visible()
+            link = panel.get_by_role("link", name="Открыть полную демоверсию ЕГЭ-2027 (PDF)")
+            expect(link).to_have_attribute("href", PROFILE_PDF)
+            expect(link).to_have_attribute("target", "_blank")
+            page.wait_for_function("document.querySelector('.rp-page img')?.naturalWidth >= 680")
+            image = panel.locator(".rp-page")
+            original_width = image.bounding_box()["width"]
+            image.click()
+            expect(image).to_have_attribute("aria-pressed", "true")
+            assert image.bounding_box()["width"] > original_width
+            if touch:
+                assert panel.bounding_box() == {"x": 0, "y": 0, "width": width, "height": height}
+                expect(link).to_be_in_viewport()
+            response = page.request.get(f"{board_support.BASE}/{PROFILE_PDF}")
+            assert response.ok and sha256(response.body()).hexdigest() == PROFILE_SHA
+            panel.get_by_role("button", name="Закрыть справочные материалы").click()
+            expect(trigger).to_be_focused()
+            page.goto(href + "&card=1", wait_until="domcontentloaded")
+            expect(page.locator("#egeProfReferenceToggle")).to_have_count(0)
+            assert not errors, errors
+    print("OK справка профильного ЕГЭ, формулы и подлинный PDF на компьютере и телефоне")
+
+
 def test():
     with board_support.local_server(), sync_playwright() as playwright:
         browser = playwright.chromium.launch()
@@ -87,6 +126,9 @@ def test():
             width = first.bounding_box()["width"]
             first.click()
             assert first.bounding_box()["width"] > width
+            panel.locator('[data-material="ege-math-profile-2027"]').click()
+            expect(preview.get_by_role("link", name="Открыть демоверсию (PDF)")).to_have_attribute("href", PROFILE_PDF)
+            expect(preview.locator("iframe")).to_have_attribute("src", PROFILE_PDF)
             search = panel.get_by_role("searchbox")
             search.fill("Физика")
             expect(panel.locator(".rl-list h4")).to_have_text(["Физика"])
@@ -195,6 +237,7 @@ def test():
             expect(viewer.locator("#boardReferenceToggle")).to_have_count(0)
             assert not errors, errors
             print("OK узкий экран, ограниченный доступ и режим ученика")
+        check_profile_trainer(browser)
         browser.close()
     print("готово")
 
