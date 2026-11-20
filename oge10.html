@@ -307,6 +307,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .mode-card .mex{font-family:var(--font-mono);font-size:13px;color:var(--ink);flex:0 0 auto;}
 .mode-card.random{background:linear-gradient(135deg, var(--hl-10), transparent);border-color:var(--ink);}
 /* тип 0 — задание из демоверсии ФИПИ: выделен так же, как «Случайно» */
+.fipi-count,.source-note{font:500 12.5px var(--font-ui);color:var(--muted-3);margin-top:6px;}
+.source-note{margin-top:12px;}
 .mode-card.demo{background:linear-gradient(135deg, var(--hl-10), transparent);border-color:var(--ink);}
 /* дробь с чертой в разборе типа 0 */
 .vfrac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.15;margin:0 3px;}
@@ -641,6 +643,7 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
   <div class="sub">выбери тип задания — реши шаги, потом впиши ответ</div>
 
   <div id="pickerArea">
+    <div id="fipiFilter"></div>
     <div class="modes" id="modesGrid"></div>
   </div>
 
@@ -664,8 +667,10 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
       <button class="submode-tab" id="tabExam">Экзамен</button>
     </div>
 
+    <div id="fipiNotice" class="fipi-notice" style="display:none"></div>
     <div class="panel" id="questionPanel" style="display:none">
       <div class="prompt" id="questionPromptText"></div>
+      <div id="sourceNote" class="source-note" style="display:none"></div>
     </div>
 
     <div class="panel" id="planPanel" style="display:none">
@@ -767,6 +772,9 @@ button.go:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
 <script src="keypad.js"></script>
 <script src="exam-spec.js"></script>
 <script src="variant-set.js"></script>
+<script src="task-captions.js"></script>
+<script src="fipi-mix.js"></script>
+<script src="oge10-fipi-bank.js"></script>
 <script src="exam-nav.js"></script>
 <script src="reference-panel.js" data-oge-reference></script>
 <script src="task-nav.js"></script>
@@ -1349,7 +1357,9 @@ function svgText(x,y,t,opts){
   return `<text x="${x}" y="${y}" text-anchor="${anchor}" font-family="var(--font-ui)" font-size="${size}" font-weight="${weight}" fill="${color}">${t}</text>`;
 }
 function buildTreeSVG(p1,p2,p3){
-  const q1 = Math.round((1-p1)*100)/100, q2 = Math.round((1-p2)*100)/100, q3 = Math.round((1-p3)*100)/100;
+  // В открытом банке встречаются вероятности с тремя знаками, например 0,375.
+  const complement = p => Math.round((1-p)*1000)/1000;
+  const q1 = complement(p1), q2 = complement(p2), q3 = complement(p3);
   const S=[300,26], A=[150,110], NA=[450,110], B1=[75,196], NB1=[225,196], B2=[375,196], NB2=[525,196];
   const line=(p,q)=>`<line x1="${p[0]}" y1="${p[1]}" x2="${q[0]}" y2="${q[1]}" stroke="var(--ink)" stroke-width="1.6"/>`;
   const dot=p=>`<circle cx="${p[0]}" cy="${p[1]}" r="4" fill="var(--ink)"/>`;
@@ -1566,12 +1576,14 @@ function gen_type21(){
 /* ─── базовое определение вероятности: N и N(A) даны напрямую ─── */
 function gen_type22(){
   const total = pick([8,10,16,20,25,40,50]);
-  const favorable = ri(1,total-1);
+  return buildType22(total, ri(1,total-1));
+}
+function buildType22(total, favorable){
   const answer = Math.round((favorable/total)*10000)/10000;
   return {
     prompt: `В случайном опыте N = ${total} равновозможных элементарных событий, из которых N(A) = ${favorable} благоприятствуют событию A. Вычислите вероятность события A.`,
     answer,
-    explain: `По определению вероятности P(A) = N(A) ⁄ N = ${favorable}⁄${total} = ${fmtRu(answer)}.`,
+    explain: `Всего равновозможных исходов — ${total}.<br>Событию A благоприятствуют ${favorable} из них.<br>P(A) = ${fracStr(favorable,total)} = ${fmtRu(answer)}.`,
     simple:true
   };
 }
@@ -1583,13 +1595,16 @@ const TREE_PRESETS = [
 ];
 function gen_type23(){
   const {p1,p2,p3} = pick(TREE_PRESETS);
-  const q1 = Math.round((1-p1)*100)/100;
-  const t1 = Math.round(p1*p2*10000)/10000, t2 = Math.round(q1*p3*10000)/10000;
-  const answer = Math.round((t1+t2)*10000)/10000;
+  return buildType23(p1,p2,p3);
+}
+function buildType23(p1,p2,p3){
+  const exact = p => Math.round(p*1e6)/1e6;
+  const q1 = exact(1-p1), t1 = exact(p1*p2), t2 = exact(q1*p3);
+  const answer = exact(t1+t2);
   return {
     prompt: `На рисунке изображено дерево случайного опыта. Найдите вероятность события B.${buildTreeSVG(p1,p2,p3)}`,
     answer,
-    explain: `По формуле полной вероятности: P(B) = P(A)·P(B|A) + P(Ā)·P(B|Ā) = ${fmtRu(p1)}·${fmtRu(p2)} + ${fmtRu(q1)}·${fmtRu(p3)} = ${fmtRu(t1)} + ${fmtRu(t2)} = ${fmtRu(answer)}.`,
+    explain: `На дереве два пути, которые заканчиваются событием B. На каждом пути перемножаем вероятности его рёбер.<br>Путь через A — ${fmtRu(p1)} · ${fmtRu(p2)} = ${fmtRu(t1)}.<br>Путь через Ā — ${fmtRu(q1)} · ${fmtRu(p3)} = ${fmtRu(t2)}.<br>Складываем вероятности путей: P(B) = ${fmtRu(t1)} + ${fmtRu(t2)} = ${fmtRu(answer)}.`,
     simple:true
   };
 }
@@ -1706,6 +1721,57 @@ const MODES = [
   { id:'type15', title:'Тип 15', gen:gen_merged_euler_regions },
   { id:'type16', title:'Тип 16', gen:gen_merged_euler_dots },
 ];
+
+const FIPI_PAGE = 'oge10';
+const FIPI_BANK = window.OGE10_FIPI;
+const FIPI_ALL = new URLSearchParams(location.search).get('all') === '1';
+
+function fipiTask(entry){
+  const {kind, args} = entry;
+  if (kind === 'nA') return buildType22(args.total,args.favorable);
+  if (kind === 'tree') return buildType23(Number(args.a),Number(args.bGivenA),Number(args.bGivenNotA));
+
+  // У сюжетов банка бывают формулировки и события, которых нет у генератора.
+  // Тип и параметры сохраняем, а для показа используем точное условие и разбор.
+  let diagram = '';
+  if (kind === 'eul_cnt' || kind === 'eul_p4') {
+    const [aOnly,both,bOnly,outside] = args.values.map(([n]) => Number(n));
+    diagram = buildEulerRegionsSVG(outside,aOnly,both,bOnly,kind === 'eul_cnt' ? 'count' : 'prob');
+  } else if (kind === 'eul_dots_eq' || kind === 'eul_dots_p') {
+    const slots = [EULER_SLOTS.aOnly,EULER_SLOTS.both,EULER_SLOTS.bOnly,[[200,25],[108,246]]];
+    const counts = kind === 'eul_dots_eq';
+    const points = args.values.flatMap((values, i) => {
+      const labels = counts ? Array(values[0]).fill(0) : values;
+      return labels.map((v, j) => ({x: slots[i][j][0], y: slots[i][j][1], v: Number(v)}));
+    });
+    diagram = buildEulerDotsSVG(points,counts ? 'count' : 'prob');
+  }
+  const steps = ['taxi','tickets','dice2'].includes(kind);
+  return {
+    prompt: entry.prompt + diagram,
+    explain: entry.sol,
+    answer: Number(entry.answer.replace(',', '.')),
+    ...(steps ? { favorable: args.favorable, total: args.total } : { simple: true }),
+  };
+}
+
+if (FIPI_BANK && window.FipiMix) {
+  for (const m of MODES) {
+    const list = FIPI_BANK.tasks.filter(t => t.type === m.id && (t.checked || FIPI_ALL));
+    if (!list.length) continue;
+    m.fipiList = list.map(t => ({
+      fipi: t.fipi,
+      make: () => ({ ...fipiTask(t), ...(!t.checked ? {unchecked:true} : {}) }),
+    }));
+    m.ownGen = m.gen;
+    m.gen = () => FipiMix.next(FIPI_PAGE,m.id,m.fipiList,m.ownGen);
+  }
+}
+
+function shownModes(){
+  const filter = FIPI_BANK && window.FipiMix && FipiMix.filter();
+  return filter && !filter.own ? MODES.filter(m => m.demo || m.fipiList) : MODES;
+}
 
 const SHARED_PLAN = `Вероятность равна отношению количества благоприятных исходов к общему числу исходов: P = благоприятные ⁄ все. Сначала сам определи оба числа и запиши дробь, а затем раздели её в столбик, чтобы получить десятичный ответ.`;
 
@@ -1899,12 +1965,14 @@ function renderPicker(){
       <div class="mtitle">Все вперемешку</div>
       <div class="mex">как на настоящем экзамене</div>
     </div>
-  ` + MODES.map(m=>{
+  ` + shownModes().map(m=>{
     const p = loadProg(m.id);
     const badges = p ? medalBadgeText(p.medals) : '';
+    const count = m.fipiList ? FipiMix.countLabel(FIPI_PAGE,m.id,m.fipiList) : '';
     return `
     <div class="mode-card${m.demo ? ' demo' : ''}" data-id="${m.id}">
       <div class="mtitle">${m.title}</div>
+      ${count ? `<div class="fipi-count">${count}</div>` : ''}
       ${badges ? `<div class="mode-medals">${badges}</div>` : ''}
     </div>
   `;
@@ -1932,11 +2000,12 @@ function startMode(id){
   resumeOrNewTask();
 }
 function navigateType(delta){
-  const idx = MODES.findIndex(x=>x.id===curMode);
+  const modes = shownModes();
+  const idx = modes.findIndex(x=>x.id===curMode);
   if(idx===-1) return; // в «случайно» стрелки скрыты
-  const newIdx = (idx + delta + MODES.length) % MODES.length;
-  curMode = MODES[newIdx].id;
-  els.taskTitle.textContent = MODES[newIdx].title;
+  const next = modes[(idx + delta + modes.length) % modes.length];
+  curMode = next.id;
+  els.taskTitle.textContent = next.title;
   curProg = loadProgOrFresh(curMode);
   renderMedalBadges();
   renderExampleHistory();
@@ -1979,6 +2048,15 @@ function renderCurrentTask(){
 
   els.questionPanel.style.display='block';
   els.questionPromptText.innerHTML = curTask.prompt;
+  const source = document.getElementById('sourceNote');
+  const sourceText = window.FipiMix ? FipiMix.sourceText(curTask) : '';
+  source.textContent = sourceText;
+  source.style.display = sourceText ? 'block' : 'none';
+  if (window.TaskCaptions) TaskCaptions.showCurrent(source,curTask,curMode);
+
+  const notice = document.getElementById('fipiNotice');
+  notice.textContent = curTask.fipiNotice || '';
+  notice.style.display = curTask.fipiNotice ? 'block' : 'none';
 
   els.fracPanel.style.display='none';
   els.sheetArea.style.display='none';
@@ -2038,21 +2116,23 @@ function renderCurrentTask(){
   }
 }
 
-/* Каталог для конструктора работ: список прототипов и задача по её месту.
-   Банка ФИПИ на странице нет — любое место отдаёт наш генератор. Экран задания
-   включаем напрямую (как newTask, но без NoRepeat и saveProg): иначе в браузер
-   учителя записались бы прогресс и память «недавних заданий» */
+/* Каталог для конструктора работ: места банка берутся в порядке выгрузки.
+   Прямое открытие задания не меняет прогресс или память недавних заданий. */
 window.__trainerCatalog = {
   list(){
     return Promise.resolve(MODES.filter(m => !m.demo).map(m => ({
-      id: m.id, title: m.title, section: null, fipi: [], hasGen: true,
+      id: m.id, title: m.title, section: null,
+      fipi: (m.fipiList || []).map(t => t.fipi), hasGen: true,
     })));
   },
   /* что сейчас на экране: { n, proto, pos, fipi } или null на экране выбора. Только читает (кнопка «＋ В вариант», exam-nav.js) */
   current(){
     if (!curMode || !curTask || els.taskArea.style.display === 'none') return null;
-    const m = MODES.find(x => x.id === curMode && !x.demo);
-    return m ? { n: null, proto: curMode, pos: null, fipi: null } : null;
+    const m = MODES.find(x => x.id === (curTask.genKind || curMode) && !x.demo);
+    if (!m) return null;
+    const fipi = curTask.fipi || null;
+    const i = fipi ? (m.fipiList || []).findIndex(t => t.fipi === fipi) : -1;
+    return { n: null, proto: m.id, pos: i >= 0 ? i : null, fipi };
   },
   openAt(protoId, pos){
     const m = MODES.find(x => x.id === protoId && !x.demo);
@@ -2063,7 +2143,8 @@ window.__trainerCatalog = {
     els.tabPractice.classList.remove('active');
     els.tabExam.classList.add('active');
     curProg = freshProg();
-    curTask = m.gen();
+    curTask = m.fipiList ? FipiMix.at(m.fipiList,pos,m.ownGen) : m.gen();
+    curTask.genKind = m.id;
     stepIdx = 0;
     taskAnswered = false;
     stepsDone = false;
@@ -2075,12 +2156,12 @@ window.__trainerCatalog = {
     els.taskArea.style.display = 'block';
     els.taskTitle.textContent = m.title;
     renderCurrentTask();
-    return { ok: true, fipi: null, pos, total: 0 };
+    return { ok: true, fipi: curTask.fipi || null, pos, total: (m.fipiList || []).length };
   },
 };
 
 function newTask(){
-  const m = curMode==='random' ? pick(MODES.filter(x=>!x.demo)) : MODES.find(x=>x.id===curMode);
+  const m = curMode==='random' ? pick(shownModes().filter(x=>!x.demo)) : MODES.find(x=>x.id===curMode);
   // Промпт №18 нового списка: без повторов — тот же генератор, но задание,
   // совпавшее с недавним (целиком или ответом подряд), перегенерируется
   // (no-repeat.js); avoid — заменяемое задание на экране
@@ -2088,6 +2169,10 @@ function newTask(){
   // его показываем тем же путём, но не выбираем заново и не пишем в память ФИПИ
   const back = window.TaskNav ? TaskNav.take() : null;
   curTask = back || NoRepeat.pick('oge10:' + curMode, () => m.gen(), { avoid: [curTask] });
+  if (!back) {
+    curTask.genKind = m.id;
+    if (m.fipiList) FipiMix.commit(FIPI_PAGE,m.id,curTask,m.fipiList);
+  }
   if (window.TaskNav) TaskNav.seen(curTask);
   stepIdx = 0;
   taskAnswered = false;
@@ -2109,8 +2194,14 @@ function newTask(){
 // при входе в прототип (или переходе между ними стрелками) — восстановить последний
 // пример, а не выдавать новый; для "случайно" прогресс не хранится вовсе
 function resumeOrNewTask(){
-  if (curMode !== 'random' && curProg && curProg.task) {
-    curTask = curProg.task;
+  const saved = curProg && curProg.task;
+  const m = MODES.find(x => x.id === curMode);
+  const filter = m && m.fipiList && FipiMix.filter();
+  const allowed = !filter || (saved && (saved.fipi
+    ? filter.fipi && m.fipiList.some(t => t.fipi === saved.fipi)
+    : filter.own));
+  if (curMode !== 'random' && saved && allowed) {
+    curTask = saved;
     stepIdx = 0;
     taskAnswered = !!curProg.answered;
     stepsDone = false;
@@ -2239,6 +2330,9 @@ function submitFinal(){
   els.finalHint.textContent = pick(['Верно!','Точно!','Отлично!']);
   els.finalHint.className='hint good';
   streak++; els.stStreak.textContent = streak;
+  if (curTask.fipi && window.FipiMix) {
+    FipiMix.markDone(FIPI_PAGE,curTask.genKind || curMode,curTask);
+  }
   finishRound();
 }
 els.finalGo.onclick = submitFinal;
@@ -2374,6 +2468,9 @@ function syncKeypadVisibility(){
   document.getElementById('kpToggle').style.display = (active && !keypadOpen) ? 'flex' : 'none';
 }
 
+if (FIPI_BANK && window.FipiMix) {
+  FipiMix.mountFilter(document.getElementById('fipiFilter'),renderPicker);
+}
 renderPicker();
 setupFloatingKeypad();
 
