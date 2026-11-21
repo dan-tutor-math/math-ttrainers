@@ -256,7 +256,7 @@ def check_mobile(browser, base):
         assert box["x"] >= 0 and box["x"] + box["width"] <= 375
         assert page.evaluate("Object.keys(windowMotions).length === 0")
         shot(page, "mobile-sunday.png")
-        header = small.locator("[data-cab-drag]").bounding_box()
+        header = small.locator(".sc-sc-status").bounding_box()
         x, y = header["x"] + 18, header["y"] + header["height"] / 2
         touch = context.new_cdp_session(page)
         touch.send("Input.dispatchTouchEvent", {"type":"touchStart", "touchPoints":[{"x":x, "y":y}]})
@@ -294,6 +294,26 @@ def check_mobile(browser, base):
         expect(small).to_be_hidden()
         sunday.tap()
         expect(status).to_have_text("перенос")
+
+        small.get_by_role("button", name="Минуты начала, 15").tap()
+        editor = page.get_by_role("dialog", name="Время занятия")
+        minutes = editor.get_by_label("Минуты начала", exact=True)
+        expect(minutes).to_be_focused()
+        assert minutes.evaluate("""el => el.inputMode === 'numeric' && parseFloat(getComputedStyle(el).fontSize) >= 16""")
+        page.keyboard.type("25")
+        expect(editor.get_by_label("Минуты окончания", exact=True)).to_have_value("25")
+        rect = editor.bounding_box()
+        assert rect["x"] >= 0 and rect["x"] + rect["width"] <= 320, rect
+        shot(editor, "timing-mobile-320.png")
+        editor.get_by_role("button", name="Отмена").tap()
+        expect(editor).to_be_hidden()
+        small.get_by_role("button", name="Изменить дату, 22 ноября").tap()
+        picker = page.get_by_role("dialog", name="Дата занятия")
+        expect(picker.get_by_role("button", name="2026-11-22")).to_be_visible()
+        assert picker.evaluate("el => el.scrollWidth === el.clientWidth")
+        shot(picker, "calendar-mobile-320.png")
+        picker.get_by_role("button", name="Отмена").tap()
+        expect(picker).to_be_hidden()
     print("✓ Узкий экран: перетаскивание и сокращение движения. На 320 px четыре статуса в один ряд и текущий виден после повторного открытия")
 
 
@@ -531,6 +551,114 @@ def check_lesson_sources(browser, base):
         print("✓ По повторному щелчку закрываются окна ученика и занятия. Полные карточки открываются поверх планера")
 
 
+def check_lesson_timing(browser, base):
+    def values(dialog, start, end):
+        for name, value in [("Часы начала", start[:2]), ("Минуты начала", start[3:]),
+                            ("Часы окончания", end[:2]), ("Минуты окончания", end[3:])]:
+            expect(dialog.get_by_label(name, exact=True)).to_have_value(value)
+
+    def read_lesson(lesson_id):
+        return next(row for row in json.loads(fixture.STATE["db"])["lessons"] if row["id"] == lesson_id)
+
+    with fixture.new_context(browser, bar_open=False) as context:
+        page = boot(context, base, "schedule/2026-11-16")
+        page.set_viewport_size({"width": 1280, "height": 950})
+        quick = page.locator(".sc-scard")
+        detailed = page.locator(".sc-side")
+        plate = page.locator('.sc-plate[data-id="sun-early"]')
+        plate.locator("[data-p]").click()
+        quick.get_by_role("button", name="Часы начала, 10").click()
+        editor = page.get_by_role("dialog", name="Время занятия")
+        hours = editor.get_by_label("Часы начала", exact=True)
+        minutes = editor.get_by_label("Минуты начала", exact=True)
+        expect(hours).to_be_focused()
+        values(editor, "10:15", "11:15")
+        page.keyboard.type("12")
+        expect(minutes).to_be_focused()
+        page.keyboard.type("45")
+        values(editor, "12:45", "13:45")
+        editor.get_by_role("button", name="Сохранить").click()
+        expect(editor).to_be_hidden()
+        expect(quick.get_by_role("button", name="Минуты начала, 45")).to_be_visible()
+        assert (read_lesson("sun-early")["start_min"], read_lesson("sun-early")["dur_min"]) == (765, 60)
+
+        quick.get_by_role("button", name="Открыть занятие").click()
+        detailed.get_by_role("button", name="Минуты окончания, 45").click()
+        expect(editor.get_by_label("Минуты окончания", exact=True)).to_be_focused()
+        page.keyboard.type("20")
+        values(editor, "12:20", "13:20")
+        page.keyboard.press("Enter")
+        expect(editor).to_be_hidden()
+        assert (read_lesson("sun-early")["start_min"], read_lesson("sun-early")["dur_min"]) == (740, 60)
+        detailed.get_by_role("button", name="Часы окончания, 13").click()
+        page.keyboard.type("0020")
+        editor.get_by_role("button", name="Сохранить").click()
+        expect(editor.get_by_role("status")).to_contain_text("должно помещаться в один день")
+        page.keyboard.press("Escape")
+        expect(editor).to_be_hidden()
+        expect(detailed.get_by_role("button", name="Часы окончания, 13")).to_be_visible()
+        assert read_lesson("sun-early")["start_min"] == 740
+
+        detailed.get_by_role("button", name="Часы начала, 12").click()
+        page.keyboard.type("1410")
+        fixture.STATE["offline"] = True
+        try:
+            editor.get_by_role("button", name="Сохранить").click()
+            expect(editor.get_by_role("status")).to_contain_text("Не сохранилось")
+            values(editor, "14:10", "15:10")
+            assert read_lesson("sun-early")["start_min"] == 740
+        finally:
+            fixture.STATE["offline"] = False
+        editor.get_by_role("button", name="Отмена").click()
+
+        detailed.get_by_role("button", name="Изменить дату, 22 ноября").click()
+        calendar = page.get_by_role("dialog", name="Дата занятия")
+        expect(calendar.get_by_role("button", name="2026-11-22")).to_have_attribute("aria-pressed", "true")
+        calendar.get_by_role("button", name="Следующий месяц").click()
+        expect(calendar.get_by_text("Декабрь 2026")).to_be_visible()
+        calendar.get_by_role("button", name="Предыдущий месяц").click()
+        calendar.get_by_role("button", name="2026-11-21").click()
+        expect(calendar).to_be_hidden()
+        expect(detailed.get_by_role("button", name="Изменить дату, 21 ноября")).to_be_visible()
+        expect(page.locator('.sc-col[data-day="2026-11-21"] [data-id="sun-early"]')).to_be_visible()
+        assert (read_lesson("sun-early")["day"], read_lesson("sun-early")["start_min"]) == ("2026-11-21", 740)
+
+        page.locator("#scUndo").click()
+        expect(detailed.get_by_role("button", name="Изменить дату, 22 ноября")).to_be_visible()
+        page.reload()
+        expect(plate.locator(".sc-pt")).to_have_text("12:20")
+        plate.locator("[data-p]").click()
+        expect(quick.get_by_role("button", name="Минуты окончания, 20")).to_be_visible()
+
+        # В паре время хранится у занятия. Правка доступна из карточек обоих учеников.
+        def profile(student):
+            page.goto(f"{base}/cabinet.html#/students/{student}")
+            row = page.locator('#lesBox [data-lesson="les-yday"]')
+            expect(row).to_be_visible()
+            return row
+
+        participants = [p for p in json.loads(fixture.STATE["db"])["lesson_students"] if p["lesson_id"] == "les-yday"]
+        vanya = profile(fixture.VANYA)
+        vanya.get_by_role("button", name="Часы начала, 15").click()
+        page.keyboard.type("1630")
+        values(editor, "16:30", "17:30")
+        page.keyboard.press("Enter")
+        expect(editor).to_be_hidden()
+        expect(vanya.get_by_role("button", name="Часы начала, 16")).to_be_visible()
+
+        petya = profile(fixture.PETYA)
+        petya.get_by_role("button", name="Минуты окончания, 30").click()
+        page.keyboard.type("10")
+        values(editor, "16:10", "17:10")
+        page.keyboard.press("Enter")
+        expect(editor).to_be_hidden()
+        expect(petya.get_by_role("button", name="Минуты начала, 10")).to_be_visible()
+        expect(profile(fixture.VANYA).get_by_role("button", name="Минуты окончания, 10")).to_be_visible()
+        assert (read_lesson("les-yday")["start_min"], read_lesson("les-yday")["dur_min"]) == (970, 60)
+        assert [p for p in json.loads(fixture.STATE["db"])["lesson_students"] if p["lesson_id"] == "les-yday"] == participants
+    print("✓ Дата и время из обеих карточек планера и профилей пары. Автопереход, обратный пересчёт, отмена и сохранение")
+
+
 if __name__ == "__main__":
     db = seed()
     db["students"][0]["exam"] = "ege_prof"
@@ -560,6 +688,7 @@ if __name__ == "__main__":
             check_desktop_sources(browser, base)
             check_lesson_sources(browser, base)
             check_stacked_lessons(browser, base)
+            check_lesson_timing(browser, base)
             browser.close()
         finally:
             server.shutdown()

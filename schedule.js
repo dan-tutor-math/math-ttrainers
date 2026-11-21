@@ -181,8 +181,12 @@
         return [{ ...edit, before: editFields(edit.before, patch), after: patch }];
       });
       if (edits.length && owner === api.userId()) rememberUndo(label, async () => {
-        try { await SC.applyEdits(edits, { reverse: true }); }
-        finally {
+        try {
+          await SC.applyEdits(edits, { reverse: true });
+          if (owner === api.userId()) for (const edit of edits) {
+            if (!edit.part) window.CabinetLessonTiming?.notify(edit.id, edit.before);
+          }
+        } finally {
           if (owner === api.userId() && st.win) { await load(); paintPayCard(); paintStudentCards(); }
         }
       }, order);
@@ -407,20 +411,39 @@
   const activeStudents = () => st.students.filter(s => !s.archived_at);
 
   /* ── запись с откатом: интерфейс не ждёт сеть ── */
-  async function patchLesson(l, patch){
-    if (undoBusy) return;
-    const old = editFields(l, patch);
+  async function patchLesson(l, patch, inline = false){
+    if (undoBusy) {
+      if (inline) throw new Error('Дождитесь окончания отмены предыдущей правки.');
+      return;
+    }
+    const old = editFields(l, patch), owner = api.userId();
     Object.assign(l, patch);
     render();
     try {
       const fresh = await recordEdit('параметры занятия', () => SC.updateLesson(l.id, patch),
         row => [{ id: l.id, before: old, after: editFields(row, patch) }]);
+      if (owner !== api.userId()) return;
       Object.assign(l, fresh);
+      window.CabinetLessonTiming?.notify(l.id, editFields(fresh, patch));
+      return fresh;
+    } catch (e) {
+      Object.assign(l, old);
+      if (inline) throw e;
+      if (owner === api.userId()) api.toast('Не сохранилось: ' + e.message);
+    } finally {
+      if (owner === api.userId()) {
+        // После переноса в другой месяц окно закроется вместе с исчезнувшей плашкой.
+        if (!inWin(l.day)) st.lessons = st.lessons.filter(x => x !== l);
+        render();
+      }
     }
-    catch (e) { Object.assign(l, old); api.toast('Не сохранилось: ' + e.message); }
-    // занятие уехало в другую неделю — из этой его убираем
-    if (!inWin(l.day)) st.lessons = st.lessons.filter(x => x !== l);
-    render();
+  }
+  function changeTiming(lesson, patch){
+    return patchLesson(findLesson(lesson.id) || lesson, patch, true);
+  }
+  function openTiming(lesson, trigger, root){
+    window.CabinetLessonTiming?.open(lesson, trigger, changeTiming, () =>
+      root.querySelector('[data-lesson-timing="' + trigger.dataset.lessonTiming + '"]'));
   }
   async function changeStatus(l, p, status){
     if (undoBusy) return;
@@ -1515,6 +1538,7 @@
       const c = curSCard(card), t = e.target.closest('button, a');
       if (!c || !t) return;
       if (t.dataset.x != null) card.dismiss(e.detail !== 0, true);
+      else if (t.dataset.lessonTiming) openTiming(c.l, t, card.el);
       else if (t.dataset.set) changeStatus(c.l, c.p, t.dataset.set).then(() => paintStudentCard(card));
       else if (t.dataset.paidc != null) togglePaid(c.l, c.p);
       else if (t.dataset.whyc != null) openPayCard(c.l, c.p);
@@ -1545,9 +1569,9 @@
     const box = card.floating?.content || card.el;
     const focus = box.contains(document.activeElement) ? document.activeElement.dataset.set : null;
     box.innerHTML =
-      '<div class="sc-sc-top" data-cab-drag><div class="sc-sc-current">' + ic(p.status) +
-        '<span class="sc-sc-time' + (gone ? ' x' : '') + '">' + esc(timeText(l).replace(' – ', '–')) + '</span>' +
-        '<strong class="sc-sc-status">' + esc(R.ST_NAME[p.status]) + '</strong></div>' +
+      '<div class="sc-sc-top" data-cab-drag><div class="sc-sc-current' + (gone ? ' sc-sc-gone' : '') + '">' + ic(p.status) +
+        '<strong class="sc-sc-status">' + esc(R.ST_NAME[p.status]) + '</strong>' +
+        (window.CabinetLessonTiming?.buttons(l, dayText(l.day)) || '<span class="sc-sc-time">' + esc(timeText(l)) + '</span>') + '</div>' +
         '<button type="button" class="sc-sc-x" data-cab-close data-x aria-label="Закрыть">×</button></div>' +
       '<div class="sc-sc-who"><div class="sc-av">' + esc(initials(personName(p))) + '</div><div><div class="sc-sc-name">' + esc(personName(p)) + '</div>' +
         '<div class="hint">' + (p.student_id ? (price != null ? 'По тарифу: ' + esc(P.money(price)) : 'Ставка не задана') : 'Гость без карточки') + '</div></div>' +
@@ -1923,6 +1947,7 @@
     if (!l) return;
     const action = t.id.slice(panel.idPrefix.length);
     if (t.classList.contains('sc-x')) panel.dismiss(e.detail !== 0, true);
+    else if (t.dataset.lessonTiming) openTiming(l, t, panel.el);
     else if (t.dataset.pick) { panel.sid = t.dataset.pick; panel.pick = null; paintPanel(panel); }
     else if (action === 'spCard' && api.toggleStudentWindow && e.button === 0 &&
       !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
@@ -2004,7 +2029,9 @@
     const mine = !!(s && cur && cur.id === String(s.id) && cur.lessonId === l.id);
     const box = panel.floating?.content || panel.el;
     const keepScroll = box.scrollTop;
-    let h = '<div class="sc-ed-head" data-cab-drag><b>' + esc(dayText(l.day)) + ', ' + esc(timeText(l)) + '</b><button type="button" class="sc-x" data-cab-close aria-label="Закрыть">×</button></div>' +
+    const timing = window.CabinetLessonTiming?.buttons(l, dayText(l.day)) || '<b>' + esc(dayText(l.day)) + ', ' + esc(timeText(l)) + '</b>';
+    let h = '<div class="sc-ed-head" data-cab-drag><span class="cab-timing-grip" aria-hidden="true"></span>' + timing +
+      '<button type="button" class="sc-x" data-cab-close aria-label="Закрыть">×</button></div>' +
       '<div class="hint">' + esc(l.is_event ? 'событие' : fmtLabel(l.format)) + '</div>';
     if (l.is_event) h += '<div class="sc-sp-name">' + esc(l.title || 'Событие') + '</div>';
     if (people.length > 1) {
@@ -2394,5 +2421,5 @@
     return load();
   }
 
-  window.Schedule = { init, show, hide: () => { closePanels(); closeStudentCards(); R.closeMenu(); if (INS()) INS().closePop(); const c = document.getElementById('scClip'); if (c) c.remove(); }, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), clearCache: () => { cacheClear(); undoHistory.length = 0; st.week = null; st.shown = null; st.shownWin = null; st.win = null; st.lessons = []; }, setMode: m => { st.mode = m; render(); } };
+  window.Schedule = { init, show, changeTiming, hide: () => { closePanels(); closeStudentCards(); R.closeMenu(); if (INS()) INS().closePop(); const c = document.getElementById('scClip'); if (c) c.remove(); }, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), clearCache: () => { cacheClear(); undoHistory.length = 0; st.week = null; st.shown = null; st.shownWin = null; st.win = null; st.lessons = []; }, setMode: m => { st.mode = m; render(); } };
 })();

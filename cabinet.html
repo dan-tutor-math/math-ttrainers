@@ -278,6 +278,50 @@ html[data-theme="dark"]{--cab-window:#232940;}
   .cab-resize[data-edge="se"]{width:26px;height:26px;}
   .cab-window-tray button{min-height:32px;}
 }
+
+/* Дата и цифры в шапке остаются отдельными целями, в том числе на сенсорном экране. */
+.cab-timing,.cab-timing-time{display:inline-flex;align-items:center;}
+.cab-timing-pair{display:inline-block;}
+.cab-timing{gap:2px 7px;flex-wrap:wrap;min-width:0;font-variant-numeric:tabular-nums;}
+.cab-timing-pair,.cab-timing-time{white-space:nowrap;}
+.cab-timing-dash{margin-inline:4px;}
+.cab-timing button,.cab-timing-calendar button{border:0;border-radius:8px;background:transparent;color:inherit;
+  font:inherit;cursor:pointer;touch-action:manipulation;}
+.cab-timing button,.cab-timing-dialog button{-webkit-tap-highlight-color:transparent;}
+.cab-timing button{padding:2px 4px;min-height:29px;}
+.cab-timing button[data-lesson-timing="day"]{font-weight:650;}
+.cab-timing button:focus-visible,.cab-timing-calendar button:focus-visible{outline:2px solid var(--ink);outline-offset:-2px;}
+.cab-timing button:active,.cab-timing-calendar button:active{background:var(--chip);}
+.sc-sc-top .cab-timing{font-size:14px;color:var(--pencil);}
+.sc-ed-head .cab-timing{margin-right:auto;font-size:15px;}
+.cab-timing-grip{flex:0 0 22px;height:30px;position:relative;}
+.cab-timing-grip::after{content:"";position:absolute;inset:8px 6px;opacity:.55;
+  background:radial-gradient(circle,var(--muted-2) 1px,transparent 1.4px) 0 0 / 5px 5px;}
+.sc-sc-gone .cab-timing-time{text-decoration:line-through;}
+.cab-timing-dialog{width:min(360px,calc(100% - 20px));max-height:calc(100dvh - 20px);margin:auto;
+  padding:16px;overflow:auto;overscroll-behavior:contain;background:var(--cab-window);color:var(--pencil);}
+.cab-timing-dialog::backdrop{background:#0a142e59;}
+.cab-timing-dialog h2{font-size:18px;margin:0 0 12px;}
+.cab-timing-dialog .form-msg{margin:8px 0;min-height:0;}
+.cab-timing-actions{justify-content:flex-end;}
+.cab-timing-form{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.cab-timing-field{display:flex;align-items:center;justify-content:center;gap:4px;padding:7px 5px;margin:0;
+  min-width:0;border:1px solid var(--glass-border);border-radius:12px;font-variant-numeric:tabular-nums;}
+.cab-timing-field legend{margin-inline:auto;padding-inline:4px;font-size:14px;color:var(--muted-2);}
+.cab-timing-field input.field{width:2.7em;min-height:44px;text-align:center;padding:3px;font-size:20px;}
+.cab-timing-month{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;}
+.cab-timing-month button{min-width:44px;min-height:42px;font-size:22px;}
+.cab-timing-calendar{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;text-align:center;}
+.cab-timing-week{font-size:12px;color:var(--muted-2);}
+.cab-timing-calendar button{min-height:36px;font-variant-numeric:tabular-nums;}
+.cab-timing-calendar button[aria-pressed="true"]{background:var(--ink);color:#fff;}
+@media(hover:hover) and (pointer:fine){
+  .cab-timing button:hover,.cab-timing-calendar button[aria-pressed="false"]:hover{background:var(--chip);}
+}
+@media(pointer:coarse){
+  .cab-timing-pair button{min-width:30px;}
+  .cab-timing button,.cab-timing-calendar button{min-height:38px;}
+}
 </style>
 </head>
 <body>
@@ -457,14 +501,15 @@ html[data-theme="dark"]{--cab-window:#232940;}
 <script src="cabinet-students.js"></script>
 <script src="schedule-insights.js"></script>
 <script src="cabinet-floating.js?v=window-toggle"></script>
-<script src="schedule.js?v=window-toggle"></script>
+<script src="cabinet-lesson-timing.js"></script>
+<script src="schedule.js?v=lesson-timing"></script>
 <script src="student-memory.js" data-picker></script>
 <script src="lesson-report-topics.js"></script>
 <script src="lesson-reports.js"></script>
 <script src="exam-spec.js"></script>
 <script src="cabinet-exam-grid.js"></script>
 <script src="cabinet-exam-mocks.js"></script>
-<script src="cabinet-log.js"></script>
+<script src="cabinet-log.js?v=lesson-timing"></script>
 <script src="schedule-sync.js"></script>
 <script>
 (function(){
@@ -759,6 +804,7 @@ function clearStudentWindows(){
 
 async function route(){
   const request = ++cardRequest;
+  CabinetLessonTiming.close();
   clearStudentWindows();
   unmountCard(directCard);
   account.open = false;

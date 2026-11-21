@@ -211,14 +211,16 @@
   }
 
   function mountLessons(box, student){
-    const SM = window.StudentMemory, SC = window.ScheduleCloud;
+    const SM = window.StudentMemory, SC = window.ScheduleCloud, timing = window.CabinetLessonTiming;
+    const updates = new Map();
     let dead = false, lessons = null, log = null, logErr = '', err = '';
     const open = new Set();
     function row(l, isPast){
       const my = l.my || {};
       const rows = (log || []).filter(r => r.lesson_id === l.id);
       let h = '<div class="les" data-lesson="' + esc(l.id) + '"><div class="les-h">' +
-        '<a class="les-t" href="#/schedule/' + esc(l.day) + '" title="Открыть неделю в расписании"><b>' + esc(dayText(l.day)) + '</b> · ' + esc(timeText(l)) + '</a>' +
+        (timing ? timing.buttons(l, dayText(l.day)) : '<span>' + esc(dayText(l.day)) + ' · ' + esc(timeText(l)) + '</span>') +
+        '<a class="les-t" href="#/schedule/' + esc(l.day) + '" title="Открыть неделю в расписании">В расписание</a>' +
         '<span class="hint">' + esc(ST_SIGN[my.status] || '') + ' ' + esc(ST_NAME[my.status] || '') + '</span>';
       if (isPast || rows.length) {
         h += '<button type="button" class="btn quiet small les-tg" data-tg="' + esc(l.id) + '" aria-expanded="' + (open.has(l.id) ? 'true' : 'false') + '">' +
@@ -247,19 +249,47 @@
       }
       box.innerHTML = h + '</div>';
     }
+    const order = (a, b) => a.day.localeCompare(b.day) || (a.start_min ?? -1) - (b.start_min ?? -1);
+    function onTiming({ detail:{ id, patch } }){
+      if (!lessons) { updates.set(id, { ...updates.get(id), ...patch }); return; }
+      const lesson = lessons.find(l => l.id === id);
+      if (!lesson) return;
+      Object.assign(lesson, patch);
+      lessons.sort(order);
+      render();
+    }
+    if (timing) window.addEventListener(timing.eventName, onTiming);
     box.addEventListener('click', ev => {
+      const trigger = ev.target.closest('[data-lesson-timing]');
+      if (trigger && timing && window.Schedule?.changeTiming) {
+        const id = trigger.closest('[data-lesson]').dataset.lesson;
+        const lesson = lessons?.find(l => l.id === id);
+        timing.open(lesson, trigger, Schedule.changeTiming, () =>
+          box.querySelector('[data-lesson="' + CSS.escape(id) + '"] [data-lesson-timing="' + trigger.dataset.lessonTiming + '"]'));
+        return;
+      }
       const t = ev.target.closest('[data-tg]');
       if (!t) return;
       const id = t.dataset.tg;
       if (open.has(id)) open.delete(id); else open.add(id);
       render();
     });
+    function dispose(){
+      dead = true;
+      if (timing) window.removeEventListener(timing.eventName, onTiming);
+    }
     render();
-    if (!SC) { err = 'Расписание не подключено'; render(); return function(){ dead = true; }; }
-    SC.listForStudent(student.id).then(ls => { lessons = ls; render(); }, e => { err = 'Занятия не загрузились: ' + (e && e.message || e); render(); });
+    if (!SC) { err = 'Расписание не подключено'; render(); return dispose; }
+    SC.listForStudent(student.id).then(ls => {
+      if (dead) return;
+      ls.forEach(lesson => Object.assign(lesson, updates.get(lesson.id)));
+      updates.clear();
+      lessons = ls.sort(order);
+      render();
+    }, e => { err = 'Занятия не загрузились: ' + (e && e.message || e); render(); });
     if (SM && SM.fetchLog) SM.fetchLog(student.id).then(rows => { log = rows; render(); }, e => { logErr = 'Журнал не загрузился: ' + (e && e.message || e); render(); });
     else logErr = 'Журнал недоступен';
-    return function(){ dead = true; };
+    return dispose;
   }
 
   window.CabinetLog = { mount, mountLessons, parseKey };
