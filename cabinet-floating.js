@@ -34,7 +34,17 @@
     updateTray();
   }
 
+  let markedSource = null;
+  function syncSource(){
+    const source = windows.at(-1)?.sourceTile?.() || null;
+    if (source === markedSource) return;
+    markedSource?.classList.remove('cab-window-source');
+    source?.classList.add('cab-window-source');
+    markedSource = source;
+  }
+
   function updateTray(){
+    syncSource();
     if (!tray && !windows.length) return;
     if (!tray) {
       tray = document.createElement('div');
@@ -259,7 +269,7 @@
 
   let order = 0;
   function attach(el, { anchor, avoid = anchor, avoidVertically = anchor, motion = true,
-    title, dismiss, canEscape = () => true, scroll = false, fitBeside = false }){
+    title, dismiss, sourceTile, canEscape = () => true, scroll = false, fitBeside = false }){
     let x = 0, y = 0, gesture = null, placed = false, sized = false, closed = false, closing = false;
     const events = new AbortController();
     const options = { signal:events.signal };
@@ -386,7 +396,7 @@
       }
       raise(true);
     }
-    const item = { el, content, raise, reopen, close, dispose, dismiss, canEscape, title, order:++order, refresh:updateTray };
+    const item = { el, content, raise, reopen, close, dispose, dismiss, canEscape, title, sourceTile, order:++order, refresh:updateTray };
     for (const edge of ['n','ne','e','se','s','sw','w','nw']) {
       const handle = document.createElement(edge === 'se' ? 'button' : 'span');
       handle.className = 'cab-resize';
@@ -458,5 +468,5 @@
     return item;
   }
 
-  window.CabinetFloating = { attach, room };
+  window.CabinetFloating = { attach, room, syncSource };
 })();

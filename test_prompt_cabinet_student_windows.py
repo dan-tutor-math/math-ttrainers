@@ -160,6 +160,76 @@ def check_week(browser, base):
     print("✓ Воскресенье открывается слева, понедельник справа, соседний урок виден, окно занятия перетаскивается")
 
 
+def check_stacked_lessons(browser, base):
+    db = json.loads(fixture.STATE["db"])
+    db["lessons"] += [
+        lesson("wed-1545", "2026-11-18", 945), lesson("wed-1600", "2026-11-18", 960),
+    ]
+    db["lesson_students"] += [
+        person("we1", "wed-1545", fixture.VANYA, "done"), person("we2", "wed-1600", fixture.PETYA, "done"),
+    ]
+    fixture.STATE["db"] = json.dumps(db)
+    with fixture.new_context(browser, bar_open=False) as context:
+        page = boot(context, base, "schedule/2026-11-16")
+        page.set_viewport_size({"width": 1440, "height": 960})
+        early = page.locator('.sc-plate[data-id="wed-1545"]')
+        late = page.locator('.sc-plate[data-id="wed-1600"]')
+        early.evaluate("el => el.scrollIntoView({block:'center', inline:'center'})")
+        layer = early.evaluate("el => getComputedStyle(el).zIndex")
+
+        def front_tile():
+            return early.evaluate("""el => {
+              const a = el.getBoundingClientRect();
+              const b = el.parentElement.querySelector('[data-id="wed-1600"]').getBoundingClientRect();
+              const x = (Math.max(a.left,b.left) + Math.min(a.right,b.right)) / 2;
+              const y = (Math.max(a.top,b.top) + Math.min(a.bottom,b.bottom)) / 2;
+              return document.elementFromPoint(x,y)?.closest('.sc-plate')?.dataset.id;
+            }""")
+
+        assert front_tile() == "wed-1600"
+        early.locator(".sc-pt").click()
+        panel = page.get_by_role("dialog", name="Занятие", exact=True)
+        expect(panel).to_be_visible()
+        assert front_tile() == "wed-1545"
+        expect(early).to_have_css("outline-style", "solid")
+        assert early.evaluate("""el => {
+          const style = getComputedStyle(el);
+          const pixels = document.createElement('canvas').getContext('2d');
+          function rgb(color) {
+            pixels.clearRect(0,0,1,1);
+            pixels.fillStyle = color;
+            pixels.fillRect(0,0,1,1);
+            return pixels.getImageData(0,0,1,1).data;
+          }
+          const edge = rgb(style.borderColor), ring = rgb(style.outlineColor);
+          return edge[1] > edge[0] && [0,1,2].every(i => Math.abs(edge[i] - ring[i]) < 4);
+        }""")
+        page.evaluate("Schedule.reload()")
+        assert front_tile() == "wed-1545"
+        panel.get_by_role("button", name="Закрыть", exact=True).click()
+        expect(panel).to_be_hidden()
+        assert front_tile() == "wed-1600"
+        expect(early).to_have_css("z-index", layer)
+
+        late.locator("[data-p]").click()
+        quick = page.get_by_role("dialog", name="Ученик на занятии")
+        settled(quick)
+        early.locator(".sc-pt").click()
+        settled(panel)
+        tray = page.get_by_role("group", name="Открытые окна")
+        tray.get_by_role("button", name="Петя", exact=True).click()
+        assert front_tile() == "wed-1600"
+        tray.get_by_role("button", name="Ваня", exact=True).click()
+        assert front_tile() == "wed-1545"
+        page.keyboard.press("Escape")
+        expect(panel).to_be_hidden()
+        assert front_tile() == "wed-1600"
+        page.keyboard.press("Escape")
+        expect(quick).to_be_hidden()
+        expect(page.locator(".sc-plate.cab-window-source")).to_have_count(0)
+    print("✓ Наложение в среду, цвет обводки, обновление сетки, переключение окон и возврат слоя")
+
+
 def overlap(a, b):
     return (a["x"] < b["x"] + b["width"] and a["x"] + a["width"] > b["x"] and
             a["y"] < b["y"] + b["height"] and a["y"] + a["height"] > b["y"])
@@ -489,6 +559,7 @@ if __name__ == "__main__":
             check_touch_limits(browser, base)
             check_desktop_sources(browser, base)
             check_lesson_sources(browser, base)
+            check_stacked_lessons(browser, base)
             browser.close()
         finally:
             server.shutdown()

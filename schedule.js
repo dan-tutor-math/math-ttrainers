@@ -1170,7 +1170,7 @@
       const need = 38 + l.people.length * 24;
       pos = (top + need > H ? 'bottom:' + Math.max(2, H - top - hgt) + 'px' : 'top:' + top + 'px') + ';min-height:' + hgt + 'px;left:4px;right:4px';
     } else pos = 'top:' + top + 'px;height:' + hgt + 'px;' + (geo.lone ? 'left:4px;right:4px' : 'left:' + (4 + (geo.half ? SH : 0)) + 'px;width:calc(100% - ' + (8 + SH) + 'px)');
-    return '<div class="sc-plate st-' + agg + (open ? ' open' : '') + (l.is_event ? ' ev' : '') + (hgt < 34 ? ' short' : '') + (hl ? ' hl' : '') + (picked ? ' picked' : '') + '" data-id="' + esc(l.id) + '" style="' + pos + ';z-index:' + (open ? 30 : 1 + geo.z) + '" ' +
+    return '<div class="sc-plate st-' + agg + (open ? ' open' : '') + (l.is_event ? ' ev' : '') + (hgt < 34 ? ' short' : '') + (hl ? ' hl' : '') + (picked ? ' picked' : '') + '" data-id="' + esc(l.id) + '" style="' + pos + ';--sc-layer:' + (open ? 30 : 1 + geo.z) + '" ' +
         'role="button" tabindex="0" aria-label="' + esc(timeText(l) + ', ' + (l.is_event ? l.title : l.people.map(personName).join(', '))) + '">' +
         '<div class="sc-ph">' + (l.is_event || !l.people.length ? '' : ic(agg, 'data-rst title="' + esc(multi ? 'Статус всем' : 'Статус') + ' — нажмите, чтобы сменить"')) +
           '<span class="sc-pt">' + esc(gTime(l)) + '</span>' +
@@ -1202,7 +1202,7 @@
         (untimed.length ? '<div class="sc-untimed">' + untimed.map(l => '<button type="button" class="sc-ut" data-gopen="' + esc(l.id) + '">' + esc(l.people.map(personName).join(' ') || l.title || 'без времени') + '</button>').join('') + '</div>' : '') +
         '</div>';
       const pos = layoutDay(ls);
-      cols += '<div class="sc-col' + (dd.today ? ' today' : '') + '" data-day="' + esc(day) + '" data-ci="' + i + '" style="height:' + H + 'px;background-size:100% ' + HH() + 'px">' +
+      cols += '<div class="sc-col' + (dd.today ? ' today' : '') + '" data-day="' + esc(day) + '" data-ci="' + i + '" style="--sc-front:' + Math.max(31, ls.length + 1) + ';height:' + H + 'px;background-size:100% ' + HH() + 'px">' +
         '<div class="sc-hv" aria-hidden="true"></div><div class="sc-gl" aria-hidden="true"></div><div class="sc-gv" aria-hidden="true"></div>' +
         ls.filter(l => l.start_min != null).map(l => plateHtml(l, pos.get(l), a, H)).join('') + '</div>';
     });
@@ -1481,6 +1481,7 @@
   }
   function floatAgenda(item, anchor, motion, title, dismiss){
     item.floating = window.CabinetFloating?.attach(item.el, {
+      sourceTile:() => anchor()?.closest('.sc-plate'),
       anchor, motion, title, dismiss, scroll:true, canEscape:() => !modal && !document.querySelector('.pay-card'),
       // Для планера границы дня важнее границ одной плашки: соседние записи этого дня видны.
       avoid:() => anchor()?.closest('.sc-col, .sc-day') || anchor(),
@@ -2313,6 +2314,7 @@
     if (INS()) INS().bind(host, { kind: 'week', insert: sid => addPersonTo(findLesson(st.pick), sid) });
     if (st.view === 'grid') {
       bindGrid();
+      window.CabinetFloating?.syncSource();
       const ngw = host.querySelector('.sc-gwrap');
       if (scroll && ngw && st.gridAt === st.week) { ngw.scrollLeft = scroll[0]; ngw.scrollTop = scroll[1]; }
       else if (ngw) gridToFirst(ngw);
