@@ -4,7 +4,7 @@
 
   const GAP = 10;
   const STACK = 64;
-  const phone = matchMedia('(max-width: 599px), (pointer: coarse) and (max-height: 499px)');
+  const touch = matchMedia('(any-pointer: coarse)');
   const reduced = matchMedia('(prefers-reduced-motion: reduce)');
   const motionKey = 'mathh:cabinet:window-motion';
   const windows = [];
@@ -69,16 +69,22 @@
     }
   }
 
+  // Узкое окно браузера на компьютере и разделённый экран планшета всё ещё вмещают несколько окон.
+  function phoneMode(){
+    return touch.matches && Math.min(screen.width, screen.height) < 600;
+  }
   function room(){
-    if (phone.matches) {
+    if (phoneMode()) {
       endFlight();
       for (const item of [...windows]) item.dismiss();
     }
     return windows.length < 5;
   }
-  phone.addEventListener('change', () => {
-    if (phone.matches) for (const item of windows.slice(0, -1)) item.dismiss();
-  });
+  function applyWindowLimit(){
+    if (phoneMode()) for (const item of windows.slice(0, -1)) item.dismiss();
+  }
+  touch.addEventListener('change', applyWindowLimit);
+  window.addEventListener('resize', applyWindowLimit);
   reduced.addEventListener('change', () => { if (reduced.matches) endFlight(); updateTray(); });
   document.addEventListener('keydown', event => {
     if (event.key !== 'Escape' || event.defaultPrevented || document.querySelector('dialog[open]')) return;
@@ -253,7 +259,7 @@
 
   let order = 0;
   function attach(el, { anchor, avoid = anchor, avoidVertically = anchor, motion = true,
-    title, dismiss, canEscape = () => true, scroll = false }){
+    title, dismiss, canEscape = () => true, scroll = false, fitBeside = false }){
     let x = 0, y = 0, gesture = null, placed = false, sized = false, closed = false, closing = false;
     const events = new AbortController();
     const options = { signal:events.signal };
@@ -275,12 +281,16 @@
     function place(){
       el.style.removeProperty('--cab-float-limit');
       if (placed) { put(x, y); return; }
+      el.style.removeProperty('--cab-float-width-limit');
       const source = rectOf(anchor()), width = document.documentElement.clientWidth;
       if (!source) { put(width - el.offsetWidth - GAP, 64); return; }
       const area = rectOf(avoid()) || source;
       const left = area.left - 2 * GAP, right = width - area.right - 2 * GAP;
+      const free = Math.max(left, right);
+      if (fitBeside && !phoneMode() && free >= limits().minW && free < el.offsetWidth)
+        el.style.setProperty('--cab-float-width-limit', Math.floor(free) + 'px');
       const w = el.offsetWidth;
-      if (Math.max(left, right) >= w) {
+      if (free >= w) {
         put(left > right ? area.left - w - GAP : area.right + GAP, source.top - 16);
         return;
       }
@@ -298,7 +308,7 @@
     function limits(){
       const w = document.documentElement.clientWidth - 2 * GAP;
       const h = innerHeight - 2 * GAP;
-      return { w, h, minW:Math.min(295, w), minH:Math.min(190, h) };
+      return { w, h, minW:Math.min(fitBeside ? 250 : 295, w), minH:Math.min(190, h) };
     }
     function resize(start, edge, dx, dy){
       const { w, h, minW, minH } = limits();
@@ -389,9 +399,11 @@
           const delta = { ArrowLeft:[-step,0], ArrowRight:[step,0], ArrowUp:[0,-step], ArrowDown:[0,step] }[event.key];
           if (!delta) return;
           event.preventDefault();
+          const start = { x, y, w:el.offsetWidth, h:el.offsetHeight };
           placed = sized = true;
           el.style.removeProperty('--cab-float-limit');
-          resize({ x, y, w:el.offsetWidth, h:el.offsetHeight }, 'se', ...delta);
+          el.style.removeProperty('--cab-float-width-limit');
+          resize(start, 'se', ...delta);
         });
       } else handle.setAttribute('aria-hidden', 'true');
       el.append(handle);
@@ -418,9 +430,10 @@
       const start = { x, y, w:el.offsetWidth, h:el.offsetHeight };
       gesture = { id:event.pointerId, edge, start, px:event.clientX, py:event.clientY };
       placed = true;
-      if (edge) sized = true;
+      if (edge || el.style.getPropertyValue('--cab-float-width-limit')) sized = true;
       if (sized) size(start.w, start.h);
       el.style.removeProperty('--cab-float-limit');
+      el.style.removeProperty('--cab-float-width-limit');
       el.setPointerCapture(event.pointerId);
       if (!edge) el.classList.add('cab-float-moving');
       if (edge === 'se') event.target.focus({ preventScroll:true });

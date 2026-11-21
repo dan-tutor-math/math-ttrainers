@@ -483,25 +483,25 @@
       if (st.armed !== p.id) { st.armed = p.id; render(); return; }
       st.armed = null;
       delete st.pay.linked[p.id];
-      render(); paintPanel();
+      render(); paintPanels();
       st.edits++;
       try { await P.deletePayment(cur.id); api.toast('Оплата снята'); }
       catch (e) { st.pay.linked[p.id] = cur; api.toast('Не сохранилось: ' + e.message); }
       st.edits++;
-      render(); paintPanel();
+      render(); paintPanels();
       return;
     }
     const price = P.rateOn(st.pay.rates[p.student_id], l.day, l.format);
     if (price == null) { api.toast('Сначала задайте ставку ученика во вкладке «Оплаты»'); return; }
     st.pay.linked[p.id] = { id: null, amount: price };
     st.edits++;
-    render(); paintPanel();
+    render(); paintPanels();
     try {
       st.pay.linked[p.id] = await P.addPayment({ student_id: p.student_id, kind: 'single', paid_on: l.day, amount: price, lesson_student_id: p.id });
       api.toast('Оплачено: ' + P.money(price));
     } catch (e) { delete st.pay.linked[p.id]; api.toast('Не сохранилось: ' + e.message); }
     st.edits++;
-    render(); paintPanel();
+    render(); paintPanels();
   }
 
   // карточка пропуска: одна на страницу, висит до ×, Esc или щелчка мимо
@@ -521,7 +521,7 @@
     el.setAttribute('aria-label', 'Пропуск занятия');
     document.body.appendChild(el);
     const onKey = e => { if (e.key === 'Escape') closePayCard(); };
-    const onDown = e => { if (!el.contains(e.target) && !e.target.closest('.sc-why, #spWhy')) closePayCard(); };
+    const onDown = e => { if (!el.contains(e.target) && !e.target.closest('.sc-why, [data-sp-why]')) closePayCard(); };
     document.addEventListener('keydown', onKey);
     document.addEventListener('pointerdown', onDown, true);
     payCard = { el, lessonId: l.id, pid: p.id, onKey, onDown, custom: false };
@@ -914,7 +914,8 @@
   }
   async function removeLesson(l){
     st.lessons = st.lessons.filter(x => x !== l);
-    closePanel(); render();
+    panels.get(l.id)?.dismiss();
+    render();
     try { await SC.deleteLesson(l.id); api.toast('Занятие удалено'); }
     catch (e) { st.lessons.push(l); api.toast('Не сохранилось: ' + e.message); render(); }
   }
@@ -1274,7 +1275,7 @@
       const hv = col.querySelector('.sc-hv');
       col.addEventListener('pointermove', e => {
         if (e.buttons) return;
-        const hit = e.target.closest('.sc-rz, .sc-rzt') ? null : edgeAt(col, e);
+        const hit = e.target.closest('.sc-rz, .sc-rzt, .sc-pt') ? null : edgeAt(col, e);
         showEdge(hit);
         if (hit || e.target.closest('.sc-plate')) { hv.style.display = 'none'; return; }
         // свободное место: мягко подсветить получас под курсором
@@ -1291,7 +1292,7 @@
       col.addEventListener('pointerdown', e => {
         if (e.button !== 0) return;
         // ручка растяжения плашки важнее линии часа: плашки чаще всего кончаются ровно на часе
-        const hit = e.target.closest('.sc-rz, .sc-rzt') ? null : edgeAt(col, e);
+        const hit = e.target.closest('.sc-rz, .sc-rzt, .sc-pt') ? null : edgeAt(col, e);
         if (hit && !e.target.closest('button, .sc-n, [data-p]')) { startEdgeDrag(e, hit, col); return; }
         const plate = e.target.closest('.sc-plate');
         const r0 = col.getBoundingClientRect();
@@ -1392,9 +1393,15 @@
         const rst = e.target.closest('[data-rst]'), pst = e.target.closest('[data-pst]');
         if ((rst || pst) && S.status) { e.stopPropagation(); S.status(l, pst ? l.people.find(p => p.id === pst.dataset.pst) : null); return; }
         if (e.target.closest('[data-exp]')) { e.stopPropagation(); st.openPlate = st.openPlate === l.id ? null : l.id; render(); return; }
-        // в раскрытом списке перетаскивания нет — имя открывает карточку здесь
-        const n = plate.classList.contains('open') && e.target.closest('[data-p]');
-        if (n) { e.stopPropagation(); const p = l.people.find(x => x.id === n.dataset.p.split('|')[1]); if (p && S.person) S.person(l, p, n, e.detail !== 0); else if (p) S.open(l, plate, e.detail !== 0); }
+        // В раскрытой плашке мышь не перетаскивает занятие, поэтому время и имя обрабатываем здесь.
+        if (!plate.classList.contains('open')) return;
+        const n = e.target.closest('[data-p]');
+        if (n) {
+          e.stopPropagation();
+          const p = l.people.find(x => x.id === n.dataset.p.split('|')[1]);
+          if (p && S.person) S.person(l, p, n, e.detail !== 0);
+          else if (p) S.open(l, plate, e.detail !== 0);
+        } else if (e.target.closest('.sc-pt')) S.open(l, plate, e.detail !== 0);
       });
       col.addEventListener('keydown', e => {
         const plate = e.target.closest('.sc-plate');
@@ -1439,25 +1446,27 @@
   /* ── карточка ученика по щелчку на имя (как в «Учительской») ──
      Коротко и рядом с именем: время и статус, тариф, оплата; подробное —
      «Открыть занятие» (боковая панель) */
-  const retiringAgenda = new Set();
-  function clearRetiringAgenda(){
-    for (const item of retiringAgenda) {
-      item.floating.dispose();
-      item.el.remove();
-    }
-    retiringAgenda.clear();
-  }
-  function detachAgenda(item, motion, restoreFocus){
-    if ((!motion && !restoreFocus) || !item.floating) {
-      item.floating?.dispose();
-      item.el.remove();
-      return;
-    }
-    retiringAgenda.add(item);
-    item.floating.close({ motion, restoreFocus, done:() => {
-      item.el.remove();
-      retiringAgenda.delete(item);
-    } });
+  function registerAgenda(list, key, item){
+    list.set(key, item);
+    item.dismiss = (motion = false, restoreFocus = false) => {
+      if (list.get(key) !== item) return;
+      const done = () => {
+        list.delete(key);
+        item.off?.();
+        item.el.remove();
+      };
+      if (!item.floating || (!motion && !restoreFocus)) {
+        item.floating?.dispose();
+        done();
+      } else if (!item.closing) {
+        item.closing = true;
+        item.floating.close({ motion, restoreFocus, done });
+      }
+    };
+    item.toggle = motion => {
+      if (item.closing) { item.closing = false; item.floating.reopen(); }
+      else item.dismiss(motion, true);
+    };
   }
   function agendaAnchor(lid, pid, start){
     const rowSelector = '[data-id="' + CSS.escape(String(lid)) + '"]';
@@ -1481,19 +1490,14 @@
 
   const SCARD_STATUS = { plan:'План', done:'Пров.', move:'Перенос', skip:'Отмена' };
   const studentCards = new Map();
-  function dismissStudentCard(card, motion = false, restoreFocus = false){
-    if (studentCards.get(card.key) !== card) return;
-    studentCards.delete(card.key);
-    detachAgenda(card, motion, restoreFocus);
-  }
   function closeStudentCards(){
-    for (const card of studentCards.values()) dismissStudentCard(card);
+    for (const card of studentCards.values()) card.dismiss();
   }
   function openStudentCard(l, p, source, motion = true){
     const key = p.student_id || l.id + '|' + p.id;
     const existing = studentCards.get(key);
-    if (existing?.lid === l.id && existing.pid === p.id) { existing.floating?.raise(true); return; }
-    if (existing) dismissStudentCard(existing);
+    if (existing?.lid === l.id && existing.pid === p.id) { existing.toggle(motion); return; }
+    existing?.dismiss();
     if (window.CabinetFloating && !CabinetFloating.room()) {
       api.toast('Открыто пять окон. Закройте одно, чтобы открыть другое.');
       return;
@@ -1505,23 +1509,22 @@
     document.body.appendChild(el);
     const anchor = agendaAnchor(l.id, p.id, source);
     const card = { el, key, lid:l.id, pid:p.id };
-    studentCards.set(key, card);
-    const dismiss = (animate, restoreFocus) => dismissStudentCard(card, animate, restoreFocus);
+    registerAgenda(studentCards, key, card);
     el.addEventListener('click', e => {
       const c = curSCard(card), t = e.target.closest('button, a');
       if (!c || !t) return;
-      if (t.dataset.x != null) dismiss(e.detail !== 0, true);
+      if (t.dataset.x != null) card.dismiss(e.detail !== 0, true);
       else if (t.dataset.set) changeStatus(c.l, c.p, t.dataset.set).then(() => paintStudentCard(card));
       else if (t.dataset.paidc != null) togglePaid(c.l, c.p);
       else if (t.dataset.whyc != null) openPayCard(c.l, c.p);
       else if (t.dataset.openl != null) {
-        dismiss();
+        card.dismiss();
         openPanel(c.l, c.p.student_id, anchor(), e.detail !== 0);
       }
     });
     paintStudentCard(card);
     if (studentCards.get(key) === card)
-      floatAgenda(card, anchor, motion, () => personName(curSCard(card)?.p || p), dismiss);
+      floatAgenda(card, anchor, motion, () => personName(curSCard(card)?.p || p), card.dismiss);
   }
   function curSCard(card){
     const l = findLesson(card.lid), p = l && l.people.find(x => x.id === card.pid);
@@ -1531,9 +1534,9 @@
     for (const card of studentCards.values()) paintStudentCard(card);
   }
   function paintStudentCard(card){
-    if (studentCards.get(card.key) !== card) return;
+    if (studentCards.get(card.key) !== card || card.closing) return;
     const c = curSCard(card);
-    if (!c) { dismissStudentCard(card); return; }
+    if (!c) { card.dismiss(); return; }
     const { l, p } = c, P = window.Payments;
     const gone = p.status === 'skip' || p.status === 'move';
     const price = P && p.student_id ? P.rateOn(st.pay.rates[p.student_id], l.day, l.format) : null;
@@ -1871,19 +1874,22 @@
      удобно видеть соседние. Сессия начинается с lessonId — события журнала
      этой сессии помечаются занятием (StudentMemory.start, Б1). */
   const EXAM_SHORT = { oge: 'ОГЭ, математика', ege_prof: 'ЕГЭ, профиль', ege_base: 'ЕГЭ, база', rus_oge: 'ОГЭ, русский' };
-  let panel = null;
-  function closePanel(motion = false, restoreFocus = false){
-    if (!panel) return;
-    const current = panel;
-    panel = null;
-    current.off?.();
-    detachAgenda(current, motion, restoreFocus);
+  const panels = new Map();
+  let panelNumber = 0;
+  function closePanels(){
+    for (const panel of panels.values()) panel.dismiss();
   }
   function openPanel(l, sid, source, motion = true){
-    const people = l.people.filter(p => p.student_id);
-    const first = sid || (people[0] && people[0].student_id) || null;
-    if (panel && panel.lessonId === l.id && !sid) { paintPanel(); panel.floating?.raise(true); return; }
-    closePanel();
+    const existing = panels.get(l.id);
+    if (existing) {
+      if (!sid || sid === existing.sid) { existing.toggle(motion); return; }
+      if (existing.closing) existing.toggle(motion);
+      existing.sid = sid;
+      existing.pick = null;
+      paintPanel(existing);
+      existing.floating?.raise(true);
+      return;
+    }
     if (window.CabinetFloating && !CabinetFloating.room()) {
       api.toast('Открыто пять окон. Закройте одно, чтобы открыть занятие.');
       return;
@@ -1893,41 +1899,53 @@
     el.setAttribute('role', 'dialog');
     el.setAttribute('aria-label', 'Занятие');
     document.body.appendChild(el);
-    const current = panel = { el, lessonId:l.id, sid:first, off:null };
-    const SM = window.StudentMemory;
-    if (SM && SM.onChange) panel.off = SM.onChange(() => paintPanel());
-    el.addEventListener('click', onPanelClick);
-    // «Отработка» — галочка, а не кнопка: своё событие change
+    const anchor = agendaAnchor(l.id, null, source);
+    const panel = { el, anchor, lessonId:l.id, sid:sid || l.people.find(p => p.student_id)?.student_id || null,
+      idPrefix:panels.size ? 'lesson-window-' + (++panelNumber) + '-' : '' };
+    registerAgenda(panels, l.id, panel);
+    panel.off = window.StudentMemory?.onChange?.(() => paintPanel(panel));
+    el.addEventListener('click', e => onPanelClick(panel, e));
     el.addEventListener('change', e => {
-      if (e.target.id !== 'spMakeup' || !panel) return;
-      const l = findLesson(panel.lessonId), p = l && l.people.find(x => x.student_id === panel.sid);
-      if (p) setPart(l, p, { makeup: e.target.checked }).then(paintPanel);
+      if (e.target.id !== panel.idPrefix + 'spMakeup') return;
+      const lesson = findLesson(panel.lessonId);
+      const person = lesson?.people.find(p => p.student_id === panel.sid);
+      if (person) setPart(lesson, person, { makeup:e.target.checked }).then(() => paintPanel(panel));
     });
-    paintPanel();
-    if (panel === current) floatAgenda(current, agendaAnchor(l.id, null, source), motion,
-      () => st.byId[current.sid]?.name || 'Занятие', closePanel);
+    paintPanel(panel);
+    if (panels.get(l.id) === panel) floatAgenda(panel, anchor, motion,
+      () => st.byId[panel.sid]?.name || 'Занятие', panel.dismiss);
   }
-  function onPanelClick(e){
+  function onPanelClick(panel, e){
     const t = e.target.closest('button, a');
-    if (!t || !panel) return;
+    if (!t) return;
     const l = findLesson(panel.lessonId);
     if (!l) return;
-    if (t.classList.contains('sc-x')) closePanel(e.detail !== 0, true);
-    else if (t.dataset.pick) { panel.sid = t.dataset.pick; paintPanel(); }
-    else if (t.id === 'spEdit') openEditor(l);
-    else if (t.id === 'spPin') openPin();
-    else if (t.dataset.pinBoard) pinBoard(t.dataset.pinBoard);
-    else if (t.id === 'spPinX') { panel.pick = null; paintPanel(); }
-    else if (t.id === 'spWhy' || t.id === 'spPaid' || t.dataset.flag) onPanelPay(t, l);
-    else if (t.id === 'spSession') toggleSession(l);
-    else if (t.id === 'spSessionBoard'){
+    const action = t.id.slice(panel.idPrefix.length);
+    if (t.classList.contains('sc-x')) panel.dismiss(e.detail !== 0, true);
+    else if (t.dataset.pick) { panel.sid = t.dataset.pick; panel.pick = null; paintPanel(panel); }
+    else if (action === 'spCard' && api.toggleStudentWindow && e.button === 0 &&
+      !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey) {
+      e.preventDefault();
+      const id = panel.sid;
+      const anchor = () => {
+        const link = panel.sid === id && panel.el.querySelector('#' + panel.idPrefix + 'spCard');
+        return link?.isConnected ? link : panel.anchor();
+      };
+      api.toggleStudentWindow(id, e.detail !== 0, { name:st.byId[id]?.name, anchor });
+    } else if (action === 'spEdit') openEditor(l);
+    else if (action === 'spPin') openPin(panel);
+    else if (t.dataset.pinBoard) pinBoard(panel, t.dataset.pinBoard);
+    else if (action === 'spPinX') { panel.pick = null; paintPanel(panel); }
+    else if (action === 'spWhy' || action === 'spPaid' || t.dataset.flag) onPanelPay(panel, t, l, action);
+    else if (action === 'spSession') toggleSession(panel, l);
+    else if (action === 'spSessionBoard'){
       const s = st.byId[panel.sid];
       if (s) api.startOnBoard(s, lessonBoard(l, s), l.id, dayText(l.day) + ', ' + timeText(l));
     }
   }
   /* «Закрепить доску»: вместо серой кнопки — список досок преподавателя;
      выбранная привязывается к ученику (students.boards), как в его карточке */
-  function pinPickHtml(){
+  function pinPickHtml(panel){
     const k = panel.pick;
     let h = '<div class="sc-sp-pick-boards"><div class="label">Какую доску закрепить за учеником</div>';
     if (k.err) h += '<div class="hint">' + esc(k.err) + '</div>';
@@ -1936,44 +1954,47 @@
     else h += k.list.map(b => '<button type="button" class="btn quiet small" data-pin-board="' + esc(b.id) + '"' + (k.busy ? ' disabled' : '') + '>' + esc(b.title) + '</button>').join('');
     return h + '<button type="button" class="btn quiet small" id="spPinX">Отмена</button></div>';
   }
-  async function openPin(){
-    if (!panel) return;
+  async function openPin(panel){
     const pk = panel.pick = { list: null, err: '', busy: false };
-    paintPanel();
+    paintPanel(panel);
     try { pk.list = await window.CabinetCloud.listBoards(); }
     catch (e) { pk.err = 'Не удалось загрузить доски: ' + (e.message || e); }
-    if (panel && panel.pick === pk) paintPanel();
+    if (panel.pick === pk) paintPanel(panel);
   }
-  async function pinBoard(id){
-    const s = panel && panel.sid && st.byId[panel.sid], pk = panel && panel.pick;
+  async function pinBoard(panel, id){
+    const s = st.byId[panel.sid], pk = panel.pick;
     if (!s || !pk || pk.busy) return;
-    pk.busy = true; paintPanel();
+    pk.busy = true; paintPanel(panel);
     try {
       const fresh = await window.CabinetCloud.updateStudent(s.id, { boards: (s.boards || []).filter(b => b !== id).concat(id) });
       s.boards = fresh.boards || [id];
       api.toast('Доска закреплена');
     } catch (e) { api.toast('Не сохранилось: ' + (e.message || e)); }
-    if (panel) { panel.pick = null; paintPanel(); }
+    if (panel.pick === pk) panel.pick = null;
+    paintPanels();
   }
   function lessonBoard(l, s){ return l.board_id || (s.boards || [])[0]; }
-  async function toggleSession(l){
+  async function toggleSession(panel, l){
     const SM = window.StudentMemory, s = st.byId[panel.sid];
     if (!SM || !s) return;
     const cur = SM.current();
     if (cur && cur.id === String(s.id) && cur.lessonId === l.id) { SM.askEnd(); return; }
-    const btn = panel.el.querySelector('#spSession');
+    const btn = panel.el.querySelector('#' + panel.idPrefix + 'spSession');
     if (btn) btn.disabled = true;
     let ok = false;
     try { await SM.start({ id: s.id, name: s.name }, { lessonId: l.id, lessonLabel: dayText(l.day) + ', ' + timeText(l) }); ok = true; }
     catch (er) { api.toast('Сессия не началась: ' + (er.message || er)); }
-    paintPanel();
+    paintPanel(panel);
     // настройка «переходить на главную»: сессия уже идёт, там висит «Отменить»
     if (ok && settings().sessionGoHome && SM.goHome) SM.goHome();
   }
-  function paintPanel(){
-    if (!panel) return;
+  function paintPanels(){
+    for (const panel of panels.values()) paintPanel(panel);
+  }
+  function paintPanel(panel){
+    if (panels.get(panel.lessonId) !== panel || panel.closing) return;
     const l = findLesson(panel.lessonId);
-    if (!l) { closePanel(); return; }
+    if (!l) { panel.dismiss(); return; }
     const people = l.people.filter(p => p.student_id && st.byId[p.student_id]);
     const guests = l.people.filter(p => !p.student_id);
     if (!people.some(p => p.student_id === panel.sid)) panel.sid = people[0] ? people[0].student_id : null;
@@ -2002,7 +2023,7 @@
                  : '<button type="button" class="btn quiet" id="spPin" title="К занятию и ученику доска не привязана">Закрепить доску</button>') +
           api.sessionButtons('sp', mine ? 'Закончить сессию' : 'Начать сессию', s.archived_at, board) +
         '</div>' +
-        (panel.pick && !board ? pinPickHtml() : '') +
+        (panel.pick && !board ? pinPickHtml(panel) : '') +
         '<div class="hint" id="spHint">' + (mine ? SM.sessionHint() + (cur.paused ? ' (пауза)' : '') + ': задания запишутся на это занятие.'
           : cur ? 'Сейчас идёт сессия с учеником «' + esc(cur.name) + '» — она сменится.' : 'Задания сессии запишутся на это занятие.') +
           (board ? ' Доска: ' + esc(boardWhere) + '.' : '') + '</div>';
@@ -2013,6 +2034,7 @@
     if (s) h += panelPayHtml(l, l.people.find(p => p.student_id === s.id), s);
     h += '<div class="sc-sp-foot"><button type="button" class="btn quiet small" id="spEdit">Править занятие</button></div>';
     box.innerHTML = h;
+    if (panel.idPrefix) for (const control of box.querySelectorAll('[id]')) control.id = panel.idPrefix + control.id;
     box.scrollTop = keepScroll;
     panel.floating?.refresh();
   }
@@ -2032,27 +2054,27 @@
         const k = c.current;
         sumCache[s.id].text = (c.mode === 'pack' ? (k ? 'Абонемент: осталось ' + k.left + ' из ' + k.cap + (k.pay.burn === 'date' ? ' · до ' + P.dm(k.end) : k.until ? ' · до ' + P.dm(k.until) : '') : 'Абонемента нет') : 'Платит за занятие') +
           (c.debt > 0 ? ' · долг ' + P.money(c.debt) : '');
-        paintPanel();
-      }, () => { sumCache[s.id].text = ''; paintPanel(); });
+        paintPanels();
+      }, () => { sumCache[s.id].text = ''; paintPanels(); });
     }
     const text = sumCache[s.id].text;
     h += '<div><a href="#/payments/' + esc(s.id) + '" id="spSum">' + esc(text || 'Оплаты ученика') + '</a></div>';
     h += paidBtn(p, l).replace('class="sc-paid', 'id="spPaid" class="sc-paid');
-    if (isAbsent(p)) h += '<button type="button" class="btn quiet small" id="spWhy">' + esc(ST_NAME[p.status] + ': ' + whyText(p, l)) + '</button>';
+    if (isAbsent(p)) h += '<button type="button" class="btn quiet small" id="spWhy" data-sp-why>' + esc(ST_NAME[p.status] + ': ' + whyText(p, l)) + '</button>';
     if (ps.flags.length) h += '<div class="sp-flags" role="group" aria-label="Флаги">' + ps.flags.map(f =>
       '<button type="button" data-flag="' + esc(f.id) + '" class="' + ((p.flags || []).indexOf(f.id) >= 0 ? 'on' : '') + '" title="' + (f.free ? 'делает занятие бесплатным' : 'пометка') + '">' + esc(f.name) + '</button>').join('') + '</div>';
     h += '<label class="chk" style="margin:0"><input type="checkbox" id="spMakeup"' + (p.makeup ? ' checked' : '') + '> Отработка</label>';
     return h + '</div>';
   }
-  function onPanelPay(t, l){
+  function onPanelPay(panel, t, l, action){
     const p = l.people.find(x => x.student_id === panel.sid);
     if (!p) return;
-    if (t.id === 'spWhy') openPayCard(l, p);
-    else if (t.id === 'spPaid') togglePaid(l, p);
+    if (action === 'spWhy') openPayCard(l, p);
+    else if (action === 'spPaid') togglePaid(l, p);
     else if (t.dataset.flag) {
       const fl = (p.flags || []).slice(), i = fl.indexOf(t.dataset.flag);
       if (i >= 0) fl.splice(i, 1); else fl.push(t.dataset.flag);
-      setPart(l, p, { flags: fl }).then(paintPanel);
+      setPart(l, p, { flags: fl }).then(() => paintPanel(panel));
     }
   }
 
@@ -2264,7 +2286,7 @@
     host.querySelectorAll('.sc-views button').forEach(b => b.addEventListener('click', () => { rows.cancel(); setView(b.dataset.v); }));
     const undoBtn = host.querySelector('#scUndo');
     if (undoBtn) { paintUndo(); undoBtn.addEventListener('click', undoLast); }
-    host.querySelectorAll('.sc-modes button').forEach(b => b.addEventListener('click', () => { rows.cancel(); st.mode = b.dataset.mode; closeModal(); closePanel(); closeStudentCards(); clearRetiringAgenda(); render(); }));
+    host.querySelectorAll('.sc-modes button').forEach(b => b.addEventListener('click', () => { rows.cancel(); st.mode = b.dataset.mode; closeModal(); closePanels(); closeStudentCards(); render(); }));
     const lookBtn = host.querySelector('#scLook');
     if (lookBtn) {
       lookBtn.setAttribute('aria-expanded', String(R.menuOpenFor(lookBtn)));
@@ -2298,7 +2320,7 @@
     } else { bindList(); st.gridAt = null; }
     if (st.goToday) { st.goToday = false; goToday(); }
     paintEditor();
-    paintPanel();
+    paintPanels();
     paintStudentCards();
   }
 
@@ -2352,9 +2374,8 @@
     st.openPlate = null;
     rows.cancel();
     closeModal();
-    closePanel();
+    closePanels();
     closeStudentCards();
-    clearRetiringAgenda();
     const nw = winOf(mon);
     st.win = nw;
     // неделя из уже загруженного месяца — данные те же, перезагрузка не нужна
@@ -2371,5 +2392,5 @@
     return load();
   }
 
-  window.Schedule = { init, show, hide: () => { closePanel(); closeStudentCards(); clearRetiringAgenda(); R.closeMenu(); if (INS()) INS().closePop(); const c = document.getElementById('scClip'); if (c) c.remove(); }, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), clearCache: () => { cacheClear(); undoHistory.length = 0; st.week = null; st.shown = null; st.shownWin = null; st.win = null; st.lessons = []; }, setMode: m => { st.mode = m; render(); } };
+  window.Schedule = { init, show, hide: () => { closePanels(); closeStudentCards(); R.closeMenu(); if (INS()) INS().closePop(); const c = document.getElementById('scClip'); if (c) c.remove(); }, parseQuick, matchName, mondayOf, _st: st, reload: () => load(), clearCache: () => { cacheClear(); undoHistory.length = 0; st.week = null; st.shown = null; st.shownWin = null; st.win = null; st.lessons = []; }, setMode: m => { st.mode = m; render(); } };
 })();

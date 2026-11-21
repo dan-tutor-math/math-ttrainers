@@ -102,7 +102,7 @@ def check_list(browser, base):
         settled(card)
         expect(page.locator(".cab-student-window")).to_have_count(1)
         page.evaluate("delete windowMotions.close")
-        card.get_by_role("button", name="Закрыть карточку").click()
+        link.click()
         expect(card).to_be_hidden()
         assert_origin(page, origin, False)
         expect(link).to_be_focused()
@@ -243,8 +243,12 @@ def check_five(browser, base):
         page.set_viewport_size({"width": 1360, "height": 1000})
         links = page.locator("#stuHost [data-student-card]")
         expect(links).to_have_count(6)
-        def open_id(student):
-            links.and_(page.locator(f'[data-student-card="{student}"]')).press("Enter")
+        def open_id(student, mouse=False):
+            source = links.and_(page.locator(f'[data-student-card="{student}"]'))
+            if mouse:
+                source.click()
+            else:
+                source.press("Enter")
 
         open_id(fixture.VANYA)
         first = page.locator(".cab-student-window").first
@@ -289,14 +293,20 @@ def check_five(browser, base):
         }""")
 
         for student in ["extra-2", "extra-3", "extra-4", "extra-5"]:
-            open_id(student)
+            open_id(student, mouse=True)
         expect(cards).to_have_count(5)
         expect(page.locator("#toast")).to_contain_text("Открыто пять окон")
         tray.get_by_role("button", name="Ваня", exact=True).click()
         expect(tray.get_by_role("button", name="Ваня", exact=True)).to_have_attribute("aria-pressed", "true")
         assert first.evaluate("el => +el.style.zIndex") > second.evaluate("el => +el.style.zIndex")
-        tray.get_by_role("button", name="Анимация").click()
-        expect(tray.get_by_role("button", name="Анимация")).to_have_attribute("aria-pressed", "false")
+        expect(page.locator(".cab-genie")).to_be_hidden()
+        motion = tray.get_by_role("button", name="Анимация")
+        enabled = motion.get_attribute("aria-pressed") == "true"
+        motion.click()
+        expect(motion).to_have_attribute("aria-pressed", str(not enabled).lower())
+        if not enabled:
+            motion.click()
+            expect(motion).to_have_attribute("aria-pressed", "false")
         first.get_by_role("button", name="Закрыть карточку").click()
         expect(cards).to_have_count(4)
         expect(page.locator(".cab-genie")).to_be_hidden()
@@ -321,9 +331,10 @@ def check_touch_limits(browser, base):
         expect(quick).to_have_count(2)
         expect(quick.first.locator(".sc-sc-name")).to_have_text("Ваня")
         expect(quick.last.locator(".sc-sc-name")).to_have_text("Петя")
+        # Ширина окна на настольном браузере может быть как у смартфона.
         page.set_viewport_size({"width": 390, "height": 844})
-        expect(quick).to_have_count(1)
-        expect(quick.locator(".sc-sc-name")).to_have_text("Петя")
+        expect(quick).to_have_count(2)
+        expect(quick.last.locator(".sc-sc-name")).to_have_text("Петя")
 
     for width, height, expected in [(820, 1180, 2), (844, 390, 1), (390, 844, 1)]:
         context = browser.new_context(viewport={"width": width, "height": height}, is_mobile=True, has_touch=True)
@@ -357,6 +368,99 @@ def check_touch_limits(browser, base):
     print("✓ Планер с двумя учениками, планшет с сенсорным растягиванием, телефон в обеих ориентациях с одним окном")
 
 
+def check_desktop_sources(browser, base):
+    with fixture.new_context(browser, bar_open=False) as context:
+        context.add_init_script("localStorage.setItem('mathh:cabinet:window-motion', 'off')")
+
+        def sync_hook(route):
+            response = route.fetch()
+            route.fulfill(response=response, body=response.text() + """
+                const originalInit = ScheduleSync.init;
+                ScheduleSync.init = options => {
+                  window.notifyScheduleSync = options.onChanged;
+                  return originalInit(options);
+                };
+            """)
+
+        context.route("**/schedule-sync.js", sync_hook)
+        page = boot(context, base, "students")
+        page.set_viewport_size({"width": 550, "height": 960})
+        open_vanya = page.locator(f'#stuHost [data-student-card="{fixture.VANYA}"]')
+        open_petya = page.locator(f'#stuHost [data-student-card="{fixture.PETYA}"]')
+        open_vanya.click()
+        open_petya.click()
+        cards = page.locator(".cab-student-window")
+        expect(cards).to_have_count(2)
+        expect(cards.first.get_by_label("Имя", exact=True)).to_have_value("Ваня")
+        expect(cards.last.get_by_label("Имя", exact=True)).to_have_value("Петя")
+        cards.last.get_by_label("Заметка").fill("Черновик Пети")
+        page.evaluate("notifyScheduleSync()")
+        expect(page.locator("#stuHost")).to_be_visible()
+        expect(cards).to_have_count(2)
+        expect(cards.last.get_by_label("Заметка")).to_have_value("Черновик Пети")
+        open_vanya.click()
+        expect(cards).to_have_count(1)
+        expect(cards.last.get_by_label("Заметка")).to_have_value("Черновик Пети")
+        open_petya.click()
+        expect(cards).to_have_count(0)
+        print("✓ Две карточки по щелчку мышью при ширине окна 550 px, сохранение окон при синхронизации, закрытие своей кнопкой")
+
+
+def check_lesson_sources(browser, base):
+    with fixture.new_context(browser, bar_open=False) as context:
+        context.add_init_script("localStorage.setItem('mathh:cabinet:window-motion', 'off')")
+        page = boot(context, base, "schedule/2026-11-16")
+        page.set_viewport_size({"width": 1280, "height": 940})
+        morning = page.locator('.sc-plate[data-id="sun-early"]')
+        later = page.locator('.sc-plate[data-id="sun-late"]')
+        quick = page.locator(".sc-scard")
+        morning.locator("[data-p]").click()
+        later.locator("[data-p]").click()
+        expect(quick).to_have_count(2)
+        morning.locator("[data-p]").click()
+        expect(quick).to_have_count(1)
+        expect(quick.locator(".sc-sc-name")).to_have_text("Петя")
+        later.locator("[data-p]").click()
+        expect(quick).to_have_count(0)
+
+        morning.locator(".sc-pt").click()
+        later.locator(".sc-pt").click()
+        details = page.locator(".sc-side")
+        expect(details).to_have_count(2)
+        expect(details.first.locator(".sc-sp-name")).to_have_text("Ваня")
+        expect(details.last.locator(".sc-sp-name")).to_have_text("Петя")
+        assert page.evaluate("""() => {
+          const ids = [...document.querySelectorAll('.sc-side [id]')].map(el => el.id);
+          return new Set(ids).size === ids.length;
+        }""")
+
+        first_profile = details.first.get_by_role("link", name="Открыть карточку")
+        second_profile = details.last.get_by_role("link", name="Открыть карточку")
+        tray = page.get_by_role("group", name="Открытые окна")
+        tray.get_by_role("button", name="Ваня", exact=True).click()
+        first_profile.click()
+        profiles = page.locator(".cab-student-window")
+        expect(profiles.first.get_by_label("Имя", exact=True)).to_have_value("Ваня")
+        tray.get_by_role("button", name="Петя", exact=True).click()
+        second_profile.click()
+        expect(profiles).to_have_count(2)
+        expect(profiles.last.get_by_label("Имя", exact=True)).to_have_value("Петя")
+        assert page.url.endswith("#/schedule/2026-11-16")
+        tray.get_by_role("button", name="Петя", exact=True).first.click()
+        second_profile.click()
+        expect(profiles).to_have_count(1)
+        expect(profiles.first.get_by_label("Имя", exact=True)).to_have_value("Ваня")
+        tray.get_by_role("button", name="Ваня", exact=True).first.click()
+        first_profile.click()
+        expect(profiles).to_have_count(0)
+        morning.locator(".sc-pt").click()
+        expect(details).to_have_count(1)
+        expect(details.first.locator(".sc-sp-name")).to_have_text("Петя")
+        later.locator(".sc-pt").click()
+        expect(details).to_have_count(0)
+        print("✓ По повторному щелчку закрываются окна ученика и занятия. Полные карточки открываются поверх планера")
+
+
 if __name__ == "__main__":
     db = seed()
     db["students"][0]["exam"] = "ege_prof"
@@ -383,6 +487,8 @@ if __name__ == "__main__":
             check_mobile(browser, base)
             check_five(browser, base)
             check_touch_limits(browser, base)
+            check_desktop_sources(browser, base)
+            check_lesson_sources(browser, base)
             browser.close()
         finally:
             server.shutdown()

@@ -229,7 +229,7 @@ select.cs-in{cursor:pointer;-webkit-appearance:none;appearance:none;}
 }
 /* Собственное полотно прокрутки позволяет менять размер окна за любой край. */
 .cab-float{position:fixed;inset:0 auto auto 0;margin:0;transform-origin:top left;overscroll-behavior:contain;
-  display:flex;flex-direction:column;box-sizing:border-box;max-width:calc(100vw - 20px);
+  display:flex;flex-direction:column;box-sizing:border-box;max-width:min(calc(100vw - 20px),var(--cab-float-width-limit,100vw));
   max-height:var(--cab-float-limit,calc(100dvh - 20px));overflow:hidden;}
 .cab-float [data-cab-drag]{cursor:grab;touch-action:none;user-select:none;}
 .cab-float-moving [data-cab-drag]{cursor:grabbing;}
@@ -456,8 +456,8 @@ html[data-theme="dark"]{--cab-window:#232940;}
 <script src="cabinet-stats.js"></script>
 <script src="cabinet-students.js"></script>
 <script src="schedule-insights.js"></script>
-<script src="cabinet-floating.js"></script>
-<script src="schedule.js"></script>
+<script src="cabinet-floating.js?v=window-toggle"></script>
+<script src="schedule.js?v=window-toggle"></script>
 <script src="student-memory.js" data-picker></script>
 <script src="lesson-report-topics.js"></script>
 <script src="lesson-reports.js"></script>
@@ -680,15 +680,18 @@ $('stuHost').addEventListener('click', event => {
   const link = event.target.closest('[data-student-card]');
   if (!link || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
   event.preventDefault();
-  openStudentWindow(link.dataset.studentCard, event.detail !== 0);
+  toggleStudentWindow(link.dataset.studentCard, event.detail !== 0);
 });
 
-function openStudentWindow(id, motion){
+function toggleStudentWindow(id, motion, source){
+  const fromList = !source;
   const existing = studentWindows.get(id);
   if (existing) {
-    existing.closing = false;
-    existing.controller.reopen();
-    history.replaceState(null, '', '#/students/' + id);
+    if (existing.closing) {
+      existing.closing = false;
+      existing.controller.reopen();
+      if (fromList) history.replaceState(null, '', '#/students/' + id);
+    } else existing.dismiss(motion, true);
     return;
   }
   if (!CabinetFloating.room()) { toast('Открыто пять окон. Закройте одно, чтобы открыть другое.'); return; }
@@ -700,36 +703,48 @@ function openStudentWindow(id, motion){
     '<button type="button" class="btn quiet small" data-cab-close aria-label="Закрыть карточку">×</button></div>' +
     '<div class="panel cab-window-scroll"><div class="empty">Загружаем…</div></div>';
   const title = el.querySelector('strong');
-  const row = studentLink(id)?.closest('tr');
-  title.textContent = row?.querySelector('.cs-nm input')?.value || studentLink(id)?.closest('.cs-arow')?.querySelector('.cs-aname')?.textContent || title.textContent;
+  const link = fromList ? studentLink(id) : null;
+  title.textContent = source?.name || link?.closest('tr')?.querySelector('.cs-nm input')?.value ||
+    link?.closest('.cs-arow')?.querySelector('.cs-aname')?.textContent || title.textContent;
   const card = { box:el.lastElementChild, prefix:studentWindows.size ? 'student-window-' + (++cardNumber) + '-' : '',
-    cleanups:[], title, active:true };
-  const dismiss = (animate = false, restoreFocus = false) => {
-    if (!card.active || card.closing) return;
+    cleanups:[], title, active:true, fromList, backHref:fromList ? '#/students' : location.hash || '#/schedule' };
+  const dismiss = card.dismiss = (animate = false, restoreFocus = false) => {
+    if (!card.active) return;
+    if (card.closing) {
+      if (animate || restoreFocus) return;
+      card.controller.dispose();
+      finish();
+      return;
+    }
     card.closing = true;
-    card.controller.close({ motion:animate, restoreFocus, done:() => {
-      card.active = false;
-      studentWindows.delete(id);
-      unmountCard(card);
-      el.remove();
-      const next = [...studentWindows].filter(([, item]) => !item.closing).at(-1);
-      // Смена вкладки может совпасть с окончанием движения окна.
-      if (location.hash === '#/students/' + id) history.replaceState(null, '', next ? '#/students/' + next[0] : '#/students');
-    } });
+    card.controller.close({ motion:animate, restoreFocus, done:finish });
   };
+  function finish(){
+    card.active = false;
+    studentWindows.delete(id);
+    unmountCard(card);
+    el.remove();
+    const next = [...studentWindows].filter(([, item]) => !item.closing).at(-1);
+    // Смена вкладки может совпасть с окончанием движения окна.
+    if (fromList && location.hash === '#/students/' + id)
+      history.replaceState(null, '', next ? '#/students/' + next[0] : '#/students');
+  }
   el.addEventListener('click', event => {
-    const link = event.target.closest('a');
-    if (link?.hash === '#/students' && (event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey)) return;
-    if (!event.target.closest('[data-cab-close]') && link?.hash !== '#/students') return;
+    const back = event.target.closest('.card-head a');
+    if (back && (event.button !== 0 || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey)) return;
+    if (!event.target.closest('[data-cab-close]') && !back) return;
     event.preventDefault();
     dismiss(event.detail !== 0, true);
   });
-  const url = '#/students/' + id;
-  if (!studentWindows.size && location.hash !== url) history.pushState(null, '', url);
-  else history.replaceState(null, '', url);
+  if (fromList) {
+    const url = '#/students/' + id;
+    if (!studentWindows.size && location.hash !== url) history.pushState(null, '', url);
+    else history.replaceState(null, '', url);
+  }
   studentWindows.set(id, card);
   document.body.append(el);
-  card.controller = CabinetFloating.attach(el, { anchor:() => studentLink(id), motion, title:() => title.textContent, dismiss });
+  const anchor = source?.anchor || (() => studentLink(id));
+  card.controller = CabinetFloating.attach(el, { anchor, motion, title:() => title.textContent, dismiss, fitBeside:fromList });
   openCard(id, card, () => card.active);
 }
 function clearStudentWindows(){
@@ -867,7 +882,8 @@ function renderCard(s, boards, card){
   const examOpts = Object.keys(EXAMS).map(k => '<option value="' + k + '"' + ((s.exam || '') === k ? ' selected' : '') + '>' + esc(EXAMS[k]) + '</option>').join('')
     + (s.exam && !(s.exam in EXAMS) ? '<option value="' + esc(s.exam) + '" selected>' + esc(s.exam) + '</option>' : '');
   box.innerHTML =
-    '<div class="card-head"><a class="btn quiet small" href="#/students">← Ученики</a>' +
+    '<div class="card-head"><a class="btn quiet small" href="' + esc(card.backHref || '#/students') + '">' +
+      (card.fromList === false ? '← Расписание' : '← Ученики') + '</a>' +
       '<h2 id="cName">' + esc(s.name) + '</h2>' +
       (s.archived_at ? '<span class="badge">архив</span>' : '') + '</div>' +
     '<div class="row-btns" style="margin-bottom:14px">' +
@@ -964,7 +980,7 @@ async function saveCard(s, card, $){
     if (card.title) {
       card.title.textContent = fresh.name;
       card.controller.refresh();
-      renderList();
+      if (card.fromList) renderList();
     }
     s.grade = fresh.grade;
     if (s.exam !== fresh.exam) {
@@ -986,7 +1002,7 @@ async function archiveCard(s, boards, card, $){
     if (!button.isConnected) return;
     toast(fresh.archived_at ? 'Ученик в архиве' : 'Ученик возвращён из архива');
     renderCard(fresh, boards, card);
-    if (card.title) renderList();
+    if (card.fromList) renderList();
   } catch (e) {
     if (button.isConnected) $('cMsg').textContent = e.message;
     button.disabled = false;
@@ -1075,7 +1091,7 @@ Schedule.init({
   addStudent: async name => { const s = await C.addStudent({ name }); students = null; return s; },
   settings: () => TS.get(),
   settingsChanged: f => TS.onChange(f),
-  sessionButtons, startOnBoard,
+  sessionButtons, startOnBoard, toggleStudentWindow,
   weekHref: mon => '#/schedule' + (mon ? '/' + mon : ''),
   toast,
 });
@@ -1104,7 +1120,11 @@ SY.init({
     students = null;
     const t = location.hash.replace(/^#\/?/, '').split('/')[0];
     if (t === 'schedule' || !t) Schedule.reload();
-    else if (t === 'students') route();
+    // Строки списка можно обновить отдельно от открытых поверх него карточек.
+    else if (t === 'students') {
+      if ($('tabStudents').hidden) route();
+      else renderList();
+    }
   },
 });
 const SY_TEXT = { off: 'Не настроено', idle: 'Ждёт синхронизации', wait_import: 'Ждёт первого импорта: нажмите «Синхронизировать сейчас»', stale: 'Старое приложение отдаёт устаревшие данные — повторим позже',
