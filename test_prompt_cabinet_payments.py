@@ -651,12 +651,20 @@ def main():
         expect(paid).to_have_text("₽")
         for width in (320, 1280):
             p.set_viewport_size({"width": width, "height": 900})
-            name_box = person_row.locator(".nm").bounding_box()
+            name = person_row.locator(".nm")
+            name.evaluate("el => el.textContent = 'Александра Константинопольская'")
+            paid.evaluate("el => el.style.width = '24px'")
+            previous_width = name.bounding_box()["width"]
+            paid.evaluate("el => el.style.removeProperty('width')")
+            name_box = name.bounding_box()
+            assert abs(name_box["width"] - previous_width - 12) < 1
             button_box = paid.bounding_box()
-            assert button_box["width"] == button_box["height"] == 24
+            assert button_box["width"] == button_box["height"] == 12
             assert paid.evaluate("b => getComputedStyle(b).borderRadius") == "50%"
             assert abs((name_box["y"] + name_box["height"] / 2) - (button_box["y"] + button_box["height"] / 2)) < 1
-        p.click('.sc-paid[data-paid="p17"]')
+        paid.scroll_into_view_if_needed()
+        button_box = paid.bounding_box()
+        p.mouse.click(button_box["x"] + 6, button_box["y"] - 2)
         ok = wait_db(p, lambda d: any(x.get("lesson_student_id") == "p17" for x in d["payments"]))
         row = next((x for x in db()["payments"] if x.get("lesson_student_id") == "p17"), {})
         check("F4 «оплатил» — разовая за это участие по ставке и дате занятия", ok and row.get("kind") == "single"
