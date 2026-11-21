@@ -23,7 +23,7 @@ test_prompt_cabinet_links.py). «Сегодня» — среда 18.11.2026, 12:
   D. ставка с даты: Пете 2 000 ₽ с 15.11 — долг пересчитан (13.11 по старой
      1 500, пара 17.11 — по новой 2 000), прошлое не тронуто;
   E. способ оплаты ученика пишется в students.pay_mode;
-  F. расписание: у Пети «₽ оплатил» на проведённом, у Вани (абонемент) нет;
+  F. расписание: у Пети круглая кнопка ₽ на проведённом, у Вани (абонемент) нет;
      щелчок — разовая оплата за это участие по ставке; снять — двумя
      щелчками; флаг «(пробное)» у имени;
   G. перенос и отмена без причины: подпись «без оплаты», карточка —
@@ -646,16 +646,40 @@ def main():
         check("F1 у Вани (абонемент) кнопки «оплатил» нет", p.locator('.sc-paid[data-paid="v17"]').count() == 0)
         check("F2 флаг «(пробное)» у Пети 16.11", "(пробное)" in p.inner_text('.rw-row[data-id="L16"]'))
         check("F3 на пробном (бесплатном) «оплатил» нет", p.locator('.sc-paid[data-paid="p16"]').count() == 0)
+        person_row = p.locator('.rw-p[data-pid="p17"]')
+        paid = person_row.get_by_role("button", name="Отметить оплату занятия")
+        expect(paid).to_have_text("₽")
+        for width in (320, 1280):
+            p.set_viewport_size({"width": width, "height": 900})
+            name_box = person_row.locator(".nm").bounding_box()
+            button_box = paid.bounding_box()
+            assert button_box["width"] == button_box["height"] == 24
+            assert paid.evaluate("b => getComputedStyle(b).borderRadius") == "50%"
+            assert abs((name_box["y"] + name_box["height"] / 2) - (button_box["y"] + button_box["height"] / 2)) < 1
         p.click('.sc-paid[data-paid="p17"]')
         ok = wait_db(p, lambda d: any(x.get("lesson_student_id") == "p17" for x in d["payments"]))
         row = next((x for x in db()["payments"] if x.get("lesson_student_id") == "p17"), {})
         check("F4 «оплатил» — разовая за это участие по ставке и дате занятия", ok and row.get("kind") == "single"
               and row.get("amount") == 2000 and row.get("paid_on") == "2026-11-17" and row.get("student_id") == PETYA, str(row))
         p.wait_for_function("() => document.querySelector('.sc-paid[data-paid=\"p17\"]').classList.contains('on')")
-        p.click('.sc-paid[data-paid="p17"]')
-        check("F5 первый щелчок по оплаченному — «снять?», оплата цела", p.inner_text('.sc-paid[data-paid="p17"]') == "снять?" and any(x.get("lesson_student_id") == "p17" for x in db()["payments"]))
-        p.click('.sc-paid[data-paid="p17"]')
+        p.get_by_role("button", name="Планер", exact=True).click()
+        tile = p.locator('.sc-plate[data-id="L17"]')
+        expect(tile).to_be_visible()
+        expect(p.locator(".sc-plate .sc-paid")).to_have_count(0)
+        tile.locator('[data-p="L17|p17"]').click()
+        card = p.get_by_role("dialog", name="Ученик на занятии")
+        card_paid = card.locator(".sc-paid")
+        expect(card_paid).to_have_text("₽")
+        expect(card_paid).to_have_attribute("aria-pressed", "true")
+        card_paid.click()
+        expect(card_paid).to_have_accessible_name("Подтвердить снятие оплаты")
+        expect(card_paid).to_have_text("₽")
+        check("F5 первый щелчок запрашивает подтверждение, оплата цела", any(x.get("lesson_student_id") == "p17" for x in db()["payments"]))
+        card_paid.click()
         check("F6 второй — оплата снята", wait_db(p, lambda d: not any(x.get("lesson_student_id") == "p17" for x in d["payments"])))
+        expect(card_paid).to_have_attribute("aria-pressed", "false")
+        card.get_by_role("button", name="Закрыть", exact=True).click()
+        p.get_by_role("button", name="Строки", exact=True).click()
 
         # ── G. прогул и карточка ──
         st_btn = '.rw-row[data-id="L18"] [data-rst]'

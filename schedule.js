@@ -494,16 +494,21 @@
   function paidBtn(p, l){
     if (!p.student_id || st.pay.modes[p.student_id] !== 'lesson' || !billOf(p, l).pay) return '';
     const on = !!st.pay.linked[p.id], armed = st.armed === p.id;
-    return '<button type="button" class="sc-paid' + (on ? ' on' : '') + '" data-paid="' + esc(p.id) + '" title="' +
-      (on ? 'Оплачено за это занятие. Нажмите дважды, чтобы снять' : 'Ученик платит за каждое занятие: отметить «оплатил»') + '">' +
-      (armed ? 'снять?' : on ? '₽ ✓' : '₽ оплатил') + '</button>';
+    const label = armed ? 'Подтвердить снятие оплаты' : on ? 'Оплачено. Нажмите дважды, чтобы снять оплату' : 'Отметить оплату занятия';
+    return '<button type="button" class="sc-paid' + (on ? ' on' : '') + (armed ? ' armed' : '') +
+      '" data-paid="' + esc(p.id) + '" aria-pressed="' + on + '" aria-label="' + label + '" title="' + label + '">₽</button>';
   }
   async function togglePaid(l, p){
     const P = window.Payments, cur = st.pay.linked[p.id];
     if (!P) return;
     if (cur) {
       // второе нажатие — подтверждение: оплату жалко снять случайно
-      if (st.armed !== p.id) { st.armed = p.id; render(); return; }
+      if (st.armed !== p.id) {
+        st.armed = p.id;
+        render();
+        api.toast('Нажмите ₽ ещё раз, чтобы снять оплату');
+        return;
+      }
       st.armed = null;
       delete st.pay.linked[p.id];
       render(); paintPanels();
@@ -1004,7 +1009,8 @@
     // стрелки ←/→ между днями идут по всем развёрнутым неделям списка
     days: () => (monthMode() ? weeksOfWin().filter(weekOpen).reduce((a, m) => a.concat(weekDays(m)), []) : weekDays()),
     name: personName,
-    personExtra: (l, p) => flagsHtml(p) + (isAbsent(p) && window.Payments ? '<button type="button" class="sc-why" data-why="' + esc(p.id) + '" title="Пропуск: оплачивается ли и причина — нажмите, чтобы сменить">' + esc(whyText(p, l)) + '</button>' : '') + paidBtn(p, l),
+    personAction: (l, p) => paidBtn(p, l),
+    personExtra: (l, p) => flagsHtml(p) + (isAbsent(p) && window.Payments ? '<button type="button" class="sc-why" data-why="' + esc(p.id) + '" title="Пропуск: оплачивается ли и причина — нажмите, чтобы сменить">' + esc(whyText(p, l)) + '</button>' : ''),
     showEnd: () => look.end,
     hoursOpen: day => !!st.expand['week:' + day],
     hl: () => st.hl,

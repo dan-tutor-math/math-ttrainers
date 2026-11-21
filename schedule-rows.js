@@ -195,9 +195,11 @@
     function personHtml(it, p, multi){
       const st = p.status || 'plan', gone = cfg.statuses && (st === 'skip' || st === 'move');
       const hl = p.student_id && cfg.hl && String(cfg.hl()) === String(p.student_id);
+      const action = cfg.personAction?.(it, p) || '';
+      const nameAndStatus = (multi && cfg.statuses ? '<button type="button" class="rw-ic sm st-' + st + '" data-pst="' + esc(p.id) + '" title="' + esc(ST_NAME[st]) + ' — нажмите, чтобы сменить" aria-label="Статус ' + esc(cfg.name(p)) + ': ' + esc(ST_NAME[st]) + '">' + icon(st) + '</button>' : '') +
+        '<span class="nm' + (gone ? ' x' : '') + '">' + esc(cfg.name(p)) + '</span>';
       return '<span class="rw-p st-' + st + (p.student_id ? '' : ' guest') + (hl ? ' hl' : '') + '" data-pid="' + esc(p.id) + '"' + (p.student_id ? ' data-sid="' + esc(p.student_id) + '"' : '') + '>' +
-        (multi && cfg.statuses ? '<button type="button" class="rw-ic sm st-' + st + '" data-pst="' + esc(p.id) + '" title="' + esc(ST_NAME[st]) + ' — нажмите, чтобы сменить" aria-label="Статус ' + esc(cfg.name(p)) + ': ' + esc(ST_NAME[st]) + '">' + icon(st) + '</button>' : '') +
-        '<span class="nm' + (gone ? ' x' : '') + '">' + esc(cfg.name(p)) + '</span>' +
+        (action ? '<span class="rw-p-main">' + nameAndStatus + action + '</span>' : nameAndStatus) +
         (p.student_id ? '' : '<span class="rw-guest" title="Гость — без карточки ученика">гость</span>') +
         (cfg.personExtra ? cfg.personExtra(it, p) : '') + '</span>';
     }

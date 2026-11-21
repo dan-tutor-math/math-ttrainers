@@ -122,11 +122,14 @@ button.rw-ic:hover{filter:brightness(1.08);border-color:var(--ink);}
 .rw-p .nm{flex:0 1 auto;min-width:0;max-width:100%;}
 /* место под значок статуса — только там, где он есть (пара, группа): у одиночной
    строки значка нет, и «100% − 26px» от ширины самого имени резало «Ваня» до «В.» */
-.rw-row.multi .rw-p .nm{max-width:calc(100% - 26px);}
+.rw-row.multi .rw-p > .nm{max-width:calc(100% - 26px);}
+/* Имя уступает место кнопке ₽; дополнительные пометки могут переноситься отдельно. */
+.rw-p-main{display:inline-flex;align-items:center;gap:4px;min-width:0;max-width:100%;}
 /* пометки оплаты — мягкие чипы в тон стекла, а не резкие рамки */
 .rw-p .sc-paid,.rw-p .sc-why{font:500 12px/18px var(--font-ui);border:none;border-radius:8px;padding:0 7px;background:var(--chip);color:var(--muted-2);
   cursor:pointer;white-space:nowrap;max-width:100%;overflow:hidden;text-overflow:ellipsis;}
-.rw-p .sc-paid.on{background:var(--st-ok-b);color:var(--st-ok-c);}
+.rw-p .sc-paid{border-radius:50%;padding:0;}
+.rw-p .sc-paid.on{border:1px solid currentColor;background:var(--st-ok-b);color:var(--st-ok-c);}
 .rw-p .sc-paid:hover,.rw-p .sc-why:hover{background:var(--hl-10);color:var(--ink);}
 .rw-p .sc-flag{font-size:12px;}
 .rw-row.multi .rw-p{padding:1px 0;}
