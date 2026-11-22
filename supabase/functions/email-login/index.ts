@@ -18,8 +18,23 @@
 // встроенной почты Supabase (несколько писем в час на весь проект) и часа
 // жизни ссылки — то самое «ограничение в часах» старого входа.
 //
+// Кто входит по одной почте: только ученики. Преподаватель видит чужих
+// учеников, заметки, оплаты — по одной почте его кабинет открыл бы любой,
+// кто знает адрес (аудит 19.11.2026, пункт 1). Поэтому преподаватель
+// входит паролем, а первый раз (и после сброса пароля) — по одноразовой
+// ссылке-приглашению: владелец копирует её в окне «Доступ» и шлёт в
+// мессенджер, преподаватель открывает — он внутри и сразу задаёт пароль.
+//
+// Приглашение — не письмо и не код Supabase (тот живёт максимум сутки):
+// случайная строка в app_metadata аккаунта (её человек сам себе не
+// поменяет) + срок. Ссылка = <id аккаунта>.<строка>. Одноразовая: при входе
+// строка стирается; новое приглашение заменяет старое. Отдельной таблицы и
+// правки SQL не нужно.
+//
 // Действия (POST, JSON { action, ... }):
-//   login          { email }               — кто угодно, без входа
+//   login          { email }               — кто угодно, без входа (только ученики)
+//   redeem         { code }                — кто угодно: вход по приглашению
+//   invite         { email }               — владелец; преподаватель — своих учеников
 //   add            { emails, role, label } — владелец; преподаватель — только учеников
 //   remove         { email }               — владелец; преподаватель — своих учеников
 //   set_role       { email, role }         — владелец
@@ -94,6 +109,38 @@ function cleanLabel(v: unknown): string | null | undefined {
 const isOwnerUser = (u: any) => !!(u && u.app_metadata && u.app_metadata.is_owner);
 const hasPassword = (u: any) => !!(u && u.user_metadata && u.user_metadata.has_password);
 
+// Приглашение живёт неделю: преподаватель может открыть сообщение не сразу
+const INVITE_TTL_MS = 7 * 24 * 3600 * 1000;
+
+// Ограничение попыток входа с одного адреса. Память — внутри одного
+// запущенного экземпляра функции: Supabase держит его минуты и может
+// поднять несколько, так что это не строгий счётчик, а защита от перебора
+// почт подряд «с одного компьютера». Строгий понадобился бы с таблицей.
+// 30 за 10 минут: целый класс за одним школьным адресом в него укладывается
+const RATE_WINDOW_MS = 10 * 60 * 1000;
+const RATE_MAX = 30;
+const attempts = new Map<string, number[]>();
+export function tooMany(ip: string, now = Date.now()): boolean {
+  if (!ip) return false;
+  const list = (attempts.get(ip) || []).filter((t) => now - t < RATE_WINDOW_MS);
+  list.push(now);
+  attempts.set(ip, list);
+  if (attempts.size > 5000) attempts.clear(); // память не растёт без конца
+  return list.length > RATE_MAX;
+}
+function clientIp(req: Request): string {
+  return (req.headers.get('x-forwarded-for') || '').split(',')[0].trim()
+    || req.headers.get('x-real-ip') || '';
+}
+
+// сравнение без раннего выхода — по времени ответа строку не угадать
+function sameString(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
+
 export async function handle(req: Request, admin: any): Promise<Response> {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ ok: false, error: 'method' }, 405);
@@ -101,9 +148,14 @@ export async function handle(req: Request, admin: any): Promise<Response> {
   let body: any = {};
   try { body = await req.json(); } catch (_) { return json({ ok: false, error: 'bad_request' }); }
 
+  const act = body && body.action;
+  if ((act === 'login' || act === 'redeem') && tooMany(clientIp(req))) return json({ ok: false, error: 'too_many' });
+
   try {
-    switch (body && body.action) {
+    switch (act) {
       case 'login': return json(await login(admin, body));
+      case 'redeem': return json(await redeem(admin, body));
+      case 'invite': return json(await invite(admin, req, body));
       case 'add': return json(await add(admin, req, body));
       case 'remove': return json(await remove(admin, req, body));
       case 'set_role': return json(await setRole(admin, req, body));
@@ -211,6 +263,10 @@ async function login(admin: any, body: any) {
     if (u && (isOwnerUser(u) || hasPassword(u))) return { ok: false, error: 'password_required' };
     return { ok: false, error: 'not_allowed' };
   }
+  // Преподаватель — только паролем или по приглашению. Ответ тот же, что
+  // у «задан пароль»: сайт подскажет «нет пароля — попросите приглашение»,
+  // а снаружи не отличить, задал ли он пароль
+  if (row.role === 'teacher') return { ok: false, error: 'password_required' };
 
   const user = await ensureUser(admin, email);
   // Владелец — только паролем, всегда. Кто задал пароль — тоже: иначе
@@ -223,6 +279,56 @@ async function login(admin: any, body: any) {
   if (link.error || !hashed) throw new Error('generateLink: ' + ((link.error && link.error.message) || 'нет кода'));
   await admin.from('access_emails').update({ last_login_at: new Date().toISOString() }).eq('email', email);
   return { ok: true, token_hash: hashed, role: row.role };
+}
+
+// Новое приглашение для аккаунта (старое этим же перестаёт работать)
+async function makeInvite(admin: any, user: any, row: any) {
+  const code = randomPassword();
+  const exp = Date.now() + INVITE_TTL_MS;
+  const { error } = await admin.auth.admin.updateUserById(user.id, {
+    app_metadata: { ...(user.app_metadata || {}), mathh_role: row.role, invite: { code, exp } },
+  });
+  if (error) throw new Error('приглашение: ' + error.message);
+  return { code: user.id + '.' + code, expires_at: new Date(exp).toISOString() };
+}
+
+async function invite(admin: any, req: Request, body: any) {
+  const caller = await getCaller(admin, req);
+  const email = normEmail(body.email);
+  const row = await getRow(admin, email);
+  if (!row) return { ok: false, error: 'not_found' };
+  if (!canManage(caller, row)) return { ok: false, error: 'forbidden' };
+  const user = await ensureUser(admin, email);
+  if (isOwnerUser(user)) return { ok: false, error: 'forbidden' };
+  await syncUser(admin, user, row);
+  return { ok: true, ...(await makeInvite(admin, user, row)) };
+}
+
+async function redeem(admin: any, body: any) {
+  const m = /^([\w-]{1,64})\.([0-9a-f]{48})$/i.exec(String(body.code || '').trim());
+  if (!m) return { ok: false, error: 'invite_invalid' };
+  const user = (await admin.auth.admin.getUserById(m[1])).data?.user;
+  const inv = user && user.app_metadata && user.app_metadata.invite;
+  if (!user || !inv || typeof inv.code !== 'string' || !sameString(inv.code, m[2].toLowerCase()) || isOwnerUser(user)) {
+    return { ok: false, error: 'invite_invalid' };
+  }
+  if (!(Date.now() < Number(inv.exp))) return { ok: false, error: 'invite_expired' };
+  const row = user.email ? await getRow(admin, normEmail(user.email)) : null;
+  if (!row) return { ok: false, error: 'not_allowed' }; // убрали из списка после приглашения
+
+  // Стираем приглашение ДО выдачи входа: вторая попытка той же ссылкой (или
+  // перехваченной копией) уже не пройдёт. В свою копию app_metadata — тоже,
+  // иначе syncUser ниже вернул бы приглашение на место
+  user.app_metadata = { ...user.app_metadata, invite: null };
+  const cleared = await admin.auth.admin.updateUserById(user.id, { app_metadata: user.app_metadata });
+  if (cleared.error) throw new Error('приглашение: ' + cleared.error.message);
+
+  await syncUser(admin, user, row);
+  const link = await admin.auth.admin.generateLink({ type: 'magiclink', email: user.email });
+  const hashed = link.data && link.data.properties && link.data.properties.hashed_token;
+  if (link.error || !hashed) throw new Error('generateLink: ' + ((link.error && link.error.message) || 'нет кода'));
+  await admin.from('access_emails').update({ last_login_at: new Date().toISOString() }).eq('email', row.email);
+  return { ok: true, token_hash: hashed, role: row.role, email: row.email, need_password: !hasPassword(user) };
 }
 
 async function add(admin: any, req: Request, body: any) {
@@ -320,13 +426,14 @@ async function resetPassword(admin: any, req: Request, body: any) {
   const user = row.user_id ? (await admin.auth.admin.getUserById(row.user_id)).data?.user : null;
   if (!user) return { ok: true };
   // Старый пароль затираем случайным (его никто не знает) и снимаем
-  // пометку — функция снова пустит по почте, а красная плашка попросит
-  // задать новый пароль
+  // пометку. Ученика функция снова пустит по почте; преподавателя по почте
+  // не пускает — ему сразу новое приглашение, сайт скопирует ссылку
   const { error } = await admin.auth.admin.updateUserById(user.id, {
     password: randomPassword(),
     user_metadata: { ...(user.user_metadata || {}), has_password: false },
   });
   if (error) throw new Error(error.message);
+  if (row.role === 'teacher') return { ok: true, ...(await makeInvite(admin, user, row)) };
   return { ok: true };
 }
 
@@ -350,7 +457,10 @@ async function list(admin: any, req: Request) {
   const out = (rows || []).map((r: any) => {
     const u = r.user_id ? users.get(r.user_id) : null;
     const by = r.added_by ? users.get(r.added_by) : null;
+    const inv = u && u.app_metadata && u.app_metadata.invite;
     return {
+      // приглашение ещё действует — в окне «Доступ» видно, что ссылку уже слали
+      invite_until: inv && Number(inv.exp) > Date.now() ? new Date(Number(inv.exp)).toISOString() : null,
       email: r.email, role: r.role, label: r.label,
       created_at: r.created_at, last_login_at: r.last_login_at,
       has_password: hasPassword(u),

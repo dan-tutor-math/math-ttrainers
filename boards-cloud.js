@@ -136,7 +136,7 @@
     .ag-modal .ag-primary:disabled{opacity:.6;cursor:default;}
     .ag-modal .ag-close{position:absolute;top:12px;right:14px;border:0;background:none;font-size:20px;line-height:1;
       color:var(--muted-2);cursor:pointer;padding:4px;}
-    .ag-modal .ag-msg{font-size:13px;line-height:1.4;margin-top:9px;color:var(--muted-2);white-space:pre-line;}
+    .ag-modal .ag-msg{font-size:13px;line-height:1.4;margin-top:9px;color:var(--muted-2);white-space:pre-line;overflow-wrap:anywhere;user-select:text;}
     .ag-modal .ag-msg.err{color:var(--teacher);}
     #agAccess .ag-card{width:520px;}
     .ag-acc-add{display:flex;flex-direction:column;}
@@ -290,12 +290,18 @@
     if (msg) { errBox.hidden = false; errBox.textContent = msg; } else { errBox.hidden = true; }
   }
 
-  // Ссылки-приглашения (?invite=…) остались в старых сообщениях. Вход
-  // теперь по списку почт, сама ссылка ничего не значит — просто убираем
-  // её из адреса, чтобы не путала, и показываем обычную форму
-  if (new URLSearchParams(location.search).has('invite')) {
+  // Старые ссылки (?invite=…) остались в давних сообщениях и ничего не
+  // значат — просто убираем. Новые (?join=<код>) — приглашение
+  // преподавателю (функция email-login, действие redeem): код запоминаем и
+  // тоже сразу убираем из адреса, чтобы он не остался ни в истории браузера,
+  // ни в закладке, ни в ссылке, которой человек поделится дальше
+  const startQs = new URLSearchParams(location.search);
+  let joinCode = (startQs.get('join') || '').trim();
+  if (startQs.has('invite') || startQs.has('join')) {
     try { history.replaceState(null, '', location.pathname + location.hash); } catch (e) {}
   }
+  // почта, которой после входа по приглашению сразу предложить пароль
+  let pwAfterJoin = '';
   // есть ли на этом устройстве сохранённый с прошлого раза вход — используем
   // только для того, чтобы решить, ЧТО показать при сбое связи (см. выше);
   // сам ключ (sb-<project-ref>-auth-token) — деталь реализации supabase-js,
@@ -411,8 +417,10 @@
     const res = await callAccess({ action: 'login', email });
     if (!res.ok) {
       if (res.error === 'password_required') {
-        setStage('form', 'Для этой почты задан пароль — введите его и нажмите «Войти».');
+        setStage('form', 'Для этой почты нужен пароль — введите его и нажмите «Войти». Пароля ещё нет или забыли — попросите ссылку-приглашение у того, кто добавил вас на платформу.');
         document.getElementById('agPassword').focus();
+      } else if (res.error === 'too_many') {
+        setStage('form', 'Слишком много попыток входа подряд. Подождите 10 минут и попробуйте снова.');
       } else if (res.error === 'not_allowed') {
         setStage('form', 'Эта почта не добавлена на платформу. Напишите преподавателю — он добавит её, и вход заработает сразу.');
       } else if (res.error === 'bad_email') {
@@ -428,6 +436,40 @@
     if (error) ({ error } = await sb.auth.verifyOtp({ token_hash: res.token_hash, type: 'magiclink' }));
     if (error) setStage('form', 'Не получилось войти: ' + error.message);
   }
+
+  // Вход по ссылке-приглашению (?join=…): функция проверяет одноразовый
+  // код и выдаёт такой же token_hash, как при входе по почте. Пока ответа
+  // нет, форму входа не показываем (joinCode не пуст — см. ветку «нет
+  // сессии» в onAuthStateChange)
+  const JOIN_ERR = {
+    invite_invalid: 'Эта ссылка-приглашение уже использована или заменена новой. Попросите новую у того, кто добавил вас на платформу.',
+    invite_expired: 'Срок ссылки-приглашения истёк (она действует 7 дней). Попросите новую у того, кто добавил вас на платформу.',
+    not_allowed: 'Эту почту убрали с платформы. Напишите тому, кто вас добавлял.',
+    too_many: 'Слишком много попыток входа подряд. Подождите 10 минут и откройте ссылку снова.',
+  };
+  async function joinLogin(code) {
+    showGate();
+    setStage('loading');
+    const res = await callAccess({ action: 'redeem', code });
+    const fail = msg => { joinCode = ''; showGate(); setStage('form', msg); };
+    if (!res.ok) {
+      fail(JOIN_ERR[res.error] || 'Не получилось связаться с сервером входа. Проверьте интернет и откройте ссылку ещё раз.');
+      return;
+    }
+    // на устройстве уже вошёл кто-то другой (например, ученик на общем
+    // компьютере) — сначала обычный выход, чтобы не смешать два аккаунта
+    try {
+      const { data } = await sb.auth.getSession();
+      const cur = data && data.session && data.session.user;
+      if (cur && String(cur.email || '').toLowerCase() !== res.email) await sb.auth.signOut();
+    } catch (e) { /* нет связи — verifyOtp ниже всё равно сменит вход */ }
+    if (res.need_password) pwAfterJoin = res.email;
+    let { error } = await sb.auth.verifyOtp({ token_hash: res.token_hash, type: 'email' });
+    if (error) ({ error } = await sb.auth.verifyOtp({ token_hash: res.token_hash, type: 'magiclink' }));
+    joinCode = '';
+    if (error) { pwAfterJoin = ''; fail('Не получилось войти по ссылке: ' + error.message); }
+  }
+
   document.getElementById('agSend').addEventListener('click', async () => {
     const email = document.getElementById('agEmail').value.trim();
     const password = document.getElementById('agPassword').value;
@@ -437,7 +479,7 @@
     try {
       const { error } = await sb.auth.signInWithPassword({ email, password });
       if (!error) return; // дальше всё делает onAuthStateChange
-      setStage('form', 'Не подошёл пароль. Проверьте его. Если не помните — напишите владельцу платформы, он сбросит пароль, и можно будет войти по одной почте.');
+      setStage('form', 'Не подошёл пароль. Проверьте его. Если не помните — напишите тому, кто добавил вас на платформу: он сбросит пароль и пришлёт новую ссылку-приглашение.');
     } catch (e) {
       setStage('form', 'Не получилось войти: ' + (e && e.message ? e.message : e));
     }
@@ -537,8 +579,10 @@
   function placePwBanner() {
     if (!pwBanner.classList.contains('open')) return;
     const board = document.getElementById('screenBoard');
+    // открытое окно пароля — в ключе: плашку, поставленную в обход окна
+    // (сразу после входа по приглашению), после закрытия возвращаем на место
     const key = [window.innerWidth, window.innerHeight, board && getComputedStyle(board).display,
-      pwBanner.classList.contains('mini')].join('|');
+      pwBanner.classList.contains('mini'), pwModal.classList.contains('open')].join('|');
     const rects = pwBlockers();
     const cur = pwBanner.getBoundingClientRect();
     if (key === pwPlaceKey && pwFree(cur.left, cur.top, cur.width, cur.height, rects)) return;
@@ -548,15 +592,20 @@
     pwBanner.style.left = spot[0] + 'px';
     pwBanner.style.top = spot[1] + 'px';
     pwPlaceKey = [window.innerWidth, window.innerHeight, board && getComputedStyle(board).display,
-      pwBanner.classList.contains('mini')].join('|');
+      pwBanner.classList.contains('mini'), pwModal.classList.contains('open')].join('|');
   }
   setInterval(placePwBanner, 500);
   window.addEventListener('resize', placePwBanner);
 
-  function openPwModal() {
+  // welcome === true — сразу после входа по приглашению (из обработчика
+  // клика сюда приходит событие, поэтому сравнение строгое)
+  function openPwModal(welcome) {
     const already = hasPassword(window.CURRENT_USER);
-    document.getElementById('agPwTitle').textContent = already ? 'Сменить пароль' : 'Добавить пароль';
-    document.getElementById('agPwText').textContent = already
+    document.getElementById('agPwTitle').textContent = welcome === true ? 'Придумайте пароль'
+      : already ? 'Сменить пароль' : 'Добавить пароль';
+    document.getElementById('agPwText').textContent = welcome === true
+      ? 'Вы вошли по ссылке-приглашению, она больше не сработает. С паролем вы войдёте на любом устройстве и после выхода. Браузер предложит его запомнить — согласитесь.'
+      : already
       ? 'Новый пароль заменит старый на всех устройствах.'
       : 'После этого войти в ваш аккаунт можно будет только с паролем — по одной почте уже нельзя.';
     document.getElementById('agPw1').value = '';
@@ -636,6 +685,7 @@
       if (r.label) meta.push(esc(r.label));
       meta.push(r.last_login_at ? 'входил(а) ' + fmtDate(r.last_login_at) : 'ещё не входил(а)');
       if (r.has_password) meta.push('<span class="pw">пароль задан</span>');
+      else if (r.invite_until) meta.push('приглашение до ' + fmtDate(r.invite_until));
       if (owner && !r.added_by_me && r.added_by_email) meta.push('добавил(а) ' + esc(r.added_by_email));
       const roleCtl = owner
         ? `<select data-act="role" data-email="${esc(r.email)}">
@@ -643,8 +693,16 @@
              <option value="student"${r.role === 'student' ? ' selected' : ''}>Ученик</option>
            </select>`
         : '';
+      // Преподаватель по одной почте не входит — только паролем или по
+      // ссылке-приглашению. Кнопка — у тех, кто пароль ещё не задал;
+      // задал и забыл — «Сбросить пароль», ссылка придёт сразу
+      const teacherRow = r.role === 'teacher';
+      const inv = r.can_manage && teacherRow && !r.has_password
+        ? `<button data-act="invite" data-email="${esc(r.email)}" title="Одноразовая ссылка на 7 дней: по ней человек войдёт и задаст пароль">Приглашение</button>` : '';
       const reset = r.can_manage && r.has_password
-        ? `<button data-act="reset" data-email="${esc(r.email)}" title="Пароль сотрётся, человек снова войдёт по почте и задаст новый">Сбросить пароль</button>` : '';
+        ? `<button data-act="reset" data-email="${esc(r.email)}" title="${teacherRow
+            ? 'Пароль сотрётся, скопируется новая ссылка-приглашение — по ней человек войдёт и задаст новый'
+            : 'Пароль сотрётся, человек снова войдёт по почте и задаст новый'}">Сбросить пароль</button>` : '';
       const del = r.can_manage
         ? (accConfirm === r.email
             ? `<button class="confirm" data-act="remove" data-email="${esc(r.email)}">Точно убрать?</button>`
@@ -653,7 +711,7 @@
       return `<div class="ag-acc-item" data-email="${esc(r.email)}">
         <div class="ag-acc-who"><div class="ag-acc-email" title="${esc(r.email)}">${esc(r.email)}</div>
           <div class="ag-acc-meta">${meta.join(' · ')}</div></div>
-        ${roleCtl}${reset}${del}</div>`;
+        ${roleCtl}${inv}${reset}${del}</div>`;
     };
     let html = '';
     if (!accRows.length) html = '<p class="ag-hint" style="margin-top:12px">Пока никого.</p>';
@@ -682,7 +740,7 @@
   function openAccess() {
     const owner = roleOf(window.CURRENT_USER) === 'owner';
     document.getElementById('agAccHint').textContent = owner
-      ? 'Добавленные почты входят на платформу без пароля и писем: открыть сайт, ввести почту, «Войти». Преподавателям после первого входа предложим задать пароль.'
+      ? 'Ученики входят без пароля и писем: открыть сайт, ввести почту, «Войти». Преподаватель — только с паролем: добавьте почту, нажмите «Приглашение» и отправьте ссылку. По ней он войдёт и задаст пароль.'
       : 'Добавьте почты своих учеников — они войдут на платформу без пароля и писем: открыть сайт, ввести почту, «Войти». И их сразу можно звать к доске.';
     document.getElementById('agAccRole').style.display = owner ? '' : 'none';
     document.getElementById('agAccRole').value = 'student';
@@ -740,12 +798,25 @@
     const email = btn.dataset.email, act = btn.dataset.act;
     if (act === 'remove-ask') { accConfirm = email; renderAccList(); return; }
     btn.disabled = true;
-    const res = await callAccess(act === 'remove' ? { action: 'remove', email } : { action: 'reset_password', email });
+    const action = act === 'remove' ? 'remove' : act === 'invite' ? 'invite' : 'reset_password';
+    const res = await callAccess({ action, email });
     accConfirm = null;
     if (!res.ok) accMessage('Не получилось: ' + (res.error === 'forbidden' ? 'нет прав на эту почту' : 'нет связи с сервером'), true);
+    else if (res.code) await showInviteLink(email, res.code, act === 'reset');
     else accMessage(act === 'remove' ? email + ' — вход закрыт' : email + ' — пароль сброшен, вход снова по почте');
     loadAccList();
   });
+  // Ссылка-приглашение: копируем и показываем целиком — если буфер обмена
+  // недоступен (Safari после ожидания ответа сервера), её можно выделить
+  async function showInviteLink(email, code, afterReset) {
+    const link = location.origin + location.pathname + '?join=' + encodeURIComponent(code);
+    let copied = false;
+    try { await navigator.clipboard.writeText(link); copied = true; } catch (e) { /* покажем для ручного копирования */ }
+    accMessage((afterReset ? email + ' — пароль сброшен.\n' : '')
+      + (copied ? 'Ссылка для ' + email + ' скопирована — отправьте её в мессенджер.'
+                : 'Скопируйте ссылку для ' + email + ' и отправьте её в мессенджер.')
+      + ' Одноразовая, действует 7 дней:\n' + link);
+  }
   document.getElementById('agAccList').addEventListener('change', async e => {
     const sel = e.target.closest('select[data-act="role"]');
     if (!sel) return;
@@ -765,6 +836,12 @@
       updateAccountUI(session.user);
       syncPillVisibility();
       hideGate();
+      // вошли по приглашению — сразу «Придумайте пароль» (почту сверяем:
+      // событие могло прийти от прежнего входа на этом устройстве)
+      if (pwAfterJoin && String(session.user.email || '').toLowerCase() === pwAfterJoin) {
+        pwAfterJoin = '';
+        openPwModal(true);
+      }
       if (window.boardsAppBoot) window.boardsAppBoot();
       // подтягиваем в локальный список доски, которыми с этим пользователем
       // поделились (см. второй блок ниже — cloudImportSharedBoards)
@@ -784,6 +861,9 @@
     } else {
       window.CURRENT_USER = null;
       updateAccountUI(null);
+      // идёт вход по ссылке-приглашению — форму не показываем, joinLogin
+      // сам либо впустит, либо покажет форму с понятной причиной
+      if (joinCode) { clearTimeout(loadingFallback); return; }
       // сессии сейчас нет — но если на устройстве всё ещё лежит сохранённый
       // токен, это почти наверняка просто сбой сети при попытке его обновить,
       // а не настоящий выход: когда сервер ДЕЙСТВИТЕЛЬНО признаёт вход
@@ -805,6 +885,7 @@
       }
     }
   });
+  if (joinCode) joinLogin(joinCode);
 })();
 
 /* ═══════════════════════════════════════════════════════════════════════

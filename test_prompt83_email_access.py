@@ -35,7 +35,12 @@ test_prompt83_access_server.py. Так проверяется связка са�
   G. владелец: смена роли, сброс пароля (вход по почте снова есть),
      «Убрать» с подтверждением — убранный не входит;
   H. телефон: плашка и окно «Доступ» в экране, без горизонтальной
-     прокрутки; тёмная тема — снимки.
+     прокрутки; тёмная тема — снимки;
+  I. (аудит 19.11) преподаватель по одной почте не входит — «нужен
+     пароль … попросите ссылку-приглашение»; владелец жмёт «Приглашение» —
+     ссылка ?join= в буфере обмена и в окне; по ней преподаватель внутри,
+     код убран из адреса, сразу «Придумайте пароль»; второй раз ссылка не
+     пускает; сброс пароля преподавателя сразу даёт новую ссылку.
 
 Запуск: python3 test_prompt83_email_access.py
 """
@@ -43,6 +48,7 @@ import contextlib
 import http.client
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -359,6 +365,7 @@ def run():
     with local_server(), sync_playwright() as p:
         browser = p.chromium.launch()
         ctx = browser.new_context(viewport={'width': 1280, 'height': 800})
+        ctx.grant_permissions(['clipboard-read', 'clipboard-write'], origin=BASE)
         ctx.add_init_script(SEED)
         ctx.add_init_script("try { localStorage.setItem('theme', 'light'); } catch (e) {}")
 
@@ -380,7 +387,7 @@ def run():
         page.evaluate("() => { window.__fake.down = false; }")
         login(page, 'owner@mathh.ru')
         page.wait_for_function("() => /пароль/.test(document.getElementById('agError').textContent)")
-        check('задан пароль' in gate_error(page), 'владелец по одной почте — «задан пароль, введите его»')
+        check('нужен пароль' in gate_error(page), 'владелец по одной почте — «нужен пароль, введите его»')
 
         print('B. владелец')
         login(page, 'owner@mathh.ru', 'ownerpw')
@@ -401,14 +408,34 @@ def run():
         lst = page.inner_text('#agAccList')
         check('eng.teacher@mail.ru' in lst and 'Преподаватель языков' in lst and 'ещё не входил' in lst,
               'список: почта строчными, подпись, «ещё не входил»')
+        check(page.locator('.ag-acc-item[data-email="eng.teacher@mail.ru"] button[data-act="invite"]').count() == 1,
+              'I: у преподавателя без пароля — «Приглашение»')
+        page.click('.ag-acc-item[data-email="eng.teacher@mail.ru"] button[data-act="invite"]')
+        page.wait_for_function("() => /join=/.test(document.getElementById('agAccMsg').textContent)")
+        msg = acc_msg(page)
+        link = re.search(r'https?://\S+\?join=\S+', msg).group(0)
+        clip = page.evaluate("() => navigator.clipboard.readText()")
+        check('скопирована' in msg and clip == link and '7 дней' in msg, f'I: ссылка в буфере и в окне ({msg!r})')
+        page.wait_for_function("() => /приглашение до/.test(document.querySelector('.ag-acc-item[data-email=\"eng.teacher@mail.ru\"]').textContent)")
+        check(True, 'I: в списке «приглашение до …»')
         page.screenshot(path=f'{SHOTS}/b_access_owner.png')
         page.keyboard.press('Escape')
         sign_out(page)
 
-        print('C. преподаватель по почте')
+        print('C. преподаватель: по почте нельзя, по приглашению — да')
         login(page, 'eng.teacher@mail.ru')
+        page.wait_for_function("() => /пароль/.test(document.getElementById('agError').textContent)")
+        err = gate_error(page)
+        check('нужен пароль' in err and 'ссылку-приглашение' in err, f'I: по одной почте — «нужен пароль, попросите приглашение» ({err})')
+        check(not page.evaluate("() => window.CURRENT_USER"), 'I: внутрь не пустило')
+        page.goto(link)
         wait_inside(page)
+        check('join' not in page.url, f'I: код убран из адреса ({page.url})')
         check(page.evaluate("() => window.__fake.verify.slice(-1)[0]") == 'email', 'вход: verifyOtp с type email')
+        page.wait_for_function("() => document.getElementById('agPwModal').classList.contains('open')")
+        check(page.inner_text('#agPwTitle') == 'Придумайте пароль', 'I: сразу «Придумайте пароль»')
+        page.screenshot(path=f'{SHOTS}/c_join_pw.png')
+        page.keyboard.press('Escape')
         check(page.evaluate("() => window.mathhRole()") == 'teacher', 'роль преподавателя')
         page.wait_for_function("() => document.getElementById('agPwBanner').classList.contains('open')")
         check(visible(page, '#agPwBanner'), 'красная плашка видна')
@@ -416,7 +443,9 @@ def run():
               'рамка красная')
         page.wait_for_timeout(600)
         b = rect(page, '#agPwBanner')
-        check(b and b[0] < 640 and b[1] < 80, f'плашка слева сверху ({b})')
+        # по ширине не ограничиваем: в шапке списка теперь поиск, и плашка
+        # встаёт правее него; что она ничего не перекрывает — проверка ниже
+        check(b and b[1] < 80, f'плашка в верхней строке ({b})')
         check(not covers(page), f'в списке плашка ничего не перекрывает ({covers(page)})')
         page.screenshot(path=f'{SHOTS}/c_teacher_list.png')
         check(visible(page, '#agOpenAccess'), '«доступ» есть у преподавателя')
@@ -467,7 +496,10 @@ def run():
         sign_out(page)
         login(page, 'eng.teacher@mail.ru')
         page.wait_for_function("() => /пароль/.test(document.getElementById('agError').textContent)")
-        check('задан пароль' in gate_error(page), 'по одной почте больше нельзя — «задан пароль»')
+        check('нужен пароль' in gate_error(page), 'по одной почте больше нельзя — «нужен пароль»')
+        page.goto(link)
+        page.wait_for_function("() => /уже использована/.test(document.getElementById('agError').textContent)")
+        check(not page.evaluate("() => window.CURRENT_USER") and 'join' not in page.url, 'I: второй раз ссылка не пускает')
         login(page, 'eng.teacher@mail.ru', 'secret1')
         wait_inside(page)
         check(not visible(page, '#agPwBanner'), 'паролем — внутри, без плашки')
@@ -516,6 +548,10 @@ def run():
               'роль сменилась и в аккаунте')
         page.click('.ag-acc-item[data-email="eng.teacher@mail.ru"] button[data-act="reset"]')
         page.wait_for_function("() => /пароль сброшен/.test(document.getElementById('agAccMsg').textContent)")
+        msg = acc_msg(page)
+        m = re.search(r'https?://\S+\?join=\S+', msg)
+        check(m is not None and m.group(0) != link, f'I: сброс преподавателю — сразу новая ссылка ({msg!r})')
+        link2 = m.group(0) if m else ''
         check('пароль задан' not in page.inner_text('.ag-acc-item[data-email="eng.teacher@mail.ru"]'), 'сброс: «пароль задан» ушло')
         page.click('.ag-acc-item[data-email="pupil@mail.ru"] button[data-act="remove-ask"]')
         check(page.locator('.ag-acc-item[data-email="pupil@mail.ru"] button.confirm').count() == 1, '«Убрать» спрашивает «Точно?»')
@@ -534,9 +570,14 @@ def run():
         page.wait_for_function("() => /не добавлена/.test(document.getElementById('agError').textContent)")
         check(True, 'убранный ученик не входит')
         login(page, 'eng.teacher@mail.ru')
+        page.wait_for_function("() => /нужен пароль/.test(document.getElementById('agError').textContent)")
+        check(True, 'после сброса по одной почте не войти')
+        page.goto(link2)
         wait_inside(page)
+        page.wait_for_function("() => document.getElementById('agPwModal').classList.contains('open')")
+        page.keyboard.press('Escape')
         page.wait_for_function("() => document.getElementById('agPwBanner').classList.contains('open')")
-        check(True, 'после сброса — снова по почте, снова красная плашка')
+        check(True, 'после сброса — по новой ссылке внутри, «Придумайте пароль», закрыл — красная плашка')
 
         print('H. телефон и тёмная тема')
         phone = browser.new_context(viewport={'width': 375, 'height': 740}, is_mobile=True, has_touch=True)
@@ -546,8 +587,16 @@ def run():
         pp.evaluate("""(st) => { localStorage.setItem('__fakeSB', st); }""",
                     page.evaluate("() => localStorage.getItem('__fakeSB')"))
         pp.reload()
-        login(pp, 'eng.teacher@mail.ru')
+        code = pp.evaluate("""async () => { const S = window.__fake; S.st.tokens['a.own.ph'] = 'u1'; S.save();
+            const req = new Request('https://fake.test/functions/v1/email-login', { method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: 'Bearer a.own.ph' },
+              body: JSON.stringify({ action: 'invite', email: 'eng.teacher@mail.ru' }) });
+            return (await (await window.__emailLoginHandle(req, window.__fakeAdmin)).json()).code; }""")
+        pp.goto(BASE + '/boards.html?join=' + code)
         wait_inside(pp)
+        pp.wait_for_function("() => document.getElementById('agPwModal').classList.contains('open')")
+        pp.screenshot(path=f'{SHOTS}/h_phone_join_pw_dark.png')
+        pp.keyboard.press('Escape')
         pp.wait_for_function("() => document.getElementById('agPwBanner').classList.contains('open')")
         pp.wait_for_timeout(700)
         b = rect(pp, '#agPwBanner')

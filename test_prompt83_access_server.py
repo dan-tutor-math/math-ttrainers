@@ -27,7 +27,14 @@
         таблицы, а не из старого токена);
      G. сброс пароля — пароль затёрт, has_password снят, вход по почте
         снова работает;
-     H. список: has_password, кто добавил, can_manage; CORS на OPTIONS.
+     H. список: has_password, кто добавил, can_manage; CORS на OPTIONS;
+     I. (аудит 19.11) преподаватель по одной почте не входит —
+        password_required; приглашение: выдаёт владелец (преподаватель —
+        своим ученикам), новое отменяет старое, ссылка одноразовая, стирается
+        при входе, просроченная и чужая не пускают, убранного не пускают;
+        сброс пароля преподавателя сразу даёт приглашение;
+     J. 31-я попытка входа за 10 минут с одного адреса — too_many.
+   Без Postgres на машине часть 1 пропускается с пометкой, часть 2 идёт.
 
 Запуск: python3 test_prompt83_access_server.py
 """
@@ -38,7 +45,17 @@ import subprocess
 import sys
 import tempfile
 
-import test_prompt15_works_schema as W
+
+def load_pg_helpers():
+    """Помощники Postgres из теста №15. На машине без Postgres тот модуль
+    выходит при загрузке (sys.exit) — тогда проверка схемы пропускается с
+    пометкой, а логика функции (вторая часть) всё равно гоняется"""
+    try:
+        import test_prompt15_works_schema as W
+        return W
+    except SystemExit as e:
+        print(f'  ПРОПУЩЕНО: {e}')
+        return None
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCHEMA = os.path.join(HERE, 'access-schema.sql')
@@ -60,6 +77,9 @@ OLD2 = '00000000-0000-4000-8000-000000000003'
 
 def test_schema():
     print('— access-schema.sql')
+    W = load_pg_helpers()
+    if W is None:
+        return
     pg = W.PG()
     try:
         pg.ok(W.SUPABASE_STUB)
@@ -190,8 +210,9 @@ globalThis.admin = admin;
 HARNESS = r"""
 const { handle } = await import(process.argv[2]);
 const out = [];
-async function call(body, token, method){
+async function call(body, token, method, ip){
   const headers = { 'Content-Type': 'application/json' };
+  if (ip) headers['x-forwarded-for'] = ip + ', 10.0.0.1';
   headers.Authorization = 'Bearer ' + (token || 'sb_publishable_xxx');
   const req = new Request('https://x.test/functions/v1/email-login', { method: method || 'POST', headers,
     body: method === 'OPTIONS' ? undefined : JSON.stringify(body) });
@@ -213,11 +234,28 @@ R.rowsAfterBatch = [...S.rows.values()].map(r => [r.email, r.role, r.label, !!r.
 R.usersAfterBatch = [...S.users.values()].map(u => u.email).sort();
 
 const eng = [...S.users.values()].find(u => u.email === 'eng.teacher@mail.ru');
+const rus = [...S.users.values()].find(u => u.email === 'rus_teacher@mail.ru');
 R.engLogin = await call({ action: 'login', email: ' ENG.teacher@mail.RU ' });
 R.engMeta = S.users.get(eng.id).app_metadata;
+R.engLastLogin0 = !!S.rows.get('eng.teacher@mail.ru').last_login_at;
+// приглашение: владелец выдаёт, преподаватель входит ссылкой один раз
+R.invAnon = await call({ action: 'invite', email: 'eng.teacher@mail.ru' });
+R.invOld = await call({ action: 'invite', email: 'eng.teacher@mail.ru' }, 'a.owner.t');
+R.inv = await call({ action: 'invite', email: 'eng.teacher@mail.ru' }, 'a.owner.t');
+R.redeemOld = await call({ action: 'redeem', code: R.invOld.code });
+R.invListed = (await call({ action: 'list' }, 'a.owner.t')).rows.find(r => r.email === 'eng.teacher@mail.ru').invite_until;
+R.redeemBadFormat = await call({ action: 'redeem', code: 'abc' });
+R.redeemWrong = await call({ action: 'redeem', code: eng.id + '.' + 'f'.repeat(48) });
+R.redeem = await call({ action: 'redeem', code: R.inv.code });
 R.engLastLogin = !!S.rows.get('eng.teacher@mail.ru').last_login_at;
+R.inviteCleared = S.users.get(eng.id).app_metadata.invite;
+R.engRoleKept = S.users.get(eng.id).app_metadata.mathh_role;
+R.redeemTwice = await call({ action: 'redeem', code: R.inv.code });
+R.invOwnerSelf = await call({ action: 'invite', email: 'owner@mathh.ru' }, 'a.owner.t');
+const exp = await call({ action: 'invite', email: 'rus_teacher@mail.ru' }, 'a.owner.t');
+S.users.get(rus.id).app_metadata.invite.exp = Date.now() - 1000;
+R.redeemExpired = await call({ action: 'redeem', code: exp.code });
 S.tokens.set('a.eng.t', eng.id);
-const rus = [...S.users.values()].find(u => u.email === 'rus_teacher@mail.ru');
 S.tokens.set('a.rus.t', rus.id);
 
 // преподаватель: только ученики, только свои
@@ -231,6 +269,9 @@ R.rusRemoveOther = await call({ action: 'remove', email: 'pupil1@mail.ru' }, 'a.
 R.rusResetOther = await call({ action: 'reset_password', email: 'pupil1@mail.ru' }, 'a.rus.t');
 R.rusSetRole = await call({ action: 'set_role', email: 'pupil1@mail.ru', role: 'teacher' }, 'a.rus.t');
 R.rusList = await call({ action: 'list' }, 'a.rus.t');
+R.rusInviteOther = await call({ action: 'invite', email: 'pupil1@mail.ru' }, 'a.rus.t');
+R.rusInviteColleague = await call({ action: 'invite', email: 'eng.teacher@mail.ru' }, 'a.rus.t');
+R.engInvitePupil = await call({ action: 'invite', email: 'pupil2@mail.ru' }, 'a.eng.t');
 R.engList = await call({ action: 'list' }, 'a.eng.t');
 R.ownerList = await call({ action: 'list' }, 'a.owner.t');
 
@@ -248,9 +289,11 @@ R.ownerListPw = (await call({ action: 'list' }, 'a.owner.t')).rows.find(r => r.e
 R.ownerReset = await call({ action: 'reset_password', email: 'eng.teacher@mail.ru' }, 'a.owner.t');
 R.engAfterReset = [S.users.get(eng.id).user_metadata.has_password, (S.users.get(eng.id).password || '').length];
 R.engLoginAfterReset = await call({ action: 'login', email: 'eng.teacher@mail.ru' });
+R.redeemAfterReset = await call({ action: 'redeem', code: R.ownerReset.code });
 
 // убрать и вернуть
 R.engRemovePupil2 = await call({ action: 'remove', email: 'pupil2@mail.ru' }, 'a.eng.t');
+R.redeemRemoved = await call({ action: 'redeem', code: R.engInvitePupil.code });
 const p2 = [...S.users.values()].find(u => u.email === 'pupil2@mail.ru');
 R.afterRemove = [S.rows.has('pupil2@mail.ru'), S.users.has(p2.id), !!S.users.get(p2.id).banned_until];
 R.loginRemoved = await call({ action: 'login', email: 'pupil2@mail.ru' });
@@ -269,6 +312,13 @@ const legacy = newUser('Legacy@Mail.ru');
 S.rows.set('legacy@mail.ru', { email: 'legacy@mail.ru', role: 'student', label: 'аккаунт до нового входа', user_id: legacy.id, added_by: null, created_at: '2026-01-01' });
 R.legacyLogin = await call({ action: 'login', email: 'legacy@mail.ru' });
 R.legacyProfile = (S.profiles.get(legacy.id) || {}).email;
+
+// ограничение попыток: 30 за 10 минут с одного адреса, другой адрес не задет
+const many = [];
+for (let i = 0; i < 31; i++) many.push((await call({ action: 'login', email: 'nobody@mail.ru' }, null, null, '203.0.113.7')).error);
+R.rate = [many[29], many[30]];
+R.rateOther = (await call({ action: 'login', email: 'nobody@mail.ru' }, null, null, '203.0.113.8')).error;
+R.rateRedeem = (await call({ action: 'redeem', code: 'x' }, null, null, '203.0.113.7')).error;
 
 R.options = await call(null, null, 'OPTIONS');
 R.badAction = await call({ action: 'drop_table' });
@@ -309,10 +359,26 @@ def test_function():
     check(sorted(R['rowsAfterBatch']) == [['eng.teacher@mail.ru', 'teacher', 'Преподаватель', True],
                                           ['rus_teacher@mail.ru', 'teacher', 'Преподаватель', True]],
           f'C: роль и подпись, аккаунт создан сразу ({R["rowsAfterBatch"]})')
-    check(R['engLogin'].get('ok') and R['engLogin'].get('token_hash', '').startswith('h-') and R['engLogin'].get('role') == 'teacher',
-          f'A: вход по почте с пробелами и заглавными — token_hash ({R["engLogin"]})')
-    check(R['engMeta'].get('mathh_role') == 'teacher', 'A: роль в app_metadata')
-    check(R['engLastLogin'], 'A: last_login_at записан')
+    check(R['engLogin'] == {'ok': False, 'error': 'password_required'} and not R['engLastLogin0'],
+          f'B: преподаватель без пароля по одной почте не входит ({R["engLogin"]})')
+    check(R['engMeta'].get('mathh_role') == 'teacher', 'C: роль в app_metadata уже при добавлении')
+
+    check(R['invAnon'] == {'ok': False, 'error': 'forbidden'}, 'I: приглашение без входа — forbidden')
+    check(R['inv'].get('ok') and R['inv']['code'] != R['invOld']['code'] and R['inv'].get('expires_at'),
+          f'I: владелец выдаёт приглашение ({R["inv"]})')
+    check(R['redeemOld'] == {'ok': False, 'error': 'invite_invalid'}, 'I: новое приглашение отменяет старое')
+    check(bool(R['invListed']), 'I: в списке видно, что приглашение действует')
+    check(R['redeemBadFormat'] == {'ok': False, 'error': 'invite_invalid'}
+          and R['redeemWrong'] == {'ok': False, 'error': 'invite_invalid'}, 'I: чужая и кривая ссылка — invite_invalid')
+    rd = R['redeem']
+    check(rd.get('ok') and rd.get('token_hash', '').startswith('h-') and rd.get('role') == 'teacher'
+          and rd.get('email') == 'eng.teacher@mail.ru' and rd.get('need_password') is True,
+          f'I: вход по приглашению — token_hash, «задайте пароль» ({rd})')
+    check(R['engLastLogin'] and R['inviteCleared'] is None and R['engRoleKept'] == 'teacher',
+          'I: last_login_at записан, приглашение стёрто, роль на месте')
+    check(R['redeemTwice'] == {'ok': False, 'error': 'invite_invalid'}, 'I: ссылка одноразовая')
+    check(R['invOwnerSelf'] == {'ok': False, 'error': 'not_found'}, 'I: владельцу приглашение не выдаётся')
+    check(R['redeemExpired'] == {'ok': False, 'error': 'invite_expired'}, 'I: просроченное — invite_expired')
 
     check(R['engAddRoles'] == ['student:true', 'student:true'], f'D: преподаватель добавляет только учеников ({R["engAddRoles"]})')
     r = R['rusAddOther']['results'][0]
@@ -324,6 +390,9 @@ def test_function():
     check(R['rusResetOther'] == {'ok': False, 'error': 'forbidden'}, 'D: чужому ученику не сбросить пароль')
     check(R['rusSetRole'] == {'ok': False, 'error': 'forbidden'}, 'D: роль меняет только владелец')
     check(R['rusList']['ok'] and R['rusList']['rows'] == [], 'D: в списке у преподавателя только свои (пусто)')
+    check(R['rusInviteOther'] == {'ok': False, 'error': 'forbidden'} and R['rusInviteColleague'] == {'ok': False, 'error': 'forbidden'},
+          'D: преподаватель не выдаёт приглашение чужому ученику и коллеге')
+    check(R['engInvitePupil'].get('ok') is True, 'D: своему ученику — выдаёт')
     check(sorted(x['email'] for x in R['engList']['rows']) == ['pupil1@mail.ru', 'pupil2@mail.ru'],
           'D: у второго — его двое')
     check(len(R['ownerList']['rows']) == 4 and R['ownerList']['me'] == {'owner': True, 'teacher': False},
@@ -338,13 +407,16 @@ def test_function():
 
     check(R['engLoginPw'] == {'ok': False, 'error': 'password_required'}, 'B: задан пароль — по одной почте не войти')
     check(R['ownerListPw'] is True, 'H: в списке видно, что пароль задан')
-    check(R['ownerReset'] == {'ok': True} and R['engAfterReset'][0] is False and R['engAfterReset'][1] >= 32,
-          f'G: сброс пароля — затёрт случайным, пометка снята ({R["engAfterReset"]})')
-    check(R['engLoginAfterReset'].get('ok') is True, 'G: после сброса снова по почте')
+    check(R['ownerReset'].get('ok') is True and R['ownerReset'].get('code') and R['engAfterReset'][0] is False
+          and R['engAfterReset'][1] >= 32, f'G: сброс пароля — затёрт случайным, пометка снята, сразу приглашение ({R["engAfterReset"]})')
+    check(R['engLoginAfterReset'] == {'ok': False, 'error': 'password_required'}, 'G: после сброса по одной почте преподаватель не входит')
+    check(R['redeemAfterReset'].get('ok') is True and R['redeemAfterReset'].get('need_password') is True,
+          'G: входит по приглашению из сброса и задаёт пароль')
 
     check(R['engRemovePupil2'] == {'ok': True} and R['afterRemove'] == [False, True, True],
           f'E: убрать — строки нет, аккаунт цел и заблокирован ({R["afterRemove"]})')
     check(R['loginRemoved'] == {'ok': False, 'error': 'not_allowed'}, 'E: убранный не входит')
+    check(R['redeemRemoved'] == {'ok': False, 'error': 'not_allowed'}, 'E: убранный не входит и по выданному раньше приглашению')
     check(R['afterReadd'] == [False, True] and R['loginReadd'].get('ok') is True, 'E: вернули — блок снят, тот же аккаунт, вход есть')
 
     check(R['setRole'] == {'ok': True} and R['rusMeta'] == 'student', 'F: роль сменилась в таблице и app_metadata')
@@ -352,6 +424,8 @@ def test_function():
 
     check(R['legacyLogin'].get('ok') is True and R['legacyProfile'] == 'legacy@mail.ru',
           'A: старый аккаунт входит, строка profiles дописана')
+    check(R['rate'] == ['not_allowed', 'too_many'] and R['rateOther'] == 'not_allowed' and R['rateRedeem'] == 'too_many',
+          f'J: 31-я попытка с одного адреса — too_many, другой адрес не задет ({R["rate"]}, {R["rateOther"]})')
     check(R['options'] == {'status': 200, 'cors': '*'}, 'H: CORS на OPTIONS')
     check(R['badAction'] == {'ok': False, 'error': 'bad_action'}, 'неизвестное действие — bad_action')
 
