@@ -126,10 +126,14 @@ with server(), sync_playwright() as pw:
     # предмета (subject-palette.js) — и линии тоже
     page.evaluate("MathhBg.set('grid'); document.documentElement.setAttribute('data-subject','math'); document.documentElement.setAttribute('data-theme','dark')")
     line = page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--bgp-line').trim()")
-    check(line.lower() == "#232a44", f"цвет линий в тёмной теме {line}")
+    # линии клетки тёмной темы с 22.11 подобраны под контраст с фоном
+    # (subject-palette.js, уровни поверхностей): у математики — синеватые
+    hx = line.lstrip('#'); cr_, cg_, cb_ = int(hx[0:2], 16), int(hx[2:4], 16), int(hx[4:6], 16)
+    check(cb_ > cr_ and cb_ > cg_ and max(cr_, cg_, cb_) < 90, f"цвет линий в тёмной теме {line}")
     page.evaluate("document.documentElement.setAttribute('data-subject','rus')")
     line = page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--bgp-line').trim()")
-    check(line.lower() != "#232a44", f"у русского линии в его тоне {line}")
+    hx = line.lstrip('#'); cr_, cg_, cb_ = int(hx[0:2], 16), int(hx[2:4], 16), int(hx[4:6], 16)
+    check(cr_ > cb_, f"у русского линии в его тоне {line}")
 
     check(not errs, f"ошибок JavaScript нет {errs}")
     b.close()

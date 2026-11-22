@@ -1821,7 +1821,8 @@ function deckPaperColor(s){
   const k = deckBgKind(s);
   if (k === 'dark') return DECK_DARK_PAPER;
   if (k === 'fill' && s.bg.f) return s.bg.f;
-  return themeVar('--paper');
+  // светлые слайды в тёмной теме (board-canvas.js, настройка тёмной темы)
+  return (window.BoardCanvas && window.BoardCanvas.slidePaper()) || themeVar('--paper');
 }
 function deckIsDarkBg(s){
   const k = deckBgKind(s);
@@ -1833,7 +1834,7 @@ function deckBgKind(s){ return (s && s.bg && s.bg.k) || 'grid'; }
 function deckLineColor(s){
   if (s.bg && s.bg.c) return s.bg.c;
   if (deckIsDarkBg(s)) return 'rgba(255,255,255,.16)';
-  return B.gridColor ? resolveColor(B.gridColor) : themeVar('--grid');
+  return B.gridColor ? resolveColor(B.gridColor) : ((window.BoardCanvas && window.BoardCanvas.slideGrid()) || themeVar('--grid'));
 }
 // узор подложки по клеткам слайда; p0/p1 — его углы на экране
 // №87г: шаг узора — slide.bg.s в клетках (клетка = 0,5 см), меняется

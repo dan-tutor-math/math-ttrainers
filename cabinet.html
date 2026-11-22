@@ -111,6 +111,9 @@ textarea.field{min-height:90px;resize:vertical;}
 .seg{display:flex;gap:2px;padding:3px;border-radius:12px;background:var(--glass);border:1px solid var(--glass-border);width:max-content;max-width:100%;flex-wrap:wrap;margin-top:8px;}
 .seg button{font-family:var(--font-ui);font-weight:600;font-size:13.5px;color:var(--muted-3);background:transparent;border:none;border-radius:9px;padding:8px 14px;cursor:pointer;}
 .seg button.on{background:var(--ink);color:#fff;}
+/* настройки тёмной темы: три переключателя подряд — подписи с отступом, иначе липнут к соседнему ряду */
+#cabDark .label{margin-top:14px;}
+#cabDark .label:first-child{margin-top:0;}
 .chk{display:flex;align-items:center;gap:8px;font-size:14.5px;margin-top:8px;cursor:pointer;}
 .save-note{font-size:13px;color:var(--muted-2);min-height:1.2em;}
 /* ── ученики таблицей (cabinet-students.js) — как «Доход / расход» старого
@@ -409,6 +412,27 @@ html[data-theme="dark"]{--cab-window:#232940;}
             <div class="seg cab-colors" id="cabPalettes" role="group" aria-labelledby="cabPaletteLabel"></div>
             <div class="save-note" id="cabPaletteNote" role="status"></div>
           </div>
+          <div class="cab-options" id="cabDark">
+            <div class="label" id="cabDarkContrastLabel">Тёмная тема: контраст</div>
+            <div class="seg" data-dark="contrast" role="group" aria-labelledby="cabDarkContrastLabel">
+              <button type="button" data-v="soft">Мягкий</button>
+              <button type="button" data-v="normal">Обычный</button>
+              <button type="button" data-v="high">Высокий</button>
+            </div>
+            <div class="label" id="cabDarkBaseLabel">Тёмная тема: фон</div>
+            <div class="seg" data-dark="base" role="group" aria-labelledby="cabDarkBaseLabel">
+              <button type="button" data-v="tone">В тоне цвета</button>
+              <button type="button" data-v="graphite">Графит</button>
+              <button type="button" data-v="black">Чёрный</button>
+            </div>
+            <div class="label" id="cabDarkSlidesLabel">Слайды презентаций в тёмной теме</div>
+            <div class="seg" data-dark="slides" role="group" aria-labelledby="cabDarkSlidesLabel">
+              <button type="button" data-v="light">Светлые</button>
+              <button type="button" data-v="dark">Тёмные</button>
+            </div>
+            <div class="hint">Контраст — насколько панели, карточки и слайды отличаются от фона. «Чёрный» бережёт батарею на OLED-экранах. Светлые слайды выглядят так, как их увидит ученик и проектор.</div>
+            <div class="save-note" id="cabDarkNote" role="status"></div>
+          </div>
         </div>
         <div class="set-group">
           <h3>Сессия с учеником</h3>
@@ -628,6 +652,36 @@ function paintMain(){
   window.MathhPalette?.refresh();
 }
 TS.onChange(paintMain);
+
+/* тёмная тема (teacher_settings.darkTheme, subject-palette.js): контраст
+   поверхностей, фон, слайды. Без своей записи — значения по умолчанию */
+const darkBox = $('cabDark');
+function currentDark(){
+  const d = TS.get().darkTheme;
+  const base = window.MathhPalette ? MathhPalette.darkSettings() : { contrast: 'normal', base: 'tone', slides: 'light' };
+  return (d && d.owner === user?.id) ? { contrast: d.contrast, base: d.base, slides: d.slides } : base;
+}
+function paintDark(){
+  const cur = currentDark();
+  darkBox.querySelectorAll('.seg[data-dark]').forEach(seg => {
+    seg.querySelectorAll('button').forEach(b => {
+      const on = cur[seg.dataset.dark] === b.dataset.v;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-pressed', String(on));
+    });
+  });
+  window.MathhPalette?.refresh();
+}
+TS.onChange(paintDark);
+darkBox.addEventListener('click', async e => {
+  const b = e.target.closest('.seg[data-dark] button');
+  const owner = user?.id;
+  if (!b || !owner) return;
+  await settingsRequest?.result;
+  if (user?.id !== owner) return;
+  const next = Object.assign(currentDark(), { [b.closest('.seg').dataset.dark]: b.dataset.v });
+  paletteSave = save({ darkTheme: Object.assign({ owner }, next) }, 'cabDarkNote');
+});
 mainBox.addEventListener('click', async e => {
   const subject = e.target.closest('button')?.dataset.main;
   const owner = user?.id;
@@ -855,6 +909,7 @@ async function route(){
   paintAccount();
   paintPalette();
   paintMain();
+  paintDark();
   if (!user){ window.Schedule?.hide(); show('scrAuth'); return; }
   const [tab, id] = location.hash.replace(/^#\/?/, '').split('/');
   // без вкладки в адресе — «Расписание»: в кабинет заходят прежде всего за ним (просьба Даниила 14.11)

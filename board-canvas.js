@@ -51,12 +51,27 @@
     return p && p.paper ? p : null;
   }
 
+  /* Светлые слайды в тёмной теме (настройка «Слайды презентаций в тёмной
+     теме», subject-palette.js; по умолчанию светлые): слайд выглядит так,
+     как его увидят ученик и проектор, и сразу отделяется от тёмного фона.
+     Подложки слайдов «тёмная» и цветная из PowerPoint — свои, их не трогаем
+     (deckPaperColor смотрит на них раньше) */
+  var SLIDE = { paper: '#FDFCF7', grid: '#DCE4F0', ink: '#1D1D1F' };
+  function lightSlides() {
+    var b = board();
+    if (!isDeck(b) || document.documentElement.getAttribute('data-theme') !== 'dark') return false;
+    var d = window.MathhPalette && window.MathhPalette.darkSettings ? window.MathhPalette.darkSettings() : null;
+    return !d || d.slides !== 'dark';
+  }
   var api = {
     presets: PRESETS,
     paper: function () { var p = current(); return p ? p.paper : null; },
     grid: function () { var p = current(); return p ? p.grid : null; },
-    ink: function () { var p = current(); return p ? p.ink : null; },
-    key: function () { var b = board(); return isDeck(b) ? '' : currentId(); },
+    // перо по умолчанию: на холсте доски — по холсту, на светлом слайде — тёмное
+    ink: function () { if (lightSlides()) return SLIDE.ink; var p = current(); return p ? p.ink : null; },
+    slidePaper: function () { return lightSlides() ? SLIDE.paper : null; },
+    slideGrid: function () { return lightSlides() ? SLIDE.grid : null; },
+    key: function () { var b = board(); return isDeck(b) ? (lightSlides() ? 'deck-light' : '') : currentId(); },
     currentId: currentId,
     // scope: 'board' — только эта доска; 'all' — все доски (эта тоже
     // переходит на общий выбор: свой цвет у неё снимается)
@@ -80,6 +95,9 @@
 
   function save() { try { if (typeof saveDB === 'function') saveDB(); } catch (e) {} }
   function redraw() {
+    // цвета темы в движке досок закешированы (themeVar) — настройки тёмной
+    // темы меняют их без смены data-theme
+    try { if (typeof themeVarCache !== 'undefined') themeVarCache.clear(); } catch (e) {}
     try { if (typeof boardCacheReset === 'function') boardCacheReset('холст'); } catch (e) {}
     try { if (typeof scheduleRedraw === 'function') scheduleRedraw(); } catch (e) {}
   }
@@ -113,10 +131,13 @@
     /* тёмная тема на светлом холсте: полупрозрачное тёмное стекло панелей
        поверх белого становилось серо-сиреневым — делаем его плотным, в тон
        тёмного фона (и предмета: --bg уже окрашен subject-palette.js) */
-    ':root[data-theme="dark"][data-canvas="light"]{--glass:color-mix(in srgb,var(--bg),#fff 9%);' +
+    ':root:root:root:root[data-theme="dark"][data-canvas="light"]{--glass:color-mix(in srgb,var(--bg),#fff 9%);' +
       '--glass-strong:color-mix(in srgb,var(--bg),#fff 12%);--card:color-mix(in srgb,var(--bg),#fff 12%)}' +
+    // миниатюры и карточки листания — того же цвета, что светлый слайд
+    ':root[data-theme="dark"][data-dark-slides="light"] .deck-card,' +
+    ':root[data-theme="dark"][data-dark-slides="light"] .deck-thumb canvas{background:#FDFCF7}' +
     // и наоборот: светлая тема на тёмном холсте (чёрный, меловой, графит)
-    ':root:not([data-theme="dark"])[data-canvas="dark"]{--glass:color-mix(in srgb,var(--bg),#fff 55%);' +
+    ':root:root:root:root:not([data-theme="dark"])[data-canvas="dark"]{--glass:color-mix(in srgb,var(--bg),#fff 55%);' +
       '--glass-strong:color-mix(in srgb,var(--bg),#fff 70%);--card:color-mix(in srgb,var(--bg),#fff 70%)}';
 
   var btn = null, pop = null, scope = 'board';
@@ -234,8 +255,13 @@
       theme = t; paintBtn();
       if (api.ink() !== null) showHint();
     }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    // выбор «для всех» в другой вкладке
-    window.addEventListener('storage', function (e) { if (e.key === GLOBAL_KEY) { redraw(); paintPop(); } });
+    // выбор «для всех» в другой вкладке; настройки тёмной темы (контраст,
+    // фон, слайды) — здесь или в кабинете в соседней вкладке
+    window.addEventListener('storage', function (e) {
+      if (e.key === GLOBAL_KEY) { redraw(); paintPop(); }
+      else if (e.key === 'mathh:dark' || e.key === 'teacher:settings:v1') setTimeout(redraw, 0);
+    });
+    if (window.MathhPalette && window.MathhPalette.onDarkChange) window.MathhPalette.onDarkChange(redraw);
     paintBtn();
     // доска открывается и меняется без перезагрузки — значок и плотность
     // панелей по текущей доске; проверка дешёвая (атрибут и localStorage)

@@ -30,6 +30,8 @@
                    owner отделяет локальные копии аккаунтов
      mainSubject — основной предмет педагога { owner, subject }: с него открывается главная
                    на новом устройстве, им окрашены доски и кабинет, пока цвет «по предмету»
+     darkTheme   — тёмная тема { owner, contrast 'soft'|'normal'|'high', base 'tone'|'graphite'|'black',
+                   slides 'light'|'dark' } (subject-palette.js)
      incomeGroups — группы дохода (В4б, фильтр статистики):
                    [{id, name, members [student_id], from, to, auto}];
                    auto — в группу сами попадают все ученики, кроме out
@@ -40,7 +42,7 @@
   const DEFAULTS = { sessionBind: 'browser', sessionGoHome: false, boardNewTab: false, labels: 'show', labelDates: true, labelCount: true, lessonMin: 60,
                      formatLabels: Object.assign({}, FORMAT_LABELS),
                      pay: { skipRule: 'free', outside: 'free', trackSingleDebt: true, remindLeft: 1, remindDays: 3, flags: [], monthMode: 'x4' },
-                     incomeGroups: [], cabinetPalette: null, mainSubject: null };
+                     incomeGroups: [], cabinetPalette: null, mainSubject: null, darkTheme: null };
   const listeners = [];
   let cur = null;
 
@@ -78,6 +80,15 @@
     if (main && typeof main.owner === 'string' && main.owner &&
         typeof main.subject === 'string' && /^[a-z0-9_-]{1,24}$/.test(main.subject)){
       o.mainSubject = { owner: main.owner, subject: main.subject };
+    }
+    const dk = raw.darkTheme;
+    if (dk && typeof dk.owner === 'string' && dk.owner){
+      o.darkTheme = {
+        owner: dk.owner,
+        contrast: /^(soft|normal|high)$/.test(dk.contrast) ? dk.contrast : 'normal',
+        base: /^(tone|graphite|black)$/.test(dk.base) ? dk.base : 'tone',
+        slides: /^(light|dark)$/.test(dk.slides) ? dk.slides : 'light',
+      };
     }
     return o;
   }

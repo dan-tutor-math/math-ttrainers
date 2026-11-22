@@ -622,6 +622,9 @@ def run():
         long_txt = "раз два три четыре пять шесть семь восемь девять десять"
         page.mouse.click(400, 500)
         page.wait_for_selector(".bd-text-editor textarea")
+        # печатать только когда поле уже в фокусе: иначе первые буквы уходили
+        # мимо (пункт падал и на старом коде — от скорости машины)
+        page.wait_for_function("() => document.activeElement && document.activeElement.matches('.bd-text-editor textarea')")
         page.keyboard.type(long_txt)
         page.wait_for_timeout(60)
         h1 = page.evaluate("() => document.querySelector('.bd-text-editor textarea').offsetHeight")

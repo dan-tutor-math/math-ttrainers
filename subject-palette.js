@@ -151,10 +151,9 @@
     }
     return out;
   }
-  // тона текста тёмной темы — общие для всех предметов, и для математики
-  // (там T — без перекраски: фон и панели остаются прежними синими)
-  function textVars(id, T) {
-    var lightest = hexOf(T('46,53,84')), cardC = hexOf(T('30,37,64'));
+  // тона текста тёмной темы — общие для всех предметов, и для математики;
+  // считаются к самой светлой поверхности и к карточке, на которых лежат
+  function textVars(id, lightest, cardC) {
     var fill = reach(P[id].d.ink, '#FFFFFF', 4.6, -1);
     // 5,2 на самой светлой панели (на карточке выходит ~6): выше — текст
     // становится почти белым и теряет цвет предмета; насыщенность поднимаем,
@@ -172,55 +171,111 @@
         '--muted-3:' + mutedB, '--muted-4:' + reach('#C7C7CC', cardC, 10, +1)
     ];
   }
-  var NIGHT = {}; // id → { bg: '#…' } для meta theme-color
-  function nightVars(id) {
-    // тёплые (русский, физика) приглушаем сильнее: красно-коричневые панели
-    // утомляют глаз на длинном уроке
-    var hue = hsl(P[id].d.ink)[0], k = { eng: 1, rus: 0.6, phys: 0.6 }[id] || 0.8;
-    var T = function (rgb) { return retint(rgb, hue, k); };
-    var bg = hexOf(T('11,14,26'));
-    NIGHT[id] = { bg: bg };
-    var menu = 'rgb(' + T('30,37,64') + ')';
-    /* Шрифты контрастнее (просьба Даниила 22.11: на цветных тёмных темах
-       читалось плохо). Замеры до правки: цветной текст 3,5–3,9, белый текст
-       на цветной кнопке 3,2–4,3 (физика хуже всего), серый 5–6,9. Одним
-       цветом предмета оба случая не вытянуть: светлее — лучше текст, но
-       хуже белое на кнопке. Поэтому два тона: --ink (заливка) темнее, чтобы
-       белому было ≥ 4,6, и --ink-text светлее для цветного текста, ≥ 5,2 на
-       самой светлой панели. Правила с color: var(--ink) переводятся на него
-       ниже (retargetInkText). Серый — до ≥ 7 на карточке */
-    return {
-      vars: textVars(id, T).concat([
-        '--bg:' + bg, '--paper:' + hexOf(T('21,26,44')),
-        '--card:rgba(' + T('30,37,64') + ',.82)', '--glass:rgba(' + T('40,46,74') + ',.5)',
-        '--glass-strong:rgba(' + T('46,53,84') + ',.65)', '--muted-7:' + hexOf(T('58,63,85')),
-        '--grid:' + hexOf(T('35,42,68')), '--bgp-line:' + hexOf(T('35,42,68')),
-        '--text-bg:rgba(' + T('20,25,44') + ',.6)',
-        // второе пятно фона — соседний оттенок, а не сиреневый математики
-        '--blob-2:rgba(' + retint('150,90,220', (hue + 40) % 360, 0.7) + ',.16)'
-      ]).join(';'),
+  /* ── тёмная тема: уровни поверхностей (макеты 22.11, решение Даниила) ──
+     Было: фон, панели, карточки и бумага тёмной темы лежали в узкой полосе
+     почти чёрного — контраст с фоном 1,1–1,2, слайд сливался с фоном.
+     Теперь три ступени светлоты от фона: панель, бумага/слайд, карточка —
+     с заданным контрастом (настройка «Контраст»), почти непрозрачные (тёмный
+     фон больше не просвечивает), со светлой кромкой вместо невидимой на
+     чёрном тени. Оттенок — предмета; «Фон» — в тоне предмета, графит или
+     чёрный (OLED). Значения — те же, что на утверждённых макетах (mock.py).
+     Тона текста пересчитываются к новым поверхностям (textVars). */
+  var DARK_KEY = 'mathh:dark';             // настройки тёмной темы без входа
+  var CONTRAST = {   // панель, бумага/слайд, карточка — к фону; клетка — к бумаге
+    soft:   { p: 1.24, pa: 1.28, c: 1.34, g: 1.18, edge: .10, inset: .06 },
+    normal: { p: 1.36, pa: 1.42, c: 1.52, g: 1.30, edge: .16, inset: .10 },
+    high:   { p: 1.52, pa: 1.65, c: 1.85, g: 1.48, edge: .24, inset: .14 }
+  };
+  // насыщенность тёмного фона: тёплые (русский, физика) приглушены сильнее —
+  // красно-коричневые панели утомляют глаз на длинном уроке
+  var SAT_K = { math: 1, eng: 1, rus: .6, phys: .6, inf: .8, soc: .8 };
+  function hueOf(id) { return id === 'math' ? 228 : hsl(P[id].d.ink)[0]; }
+  // светлота, при которой цвет (h, s, L) даёт с опорным контраст target
+  function solveL(h, s, ref, target) {
+    var L = hsl(ref)[2];
+    while (L < .6 && cr(hex2(h, s, L), ref) < target) L += .002;
+    return L;
+  }
+  function rgbOf(hex) { var n = parseInt(hex.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255].join(','); }
+  function darkSurfaces(id, set) {
+    var h = hueOf(id), s = .41 * (SAT_K[id] || .8), L0 = .0725;
+    if (set.base === 'graphite') { s = .07; L0 = .10; }
+    if (set.base === 'black') { s = Math.min(s, .3); L0 = .03; }
+    var k = CONTRAST[set.contrast] || CONTRAST.normal;
+    // фон математики в тоне предмета — ровно прежний #0B0E1A
+    var bg = id === 'math' && set.base === 'tone' ? '#0B0E1A' : hex2(h, s, L0);
+    var panel = hex2(h, s * .9, solveL(h, s * .9, bg, k.p));
+    var panelSoft = hex2(h, s * .9, hsl(panel)[2] - .01);
+    var paper = hex2(h, s * .85, solveL(h, s * .85, bg, k.pa));
+    var card = hex2(h, s * .85, solveL(h, s * .85, bg, k.c));
+    var grid = hex2(h, s * .7, solveL(h, s * .7, paper, k.g));
+    var line = hex2(h, s * .7, solveL(h, s * .7, bg, k.g));
+    var lightest = cr(card, bg) > cr(panel, bg) ? card : panel;
+    var v = textVars(id, lightest, card).concat([
+      '--bg:' + bg, '--paper:' + paper, '--card:' + card,
+      '--glass:' + panelSoft, '--glass-strong:' + panel,
+      '--grid:' + grid, '--bgp-line:' + line,
+      '--glass-border:rgba(255,255,255,' + k.edge + ')', '--glass-inset:rgba(255,255,255,' + k.inset + ')',
+      '--muted-7:' + hex2(h, s * .5, hsl(card)[2] + .10),
+      '--text-bg:rgba(' + rgbOf(card) + ',.6)',
+      // тень на почти чёрном не видна — кромка и мягкий ореол
+      '--shadow:0 0 0 1px rgba(255,255,255,' + (k.edge * .7).toFixed(3) + '),0 12px 32px rgba(0,0,0,.55)'
+    ]);
+    // на графите и чёрном цветные пятна фона приглушаем: иначе они
+    // перекрывают сам выбор фона (заметили на макетах)
+    if (set.base !== 'tone') v.push('--blob-1:rgba(' + P[id].d.rgb + ',.10)', '--blob-2:rgba(' + P[id].d.rgb + ',.05)');
+    else if (id !== 'math') v.push('--blob-2:rgba(' + retint('150,90,220', (h + 40) % 360, 0.7) + ',.16)');
+    return { bg: bg, card: card, vars: v.join(';') };
+  }
+  // настройки тёмной темы: аккаунт (teacher_settings.darkTheme, копия в
+  // localStorage, сверка owner — как у цвета) → устройство → по умолчанию
+  var DARK_DEF = { contrast: 'normal', base: 'tone', slides: 'light' };
+  function darkValid(o) {
+    var r = {};
+    r.contrast = o && CONTRAST[o.contrast] ? o.contrast : DARK_DEF.contrast;
+    r.base = o && /^(tone|graphite|black)$/.test(o.base) ? o.base : DARK_DEF.base;
+    r.slides = o && /^(light|dark)$/.test(o.slides) ? o.slides : DARK_DEF.slides;
+    return r;
+  }
+  function darkSettings() {
+    var uid = userId();
+    if (uid) {
+      var ts = null;
+      try { ts = JSON.parse(ls(TS_KEY) || 'null'); } catch (e) {}
+      var d = ts && ts.darkTheme;
+      if (d && d.owner === uid) return darkValid(d);
+    }
+    var loc = null;
+    try { loc = JSON.parse(ls(DARK_KEY) || 'null'); } catch (e) {}
+    return darkValid(loc);
+  }
+  var NIGHT = {}; // id → { bg } для meta theme-color
+  var nightStyle = document.createElement('style');
+  nightStyle.id = 'mathh-night';
+  var nightKey = '';
+  function paintNight(id) {
+    var set = darkSettings(), key = id + '|' + set.contrast + '|' + set.base;
+    root.setAttribute('data-dark-slides', set.slides);
+    if (key === nightKey) return;
+    nightKey = key;
+    var n = darkSurfaces(id, set);
+    NIGHT[id] = { bg: n.bg };
+    // (0,4,0) — сильнее правил палитры (0,3,0) и страниц
+    var sel = ':root:root:root[data-theme="dark"]';
+    nightStyle.textContent = sel + '{' + n.vars + '}' +
       // меню с непрозрачным фоном, прописанным прямо в стилях
-      menu: menu
-    };
+      sel + ' #examJumpMenu,' + sel + ' .exam-vb-pop{background:' + n.card + '!important}';
   }
   var css = '';
   ORDER.forEach(function (id) {
     css += ':root[data-palette="' + id + '"]{' + vars(P[id].l, false) + '}';
     css += ':root[data-palette="' + id + '"][data-theme="dark"]{' + vars(P[id].d, true) + '}';
-    if (id === 'math') {
-      // у математики фон и панели прежние, меняются только тона текста
-      css += ':root[data-palette-subject="math"][data-theme="dark"]{' +
-        textVars('math', function (rgb) { return rgb; }).join(';') + '}';
-      return;
-    }
-    var n = nightVars(id), sel = ':root[data-palette-subject="' + id + '"][data-theme="dark"]';
-    css += sel + '{' + n.vars + '}';
-    css += sel + ' #examJumpMenu,' + sel + ' .exam-vb-pop{background:' + n.menu + '!important}';
   });
   var style = document.createElement('style');
   style.id = 'mathh-palette';
   style.textContent = css;
   (document.head || root).appendChild(style);
+  (document.head || root).appendChild(nightStyle);
 
   /* ── цветной текст — светлым тоном (--ink-text) ──
      Цвет предмета служит и заливкой кнопок (белый текст поверх), и цветом
@@ -360,6 +415,7 @@
     if (cur === native()) root.removeAttribute('data-palette');
     else root.setAttribute('data-palette', cur);
     root.setAttribute('data-palette-subject', cur);
+    paintNight(cur);
     paintBar(cur);
     // и смена выбора без смены цвета («по предмету» → «математика» на
     // математике) — подпись пункта меню должна обновиться
@@ -392,7 +448,7 @@
     .observe(root, { attributes: true, attributeFilter: ['data-subject'] });
   // выбор в другой вкладке (кабинет сохранил, сервер ответил)
   window.addEventListener('storage', function (e) {
-    if (!e.key || e.key === TS_KEY || e.key === LOCAL_KEY || /auth-token$/.test(e.key)) apply();
+    if (!e.key || e.key === TS_KEY || e.key === LOCAL_KEY || e.key === DARK_KEY || /auth-token$/.test(e.key)) apply();
   });
   window.addEventListener('pageshow', function (e) { if (e.persisted) apply(); });
 
@@ -434,6 +490,31 @@
       });
     }).then(function () { apply(); return true; }, function () { return false; });
   }
+
+  // настройки тёмной темы: patch { contrast?, base?, slides? }. С входом —
+  // на сервер (teacher_settings.darkTheme, как цвет), без — на устройство
+  function setDark(patch) {
+    var next = darkValid(Object.assign({}, darkSettings(), patch || {}));
+    lsSet(DARK_KEY, JSON.stringify(next));
+    var uid = userId();
+    if (uid) {
+      try {
+        var ts = JSON.parse(ls(TS_KEY) || 'null') || {};
+        ts.darkTheme = Object.assign({ owner: uid }, next);
+        lsSet(TS_KEY, JSON.stringify(ts));
+      } catch (e) {}
+    }
+    apply();
+    darkSubs.forEach(function (fn) { try { fn(next); } catch (e) {} });
+    if (!uid || !window.SUPABASE_CONFIG || !window.supabase) return Promise.resolve(false);
+    var ready = window.TeacherSettings && window.CabinetCloud ? Promise.resolve()
+      : loadScript('teacher-settings.js').then(function () { return loadScript('cabinet-cloud.js'); });
+    return ready.then(function () {
+      var TS = window.TeacherSettings;
+      return TS.load().then(function () { return TS.set({ darkTheme: Object.assign({ owner: uid }, next) }); });
+    }).then(function () { apply(); return true; }, function () { return false; });
+  }
+  var darkSubs = [];
 
   function setRemote(id) {
     try {
@@ -484,6 +565,8 @@
     subjects: ORDER.map(function (id) { return { id: id, title: P[id].title, colorName: P[id].color, color: P[id].l.ink }; }),
     current: current, choice: choice, native: native, choose: choose, mainSubject: mainSubject,
     setRemote: setRemote, refresh: apply,
+    darkSettings: darkSettings, setDark: setDark,
+    onDarkChange: function (fn) { darkSubs.push(fn); },
     // цвета для содержимого слайда (фигуры, шапка таблицы в презентациях):
     // светлый тон предмета — слайд печатают и показывают на белом, тёмная
     // тема интерфейса тут ни при чём. У математики — null: остаются
