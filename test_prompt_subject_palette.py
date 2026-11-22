@@ -25,9 +25,9 @@
      его, главная на новом устройстве открывается им; блок в кабинете
   L. презентации: новая фигура и шапка таблицы — цветом предмета, первый
      быстрый стиль — предмет; у математики — прежний синий Office
-  M. шрифты на цветных тёмных темах: цветной текст, белый на цветных
-     кнопках и серый — не ниже 4,5 (до правки 3,2–4,3); светлая тема и
-     тёмная математика — без изменений
+  M. шрифты в тёмной теме (все предметы, и математика): цветной текст,
+     белый на цветных кнопках и серый — не ниже 4,5 (до правки 3,2–4,3);
+     светлая тема без изменений, фон тёмной математики прежний
   I. без ошибок в консоли
 
 Запуск: python3 test_prompt_subject_palette.py
@@ -244,7 +244,7 @@ def run():
           }
           return [Math.round(worst * 100) / 100, what];
         }"""
-        for page, pal in (("lcm.html", "rus"), ("lcm.html", "soc"), ("lcm.html", "eng"), ("lcm.html", "phys"),
+        for page, pal in (("lcm.html", None), ("index.html?subject=math", None), ("lcm.html", "rus"), ("lcm.html", "soc"), ("lcm.html", "eng"), ("lcm.html", "phys"),
                           ("soc_oge.html", None), ("index.html?subject=rus", None)):
             open_(page, {"mathh:palette": pal} if pal else {}, theme="dark")
             pg.wait_for_timeout(500)
@@ -254,8 +254,9 @@ def run():
         lab = pg.evaluate("getComputedStyle(document.querySelector('.calc-tool-btn, .ans-label, label') || document.body).color")
         check("M2 светлая тема: --ink-text не задан, цвет как был", pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--ink-text').trim()") == "", lab)
         open_("lcm.html", theme="dark")
-        check("M3 тёмная математика без изменений", pg.evaluate(INK) == "#2E7DE0" and
-              pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--ink-text').trim()") == "", pg.evaluate(INK))
+        bg = pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().toUpperCase()")
+        check("M3 тёмная математика: шрифты тоже контрастнее, фон прежний",
+              pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--ink-text').trim()") != "" and bg == "#0B0E1A", bg)
 
         br.close()
     check("I без ошибок на страницах", not errors, "; ".join(errors[:3]))

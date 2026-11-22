@@ -151,6 +151,27 @@
     }
     return out;
   }
+  // тона текста тёмной темы — общие для всех предметов, и для математики
+  // (там T — без перекраски: фон и панели остаются прежними синими)
+  function textVars(id, T) {
+    var lightest = hexOf(T('46,53,84')), cardC = hexOf(T('30,37,64'));
+    var fill = reach(P[id].d.ink, '#FFFFFF', 4.6, -1);
+    // 5,2 на самой светлой панели (на карточке выходит ~6): выше — текст
+    // становится почти белым и теряет цвет предмета; насыщенность поднимаем,
+    // чтобы осветлённый тон оставался узнаваемым
+    var t0 = hsl(P[id].d.ink);
+    var text = reach(hex2(t0[0], Math.max(t0[1], 0.75), t0[2]), lightest, 5.2, +1);
+    var mutedA = reach('#9A9AA2', cardC, 7, +1), mutedB = reach('#AEAEB4', cardC, 8.5, +1);
+    var ink = { fill: fill, text: text, act: hex2(hsl(fill)[0], hsl(fill)[1], Math.max(0, hsl(fill)[2] - .06)) };
+    return [
+        '--ink:' + fill, '--ink-active:' + ink.act, '--ink-text:' + text, '--ink-2:' + text,
+        '--ej-ink:' + text, '--lesson-action-bg:' + fill,
+        // зелёная кнопка «верно» (Хватит, Проверено) — тоже белый текст поверх
+        '--ok:' + reach('#3E8E5B', '#FFFFFF', 4.6, -1),
+        '--muted-1:' + mutedA, '--muted-2:' + mutedA, '--muted-6:' + mutedA, '--muted-8:' + mutedA,
+        '--muted-3:' + mutedB, '--muted-4:' + reach('#C7C7CC', cardC, 10, +1)
+    ];
+  }
   var NIGHT = {}; // id → { bg: '#…' } для meta theme-color
   function nightVars(id) {
     // тёплые (русский, физика) приглушаем сильнее: красно-коричневые панели
@@ -168,24 +189,8 @@
        белому было ≥ 4,6, и --ink-text светлее для цветного текста, ≥ 5,2 на
        самой светлой панели. Правила с color: var(--ink) переводятся на него
        ниже (retargetInkText). Серый — до ≥ 7 на карточке */
-    var lightest = hexOf(T('46,53,84')), cardC = hexOf(T('30,37,64'));
-    var fill = reach(P[id].d.ink, '#FFFFFF', 4.6, -1);
-    // 5,2 на самой светлой панели (на карточке выходит ~6): выше — текст
-    // становится почти белым и теряет цвет предмета; насыщенность поднимаем,
-    // чтобы осветлённый тон оставался узнаваемым
-    var t0 = hsl(P[id].d.ink);
-    var text = reach(hex2(t0[0], Math.max(t0[1], 0.75), t0[2]), lightest, 5.2, +1);
-    var mutedA = reach('#9A9AA2', cardC, 7, +1), mutedB = reach('#AEAEB4', cardC, 8.5, +1);
-    var ink = { fill: fill, text: text, act: hex2(hsl(fill)[0], hsl(fill)[1], Math.max(0, hsl(fill)[2] - .06)) };
-    NIGHT[id].ink = ink;
     return {
-      vars: [
-        '--ink:' + fill, '--ink-active:' + ink.act, '--ink-text:' + text, '--ink-2:' + text,
-        '--ej-ink:' + text, '--lesson-action-bg:' + fill,
-        // зелёная кнопка «верно» (Хватит, Проверено) — тоже белый текст поверх
-        '--ok:' + reach('#3E8E5B', '#FFFFFF', 4.6, -1),
-        '--muted-1:' + mutedA, '--muted-2:' + mutedA, '--muted-6:' + mutedA, '--muted-8:' + mutedA,
-        '--muted-3:' + mutedB, '--muted-4:' + reach('#C7C7CC', cardC, 10, +1),
+      vars: textVars(id, T).concat([
         '--bg:' + bg, '--paper:' + hexOf(T('21,26,44')),
         '--card:rgba(' + T('30,37,64') + ',.82)', '--glass:rgba(' + T('40,46,74') + ',.5)',
         '--glass-strong:rgba(' + T('46,53,84') + ',.65)', '--muted-7:' + hexOf(T('58,63,85')),
@@ -193,7 +198,7 @@
         '--text-bg:rgba(' + T('20,25,44') + ',.6)',
         // второе пятно фона — соседний оттенок, а не сиреневый математики
         '--blob-2:rgba(' + retint('150,90,220', (hue + 40) % 360, 0.7) + ',.16)'
-      ].join(';'),
+      ]).join(';'),
       // меню с непрозрачным фоном, прописанным прямо в стилях
       menu: menu
     };
@@ -202,7 +207,12 @@
   ORDER.forEach(function (id) {
     css += ':root[data-palette="' + id + '"]{' + vars(P[id].l, false) + '}';
     css += ':root[data-palette="' + id + '"][data-theme="dark"]{' + vars(P[id].d, true) + '}';
-    if (id === 'math') return;
+    if (id === 'math') {
+      // у математики фон и панели прежние, меняются только тона текста
+      css += ':root[data-palette-subject="math"][data-theme="dark"]{' +
+        textVars('math', function (rgb) { return rgb; }).join(';') + '}';
+      return;
+    }
     var n = nightVars(id), sel = ':root[data-palette-subject="' + id + '"][data-theme="dark"]';
     css += sel + '{' + n.vars + '}';
     css += sel + ' #examJumpMenu,' + sel + ' .exam-vb-pop{background:' + n.menu + '!important}';
