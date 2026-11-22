@@ -58,7 +58,25 @@
     if (!m) return null;
     try { return m.isFollower() ? null : m.current(); } catch (e) { return null; }
   }
-  function active(){ return !!student(); }
+  // Ученики страницы (конструктор работ): преподаватель выбрал одного или
+  // нескольких учеников без сессии. Пока список задан, подписи на ЭТОЙ странице
+  // идут по нему, а не по сессии; сама сессия (StudentMemory.current) не
+  // меняется и в другие вкладки ничего не уходит — список живёт в памяти страницы
+  let pageStudents = null;
+  function targets(){
+    if (pageStudents && pageStudents.length) return pageStudents;
+    const s = student();
+    return s ? [{ id: String(s.id), name: s.name }] : [];
+  }
+  function setStudents(list){
+    const m = SM();
+    pageStudents = (list && list.length && m && !m.isFollower())
+      ? list.filter(s => s && s.id).map(s => ({ id: String(s.id), name: s.name || 'ученик' })) : null;
+    sig = sigNow();
+    fire(false);
+  }
+  function students(){ return targets().slice(); }
+  function active(){ return targets().length > 0; }
   function baseMode(){
     const o = ssGet(SS_MODE);
     return MODES.indexOf(o) >= 0 ? o : settings().labels;
@@ -81,12 +99,15 @@
       return window.TaskKey.fromTask(pageName(), t);
     } catch (e) { return null; }
   }
-  function summaryOf(key){
+  // sid не задан — первый ученик из targets() (в сессии это ученик сессии, как раньше)
+  function summaryOf(key, sid){
     const m = SM();
     if (!m || !key) return null;
-    try { return m.summary(key); } catch (e) { return null; }
+    if (!sid) { const t = targets()[0]; sid = t ? t.id : null; }
+    try { return sid ? m.summary(key, { studentId: sid }) : m.summary(key); } catch (e) { return null; }
   }
-  function hasEvents(key){ const s = summaryOf(key); return !!(s && s.total); }
+  // при нескольких учениках «было» — хотя бы у одного
+  function hasEvents(key){ return targets().some(t => { const s = summaryOf(key, t.id); return !!(s && s.total); }); }
   // пропускаем только задания банка ФИПИ: это «выбор следующего задания ФИПИ»
   function skip(key){
     return !!key && key.indexOf('fipi:') === 0 && mode() === 'hide_solved' && hasEvents(key);
@@ -98,8 +119,29 @@
 
   // решено ли задание у ученика сессии: в журнале есть верный итог (ok) —
   // по правилам памяти (задача 56) это и «верно с первого раза», и «верно после ошибки».
+  // Группа (несколько учеников страницы): «решено» — решили ВСЕ, это прогресс
+  // группы; «было» (точка, hasEvents) — хоть у одного. Сколько у каждого — perStudent
+  function solvedBy(key, sid){ return (summaryOf(key, sid)?.ok?.n || 0) > 0; }
   function solved(key){
-    return active() && (summaryOf(key)?.ok?.n || 0) > 0;
+    const ts = targets();
+    return ts.length > 0 && ts.every(t => solvedBy(key, t.id));
+  }
+  function group(){ return targets().length > 1; }
+  // keys — ключи или массивы ключей-синонимов (как у progress); у каждого ученика — сколько решил
+  function perStudent(keys){
+    const list = [];
+    for (const key of keys) { const al = Array.isArray(key) ? key : [key]; if (al[0]) list.push(al); }
+    return targets().map(t => ({ id: t.id, name: t.name, done: list.filter(al => al.some(k => solvedBy(k, t.id))).length }));
+  }
+  // хвост подписи для группы: «Ваня 5, Петя 3»; больше четырёх учеников — «у каждого от 2 до 7»
+  function perLabel(keys){
+    if (!group()) return '';
+    const per = perStudent(keys);
+    if (per.length > 4){
+      const d = per.map(p => p.done);
+      return 'у каждого от ' + Math.min(...d) + ' до ' + Math.max(...d);
+    }
+    return per.map(p => p.name + ' ' + p.done).join(', ');
   }
   function solvedFipi(page, fipi){
     if (!active() || !window.TaskKey) return false;
@@ -114,6 +156,12 @@
       if (aliases[0]) unique.set(aliases[0], aliases);
     }
     if (!unique.size) return null;
+    if (group()){
+      // группа: решили все — и сколько у каждого
+      const done = [...unique.values()].filter(al => targets().every(t => al.some(k => solvedBy(k, t.id)))).length;
+      return { done, allDone: done === unique.size, group: true, per: perStudent([...unique.values()]),
+        label: 'Решено всеми ' + done + ' из ' + unique.size + ' · ' + perLabel([...unique.values()]) };
+    }
     const done = [...unique.values()].filter(aliases => aliases.some(solved)).length;
     return { done, allDone: done === unique.size, label: 'Решено ' + done + ' из ' + unique.size };
   }
@@ -125,13 +173,13 @@
     return String(d.getDate()).padStart(2, '0') + '.' + String(d.getMonth() + 1).padStart(2, '0') +
       (d.getFullYear() !== now.getFullYear() ? '.' + d.getFullYear() : '');
   }
-  function lines(keys){
+  function lines(keys, sid){
     const opt = settings(), out = [];
     // по нескольким ключам (группа заданий) события складываем
     const agg = {};
     let total = 0;
     keys.forEach(k => {
-      const s = summaryOf(k);
+      const s = summaryOf(k, sid);
       if (!s || !s.total) return;
       total += s.total;
       NAMES.forEach(([e]) => {
@@ -143,7 +191,7 @@
     // одно задание — решения цепочкой по времени («Решали: неверно 17.11 →
     // верно 17.11», задача 56); у группы заданий цепочка смысла не имеет —
     // там по-прежнему «Верно: даты», «Неверно: даты»
-    const chain = keys.length === 1 ? solveChain(keys[0], opt) : '';
+    const chain = keys.length === 1 ? solveChain(keys[0], opt, sid) : '';
     NAMES.forEach(([e, name]) => {
       const a = agg[e];
       if (!a) return;
@@ -155,10 +203,21 @@
       out.push(t);
     });
     if (chain) out.push('Решали: ' + chain);
-    return { lines: out, total, last: lastEvent(keys) };
+    return { lines: out, total, last: lastEvent(keys, sid) };
   }
-  function solveChain(key, opt){
-    const s = summaryOf(key), runs = [];
+  // по всем ученикам: у каждого свои строки; last — самое свежее событие среди всех
+  function linesAll(keys){
+    const per = targets().map(t => Object.assign({ who: t }, lines(keys, t.id)));
+    let total = 0, lastAt = -1, last = null;
+    per.forEach(p => {
+      total += p.total;
+      const ev = lastEventObj(keys, p.who.id);
+      if (ev && ev.at > lastAt) { lastAt = ev.at; last = ev.event; }
+    });
+    return { per, total, last };
+  }
+  function solveChain(key, opt, sid){
+    const s = summaryOf(key, sid), runs = [];
     ((s && s.events) || []).forEach(x => {
       if (x.event !== 'ok' && x.event !== 'bad') return;
       const r = runs[runs.length - 1];
@@ -168,16 +227,17 @@
     const txt = shown.map(r => (r.e === 'ok' ? 'верно' : 'неверно') + (opt.labelDates ? ' ' + fmtDate(r.last) : '') + (opt.labelCount && r.n > 1 ? ' ×' + r.n : ''));
     return txt.length ? (runs.length > shown.length ? '… → ' : '') + txt.join(' → ') : '';
   }
-  function lastEvent(keys){
+  function lastEvent(keys, sid){ const ev = lastEventObj(keys, sid); return ev ? ev.event : null; }
+  function lastEventObj(keys, sid){
     let best = null;
     keys.forEach(k => {
-      const s = summaryOf(k);
+      const s = summaryOf(k, sid);
       if (s && s.events.length){
         const ev = s.events[s.events.length - 1];
         if (!best || ev.at > best.at) best = ev;
       }
     });
-    return best ? best.event : null;
+    return best;
   }
 
   /* ── точка и всплывашка ── */
@@ -190,6 +250,8 @@
 .tc-pop{position:fixed;z-index:200;max-width:min(300px,calc(100vw - 24px));background:var(--bg,#fff);color:var(--muted-5,#333);border:1px solid var(--glass-border,#ddd);border-radius:12px;box-shadow:var(--shadow,0 6px 24px rgba(0,0,0,.18));padding:9px 12px;font:500 13px/1.4 var(--font-ui,system-ui);}
 .tc-pop b{display:block;font-weight:600;margin-bottom:3px;}
 .tc-pop .tc-line{display:block;}
+.tc-pop .tc-who{display:block;font-weight:600;margin-top:5px;}
+.tc-pop .tc-none{opacity:.6;}
 .tc-pop button{margin-top:7px;font:500 12.5px var(--font-ui,system-ui);color:var(--muted-5,#333);background:none;border:1px solid var(--glass-border,#ccc);border-radius:8px;padding:3px 9px;cursor:pointer;}
 .tc-pop button:hover{border-color:var(--ink,#222);}
 .tc-tg{display:inline-flex;align-items:center;gap:2px;margin-right:8px;padding:2px;border:1px solid var(--glass-border,#ddd);border-radius:10px;background:var(--glass-strong,transparent);}
@@ -218,28 +280,40 @@
     clearTimeout(hideTimer);
     if (popDot === dot && pop) { if (pin) pinned = true; return; }
     closePop();
-    const keys = dot._tcKeys, info = lines(keys), who = (student() || {}).name || 'ученика';
+    const keys = dot._tcKeys, all = linesAll(keys), many = all.per.length > 1;
     pop = document.createElement('div');
     pop.className = 'tc-pop';
     pop.setAttribute('data-tc-pop', '1');
-    const head = keys.length > 1 ? ('Из ' + keys.length + ' заданий группы были у ' + who) : ('У ' + who + ' это задание уже было');
-    pop.innerHTML = '<b></b>' + info.lines.map(() => '<span class="tc-line"></span>').join('') + '<button type="button" data-tc-forget="1"></button>';
-    pop.querySelector('b').textContent = head;
-    pop.querySelectorAll('.tc-line').forEach((n, i) => { n.textContent = info.lines[i]; });
-    const btn = pop.querySelector('button');
-    btn.textContent = keys.length > 1 ? 'Забыть эти задания' : 'Забыть это задание';
-    btn.onclick = async () => {
-      btn.disabled = true;
-      try {
-        await SM().forget(keys);
-        closePop();
-        refresh();
-        fire(false);
-      } catch (e) {
-        btn.disabled = false;
-        btn.textContent = 'Не получилось забыть — повторите';
-      }
-    };
+    const add = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; n.textContent = text; pop.appendChild(n); return n; };
+    if (!many){
+      const one = all.per[0], who = one.who.name || 'ученика';
+      add('b', '', keys.length > 1 ? ('Из ' + keys.length + ' заданий группы были у ' + who) : ('У ' + who + ' это задание уже было'));
+      one.lines.forEach(t => add('span', 'tc-line', t));
+      const btn = add('button', '', keys.length > 1 ? 'Забыть эти задания' : 'Забыть это задание');
+      btn.type = 'button'; btn.setAttribute('data-tc-forget', '1');
+      btn.onclick = async () => {
+        btn.disabled = true;
+        try {
+          await SM().forget(keys, { studentId: one.who.id });
+          closePop();
+          refresh();
+          fire(false);
+        } catch (e) {
+          btn.disabled = false;
+          btn.textContent = 'Не получилось забыть — повторите';
+        }
+      };
+    } else {
+      // несколько учеников (работа на группу): по строке-заголовку на каждого;
+      // «забыть» здесь не даём — непонятно, у кого именно
+      add('b', '', keys.length > 1 ? ('Задания группы (' + keys.length + ') у выбранных учеников') : 'Это задание у выбранных учеников');
+      all.per.forEach(p => {
+        const w = add('span', 'tc-who', p.who.name);
+        w.setAttribute('data-tc-who', p.who.id);
+        if (p.lines.length) p.lines.forEach(t => add('span', 'tc-line', t));
+        else add('span', 'tc-line tc-none', 'не было');
+      });
+    }
     pop.onmouseenter = () => clearTimeout(hideTimer);
     pop.onmouseleave = () => { if (!pinned) hideTimer = setTimeout(closePop, 250); };
     document.body.appendChild(pop);
@@ -257,7 +331,7 @@
   function dot(keys){
     keys = (Array.isArray(keys) ? keys : [keys]).filter(Boolean);
     if (!keys.length || !active() || mode() === 'off') return null;
-    const info = lines(keys);
+    const info = linesAll(keys);
     if (!info.total) return null;
     injectCss();
     const el = document.createElement('span');
@@ -265,7 +339,7 @@
     el.setAttribute('data-tc-dot', '1');
     el.setAttribute('role', 'button');
     el.setAttribute('tabindex', '0');
-    el.setAttribute('aria-label', 'Задание уже было у ученика');
+    el.setAttribute('aria-label', info.per.length > 1 ? 'Задание уже было у кого-то из выбранных учеников' : 'Задание уже было у ученика');
     el.dataset.last = info.last || '';
     el._tcKeys = keys;
     el.onmouseenter = () => openPop(el, false);
@@ -284,7 +358,7 @@
   function refresh(){
     dots.forEach(el => {
       if (!el.isConnected) { dots.delete(el); return; }
-      const info = lines(el._tcKeys);
+      const info = linesAll(el._tcKeys);
       if (!active() || mode() === 'off' || !info.total) { dots.delete(el); el.remove(); return; }
       el.dataset.last = info.last || '';
     });
@@ -391,7 +465,7 @@
   }
   // Списки со счётчиком подписываются и на изменения журнала. Точкам на
   // прочих страницах достаточно обновить подписи на месте.
-  function sigNow(){ const s = student(); return (s ? s.id : '') + '|' + mode(); }
+  function sigNow(){ return targets().map(t => t.id).join(',') + '|' + mode(); }
   function boot(){
     sig = sigNow();
     const m = SM();
@@ -407,5 +481,5 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 
-  window.TaskCaptions = { active, mode, setMode, keyOfTask, skip, skipFipi, solved, solvedFipi, progress, dot, decorate, showCurrent, mountToggle, onChange, summaryOf };
+  window.TaskCaptions = { active, mode, setMode, keyOfTask, skip, skipFipi, solved, solvedFipi, progress, dot, decorate, showCurrent, mountToggle, onChange, summaryOf, hasEvents, setStudents, students, group, perStudent, perLabel };
 })();

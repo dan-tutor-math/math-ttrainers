@@ -87,7 +87,8 @@ def run():
         pg.click('#wkTasks [data-tc-dot]')
         pg.wait_for_timeout(200)
         pop = pg.evaluate("document.querySelector('.tc-pop') ? document.querySelector('.tc-pop').innerText : ''")
-        check("B8 всплывашка с событием", "Верно" in pop, pop)
+        # с задачи 56 одно задание показывает цепочку «Решали: верно 22.11»
+        check("B8 всплывашка с событием", "верно" in pop.lower(), pop)
         pg.mouse.click(5, 5)
         pg.wait_for_function("() => document.querySelectorAll('#addCap [data-tc-dot]').length === 1", timeout=5000)
         check("B9 у задания в кадре (панель добавления) точка", True)

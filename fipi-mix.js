@@ -149,6 +149,11 @@
     if (window.TaskCaptions && TaskCaptions.active && TaskCaptions.active() && TaskCaptions.solvedFipi) {
       const k = list.filter(x => TaskCaptions.solvedFipi(page, x.fipi)).length;
       let t = (f.own && hasOwn ? `${n}+ ${plural(n)}` : `${n} ${plural(n)} ФИПИ`) + ` · Решено ${k} из ${n}`;
+      // группа учеников (работа на нескольких): «решено всеми» и сколько у каждого
+      if (TaskCaptions.group && TaskCaptions.group() && window.TaskKey) {
+        const keys = list.map(x => { try { return TaskKey.fromTask(page, { fipi: x.fipi }); } catch (e) { return null; } });
+        t = t.replace(' · Решено ', ' · Решено всеми ') + ' · ' + TaskCaptions.perLabel(keys);
+      }
       // кабинет (Б4): «скрывать решённые» — ещё и сколько заданий ФИПИ у ученика не было
       if (TaskCaptions.mode() === 'hide_solved') t += ` · осталось ${list.filter(x => !skipSeen(page, x.fipi)).length} из ${n}`;
       return t;

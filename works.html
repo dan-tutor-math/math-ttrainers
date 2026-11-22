@@ -115,6 +115,13 @@ body.editing .corner-btn{position:absolute;}
 .mem-line{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
 .mem-line .check-line{margin-top:0;}
 .mem-line .hint{flex-basis:100%;}
+/* подбор для учеников: чипы выбранных, у каждого × — убрать */
+.mem-for{display:contents;}
+.mem-chip{display:inline-flex;align-items:center;gap:4px;font:600 13px var(--font-ui);color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:999px;padding:3px 4px 3px 11px;}
+.mem-chip button{font:600 14px/1 var(--font-ui);color:var(--muted-3);background:none;border:0;border-radius:50%;width:22px;height:22px;cursor:pointer;}
+.mem-chip button:hover{color:var(--ink);background:var(--hl-10);}
+.mem-line .mem-group{flex-basis:auto;margin:0;}
+.mem-add{width:auto;max-width:190px;padding:5px 8px;font-size:13px;}
 .add-cap{display:inline-flex;align-items:center;min-width:12px;}
 .add-skip{margin:0 4px 0 0;}
 .ti-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;}
@@ -448,13 +455,16 @@ html.rv-on{overflow:hidden;}
           </div>
         </div>
         <div class="sheet-row" id="wkMemRow" hidden>
-          <span class="label">Журнал ученика</span>
+          <span class="label">Для учеников</span>
           <div class="mem-line">
-            <button class="btn small" id="wkIssued" type="button" title="Записать в журнал ученика, что все задания этого варианта выданы ему в домашнюю работу"></button>
-            <button class="btn quiet small" id="wkIssuedChange" type="button">Другой ученик</button>
-            <select class="field" id="wkIssuedPick" hidden aria-label="Кому выдана работа"></select>
+            <span class="mem-for" id="wkFor"></span>
+            <select class="field mem-add" id="wkForAdd" aria-label="Подбирать задания для ученика"></select>
+            <button class="btn quiet small" id="wkGroupSave" type="button" hidden title="Запомнить выбранных учеников группой — она появится в списке здесь и вкладкой в списке учеников кабинета">Сохранить группой</button>
+            <button class="btn small" id="wkIssued" type="button" title="Записать в журнал учеников, что все задания этого варианта выданы им в домашнюю работу"></button>
             <label class="check-line"><input type="checkbox" id="wkSkipSolved"> Не брать уже решённые</label>
             <span id="wkCapToggle"></span>
+            <span class="hint mem-group" id="wkGroupName"></span>
+            <div class="hint" id="wkForNote"></div>
             <div class="hint" id="wkIssuedNote"></div>
           </div>
         </div>
@@ -563,6 +573,9 @@ html.rv-on{overflow:hidden;}
 <script src="video-links.js"></script>
 <script src="video-player.js"></script>
 <script src="works-cloud.js"></script>
+<!-- группы учеников для «Для учеников» = «сортировки» кабинета (settings.studentCats) -->
+<script src="cabinet-cloud.js"></script>
+<script src="teacher-settings.js"></script>
 <script>
 (function(){
 'use strict';
@@ -790,6 +803,9 @@ async function openEditor(id){
   $('edWarn').textContent = E.attempts ? 'Эту работу уже начали ученики (' + E.attempts + '). Правки увидят те, кто откроет ссылку после сохранения; ответы на удалённые задания пропадут из итогов.' : '';
   $('wkTitle').value = E.title;
   $('wkKindName').value = E.settings.kindName || '';
+  // список учеников мог не загрузиться раньше (страница открылась до входа) — спросим снова
+  if (!studentsList.length) pickListAsked = false;
+  groupsAsked = false;   // группы могли поменять в кабинете — подтянем при открытии работы
   renderSettings(); renderVariants(); renderTasks(); renderLink(); renderMem();
   $('wkSaved').textContent = E.id ? 'Сохранено' : '';
   loadWas();
@@ -1202,7 +1218,7 @@ function syncFrameTrainer(){
   if (it.id !== openTid){ openTid = it.id; openHref = it.href; $('catTitle').textContent = it.name; }
   return true;
 }
-$('trFrame').addEventListener('load', () => { if (openTid) syncFrameTrainer(); });
+$('trFrame').addEventListener('load', () => { if (openTid) syncFrameTrainer(); pushPickToFrame(); });
 function closeTrainer(){
   openTid = null; openHref = null;
   $('catTitle').textContent = 'Тренажёры';
@@ -2449,7 +2465,14 @@ async function nextWork(id){
    Ученик работы запоминается в works.settings.issuedTo — только id: настройки
    работы отдаёт ученику work_open, и имя в них видел бы тот, у кого ссылка.
    Схему работ это не меняет (settings — jsonb). Результаты работы ученика в
-   журнал здесь не пишутся: для этого нужна личная ссылка на работу. */
+   журнал здесь не пишутся: для этого нужна личная ссылка на работу.
+   «Для учеников» (подбор под одного или нескольких учеников без сессии):
+   выбранные лежат в works.settings.pickFor — тоже только id. Их журналы
+   грузятся (StudentMemory.loadLog) и отдаются TaskCaptions.setStudents —
+   подписи и «не брать решённые» на этой странице идут по ним, а не по сессии.
+   Несколько учеников: точка — если задание было хоть у одного, во всплывашке
+   строка на каждого; «не брать решённые» пропускает решённое хоть кем-то;
+   «Выдано» пишет hw каждому выбранному. Сессию это не трогает. */
 const TCAP = () => (window.TaskCaptions && TaskCaptions.active()) ? window.TaskCaptions : null;
 function blockKey(b){
   if (!b) return null;
@@ -2471,6 +2494,7 @@ function skipActive(){ return skipSolvedOn && !!TCAP(); }
 function solvedKey(key){
   if (!key || String(key).indexOf('fipi:') !== 0) return false;
   const tc = TCAP(); if (!tc) return false;
+  if (tc.hasEvents) return tc.hasEvents(key);   // несколько учеников — у кого-нибудь из них
   const s = tc.summaryOf(key);
   return !!(s && s.total);
 }
@@ -2482,80 +2506,206 @@ function setSkipSolved(on){
 $('wkSkipSolved').addEventListener('change', () => setSkipSolved($('wkSkipSolved').checked));
 $('addSkip').addEventListener('change', () => setSkipSolved($('addSkip').checked));
 
-const issuedNames = new Map();   // id ученика → имя (список из кабинета, грузится один раз)
+const issuedNames = new Map();
+let studentsList = [];           // ученики кабинета (для «Для учеников»), пусто — нет входа или учеников   // id ученика → имя (список из кабинета, грузится один раз)
 let studentsLoad = null;
 function loadStudents(){
   if (!window.StudentMemory) return Promise.resolve([]);
-  if (!studentsLoad) studentsLoad = StudentMemory.listStudents().then(list => { list.forEach(s => issuedNames.set(s.id, s.name)); return list; })
+  if (!studentsLoad) studentsLoad = StudentMemory.listStudents().then(list => { list.forEach(s => issuedNames.set(s.id, s.name)); studentsList = list; return list; })
     .catch(() => { studentsLoad = null; return []; });
   return studentsLoad;
 }
 function sessionStudent(){
   try { const m = window.StudentMemory; return (m && !m.isFollower()) ? m.current() : null; } catch (e) { return null; }
 }
-// кому выдана работа: запомненный в settings, иначе ученик сессии
-function issuedTo(){
-  const id = E.settings.issuedTo ? String(E.settings.issuedTo) : null;
-  if (id){
-    const ss = sessionStudent();
-    const name = (ss && ss.id === id) ? ss.name : issuedNames.get(id);
-    return { id, name: name || '…', remembered: true };
-  }
-  const ss = sessionStudent();
-  return ss ? { id: ss.id, name: ss.name, remembered: false } : null;
+// для кого подбираем: выбранные чипами (settings.pickFor, только id)
+function pickIds(){
+  const a = E.settings.pickFor;
+  return Array.isArray(a) ? a.map(String).filter(Boolean) : [];
 }
+// кому выдана работа: выбранные «Для учеников»; иначе запомненный в settings; иначе ученик сессии
+function issuedList(){
+  const ss = sessionStudent();
+  const nameOf = id => (ss && ss.id === id) ? ss.name : (issuedNames.get(id) || '…');
+  const ids = pickIds();
+  if (ids.length) return ids.map(id => ({ id, name: nameOf(id), remembered: true }));
+  const id = E.settings.issuedTo ? String(E.settings.issuedTo) : null;
+  if (id) return [{ id, name: nameOf(id), remembered: true }];
+  return ss ? [{ id: ss.id, name: ss.name, remembered: false }] : [];
+}
+function issuedTo(){ return issuedList()[0] || null; }
+// выбранных — в TaskCaptions. Сначала сразу (по копиям журналов в браузере),
+// потом ещё раз, когда журналы пришли с сервера: setStudents перерисовывает точки
+let pickApplied = null;
+function applyPick(){
+  if (!window.TaskCaptions || !TaskCaptions.setStudents || !window.StudentMemory) return;
+  const ids = pickIds(), sig = ids.join(',');
+  if (sig === pickApplied) return;
+  pickApplied = sig;
+  if (!ids.length){ TaskCaptions.setStudents(null); pushPickToFrame(); $('wkForNote').textContent = ''; return; }
+  const list = () => ids.map(id => ({ id, name: issuedNames.get(id) || '…' }));
+  TaskCaptions.setStudents(list());
+  pushPickToFrame();
+  $('wkForNote').textContent = 'Загружаем, что ' + (ids.length > 1 ? 'ученики уже решали' : 'ученик уже решал') + '…';
+  const failed = [];
+  Promise.all([loadStudents()].concat(ids.map(id => StudentMemory.loadLog(id).catch(() => { failed.push(id); }))))
+    .then(() => {
+      if (pickApplied !== sig) return;
+      TaskCaptions.setStudents(list());
+      pushPickToFrame();
+      $('wkForNote').textContent = failed.length
+        ? 'Журнал не загрузился: ' + failed.map(id => issuedNames.get(id) || id).join(', ') + ' — подписи по тому, что уже есть в браузере'
+        : '';
+    });
+}
+// тех же учеников — в тренажёр в панели добавления: там свой TaskCaptions
+// (точки в списках, «Решено K из N» по группе). Кадр того же адреса, журналы
+// он читает из той же копии в localStorage; новая страница в кадре — снова сюда
+function pickList(){ return pickIds().map(id => ({ id, name: issuedNames.get(id) || '…' })); }
+function pushPickToFrame(){
+  let tc = null;
+  try { tc = $('trFrame').contentWindow.TaskCaptions; } catch (e) { return; }
+  if (!tc || !tc.setStudents) return;
+  const ids = pickIds();
+  try { tc.setStudents(ids.length ? pickList() : null); } catch (e) {}
+}
+function setPick(ids){
+  if (ids.length) E.settings.pickFor = ids; else delete E.settings.pickFor;
+  markDirty();
+  renderMem();
+}
+let pickListAsked = false;
+function renderPick(){
+  const box = $('wkFor'), add = $('wkForAdd');
+  const ids = pickIds();
+  box.textContent = '';
+  ids.forEach(id => {
+    const chip = document.createElement('span');
+    chip.className = 'mem-chip';
+    chip.dataset.id = id;
+    chip.appendChild(document.createTextNode(issuedNames.get(id) || '…'));
+    const x = document.createElement('button');
+    x.type = 'button'; x.textContent = '×'; x.title = 'Не подбирать для этого ученика';
+    x.setAttribute('aria-label', 'Убрать ' + (issuedNames.get(id) || 'ученика'));
+    x.onclick = () => setPick(pickIds().filter(v => v !== id));
+    chip.appendChild(x);
+    box.appendChild(chip);
+  });
+  const list = studentsCached();
+  const rest = list.filter(s => ids.indexOf(s.id) < 0);
+  // группа в списке — если в ней есть кто-то ещё не выбранный
+  const groups = studentGroups().filter(g => g.members.some(id => ids.indexOf(id) < 0));
+  add.hidden = !rest.length && !groups.length;
+  add.innerHTML = '<option value="">' + (ids.length ? '+ ещё ученик или группа' : 'Подбирать для ученика или группы…') + '</option>'
+    + (groups.length ? '<optgroup label="Группы">' + groups.map(g => '<option value="g:' + esc(g.id) + '">' + esc(g.name) + ' (' + g.members.length + ')</option>').join('') + '</optgroup>' : '')
+    + (rest.length ? '<optgroup label="Ученики">' + rest.map(s => '<option value="' + esc(s.id) + '">' + esc(s.name) + '</option>').join('') + '</optgroup>' : '');
+  add.value = '';
+  // выбранные целиком совпадают с группой — подпишем её; два и больше без группы — «Сохранить группой»
+  const same = studentGroups().find(g => sameSet(g.members, ids));
+  $('wkGroupSave').hidden = !(ids.length > 1 && !same && window.TeacherSettings && window.CabinetCloud);
+  $('wkGroupName').textContent = same ? 'Группа «' + same.name + '»' : '';
+}
+function sameSet(a, b){ return a.length === b.length && a.every(x => b.indexOf(x) >= 0); }
+// группы учеников — «сортировки» кабинета (settings.studentCats): свой список,
+// класс или экзамен. Состав по классу и экзамену — по ученикам кабинета (archived не входят)
+function studentGroups(){
+  let cats = [];
+  try { cats = (window.TeacherSettings && TeacherSettings.get().studentCats) || []; } catch (e) {}
+  const list = studentsCached();
+  const has = (c, st) => c.kind === 'grade' ? String(st.grade || '').trim().toLowerCase() === String(c.v || '').toLowerCase()
+    : c.kind === 'exam' ? (st.exam || '') === c.v : c.members.indexOf(String(st.id)) >= 0;
+  return cats.map(c => ({ id: c.id, name: c.name, kind: c.kind, members: list.filter(st => has(c, st)).map(st => st.id) }))
+    .filter(g => g.members.length);
+}
+let groupsAsked = false, groupsHooked = false;
+function loadGroups(){
+  if (groupsAsked || !window.TeacherSettings || !window.CabinetCloud) return;
+  groupsAsked = true;
+  if (!groupsHooked){ groupsHooked = true; TeacherSettings.onChange(() => renderMem()); }
+  TeacherSettings.load().catch(() => {});
+}
+function studentsCached(){ return studentsList; }
 function renderMem(){
   const row = $('wkMemRow'); if (!row) return;
-  const who = issuedTo();
+  // список учеников грузим один раз (строка видна, если он не пустой); имена у чипов появятся, когда он придёт
+  if (!pickListAsked && window.StudentMemory && !StudentMemory.isFollower()){
+    pickListAsked = true;
+    loadStudents().then(l => { if (l.length) renderMem(); });
+  }
+  loadGroups();
+  applyPick();
+  const who = issuedList();
   const tc = TCAP();
-  row.hidden = !(who || tc);
+  row.hidden = !(who.length || tc || studentsList.length);
   if (row.hidden) return;
+  renderPick();
   const btn = $('wkIssued');
-  btn.hidden = !who;
-  if (who){
-    btn.textContent = 'Выдано: ' + who.name;
+  btn.hidden = !who.length;
+  if (who.length){
+    btn.textContent = 'Выдано: ' + who.map(w => w.name).join(', ');
     const k = (curVar().blocks || []).filter(isTask).length;
     btn.disabled = !k;
-    if (who.remembered && who.name === '…' && window.StudentMemory) loadStudents().then(() => renderMem());
+    if (who.some(w => w.remembered && w.name === '…') && window.StudentMemory) loadStudents().then(l => { if (l.length) renderMem(); });
   }
-  $('wkIssuedChange').hidden = !window.StudentMemory;
   $('wkSkipSolved').checked = skipSolvedOn;
   $('wkSkipSolved').closest('label').hidden = !tc;
   const tg = $('wkCapToggle');
   if (tc && !tg.firstChild && tc.mountToggle) tc.mountToggle(tg);
   tg.hidden = !tc;
 }
+$('wkForAdd').addEventListener('change', () => {
+  const id = $('wkForAdd').value; if (!id) return;
+  const ids = pickIds();
+  const g = id.indexOf('g:') === 0 ? studentGroups().find(x => 'g:' + x.id === id) : null;
+  (g ? g.members : [id]).forEach(v => { if (ids.indexOf(v) < 0) ids.push(v); });
+  $('wkIssuedNote').textContent = '';
+  setPick(ids);
+});
+$('wkGroupSave').addEventListener('click', async () => {
+  const ids = pickIds(); if (ids.length < 2) return;
+  const def = ids.map(id => issuedNames.get(id) || '…').slice(0, 3).join(', ') + (ids.length > 3 ? '…' : '');
+  let name = prompt('Название группы', def);
+  if (name == null) return;
+  name = name.trim().slice(0, 40) || def;
+  const btn = $('wkGroupSave'); btn.disabled = true;
+  try {
+    // настройки — одна строка на всё (оплаты, планер…): сначала свежие с сервера,
+    // иначе старой копией этого браузера затрём то, что поменяли в кабинете.
+    // Сервер не ответил — не сохраняем вовсе
+    await CabinetCloud.getSettings();
+    await TeacherSettings.load();
+    const cats = (TeacherSettings.get().studentCats || []).slice();
+    if (cats.length >= 30){ toast('Групп уже 30 — удалите ненужные в кабинете (список учеников)'); return; }
+    cats.push({ id: 'w' + Date.now().toString(36), name, kind: 'list', v: '', members: ids.slice() });
+    await TeacherSettings.set({ studentCats: cats });
+    toast('Группа «' + name + '» сохранена — она есть и в списке учеников кабинета');
+  } catch (e) {
+    toast('Группа не сохранилась: ' + ((window.CabinetCloud && CabinetCloud.errorText) ? CabinetCloud.errorText(e) : e.message), 6000);
+  } finally { btn.disabled = false; renderMem(); }
+});
 $('wkIssued').addEventListener('click', () => {
-  const who = issuedTo(); if (!who || !window.StudentMemory) return;
+  const whoAll = issuedList(); if (!whoAll.length || !window.StudentMemory) return;
   const blocks = (curVar().blocks || []).filter(isTask);
-  let ok = 0, dup = 0, none = 0;
-  blocks.forEach(b => {
-    const k = blockKey(b);
-    if (!k){ none++; return; }
-    const r = StudentMemory.record(k, 'hw', { source: 'work', srcRef: E.id || '', studentId: who.id });
-    if (r.ok) ok++; else if (r.reason === 'throttled') dup++; else none++;
+  const parts = [];
+  whoAll.forEach(who => {
+    let ok = 0, dup = 0, none = 0;
+    blocks.forEach(b => {
+      const k = blockKey(b);
+      if (!k){ none++; return; }
+      const r = StudentMemory.record(k, 'hw', { source: 'work', srcRef: E.id || '', studentId: who.id });
+      if (r.ok) ok++; else if (r.reason === 'throttled') dup++; else none++;
+    });
+    parts.push({ who, ok, dup, none });
   });
   // запомнить ученика у работы — он не пропадёт после перезагрузки
-  if (!E.settings.issuedTo || E.settings.issuedTo !== who.id){ E.settings.issuedTo = who.id; markDirty(); }
-  issuedNames.set(who.id, who.name);
+  // (issuedTo — первый, как раньше; при выборе нескольких все они уже в pickFor)
+  const first = whoAll[0];
+  if (!E.settings.issuedTo || E.settings.issuedTo !== first.id){ E.settings.issuedTo = first.id; markDirty(); }
+  whoAll.forEach(w => { if (w.name !== '…') issuedNames.set(w.id, w.name); });
   renderTasks();   // точки подписей: у только что выданных появилось «В ДЗ»
-  $('wkIssuedNote').textContent = 'Записано в журнал «' + who.name + '»: ' + ok + ' из ' + blocks.length
-    + (dup ? ' · уже записано недавно: ' + dup : '') + (none ? ' · без ключа (не записано): ' + none : '') + '. Не забудьте сохранить работу, чтобы ученик запомнился.';
-  renderMem();
-});
-$('wkIssuedChange').addEventListener('click', async () => {
-  const sel = $('wkIssuedPick');
-  if (!sel.hidden){ sel.hidden = true; return; }
-  const list = await loadStudents();
-  if (!list.length){ toast('Учеников в кабинете нет или нет связи с сервером'); return; }
-  sel.innerHTML = '<option value="">— выберите ученика —</option>' + list.map(s => '<option value="' + esc(s.id) + '">' + esc(s.name) + '</option>').join('');
-  sel.value = E.settings.issuedTo || '';
-  sel.hidden = false;
-});
-$('wkIssuedPick').addEventListener('change', () => {
-  const id = $('wkIssuedPick').value; if (!id) return;
-  E.settings.issuedTo = id; markDirty();
-  $('wkIssuedPick').hidden = true; $('wkIssuedNote').textContent = '';
+  $('wkIssuedNote').textContent = parts.map(p => 'Записано в журнал «' + p.who.name + '»: ' + p.ok + ' из ' + blocks.length
+    + (p.dup ? ' · уже записано недавно: ' + p.dup : '') + (p.none ? ' · без ключа (не записано): ' + p.none : '')).join('; ')
+    + '. Не забудьте сохранить работу, чтобы ' + (whoAll.length > 1 ? 'ученики запомнились.' : 'ученик запомнился.');
   renderMem();
 });
 
@@ -3150,22 +3300,30 @@ async function fillBuildStudents(){
   if (!window.StudentMemory){ $('bdForBox').hidden = true; return; }
   const list = await loadStudents();
   $('bdForBox').hidden = !list.length;
-  sel.innerHTML = '<option value="">— без ученика —</option>' + list.map(s => '<option value="' + esc(s.id) + '">' + esc(s.name) + '</option>').join('');
-  sel.value = list.some(s => s.id === BD.student) ? BD.student : '';
+  // «Для учеников» открытой работы (pickFor) — отдельным пунктом: решённое хоть кем-то из них пропускаем
+  const pick = (BD.target === 'cur') ? pickIds() : [];
+  const pickOpt = pick.length > 1 ? '<option value="@pick">Выбранные в работе: ' + esc(pick.map(id => issuedNames.get(id) || '…').join(', ')) + '</option>' : '';
+  sel.innerHTML = '<option value="">— без ученика —</option>' + pickOpt + list.map(s => '<option value="' + esc(s.id) + '">' + esc(s.name) + '</option>').join('');
+  // при открытии сборки из работы с выбранными учениками — по ним; иначе прежний выбор
+  const want = pick.length ? (pick.length > 1 ? '@pick' : pick[0]) : BD.student;
+  sel.value = (want === '@pick' ? pickOpt : list.some(s => s.id === want)) ? want : '';
   if (sel.value !== BD.student) setBuildStudent(sel.value);
 }
 async function setBuildStudent(id){
   BD.student = id || ''; BD.solved = null;
   renderBuildPreview();
   if (!id) return;
-  $('bdGoNote').textContent = 'Загружаем, что ученик уже решал…';
+  const ids = id === '@pick' ? pickIds() : [id];
+  $('bdGoNote').textContent = ids.length > 1 ? 'Загружаем, что ученики уже решали…' : 'Загружаем, что ученик уже решал…';
   let keys = new Set();
-  try {
-    const rows = await StudentMemory.fetchLog(id);
-    rows.forEach(r => { if (r.task_key) keys.add(r.task_key); });
-  } catch (e) { toast('Журнал ученика не загрузился: ' + e.message, 6000); }
-  // ещё не отправленное из очереди этого браузера — в локальной копии журнала
-  try { (StudentMemory.keys({ studentId: id }) || []).forEach(k => keys.add(k)); } catch (e) {}
+  for (const sid of ids){
+    try {
+      const rows = await StudentMemory.fetchLog(sid);
+      rows.forEach(r => { if (r.task_key) keys.add(r.task_key); });
+    } catch (e) { toast('Журнал ученика «' + (issuedNames.get(sid) || sid) + '» не загрузился: ' + e.message, 6000); }
+    // ещё не отправленное из очереди этого браузера — в локальной копии журнала
+    try { (StudentMemory.keys({ studentId: sid }) || []).forEach(k => keys.add(k)); } catch (e) {}
+  }
   if (BD.student !== id) return;
   BD.solved = keys;
   renderBuildPreview();
