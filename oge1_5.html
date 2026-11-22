@@ -307,6 +307,11 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .back-btn{font-family:var(--font-ui);font-weight:600;font-size:14px;color:var(--ink);background:var(--glass);border:1px solid var(--glass-border);border-radius:12px;padding:8px 14px;cursor:pointer;backdrop-filter:blur(16px) saturate(160%);transition:transform .15s;}
 .back-btn:active{transform:scale(.96)}
 .back-btn:hover{border-color:var(--ink)}
+.example-pager{display:inline-flex;align-items:center;gap:6px;flex:none;}
+.example-pager .type-nav-btn{min-width:32px;position:relative;z-index:3;}
+.example-pager button:disabled{opacity:.4;cursor:default;}
+.example-pager[hidden]{display:none;}
+html[data-card="1"] #taskArea > .example-pager{margin:6px 0 8px;}
 .task-title{font-family:var(--font-ui);font-weight:600;font-size:15px;color:var(--muted-3)}
 .corner{font-family:var(--font-ui);font-weight:500;display:flex;flex-wrap:wrap;row-gap:6px;align-items:center;gap:10px;}
 .refresh-btn{width:28px;height:28px;flex:0 0 auto;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass-strong);backdrop-filter:blur(14px) saturate(160%);-webkit-backdrop-filter:blur(14px) saturate(160%);color:var(--ink);font-size:15px;line-height:1;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:transform .18s, border-color .12s;}
@@ -326,7 +331,8 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .taskset-nav-label{font-family:var(--font-ui);font-weight:600;font-size:13px;color:var(--muted-2);flex:0 0 auto;}
 /* На широком экране используем место слева, сохраняя правый край под клавиатуру. */
 @media(min-width:1240px){
-  .task-head{margin-inline:-112px 0;flex-wrap:nowrap;}
+  .task-head{justify-content:flex-start;}
+  .task-head .corner{flex-basis:100%;}
   .type-nav{flex:none;column-gap:6px;}
   .type-nav-btn,.taskset-nav .taskset-nav-btn{padding-inline:8px;}
   .taskset-nav{flex-wrap:nowrap;column-gap:6px;}
@@ -690,6 +696,11 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
         <span class="medal-badge-row" id="medalBadgeRow"></span>
         <button class="basket-add-btn" id="basketAddBtn" title="В подборку">📥</button>
         <button class="refresh-btn" id="refreshBtn" title="Обновить задание">⟳</button>
+        <div class="example-pager" id="examplePager" role="group" aria-label="Примеры этого номера" hidden>
+          <button class="type-nav-btn" id="prevExample" type="button" title="Предыдущий пример" aria-label="Предыдущий пример">◀</button>
+          <span class="taskset-nav-label" id="exampleCount" aria-live="polite"></span>
+          <button class="type-nav-btn" id="nextExampleTop" type="button" title="Следующий пример" aria-label="Следующий пример">▶</button>
+        </div>
       </div>
     </div>
 
@@ -1434,6 +1445,10 @@ const els = {
   nextTypeBtn: document.getElementById('nextTypeBtn'),
   taskTitle: document.getElementById('taskTitle'),
   refreshBtn: document.getElementById('refreshBtn'),
+  examplePager: document.getElementById('examplePager'),
+  exampleCount: document.getElementById('exampleCount'),
+  prevExample: document.getElementById('prevExample'),
+  nextExample: document.getElementById('nextExampleTop'),
   tabLearn: document.getElementById('tabLearn'),
   tabPractice: document.getElementById('tabPractice'),
   tabExam: document.getElementById('tabExam'),
@@ -1485,6 +1500,7 @@ function loadProg(key) {
   catch (e) { return null; }
 }
 function saveProg(key, data) {
+  if (IS_CARD_FRAME) return; // Ответ в дополнительной карточке не заменяет основной пример.
   try { data.lastActiveAt = Date.now(); localStorage.setItem(PROGRESS_NS + key, JSON.stringify(data)); } catch (e) {}
 }
 function clearProg(key) {
@@ -1765,13 +1781,9 @@ document.querySelector('.mode-card.random').onclick = () => {
   openTask();
 };
 
-const COMING_SOON_TEXT = {
-  learn: '🚧 Режим «Обучение» ещё в разработке. Здесь появится подробное объяснение решения — со всеми подсказками, шаг за шагом.',
-};
-
 let curSubMode = 'exam';
 
-function openTask() {
+function openTask(incomingTask = false) {
   els.picker.style.display = 'none';
   els.taskArea.style.display = 'block';
   window.scrollTo(0, 0);
@@ -1779,7 +1791,9 @@ function openTask() {
   // только id задания. Восстанавливаем тему по этому id: теория и навигация
   // «Задание N из 5» — как у ведущего. Заводская шина «Шины 1» и текст «Шин ·
   // ФИПИ» приходят в снимке (factoryTire, tireFipiVar) раньше, чем сюда
-  if (!curTasksetRef) {
+  if (!curTasksetRef?.tasks.some(t => t.id === curMode)) {
+    curTasksetRef = null;
+    curTasksetTheory = null;
     const ts = GROUPS.flatMap(g => g.modes).find(x => x.kind === 'taskset' && x.theory && x.tasks.some(t => t.id === curMode));
     if (ts) { curTasksetRef = ts; curTasksetTheory = ts.theory(); }
   }
@@ -1818,7 +1832,7 @@ function openTask() {
   updateTasksetNav();
   updateTypeNav();
   syncVideoBtn();
-  switchSubMode(curSubMode, true);
+  switchSubMode(curSubMode, true, incomingTask);
 }
 /* «Смотреть разбор» — только если к блоку текущего задания привязано видео
    (video-links.js). В кадре карточки «+» кнопки нет: карточка — копия
@@ -1846,7 +1860,7 @@ els.backBtn.onclick = () => {
   syncKeypadVisibility();
   renderPicker();
 };
-els.refreshBtn.onclick = () => { if (curSubMode === 'exam' || curSubMode === 'practice') nextExample(); };
+els.refreshBtn.onclick = nextExample;
 
 els.basketAddBtn = document.getElementById('basketAddBtn');
 els.basketAddBtn.onclick = () => {
@@ -1911,29 +1925,128 @@ function navigateType(delta) {
 els.prevTypeBtn.onclick = guardTaskNavigation(() => navigateType(-1));
 els.nextTypeBtn.onclick = guardTaskNavigation(() => navigateType(1));
 
-function switchSubMode(mode, isEntering) {
+// В конструкторе остаются только полные наборы. На странице номера доступны
+// все его задания, даже если в исходном тексте ФИПИ отсутствует соседний номер.
+const exampleModes = new Map();
+for (const group of GROUPS) {
+  for (const set of group.modes) {
+    set.tasks.forEach((task, index) => {
+      const bank = set.fipi ? setPartRaw(set, index).filter(t => t.checked || FIPI15_ALL) : [];
+      exampleModes.set(task.id, { set, task, bank });
+    });
+  }
+}
+const generatorHistory = new Map();
+function currentExampleMode() {
+  return exampleModes.get(curMode === 'random' ? curTask?.genKind : curMode);
+}
+function matchesExampleContext(task) {
+  if (!curTasksetRef) return true;
+  if (curTasksetRef.id === 'tire_set1' && task.factoryTire) {
+    return tireMark(task.factoryTire) === tireMark(ensureFactoryTire());
+  }
+  if (!isTextSet()) return true;
+  const record = curTasksetRef.fipiTasks.find(t => t.fipi === task.fipi);
+  const variant = curTasksetRef.varPlot ? plotVarOf(curTasksetRef.varPlot) : tireFipiVar();
+  return record && record.v === variant.v;
+}
+function alignExampleTheory(record) {
+  if (!record) return;
+  const plot = curTasksetRef.varPlot;
+  const state = plot ? plotVarState() : null;
+  const saved = (plot ? state[plot] : tireFipiState()) || {};
+  const next = { v: record.v, seen: [...new Set([...(saved.seen || []), record.v])] };
+  if (plot) {
+    curPlotVar[plot] = record.v;
+    state[plot] = next;
+    savePlotVarState(state);
+  } else {
+    curTireFipiVar = record.v;
+    saveTireFipiState(next);
+  }
+  curTasksetTheory = curTasksetRef.theory();
+  els.theoryContent.innerHTML = curTasksetTheory;
+}
+function historyFor(mode) {
+  // При новой заводской шине задания о прежней шине имеют другие исходные данные.
+  const key = mode.task.id + ':' + tireMark(ensureFactoryTire());
+  if (!generatorHistory.has(key)) generatorHistory.set(key, []);
+  const list = generatorHistory.get(key);
+  let index = list.findIndex(t => t.prompt === curTask.prompt && t.correctValue === curTask.correctValue);
+  if (index < 0) {
+    list.push(curTask);
+    if (list.length > 30) list.shift();
+    index = list.length - 1;
+  }
+  return { list, index };
+}
+function examplePosition(mode) {
+  if (mode.bank.length) {
+    return { index: mode.bank.findIndex(t => t.fipi === curTask.fipi), total: mode.bank.length };
+  }
+  if (mode.task.demo) return { index: 0, total: 1 };
+  // Диаметр заводской шины полностью определяется самой шиной.
+  if (mode.task.id === 'tire1_t3') {
+    const tire = curTask.factoryTire || ensureFactoryTire();
+    return { index: FACTORY_TIRE_POOL.findIndex(t => tireMark(t) === tireMark(tire)), total: FACTORY_TIRE_POOL.length };
+  }
+  return { index: historyFor(mode).index, total: null };
+}
+function syncExamplePager() {
+  const mode = currentExampleMode();
+  els.examplePager.hidden = !mode || !curTask;
+  if (els.examplePager.hidden) return;
+  const { index, total } = examplePosition(mode);
+  els.exampleCount.textContent = total ? (index < 0 ? 'Пример' : (index + 1) + ' из ' + total) : 'Пример ' + (index + 1);
+  els.prevExample.disabled = total === 1 || (!total && index === 0);
+  els.nextExample.disabled = total === 1;
+}
+function browseExample(delta) {
+  const mode = currentExampleMode();
+  if (!mode) return;
+  const { index, total } = examplePosition(mode);
+  if (total === 1) return;
+  const next = total ? ((index < 0 && delta < 0 ? 0 : index) + delta + total) % total : index + delta;
+  let task;
+  if (mode.bank.length) {
+    const record = mode.bank[next];
+    task = mode.set.id === 'tire_fipi'
+      ? tireFipiTaskOf(TIRE_FIPI.find(v => v.v === record.v), record)
+      : plotTaskOf(record.plot, record, IS_CARD_FRAME || !curTasksetRef);
+  } else if (mode.task.id === 'tire1_t3') {
+    curFactoryTire = FACTORY_TIRE_POOL[next];
+    if (curTasksetRef && !IS_CARD_FRAME) {
+      saveFactoryTire(curFactoryTire);
+      curTasksetTheory = curTasksetRef.theory();
+      els.theoryContent.innerHTML = curTasksetTheory;
+    }
+    task = mode.task.gen();
+  } else {
+    if (next < 0) return;
+    task = historyFor(mode).list[next];
+  }
+  newTask(task, mode.task);
+}
+function bindExamplePager(guard, changed) {
+  for (const [button, delta] of [[els.prevExample, -1], [els.nextExample, 1]]) {
+    button.onclick = guard(() => {
+      browseExample(delta);
+      if (changed) changed();
+    });
+  }
+}
+bindExamplePager(guardTaskNavigation);
+
+function switchSubMode(mode, isEntering, incomingTask = false) {
   curSubMode = mode;
   els.tabLearn.classList.toggle('active', mode === 'learn');
   els.tabPractice.classList.toggle('active', mode === 'practice');
   els.tabExam.classList.toggle('active', mode === 'exam');
 
-  if (mode === 'exam' || mode === 'practice') {
-    els.comingSoonPanel.style.display = 'none';
-    els.refreshBtn.style.display = 'inline-flex';
-    // переключение вкладки вручную всегда даёт новый пример; а вот при первом
-    // входе в прототип (isEntering) — пробуем восстановить последний
-    if (isEntering) resumeOrNewTask(); else newTask();
-  } else {
-    els.questionPanel.style.display = 'none';
-    els.mainPanel.style.display = 'none';
-    els.showSolutionBtn.style.display = 'none';
-    els.calcTools.style.display = 'none';
-    closeCalc();
-    closeCalcHistory();
-    els.refreshBtn.style.display = 'none';
-    els.comingSoonPanel.textContent = COMING_SOON_TEXT[mode];
-    els.comingSoonPanel.style.display = 'block';
-  }
+  els.comingSoonPanel.style.display = 'none';
+  els.refreshBtn.style.display = 'inline-flex';
+  if (incomingTask) return; // Сам пример уже есть в снимке, ниже его покажет tsApplyState.
+  if (isEntering) resumeOrNewTask(); else newTask();
 }
 els.tabLearn.onclick = () => switchSubMode('learn');
 els.tabPractice.onclick = () => switchSubMode('practice');
@@ -2011,6 +2124,8 @@ function renderCurrentTask(){
   els.explainBox.style.display = 'none';
   els.nextBtn.style.display = 'none';
 
+  if (curSubMode === 'learn') revealSolution();
+  syncExamplePager();
   syncKeypadVisibility();
 }
 
@@ -2114,6 +2229,7 @@ window.__trainerCatalog = {
       task = own();
       if (bank.length) task.basedOnFipi = true;
     }
+    task.genKind = protoId;
     curMode = protoId;   // не setCurMode: тот сохранил бы лист заметок в localStorage
     curTasksetRef = null;
     curTasksetTheory = null;
@@ -2142,7 +2258,7 @@ window.__trainerCatalog = {
   },
 };
 
-function newTask() {
+function newTask(selectedTask, selectedMode) {
   const tasksetDef = curTasksetRef ? curTasksetRef.tasks.find(t => t.id === curMode) : null;
   if (tasksetDef && !tasksetDef.gen) {
     els.questionPanel.style.display = 'none';
@@ -2152,6 +2268,7 @@ function newTask() {
     closeCalc();
     closeCalcHistory();
     els.refreshBtn.style.display = 'none';
+    els.examplePager.hidden = true;
     els.comingSoonPanel.textContent = '🚧 Это задание ещё в разработке. Переходите к следующему через кнопку выше.';
     els.comingSoonPanel.style.display = 'block';
     syncKeypadVisibility();
@@ -2163,13 +2280,13 @@ function newTask() {
   // новый пример — новое содержимое листа: старые записи (если были) к нему уже
   // не относятся, поэтому лист очищается (и вместе с ним — сохранённая для этого
   // режима копия, чтобы при возврате сюда позже не подставились чужие заметки)
-  if (window.clearInkForMode) window.clearInkForMode(curMode);
+  if (!IS_CARD_FRAME && (curTasksetRef || curMode === 'random') && window.clearInkForMode) window.clearInkForMode(curMode);
 
-  const m = curMode === 'random' ? pick(RANDOM_MODES) : ALL_MODES.find(x => x.id === curMode);
+  const m = selectedMode || (curMode === 'random' ? pick(RANDOM_MODES) : ALL_MODES.find(x => x.id === curMode));
   // Промпт №18 нового списка: без повторов — тот же генератор, но задание,
   // совпавшее с недавним (целиком или ответом подряд), перегенерируется
   // (no-repeat.js); avoid — заменяемое задание на экране
-  curTask = NoRepeat.pick('oge1_5:' + curMode, () => m.gen(), { avoid: [curTask] });
+  curTask = selectedTask ? { ...selectedTask } : NoRepeat.pick('oge1_5:' + curMode, () => m.gen(), { avoid: [curTask] });
   // id выпавшего типа: в «вперемешку» curMode остаётся 'random', а ключ задания
   // для журнала кабинета (task-key.js, gen:<страница>:<вид>) нужен по настоящему типу
   if (curTask && typeof curTask === 'object' && m && m.id) curTask.genKind = m.id;
@@ -2178,9 +2295,12 @@ function newTask() {
   solutionShown = false;
   hadWrongPick = false;
 
+  if (isTextSet() && !IS_CARD_FRAME) {
+    alignExampleTheory(curTasksetRef.fipiTasks.find(t => t.fipi === curTask.fipi));
+  }
   renderCurrentTask();
 
-  if (curMode !== 'random') {
+  if (curTasksetRef) {
     curProg.task = curTask;
     curProg.answered = false;
     curProg.hadWrongPick = false;
@@ -2196,7 +2316,7 @@ function resumeOrNewTask(){
   const tasksetDef = curTasksetRef ? curTasksetRef.tasks.find(t => t.id === curMode) : null;
   if (tasksetDef && !tasksetDef.gen) { newTask(); return; }
 
-  if (curMode !== 'random' && curProg && curProg.task) {
+  if (curMode !== 'random' && curProg.task && matchesExampleContext(curProg.task)) {
     curTask = curProg.task;
     taskAnswered = !!curProg.answered;
     hadWrongPick = !!curProg.hadWrongPick;
@@ -2708,17 +2828,14 @@ function tsApplyState(state){
     }
     return;
   }
-  if (els.picker.style.display !== 'none' || curMode !== state.curMode) {
-    // тренажёры называют «открыть выбранный тип» по-разному: где-то это
-    // openTask() при уже выставленном curMode, где-то startMode(id) —
-    // берём то, что есть в этом файле
-    if (typeof openTask === 'function') { curMode = state.curMode; openTask(); }
-    else if (typeof startMode === 'function') { startMode(state.curMode); }
-    else { curMode = state.curMode; }
-  }
-  if (typeof curSubMode !== 'undefined' && state.curSubMode && curSubMode !== state.curSubMode
-      && typeof switchSubMode === 'function') {
-    switchSubMode(state.curSubMode);
+  const enteringTask = els.picker.style.display !== 'none' || curMode !== state.curMode;
+  const changingTab = state.curSubMode && curSubMode !== state.curSubMode;
+  if (enteringTask) {
+    curMode = state.curMode;
+    if (state.curSubMode) curSubMode = state.curSubMode;
+    openTask(!!state.curTask);
+  } else if (changingTab) {
+    switchSubMode(state.curSubMode, false, !!state.curTask);
   }
   if (state.curTask) {
     // Промпт №31: перерисовываем только при настоящем изменении — иначе
@@ -2726,10 +2843,14 @@ function tsApplyState(state){
     const same = curTask
       && !!taskAnswered === !!state.taskAnswered
       && JSON.stringify(curTask) === JSON.stringify(state.curTask);
-    if (!same) {
+    if (enteringTask || changingTab || !same) {
       curTask = state.curTask;
       taskAnswered = !!state.taskAnswered;
       if (typeof hadWrongPick !== 'undefined') hadWrongPick = !!state.hadWrongPick;
+      curProg.task = curTask;
+      curProg.answered = taskAnswered;
+      curProg.hadWrongPick = hadWrongPick;
+      curProg.pickedIndex = null;
       renderCurrentTask();
     }
   }
@@ -2780,6 +2901,10 @@ function tsApplyStateFromPeer(state){
   try { tsPeerSig = tsWatchSig(tsGetState()); } catch (e) {}
 }
 window.__trainerState = { get: tsGetState, apply: tsApplyState,
+  mountExamplePager(guard, changed) {
+    els.questionPanel.before(els.examplePager);
+    bindExamplePager(guard, changed);
+  },
   newTask: function(){ if (typeof newTask === 'function') newTask(); } };
 if (window.TrainerSession) {
   window.TrainerSession.init({ trainer: 'oge1_5', getState: tsGetStateVersioned, applyState: tsApplyStateFromPeer });

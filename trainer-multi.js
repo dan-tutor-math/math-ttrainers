@@ -273,6 +273,17 @@
       applied.delete(card.id);   // свежая загрузка кадра — снимка в нём ещё нет
       loading.remove();
       applyToFrame(card.id);
+      const api = frame.contentWindow.__trainerState;
+      if (api && api.mountExamplePager) {
+        api.mountExamplePager(fn => TS.guardStudentAction('switchTask', fn), () => {
+          const current = cards.find(c => c.id === card.id);
+          if (!current) return;
+          current.state = taskSnapshot(frame.contentWindow);
+          current.exampleRevision = uid();
+          applied.set(card.id, JSON.stringify(current.state));
+          TS.push();
+        });
+      }
     });
     box.appendChild(rm);
     box.appendChild(loading);
@@ -365,10 +376,11 @@
       for (let i = 0; i < cards.length; i++) {
         if (cards[i].id !== state.__cards[i].id) { changed = true; break; }
         if (!cards[i].state && state.__cards[i].state) { changed = true; break; }
+        if (cards[i].exampleRevision !== state.__cards[i].exampleRevision) { changed = true; break; }
       }
     }
     if (!changed) return;
-    cards = state.__cards.map(c => ({ id: c.id, state: c.state || null }));
+    cards = state.__cards.map(c => ({ id: c.id, state: c.state || null, exampleRevision: c.exampleRevision }));
     render();
   };
 
