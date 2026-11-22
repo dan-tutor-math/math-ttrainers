@@ -817,6 +817,9 @@ html[data-theme="dark"] .bd-optbar{box-shadow:var(--shadow), inset 0 1px 0 rgba(
 .bd-ctx-rotate button{font-size:17px;line-height:1;width:32px;height:28px;border-radius:9px;
   border:1px solid var(--glass-border);background:var(--glass);color:var(--pencil);cursor:pointer;}
 .bd-ctx-rotate button:hover{border-color:var(--ink);}
+.bd-ctx-layers{display:none;grid-template-columns:1fr 1fr;gap:4px;padding:6px 0 4px;margin-top:2px;border-top:1px solid var(--glass-border);}
+.bd-ctx-layers .bd-ctx-layers-cap{grid-column:1/-1;font-family:var(--font-ui);font-size:11.5px;color:var(--muted-2);padding:0 4px;}
+.bd-ctx-menu .bd-ctx-layers button{text-align:center;padding:6px 4px;font-size:12.5px;border:1px solid var(--glass-border);background:var(--glass);}
 .bd-ctx-zoom{display:flex;align-items:center;justify-content:space-between;gap:4px;padding-top:8px;margin-top:4px;border-top:1px solid var(--glass-border);}
 .bd-ctx-zoom button{width:26px;height:26px;flex:none;border-radius:8px;border:1px solid var(--glass-border);background:var(--glass);font-weight:700;cursor:pointer;color:var(--pencil);}
 .bd-ctx-zoom span{font-family:var(--font-mono);font-size:12px;color:var(--muted-2);}
@@ -2059,6 +2062,14 @@ function resolveBasketTexInHtml(html){
       <button data-act="rotl" title="Повернуть влево на 90°">↺</button>
       <span>поворот</span>
       <button data-act="rotr" title="Повернуть вправо на 90°">↻</button>
+    </div>
+    <!-- Порядок слоёв картинок и заданий (moveLayer в boards-core.js) -->
+    <div class="bd-ctx-layers" id="bdCtxLayers">
+      <span class="bd-ctx-layers-cap">Слои</span>
+      <button data-act="layer-front" id="bdCtxLayerFront" title="На передний план (Ctrl+Shift+])">Поверх всех</button>
+      <button data-act="layer-up" id="bdCtxLayerUp" title="Переместить вперёд (Ctrl+])">Вперёд</button>
+      <button data-act="layer-back" id="bdCtxLayerBack" title="На задний план (Ctrl+Shift+[)">Под всеми</button>
+      <button data-act="layer-down" id="bdCtxLayerDown" title="Переместить назад (Ctrl+[)">Назад</button>
     </div>
     <div class="bd-ctx-zoom">
       <button id="bdCtxZoomOut">−</button>

@@ -3479,6 +3479,7 @@ function doUndo(){
     B.objects = JSON.parse(popped);
   } else {
     undoApplyOps(popped.ops, false);
+    if (popped.order) layerRefill(B.objects, popped.order.before);   // порядок слоёв (moveLayer)
     redoStack.push(popped);
     const rRef = { v: redoBytes + popped.bytes };
     trimStackToBudget(redoStack, rRef);
@@ -3503,6 +3504,7 @@ function doRedo(){
     B.objects = JSON.parse(popped);
   } else {
     undoApplyOps(popped.ops, true);
+    if (popped.order) layerRefill(B.objects, popped.order.after);   // порядок слоёв (moveLayer)
     undoStack.push(popped);
     const uRef = { v: undoBytes + popped.bytes };
     trimStackToBudget(undoStack, uRef);
@@ -9344,6 +9346,172 @@ function raiseTaskCard(id){
   scheduleRedraw();
   return true;
 }
+/* ═══ Порядок слоёв из меню выделения: «Вперёд», «Назад», «Поверх всех»,
+   «Под всеми» (как в PowerPoint). Работает только среди изображений и
+   заданий: штрихи и фигуры остаются на своих местах, иначе «поверх всех» у
+   карточки закрыло бы пометки ручкой, сделанные на ней.
+   Порядок пишется тем же числом zr, что и подъём карточки кликом
+   (applyLayerOrder): формат хранения не новый, старые вкладки его понимают,
+   облако рассылает его как обычную правку объекта.
+   Участники — выделенные картинки и картинки, которые их перекрывают
+   (по рамке). Картинки, которые с выделенным не пересекаются, не трогаем:
+   порядок между ними не виден, а каждая запись картинки в облако тяжёлая.
+   Новые zr берутся «между соседями» (дробные), чтобы не переписывать zr у
+   всех остальных. ═══ */
+function layerParticipant(o){
+  // подложка слайда всегда снизу, её место меняет только окно «Слайд»
+  return !!(o && o.type === 'image' && o.points && o.points[0] && !o.bgOf);
+}
+function layerOverlap(a, b){ return a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY; }
+function layerSelected(){
+  if (!B || !Array.isArray(B.objects)) return [];
+  return getSelectedObjects().filter(o => layerParticipant(o) && mayTouch(o));
+}
+// Новые zr для объектов need так, чтобы в порядке arr значения zr у всех
+// объектов с zr шли строго по возрастанию. zrOf — текущее значение (с учётом
+// уже намеченных правок). Возвращает Map(объект → zr) или null, если между
+// соседями не осталось места (дроби измельчились) — тогда перенумерация
+function layerFillZr(arr, need, zrOf){
+  const out = new Map();
+  let lo, i = 0;
+  while (i < arr.length){
+    const o = arr[i];
+    if (!need.has(o)){ const z = zrOf(o); if (typeof z === 'number') lo = z; i++; continue; }
+    const run = [];
+    let j = i, hi;
+    for (; j < arr.length; j++){
+      const q = arr[j];
+      if (need.has(q)) run.push(q);
+      else { const z = zrOf(q); if (typeof z === 'number'){ hi = z; break; } }
+    }
+    const k = run.length;
+    const vals = run.map((_, t) => {
+      if (lo === undefined && hi === undefined) return t + 1;
+      if (lo === undefined) return hi - (k - t);
+      if (hi === undefined) return lo + t + 1;
+      return lo + (hi - lo) * (t + 1) / (k + 1);
+    });
+    // строго между соседями и по возрастанию — иначе сортировка их перепутает
+    let prev = lo;
+    for (const v of vals){
+      if (!isFinite(v) || (prev !== undefined && !(v > prev))) return null;
+      prev = v;
+    }
+    if (hi !== undefined && !(prev < hi)) return null;
+    run.forEach((q, t) => out.set(q, vals[t]));
+    lo = vals[k - 1];
+    i = j;
+  }
+  return out;
+}
+// План перестановки: новый порядок участников на их же местах в B.objects
+// и новые zr. null — переставлять нечего (уже сверху / снизу / не с кем)
+function layerPlan(dir){
+  const sel = layerSelected();
+  if (!sel.length) return null;
+  const arr = B.objects;
+  const selSet = new Set(sel);
+  const bbs = new Map();
+  const bb = (o) => { let b = bbs.get(o); if (!b){ b = objectBBox(o); bbs.set(o, b); } return b; };
+  const part = arr.filter(o => layerParticipant(o) && (selSet.has(o) || sel.some(s => layerOverlap(bb(s), bb(o)))));
+  const before = part.slice();
+  let order = part.slice();
+  if (dir === 'front') order = order.filter(o => !selSet.has(o)).concat(order.filter(o => selSet.has(o)));
+  else if (dir === 'back') order = order.filter(o => selSet.has(o)).concat(order.filter(o => !selSet.has(o)));
+  else {
+    // на шаг: каждую выделенную — за ближайшую невыделенную картинку,
+    // которая её перекрывает. Идём от той, что ближе к цели, чтобы
+    // выделенные не перепрыгивали друг через друга
+    const up = dir === 'up';
+    const list = order.filter(o => selSet.has(o));
+    if (up) list.reverse();
+    list.forEach(s => {
+      const i = order.indexOf(s);
+      let t = -1;
+      if (up){ for (let k = i + 1; k < order.length; k++) if (!selSet.has(order[k]) && layerOverlap(bb(s), bb(order[k]))){ t = k; break; } }
+      else { for (let k = i - 1; k >= 0; k--) if (!selSet.has(order[k]) && layerOverlap(bb(s), bb(order[k]))){ t = k; break; } }
+      if (t < 0) return;
+      order.splice(i, 1);
+      // после удаления s вставка на старый номер цели — это сразу за ней
+      // (вверх: цель сдвинулась на шаг) или прямо перед ней (вниз)
+      order.splice(t, 0, s);
+    });
+  }
+  if (order.every((o, k) => o === before[k])) return null;
+  // места участников в массиве — те же, меняется только кто где стоит
+  const slots = [];
+  arr.forEach((o, i) => { if (part.includes(o)) slots.push(i); });
+  const next = arr.slice();
+  slots.forEach((s, k) => { next[s] = order[k]; });
+  // 1) подготовка: участникам без zr (и выделенным тоже) — zr по их
+  // нынешнему месту, видимо ничего не меняется. Выделенным это нужно для
+  // отмены на общей доске: она возвращает прежний zr, а без него картинка
+  // осталась бы на новом месте. 2) выделенным — zr между соседями на новом месте
+  const cur = (o) => o.zr;
+  let prep = layerFillZr(arr, new Set(part.filter(o => typeof o.zr !== 'number')), cur);
+  const withPrep = (m) => (o) => m.has(o) ? m.get(o) : o.zr;
+  let move = prep && layerFillZr(next, selSet, withPrep(prep));
+  if (!prep || !move){
+    // места между соседями не осталось — перенумеровать по порядку все
+    // объекты с zr и участников (разовая большая запись, бывает редко)
+    prep = new Map();
+    let n = 0;
+    arr.forEach(o => { if (typeof o.zr === 'number' || part.includes(o)) prep.set(o, ++n); });
+    move = layerFillZr(next, selSet, withPrep(prep));
+    if (!move) return null;
+  }
+  for (const [o, z] of Array.from(prep)) if (o.zr === z) prep.delete(o);
+  return { sel, next, prep, move, beforeIds: before.map(o => o.id), afterIds: order.map(o => o.id) };
+}
+// поставить объекты ids на их же места в arr в заданном порядке (для отмены)
+function layerRefill(arr, ids){
+  const want = new Set(ids), slots = [], by = new Map();
+  arr.forEach((o, i) => { if (o && want.has(o.id)){ slots.push(i); by.set(o.id, o); } });
+  const list = ids.map(id => by.get(id)).filter(Boolean);
+  if (list.length !== slots.length) return;
+  slots.forEach((s, k) => { arr[s] = list[k]; });
+}
+function moveLayer(dir){
+  if (!B || !Array.isArray(B.objects) || !mayDraw()) return false;
+  applyLayerOrder(B.objects);   // массив и zr должны совпадать до расчёта
+  const plan = layerPlan(dir);
+  if (!plan) return false;
+  const prepObjs = Array.from(plan.prep.keys());
+  if (!prepObjs.every(mayTouch)){
+    // перекрывающая картинка без zr — чужая, записать ей zr нельзя.
+    // Как у подъёма карточки: переставляем только на этом экране
+    plan.next.forEach((o, i) => { B.objects[i] = o; });
+    scheduleRedraw(); updateContextMenu();
+    return true;
+  }
+  const selIds = plan.sel.map(o => o.id);
+  if (B.cloudBoardId && prepObjs.length){
+    // общая доска: подготовка — отдельным жестом. Отмена в облаке
+    // возвращает объекты как были и сортирует по zr; если бы картинка
+    // получила zr и переехала одним жестом, отмена сняла бы zr и оставила
+    // её на новом месте. Подготовка порядок не меняет — её шаг отмены
+    // невидим
+    pushUndo({ ids: prepObjs.map(o => o.id) });
+    plan.prep.forEach((z, o) => { o.zr = z; });
+    saveDB();
+    pushUndo({ ids: selIds });
+  } else {
+    pushUndo({ ids: selIds.concat(prepObjs.filter(o => !plan.move.has(o)).map(o => o.id)) });
+    plan.prep.forEach((z, o) => { o.zr = z; });
+    // своя доска: отмена по операциям возвращает объекты на их места в
+    // массиве, а не по zr — запоминаем порядок участников до и после
+    if (undoOpen && undoStack[undoStack.length - 1] === undoOpen.entry){
+      undoOpen.entry.order = { before: plan.beforeIds, after: plan.afterIds };
+    }
+  }
+  plan.move.forEach((z, o) => { o.zr = z; });
+  plan.next.forEach((o, i) => { B.objects[i] = o; });
+  saveDB();
+  scheduleRedraw();
+  updateContextMenu();
+  return true;
+}
+window.boardsMoveLayer = moveLayer;
 // вызывается на каждый кадр перерисовки: создать/подвинуть/убрать живые
 // элементы у заданий, которые сейчас в кадре
 function syncTaskOverlays(){
@@ -11726,6 +11894,14 @@ document.addEventListener('keydown', (e) => {
     // Delete срабатывал только на одиночный объект
     if (selectedId || multiSelectIds.length){ deleteSelected(); return; }
   }
+  // порядок слоёв, как в PowerPoint: Ctrl+] / Ctrl+[ — на шаг, с Shift —
+  // поверх всех / под всеми. По e.code: на русской раскладке там «ъ» и «х»
+  if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.code === 'BracketLeft' || e.code === 'BracketRight') && layerSelected().length){
+    e.preventDefault();
+    const fwd = e.code === 'BracketRight';
+    moveLayer(e.shiftKey ? (fwd ? 'front' : 'back') : (fwd ? 'up' : 'down'));
+    return;
+  }
   // Промпт №22: размер ластика — [ и ], как кисть в Фотошопе. По e.code —
   // физической клавише: на русской раскладке там «х» и «ъ»
   if (tool === 'eraser' && !e.ctrlKey && !e.metaKey && !e.altKey && (e.code === 'BracketLeft' || e.code === 'BracketRight')){
@@ -11771,6 +11947,19 @@ function updateContextMenu(){
   const pinBtn = document.getElementById('bdCtxPin');
   pinBtn.style.display = isSingleImage ? '' : 'none';
   pinBtn.textContent = (isSingleImage && sel[0].locked) ? 'Открепить' : 'Закрепить';
+  // порядок слоёв — только если в выделенном есть картинка или задание;
+  // кнопка гаснет, когда двигать в эту сторону некуда (нет перекрытий)
+  const lay = document.getElementById('bdCtxLayers');
+  if (lay){
+    const can = layerSelected().length > 0;
+    lay.style.display = can ? 'grid' : 'none';
+    if (can){
+      [['bdCtxLayerFront','front'],['bdCtxLayerUp','up'],['bdCtxLayerBack','back'],['bdCtxLayerDown','down']].forEach(([id, dir]) => {
+        const btn = document.getElementById(id);
+        if (btn) btn.disabled = !layerPlan(dir);
+      });
+    }
+  }
   document.getElementById('bdCtxZoomLabel').textContent = Math.round(cam.zoom*100) + '%';
   if (typeof figOnSelection === 'function') figOnSelection(sel);   // Промпт №17
 }
@@ -11801,6 +11990,8 @@ document.getElementById('bdCtxMenu').addEventListener('click', (e) => {
       multiSelectIds.forEach(id => { const o=B.objects.find(x=>x.id===id); if (o) o.groupId = gid; });
       saveDB(); scheduleRedraw();
     }
+  } else if (act === 'layer-front' || act === 'layer-up' || act === 'layer-back' || act === 'layer-down'){
+    moveLayer(act.slice(6));
   } else if (act === 'rotl'){
     rotateSelectedImage(-1);
   } else if (act === 'rotr'){
