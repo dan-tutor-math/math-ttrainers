@@ -14,6 +14,7 @@
 <link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/onest-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="onest.css">
+<link rel="stylesheet" href="katex-0.18.5.css" id="katexCss">
 <style>
 :root{
   --font-ui:'Onest',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
@@ -394,6 +395,9 @@ sup sub,sub sup,sup sup,sub sub{font-size:.82em}
 .rt .ri{font-size:.56em;margin-right:-.42em;position:relative;top:-.18em;z-index:1}
 .rt .rs{font-weight:400}
 .rt .rad{border-top:1.5px solid currentColor;padding:0 .12em 0 .08em;margin-left:-.06em;margin-top:.18em;line-height:1.1}
+/* корень из числа рисует KaTeX (trig-bank.js); до прогрева шрифтов скрыт, чтобы не прыгал */
+.katex{visibility:hidden;font-size:1.05em}
+html.katex-fonts-ready .katex{visibility:visible}
 .frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;line-height:1.12;margin:0 .14em;white-space:nowrap}
 .frac .num{padding:0 .22em .1em;border-bottom:1.5px solid currentColor}
 .frac .den{padding:.1em .22em 0}
@@ -874,6 +878,9 @@ html[data-focus="on"] .run-row,html[data-focus="on"] .prop-ref{display:none!impo
 <script src="lazy-libs.js" data-preload="html2canvas jspdf"></script>
 <script src="lesson-history.js"></script>
 <script src="tile-demo.js"></script>
+<script src="katex-0.18.5.js"></script>
+<script>(function(){function r(){document.documentElement.classList.add('katex-fonts-ready');}
+if(document.fonts&&document.fonts.ready&&document.fonts.ready.then){document.fonts.ready.then(r).catch(r);setTimeout(r,1500);}else r();})();</script>
 <script src="trig-bank.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════════

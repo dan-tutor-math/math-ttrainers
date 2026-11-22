@@ -101,7 +101,16 @@
       case 'v': return '<i class="mv">' + t[1] + '</i>';
       case 'pi': return piHTML(t[1]);
       case 'q': return qHTML(t[1]);
-      case 'sqrt': return '<span class="rt"><span class="rs">√</span><span class="rad">' + render(t[1]) + '</span></span>';
+      case 'sqrt': {
+        // под корнем число (√2, √3) — рисует KaTeX: знак и черта слиты в одну фигуру.
+        // Без KaTeX (страница без него, node) и для сложного подкоренного — прежняя
+        // разметка из CSS: внутри неё лежит HTML дробей и клеток
+        const K = typeof window !== 'undefined' && window.katex;
+        if (K && typeof t[1] === 'number') {
+          try { return K.renderToString('\\sqrt{' + t[1] + '}', { throwOnError: false, output: 'html' }); } catch (e) { /* запасной путь ниже */ }
+        }
+        return '<span class="rt"><span class="rs">√</span><span class="rad">' + render(t[1]) + '</span></span>';
+      }
       case '/': return fracHTML(render(t[1]), render(t[2]));
       case 'fn': return '<span class="fn">' + FNAME[t[1]] + (t[3] ? '<sup>' + t[3] + '</sup>' : '') + '</span>&#8201;' + argHTML(t[2]);
       case 'pow': return '<span class="pw">' + (prec(t[1]) >= 9 ? render(t[1]) : par(render(t[1]))) + '<sup>' + render(t[2]) + '</sup></span>';
