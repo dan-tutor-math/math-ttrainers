@@ -1,0 +1,294 @@
+/* subject-palette.js — цвет всего интерфейса по предмету.
+
+   Зачем. У каждого предмета свой цвет (subjects-catalog.js: математика
+   синяя, русский красный, обществознание зелёное, английский фиолетовый…),
+   но раскрашена им была только главная. Тренажёры обществознания, английского,
+   физики и информатики, доски, кабинет и «Работы» оставались синими: синий
+   прописан в :root каждой страницы отдельно. Решение Даниила 18.11: палитра
+   идёт от предмета, и педагог может выбрать её сам — не обязательно тот
+   предмет, с которого зашёл; ученик видит то же, что показывает педагог.
+
+   Как работает. Все страницы берут акцент из одних и тех же переменных
+   (--ink, --ink-active, --hl-*, --hover-*, --blob-1, --grid). Скрипт стоит в
+   <head> сразу после определения темы, вычисляет предмет палитры и ставит
+   html[data-palette="<предмет>"], а вставленный <style> перекрывает эти
+   переменные. Селектор :root[data-palette] сильнее, чем :root и
+   html[data-theme="dark"] страниц, поэтому порядок подключения не важен.
+   Если палитра совпадает с родной палитрой страницы, атрибута нет вовсе —
+   страница выглядит ровно как раньше (свои тонкие настройки цвета целы).
+
+   Какой предмет:
+     1) у ученика в сессии — предмет, который прислал педагог (только на
+        эту вкладку, sessionStorage; свой выбор ученика не трогаем);
+     2) выбор педагога — настройка cabinetPalette в teacher_settings
+        (сервер, копия в localStorage 'teacher:settings:v1', читаем её
+        синхронно). Без входа — выбор этого устройства ('mathh:palette');
+     3) «По предмету» (по умолчанию, cabinetPalette.subject = 'neutral'):
+        тренажёр — свой предмет, главная — выбранная вкладка, доски, кабинет,
+        «Работы», конспект — последний открытый предмет ('mathh:lastSubject').
+
+   API: MathhPalette.current() — предмет палитры сейчас; choice() — выбор
+   ('auto' или id); choose(id|'auto') — выбрать (и сохранить на сервер, если
+   есть вход); subjects; setRemote(id|null) — палитра педагога в сессии;
+   onChange(fn). */
+(function () {
+  'use strict';
+  if (window.MathhPalette) return;
+
+  var root = document.documentElement;
+  var LOCAL_KEY = 'mathh:palette';        // выбор без входа в аккаунт
+  var LAST_KEY = 'mathh:lastSubject';     // последний открытый предмет
+  var REMOTE_KEY = 'mathh:palette:remote'; // палитра педагога у ученика (вкладка)
+  var TS_KEY = 'teacher:settings:v1';     // копия teacher-settings.js
+
+  // Цвета — те же, что у главной (index.html, html[data-subject]) и в
+  // subjects-catalog.js. ink/act — акцент и нажатие, rgb — для полупрозрачных
+  // подсветок, blob — цветное пятно фона. В тёмной теме тон светлее, чтобы
+  // белый текст на акцентной кнопке читался так же
+  var P = {
+    math: { title: 'Математика',
+      l: { ink: '#004C99', act: '#003A75', ink2: '#1E6FC2', rgb: '0,76,153',    blob: 'rgba(120,150,255,.16)' },
+      d: { ink: '#2E7DE0', act: '#4A93F0', ink2: '#79ADF0', rgb: '46,125,224',  blob: 'rgba(90,110,255,.22)' } },
+    inf:  { title: 'Информатика',
+      l: { ink: '#0B6577', act: '#08505E', ink2: '#1592A5', rgb: '11,101,119',  blob: 'rgba(21,146,165,.16)' },
+      d: { ink: '#2FA3B5', act: '#4DB8C8', ink2: '#7FD0DC', rgb: '47,163,181',  blob: 'rgba(47,163,181,.22)' } },
+    phys: { title: 'Физика',
+      l: { ink: '#A3480F', act: '#843A0C', ink2: '#C8621F', rgb: '163,72,15',   blob: 'rgba(200,98,31,.16)' },
+      d: { ink: '#D9773A', act: '#E58C52', ink2: '#F0AE80', rgb: '217,119,58',  blob: 'rgba(217,119,58,.22)' } },
+    rus:  { title: 'Русский',
+      l: { ink: '#9E2A47', act: '#7E1F37', ink2: '#C2405F', rgb: '158,42,71',   blob: 'rgba(194,64,95,.16)' },
+      d: { ink: '#C9506E', act: '#D86A86', ink2: '#ED8DA5', rgb: '210,90,118',  blob: 'rgba(210,90,118,.22)' } },
+    soc:  { title: 'Обществознание',
+      l: { ink: '#17694F', act: '#10523D', ink2: '#24896A', rgb: '23,105,79',   blob: 'rgba(36,137,106,.16)' },
+      d: { ink: '#2F8F70', act: '#3FA584', ink2: '#78CBB0', rgb: '58,158,126',  blob: 'rgba(58,158,126,.22)' } },
+    eng:  { title: 'Английский',
+      l: { ink: '#5B3596', act: '#47287A', ink2: '#7A52B8', rgb: '91,53,150',   blob: 'rgba(122,82,184,.16)' },
+      d: { ink: '#8462C8', act: '#9878D6', ink2: '#BAA0ED', rgb: '148,116,208', blob: 'rgba(148,116,208,.22)' } }
+  };
+  var ORDER = ['math', 'inf', 'phys', 'rus', 'soc', 'eng'];
+
+  // смесь двух цветов #RRGGBB: линии клетки — едва заметный оттенок предмета
+  function mix(a, b, t) {
+    var x = parseInt(a.slice(1), 16), y = parseInt(b.slice(1), 16), out = '#';
+    [16, 8, 0].forEach(function (s) {
+      var c = Math.round(((x >> s) & 255) * (1 - t) + ((y >> s) & 255) * t);
+      out += (c < 16 ? '0' : '') + c.toString(16);
+    });
+    return out;
+  }
+  function rgba(rgb, a) { return 'rgba(' + rgb + ',' + a + ')'; }
+
+  function vars(c, dark) {
+    var grid = dark ? mix('#151A2C', c.ink, 0.22) : mix('#FFFFFF', c.ink, 0.14);
+    return [
+      '--ink:' + c.ink, '--ink-active:' + c.act, '--ink-2:' + c.ink2,
+      '--hl-06:' + rgba(c.rgb, dark ? .10 : .06), '--hl-10:' + rgba(c.rgb, dark ? .16 : .10),
+      '--hl-14:' + rgba(c.rgb, dark ? .26 : .14), '--hl:' + rgba(c.rgb, dark ? .26 : .14),
+      '--hl-18:' + rgba(c.rgb, .18), '--hl-28:' + rgba(c.rgb, .28), '--hl-35:' + rgba(c.rgb, .35),
+      '--hover-1:' + rgba(c.rgb, dark ? .08 : .06), '--hover-2:' + rgba(c.rgb, dark ? .14 : .10),
+      '--blob-1:' + c.blob, '--grid:' + grid, '--bgp-line:' + grid,
+      // панель сессии ученика и форма отчёта об уроке (student-memory.js,
+      // lesson-reports.css) уже читают общий цвет действий отсюда
+      '--lesson-action-bg:' + (dark ? c.ink : c.act),
+      // меню навигации по номерам экзамена (exam-nav.css)
+      '--ej-ink:' + (dark ? c.ink2 : c.ink), '--ej-soft:' + rgba(c.rgb, dark ? .10 : .08), '--ej-dot:' + c.ink2,
+      '--subject-color:' + c.ink
+    ].join(';');
+  }
+  var css = '';
+  ORDER.forEach(function (id) {
+    css += ':root[data-palette="' + id + '"]{' + vars(P[id].l, false) + '}';
+    css += ':root[data-palette="' + id + '"][data-theme="dark"]{' + vars(P[id].d, true) + '}';
+  });
+  var style = document.createElement('style');
+  style.id = 'mathh-palette';
+  style.textContent = css;
+  (document.head || root).appendChild(style);
+
+  /* ── предмет страницы ── */
+  var file = (location.pathname.split('/').pop() || 'index.html').toLowerCase().replace(/\.html$/, '') || 'index';
+  // страницы без своего предмета: их палитра — от последнего открытого
+  // предмета; свёрстаны они синими, поэтому «родная» палитра — математика
+  var NEUTRAL = /^(boards|boards-panel|cabinet|works|work|notes|stage|deck-guide|font-check)$/;
+  var isIndex = file === 'index';
+  var isNeutral = NEUTRAL.test(file);
+  function valid(id) { return typeof id === 'string' && Object.prototype.hasOwnProperty.call(P, id); }
+  function ls(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} }
+
+  // родной предмет страницы — тот же разбор имени файла, что в bg-style.js
+  function native() {
+    if (isNeutral) return 'math';
+    if (/^rus/.test(file)) return 'rus';
+    if (/^soc/.test(file)) return 'soc';
+    if (/^eng/.test(file)) return 'eng';
+    if (/^phys?/.test(file)) return 'phys';
+    if (/^inf/.test(file)) return 'inf';
+    var a = root.getAttribute('data-subject');
+    return isIndex && valid(a) ? a : 'math';
+  }
+  function lastSubject() {
+    var v = ls(LAST_KEY) || ls('ogeNav:subject');
+    return valid(v) ? v : 'math';
+  }
+
+  /* ── выбор педагога ── */
+  // id вошедшего пользователя — из сессии supabase-js в localStorage
+  // (ключ sb-<проект>-auth-token). Копия teacher_settings общая для всех
+  // аккаунтов на устройстве, поэтому выбор чужого аккаунта не берём —
+  // так же сверяет owner кабинет
+  function userId() {
+    try {
+      for (var i = 0; i < localStorage.length; i++) {
+        var k = localStorage.key(i);
+        if (!/^sb-.+-auth-token$/.test(k)) continue;
+        var s = JSON.parse(localStorage.getItem(k) || 'null');
+        var u = s && (s.user || (s.currentSession && s.currentSession.user));
+        if (u && u.id) return u.id;
+      }
+    } catch (e) {}
+    return null;
+  }
+  function choice() {
+    var uid = userId();
+    if (uid) {
+      var ts = null;
+      try { ts = JSON.parse(ls(TS_KEY) || 'null'); } catch (e) {}
+      var p = ts && ts.cabinetPalette;
+      if (p && p.owner === uid) return valid(p.subject) ? p.subject : 'auto';
+    }
+    var v = ls(LOCAL_KEY);
+    return valid(v) ? v : 'auto';
+  }
+  function remote() {
+    var v = null;
+    try { v = sessionStorage.getItem(REMOTE_KEY); } catch (e) {}
+    return valid(v) ? v : null;
+  }
+  function current() {
+    var r = remote();
+    if (r) return r;
+    var c = choice();
+    if (c !== 'auto') return c;
+    return isNeutral ? lastSubject() : native();
+  }
+
+  var subs = [], lastApplied = null;
+  function apply() {
+    var cur = current();
+    if (cur === native()) root.removeAttribute('data-palette');
+    else root.setAttribute('data-palette', cur);
+    root.setAttribute('data-palette-subject', cur);
+    // и смена выбора без смены цвета («по предмету» → «математика» на
+    // математике) — подпись пункта меню должна обновиться
+    var key = cur + '|' + choice();
+    if (key !== lastApplied) {
+      lastApplied = key;
+      subs.forEach(function (fn) { try { fn(cur); } catch (e) {} });
+    }
+  }
+  // тренажёр и вкладка главной — «последний открытый предмет» для досок и
+  // кабинета: с какого предмета пришли, тем цветом они и откроются
+  function remember() { if (!isNeutral) lsSet(LAST_KEY, native()); }
+  remember();
+  apply();
+
+  // на главной предмет меняется вкладкой без перезагрузки
+  if (isIndex) new MutationObserver(function () { remember(); apply(); })
+    .observe(root, { attributes: true, attributeFilter: ['data-subject'] });
+  // выбор в другой вкладке (кабинет сохранил, сервер ответил)
+  window.addEventListener('storage', function (e) {
+    if (!e.key || e.key === TS_KEY || e.key === LOCAL_KEY || /auth-token$/.test(e.key)) apply();
+  });
+  window.addEventListener('pageshow', function (e) { if (e.persisted) apply(); });
+
+  /* ── сохранить выбор ── */
+  function loadScript(src) {
+    return new Promise(function (ok, fail) {
+      if (document.querySelector('script[src="' + src + '"]')) return ok();
+      var s = document.createElement('script');
+      s.src = src; s.onload = ok; s.onerror = fail;
+      document.head.appendChild(s);
+    });
+  }
+  // Выбор педагога живёт на сервере (teacher_settings.cabinetPalette), чтобы
+  // открываться первым с любого устройства. Страницы без кабинета
+  // (главная, доски) догружают teacher-settings.js и cabinet-cloud.js только
+  // в момент выбора — при обычном открытии сеть не нужна
+  function choose(id) {
+    if (id !== 'auto' && !valid(id)) return Promise.resolve(false);
+    var uid = userId();
+    var subject = id === 'auto' ? 'neutral' : id;
+    lsSet(LOCAL_KEY, id === 'auto' ? null : id);
+    if (!uid) { apply(); return Promise.resolve(false); }
+    // локальная копия — сразу, интерфейс не ждёт сеть
+    try {
+      var ts = JSON.parse(ls(TS_KEY) || 'null') || {};
+      ts.cabinetPalette = { owner: uid, subject: subject };
+      lsSet(TS_KEY, JSON.stringify(ts));
+    } catch (e) {}
+    apply();
+    if (!window.SUPABASE_CONFIG || !window.supabase) return Promise.resolve(false);
+    var ready = window.TeacherSettings && window.CabinetCloud ? Promise.resolve()
+      : loadScript('teacher-settings.js').then(function () { return loadScript('cabinet-cloud.js'); });
+    return ready.then(function () {
+      var TS = window.TeacherSettings;
+      // сначала серверная копия: иначе set() затёр бы чужие поля
+      // настроек (оплаты, подписи) старыми значениями этого устройства
+      return TS.load().then(function () {
+        return TS.set({ cabinetPalette: { owner: uid, subject: subject } });
+      });
+    }).then(function () { apply(); return true; }, function () { return false; });
+  }
+
+  function setRemote(id) {
+    try {
+      if (valid(id)) sessionStorage.setItem(REMOTE_KEY, id);
+      else sessionStorage.removeItem(REMOTE_KEY);
+    } catch (e) {}
+    apply();
+  }
+
+  /* ── пункт «Цвет» в меню «⋯» (главная, доски) ── */
+  function label() {
+    var c = choice();
+    return 'Цвет: ' + (c === 'auto' ? 'по предмету' : P[c].title.toLowerCase());
+  }
+  function mountMenuItem() {
+    if (!window.MathhMenu || !document.querySelector('.lg-menu') || document.getElementById('paletteToggle')) return;
+    var item = window.MathhMenu.mount().add({ id: 'paletteToggle', icon: 'board', label: label(), keepOpen: true,
+      onClick: function () {
+        // по кругу: по предмету → математика → … → английский → по предмету
+        var ids = ['auto'].concat(ORDER);
+        choose(ids[(ids.indexOf(choice()) + 1) % ids.length]);
+      } });
+    // место — рядом с «Фон» (оба про внешний вид), а «Подборка» остаётся
+    // последней: ею пользуются реже всего (test_prompt114)
+    var anchor = document.getElementById('bgToggle') || document.getElementById('fxToggle');
+    var anchorRow = anchor && anchor.closest('.lg-item');
+    if (anchorRow && anchorRow.parentNode) {
+      anchorRow.parentNode.insertBefore(item.row, anchorRow.nextSibling);
+      Array.prototype.forEach.call(anchorRow.parentNode.children, function (r, i) { r.style.setProperty('--i', i); });
+    }
+    // значок — кружок цвета палитры: подпись и так называет предмет
+    item.el.innerHTML = '<span aria-hidden="true" style="display:block;width:20px;height:20px;border-radius:50%;' +
+      'background:var(--ink);box-shadow:inset 0 0 0 2px rgba(255,255,255,.55)"></span>';
+    function sync() {
+      item.setLabel(label());
+      item.el.setAttribute('aria-label', label());
+      item.setActive(choice() !== 'auto');
+    }
+    subs.push(sync);
+    window.addEventListener('storage', sync);
+    sync();
+  }
+  if (document.readyState === 'complete') setTimeout(mountMenuItem, 0);
+  else window.addEventListener('load', function () { setTimeout(mountMenuItem, 0); });
+
+  window.MathhPalette = {
+    subjects: ORDER.map(function (id) { return { id: id, title: P[id].title, color: P[id].l.ink }; }),
+    current: current, choice: choice, native: native, choose: choose,
+    setRemote: setRemote, refresh: apply,
+    onChange: function (fn) { subs.push(fn); }
+  };
+})();

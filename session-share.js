@@ -752,6 +752,8 @@
       __permissions: permissions,
       __autosaveHistory: autosaveHistory,
       __theme: theme,
+      // палитра предмета (subject-palette.js): ученик видит цвет педагога
+      __palette: window.MathhPalette ? window.MathhPalette.current() : null,
       __trainer: trainerSlug, // Промпт №30 — какая страница прислала этот снимок
     }, isLeaderFlag ? {
       __stage: stageSize(), __ui: uiSnapshot(),
@@ -795,6 +797,9 @@
     // тема молча возвращалась в светлую. По той же причине тема ученика из
     // его рассылки не должна перекрашивать экран учителя
     if (state.__theme && !isLeaderFlag) applyRemoteTheme(state.__theme);
+    // палитру — так же, только ученику и только на эту вкладку (setRemote
+    // пишет в sessionStorage): свой выбор ученика на устройстве не трогаем
+    if (state.__palette && !isLeaderFlag && window.MathhPalette) window.MathhPalette.setRemote(state.__palette);
     // снимок с размером сцены кладёт только учитель — его тема и есть «правильная»
     if (state.__theme && state.__stage) leaderTheme = state.__theme;
     // Промпт №11 нового списка: размер окна учителя — до проверки «чей снимок»: он нужен
@@ -1191,6 +1196,9 @@
   }
   function dropQueued() {}
 
+  // педагог сменил палитру посреди урока — сразу разослать снимок, не ждать
+  // следующего действия на странице
+  if (window.MathhPalette) window.MathhPalette.onChange(() => { try { if (isLeaderFlag) push(); } catch (e) {} });
   function push() {
     if (applyingRemote || !code) return;
     const state = fullState();

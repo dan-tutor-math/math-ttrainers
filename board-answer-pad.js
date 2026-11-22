@@ -46,14 +46,14 @@
       background:var(--hover-1,rgba(0,0,0,.05));color:var(--ink,#1d1d1f);font:inherit;font-size:19px;}
     #bdAnsPad.slim button{height:36px;font-size:17px;}
     #bdAnsPad button:active{background:var(--hover-2,rgba(0,0,0,.12));}
-    #bdAnsPad button.sp{color:#2e7de0;font-weight:600;}
+    #bdAnsPad button.sp{color:var(--ink,#2e7de0);font-weight:600;}
     /* класс НЕ «mi»: в liquid-glass.css «.mi» — общий класс значков (width:1em),
        и кнопка «−» сжималась до узкой полоски вместо своей ячейки сетки */
     #bdAnsPad button.neg{color:var(--teacher,#ff3b30);font-weight:700;}
     #bdAnsPad button.set{font-family:"STIX Two Math","Cambria Math","Latin Modern Math","Times New Roman",serif;
       font-weight:400;font-size:25px;}
     #bdAnsPad button.aux{font-size:14px;color:var(--muted-6,#86868b);}
-    #bdAnsPad button.go{background:#2e7de0;color:#fff;font-size:16px;font-weight:600;}
+    #bdAnsPad button.go{background:var(--ink,#2e7de0);color:#fff;font-size:16px;font-weight:600;}
     @media (max-width:420px){#bdAnsPad.full .bap-grid{grid-template-columns:repeat(5,minmax(44px,1fr));}}
   `;
 

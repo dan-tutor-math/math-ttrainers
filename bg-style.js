@@ -51,6 +51,9 @@
   }
 
   function subject() {
+    // палитра по предмету (subject-palette.js): педагог мог выбрать предмет
+    // сам — тогда и фон «по предмету» идёт от него, а не от страницы
+    if (window.MathhPalette) return window.MathhPalette.current();
     // сначала имя файла: у тренажёров data-subject может быть общим
     var f = (location.pathname.split('/').pop() || '').toLowerCase();
     if (/^rus/.test(f)) return 'rus';
@@ -101,7 +104,7 @@
   // выбор, сделанный в другой вкладке, и переключение предмета на главной
   window.addEventListener('storage', function (e) { if (e.key === KEY) changed(); });
   new MutationObserver(function () { if (get() === 'auto') changed(); })
-    .observe(root, { attributes: true, attributeFilter: ['data-subject'] });
+    .observe(root, { attributes: true, attributeFilter: ['data-subject', 'data-palette-subject'] });
 
   window.MathhBg = {
     presets: PRESETS, get: get, set: set, effective: effective,

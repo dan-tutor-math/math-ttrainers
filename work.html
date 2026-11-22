@@ -7,6 +7,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#0B0E1A">
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<script src="subject-palette.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Работа — Mathh</title>
 <link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
@@ -1318,12 +1319,12 @@ body > :not([data-wl-up]):not([data-wl-root]),
   background:transparent!important;border:0!important;box-shadow:none!important;border-radius:0!important;padding:0!important;
   -webkit-backdrop-filter:none!important;backdrop-filter:none!important;}
 .wl-below [data-wl-root] :is(.input-answer-row, .p2-field, .sym-bar, .check-btn){display:none!important;}
-.wl-c.picked{outline:3px solid #2e7de0!important;outline-offset:1px;}
+.wl-c.picked{outline:3px solid var(--ink,#2e7de0)!important;outline-offset:1px;}
 .wl-c.good{outline:3px solid #248a3d!important;outline-offset:1px;}
 .wl-c.bad{outline:3px solid #ff3b30!important;outline-offset:1px;}
 input.wl-c.good{outline:none!important;border-color:#248a3d!important;color:#248a3d!important;}
 input.wl-c.bad{outline:none!important;border-color:#ff3b30!important;color:#ff3b30!important;}
-input.wl-c.done{border-color:#2e7de0!important;}
+input.wl-c.done{border-color:var(--ink,#2e7de0)!important;}
 input.wl-c:disabled{opacity:1;-webkit-text-fill-color:currentColor;}
 `;
 function liveIsolate(w, node){

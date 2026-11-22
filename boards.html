@@ -8,6 +8,7 @@
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0B0E1A">
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<script src="subject-palette.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Доски — Тренажёры</title>
 <link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
@@ -322,7 +323,7 @@ html[data-theme="dark"] .bd-zoom-pop{background:var(--glass-strong);backdrop-fil
    ходит от --pad до высоты минус --pad, чтобы бегунок не вылезал за полосу */
 .bd-zoom-track{--f:0;--f1:0;--pad:9px;position:relative;width:30px;height:min(200px,calc(100vh - 150px));flex:none;cursor:pointer;touch-action:none;outline:none;border-radius:10px;}
 .bd-zoom-track:focus-visible{box-shadow:0 0 0 2px var(--ink);}
-.bd-zoom-rail{position:absolute;left:50%;top:calc(var(--pad) - 3px);bottom:calc(var(--pad) - 3px);width:6px;margin-left:-3px;border-radius:3px;background:#fff;box-shadow:inset 0 0 0 1px rgba(0,76,153,.28);overflow:hidden;}
+.bd-zoom-rail{position:absolute;left:50%;top:calc(var(--pad) - 3px);bottom:calc(var(--pad) - 3px);width:6px;margin-left:-3px;border-radius:3px;background:#fff;box-shadow:inset 0 0 0 1px var(--hl-28,rgba(0,76,153,.28));overflow:hidden;}
 .bd-zoom-fill{position:absolute;left:0;right:0;bottom:0;height:calc(3px + var(--f) * (100% - 6px));background:var(--ink);border-radius:3px;}
 /* засечка 100 %: шкала логарифмическая, середина у неё не на 100 % —
    без засечки «натуральный размер» на глаз не найти */
@@ -947,7 +948,7 @@ html[data-theme="dark"] .bd-optbar{box-shadow:var(--shadow), inset 0 1px 0 rgba(
 .bd-fig-3d:hover{background:var(--ink-active);}
 .bd-fig-panel{position:fixed;z-index:261;top:62px;right:12px;display:none;flex-direction:column;gap:9px;width:min(330px,calc(100vw - 24px));max-height:calc(100vh - 150px);overflow:auto;background:var(--glass-strong);backdrop-filter:blur(26px) saturate(190%);-webkit-backdrop-filter:blur(26px) saturate(190%);border:1px solid var(--glass-border);border-radius:16px;box-shadow:var(--shadow);padding:11px 12px;}
 .bd-fig-panel.open{display:flex;}
-.bd-fig-panel{--fg-line:rgba(0,76,153,.22);}
+.bd-fig-panel{--fg-line:color-mix(in srgb,var(--ink,#004C99) 22%,transparent);}
 html[data-theme="dark"] .bd-fig-panel{--fg-line:rgba(255,255,255,.18);}
 .bd-fig-head{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:13.5px;}
 .bd-fig-x{border:none;background:none;color:var(--muted-2);font-size:14px;cursor:pointer;border-radius:8px;width:26px;height:26px;}

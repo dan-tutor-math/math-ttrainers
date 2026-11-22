@@ -23,7 +23,7 @@
   --pl-hi:rgba(255,255,255,.8);
   --pl-sh:0 1px 3px rgba(20,30,60,.16);
   --frame:rgba(255,159,10,.07);      --frame-b:rgba(230,150,40,.2);
-  --grab:rgba(0,76,153,.5);
+  --grab:color-mix(in srgb,var(--ink,#004C99) 50%,transparent);
   --chip:rgba(0,40,100,.06);
 }
 [data-theme="dark"]{

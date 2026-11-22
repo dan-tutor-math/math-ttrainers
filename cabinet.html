@@ -7,6 +7,7 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="theme-color" content="#0B0E1A">
 <script>(function(){try{var t=localStorage.getItem('theme');if(!t){t=window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+<script src="subject-palette.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
 <title>Кабинет — Mathh</title>
 <link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
@@ -398,7 +399,7 @@ html[data-theme="dark"]{--cab-window:#232940;}
             </div>
           </div>
           <div class="cab-options">
-            <div class="label" id="cabPaletteLabel">Цвет фона</div>
+            <div class="label" id="cabPaletteLabel">Цвет интерфейса</div>
             <div class="seg cab-colors" id="cabPalettes" role="group" aria-labelledby="cabPaletteLabel"></div>
             <div class="save-note" id="cabPaletteNote" role="status"></div>
           </div>
@@ -567,7 +568,9 @@ const account = $('cabAccount');
 const passwordDialog = $('cabPassword');
 const passwordForm = $('cabPasswordForm');
 const paletteBox = $('cabPalettes');
-const palettes = [{ id: 'neutral', title: 'Нейтральный', color: '' }, ...(window.MathhCatalog?.subjects || [])];
+// «По предмету» (neutral) — цвет тренажёра, а доски и кабинет — цвет последнего
+// открытого предмета; выбранный предмет красит весь сайт (subject-palette.js)
+const palettes = [{ id: 'neutral', title: 'По предмету', color: '' }, ...(window.MathhCatalog?.subjects || [])];
 let settingsRequest = null;
 let paletteSave = Promise.resolve();
 
@@ -585,6 +588,8 @@ function paintPalette(){
   const palette = currentPalette();
   if (palette.color) document.body.style.setProperty('--cab-subject', palette.color);
   else document.body.style.removeProperty('--cab-subject');
+  // выбор лежит в копии teacher_settings — палитра всех страниц читает её оттуда
+  window.MathhPalette?.refresh();
   paletteBox.querySelectorAll('button').forEach(b => {
     const selected = b.dataset.palette === palette.id;
     b.classList.toggle('on', selected);
