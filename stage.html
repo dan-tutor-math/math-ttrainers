@@ -258,7 +258,9 @@ html,body{margin:0;height:100%;background:var(--stage-bg);overflow:hidden;touch-
   function targetUrl(raw){
     let u;
     try { u = new URL(raw || 'index.html', location.href); } catch (e) { u = null; }
-    if (!u || u.origin !== location.origin || /\/stage\.html$/i.test(u.pathname)) u = new URL('index.html', location.href);
+    // .html необязателен: тестовый сайт на Cloudflare Pages отдаёт адреса
+    // без него (/stage), и без этого сцена открылась бы в кадре самой себя
+    if (!u || u.origin !== location.origin || /\/stage(\.html)?$/i.test(u.pathname)) u = new URL('index.html', location.href);
     u.searchParams.set('s', code);
     return u;
   }
