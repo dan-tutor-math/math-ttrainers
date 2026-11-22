@@ -1,6 +1,6 @@
 """
 Правка «корни в ОГЭ №1–8, 19 через KaTeX» (sqrt-katex.js).
-Проверяет на oge1_5, oge7, oge8, oge19 (+ oge6, он корней не содержит и не подключён):
+Проверяет на oge1_5, oge7, oge8, oge19, oge15_18, quadratic, powers:
   1. текст «√3», «2 − √3», «√(ab)», «√a · √b» в странице превращается в KaTeX-корни,
      простого «√» рядом с цифрой не остаётся;
   2. то же для узла, добавленного после загрузки (генераторы дорисовывают условие);
@@ -25,7 +25,7 @@ PROBE = """() => {
 def main():
     with T.local_server(), sync_playwright() as pw:
         b = pw.chromium.launch()
-        for name in ("oge1_5", "oge7", "oge8", "oge19"):
+        for name in ("oge1_5", "oge7", "oge8", "oge19", "oge15_18", "quadratic", "powers"):
             for width in (1300, 375):
                 ctx, page, errs = T.new_page(b, f"{T.BASE}/{name}.html?all=1", width=width)
                 page.evaluate(PROBE); page.wait_for_timeout(300)
