@@ -916,6 +916,15 @@ const DTB_QUICK_STYLES = [
   { f: '#DDEBF7', l: '#4472C4', t: '#1D1D1F', n: 'Светлый' },
   { f: null, l: '#4472C4', t: '#1D1D1F', n: 'Только контур' }
 ];
+// первым — цвет предмета палитры (subject-palette.js): им же рисуются новые
+// фигуры, и стиль «как у новой» должен быть под рукой. У математики его нет —
+// там первый и так «Синий»
+(function(){
+  const sc = window.MathhPalette && window.MathhPalette.slideColors();
+  if (!sc) return;
+  DTB_QUICK_STYLES.unshift({ f: sc.fill, l: sc.line, t: '#FFFFFF', n: sc.title },
+    { f: sc.soft, l: sc.fill, t: '#1D1D1F', n: sc.title + ', светлый' });
+})();
 // меню «Упорядочить»: разделы и пункты; can — когда пункт доступен
 const DTB_ARR_MENU = [
   { h: 'Порядок', items: [['front', 'На передний план'], ['forward', 'Переместить вперёд'], ['backward', 'Переместить назад'], ['back', 'На задний план']] },

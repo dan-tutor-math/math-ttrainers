@@ -2830,7 +2830,8 @@ function deckAnimSyncUI(){
     + '.deck-anim-dots button{width:28px;height:28px;border-radius:50%;border:1.5px solid var(--ink);background:none;color:var(--ink);font:700 13px/1 var(--font-ui);cursor:pointer;padding:0}'
     + '.deck-anim-dots button.on{background:color-mix(in srgb, var(--ink) 22%, transparent)}'
     + '.deck-anim-dots button.cur{background:var(--ink);color:#fff}'
-    + '.deck-anim-dots.in-show button{border-color:#4A93F0;color:#ddd}.deck-anim-dots.in-show button.cur{background:#4A93F0;color:#fff}';
+    // в показе фон всегда тёмный — берём светлый тон предмета, а не --ink светлой темы
+    + '.deck-anim-dots.in-show button{border-color:var(--ej-dot,#4A93F0);color:#ddd}.deck-anim-dots.in-show button.cur{background:var(--ej-dot,#4A93F0);color:#fff}';
   document.head.appendChild(st);
 })();
 

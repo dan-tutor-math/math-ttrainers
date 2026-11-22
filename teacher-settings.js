@@ -26,7 +26,10 @@
                    flags [{id, name, free}] — свои флаги преподавателя;
                    monthMode 'x4'|'tpl' — как считать «в месяц» (В4б) }
      planner     — вид планера { end, grp, span, pal } (schedule.js); null — ещё не задан
-     cabinetPalette — фон кабинета { owner, subject }; owner отделяет локальные копии аккаунтов
+     cabinetPalette — цвет интерфейса { owner, subject } (subject-palette.js; 'neutral' — по предмету);
+                   owner отделяет локальные копии аккаунтов
+     mainSubject — основной предмет педагога { owner, subject }: с него открывается главная
+                   на новом устройстве, им окрашены доски и кабинет, пока цвет «по предмету»
      incomeGroups — группы дохода (В4б, фильтр статистики):
                    [{id, name, members [student_id], from, to, auto}];
                    auto — в группу сами попадают все ученики, кроме out
@@ -37,7 +40,7 @@
   const DEFAULTS = { sessionBind: 'browser', sessionGoHome: false, boardNewTab: false, labels: 'show', labelDates: true, labelCount: true, lessonMin: 60,
                      formatLabels: Object.assign({}, FORMAT_LABELS),
                      pay: { skipRule: 'free', outside: 'free', trackSingleDebt: true, remindLeft: 1, remindDays: 3, flags: [], monthMode: 'x4' },
-                     incomeGroups: [], cabinetPalette: null };
+                     incomeGroups: [], cabinetPalette: null, mainSubject: null };
   const listeners = [];
   let cur = null;
 
@@ -70,6 +73,11 @@
     if (palette && typeof palette.owner === 'string' && palette.owner &&
         typeof palette.subject === 'string' && /^[a-z0-9_-]{1,24}$/.test(palette.subject)){
       o.cabinetPalette = { owner: palette.owner, subject: palette.subject };
+    }
+    const main = raw.mainSubject;
+    if (main && typeof main.owner === 'string' && main.owner &&
+        typeof main.subject === 'string' && /^[a-z0-9_-]{1,24}$/.test(main.subject)){
+      o.mainSubject = { owner: main.owner, subject: main.subject };
     }
     return o;
   }

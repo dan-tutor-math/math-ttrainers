@@ -399,6 +399,12 @@ html[data-theme="dark"]{--cab-window:#232940;}
             </div>
           </div>
           <div class="cab-options">
+            <div class="label" id="cabMainLabel">Основной предмет</div>
+            <div class="seg cab-colors" id="cabMainSubjects" role="group" aria-labelledby="cabMainLabel" aria-describedby="cabMainHint"></div>
+            <div class="hint" id="cabMainHint">С него главная открывается на новом устройстве; его цветом окрашены доски, кабинет и «Работы», пока цвет интерфейса — «по предмету».</div>
+            <div class="save-note" id="cabMainNote" role="status"></div>
+          </div>
+          <div class="cab-options">
             <div class="label" id="cabPaletteLabel">Цвет интерфейса</div>
             <div class="seg cab-colors" id="cabPalettes" role="group" aria-labelledby="cabPaletteLabel"></div>
             <div class="save-note" id="cabPaletteNote" role="status"></div>
@@ -597,6 +603,37 @@ function paintPalette(){
   });
 }
 TS.onChange(paintPalette);
+
+/* основной предмет (teacher_settings.mainSubject): «Не задан» — доски и
+   кабинет берут цвет последнего открытого предмета (subject-palette.js) */
+const mainBox = $('cabMainSubjects');
+const mainOptions = [{ id: 'none', title: 'Не задан', color: '' }, ...(window.MathhCatalog?.subjects || [])];
+mainBox.innerHTML = mainOptions.map(({ id, title, color }) =>
+  '<button type="button" data-main="' + esc(id) + '">' +
+  '<span class="cab-swatch" aria-hidden="true"' + (color ? ' style="--swatch:' + esc(color) + '"' : '') +
+  '></span>' + esc(title) + '</button>').join('');
+function currentMain(){
+  const saved = TS.get().mainSubject;
+  return (saved && saved.owner === user?.id && mainOptions.some(o => o.id === saved.subject)) ? saved.subject : 'none';
+}
+function paintMain(){
+  const cur = currentMain();
+  mainBox.querySelectorAll('button').forEach(b => {
+    const on = b.dataset.main === cur;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', String(on));
+  });
+  window.MathhPalette?.refresh();
+}
+TS.onChange(paintMain);
+mainBox.addEventListener('click', async e => {
+  const subject = e.target.closest('button')?.dataset.main;
+  const owner = user?.id;
+  if (!subject || !owner) return;
+  await settingsRequest?.result;
+  if (user?.id !== owner || subject === currentMain()) return;
+  paletteSave = save({ mainSubject: subject === 'none' ? null : { owner, subject } }, 'cabMainNote');
+});
 
 function loadSettings(){
   const owner = user.id;
@@ -815,6 +852,7 @@ async function route(){
   account.open = false;
   paintAccount();
   paintPalette();
+  paintMain();
   if (!user){ window.Schedule?.hide(); show('scrAuth'); return; }
   const [tab, id] = location.hash.replace(/^#\/?/, '').split('/');
   // без вкладки в адресе — «Расписание»: в кабинет заходят прежде всего за ним (просьба Даниила 14.11)

@@ -122,9 +122,14 @@ with server(), sync_playwright() as pw:
     page.evaluate("MathhBg.set('lines')"); check(kind(page) == "lines", "линейка")
 
     print("5. тёмная тема")
-    page.evaluate("MathhBg.set('grid'); document.documentElement.setAttribute('data-theme','dark')")
+    # у математики линии прежние; у других предметов тёмная тема в тоне
+    # предмета (subject-palette.js) — и линии тоже
+    page.evaluate("MathhBg.set('grid'); document.documentElement.setAttribute('data-subject','math'); document.documentElement.setAttribute('data-theme','dark')")
     line = page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--bgp-line').trim()")
     check(line.lower() == "#232a44", f"цвет линий в тёмной теме {line}")
+    page.evaluate("document.documentElement.setAttribute('data-subject','rus')")
+    line = page.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--bgp-line').trim()")
+    check(line.lower() != "#232a44", f"у русского линии в его тоне {line}")
 
     check(not errs, f"ошибок JavaScript нет {errs}")
     b.close()

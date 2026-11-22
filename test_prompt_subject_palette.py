@@ -19,6 +19,12 @@
   F. фон «по предмету» (bg-style.js) идёт от палитры: клетка у математики
   G. пункт «Цвет» в меню «⋯» главной переключает палитру по кругу
   H. кабинет: «Цвет интерфейса», первый вариант «По предмету»
+  J. тёмная тема в тоне предмета: фон и карточки не тёмно-синие (кроме
+     математики), полоса браузера (theme-color) — в тон фона
+  K. основной предмет (teacher_settings.mainSubject): доски/«Работы» берут
+     его, главная на новом устройстве открывается им; блок в кабинете
+  L. презентации: новая фигура и шапка таблицы — цветом предмета, первый
+     быстрый стиль — предмет; у математики — прежний синий Office
   I. без ошибок в консоли
 
 Запуск: python3 test_prompt_subject_palette.py
@@ -54,6 +60,8 @@ class Quiet(http.server.SimpleHTTPRequestHandler):
 srv = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), Quiet)
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 
+BOOT_JS = """() => { const g = document.getElementById('authGate'); if (g) g.style.display = 'none';
+  window.boardsAppBoot(); document.getElementById('screenList').style.display = 'flex'; }"""
 INK = "getComputedStyle(document.documentElement).getPropertyValue('--ink').trim().toUpperCase()"
 
 
@@ -153,6 +161,60 @@ def run():
         txt = pg.evaluate("document.getElementById('cabPaletteLabel').textContent")
         first = pg.evaluate("document.querySelector('#cabPalettes button').textContent")
         check("H кабинет: «Цвет интерфейса» / «По предмету»", txt == "Цвет интерфейса" and first == "По предмету", f"{txt} {first}")
+
+        # J
+        open_("soc_oge.html", theme="dark")
+        bg = pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().toUpperCase()")
+        card = pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--card').trim()")
+        def rgb(h): h = h.lstrip('#'); return [int(h[i:i+2], 16) for i in (0, 2, 4)]
+        r, g, b = rgb(bg)
+        check("J1 тёмный фон обществознания зеленоватый, не синий", bg != "#0B0E1A" and g > r and g >= b, bg)
+        check("J2 карточки обществознания не тёмно-синие", "30,37,64" not in card.replace(" ", ""), card)
+        meta = pg.evaluate("document.querySelector('meta[name=theme-color]').content.toUpperCase()")
+        check("J3 полоса браузера в тон фона", meta == bg, f"{meta} {bg}")
+        open_("lcm.html", theme="dark")
+        bg = pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().toUpperCase()")
+        check("J4 у математики тёмная тема прежняя", bg == "#0B0E1A", bg)
+        open_("lcm.html", {"mathh:palette": "rus"}, theme="dark")
+        bg = pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().toUpperCase()")
+        r, g, b = rgb(bg)
+        check("J5 математика в палитре русского — бордовая ночь", r > b and r > g, bg)
+        pg.evaluate("document.documentElement.setAttribute('data-theme','light')")
+        meta = pg.evaluate("document.querySelector('meta[name=theme-color]').content.toUpperCase()")
+        check("J6 светлая тема — полоса как в странице", meta == "#0B0E1A", meta)
+
+        # K
+        main = lambda subj: json.dumps({"mainSubject": {"owner": "u1", "subject": subj}})
+        open_("soc_oge.html", {"sb-x-auth-token": auth, "teacher:settings:v1": main("eng")})
+        pg.goto(BASE + "works.html")
+        pg.wait_for_function("window.MathhPalette")
+        check("K1 «Работы» — основной предмет, а не последний", pg.evaluate(INK) == "#5B3596", pg.evaluate(INK))
+        open_("works.html", {"sb-x-auth-token": auth, "teacher:settings:v1": json.dumps({"mainSubject": {"owner": "u2", "subject": "eng"}})})
+        check("K2 основной предмет чужого аккаунта не берётся", pg.evaluate(INK) == "#004C99", pg.evaluate(INK))
+        open_("index.html", {"sb-x-auth-token": auth, "teacher:settings:v1": main("rus")})
+        check("K3 главная на новом устройстве — основной предмет",
+              pg.evaluate("document.documentElement.dataset.subject") == "rus", pg.evaluate("document.documentElement.dataset.subject"))
+        open_("cabinet.html")
+        n = pg.evaluate("document.querySelectorAll('#cabMainSubjects button').length")
+        first = pg.evaluate("document.querySelector('#cabMainSubjects button').textContent")
+        check("K4 кабинет: «Основной предмет» — «Не задан» и 6 предметов", n == 7 and first == "Не задан", f"{n} {first}")
+
+        # L
+        def deck_shape(store):
+            open_("boards.html", store)
+            pg.evaluate(BOOT_JS)
+            pg.click("#blCreateDeck")
+            pg.wait_for_function("() => typeof B !== 'undefined' && B && B.kind === 'deck' && boardActive && typeof DTB_QUICK_STYLES !== 'undefined'")
+            return pg.evaluate("""() => { const r = deckSlideRect(deckCur());
+              const o = bxInsert('rect', { x: r.x + r.w / 2, y: r.y + r.h / 2 }); bxCloseEditor && bxCloseEditor(false);
+              const t = bxInsert('table', { x: r.x + 100, y: r.y + 100 }); bxCloseEditor && bxCloseEditor(false);
+              return [o.fill.c, t.cells[0][0].fill.c, DTB_QUICK_STYLES[0].f]; }""")
+        fill, hdr, q0 = deck_shape({"mathh:palette": "rus"})
+        check("L1 фигура в палитре русского — бордовая", fill == "#9E2A47", fill)
+        check("L2 шапка таблицы — бордовая", hdr == "#9E2A47", hdr)
+        check("L3 первый быстрый стиль — русский", q0 == "#9E2A47", q0)
+        fill, hdr, q0 = deck_shape({})
+        check("L4 у математики — синий Office", fill == "#4472C4" and hdr == "#4472C4" and q0 == "#4472C4", f"{fill} {hdr} {q0}")
 
         br.close()
     check("I без ошибок на страницах", not errors, "; ".join(errors[:3]))

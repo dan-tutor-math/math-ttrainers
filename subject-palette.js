@@ -84,7 +84,8 @@
       '--ink:' + c.ink, '--ink-active:' + c.act, '--ink-2:' + c.ink2,
       '--hl-06:' + rgba(c.rgb, dark ? .10 : .06), '--hl-10:' + rgba(c.rgb, dark ? .16 : .10),
       '--hl-14:' + rgba(c.rgb, dark ? .26 : .14), '--hl:' + rgba(c.rgb, dark ? .26 : .14),
-      '--hl-18:' + rgba(c.rgb, .18), '--hl-28:' + rgba(c.rgb, .28), '--hl-35:' + rgba(c.rgb, .35),
+      // в тёмной теме у страниц эти подсветки плотнее (lcm.html и др.)
+      '--hl-18:' + rgba(c.rgb, dark ? .29 : .18), '--hl-28:' + rgba(c.rgb, dark ? .45 : .28), '--hl-35:' + rgba(c.rgb, dark ? .5 : .35),
       '--hover-1:' + rgba(c.rgb, dark ? .08 : .06), '--hover-2:' + rgba(c.rgb, dark ? .14 : .10),
       '--blob-1:' + c.blob, '--grid:' + grid, '--bgp-line:' + grid,
       // панель сессии ученика и форма отчёта об уроке (student-memory.js,
@@ -95,10 +96,68 @@
       '--subject-color:' + c.ink
     ].join(';');
   }
+  /* Тёмная тема в тоне предмета. Фон, бумага, карточки и стекло тёмной темы
+     у всех страниц одни и те же тёмно-синие (#0B0E1A, rgba(30,37,64,.82)…) —
+     это «ночь» математики. С красным или зелёным акцентом синяя ночь
+     выглядит чужой, поэтому у остальных предметов те же тёмные тона берут
+     оттенок предмета: светлота та же, насыщенность чуть ниже (тёплые
+     оттенки при той же насыщенности смотрятся грязно-коричневыми).
+     Правило по data-palette-subject, а не data-palette: оно нужно и там,
+     где палитра совпадает с родной (обществознание на своей странице) */
+  function hsl(hex) {
+    var n = parseInt(hex.slice(1), 16), r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+    var mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, h = 0, s = 0, d = mx - mn;
+    if (d) {
+      s = d / (1 - Math.abs(2 * l - 1));
+      h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      h = (h * 60 + 360) % 360;
+    }
+    return [h, s, l];
+  }
+  // тот же тёмный тон, но с оттенком hue: 'r,g,b'
+  function retint(rgb, hue, k) {
+    var p = rgb.split(',').map(Number);
+    var hx = '#' + p.map(function (v) { return (v < 16 ? '0' : '') + v.toString(16); }).join('');
+    var t = hsl(hx), s = t[1] * k, l = t[2];
+    var c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((hue / 60) % 2 - 1)), m = l - c / 2;
+    var seg = Math.floor(hue / 60) % 6;
+    var rr = [c, x, 0, 0, x, c][seg], gg = [x, c, c, x, 0, 0][seg], bb = [0, 0, x, c, c, x][seg];
+    return [rr, gg, bb].map(function (v) { return Math.round((v + m) * 255); }).join(',');
+  }
+  function hexOf(rgb) {
+    return '#' + rgb.split(',').map(function (v) { v = +v; return (v < 16 ? '0' : '') + v.toString(16); }).join('').toUpperCase();
+  }
+  var NIGHT = {}; // id → { bg: '#…' } для meta theme-color
+  function nightVars(id) {
+    // тёплые (русский, физика) приглушаем сильнее: красно-коричневые панели
+    // утомляют глаз на длинном уроке
+    var hue = hsl(P[id].d.ink)[0], k = { eng: 1, rus: 0.6, phys: 0.6 }[id] || 0.8;
+    var T = function (rgb) { return retint(rgb, hue, k); };
+    var bg = hexOf(T('11,14,26'));
+    NIGHT[id] = { bg: bg };
+    var menu = 'rgb(' + T('30,37,64') + ')';
+    return {
+      vars: [
+        '--bg:' + bg, '--paper:' + hexOf(T('21,26,44')),
+        '--card:rgba(' + T('30,37,64') + ',.82)', '--glass:rgba(' + T('40,46,74') + ',.5)',
+        '--glass-strong:rgba(' + T('46,53,84') + ',.65)', '--muted-7:' + hexOf(T('58,63,85')),
+        '--grid:' + hexOf(T('35,42,68')), '--bgp-line:' + hexOf(T('35,42,68')),
+        '--text-bg:rgba(' + T('20,25,44') + ',.6)',
+        // второе пятно фона — соседний оттенок, а не сиреневый математики
+        '--blob-2:rgba(' + retint('150,90,220', (hue + 40) % 360, 0.7) + ',.16)'
+      ].join(';'),
+      // меню с непрозрачным фоном, прописанным прямо в стилях
+      menu: menu
+    };
+  }
   var css = '';
   ORDER.forEach(function (id) {
     css += ':root[data-palette="' + id + '"]{' + vars(P[id].l, false) + '}';
     css += ':root[data-palette="' + id + '"][data-theme="dark"]{' + vars(P[id].d, true) + '}';
+    if (id === 'math') return;
+    var n = nightVars(id), sel = ':root[data-palette-subject="' + id + '"][data-theme="dark"]';
+    css += sel + '{' + n.vars + '}';
+    css += sel + ' #examJumpMenu,' + sel + ' .exam-vb-pop{background:' + n.menu + '!important}';
   });
   var style = document.createElement('style');
   style.id = 'mathh-palette';
@@ -160,6 +219,15 @@
     var v = ls(LOCAL_KEY);
     return valid(v) ? v : 'auto';
   }
+  // основной предмет педагога (teacher_settings.mainSubject, кабинет)
+  function mainSubject() {
+    var uid = userId();
+    if (!uid) return null;
+    var ts = null;
+    try { ts = JSON.parse(ls(TS_KEY) || 'null'); } catch (e) {}
+    var m = ts && ts.mainSubject;
+    return m && m.owner === uid && valid(m.subject) ? m.subject : null;
+  }
   function remote() {
     var v = null;
     try { v = sessionStorage.getItem(REMOTE_KEY); } catch (e) {}
@@ -170,7 +238,9 @@
     if (r) return r;
     var c = choice();
     if (c !== 'auto') return c;
-    return isNeutral ? lastSubject() : native();
+    // доски, кабинет, «Работы»: основной предмет педагога (решение Даниила
+    // 18.11), а пока он не выбран — последний открытый предмет
+    return isNeutral ? (mainSubject() || lastSubject()) : native();
   }
 
   var subs = [], lastApplied = null;
@@ -179,6 +249,7 @@
     if (cur === native()) root.removeAttribute('data-palette');
     else root.setAttribute('data-palette', cur);
     root.setAttribute('data-palette-subject', cur);
+    paintBar(cur);
     // и смена выбора без смены цвета («по предмету» → «математика» на
     // математике) — подпись пункта меню должна обновиться
     var key = cur + '|' + choice();
@@ -187,6 +258,18 @@
       subs.forEach(function (fn) { try { fn(cur); } catch (e) {} });
     }
   }
+  // полоса браузера на телефоне (meta theme-color) — в цвет тёмного фона
+  // предмета; в светлой теме и у математики — как прописано в странице
+  var metaOrig = null;
+  function paintBar(cur) {
+    var m = document.querySelector('meta[name="theme-color"]');
+    if (!m) return;
+    if (metaOrig === null) metaOrig = m.getAttribute('content') || '';
+    var dark = root.getAttribute('data-theme') === 'dark';
+    m.setAttribute('content', dark && NIGHT[cur] && metaOrig.toUpperCase() === '#0B0E1A' ? NIGHT[cur].bg : metaOrig);
+  }
+  new MutationObserver(function () { paintBar(current()); })
+    .observe(root, { attributes: true, attributeFilter: ['data-theme'] });
   // тренажёр и вкладка главной — «последний открытый предмет» для досок и
   // кабинета: с какого предмета пришли, тем цветом они и откроются
   function remember() { if (!isNeutral) lsSet(LAST_KEY, native()); }
@@ -287,8 +370,18 @@
 
   window.MathhPalette = {
     subjects: ORDER.map(function (id) { return { id: id, title: P[id].title, color: P[id].l.ink }; }),
-    current: current, choice: choice, native: native, choose: choose,
+    current: current, choice: choice, native: native, choose: choose, mainSubject: mainSubject,
     setRemote: setRemote, refresh: apply,
+    // цвета для содержимого слайда (фигуры, шапка таблицы в презентациях):
+    // светлый тон предмета — слайд печатают и показывают на белом, тёмная
+    // тема интерфейса тут ни при чём. У математики — null: остаются
+    // привычные цвета Office (#4472C4), как у импорта PPTX
+    slideColors: function () {
+      var id = current();
+      if (id === 'math') return null;
+      var c = P[id].l;
+      return { fill: c.ink, line: c.act, soft: mix('#FFFFFF', c.ink, 0.15), border: mix('#FFFFFF', c.ink, 0.45), title: P[id].title };
+    },
     onChange: function (fn) { subs.push(fn); }
   };
 })();

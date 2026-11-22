@@ -11,8 +11,10 @@
 <script src="bg-style.js"></script>
 <!-- предмет ставим на <html> до первого кадра, как тему: от него зависит цвет
      всей страницы, и без этого русский на мгновение мигал бы синим -->
-<script>(function(){var s='math';try{var q=new URLSearchParams(location.search).get('subject');s=q||localStorage.getItem('ogeNav:subject')||'math';}catch(e){}if(!/^(math|rus|soc|eng|phys|inf)$/.test(s))s='math';document.documentElement.setAttribute('data-subject',s);})();</script>
+<!-- палитра — раньше предмета: на новом устройстве главная открывается
+     основным предметом педагога (MathhPalette.mainSubject, настройка в кабинете) -->
 <script src="subject-palette.js"></script>
+<script>(function(){var s='math';try{var q=new URLSearchParams(location.search).get('subject');s=q||localStorage.getItem('ogeNav:subject')||(window.MathhPalette&&MathhPalette.mainSubject())||'math';}catch(e){}if(!/^(math|rus|soc|eng|phys|inf)$/.test(s))s='math';document.documentElement.setAttribute('data-subject',s);})();</script>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Тренажёры — Школа репетиторов</title>
 <link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>

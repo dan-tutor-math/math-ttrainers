@@ -1849,13 +1849,18 @@ function bxInsert(kind, at){
     const fr = bxTextFrameRaw(o.text, o.w, 1e6); o.h = Math.max(30, fr.lay.h + 10);
   } else if (kind === 'table'){
     const cols = [200, 200, 200], rows = [56, 56, 56];
+    // шапка и рамки — цветом предмета (subject-palette.js), у математики — Office
+    const sc = window.MathhPalette && window.MathhPalette.slideColors();
+    const hdrC = sc ? sc.fill : '#4472C4', bdC = sc ? sc.border : '#8EA9DB';
     const cell = (hdr) => ({ text: Object.assign(bxTextOf('', { sz: 16 * ppt, c: hdr ? '#FFFFFF' : '#1D1D1F', f: BX_DEF_FONT, b: hdr || undefined }), { anchor: 'm' }),
-      fill: { c: hdr ? '#4472C4' : '#FFFFFF' }, bd: { l: { c: '#8EA9DB', w: 1.2 }, t: { c: '#8EA9DB', w: 1.2 }, r: { c: '#8EA9DB', w: 1.2 }, b: { c: '#8EA9DB', w: 1.2 } } });
+      fill: { c: hdr ? hdrC : '#FFFFFF' }, bd: { l: { c: bdC, w: 1.2 }, t: { c: bdC, w: 1.2 }, r: { c: bdC, w: 1.2 }, b: { c: bdC, w: 1.2 } } });
     o = { id: uid(), type: 'table', cols, rows, w: 600, h: 168, cells: rows.map((_, r) => cols.map(() => cell(r === 0))) };
   } else {
     const geom = kind || 'rect';
     const sq = /ellipse|star|mathPlus|mathMultiply|plus|heart|smiley/.test(geom);
-    o = { id: uid(), type: 'box', geom, w: sq ? 240 : 320, h: sq ? 240 : 200, fill: { c: '#4472C4' }, line: { c: '#2F5597', w: 1.5 * ppt },
+    // новая фигура — цветом предмета палитры; у математики — синий Office
+    const sc = window.MathhPalette && window.MathhPalette.slideColors();
+    o = { id: uid(), type: 'box', geom, w: sq ? 240 : 320, h: sq ? 240 : 200, fill: { c: sc ? sc.fill : '#4472C4' }, line: { c: sc ? sc.line : '#2F5597', w: 1.5 * ppt },
       text: Object.assign(bxTextOf('', { sz: 18 * ppt, c: '#FFFFFF', f: BX_DEF_FONT }), { anchor: 'm', paras: [{ runs: [], esz: 18 * ppt, al: 'c' }] }) };
     if (/line|Connector/.test(geom)){ o.fill = null; delete o.text; o.h = 0.01; }
   }
