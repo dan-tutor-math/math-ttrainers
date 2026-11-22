@@ -65,7 +65,10 @@
       var b = board();
       if (scope === 'all') {
         lsSet(GLOBAL_KEY, id);
-        if (b && b.canvasColor) { delete b.canvasColor; save(); }
+        if (b && b.canvasColor) delete b.canvasColor;
+        // и без своего цвета у доски — через saveDB: на нём держится рассылка
+        // настроек листа ученику в сессии (board-stage.js, settingsOf)
+        if (b) save();
       } else if (b) {
         b.canvasColor = id; save();
       }

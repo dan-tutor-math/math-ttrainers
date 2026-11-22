@@ -263,6 +263,9 @@
         name: b.name || '', cellSize: b.cellSize, sheetCols: b.sheetCols, sheetRows: b.sheetRows,
         pageOrder: b.pageOrder, gridColor: b.gridColor == null ? null : b.gridColor,
         showPageNumbers: !!b.showPageNumbers,
+        // цвет холста (board-canvas.js): действующий у учителя — свой у доски
+        // или общий «для всех досок»; ученик видит тот же холст
+        canvasColor: window.BoardCanvas ? window.BoardCanvas.currentId() : null,
       };
     }
     let lastSettings = '';
@@ -906,7 +909,7 @@
 
     function applySettings(s) {
       if (!s) return;
-      ['cellSize', 'sheetCols', 'sheetRows', 'pageOrder', 'gridColor', 'showPageNumbers'].forEach((k) => {
+      ['cellSize', 'sheetCols', 'sheetRows', 'pageOrder', 'gridColor', 'showPageNumbers', 'canvasColor'].forEach((k) => {
         if (s[k] !== undefined) VB[k] = s[k];
       });
       if (s.name) { VB.name = s.name; document.title = s.name + ' — доска учителя'; }

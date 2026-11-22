@@ -338,6 +338,17 @@ def run_main(browser):
     teacher.evaluate("() => { const o = getCurrentBoard().objects.find(x => x.id === 't1'); o.points[0].x += 240; o.points[0].y += 60; saveDB(); scheduleRedraw(); }")
     ok = wait_js(f, "() => { const o = getCurrentBoard().objects.find(x => x.id === 't1'); return o && o.points[0].x === 2640; }", 4000)
     check("C: правка объекта (перенос текста) доезжает", ok)
+    # цвет холста (board-canvas.js): ученик видит холст учителя — и свой цвет
+    # доски, и общий «для всех досок»
+    teacher.evaluate("() => BoardCanvas.set('black', 'board')")
+    ok = wait_js(f, "() => window.BoardCanvas && BoardCanvas.paper() === '#0E0F12'", 4000)
+    check("C: холст учителя «Чёрный» (эта доска) — и у ученика", ok, str(f.evaluate("() => window.BoardCanvas && BoardCanvas.paper()")))
+    teacher.evaluate("() => BoardCanvas.set('chalk', 'all')")
+    ok = wait_js(f, "() => BoardCanvas.paper() === '#1F3B30'", 4000)
+    check("C: холст «Меловая» для всех досок — и у ученика", ok, str(f.evaluate("() => BoardCanvas.paper()")))
+    teacher.evaluate("() => { BoardCanvas.set('white', 'all'); localStorage.removeItem('boards:canvas'); }")
+    ok = wait_js(f, "() => BoardCanvas.paper() === '#FFFFFF'", 4000)
+    check("C: вернули белый — и у ученика", ok, str(f.evaluate("() => BoardCanvas.paper()")))
 
     # ── D. панель тренажёров слева ──
     teacher.evaluate("() => setTrainersPanel('open')")
