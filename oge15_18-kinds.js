@@ -30,7 +30,18 @@
     return String(r).replace('.', ',').replace('-', MINUS);
   }
   const frac = (a, b) => `<span class="frac"><span class="num">${a}</span><span class="den">${b}</span></span>`;
-  const rad = x => `√<span class="rad">${x}</span>`;
+  /* корень рисует KaTeX (\sqrt), а не «√» + черта: так знак и черта слиты в одну фигуру.
+     Без KaTeX (скрипт сверки в node, окно без загрузки) — прежняя разметка: условие
+     text(a) остаётся плоским текстом ФИПИ, HTML строится только здесь */
+  const radOld = x => `√<span class="rad">${x}</span>`;
+  const rad = x => {
+    const K = typeof window !== 'undefined' && window.katex;
+    if (!K) return radOld(x);
+    // десятичная запятая в формуле KaTeX даёт лишний пробел — прячем её в {,}
+    const tex = String(x).replace(/(\d),(\d)/g, '$1{,}$2').replace(/%/g, '\\%');
+    try { return K.renderToString('\\sqrt{' + tex + '}', { throwOnError: false, output: 'html' }); }
+    catch (e) { return radOld(x); }
+  };
   const kr = (k, r) => (k && k !== '1' ? k : '') + rad(r);
   const deg = a => `${fmt(a)}°`;
   const sqr = x => x * x;

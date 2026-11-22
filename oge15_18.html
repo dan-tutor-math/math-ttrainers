@@ -14,6 +14,7 @@
 <link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/onest-latin.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="onest.css">
+<link rel="stylesheet" href="katex-0.18.5.css" id="katexCss">
 <style>
 :root{
   --font-ui:'Onest',-apple-system,BlinkMacSystemFont,'Helvetica Neue',Arial,sans-serif;
@@ -386,6 +387,10 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 .prompt .frac .den,.example-history-prompt .frac .den{padding:2px 5px 0;border-top:1.5px solid currentColor;}
 /* корень: черта над подкоренным числом, как в тетради, а не «√(3)» */
 .rad{border-top:1.5px solid currentColor;padding:0 2px;margin-left:1px;}
+/* корень рисует KaTeX (rad() в oge15_18-kinds.js); пока шрифты не прогреты, он скрыт —
+   иначе знак и черта на миг рисуются запасным шрифтом и прыгают */
+.katex{visibility:hidden;font-size:1.05em}
+html.katex-fonts-ready .katex{visibility:visible}
 .fipi-fig{display:block;max-width:min(100%,360px);margin:10px auto 0;border-radius:10px;background:#fff;}
 :root[data-theme="dark"] .fipi-fig{filter:invert(.88) hue-rotate(180deg);}
 
@@ -697,6 +702,9 @@ h1{font-family:var(--font-ui);font-weight:700;letter-spacing:-.02em;font-size:cl
 <script src="trainer-multi.js"></script>
 <script src="task-captions.js"></script>
 <script src="fipi-mix.js"></script>
+<script src="katex-0.18.5.js"></script>
+<script>(function(){function r(){document.documentElement.classList.add('katex-fonts-ready');}
+if(document.fonts&&document.fonts.ready&&document.fonts.ready.then){document.fonts.ready.then(r).catch(r);setTimeout(r,1500);}else r();})();</script>
 <script src="oge15_18-kinds.js"></script>
 <script src="oge15_18-fipi-bank.js"></script>
 <script src="oge18-fipi-bank.js"></script>
