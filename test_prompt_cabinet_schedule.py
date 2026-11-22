@@ -683,6 +683,10 @@ def main():
         pp.wait_for_selector(".sc-day.today.sc-flash")
         pp.wait_for_function("() => { const r = document.querySelector('.sc-day.today').getBoundingClientRect(); return r.top >= 0 && r.top < 300; }", timeout=4000)
         check("G2a «Сегодня» на телефоне: страница сама долистала до среды, день вспыхнул", True)
+        # «Сегодня» листает плавно: дождаться конца, иначе прокрутка доедет уже после замера строки ниже
+        # и палец попадёт не в строку вторника, а в «+ строка»
+        pp.wait_for_function("""() => new Promise(ok => { let y = scrollY, n = 0;
+            const t = setInterval(() => { if (scrollY === y) { if (++n >= 3) { clearInterval(t); ok(true); } } else { y = scrollY; n = 0; } }, 50); })""", timeout=4000)
         cdp = ph.new_cdp_session(pp)
         src = row('2026-11-17', tid) + " .rw-time"
         pp.eval_on_selector(src, "e => e.scrollIntoView({ block: 'center' })")
