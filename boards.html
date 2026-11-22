@@ -379,6 +379,12 @@ html[data-theme="dark"] .bd-dock{box-shadow:var(--shadow), inset 0 1px 0 rgba(25
    --dock-offset у бокового дока сдвигает его вдоль края по вертикали —
    панель едет за точкой захвата и там, а не стоит намертво посередине */
 .bd-dock.pos-bottom{left:calc(50% + var(--bd-inset,0px) / 2 + var(--dock-offset,0px));bottom:16px;top:auto;right:auto;transform:translateX(-50%);max-width:calc(100vw - 20px - var(--bd-inset,0px));padding-left:18px;padding-right:18px;}
+/* полос прокрутки у панели нет никогда (просьба Даниила 22.11): overflow
+   auto по одной оси включает прокрутку и по второй, и в «максимуме» кнопка
+   под курсором на миг делала ряд выше — справа вылезала белая полоса.
+   Листать узкую панель можно жестом и колесом, полоса для этого не нужна */
+.bd-dock-tools{scrollbar-width:none;-ms-overflow-style:none;}
+.bd-dock-tools::-webkit-scrollbar{display:none;width:0;height:0;}
 .bd-dock.pos-bottom .bd-dock-tools{flex-direction:row;max-width:calc(100vw - 58px - var(--bd-inset,0px));overflow-x:auto;overflow-y:visible;}
 .bd-dock.pos-left{left:calc(14px + var(--bd-inset,0px));top:calc(50% + var(--dock-offset,0px));bottom:auto;right:auto;transform:translateY(-50%);max-height:calc(100vh - 90px);padding-top:18px;padding-bottom:18px;}
 .bd-dock.pos-left .bd-dock-tools{flex-direction:column;max-height:calc(100vh - 128px);overflow-y:auto;overflow-x:visible;}

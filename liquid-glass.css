@@ -289,3 +289,9 @@ html:not([data-fx="full"]) .lg-ambient{display:none}
 @media print{
   .lg-menu,.lg-side,.lg-ambient{display:none !important}
 }
+
+/* ряды с увеличением кнопок под курсором (.lg-mag: панель доски, меню «⋯»)
+   без полос прокрутки: кнопка растёт, ряд на миг не помещается — и браузер
+   рисовал белую полосу. Прокрутка жестом и колесом остаётся */
+.lg-mag{scrollbar-width:none;-ms-overflow-style:none}
+.lg-mag::-webkit-scrollbar{display:none;width:0;height:0}
