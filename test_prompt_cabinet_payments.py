@@ -276,6 +276,21 @@ def check_new_payment_layout(browser):
 
     assert_inputs_aligned(["payer", "amount", "lessons", "used"])
     total = page.locator("#payGot b").inner_text()
+    hide = pack.get_by_role("button", name="Скрыть из абонементов — Ваня")
+    hide.click()
+    expect(pack).to_have_count(0)
+    expect(page.locator("#paySoon")).not_to_contain_text("Ваня")
+    assert wait_db(page, lambda d: d["teacher_settings"][0]["settings"]["pay"]["hiddenPackStudents"].get(VANYA))
+    page.reload()
+    hidden = page.locator("#payHiddenStudents")
+    hidden.locator("summary").click()
+    expect(pack).to_have_count(0)
+    expect(page.locator("#payGot b")).to_have_text(total)
+    hidden.get_by_role("button", name="Вернуть в абонементы").click()
+    expect(hide).to_be_visible()
+    expect(page.locator("#paySoon")).to_contain_text("Ваня")
+    assert db()["payments"] == data["payments"]
+    assert db()["students"] == data["students"]
     page.locator("#payView summary").click()
     remainder = page.get_by_role("checkbox", name="Остаток занятий")
     remainder.check()
@@ -483,6 +498,59 @@ def check_single_groups_and_batch(browser):
     assert not errors, errors
     ctx.close()
     print("[OK] Группы и архив по ученикам, период, дата и ставка занятия, конфликт и повторная отметка")
+
+def check_settle_all_debt(browser):
+    data = seed()
+    data["teacher_settings"][0]["settings"]["pay"]["skipRule"] = "charge"
+    data["lessons"].extend([lesson("old", "2026-09-18", 600), lesson("no-rate", "2026-08-01", 600)])
+    data["lesson_students"].extend([person("p-old", "old", PETYA, "skip"),
+                                    person("p-no-rate", "no-rate", PETYA, "done"),
+                                    person("p-plan", "L20", PETYA, "plan")])
+    data["payments"].append(pay("advance", PETYA, "single", "2026-10-01", 300.75))
+    STATE["db"] = json.dumps(data)
+    ctx = B1.new_context(browser, bar_open=False)
+    ctx.add_init_script(FIXED_NOW_JS)
+    page = ctx.new_page()
+    page.set_viewport_size({"width": 320, "height": 740})
+    page.goto(f"{BASE}/cabinet.html#/payments")
+    page.locator('[data-pay-filter="lesson"]').click()
+    group = page.locator(f'.pay-single-student[data-sid="{PETYA}"]')
+    group.locator(":scope > summary").click()
+    settle = group.get_by_role("button", name="Засчитать за всё время")
+    messages = []
+    def confirm(dialog):
+        messages.append(norm(dialog.message))
+        dialog.accept()
+    page.once("dialog", lambda dialog: dialog.dismiss())
+    settle.click()
+    assert db()["payments"] == data["payments"]
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    # Из другой вкладки внесли ещё часть долга после открытия списка.
+    saved = db()
+    saved["payments"].append(pay("more", PETYA, "single", "2026-11-15", 200))
+    STATE["db"] = json.dumps(saved)
+    page.once("dialog", confirm)
+    settle.click()
+    expect(group.locator(".pay-debt")).to_contain_text("3 499")
+    assert db()["payments"] == saved["payments"]
+    page.once("dialog", confirm)
+    settle.evaluate("(b) => { b.click(); b.click(); }")
+    expect(settle).to_have_count(0)
+    expect(group.locator(".pay-debt")).to_have_count(0)
+    assert len(messages) == 2 and "3 699,25" in messages[0] and "3 499,25" in messages[1], messages
+    added = db()["payments"][len(saved["payments"]):]
+    assert {(p["paid_on"], p["amount"], p.get("lesson_student_id")) for p in added} == {
+        ("2026-09-18", 999.25, None), ("2026-11-13", 1500, "p13"), ("2026-11-17", 1000, "p17")}
+    assert len(added) == 3 and all(p["student_id"] == PETYA for p in added)
+    partial = next(p for p in added if not p.get("lesson_student_id"))
+    assert re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-8[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}", partial["id"])
+    assert not partial.get("ext_id")
+    page.reload()
+    page.locator('[data-pay-filter="lesson"]').click()
+    expect(group.locator(".pay-debt")).to_have_count(0)
+    expect(settle).to_have_count(0)
+    ctx.close()
+    print("[OK] Весь долг за несколько месяцев, частичный аванс, изменение суммы и защита от повтора")
 
 def check_archived_pack_keeps_lessons(browser):
     data = seed()
@@ -795,6 +863,7 @@ def main():
         check_new_payment_layout(browser)
         check_archived_pack_keeps_lessons(browser)
         check_single_groups_and_batch(browser)
+        check_settle_all_debt(browser)
         browser.close()
     print("\nИТОГ:", "всё зелёное" if not B1.FAILS else "есть падения: " + ", ".join(B1.FAILS))
     sys.exit(1 if B1.FAILS else 0)

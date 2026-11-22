@@ -102,6 +102,10 @@
       o[key] = Object.fromEntries(Object.entries(raw[key]).filter(([id, day]) =>
         /^[a-z0-9_-]{1,64}$/i.test(id) && typeof day === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(day)));
     });
+    if (raw.hiddenPackStudents && typeof raw.hiddenPackStudents === 'object' && !Array.isArray(raw.hiddenPackStudents)) {
+      o.hiddenPackStudents = Object.fromEntries(Object.entries(raw.hiddenPackStudents).filter(([id, hidden]) =>
+        /^[a-z0-9_-]{1,64}$/i.test(id) && hidden === true));
+    }
     return o;
   }
   // группы дохода: не больше 20, в составе — id учеников (не имена, как в

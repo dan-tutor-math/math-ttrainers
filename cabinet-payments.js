@@ -197,7 +197,10 @@
         (singles.length ? singles.map(({s,c})=>singleStudentHtml(s,c)).join('') : '<div class="empty">Учеников с разовыми оплатами пока нет.</div>')+'</div>';
     }
     const ps = P().paySettings(settings());
-    const reminders = rows.flatMap(({s,c}) => {
+    const packStudents = rows.filter(({c})=>c.mode==='pack' || c.packs.some(k=>!k.pay.archived_at));
+    const visible = packStudents.filter(({s})=>ps.hiddenPackStudents?.[s.id] !== true);
+    const hidden = packStudents.filter(({s})=>ps.hiddenPackStudents?.[s.id] === true);
+    const reminders = visible.flatMap(({s,c}) => {
       const k = c.active.find(pack=>!pack.pay.archived_at) || c.packs.findLast(pack=>!pack.pay.archived_at);
       if (!k || k.start>now) return [];
       const end = periodPreview(s,k).end;
@@ -208,11 +211,14 @@
       '</b> на ближайшие 7 дней</small></div>'+soon.map(({s,k,end})=>'<div class="pay-remind-row"><div>'+studentLink(s)+'<div class="hint">'+
       (end===now?'Сегодня':P().dm(end))+'</div></div><button type="button" class="btn quiet small" data-pay-reminded="'+esc(k.pay.id)+
       '" data-due="'+end+'">Напомнил</button></div>').join('')+(soon.length?'':'<div class="hint">Напоминаний нет</div>')+'</aside>';
-    const visible = rows.filter(({c})=>c.mode==='pack' || c.packs.some(k=>!k.pay.archived_at));
+    const hiddenList = hidden.length ? '<details class="pay-archive" id="payHiddenStudents"'+openAttr('payHiddenStudents')+
+      '><summary>Скрытые ученики <span class="hint">'+hidden.length+'</span></summary>'+hidden.map(({s})=>
+        '<div class="pay-archive-row">'+studentLink(s)+paymentButton('Вернуть в абонементы','pay-restore-student',s.id)+'</div>'
+      ).join('')+'</details>' : '';
     const table = '<div role="table" aria-label="Абонементы" class="pay-ledger pack'+
       (view.showPayer===false?' hide-payer':'')+'">'+sortingHeader('pack')+
       (visible.length ? packRows(visible) : '<div class="empty">Таких оплат пока нет.</div>')+'</div>';
-    return header+'<div class="pay-overview"><div class="pay-main">'+filter+table+'</div>'+remind+'</div>'+
+    return header+'<div class="pay-overview"><div class="pay-main">'+filter+table+hiddenList+'</div>'+remind+'</div>'+
       archiveHtml(new Map(rows.map(({s,c})=>[s.id,c])));
   }
 
@@ -263,7 +269,7 @@
     return {p,student,payer:p.payer,paidOn:p.paid_on,amount:Number(p.amount)};
   }
 
-  const debtLabel = c => c.debt>0 ? '<small class="pay-debt">долг '+moneyHtml(c.debt)+'</small>' : '';
+  const debtLabel = c => c.debt>0 ? '<small class="pay-debt">долг '+valueHtml(singleMoney(c.debt))+'</small>' : '';
   const openAttr = id => st.open.has(id) ? ' open' : '';
 
   function packRows(students){
@@ -280,8 +286,10 @@
     return sortedEntries(entries,'pack').map(row=>{
       const {s,c,p} = row, first = !seen.has(s.id);
       seen.add(s.id);
-      const identity = studentLink(s)+(first ? debtLabel(c)+
-        paymentButton('+ оплата','add',s.id,'pay-add') : '');
+      const hideLabel = esc('Скрыть из абонементов — '+s.name);
+      const identity = first ? '<div class="pay-pack-name">'+studentLink(s)+
+        '<button type="button" class="sc-rm" data-pay-hide-student="'+esc(s.id)+'" aria-label="'+hideLabel+
+        '" title="'+hideLabel+'">×</button></div>'+debtLabel(c)+paymentButton('+ оплата','add',s.id,'pay-add') : studentLink(s);
       const html = p ? packEntry(row,identity) : '<div role="row" class="pay-entry pay-entry-empty">'+
         paymentCell(0,identity,'pay-identity')+cell('','Абонемента нет','hint')+'</div>';
       return '<div role="presentation" class="pay-row" data-sid="'+esc(s.id)+'">'+html+
@@ -310,7 +318,8 @@
       '<summary><b>'+esc(s.name)+'</b> '+(s.archived_at ? '<span class="hint">В архиве</span>' : debtLabel(c))+'</summary>'+
       '<div class="pay-single-body"><div class="pay-single-actions">'+studentLink({...s,name:'Карточка оплат'})+
       (s.archived_at ? '' : paymentButton('+ оплата','add',s.id,'pay-add')+
-        '<button type="button" class="btn quiet small" data-pay-bulk="'+id+'" aria-expanded="'+Boolean(draft)+'">Засчитать за период</button>')+'</div>'+
+        '<button type="button" class="btn quiet small" data-pay-bulk="'+id+'" aria-expanded="'+Boolean(draft)+'">Засчитать за период</button>')+
+      (Math.round(c.debt*100)>0 ? paymentButton('Засчитать за всё время','pay-settle',s.id) : '')+'</div>'+
       (st.formFor===String(s.id)?'<div class="pay-formbox">'+formHtml(s,c)+'</div>':'')+
       (draft?bulkFormHtml(draft):'')+singleReceiptsHtml(s,active,false)+
       '<details class="pay-single-archive" id="'+history+'"'+openAttr(history)+'><summary>Архив разовых оплат <span class="hint">'+
@@ -338,6 +347,65 @@
       if (inPeriod) records.push({student_id:sid, kind:'single', paid_on:line.day, amount:line.price, lesson_student_id:line.lsId});
     }
     return {records,noRate,covered};
+  }
+
+  async function partialPaymentId(sid, lessonId, advances){
+    // Для доплаты без привязки две вкладки должны послать один UUID.
+    // После нового аванса или предыдущей доплаты набор платежей изменится.
+    const ids = advances.map(line=>line.pay.id).sort();
+    const key = JSON.stringify(['partial-payment',sid,lessonId,ids]);
+    const hash = new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(key)));
+    hash[6] = (hash[6] & 15) | 128;
+    hash[8] = (hash[8] & 63) | 128;
+    const hex = Array.from(hash.slice(0,16),byte=>byte.toString(16).padStart(2,'0')).join('');
+    return [hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-');
+  }
+
+  async function debtPayments(sid, calculation){
+    const advances = calculation.lines.filter(line=>line.pay?.kind==='single' && line.money>0);
+    let credit = advances.reduce((sum,line)=>sum+Math.round(line.money*100),0);
+    const records = [];
+    for (const line of calculation.lines){
+      if (line.cls!=='debt' || !(line.money<0)) continue;
+      const price = Math.round(-line.money*100);
+      const covered = Math.min(price,credit);
+      credit -= covered;
+      if (price===covered) continue;
+      const record = {student_id:sid,kind:'single',paid_on:line.day,amount:(price-covered)/100};
+      if (covered===0) record.lesson_student_id = line.lsId;
+      else {
+        // Привязка к занятию зачла бы полную ставку. Доплату проводим
+        // в счёт занятий, чтобы уже внесённый аванс не зачёлся дважды.
+        record.note = 'Доплата за занятие '+P().dmy(line.day);
+        record.id = await partialPaymentId(sid,line.lsId,advances);
+      }
+      records.push(record);
+    }
+    return records;
+  }
+
+  async function settleDebt(button){
+    const sid = button.dataset.paySettle;
+    if (pendingPayments.has(sid) || st.bulk?.pending) return;
+    const student = st.per[sid].student;
+    const cents = Math.round(calcFor(sid).debt*100);
+    if (!cents || !window.confirm(student.name+' — засчитать '+singleMoney(cents/100)+' за всё время?')) return;
+    pendingPayments.add(sid);
+    button.disabled = true;
+    try {
+      const fresh = P().split(await P().loadAll(),[student])[sid];
+      const current = P().calc({...fresh,settings:settings()});
+      if (Math.round(current.debt*100)!==cents) ctx.toast('Сумма долга изменилась. Проверьте обновлённые оплаты.');
+      else {
+        await P().addPayments(await debtPayments(sid,current));
+        ctx.toast('Засчитано '+singleMoney(cents/100));
+      }
+      if (st.bulk?.sid===sid) st.bulk = null;
+    } catch (e) {
+      ctx.toast(e.raw?.code==='23505' ? 'Оплата уже изменилась. Проверьте остаток долга.' : 'Не удалось засчитать оплаты: '+e.message);
+    } finally {
+      try { await load(); } finally { pendingPayments.delete(sid); }
+    }
   }
 
   function bulkFormHtml(draft){
@@ -882,6 +950,13 @@
   }
 
   function bindOverview(){
+    host.querySelectorAll('[data-pay-settle]').forEach(button=>button.addEventListener('click',()=>settleDebt(button)));
+    host.querySelectorAll('[data-pay-hide-student], [data-pay-restore-student]').forEach(button=>button.addEventListener('click',()=>{
+      const hide = button.hasAttribute('data-pay-hide-student');
+      const sid = hide ? button.dataset.payHideStudent : button.dataset.payRestoreStudent;
+      void runPack(button,'student:'+sid,()=>savePayMap('hiddenPackStudents',sid,hide),
+        hide ? 'Ученик скрыт из абонементов' : 'Ученик возвращён в абонементы');
+    }));
     host.querySelectorAll('[data-pay-bulk]').forEach(button=>button.addEventListener('click',()=>{
       const sid = button.dataset.payBulk;
       if (st.bulk?.pending) return;

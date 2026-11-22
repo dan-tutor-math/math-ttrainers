@@ -242,6 +242,8 @@
 .pay-archive-action{justify-self:end;}
 .pay-entry>div{min-width:0;overflow-wrap:anywhere;}
 .pay-entry .pay-identity{display:flex;flex-direction:column;align-items:flex-start;gap:5px;font-weight:650;}
+.pay-pack-name{display:flex;align-items:center;gap:5px;max-width:100%;}
+.pay-pack-name .sc-rm{flex-shrink:0;}
 .pay-ledger .pay-identity .nm{min-width:0;font-size:1.125rem;line-height:1.25;color:var(--pencil);}
 .pay-identity .btn{padding:5px 8px;}
 .pay-entry .pay-debt{font-size:.875rem;}

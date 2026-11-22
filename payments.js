@@ -224,7 +224,7 @@
     lines.forEach(ln => {
       if (ln.money == null) return;
       const previous = balance;
-      balance += ln.money;
+      balance = (Math.round(balance*100) + Math.round(ln.money*100))/100;
       // При отключённых долгах занятие расходует уже внесённый аванс,
       // а будущий платёж остаётся доступен для следующих занятий.
       if (ignoreSingleDebt) balance = Math.max(0, balance);
@@ -336,7 +336,8 @@
   }
   const addPayment = f => run(need().from('payments').insert(cleanPay(f)).select(PAY_COLS).single());
   // Конфликт по занятию откатывает весь INSERT за период.
-  const addPayments = records => run(need().from('payments').insert(records.map(cleanPay)));
+  const addPayments = records => run(need().from('payments').insert(
+    records.map(record=>record.id ? {...cleanPay(record),id:record.id} : cleanPay(record)), {defaultToNull:false}));
   const updatePayment = (id, f) => run(need().from('payments').update(cleanPay(f)).eq('id', id).select(PAY_COLS).single());
   const deletePayment = id => run(need().from('payments').delete().eq('id', id));
   // ставка с даты: та же дата — правим строку (unique student_id + valid_from)
