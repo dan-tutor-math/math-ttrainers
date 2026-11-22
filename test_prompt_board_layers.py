@@ -216,6 +216,45 @@ def run():
         r.flush("a"); S.wait_for_timeout(400)
         s_img = ",".join(i for i in cid(S).split(",") if i != "pen")
         check("облако: Ctrl+Z доезжает до второго", s_img == "A,B,C", cid(S))
+
+        # ── 8. подъём карточки кликом и его отмена (своя и общая доска) ──
+        cards = [task("low", 100, 100), task("top", 100, 160)]
+        CLICK = """() => { const r = document.getElementById('boardCv').getBoundingClientRect();
+            const p = worldToScreen({ x: 300, y: 130 }); return { x: r.x + p.x, y: r.y + p.y }; }"""
+        cards_ids = lambda page: page.evaluate("() => getCurrentBoard().objects.map(o => o.id).join()")
+        L = open_board(browser, "T", cards, cloud=False)
+        L.on("pageerror", lambda e: errors.append(str(e)))
+        L.evaluate("() => { tool = 'hand'; setZoom(1, 300, 230, cssW / 2, cssH / 2); }")
+        L.wait_for_timeout(200)
+        pt = L.evaluate(CLICK)
+        L.mouse.click(pt["x"], pt["y"]); L.wait_for_timeout(300)
+        check("своя: клик поднял нижнюю карточку", cards_ids(L) == "top,low", cards_ids(L))
+        L.keyboard.press("Control+z"); L.wait_for_timeout(200)
+        check("своя: Ctrl+Z опустил её обратно", cards_ids(L) == "low,top", cards_ids(L))
+        T2 = open_board(browser, "T", cards)
+        S2 = open_board(browser, "S", cards)
+        for pg2 in (T2, S2):
+            pg2.on("pageerror", lambda e: errors.append(str(e)))
+            pg2.evaluate("() => { tool = 'hand'; setZoom(1, 300, 230, cssW / 2, cssH / 2); }")
+        T2.wait_for_timeout(200)
+        r2 = Relay(T2, S2)
+        pt = T2.evaluate(CLICK)
+        T2.mouse.click(pt["x"], pt["y"]); T2.wait_for_timeout(1200)
+        r2.flush("a"); S2.wait_for_timeout(400)
+        check("общая: подъём кликом у обоих", cards_ids(T2) == cards_ids(S2) == "top,low", f"{cards_ids(T2)} {cards_ids(S2)}")
+        T2.keyboard.press("Control+z"); T2.wait_for_timeout(1200)
+        r2.flush("a"); S2.wait_for_timeout(400)
+        check("общая: Ctrl+Z опустил карточку у обоих", cards_ids(T2) == cards_ids(S2) == "low,top", f"{cards_ids(T2)} {cards_ids(S2)}")
+        # ученица с правом «только свои объекты» кликает по карточке учителя:
+        # только у себя, без записи (в стенде оба — владельцы, права задаём руками)
+        S2.evaluate("() => { boardAccess = 'own'; boardUserId = 'S'; }")
+        n0 = len(S2.evaluate("() => window.__fake.sent"))
+        # её «рука» чужое не берёт, подъём идёт кликом по полю карточки — тот же вызов
+        S2.evaluate("() => raiseTaskCard('low')"); S2.wait_for_timeout(1200)
+        check("ученица: чужая карточка поднимается у неё на экране", cards_ids(S2) == "top,low", cards_ids(S2))
+        sent = S2.evaluate("() => window.__fake.sent")[n0:]
+        check("ученица: ничего не отправлено", not any("low" in str(m) or "top" in str(m) for m in sent),
+              str([m.get("event") for m in sent]))
         check("ошибок страниц нет", not errors, str(errors))
         browser.close()
     print("ГОТОВО" if not failures else f"ПРОВАЛЕНО: {failures}")

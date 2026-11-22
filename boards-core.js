@@ -9311,40 +9311,16 @@ function applyLayerOrder(arr){
 window.boardsApplyLayerOrder = applyLayerOrder;
 // Клик по карточке задания (по картинке на холсте или по её полю) поднимает её
 // над теми, кто её закрывает. Поднимаем, только если сверху действительно лежит
-// другое изображение: пустые подъёмы не нужны. Один клик — одна правка (один
-// pushUndo/saveDB), а не по записи на движение. Закрывающим карточкам без zr
-// тоже ставим zr (по их текущему месту), иначе подъём нечем сравнить с ними;
-// это разовая запись у таких карточек. Если среди них есть чужая (mayTouch),
-// писать нельзя — порядок меняется только на этом экране
+// другое изображение: пустые подъёмы не нужны. Это то же «Поверх всех», что в
+// меню слоёв (moveLayer ниже): раньше подъём писал zr сам, и на общей доске
+// Ctrl+Z не опускал карточку без прежнего zr — отмена снимала zr и оставляла
+// её наверху. Теперь подготовка и отмена — общие с меню. Чужую карточку
+// (mayTouch) записать нельзя — порядок меняется только на этом экране
 function raiseTaskCard(id){
   if (!B || !Array.isArray(B.objects)) return false;
-  const i = B.objects.findIndex(o => o.id === id);
-  if (i < 0 || i === B.objects.length - 1) return false;
-  const o = B.objects[i];
-  if (o.type !== 'image' || !o.points || !o.points[0] || !(o.task || o.gen)) return false;
-  const x0 = o.points[0].x, y0 = o.points[0].y;
-  const above = [];
-  B.objects.forEach((q, qi) => {
-    if (qi > i && q.type === 'image' && q.points && q.points[0] &&
-        q.points[0].x < x0 + o.w && q.points[0].x + q.w > x0 && q.points[0].y < y0 + o.h && q.points[0].y + q.h > y0) above.push(q);
-  });
-  if (!above.length) return false;
-  const targets = [o].concat(above.filter(q => typeof q.zr !== 'number'));
-  if (!targets.every(mayTouch)){
-    // только у себя: без записи
-    B.objects.splice(i, 1); B.objects.push(o);
-    scheduleRedraw();
-    return true;
-  }
-  pushUndo({ ids: targets.map(q => q.id) });
-  let top = B.objects.length;
-  B.objects.forEach(q => { if (typeof q.zr === 'number' && q.zr > top) top = q.zr; });
-  B.objects.forEach((q, qi) => { if (targets.includes(q) && q !== o) q.zr = qi + 1; });
-  o.zr = top + 1;
-  applyLayerOrder(B.objects);
-  saveDB();
-  scheduleRedraw();
-  return true;
+  const o = B.objects.find(q => q.id === id);
+  if (!o || o.type !== 'image' || !o.points || !o.points[0] || !(o.task || o.gen)) return false;
+  return moveLayer('front', [o], true);
 }
 /* ═══ Порядок слоёв из меню выделения: «Вперёд», «Назад», «Поверх всех»,
    «Под всеми» (как в PowerPoint). Работает только среди изображений и
@@ -9406,8 +9382,9 @@ function layerFillZr(arr, need, zrOf){
 }
 // План перестановки: новый порядок участников на их же местах в B.objects
 // и новые zr. null — переставлять нечего (уже сверху / снизу / не с кем)
-function layerPlan(dir){
-  const sel = layerSelected();
+function layerPlan(dir, own){
+  // own — свои объекты вместо выделения (подъём карточки кликом)
+  const sel = own ? own.filter(layerParticipant) : layerSelected();
   if (!sel.length) return null;
   const arr = B.objects;
   const selSet = new Set(sel);
@@ -9471,17 +9448,20 @@ function layerRefill(arr, ids){
   if (list.length !== slots.length) return;
   slots.forEach((s, k) => { arr[s] = list[k]; });
 }
-function moveLayer(dir){
-  if (!B || !Array.isArray(B.objects) || !mayDraw()) return false;
+// own — объекты вместо выделения, quiet — не трогать меню (подъём кликом)
+function moveLayer(dir, own, quiet){
+  if (!B || !Array.isArray(B.objects)) return false;
+  // просмотр: подъём кликом раньше работал и у зрителя (только на экране)
+  if (!mayDraw() && !own) return false;
   applyLayerOrder(B.objects);   // массив и zr должны совпадать до расчёта
-  const plan = layerPlan(dir);
+  const plan = layerPlan(dir, own);
   if (!plan) return false;
   const prepObjs = Array.from(plan.prep.keys());
-  if (!prepObjs.every(mayTouch)){
-    // перекрывающая картинка без zr — чужая, записать ей zr нельзя.
-    // Как у подъёма карточки: переставляем только на этом экране
+  if (!mayDraw() || !plan.sel.every(mayTouch) || !prepObjs.every(mayTouch)){
+    // чужая карточка или перекрывающая чужая картинка без zr — записать
+    // нельзя. Переставляем только на этом экране
     plan.next.forEach((o, i) => { B.objects[i] = o; });
-    scheduleRedraw(); updateContextMenu();
+    scheduleRedraw(); if (!quiet) updateContextMenu();
     return true;
   }
   const selIds = plan.sel.map(o => o.id);
@@ -9508,7 +9488,7 @@ function moveLayer(dir){
   plan.next.forEach((o, i) => { B.objects[i] = o; });
   saveDB();
   scheduleRedraw();
-  updateContextMenu();
+  if (!quiet) updateContextMenu();
   return true;
 }
 window.boardsMoveLayer = moveLayer;
