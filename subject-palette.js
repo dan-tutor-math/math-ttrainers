@@ -46,22 +46,22 @@
   // подсветок, blob — цветное пятно фона. В тёмной теме тон светлее, чтобы
   // белый текст на акцентной кнопке читался так же
   var P = {
-    math: { title: 'Математика',
+    math: { title: 'Математика', color: 'Синий',
       l: { ink: '#004C99', act: '#003A75', ink2: '#1E6FC2', rgb: '0,76,153',    blob: 'rgba(120,150,255,.16)' },
       d: { ink: '#2E7DE0', act: '#4A93F0', ink2: '#79ADF0', rgb: '46,125,224',  blob: 'rgba(90,110,255,.22)' } },
-    inf:  { title: 'Информатика',
+    inf:  { title: 'Информатика', color: 'Бирюзовый',
       l: { ink: '#0B6577', act: '#08505E', ink2: '#1592A5', rgb: '11,101,119',  blob: 'rgba(21,146,165,.16)' },
       d: { ink: '#2FA3B5', act: '#4DB8C8', ink2: '#7FD0DC', rgb: '47,163,181',  blob: 'rgba(47,163,181,.22)' } },
-    phys: { title: 'Физика',
+    phys: { title: 'Физика', color: 'Оранжевый',
       l: { ink: '#A3480F', act: '#843A0C', ink2: '#C8621F', rgb: '163,72,15',   blob: 'rgba(200,98,31,.16)' },
       d: { ink: '#D9773A', act: '#E58C52', ink2: '#F0AE80', rgb: '217,119,58',  blob: 'rgba(217,119,58,.22)' } },
-    rus:  { title: 'Русский',
+    rus:  { title: 'Русский', color: 'Красный',
       l: { ink: '#9E2A47', act: '#7E1F37', ink2: '#C2405F', rgb: '158,42,71',   blob: 'rgba(194,64,95,.16)' },
       d: { ink: '#C9506E', act: '#D86A86', ink2: '#ED8DA5', rgb: '210,90,118',  blob: 'rgba(210,90,118,.22)' } },
-    soc:  { title: 'Обществознание',
+    soc:  { title: 'Обществознание', color: 'Зелёный',
       l: { ink: '#17694F', act: '#10523D', ink2: '#24896A', rgb: '23,105,79',   blob: 'rgba(36,137,106,.16)' },
       d: { ink: '#2F8F70', act: '#3FA584', ink2: '#78CBB0', rgb: '58,158,126',  blob: 'rgba(58,158,126,.22)' } },
-    eng:  { title: 'Английский',
+    eng:  { title: 'Английский', color: 'Фиолетовый',
       l: { ink: '#5B3596', act: '#47287A', ink2: '#7A52B8', rgb: '91,53,150',   blob: 'rgba(122,82,184,.16)' },
       d: { ink: '#8462C8', act: '#9878D6', ink2: '#BAA0ED', rgb: '148,116,208', blob: 'rgba(148,116,208,.22)' } }
   };
@@ -446,7 +446,8 @@
   /* ── пункт «Цвет» в меню «⋯» (главная, доски) ── */
   function label() {
     var c = choice();
-    return 'Цвет: ' + (c === 'auto' ? 'по предмету' : P[c].title.toLowerCase());
+    // цвет называем цветом, а не предметом (просьба Даниила 22.11)
+    return 'Цвет: ' + (c === 'auto' ? 'по предмету' : P[c].color.toLowerCase());
   }
   function mountMenuItem() {
     if (!window.MathhMenu || !document.querySelector('.lg-menu') || document.getElementById('paletteToggle')) return;
@@ -480,7 +481,7 @@
   else window.addEventListener('load', function () { setTimeout(mountMenuItem, 0); });
 
   window.MathhPalette = {
-    subjects: ORDER.map(function (id) { return { id: id, title: P[id].title, color: P[id].l.ink }; }),
+    subjects: ORDER.map(function (id) { return { id: id, title: P[id].title, colorName: P[id].color, color: P[id].l.ink }; }),
     current: current, choice: choice, native: native, choose: choose, mainSubject: mainSubject,
     setRemote: setRemote, refresh: apply,
     // цвета для содержимого слайда (фигуры, шапка таблицы в презентациях):
@@ -491,7 +492,7 @@
       var id = current();
       if (id === 'math') return null;
       var c = P[id].l;
-      return { fill: c.ink, line: c.act, soft: mix('#FFFFFF', c.ink, 0.15), border: mix('#FFFFFF', c.ink, 0.45), title: P[id].title };
+      return { fill: c.ink, line: c.act, soft: mix('#FFFFFF', c.ink, 0.15), border: mix('#FFFFFF', c.ink, 0.45), title: P[id].color };
     },
     onChange: function (fn) { subs.push(fn); }
   };

@@ -576,12 +576,14 @@ const passwordForm = $('cabPasswordForm');
 const paletteBox = $('cabPalettes');
 // «По предмету» (neutral) — цвет тренажёра, а доски и кабинет — цвет последнего
 // открытого предмета; выбранный предмет красит весь сайт (subject-palette.js)
-const palettes = [{ id: 'neutral', title: 'По предмету', color: '' }, ...(window.MathhCatalog?.subjects || [])];
+// названия — цветом («Синий»), предмет — во всплывающей подсказке
+const palettes = [{ id: 'neutral', title: 'По предмету', color: '' },
+  ...(window.MathhPalette?.subjects || []).map(s => ({ id: s.id, title: s.colorName, color: s.color, hint: s.title }))];
 let settingsRequest = null;
 let paletteSave = Promise.resolve();
 
-paletteBox.innerHTML = palettes.map(({ id, title, color }) =>
-  '<button type="button" data-palette="' + esc(id) + '">' +
+paletteBox.innerHTML = palettes.map(({ id, title, color, hint }) =>
+  '<button type="button" data-palette="' + esc(id) + '"' + (hint ? ' title="Цвет предмета «' + esc(hint) + '»"' : '') + '>' +
   '<span class="cab-swatch" aria-hidden="true"' + (color ? ' style="--swatch:' + esc(color) + '"' : '') +
   '></span>' + esc(title) + '</button>').join('');
 

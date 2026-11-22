@@ -152,10 +152,10 @@ def run():
         check("G1 пункт «Цвет: по предмету»", label() == "Цвет: по предмету", label())
         pg.click("#lgMenuToggle")
         pg.click("#paletteToggle")
-        check("G2 первый щелчок — математика", label() == "Цвет: математика" and pg.evaluate("localStorage.getItem('mathh:palette')") == "math", label())
+        check("G2 первый щелчок — синий", label() == "Цвет: синий" and pg.evaluate("localStorage.getItem('mathh:palette')") == "math", label())
         pg.click("#paletteToggle")
-        check("G3 второй — информатика, интерфейс перекрашен",
-              label() == "Цвет: информатика" and pg.evaluate(INK) == "#0B6577", f"{label()} {pg.evaluate(INK)}")
+        check("G3 второй — бирюзовый, интерфейс перекрашен",
+              label() == "Цвет: бирюзовый" and pg.evaluate(INK) == "#0B6577", f"{label()} {pg.evaluate(INK)}")
         pg.goto(BASE + "lcm.html")
         pg.wait_for_function("window.MathhPalette")
         check("G4 выбор действует на тренажёре", pg.evaluate(INK) == "#0B6577", pg.evaluate(INK))
@@ -165,6 +165,8 @@ def run():
         txt = pg.evaluate("document.getElementById('cabPaletteLabel').textContent")
         first = pg.evaluate("document.querySelector('#cabPalettes button').textContent")
         check("H кабинет: «Цвет интерфейса» / «По предмету»", txt == "Цвет интерфейса" and first == "По предмету", f"{txt} {first}")
+        names = pg.evaluate("[...document.querySelectorAll('#cabPalettes button')].slice(1).map(b => b.textContent)")
+        check("H2 цвета названы цветом", names == ["Синий", "Бирюзовый", "Оранжевый", "Красный", "Зелёный", "Фиолетовый"], names)
 
         # J
         open_("soc_oge.html", theme="dark")

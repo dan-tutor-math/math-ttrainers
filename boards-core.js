@@ -1703,6 +1703,9 @@ try {
 function resolveColor(tok){
   // Промпт №87: на тёмной подложке слайда перо по умолчанию светлое
   if (tok === '--pencil' && typeof deckInkOnDark !== 'undefined' && deckInkOnDark) return DECK_DARK_INK;
+  // перо по умолчанию — по цвету холста, а не темы: иначе в тёмной теме на
+  // белом холсте (board-canvas.js) оно рисовало бы белым
+  if (tok === '--pencil' && window.BoardCanvas){ const ink = window.BoardCanvas.ink(); if (ink) return ink; }
   if (typeof tok === 'string' && tok.indexOf('--') === 0) return themeVar(tok) || '#000';
   return tok || '#000';
 }
@@ -4075,7 +4078,7 @@ function bcKey(liveFrom){
   let twp = '';
   if (taskWidthPreview.size) taskWidthPreview.forEach((v, id) => { twp += id + JSON.stringify(v); });
   return [B.id, document.documentElement.getAttribute('data-theme') || '', dpr, cssW, cssH, editing, bx, twp,
-    B.gridColor || '', B.cellSize, B.sheetCols, B.sheetRows, B.showPageNumbers ? 1 : 0,
+    B.gridColor || '', window.BoardCanvas ? window.BoardCanvas.key() : '', B.cellSize, B.sheetCols, B.sheetRows, B.showPageNumbers ? 1 : 0,
     liveFrom < B.objects.length ? 'L' + liveFrom : ''].join('|');
 }
 // в кеше ровно те объекты, что сейчас в B.objects (до liveFrom), — по ссылкам
@@ -4391,8 +4394,11 @@ function applyTextEditorLiveStyle(){
 // проводил бы все линии сетки по всему кешу, хотя видна лишь его часть
 function drawSheetsAndGrid(c, camv, w, h, region){
   // свой цвет клетки (настройки листа) — если не выбран, берём цвет по теме
-  const gridColor = B.gridColor ? resolveColor(B.gridColor) : themeVar('--grid');
-  const paperColor = themeVar('--paper');
+  // цвет холста (board-canvas.js): по умолчанию белый при любой теме;
+  // null — «как тема», тогда бумага и клетка из темы, как было
+  const cv = window.BoardCanvas;
+  const gridColor = B.gridColor ? resolveColor(B.gridColor) : ((cv && cv.grid()) || themeVar('--grid'));
+  const paperColor = (cv && cv.paper()) || themeVar('--paper');
   const tw = totalW(), th = totalH();
 
   const p0 = worldToScreen({ x: 0, y: 0 });

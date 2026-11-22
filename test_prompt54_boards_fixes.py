@@ -176,15 +176,17 @@ def run():
         check("5. запомненный вид дошёл до диска", disk_view and abs(disk_view["y"] - after_mem["y"]) < 1e-6)
 
         # ── 6. кэш цветов темы сбрасывается при смене темы ─────────────
+        # проверяем по --ink: перо по умолчанию (--pencil) с 22.11 берёт цвет
+        # от холста (board-canvas.js, белый при любой теме), а не от темы
         colors = page.evaluate("""async () => {
-            const a = resolveColor('--pencil');
+            const a = resolveColor('--ink');
             const was = document.documentElement.getAttribute('data-theme');
             document.documentElement.setAttribute('data-theme', was === 'dark' ? 'light' : 'dark');
             await new Promise(r => setTimeout(r, 0));
-            const b = resolveColor('--pencil');
+            const b = resolveColor('--ink');
             document.documentElement.setAttribute('data-theme', was);
             await new Promise(r => setTimeout(r, 0));
-            const c = resolveColor('--pencil');
+            const c = resolveColor('--ink');
             return [a, b, c];
         }""")
         check("6. цвет темы меняется вместе с темой и возвращается", colors[0] != colors[1] and colors[0] == colors[2])
