@@ -25,6 +25,9 @@
      его, главная на новом устройстве открывается им; блок в кабинете
   L. презентации: новая фигура и шапка таблицы — цветом предмета, первый
      быстрый стиль — предмет; у математики — прежний синий Office
+  M. шрифты на цветных тёмных темах: цветной текст, белый на цветных
+     кнопках и серый — не ниже 4,5 (до правки 3,2–4,3); светлая тема и
+     тёмная математика — без изменений
   I. без ошибок в консоли
 
 Запуск: python3 test_prompt_subject_palette.py
@@ -90,7 +93,8 @@ def run():
         ink, attr = open_("soc_oge.html")
         check("A1 обществознание зелёное (своя палитра страницы)", ink == "#17694F" and attr is None, f"{ink} {attr}")
         ink, attr = open_("soc_oge.html", theme="dark")
-        check("A2 обществознание в тёмной теме", ink == "#2F8F70", ink)
+        # заливка в тёмной теме затемнена до белого текста ≥ 4,6 (пункт M)
+        check("A2 обществознание в тёмной теме", ink == "#2B8367", ink)
         ink, attr = open_("lcm.html")
         check("A3 математика без перекрытия", ink == "#004C99" and attr is None, f"{ink} {attr}")
         ink, attr = open_("rus_oge.html")
@@ -104,7 +108,7 @@ def run():
         ink, attr = open_("rus_oge.html", {"mathh:palette": "math"})
         check("B2 русский в палитре математики", ink == "#004C99" and attr == "math", f"{ink} {attr}")
         ink, _ = open_("lcm.html", {"mathh:palette": "rus"}, theme="dark")
-        check("B3 тёмная тема палитры русского", ink == "#C9506E", ink)
+        check("B3 тёмная тема палитры русского", ink == "#C74868", ink)
 
         # C
         auth = json.dumps({"user": {"id": "u1"}})
@@ -215,6 +219,43 @@ def run():
         check("L3 первый быстрый стиль — русский", q0 == "#9E2A47", q0)
         fill, hdr, q0 = deck_shape({})
         check("L4 у математики — синий Office", fill == "#4472C4" and hdr == "#4472C4" and q0 == "#4472C4", f"{fill} {hdr} {q0}")
+
+        # M
+        MIN_CR = r"""() => {
+          const parse = c => { const m = c.match(/[\d.]+/g); return m ? m.map(Number).concat(m.length === 3 ? [1] : []) : null; };
+          const lin = v => { v /= 255; return v <= .04045 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); };
+          const L = c => .2126 * lin(c[0]) + .7152 * lin(c[1]) + .0722 * lin(c[2]);
+          const over = (t, b) => [0,1,2].map(i => t[i] * t[3] + b[i] * (1 - t[3])).concat([1]);
+          const hx = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+          const root = [1,3,5].map(i => parseInt(hx.slice(i, i + 2), 16)).concat([1]);
+          let worst = 99, what = '';
+          const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); let n;
+          while ((n = w.nextNode())) {
+            const t = n.textContent.trim(); if (t.length < 2 || /[\u2600-\u27ff\ud83c-\ud83e]/.test(t)) continue;
+            const el = n.parentElement, r = el.getBoundingClientRect();
+            if (!r.width || r.bottom < 0 || r.top > innerHeight) continue;
+            const cs = getComputedStyle(el); if (cs.visibility === 'hidden' || +cs.opacity === 0) continue;
+            const chain = []; for (let e = el; e && e.nodeType === 1; e = e.parentElement) chain.push(e);
+            let bg = root.slice();
+            for (let i = chain.length - 1; i >= 0; i--) { const b = parse(getComputedStyle(chain[i]).backgroundColor); if (b && b[3] > 0) bg = over(b, bg); }
+            const fg = over(parse(cs.color), bg);
+            const c = (Math.max(L(fg), L(bg)) + .05) / (Math.min(L(fg), L(bg)) + .05);
+            if (c < worst) { worst = c; what = t.slice(0, 20); }
+          }
+          return [Math.round(worst * 100) / 100, what];
+        }"""
+        for page, pal in (("lcm.html", "rus"), ("lcm.html", "soc"), ("lcm.html", "eng"), ("lcm.html", "phys"),
+                          ("soc_oge.html", None), ("index.html?subject=rus", None)):
+            open_(page, {"mathh:palette": pal} if pal else {}, theme="dark")
+            pg.wait_for_timeout(500)
+            worst, what = pg.evaluate(MIN_CR)
+            check(f"M1 {page} {pal or ''} тёмная: весь текст ≥ 4,5", worst >= 4.5, f"{worst} «{what}»")
+        open_("lcm.html", {"mathh:palette": "rus"})
+        lab = pg.evaluate("getComputedStyle(document.querySelector('.calc-tool-btn, .ans-label, label') || document.body).color")
+        check("M2 светлая тема: --ink-text не задан, цвет как был", pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--ink-text').trim()") == "", lab)
+        open_("lcm.html", theme="dark")
+        check("M3 тёмная математика без изменений", pg.evaluate(INK) == "#2E7DE0" and
+              pg.evaluate("getComputedStyle(document.documentElement).getPropertyValue('--ink-text').trim()") == "", pg.evaluate(INK))
 
         br.close()
     check("I без ошибок на страницах", not errors, "; ".join(errors[:3]))

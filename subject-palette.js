@@ -127,6 +127,30 @@
   function hexOf(rgb) {
     return '#' + rgb.split(',').map(function (v) { v = +v; return (v < 16 ? '0' : '') + v.toString(16); }).join('').toUpperCase();
   }
+  function hex2(h, s, l) {
+    var c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+    var seg = Math.floor(h / 60) % 6;
+    var rr = [c, x, 0, 0, x, c][seg], gg = [x, c, c, x, 0, 0][seg], bb = [0, 0, x, c, c, x][seg];
+    return hexOf([rr, gg, bb].map(function (v) { return Math.round((v + m) * 255); }).join(','));
+  }
+  // относительная яркость и контраст по WCAG — тот же расчёт, что в тесте
+  function lum(hex) {
+    var n = parseInt(hex.slice(1), 16);
+    return [n >> 16 & 255, n >> 8 & 255, n & 255].map(function (v, i) {
+      v /= 255; v = v <= .04045 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4);
+      return v * [.2126, .7152, .0722][i];
+    }).reduce(function (a, b) { return a + b; });
+  }
+  function cr(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); }
+  // двигаем светлоту цвета (оттенок тот же), пока контраст с ref не станет ≥ goal
+  function reach(hex, ref, goal, dir) {
+    var t = hsl(hex), l = t[2], out = hex;
+    for (var i = 0; i < 100 && cr(out, ref) < goal; i++) {
+      l = Math.min(1, Math.max(0, l + dir * 0.01));
+      out = hex2(t[0], t[1], l);
+    }
+    return out;
+  }
   var NIGHT = {}; // id → { bg: '#…' } для meta theme-color
   function nightVars(id) {
     // тёплые (русский, физика) приглушаем сильнее: красно-коричневые панели
@@ -136,8 +160,32 @@
     var bg = hexOf(T('11,14,26'));
     NIGHT[id] = { bg: bg };
     var menu = 'rgb(' + T('30,37,64') + ')';
+    /* Шрифты контрастнее (просьба Даниила 22.11: на цветных тёмных темах
+       читалось плохо). Замеры до правки: цветной текст 3,5–3,9, белый текст
+       на цветной кнопке 3,2–4,3 (физика хуже всего), серый 5–6,9. Одним
+       цветом предмета оба случая не вытянуть: светлее — лучше текст, но
+       хуже белое на кнопке. Поэтому два тона: --ink (заливка) темнее, чтобы
+       белому было ≥ 4,6, и --ink-text светлее для цветного текста, ≥ 5,2 на
+       самой светлой панели. Правила с color: var(--ink) переводятся на него
+       ниже (retargetInkText). Серый — до ≥ 7 на карточке */
+    var lightest = hexOf(T('46,53,84')), cardC = hexOf(T('30,37,64'));
+    var fill = reach(P[id].d.ink, '#FFFFFF', 4.6, -1);
+    // 5,2 на самой светлой панели (на карточке выходит ~6): выше — текст
+    // становится почти белым и теряет цвет предмета; насыщенность поднимаем,
+    // чтобы осветлённый тон оставался узнаваемым
+    var t0 = hsl(P[id].d.ink);
+    var text = reach(hex2(t0[0], Math.max(t0[1], 0.75), t0[2]), lightest, 5.2, +1);
+    var mutedA = reach('#9A9AA2', cardC, 7, +1), mutedB = reach('#AEAEB4', cardC, 8.5, +1);
+    var ink = { fill: fill, text: text, act: hex2(hsl(fill)[0], hsl(fill)[1], Math.max(0, hsl(fill)[2] - .06)) };
+    NIGHT[id].ink = ink;
     return {
       vars: [
+        '--ink:' + fill, '--ink-active:' + ink.act, '--ink-text:' + text, '--ink-2:' + text,
+        '--ej-ink:' + text, '--lesson-action-bg:' + fill,
+        // зелёная кнопка «верно» (Хватит, Проверено) — тоже белый текст поверх
+        '--ok:' + reach('#3E8E5B', '#FFFFFF', 4.6, -1),
+        '--muted-1:' + mutedA, '--muted-2:' + mutedA, '--muted-6:' + mutedA, '--muted-8:' + mutedA,
+        '--muted-3:' + mutedB, '--muted-4:' + reach('#C7C7CC', cardC, 10, +1),
         '--bg:' + bg, '--paper:' + hexOf(T('21,26,44')),
         '--card:rgba(' + T('30,37,64') + ',.82)', '--glass:rgba(' + T('40,46,74') + ',.5)',
         '--glass-strong:rgba(' + T('46,53,84') + ',.65)', '--muted-7:' + hexOf(T('58,63,85')),
@@ -163,6 +211,59 @@
   style.id = 'mathh-palette';
   style.textContent = css;
   (document.head || root).appendChild(style);
+
+  /* ── цветной текст — светлым тоном (--ink-text) ──
+     Цвет предмета служит и заливкой кнопок (белый текст поверх), и цветом
+     текста. В тёмной теме этим ролям нужны разные тона, а правил с
+     «color: var(--ink)» — сотни в десятках страниц. Поэтому не правим
+     файлы, а один раз проходим по готовым стилям и меняем в таких правилах
+     цвет на var(--ink-text, var(--ink)). --ink-text задан только в тёмной
+     теме цветных предметов, в остальных случаях подставится тот же --ink —
+     ничего не меняется. Правило, где фон тоже --ink, не трогаем: там текст
+     поверх заливки. Пропущенное место (стиль, вписанный прямо в элемент)
+     остаётся каким было, хуже не становится */
+  var INK_RE = /^var\(\s*--ink\s*(,[^)]*)?\)$/;
+  function retargetRules(rules) {
+    for (var i = 0; i < rules.length; i++) {
+      var r = rules[i];
+      if (r.cssRules && !r.selectorText) { retargetRules(r.cssRules); continue; }
+      if (!r.style || !r.selectorText) continue;
+      var c = r.style.getPropertyValue('color').trim();
+      if (!INK_RE.test(c)) continue;
+      var b = r.style.getPropertyValue('background') + r.style.getPropertyValue('background-color');
+      if (b.indexOf('--ink') >= 0) continue;
+      r.style.setProperty('color', 'var(--ink-text, ' + c + ')', r.style.getPropertyPriority('color'));
+    }
+  }
+  function retargetInkText() {
+    for (var i = 0; i < document.styleSheets.length; i++) {
+      var sh = document.styleSheets[i], rules = null;
+      try { rules = sh.cssRules; } catch (e) { continue; } // чужой домен — не читается
+      if (rules) retargetRules(rules);
+    }
+  }
+  // стили досок, презентаций и сессии добавляются скриптами позже — проход
+  // повторяем (он идемпотентен: переведённое правило уже не совпадает с INK_RE)
+  var retT = 0;
+  function retargetSoon() { clearTimeout(retT); retT = setTimeout(retargetInkText, 30); }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', retargetInkText);
+  else retargetInkText();
+  window.addEventListener('load', retargetInkText);
+  // следим только за прямыми детьми <head> и <body> — туда скрипты кладут
+  // свои <style>; всё дерево не слушаем: на досках узлы меняются постоянно
+  var styleObs = null;
+  try {
+    styleObs = new MutationObserver(function (list) {
+      for (var i = 0; i < list.length; i++) for (var j = 0; j < list[i].addedNodes.length; j++) {
+        var n = list[i].addedNodes[j];
+        if (n.nodeName === 'STYLE') retargetSoon();
+        else if (n.nodeName === 'LINK') n.addEventListener('load', retargetSoon);
+      }
+    });
+    if (document.head) styleObs.observe(document.head, { childList: true });
+    var watchBody = function () { if (document.body) styleObs.observe(document.body, { childList: true }); };
+    if (document.body) watchBody(); else document.addEventListener('DOMContentLoaded', watchBody);
+  } catch (e) {}
 
   /* ── предмет страницы ── */
   var file = (location.pathname.split('/').pop() || 'index.html').toLowerCase().replace(/\.html$/, '') || 'index';
