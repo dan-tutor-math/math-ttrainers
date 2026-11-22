@@ -54,14 +54,29 @@
     const t = String(text || '').trim();
     if (!t) return null;
     let h, m;
-    let r = t.match(/^(\d{1,2})[:.,\s](\d{1,2})$/);
-    if (r) { h = +r[1]; m = r[2].length === 1 ? +r[2] * 10 : +r[2]; }
+    // «15:» — двоеточие ставится само после часов, минуты могли не набрать
+    let r = t.match(/^(\d{1,2})[:.,\s](\d{0,2})$/);
+    if (r) { h = +r[1]; m = !r[2] ? 0 : r[2].length === 1 ? +r[2] * 10 : +r[2]; }
     else if (/^\d{1,4}$/.test(t)) {
       if (t.length <= 2) { h = +t; m = 0; }
       else if (t.length === 3) { h = +t[0]; m = +t.slice(1); }
       else { h = +t.slice(0, 2); m = +t.slice(2); }
     } else return null;
     return h >= 0 && h <= 23 && m >= 0 && m <= 59 ? h * 60 + m : null;
+  }
+
+  /* ── набор времени: двоеточие после часов ставится само ──
+     Набрали 1, 5 → «15:», дальше 3, 0 → «15:30». Час из одной цифры (3–9:
+     часа 35 не бывает) — двоеточие сразу: 9 → «9:», 3, 0 → «9:30».
+     Трогаем только набор цифр в конце поля: стирание, вставку и свои
+     разделители («15.3») оставляем как есть, чтобы не мешать править. */
+  function maskTime(value){
+    if (!/^\d{0,2}:?\d*$/.test(value)) return value;
+    const d = value.replace(':', '').slice(0, 4);
+    if (!d) return value;
+    const hl = +d[0] >= 3 || (d.length >= 2 && +d.slice(0, 2) > 23) ? 1 : 2;
+    if (d.length < hl) return d;
+    return d.slice(0, hl) + ':' + d.slice(hl, hl + 2);
   }
 
   /* ── пересечения: занятия одного дня, идущие внахлёст, — одна группа ── */
@@ -515,6 +530,10 @@
         root.addEventListener('input', e => {
           const inp = e.target.closest('.rw-in');
           if (!inp || !ed) return;
+          if (inp.dataset.field === 'time' && e.inputType === 'insertText' && inp.selectionStart === inp.value.length) {
+            const v = maskTime(inp.value);
+            if (v !== inp.value) { inp.value = v; inp.setSelectionRange(v.length, v.length); }
+          }
           ed[inp.dataset.field] = inp.value;
           ed.caret = inp.selectionStart;
           if (ed.msg) ed.msg = '';
@@ -615,5 +634,5 @@
     return C;
   }
 
-  window.ScheduleRows = { create, parseTime, clusters, icon, aggStatus, NEXT, ST_NAME, openMenu, closeMenu, menuOpenFor, hm };
+  window.ScheduleRows = { create, parseTime, maskTime, clusters, icon, aggStatus, NEXT, ST_NAME, openMenu, closeMenu, menuOpenFor, hm };
 })();

@@ -312,6 +312,10 @@ def main():
         mt = page.evaluate("""() => { const L = [{id:1,name:'Маша Иванова'},{id:2,name:'Маша Петрова'},{id:3,name:'Пётр Сидоров'}];
                                        return [Schedule.matchName('маша иванова', L).length, Schedule.matchName('Маша', L).length,
                                                Schedule.matchName('Петр', L).map(s => s.id), Schedule.matchName('Вася', L).length]; }""")
+        mk = page.evaluate("""() => { const M = ScheduleRows.maskTime, P = ScheduleRows.parseTime;
+            return [M('1'), M('15'), M('153'), M('1530'), M('9'), M('93'), M('930'), M('24'), M('09'), M('2'), M('15.3'), P('15:'), P('9:'), P('15:3')]; }""")
+        check("A7 двоеточие при наборе и разбор «15:»",
+              mk == ["1", "15:", "15:3", "15:30", "9:", "9:3", "9:30", "2:4", "09:", "2", "15.3", 900, 540, 930], str(mk))
         check("A6 поиск ученика: полное имя, неоднозначно, ё/е, нет", mt == [1, 2, [3], 0], str(mt))
 
         # ── B. «Строки»: дни карточками, строка добавляется и правится на месте
@@ -323,7 +327,14 @@ def main():
         check("B2a постоянных полей ввода нет", page.locator(".sc-days input").count() == 0)
         page.click(f".rw-add[data-add='{WEEK}']")
         focused("rw-in-time")
-        page.keyboard.type("1500")
+        tin = lambda: page.evaluate("() => document.activeElement.value")
+        page.keyboard.type("1")
+        v1 = tin()
+        page.keyboard.type("5")
+        v2 = tin()
+        page.keyboard.type("00")
+        check("B2b время: после двух цифр двоеточие само (1 → «1», 15 → «15:», 1500 → «15:00»)",
+              (v1, v2, tin()) == ("1", "15:", "15:00"), str((v1, v2, tin())))
         page.keyboard.press("Enter")
         focused("rw-in-names")
         page.keyboard.type("Маша, Петя")
