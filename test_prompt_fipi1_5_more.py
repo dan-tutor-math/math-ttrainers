@@ -128,6 +128,18 @@ def test_bank(bank):
     arch = [t for t in more if t["fipi"] in ARCH]
     check("банк: у радиуса арки в условии оба рисунка ФИПИ",
           len(arch) == 2 and all(t["prompt"].count('<img class="fipi-fig" src="oge1_5-fipi/') == 2 for t in arch))
+    # разбор бани — по шагам для ученика, который ошибся (AGENTS.md, «Разбор задания»):
+    # откуда числа и каждое действие отдельной строкой, а не сводка в одну-две строки
+    # разряды в банке — через неразрывный пробел, сравниваем с обычным
+    bath = {t["fipi"]: [l.replace("\xa0", " ") for l in t["sol"]] for t in more if t["plot"] == "bath"}
+    short = [k for k, v in bath.items() if len(v) < 3]
+    check("банк: разборы бани по шагам (не короче 3 строк)", not short, str(short))
+    check("банк: в №3 разобрано, почему печь 1 не подходит",
+          all("Печь 1 — для 8–12 куб. м: 15,4 больше 12, не подходит." in bath[k] for k in ("888F31", "908015")))
+    check("банк: в №4 скидка считается от цены отдельным действием",
+          bath["8A06F1"][-2:] == ["18 000 : 100 · 10 = 1800 руб.", "18 000 − 1800 = 16 200 руб."], str(bath["8A06F1"]))
+    check("банк: в №5 корень и ответ последней строкой",
+          bath["59DCD0"][-1] == "R = √2500 = 50 см" and bath["BE99C7"][-1] == "R = √4225 = 65 см")
     junk = [t["fipi"] for t in more if re.search(r"MsoNormal|<m:|</p>\s*<p>\s*</td>|&nbsp;|<script", t["prompt"])]
     check("банк: условие ФИПИ вычищено (без MsoNormal, MathML, скриптов)", not junk, str(junk[:3]))
 
@@ -203,6 +215,10 @@ def test_page(browser, bank):
     check("баня, задание 5: оба рисунка загрузились", len(imgs) == 2 and all(w > 0 for w in imgs), str(imgs))
     answer(page, str(EXPECT[t["fipi"]]))
     check("баня, задание 5: радиус засчитан", page.evaluate("taskAnswered"), t["fipi"])
+    page.wait_for_timeout(300)
+    ex = page.evaluate("document.getElementById('explainBox').innerText")
+    check("баня, задание 5: в разборе на странице шаги и корень KaTeX",
+          "С чертежа" in ex and "R²" in ex and page.query_selector("#explainBox .katex") is not None, ex[:200])
     check("баня: без ошибок JS", not errors, str(errors[:1]))
     ctx.close()
 
