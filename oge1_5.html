@@ -1327,7 +1327,7 @@ function fipiNoteText(task){
    иначе задание не решить. Наших заданий «на основе ФИПИ» здесь нет. */
 const PLOT_FIPI = [
   { plot: 'paper', group: '📄 Листы бумаги', title: 'Листы бумаги · задания ФИПИ' },
-  { plot: 'bath', group: '🔥 Печь для бани', title: 'Печь для бани · задания ФИПИ' },
+  { plot: 'bath', group: '🔥 Печь для бани', key: 'bath', title: 'Печь для бани · задания ФИПИ' },
   { plot: 'trip', group: '🗺️ План местности', title: 'Поездка в село · задания ФИПИ' },
   { plot: 'plan', group: '🗺️ План местности', title: 'План сельской местности · задания ФИПИ' },
   // квартира, участки, тарифы — n15_more2.py (Codex); у участков три разных сюжета
@@ -1409,7 +1409,7 @@ PLOT_FIPI.forEach(p => {
   if (vs) mode.varPlot = p.plot;
   // несколько сюжетов одной темы (поездка и план Тани — «План местности») — одна плашка
   const g = GROUPS.find(x => x.title === p.group);
-  if (g) g.modes.push(mode); else GROUPS.push({ title: p.group, modes: [mode] });
+  if (g) g.modes.push(mode); else GROUPS.push({ title: p.group, key: p.key, modes: [mode] });
   if (PLOT_FIPI_ON.indexOf(p.group) < 0) PLOT_FIPI_ON.push(p.group);
 });
 for (let i = GROUPS.length - 1; i >= 0; i--) if (!GROUPS[i].modes.length) GROUPS.splice(i, 1);
